@@ -26,6 +26,18 @@ abstract final class Routes {
   /// `ACTIVE`.
   static const home = '/';
 
+  /// ACTIVE riders: the incoming offer (04 §2.4, screen 9), while one is open.
+  static const offer = '/offer';
+
+  /// ACTIVE riders: the current task, step by step (screens 10–14). While a
+  /// task is active this is the only place the rider can be.
+  static const task = '/task';
+  static const taskScan = '/task/scan';
+  static const taskFail = '/task/fail';
+
+  static bool isTaskRoute(String location) =>
+      location == task || location.startsWith('$task/');
+
   // Dev flavor only (Phase 0 spike).
   /// Permissions gate (04 §2.1). Becomes the go-online guard in P5.
   static const permissions = '/permissions';

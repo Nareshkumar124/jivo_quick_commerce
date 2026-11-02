@@ -111,6 +111,40 @@ class OfferAlertNotifications {
     ),
   );
 
+  /// The real offer alert: same channel and flags as [showTestOffer], with
+  /// the offer's own payload (`offer:<id>`) and a timeout matching the time
+  /// the offer has left.
+  Future<void> showOffer({
+    required int offerId,
+    required String title,
+    required String body,
+    required String channelName,
+    required Duration timeout,
+  }) => _plugin.show(
+    id: offerNotificationId,
+    title: title,
+    body: body,
+    payload: '$payloadPrefix$offerId',
+    notificationDetails: NotificationDetails(
+      android: AndroidNotificationDetails(
+        channelId,
+        channelName,
+        importance: Importance.max,
+        priority: Priority.max,
+        category: AndroidNotificationCategory.alarm,
+        fullScreenIntent: true,
+        visibility: NotificationVisibility.public,
+        vibrationPattern: _vibration,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+        timeoutAfter: timeout.inMilliseconds.clamp(1000, 60000),
+        additionalFlags: Int32List.fromList(const [4]),
+      ),
+    ),
+  );
+
+  /// The notification id of real offers (one offer at a time).
+  static const offerNotificationId = 9002;
+
   /// Removes the alert and stops showing the app over the lock screen.
   Future<void> dismiss({int id = testNotificationId}) async {
     await _plugin.cancel(id: id);

@@ -36,6 +36,12 @@
         android:name="android.permission.RECEIVE_BOOT_COMPLETED"
         tools:node="remove" />
 
+    <!-- Camera for the pickup QR scan and KYC photos (CAMERA comes from
+         mobile_scanner). Optional, so Play does not hide the app on phones
+         without a camera or autofocus: the code can be typed instead. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
     <application
         android:label="${appLabel}"
         android:name="${applicationName}"

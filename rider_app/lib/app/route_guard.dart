@@ -1,3 +1,4 @@
+import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
 import 'package:jivo_core/jivo_core.dart';
 
 import '../features/auth/domain/rider_account.dart';
@@ -17,7 +18,9 @@ import 'routes.dart';
 ///    network): splash, which offers Retry;
 /// 5. optional update not dismissed: the update prompt;
 /// 6. signed out: login (the OTP step only while an OTP is pending);
-/// 7. signed in: the screen for `rider_status`. `PENDING_KYC` and
+/// 7. signed in and ACTIVE: the task screens while a task is active (or its
+///    end is unread), else the offer screen while an offer is open;
+/// 8. signed in: the screen for `rider_status`. `PENDING_KYC` and
 ///    `REJECTED` riders may also open the application steps under it
 ///    (documents, bank details); everyone else gets exactly that screen.
 String? riderRedirect({
@@ -29,6 +32,8 @@ String? riderRedirect({
   required RiderAccountState account,
   required bool hasOtpChallenge,
   required bool showDevTools,
+  bool hasRiderTask = false,
+  bool hasOffer = false,
 }) {
   if (showDevTools && Routes.isDevRoute(location)) return null;
 
@@ -53,6 +58,12 @@ String? riderRedirect({
   if (!signedIn || account is! AccountLoaded) {
     if (location == Routes.otp && hasOtpChallenge) return null;
     return _goTo(location, Routes.login);
+  }
+  if (account.riderStatus == RiderStatusEnum.ACTIVE) {
+    // One order at a time: a task (until the rider acknowledges how it
+    // ended) keeps them on the task screens, then an open offer.
+    if (hasRiderTask) return Routes.isTaskRoute(location) ? null : Routes.task;
+    if (hasOffer) return _goTo(location, Routes.offer);
   }
   final target = routeFor(destinationFor(account.riderStatus));
   if (canEditApplication(account.riderStatus) &&

@@ -9,6 +9,7 @@ import '../../../app/providers.dart';
 import '../../location/presentation/location_debug_controller.dart';
 import '../../offers/presentation/offer_alert_providers.dart';
 import '../../onboarding/presentation/onboarding_providers.dart';
+import '../../task/presentation/task_block.dart';
 import '../domain/rider_account.dart';
 import 'auth_providers.dart';
 import 'login_controllers.dart';
@@ -19,6 +20,9 @@ enum LogoutResult {
   /// The rider is online (location service running): go offline first
   /// (04 §2.9).
   blockedWhileOnline,
+
+  /// A delivery task is active: finish it first (agent rule 7).
+  blockedDuringTask,
 }
 
 final riderAccountControllerProvider =
@@ -128,6 +132,9 @@ class RiderAccountController extends Notifier<RiderAccountState> {
   /// token on the server (best effort) and ends the local session, which
   /// deletes the location buffer through the sign-out hook.
   Future<LogoutResult> logout() async {
+    if (ref.read(taskBlocksGoingOfflineProvider)) {
+      return LogoutResult.blockedDuringTask;
+    }
     if (await ref.read(locationServiceClientProvider).isRunning()) {
       return LogoutResult.blockedWhileOnline;
     }
