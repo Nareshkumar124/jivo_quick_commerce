@@ -7,6 +7,12 @@ This document says **how Phases 0–8 are built by three agents working at the s
 | `django-backend-dev` | `backend/`, `infra/`, backend CI, `backend/openapi/schema.yaml` |
 | `flutter-customer-dev` | `customer_app/`, plus the shared Flutter code in `packages/`: `jivo_core`, `jivo_api`, `tool/generate_api.sh`, the shared `analysis_options.yaml`, and the Flutter CI |
 | `flutter-rider-dev` | `rider_app/` |
+| `admin-panel-dev` (added 2026-11-02) | The admin panel UI inside `backend/`: every `apps/*/admin.py`, `apps/ops_console/`, `templates/`, `static/`, `config/admin_ui.py`, and the admin and ops tests |
+| `qa-engineer` (added 2026-11-02) | `qa/` only: test plan, test cases, reports, bug files and a black-box test suite. It never edits application code. |
+| `devops-engineer` (added 2026-11-02) | `infra/`, `.github/workflows/` (all CI/CD), `backend/Dockerfile` and `.dockerignore`, `docs/deployment.md`. Staging and production changes need the user's approval. |
+| `code-reviewer` (added 2026-11-02, read-only) | Nothing: it reviews each module branch before the PM merges it into `develop` |
+| `catalog-data` (added 2026-11-02) | `data/` (import-ready catalog files, validation reports, image manifests). Raw inputs go in gitignored `data/incoming/`. |
+| `ui-designer` (added 2026-11-02) | `design/` (design system, tokens, screen specs, prototypes, UX audits). Brand assets go in gitignored `design/incoming/`. |
 
 **Scope of this document:**
 - **What it covers:** sequencing and coordination only. The *what* of each feature stays in the feature docs (`03`–`08`).
@@ -15,6 +21,18 @@ This document says **how Phases 0–8 are built by three agents working at the s
 - **No dates or durations.** The docs give no basis for them.
 
 ---
+
+**QA track (since Phase 2).** `qa-engineer` tests continuously and independently:
+- after each agent's report: verifying the claims and running black-box API and security tests
+- at each phase gate: regression, then the release-readiness verdict
+
+Its bugs are routed by the main session into the owning agent's next fix run. Its verdict in `qa/docs/10-release-readiness-report.md` is an input to the `10 §5` gate.
+
+**Admin panel track (since Phase 2).** The Admin and Ops Console items listed under "Backend" in §3 are built by `admin-panel-dev`, in parallel with the other three agents:
+- **Start** (no dependency): layouts, components, and admin screens for models that already exist.
+- **After the backend's R2 lands the phase's models and services:** the phase's admin and ops screens.
+
+The backend agent never registers admin classes, and the admin agent never writes models, migrations or services. Each reports gaps to the other through the main session.
 
 ## 1. Principles
 
@@ -454,3 +472,81 @@ This plan relies on these changes. Until they are approved, each row's fallback 
 4. **One phase at a time.** `README.md` says work happens one phase at a time. §1.4 depends on the `10 §5.1` exception.
 5. **Missing phase files.** `docs/plan/` (the roadmap and phase files) is still missing. This document does not replace them. Each phase file still needs its task checklist, test cases, exit criteria, demo script and sign-off.
 6. **Not linked yet.** `README.md` does not link to this document.
+
+---
+
+## 9. Project management (PM operating model, added 2026-11-02)
+
+### 9.1 Roles
+- **The main session is the Project Manager and Technical Architect.** It:
+  - launches and briefs agents
+  - owns `task-tracker.md`, `plan/00-roadmap.md`, `api-requests.md`, the integration and release checklists, and the cross-cutting docs (`02` layout, this file, `CLAUDE.md`)
+  - runs the sync points, makes the commits and reports to the user
+- **Five agents** (ownership table at the top of this file):
+  - `django-backend-dev` owns the **API specification** (`06`, `backend/openapi/schema.yaml`) and the **database architecture** (`07`, all models and migrations).
+  - `admin-panel-dev`, `flutter-customer-dev` and `flutter-rider-dev` own their UIs.
+  - `qa-engineer` tests everything independently.
+
+### 9.2 Contract and consistency rules
+1. **No invented endpoints.** Only the backend agent adds or changes API endpoints. App and admin agents request them through their reports, and the PM logs each request in [`api-requests.md`](api-requests.md). An app may build against a fake (`// TODO(api)`) only when the brief explicitly says so.
+2. **No duplicate models.** Models exist only in the backend apps listed in `06 §1`, matching `07`. The admin agent never creates models; it reports gaps instead.
+3. **Common API response structure** (as shipped in Phase 1, so it stays the standard):
+   - success: the plain resource JSON body
+   - lists: `{count, next, previous, results}` with `page`/`page_size`
+   - errors: `{"error": {"code", "message", "details"}}`, with the codes in `06 §6`
+   - money: 2-decimal strings
+   - times: UTC ISO 8601
+
+   Changing this (for example to a `{success, data}` wrapper) would break both apps and needs the user's approval.
+4. **Consistent auth.**
+   - Apps: phone OTP and JWT (`06 §2.1`). Staff: Django sessions (Jivo Auth SSO in P7).
+   - Authorisation is always server-side, with requester-scoped querysets and the `05 §3` role matrix.
+5. **No overwriting.** No agent modifies another agent's files (§4). Working functionality is never removed without the PM's approval, and every change keeps the existing tests green.
+6. **Credentials.** No hard-coded credentials, ever. Secrets live only in gitignored env files and are never printed.
+7. **Honest status.** Nothing is marked done or passed without evidence: actual command output, plus QA verification for features.
+
+### 9.3 Agent report format (every run's final message)
+Every agent ends every run with these sections. The PM maps each report into [`task-tracker.md`](task-tracker.md) and [`project-status.md`](project-status.md).
+1. **Completed tasks**, with tracker IDs
+2. **Currently working**: what is still in flight, for an interim report
+3. **Pending tasks**, with the reason
+4. **Files created or modified**
+5. **APIs required**: endpoints, fields or services needed and not yet available
+6. **APIs implemented**: backend only, with operationIds and whether the schema was re-exported
+7. **Dependencies**: on other agents, the user or Jivo
+8. **Blockers**
+9. **Issues encountered**: bugs, risks, untested areas
+10. **Next planned tasks**
+
+Plus the actual test output. A task becomes **Completed** only after QA verifies it; an agent's statement is never enough.
+
+### 9.4 Git workflow (DL-24)
+```
+main      ← gated releases only. A PR from develop at each phase gate (CI green + QA "Ready")
+develop   ← stable integration branch. The PM merges reviewed module branches here. The :8001 dev server runs from it.
+<agent>/phase-N  ← one module branch per agent per phase, each checked out in its own worktree
+```
+- **Worktrees.** The PM creates and manages them under `.worktrees/` (gitignored) with `git worktree add .worktrees/<agent> -b <agent>/phase-N develop`.
+  - Agents are `backend`, `admin`, `customer`, `rider` and `qa`.
+  - Every brief gives the agent its worktree's absolute path: **all edits and commands happen there**.
+  - The backend, admin and QA worktrees symlink `backend/.env` from the main tree (secrets are never copied), then run `uv sync`. The Flutter worktrees run `flutter pub get`.
+- **Agents don't commit.** At each run boundary the PM:
+  1. **reviews** the run: its diff touches only the agent's paths, its definition-of-done output is green, and a secret scan of the diff is clean
+  2. commits it in the agent's worktree with a meaningful conventional message: `feat(backend): …`, `feat(admin): …`, `feat(customer): …`, `feat(rider): …`, `test(qa): …`, plus the attribution line
+  3. merges it into `develop` with `git merge --no-ff`
+- **Shared files.** `backend/config/settings/base.py` and `backend/config/urls.py` are touched by both backend and admin (by agreed one-line edits). Each agent's edits travel on its own branch. If a merge conflicts, the PM resolves it by keeping both sides' lines.
+- **Integration after each merge** (in the main tree on `develop`):
+  - regenerate `jivo_api`, run the shared-version check and the tests
+  - restart :8001
+  - then `git merge develop` into every other active module branch before that agent's next run
+- **Hand-offs between agents happen only at merges.** For example, the backend's models reach the admin, `jivo_core` reaches the rider, and the schema reaches the apps. Briefs are ordered accordingly.
+- **What stays in the main tree:**
+  - the :8001 server, which only ever runs merged code
+  - QA's :8004 instance, which tests merged code. Only QA's `qa/` edits go in its worktree.
+  - `jivo_api` generation
+- **Push cadence:** `develop` and the module branches stay local, and the phase merges to `main` through a PR when it completes (the user's cadence: push at phase completion).
+- **Transition (2026-11-02):**
+  - Runs that started before DL-24 work in the main tree.
+  - At each one's end, the PM commits its paths straight onto `develop`. The shared config files go in a separate `chore(config)` commit once both backend and admin are idle.
+  - The agent's **next** run starts in its worktree.
+- **Cost:** merges at every sync point, slower first Flutter and Gradle builds per worktree, and hand-offs only at merges. **Benefit:** isolated, reviewable module branches, a `develop` branch that always runs, and no half-written code under the user's dev server.

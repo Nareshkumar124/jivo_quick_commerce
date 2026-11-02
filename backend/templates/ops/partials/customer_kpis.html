@@ -1,0 +1,10 @@
+{# Customer KPI cards. Polls itself every 60 s (outerHTML swap keeps the trigger). Context: customers (selectors.CustomerStats). #}
+<div id="customer-kpis" class="ops-grid-kpi" hx-get="{% url 'ops:dashboard-kpis' %}" hx-trigger="every 60s" hx-swap="outerHTML" data-testid="customer-kpis">
+    {% url 'admin:accounts_customer_changelist' as customers_url %}
+    {% include "ops/components/kpi_card.html" with label="Customers" value=customers.total icon="group" hint="Excludes anonymised accounts" href=customers_url testid="kpi-total" %}
+    {% include "ops/components/kpi_card.html" with label="Active" value=customers.active icon="check_circle" tone="success" testid="kpi-active" %}
+    {% include "ops/components/kpi_card.html" with label="Blocked" value=customers.blocked icon="block" tone="danger" testid="kpi-blocked" %}
+    {% include "ops/components/kpi_card.html" with label="Deletion requested" value=customers.deletion_requested icon="person_remove" tone="warning" hint="Anonymised after the grace period" testid="kpi-deletion" %}
+    {% include "ops/components/kpi_card.html" with label="New today" value=customers.new_today icon="person_add" hint="Since midnight IST" testid="kpi-new-today" %}
+    {% include "ops/components/kpi_card.html" with label="New, last 7 days" value=customers.new_last_7_days icon="calendar_month" hint="Including today (IST)" testid="kpi-new-7d" %}
+</div>

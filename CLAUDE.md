@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state of the repo
 
-**Phase 0 (foundation) and Phase 1 (auth & users) are built and tested** (2026-11-02): OTP login, profile, addresses and staff roles on the backend and both apps, with real-API integration tests passing. The formal phase gate (staging QA, demo, sign-off; `docs/10-testing-strategy.md` §5) is still a human step. Phase 2 is next. The work is run as three parallel subagents per `docs/development-phase.md`.
+**Phase 0 (foundation) and Phase 1 (auth & users) are built and tested** (2026-11-02): OTP login, profile, addresses and staff roles on the backend and both apps, with real-API integration tests passing. The formal phase gate (staging QA, demo, sign-off; `docs/10-testing-strategy.md` §5) is still a human step. Phase 2 is next. The work is run as four parallel development subagents (backend, admin panel, customer app, rider app), an independent QA agent and four support agents (DevOps, code reviewer, catalog data, UI/UX designer), per `docs/development-phase.md`.
 
 Repo layout (top-level folders, chosen by the user for readability):
 - `backend/`: the Django project
@@ -16,18 +16,32 @@ Repo layout (top-level folders, chosen by the user for readability):
 - `infra/`, `docs/`, `.github/workflows/`
 
 **Environment specifics** (they differ from the docs' original plan):
-- **Database.** The DB is a **remote PostgreSQL 16** server. Its credentials are only in `backend/.env`, which is gitignored. Never print that file or copy the password anywhere. The server is shared, so the only database tests may create or drop is `test_jivo_quick_commerce`. Never run `DROP DATABASE`, `flush` or `CREATE EXTENSION`.
-- **No PostGIS yet.** The server has no PostGIS, and the host has no GDAL/GEOS.
-  - Settings use the plain `postgresql` engine.
-  - `django.contrib.gis` is not installed.
-  - `Address` stores `lat`/`lng` as decimals.
-  - Phase 2 needs PostGIS on the server, plus GDAL locally or the Docker image, which already has it.
+- **Database.** The DB is a **remote PostgreSQL 16** server. Its credentials are only in `backend/.env`, which is gitignored. Never print that file or copy the password anywhere. The server is shared, so tests may only create or drop databases whose names start with `test_jivo_quick_commerce`. Settings refuse any other `POSTGRES_TEST_DB`. The backend agent uses the default name. The admin agent runs with `POSTGRES_TEST_DB=test_jivo_quick_commerce_admin TEST_REDIS_DB=14`, so parallel test runs don't collide. Never run `DROP DATABASE` or `flush`. The only extension in use is `postgis`, which is already enabled; tests may let GeoDjango create it in their own test DBs.
+- **PostGIS.**
+  - **Server:** PostGIS 3.4.2 was installed on the DB server and enabled in `jivo_quick_commerce` on 2026-11-02 (Phase 2), at the user's request.
+  - **Engine:** settings use the plain `postgresql` engine until the backend agent's Phase 2 R2 switches to `django.contrib.gis.db.backends.postgis`.
+  - **Address storage:** `Address` still stores `lat`/`lng` as decimals until then.
+  - **Host libraries:** GDAL 3.12.2 and GEOS 3.14.1 are installed on the host (2026-11-02), and the backend Docker image has them too.
 - **Host ports.** Other projects already use some defaults: **6379 is another project's `redis-chai`; never use it or touch that container**, nor `mongo-chai`. 5432 and 8000 are also taken. This project uses:
   - Redis 6380
   - Django 8001 (Android emulator: `http://10.0.2.2:8001`)
   - MinIO 9000/9001
   - Mailpit 1025/8025
-- **Git.** Hosted at `github.com/Nareshkumar124/jivo_quick_commerce`, branch `main`. Commit all four Flutter `pubspec.lock` files, because CI uses `--enforce-lockfile`.
+- **Git.** Hosted at `github.com/Nareshkumar124/jivo_quick_commerce`.
+  - `main` holds only gated work.
+  - **`main`** holds gated releases only.
+  - **`develop`** is the stable integration branch; the :8001 server runs from it.
+  - **Module branches** `<agent>/phase-N` each live in a PM-managed worktree, `.worktrees/<agent>` (gitignored).
+  - The PM reviews each run, commits it and merges it into `develop` with `--no-ff`. A PR `develop` → `main` follows at each phase gate (`docs/development-phase.md` §9.4, DL-24). Agents never commit.
+  - Commit all four Flutter `pubspec.lock` files, because CI uses `--enforce-lockfile`.
+- **Project management.** The main session is the PM.
+  - Status: `docs/plan/00-roadmap.md` and `docs/project-status.md`.
+  - Tasks: `docs/task-tracker.md` (only the PM edits it).
+  - Decisions: `docs/decision-log.md`.
+  - Deployment: `docs/deployment.md`.
+  - Procedures: `docs/integration-checklist.md` and `docs/release-checklist.md`.
+  - Agent reports use the §9.3 format.
+- **Maps: Mappls (MapmyIndia), not Google Maps** (DL-29). The SDK config files (`*.a.olf`, `*.a.conf`) are secrets: they live only in `~/.config/jivo-quick-commerce/mappls/`, are gitignored, and must never be committed or printed.
 - **Test login:** fixed-OTP test numbers `+919000000001`, `…002` and `…003` all use OTP `123456` and send no SMS (local and test settings only; production refuses them). Seeded staff passwords come only from `SEED_DEMO_STAFF_PASSWORD` in `backend/.env`.
 
 **Known gap:** `docs/README.md` links to `docs/plan/00-roadmap.md` and `docs/plan/phase-0-…` through `phase-8-…`. All three subagents treat `docs/plan/phase-N-*.md` as their main brief. **The `docs/plan/` directory does not exist yet.** Don't invent phase files on your own. Tell the user they're missing and offer to draft them from `docs/README.md` (the phase list and file format) and `docs/10-testing-strategy.md` §5 (gate, test case format, sign-off template).
@@ -134,8 +148,27 @@ Data and services: PostgreSQL + PostGIS for point-in-polygon serviceability and 
 ## Subagents and ownership
 
 The agents live in `.claude/agents/`. Their files hold the detailed engineering rules and definitions of done, so read them rather than duplicating their rules here.
-- **`django-backend-dev`:** owns `backend/`, `infra/`, the backend CI, and `backend/openapi/schema.yaml`. It never edits the Flutter folders.
-- **`flutter-customer-dev`:** owns `customer_app/` and the shared Flutter code in `packages/`: `jivo_core`, `jivo_api`, `tool/` and the shared lint config. It also owns the Flutter CI (`.github/workflows/mobile.yml`).
+- **`django-backend-dev`:** owns `backend/` (models, migrations, services, APIs, tasks, settings) and `backend/openapi/schema.yaml`. It never edits the Flutter folders, the admin UI layer, or infra/CI.
+- **`admin-panel-dev`** (added 2026-11-02): owns the admin panel UI inside `backend/`:
+  - every `apps/*/admin.py` (Django Admin + unfold)
+  - `apps/ops_console/` (`/ops/`, Django templates + HTMX + Alpine.js, no SPA)
+  - `templates/`, `static/`, `config/admin_ui.py`
+  - the admin and ops tests
+
+  It changes state only through backend services, enforces the `docs/05` §3 role matrix server-side, and reports missing services or fields to the backend agent.
+- **`qa-engineer`** (added 2026-11-02): the independent QA agent. It owns only `qa/`:
+  - the 10 QA documents in `qa/docs/`
+  - a black-box test suite in `qa/tests/` (its own uv project)
+  - bug files in `qa/bugs/`
+  - `qa/private/` (gitignored security details)
+
+  It never edits application code. It runs its own backend instance on `127.0.0.1:8004`, with Redis DBs 5–7 and QA test numbers `+9190000001xx`, so its tests never disturb the user's server on 8001. Bugs go to the owning agent through the main session.
+- **`flutter-customer-dev`:** owns `customer_app/` and the shared Flutter code in `packages/`: `jivo_core`, `jivo_api`, `tool/` and the shared lint config.
 - **`flutter-rider-dev`:** owns `rider_app/` and builds on `packages/`.
+- **Four support agents** (added 2026-11-02, DL-31):
+  - **`devops-engineer`:** owns `infra/`, `.github/workflows/` (all CI/CD), `backend/Dockerfile` and `.dockerignore`, and `docs/deployment.md`. Staging and production need the user's approval (D-05).
+  - **`code-reviewer`** (read-only, Sonnet): reviews every module branch before the PM merges it into `develop`.
+  - **`catalog-data`** (Sonnet): owns `data/` and turns Jivo's product sheets, SAP CSVs and photos into validated import files. Raw inputs go in gitignored `data/incoming/`.
+  - **`ui-designer`:** owns `design/` (design system, tokens, screen specs, HTML prototypes, UX audits). Brand assets go in gitignored `design/incoming/`. Developers implement its specs.
 - **Shared code:** changes to `jivo_core` must be **additive only**. Never rename or remove its public APIs. If an app needs an API that's missing, it reports the gap to the backend owner rather than inventing backend behaviour.
 - **Git:** no agent commits or pushes unless explicitly asked. Conventional Commits are planned.

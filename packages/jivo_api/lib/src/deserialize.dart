@@ -5,6 +5,11 @@ import 'package:jivo_api/src/model/address.dart';
 import 'package:jivo_api/src/model/address_request.dart';
 import 'package:jivo_api/src/model/app_config.dart';
 import 'package:jivo_api/src/model/auth_session.dart';
+import 'package:jivo_api/src/model/category_node.dart';
+import 'package:jivo_api/src/model/category_tile.dart';
+import 'package:jivo_api/src/model/category_tree.dart';
+import 'package:jivo_api/src/model/collection_detail.dart';
+import 'package:jivo_api/src/model/collection_rail.dart';
 import 'package:jivo_api/src/model/device.dart';
 import 'package:jivo_api/src/model/device_request.dart';
 import 'package:jivo_api/src/model/error_body.dart';
@@ -12,20 +17,37 @@ import 'package:jivo_api/src/model/error_envelope.dart';
 import 'package:jivo_api/src/model/health_checks.dart';
 import 'package:jivo_api/src/model/health_live.dart';
 import 'package:jivo_api/src/model/health_ready.dart';
+import 'package:jivo_api/src/model/home_banner.dart';
+import 'package:jivo_api/src/model/home_feed.dart';
+import 'package:jivo_api/src/model/image_set.dart';
 import 'package:jivo_api/src/model/logout_request.dart';
 import 'package:jivo_api/src/model/me.dart';
+import 'package:jivo_api/src/model/notify_me.dart';
+import 'package:jivo_api/src/model/notify_me_request.dart';
+import 'package:jivo_api/src/model/nutrition_row.dart';
+import 'package:jivo_api/src/model/nutrition_table.dart';
 import 'package:jivo_api/src/model/otp_send_request.dart';
 import 'package:jivo_api/src/model/otp_sent.dart';
 import 'package:jivo_api/src/model/otp_settings.dart';
 import 'package:jivo_api/src/model/otp_verify_request.dart';
 import 'package:jivo_api/src/model/paginated_address_list.dart';
+import 'package:jivo_api/src/model/paginated_product_card_list.dart';
 import 'package:jivo_api/src/model/patched_address_request.dart';
 import 'package:jivo_api/src/model/patched_me_request.dart';
 import 'package:jivo_api/src/model/policy_urls.dart';
+import 'package:jivo_api/src/model/product_card.dart';
+import 'package:jivo_api/src/model/product_detail.dart';
 import 'package:jivo_api/src/model/rider_location_settings.dart';
+import 'package:jivo_api/src/model/search_suggestion.dart';
+import 'package:jivo_api/src/model/search_suggestions.dart';
+import 'package:jivo_api/src/model/serviceability.dart';
+import 'package:jivo_api/src/model/store_status.dart';
 import 'package:jivo_api/src/model/support_contacts.dart';
 import 'package:jivo_api/src/model/token_pair.dart';
 import 'package:jivo_api/src/model/token_refresh_request.dart';
+import 'package:jivo_api/src/model/unit_price.dart';
+import 'package:jivo_api/src/model/variant_detail.dart';
+import 'package:jivo_api/src/model/variant_summary.dart';
 
 final _regList = RegExp(r'^List<(.*)>$');
 final _regSet = RegExp(r'^Set<(.*)>$');
@@ -66,6 +88,19 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'AppEnum':
     case 'AuthSession':
       return AuthSession.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'BannerLinkTypeEnum':
+    case 'CategoryNode':
+      return CategoryNode.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CategoryTile':
+      return CategoryTile.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CategoryTree':
+      return CategoryTree.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CollectionDetail':
+      return CollectionDetail.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CollectionRail':
+      return CollectionRail.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'Device':
       return Device.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'DeviceRequest':
@@ -85,11 +120,27 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'HealthReady':
       return HealthReady.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'HealthStatusEnum':
+    case 'HomeBanner':
+      return HomeBanner.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'HomeFeed':
+      return HomeFeed.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ImageSet':
+      return ImageSet.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'LogoutRequest':
       return LogoutRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'Me':
       return Me.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'NotifyMe':
+      return NotifyMe.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'NotifyMeRequest':
+      return NotifyMeRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'NutritionRow':
+      return NutritionRow.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'NutritionTable':
+      return NutritionTable.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'OtpPurposeEnum':
     case 'OtpSendRequest':
       return OtpSendRequest.fromJson(value as Map<String, dynamic>)
@@ -104,6 +155,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'PaginatedAddressList':
       return PaginatedAddressList.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'PaginatedProductCardList':
+      return PaginatedProductCardList.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'PatchedAddressRequest':
       return PatchedAddressRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -113,10 +167,28 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'PlatformEnum':
     case 'PolicyUrls':
       return PolicyUrls.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ProductCard':
+      return ProductCard.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ProductDetail':
+      return ProductDetail.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'RiderLocationSettings':
       return RiderLocationSettings.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'RiderStatusEnum':
+    case 'SearchSuggestion':
+      return SearchSuggestion.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SearchSuggestionTypeEnum':
+    case 'SearchSuggestions':
+      return SearchSuggestions.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'Serviceability':
+      return Serviceability.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'StockStatusEnum':
+    case 'StoreStatus':
+      return StoreStatus.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'SupportContacts':
       return SupportContacts.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -124,6 +196,14 @@ ReturnType deserialize<ReturnType, BaseType>(
       return TokenPair.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'TokenRefreshRequest':
       return TokenRefreshRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'UnitPrice':
+      return UnitPrice.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'VariantDetail':
+      return VariantDetail.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'VariantSummary':
+      return VariantSummary.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     default:
       RegExpMatch? match;

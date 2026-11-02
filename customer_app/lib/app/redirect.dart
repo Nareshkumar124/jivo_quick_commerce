@@ -10,6 +10,12 @@ abstract final class Routes {
   static const otp = '/login/otp';
   static const completeProfile = '/complete-profile';
   static const home = '/home';
+  static const categories = '/categories';
+  static const orderAgain = '/order-again';
+  static const search = '/search';
+  static const location = '/location';
+  static const mapPicker = '/location/map';
+  static const notServiceable = '/location/not-serviceable';
   static const account = '/account';
   static const editProfile = '/account/profile';
   static const addresses = '/account/addresses';
@@ -17,6 +23,16 @@ abstract final class Routes {
   static const deleteAccount = '/account/delete';
 
   static String editAddress(int id) => '/account/addresses/$id';
+
+  /// Product list of a category; [sub] preselects a sub-category.
+  static String category(String slug, {String? sub}) => Uri(
+    path: '/category/$slug',
+    queryParameters: sub == null ? null : {'sub': sub},
+  ).toString();
+
+  static String product(String slug) => '/product/$slug';
+
+  static String collection(String slug) => '/collection/$slug';
 
   /// Screens that only make sense before the user is in the app.
   static const _entry = {

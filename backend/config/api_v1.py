@@ -5,4 +5,6 @@ from django.urls import include, path
 urlpatterns = [
     path("", include("apps.accounts.urls")),  # auth, me, addresses (Phase 1)
     path("", include("apps.cms.urls")),  # config/app (Phase 1)
+    path("", include("apps.stores.urls")),  # serviceability, notify-me (Phase 2)
+    path("", include("apps.catalog.urls")),  # home, categories, products, search (Phase 2)
 ]

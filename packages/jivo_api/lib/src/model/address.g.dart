@@ -37,6 +37,8 @@ abstract class _$AddressCWProxy {
 
   Address isDefault(bool isDefault);
 
+  Address isServiceable(bool isServiceable);
+
   Address createdAt(DateTime createdAt);
 
   Address updatedAt(DateTime updatedAt);
@@ -63,6 +65,7 @@ abstract class _$AddressCWProxy {
     double lat,
     double lng,
     bool isDefault,
+    bool isServiceable,
     DateTime createdAt,
     DateTime updatedAt,
   });
@@ -123,6 +126,10 @@ class _$AddressCWProxyImpl implements _$AddressCWProxy {
   Address isDefault(bool isDefault) => this(isDefault: isDefault);
 
   @override
+  Address isServiceable(bool isServiceable) =>
+      this(isServiceable: isServiceable);
+
+  @override
   Address createdAt(DateTime createdAt) => this(createdAt: createdAt);
 
   @override
@@ -151,6 +158,7 @@ class _$AddressCWProxyImpl implements _$AddressCWProxy {
     Object? lat = const $CopyWithPlaceholder(),
     Object? lng = const $CopyWithPlaceholder(),
     Object? isDefault = const $CopyWithPlaceholder(),
+    Object? isServiceable = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
     Object? updatedAt = const $CopyWithPlaceholder(),
   }) {
@@ -215,6 +223,10 @@ class _$AddressCWProxyImpl implements _$AddressCWProxy {
           ? _value.isDefault
           // ignore: cast_nullable_to_non_nullable
           : isDefault as bool,
+      isServiceable: isServiceable == const $CopyWithPlaceholder()
+          ? _value.isServiceable
+          // ignore: cast_nullable_to_non_nullable
+          : isServiceable as bool,
       createdAt: createdAt == const $CopyWithPlaceholder()
           ? _value.createdAt
           // ignore: cast_nullable_to_non_nullable
@@ -254,6 +266,7 @@ Address _$AddressFromJson(Map<String, dynamic> json) => $checkedCreate(
         'lat',
         'lng',
         'is_default',
+        'is_serviceable',
         'created_at',
         'updated_at',
       ],
@@ -281,6 +294,7 @@ Address _$AddressFromJson(Map<String, dynamic> json) => $checkedCreate(
       lat: $checkedConvert('lat', (v) => (v as num).toDouble()),
       lng: $checkedConvert('lng', (v) => (v as num).toDouble()),
       isDefault: $checkedConvert('is_default', (v) => v as bool),
+      isServiceable: $checkedConvert('is_serviceable', (v) => v as bool),
       createdAt: $checkedConvert(
         'created_at',
         (v) => DateTime.parse(v as String),
@@ -298,6 +312,7 @@ Address _$AddressFromJson(Map<String, dynamic> json) => $checkedCreate(
     'receiverPhone': 'receiver_phone',
     'buildingStreet': 'building_street',
     'isDefault': 'is_default',
+    'isServiceable': 'is_serviceable',
     'createdAt': 'created_at',
     'updatedAt': 'updated_at',
   },
@@ -319,6 +334,7 @@ Map<String, dynamic> _$AddressToJson(Address instance) => <String, dynamic>{
   'lat': instance.lat,
   'lng': instance.lng,
   'is_default': instance.isDefault,
+  'is_serviceable': instance.isServiceable,
   'created_at': instance.createdAt.toIso8601String(),
   'updated_at': instance.updatedAt.toIso8601String(),
 };

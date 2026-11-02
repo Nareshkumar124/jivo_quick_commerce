@@ -52,6 +52,11 @@ class ErrorCode(models.TextChoices):
     RATE_LIMITED = "RATE_LIMITED", "Too many requests. Try again later."
     SERVER_ERROR = "SERVER_ERROR", "Something went wrong. Please try again."
     SERVICE_UNAVAILABLE = "SERVICE_UNAVAILABLE", "The service is temporarily unavailable."
+    # --- Added in Phase 2 ---------------------------------------------------------------------
+    STORE_NOT_FOUND = (
+        "STORE_NOT_FOUND",
+        "This store is not available. Check serviceability again.",
+    )
 
 
 ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
@@ -90,6 +95,7 @@ ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.RATE_LIMITED: 429,
     ErrorCode.SERVER_ERROR: 500,
     ErrorCode.SERVICE_UNAVAILABLE: 503,
+    ErrorCode.STORE_NOT_FOUND: 404,
 }
 
 

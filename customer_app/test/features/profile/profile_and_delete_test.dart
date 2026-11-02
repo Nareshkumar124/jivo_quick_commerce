@@ -70,7 +70,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(app.profile.profile.name, 'Asha Verma');
-      expect(find.text('Hi, Asha Verma!'), findsOneWidget);
+      expect(find.byKey(const Key('home-screen')), findsOneWidget);
     });
   });
 
@@ -168,6 +168,7 @@ void main() {
     await tester.tap(find.byTooltip('Account'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Log out'), 100);
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Log out'));
     await tester.pumpAndSettle();

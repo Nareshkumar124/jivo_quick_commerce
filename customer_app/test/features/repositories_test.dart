@@ -34,6 +34,7 @@ final addressJson = {
   'lat': 28.613939,
   'lng': 77.209023,
   'is_default': true,
+  'is_serviceable': true,
   'created_at': '2026-11-02T10:15:00Z',
   'updated_at': '2026-11-02T10:15:00Z',
 };

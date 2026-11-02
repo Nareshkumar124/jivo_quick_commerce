@@ -19,7 +19,7 @@ void main() {
     final backendCodes = ApiErrorCode.values.where((c) => c.wireValue != null);
     expect(
       backendCodes,
-      hasLength(35),
+      hasLength(36),
       reason: '06 §6 + OpenAPI ErrorCodeEnum',
     );
 

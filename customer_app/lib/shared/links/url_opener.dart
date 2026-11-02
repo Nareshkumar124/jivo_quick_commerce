@@ -1,31 +1,17 @@
+import 'package:jivo_core/helpers.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Opens policy pages and the store listing outside the app.
-abstract interface class UrlOpener {
-  /// Returns false when nothing could open [url].
-  Future<bool> open(Uri url);
-}
-
+/// Opens policy pages and the store listing outside the app. The
+/// [UrlOpener] interface and its test double live in jivo_core.
 class LaunchUrlOpener implements UrlOpener {
   const LaunchUrlOpener();
 
   @override
-  Future<bool> open(Uri url) async {
+  Future<bool> open(Uri uri) async {
     try {
-      return await launchUrl(url, mode: LaunchMode.externalApplication);
+      return await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
       return false;
     }
-  }
-}
-
-/// For tests: records the URLs.
-class FakeUrlOpener implements UrlOpener {
-  final List<Uri> opened = [];
-
-  @override
-  Future<bool> open(Uri url) async {
-    opened.add(url);
-    return true;
   }
 }

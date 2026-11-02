@@ -5,6 +5,7 @@ import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/presentation/auth_flow.dart';
 import 'package:customer_app/features/launch/data/config_repository.dart';
 import 'package:customer_app/features/launch/domain/launch_config.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
@@ -83,7 +84,7 @@ void main() {
       await tester.tap(find.text('Try again'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Hi, '), findsOneWidget);
+      expect(find.byKey(const Key('home-screen')), findsOneWidget);
     },
   );
 

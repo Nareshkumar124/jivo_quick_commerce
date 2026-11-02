@@ -2,6 +2,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import PermissionsMixin
+from django.contrib.gis.db import models as gis_models
 from django.core.validators import RegexValidator
 from django.db import models
 
@@ -174,8 +175,11 @@ def to_coordinate(value: float | Decimal) -> Decimal:
 class Address(TimeStampedModel):
     """A saved delivery address (07 §2.1).
 
-    The map pin is stored as `lat`/`lng` decimals until PostGIS is available; Phase 2 migrates
-    it to a Point field. The API shape (`lat`, `lng`) stays the same.
+    Phase 2 adds `location` (PostGIS Point, SRID 4326), the field geo queries use. Migration is
+    backward compatible: `lat`/`lng` decimals stay and are always written together with
+    `location` (code still running from before Phase 2 writes only the decimals, so geo queries
+    fall back to them via `address_point()`). A later migration switches reads to `location` and
+    drops the decimals. The API shape (`lat`, `lng` numbers) never changes.
     """
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="addresses")
@@ -192,6 +196,7 @@ class Address(TimeStampedModel):
     pincode = models.CharField(max_length=6)
     lat = models.DecimalField(max_digits=9, decimal_places=6)
     lng = models.DecimalField(max_digits=9, decimal_places=6)
+    location = gis_models.PointField(srid=4326, null=True, blank=True)
     is_default = models.BooleanField(default=False)
     is_deleted = models.BooleanField(default=False)
 

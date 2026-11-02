@@ -3,7 +3,18 @@
 Tests run against real PostgreSQL (database `test_jivo_quick_commerce`, created and dropped by
 pytest-django only) and the compose Redis on port 6380, never SQLite and never another project's
 Redis.
+
+Parallel runs against the same servers use separate state:
+- `POSTGRES_TEST_DB` (default `test_jivo_quick_commerce`): must start with
+  `test_jivo_quick_commerce`, checked in base.py.
+- `TEST_REDIS_DB` (default 15): Redis DB index, 3-15.
+Example (admin agent):
+`POSTGRES_TEST_DB=test_jivo_quick_commerce_admin TEST_REDIS_DB=14 uv run pytest`.
 """
+
+from urllib.parse import urlsplit
+
+from config.env import env_test_redis_db
 
 from .base import *
 
@@ -14,8 +25,16 @@ ALLOWED_HOSTS = ["testserver", "localhost"]
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
-# A dedicated Redis DB so tests (which may clear the cache) never touch dev data.
-REDIS_TEST_URL = env_str("REDIS_TEST_URL", default="redis://localhost:6380/15")
+# A dedicated Redis DB so tests (which may clear the cache) never touch dev data. REDIS_TEST_URL
+# gives the server; TEST_REDIS_DB (default 15) picks the DB index and overrides the URL's path, so
+# test runs in parallel (e.g. two agents) use separate DBs. DBs 0-2 are dev (cache, broker,
+# channels) and are refused.
+TEST_REDIS_DB = env_test_redis_db()
+REDIS_TEST_URL = (
+    urlsplit(env_str("REDIS_TEST_URL", default="redis://localhost:6380/15"))
+    ._replace(path=f"/{TEST_REDIS_DB}")
+    .geturl()
+)
 REDIS_URL = REDIS_TEST_URL
 CACHES = {
     "default": {
@@ -40,6 +59,10 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 STORAGES = {
     **STORAGES,
     "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
+    "public": {
+        "BACKEND": "django.core.files.storage.InMemoryStorage",
+        "OPTIONS": {"base_url": "https://media.test/"},
+    },
 }
 
 API_DOCS_PUBLIC = True

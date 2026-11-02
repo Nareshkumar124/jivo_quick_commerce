@@ -1,0 +1,8 @@
+{# Empty state. Params: title, message (optional), icon (default "inbox"), compact (optional). #}
+<div class="ops-state flex flex-col items-center text-center {% if compact %}py-6{% else %}py-12{% endif %}" data-testid="empty-state">
+    <div class="border border-base-300 border-dashed flex items-center justify-center mb-4 rounded-full ops-state__icon dark:border-base-700">
+        <span class="material-symbols-outlined text-base-500 dark:text-base-400">{{ icon|default:"inbox" }}</span>
+    </div>
+    <h3 class="font-semibold text-font-important-light dark:text-font-important-dark">{{ title }}</h3>
+    {% if message %}<p class="ops-state__message mt-1 text-font-subtle-light dark:text-font-subtle-dark">{{ message }}</p>{% endif %}
+</div>

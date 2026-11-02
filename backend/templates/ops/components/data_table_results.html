@@ -1,0 +1,32 @@
+{# Results region of a data table (also the HTMX partial). Param: table. #}
+<div id="{{ table.results_id }}" class="ops-table__results" aria-live="polite">
+    {% if table.rows %}
+        <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+            <table class="border-separate border-spacing-none w-full">
+                <thead class="text-font-important-light dark:text-font-important-dark">
+                    <tr class="bg-base-50 dark:bg-base-900">
+                        {% for column in table.columns %}
+                            <th scope="col" class="border-b border-base-200 font-semibold px-3 py-2 text-left whitespace-nowrap dark:border-base-800">{{ column.title }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in table.rows %}
+                        <tr>
+                            {% for cell in row %}
+                                <td class="align-middle border-b border-base-200 h-[45px] px-3 py-1.5 dark:border-base-800{% if cell.css %} {{ cell.css }}{% endif %}">{{ cell.value }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "ops/components/pagination.html" %}
+    {% else %}
+        {% if table.filters_applied %}
+            {% include "ops/components/empty_state.html" with title=table.empty_title message=table.empty_message icon="search_off" compact=1 %}
+        {% else %}
+            {% include "ops/components/empty_state.html" with title=table.empty_title compact=1 %}
+        {% endif %}
+    {% endif %}
+</div>

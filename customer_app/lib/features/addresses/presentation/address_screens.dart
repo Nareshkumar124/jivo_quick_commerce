@@ -103,6 +103,13 @@ class AddressListScreen extends ConsumerWidget {
                 title: Row(
                   children: [
                     Flexible(child: Text(labelText(l10n, address))),
+                    if (!address.isServiceable) ...[
+                      const SizedBox(width: JivoSpacing.sm),
+                      Chip(
+                        label: Text(l10n.addressNotServiceable),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
                     if (address.isDefault) ...[
                       const SizedBox(width: JivoSpacing.sm),
                       Chip(

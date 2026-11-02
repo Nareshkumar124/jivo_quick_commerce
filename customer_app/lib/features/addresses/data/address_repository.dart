@@ -120,6 +120,7 @@ class ApiAddressRepository implements AddressRepository {
   static SavedAddress _fromApi(Address a) => SavedAddress(
     id: a.id,
     isDefault: a.isDefault,
+    isServiceable: a.isServiceable,
     input: AddressInput(
       label: switch (a.label) {
         AddressLabelEnum.home => AddressLabel.home,

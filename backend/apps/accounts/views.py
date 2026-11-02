@@ -47,7 +47,8 @@ from apps.core.schema import (
 
 
 def _own_address(request: Request, address_id: int) -> Address:
-    return get_object_or_404(addresses.live_addresses(request.user), pk=address_id)
+    queryset = addresses.with_serviceability(addresses.live_addresses(request.user))
+    return get_object_or_404(queryset, pk=address_id)
 
 
 def _ok(serializer, description: str, *examples: tuple[str, dict]) -> OpenApiResponse:
@@ -534,7 +535,8 @@ class AddressListCreateView(APIView):
         ),
     )
     def get(self, request: Request) -> Response:
-        queryset = addresses.live_addresses(request.user).order_by("-is_default", "-created_at")
+        queryset = addresses.with_serviceability(addresses.live_addresses(request.user))
+        queryset = queryset.order_by("-is_default", "-created_at")
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         return paginator.get_paginated_response(AddressSerializer(page, many=True).data)
@@ -587,9 +589,17 @@ class AddressDetailView(APIView):
         operation_id="addresses_update",
         tags=["addresses"],
         summary="Edit an address",
-        description="Partial update. Use `set-default` to change the default.",
+        description=(
+            'Partial update. Use `set-default` to change the default. Send `""` for '
+            "`receiver_name` or `receiver_phone` to reset it to the user's own (T-205)."
+        ),
         request=AddressSerializer,
-        examples=[_request_example("Edit", {"landmark": "Behind Galleria Market"})],
+        examples=[
+            _request_example("Edit", {"landmark": "Behind Galleria Market"}),
+            _request_example(
+                "Reset receiver to me (T-205)", {"receiver_name": "", "receiver_phone": ""}
+            ),
+        ],
         responses=app_responses(
             {
                 200: _ok(

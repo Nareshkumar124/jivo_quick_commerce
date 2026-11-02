@@ -46,6 +46,10 @@ enum ApiErrorCode {
   rateLimited('RATE_LIMITED'),
   serviceUnavailable('SERVICE_UNAVAILABLE'),
 
+  /// Phase 2: the `X-Store-Id` store is unknown or deactivated (404). Drop
+  /// the saved store and check serviceability again.
+  storeNotFound('STORE_NOT_FOUND'),
+
   /// No connection, DNS failure, refused connection or TLS failure.
   network(null),
 

@@ -1,0 +1,3 @@
+{# Status badge. Context: badge (status.Badge: label, tone), optional size ("md"). #}
+{# Tag form: {% load ops %}{% status_badge "order" order.status %}. Tones map to unfold's label variants. #}
+{% include "unfold/helpers/label.html" with text=badge.label variant=badge.tone size=size %}

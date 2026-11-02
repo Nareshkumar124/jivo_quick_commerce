@@ -404,7 +404,7 @@ class AddressesApi {
   }
 
   /// Edit an address
-  /// Partial update. Use &#x60;set-default&#x60; to change the default.
+  /// Partial update. Use &#x60;set-default&#x60; to change the default. Send &#x60;\&quot;\&quot;&#x60; for &#x60;receiver_name&#x60; or &#x60;receiver_phone&#x60; to reset it to the user&#39;s own (T-205).
   ///
   /// Parameters:
   /// * [id]

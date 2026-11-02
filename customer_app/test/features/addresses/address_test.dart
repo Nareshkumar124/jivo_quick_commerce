@@ -23,6 +23,8 @@ Future<void> openAddresses(TestApp app, WidgetTester tester) async {
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await app.pump(tester);
+  await tester.tap(find.text('Account'));
+  await tester.pumpAndSettle();
   await tester.tap(find.text('Saved addresses'));
   await tester.pumpAndSettle();
 }

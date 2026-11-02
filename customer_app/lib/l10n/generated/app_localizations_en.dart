@@ -193,15 +193,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get emailCantBeUsed => 'This email can\'t be used.';
 
   @override
-  String homeGreeting(String name) {
-    return 'Hi, $name!';
-  }
-
-  @override
-  String get homeComingSoon =>
-      'Shopping arrives in the next update. Meanwhile, set up your account and addresses.';
-
-  @override
   String get accountTitle => 'Account';
 
   @override
@@ -372,4 +363,376 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get staffCannotDelete =>
       'This account can\'t be deleted from the app. Please contact support.';
+
+  @override
+  String get tabHome => 'Home';
+
+  @override
+  String get tabCategories => 'Categories';
+
+  @override
+  String get tabOrderAgain => 'Order again';
+
+  @override
+  String get tabAccount => 'Account';
+
+  @override
+  String get addToCart => 'ADD';
+
+  @override
+  String addToCartSemantics(String name) {
+    return 'Add $name to cart';
+  }
+
+  @override
+  String stepperDecrease(String name) {
+    return 'Remove one $name';
+  }
+
+  @override
+  String stepperIncrease(String name) {
+    return 'Add one more $name';
+  }
+
+  @override
+  String stepperQuantity(int count) {
+    return '$count in cart';
+  }
+
+  @override
+  String maxQtyReached(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'You can add up to $count of this item',
+      one: 'You can add only 1 of this item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get outOfStock => 'Out of stock';
+
+  @override
+  String onlyLeft(int count) {
+    return 'Only $count left';
+  }
+
+  @override
+  String discountOff(int percent) {
+    return '$percent% OFF';
+  }
+
+  @override
+  String mrpSemantics(String price) {
+    return 'MRP $price';
+  }
+
+  @override
+  String priceSemantics(String price) {
+    return 'Price $price';
+  }
+
+  @override
+  String get vegMark => 'Vegetarian';
+
+  @override
+  String get nonVegMark => 'Non-vegetarian';
+
+  @override
+  String cartItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get viewCart => 'View cart';
+
+  @override
+  String get cartComingSoon => 'Cart and checkout arrive in the next update.';
+
+  @override
+  String deliveryIn(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Delivery in $minutes mins',
+      one: 'Delivery in 1 min',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get selectLocation => 'Select delivery location';
+
+  @override
+  String get checkingDelivery => 'Checking delivery…';
+
+  @override
+  String get notDeliveringHere => 'Not delivering here';
+
+  @override
+  String get changeLocationSemantics => 'Change delivery location';
+
+  @override
+  String get searchHint => 'Search for oils, ghee and more';
+
+  @override
+  String get shopByCategory => 'Shop by category';
+
+  @override
+  String get previouslyBought => 'Previously bought';
+
+  @override
+  String get seeAll => 'See all';
+
+  @override
+  String get homeEmpty => 'Nothing to show here yet. Pull down to refresh.';
+
+  @override
+  String get homeNeedsLocation =>
+      'Choose a delivery location to see what\'s in stock near you.';
+
+  @override
+  String get notServiceableInline => 'We don\'t deliver to this location yet.';
+
+  @override
+  String get changeLocation => 'Change location';
+
+  @override
+  String storeClosedOpensAt(String time) {
+    return 'Store closed. Opens at $time. You can browse; checkout opens then.';
+  }
+
+  @override
+  String get storeClosed => 'Store closed right now. You can still browse.';
+
+  @override
+  String bannerSemantics(String title) {
+    return 'Offer: $title';
+  }
+
+  @override
+  String get allInCategory => 'All';
+
+  @override
+  String get categoriesEmpty => 'No categories yet.';
+
+  @override
+  String get sortBy => 'Sort by';
+
+  @override
+  String sortButton(String option) {
+    return 'Sort: $option';
+  }
+
+  @override
+  String get sortRelevance => 'Relevance';
+
+  @override
+  String get sortPriceLowHigh => 'Price: low to high';
+
+  @override
+  String get sortPriceHighLow => 'Price: high to low';
+
+  @override
+  String get sortDiscount => 'Discount';
+
+  @override
+  String get productsEmpty => 'No products here yet.';
+
+  @override
+  String get loadMoreFailed => 'Couldn\'t load more products.';
+
+  @override
+  String get collectionEmpty => 'No products in this collection yet.';
+
+  @override
+  String get orderAgainEmpty =>
+      'Items you order will show up here so you can buy them again quickly.';
+
+  @override
+  String get productNotFound => 'This product isn\'t available.';
+
+  @override
+  String get packSize => 'Pack size';
+
+  @override
+  String youSave(String amount) {
+    return 'You save $amount';
+  }
+
+  @override
+  String get highlights => 'Highlights';
+
+  @override
+  String get description => 'Description';
+
+  @override
+  String get productInfo => 'Product information';
+
+  @override
+  String get ingredients => 'Ingredients';
+
+  @override
+  String get nutritionInfo => 'Nutrition information';
+
+  @override
+  String get shelfLife => 'Shelf life';
+
+  @override
+  String get storageInfo => 'Storage';
+
+  @override
+  String get countryOfOrigin => 'Country of origin';
+
+  @override
+  String get manufacturedBy => 'Manufactured by';
+
+  @override
+  String get marketedBy => 'Marketed by';
+
+  @override
+  String get fssaiLicence => 'FSSAI licence no.';
+
+  @override
+  String get similarProducts => 'Similar products';
+
+  @override
+  String galleryImage(int index, int count) {
+    return 'Image $index of $count. Double tap to zoom.';
+  }
+
+  @override
+  String get searchFieldHint => 'Search products';
+
+  @override
+  String get clearSearch => 'Clear search';
+
+  @override
+  String get recentSearches => 'Recent searches';
+
+  @override
+  String get clearRecentSearches => 'Clear';
+
+  @override
+  String get trendingSearches => 'Trending';
+
+  @override
+  String get suggestionsFailed => 'Couldn\'t load suggestions.';
+
+  @override
+  String noResults(String query) {
+    return 'No results for \"$query\"';
+  }
+
+  @override
+  String get noResultsTry => 'Try one of these:';
+
+  @override
+  String get locationPrompt => 'Where should we deliver?';
+
+  @override
+  String get detectLocation => 'Use current location';
+
+  @override
+  String get pickOnMap => 'Pick on map';
+
+  @override
+  String get currentLocationTitle => 'Current location';
+
+  @override
+  String get pinnedLocationTitle => 'Pinned location';
+
+  @override
+  String get storeChangeTitle => 'Change delivery location?';
+
+  @override
+  String get storeChangeBody =>
+      'A different store delivers to this location, so your cart will be cleared.';
+
+  @override
+  String get storeChangeConfirm => 'Change and clear cart';
+
+  @override
+  String get mapPickerTitle => 'Pick location on map';
+
+  @override
+  String get mapPickerHint => 'Move the map to place the pin on your door.';
+
+  @override
+  String pinCoordinates(String lat, String lng) {
+    return 'Pin at $lat, $lng';
+  }
+
+  @override
+  String get findingAddress => 'Finding the address…';
+
+  @override
+  String get confirmLocation => 'Confirm location';
+
+  @override
+  String get locateMe => 'Go to my location';
+
+  @override
+  String get mapUnavailableTitle => 'Map isn\'t available';
+
+  @override
+  String get mapUnavailableBody =>
+      'Use your current location, or enter the address by hand.';
+
+  @override
+  String get enterAddressManually => 'Enter address manually';
+
+  @override
+  String get notServiceableTitle => 'We\'re not in your area yet';
+
+  @override
+  String get notServiceableBody =>
+      'Jivo is growing fast. Tap Notify me and we\'ll tell you when we deliver here.';
+
+  @override
+  String get notifyMe => 'Notify me';
+
+  @override
+  String get notifyMeDone =>
+      'Thanks! We\'ll let you know when we start delivering here.';
+
+  @override
+  String get tryAnotherAddress => 'Try another address';
+
+  @override
+  String variantOptions(String variant, int count) {
+    return '$variant · $count options';
+  }
+
+  @override
+  String unitPrice(String amount, String per) {
+    return '$amount/$per';
+  }
+
+  @override
+  String get storeClosedHeadline => 'Store closed';
+
+  @override
+  String storeClosedOpensTomorrow(String time) {
+    return 'Store closed. Opens tomorrow at $time. You can browse; checkout opens then.';
+  }
+
+  @override
+  String get importedBy => 'Imported by';
+
+  @override
+  String get consumerCare => 'Consumer care';
+
+  @override
+  String get cartComingSoonLabel => 'Cart coming soon';
+
+  @override
+  String get addressNotServiceable => 'Not serviceable';
 }

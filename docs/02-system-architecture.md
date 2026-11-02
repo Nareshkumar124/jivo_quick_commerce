@@ -112,7 +112,7 @@ One Django project serves the REST API, WebSockets, Django Admin and the custom 
 | HTTP | dio, with interceptors for the auth token, refresh, app version and logging | |
 | Models | freezed + json_serializable, **or** a Dart client generated from the OpenAPI schema | Decided in Phase 0 (D-13). Recommended: generate `jivo_api` from OpenAPI. |
 | Secure storage | flutter_secure_storage | JWT tokens |
-| Maps | google_maps_flutter (or the SDK of the chosen maps provider) | See D-03 |
+| Maps | **Mappls (MapmyIndia) Flutter SDK** (DL-29) | Config files are secrets kept outside the repo; see D-03 and `deployment.md` |
 | Location | geolocator, plus a foreground service for the rider app | Rider background location |
 | Push | firebase_messaging + flutter_local_notifications | |
 | Payments | razorpay_flutter | Customer app only |
@@ -145,7 +145,7 @@ jivo_quick_commerce/
 │   │   ├── support/               # tickets, FAQs
 │   │   ├── cms/                   # static pages, app config
 │   │   ├── reports/               # dashboard metrics, exports
-│   │   └── ops_console/           # custom Django views: live board, packing, rider map, dispatch
+│   │   └── ops_console/           # Ops Console (/ops/): dashboard, live board, packing, rider map, dispatch (admin-panel-dev)
 │   ├── templates/  static/
 │   ├── pyproject.toml  uv.lock
 │   └── Dockerfile
@@ -160,6 +160,7 @@ jivo_quick_commerce/
 │   ├── docker-compose.yml         # redis, minio, mailpit, backend, worker, beat (local Postgres is remote, see §4)
 │   ├── nginx/
 │   └── env/                       # .env.example files (never real secrets)
+├── qa/                            # QA agent only: docs/ (10 QA reports), tests/ (black-box uv suite), bugs/; private/ is gitignored
 └── .github/workflows/             # CI: backend tests, flutter analyze/test, builds
 ```
 
@@ -190,7 +191,7 @@ The rider app uses the same pattern: `auth`, `onboarding`, `shift`, `offers`, `t
 
 | Env | Purpose | Backend | Apps |
 |-----|---------|---------|------|
-| **local** | Developer machines | **PostgreSQL 16 is a remote server** (credentials only in the gitignored `backend/.env`; no PostGIS yet, so Phase 0–1 use the plain `postgresql` engine and Phase 2 needs PostGIS installed there). `docker compose -f infra/docker-compose.yml up` runs Redis (host port **6380**), MinIO (**9000** API / **9001** console), Mailpit (**1025** SMTP / **8025** UI), and `backend` (host port **8001**), `worker`, `beat`. The defaults 6379, 5432 and 8000 are taken by other projects on the dev machine, so never use them. Tests use the remote server's `test_jivo_quick_commerce` database (created/dropped by pytest only) and Redis DB 15. | `dev` flavor → local API (`http://10.0.2.2:8001` from the Android emulator) |
+| **local** | Developer machines | **PostgreSQL 16 is a remote server** (credentials only in the gitignored `backend/.env`; PostGIS 3.4 enabled, engine `django.contrib.gis.db.backends.postgis` since Phase 2; the host needs GDAL/GEOS, the Docker image has them; product images go to the public MinIO bucket `jivo-public`, which `seed_demo` creates locally). `docker compose -f infra/docker-compose.yml up` runs Redis (host port **6380**), MinIO (**9000** API / **9001** console), Mailpit (**1025** SMTP / **8025** UI), and `backend` (host port **8001**), `worker`, `beat`. The defaults 6379, 5432 and 8000 are taken by other projects on the dev machine, so never use them. Tests use the remote server's `test_jivo_quick_commerce` database (created/dropped by pytest only) and Redis DB 15. Parallel test runs pick their own with `POSTGRES_TEST_DB` (must start with `test_jivo_quick_commerce`; anything else is refused at settings load) and `TEST_REDIS_DB` (3–15). | `dev` flavor → local API (`http://10.0.2.2:8001` from the Android emulator) |
 | **staging** | Phase testing, QA, UAT, demos | Cloud, production-like, Razorpay **test** keys, test SMS | `staging` flavor; internal distribution (Firebase App Distribution / Play internal testing / TestFlight) |
 | **production** | Live | Cloud, managed Postgres with backups, Razorpay **live** keys | `prod` flavor via Play Store / App Store |
 

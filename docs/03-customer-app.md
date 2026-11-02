@@ -35,7 +35,9 @@ flowchart TD
     P --> HS[Help & support]
 ```
 
-A floating **cart bar** ("2 items · ₹348 · View cart") stays visible on Home, Category, Product list, Product detail and Search when the cart is not empty.
+A floating **cart bar** ("2 items · ₹348 · View cart") stays visible on Home, Category, Product list, Product detail and Search when the cart is not empty. The amount is the server's cart total; until the cart API (P3) it shows the item count only.
+
+Until a delivery location is chosen, Home shows a "Choose a delivery location" prompt that opens the location screen (instead of a forced redirect after login); catalog data needs a store.
 
 ## 2. Features
 
@@ -62,10 +64,10 @@ A floating **cart bar** ("2 items · ₹348 · View cart") stays visible on Home
 | Feature | Details |
 |---------|---------|
 | Detect location | Asks for location permission and uses GPS. If denied, falls back to manual search or map pick. |
-| Pick on map | Draggable pin, reverse-geocoded address preview, "Confirm location" |
-| Serviceability check | `GET /serviceability/?lat=&lng=` returns serviceable, store_id, ETA in minutes, and store open/closed |
+| Pick on map | Mappls (MapmyIndia) map, D-03. Draggable pin, reverse-geocoded address preview (Mappls reverse geocoding; it falls back to the pin's coordinates), "Confirm location". The address is kept with the location and sent as notify-me's `address_text`. Builds without the Mappls SDK config files, and maps that fail to authenticate, show a "Map isn't available" fallback (current location or manual address entry). |
+| Serviceability check | `GET /serviceability/?lat=&lng=` always returns 200: `serviceable`, `store` (`id`, `name`, `is_open`, `opens_at`; null when not serviceable), `eta_minutes` (null when not serviceable or closed) and `message`. `store.id` is sent as `X-Store-Id` on catalog and cart calls. A `404 STORE_NOT_FOUND` on those calls drops the saved store and re-checks serviceability. |
 | Not serviceable | Friendly screen: "We're not in your area yet". "Notify me" saves the interest. "Try another address". |
-| Store closed | Banner "Store opens at 7:00 AM". Browsing allowed, checkout disabled. |
+| Store closed | Banner "Store closed. Opens at 7:00 AM" (or "Opens tomorrow at 7:00 AM", from `opens_at` in IST); the home header says "Store closed" instead of the ETA. Browsing allowed, checkout disabled. |
 | Header | Home header shows "Delivery in **14 mins**" + the selected address. Tapping it opens the address switcher. |
 | Address switch | Changing to an address served by a different store clears the cart (after confirmation), because stock and prices are per store |
 
@@ -87,7 +89,7 @@ A floating **cart bar** ("2 items · ₹348 · View cart") stays visible on Home
 | Previously bought | Rail of variants from past delivered orders (when logged in and history exists) |
 | Pull to refresh | Reloads home and re-checks serviceability |
 
-All product tiles show the image, name, variant (e.g., 1 L), selling price, struck-out MRP, a discount badge ("12% OFF") and an **ADD** button that becomes a − qty + stepper. Out-of-stock tiles are greyed out with "Out of stock".
+All product tiles show the image, name, variant (e.g., 1 L), selling price, struck-out MRP, a discount badge ("12% OFF", the server's `discount_percent` when above 0) and an **ADD** button that becomes a − qty + stepper. Out-of-stock tiles are greyed out with "Out of stock". A product with several variants shows "1 L · 3 options"; its ADD (and its stepper, which shows the total over its variants) opens a variant picker with a stepper per variant.
 
 ### 2.6 Catalog [P2]
 | Feature | Details |
@@ -95,14 +97,14 @@ All product tiles show the image, name, variant (e.g., 1 L), selling price, stru
 | Categories tab | Full category tree |
 | Product list | Left rail of sub-categories plus a product grid (Blinkit pattern). Sort: relevance, price low→high, high→low, discount. Paginated (infinite scroll). |
 | Product detail | Image gallery (zoom), name, variant selector (chips: 1 L / 2 L / 5 L) with per-variant price and stock, ADD/stepper, "You save ₹X", description, key highlights, ingredients, nutrition info, shelf life, storage, country of origin, manufacturer/marketer details, FSSAI licence number, veg mark. A "Similar products" rail. |
-| Stock awareness | The stepper caps at `min(available, max_qty_per_order)` and shows "Only 2 left" when low |
+| Stock awareness | The stepper caps at the server's `orderable_quantity` (= `min(stock, max_qty_per_order)`, 0 when out of stock) and shows "Only 2 left" from `units_left` when `stock_status` is `LOW_STOCK`. The app never sees exact stock. |
 
 ### 2.7 Search [P2]
 | Feature | Details |
 |---------|---------|
-| Instant search | Debounced (300 ms) suggestions while typing. Matches product name, variant, tags and category. |
+| Instant search | Debounced (300 ms) suggestions while typing. Matches product name, variant, tags and category. Product suggestions open the product, category suggestions the product list, keywords run the search. |
 | Recent searches | Stored locally. Clearable. |
-| Trending | Admin-defined or computed popular searches |
+| Trending | Admin-defined or computed popular searches: `GET /search/suggest/` with a blank `q` |
 | Results | Same tile grid as the product list. Empty state with suggestions. |
 
 ### 2.8 Cart [P3]

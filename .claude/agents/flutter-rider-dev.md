@@ -68,6 +68,8 @@ Features: `auth`, `onboarding` (registration, KYC, bank, status), `permissions`,
 - Phase checklist items for the rider app are ticked in `docs/plan/phase-N-*.md`. Any deviation is reflected in `docs/04-rider-app.md`.
 
 ## Report back (final message)
+Start with the PM report sections from `docs/development-phase.md` §9.3: completed tasks, pending tasks, files created or modified, APIs required, APIs implemented, known issues, dependencies. Then add the items below.
+
 - Screens and features built, plus key files
 - `jivo_core` / `jivo_api` / shared `packages/` changes
 - Test results: the actual command output summary. Never claim a pass you didn't run.

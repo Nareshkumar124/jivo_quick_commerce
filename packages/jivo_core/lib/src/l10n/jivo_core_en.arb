@@ -74,6 +74,8 @@
   "@errorRateLimited": {"description": "RATE_LIMITED (HTTP 429)"},
   "errorServiceUnavailable": "Jivo is temporarily unavailable. Please try again in a few minutes.",
   "@errorServiceUnavailable": {"description": "SERVICE_UNAVAILABLE (HTTP 503)"},
+  "errorStoreNotFound": "This store isn't available any more. Please choose your location again.",
+  "@errorStoreNotFound": {"description": "STORE_NOT_FOUND (HTTP 404): the saved store is gone."},
   "errorOtpInvalidAttempts": "{count, plural, =0{That OTP is incorrect. No attempts left: please request a new OTP.} =1{That OTP is incorrect. 1 attempt left.} other{That OTP is incorrect. {count} attempts left.}}",
   "@errorOtpInvalidAttempts": {
     "description": "OTP_INVALID with details.attempts_remaining.",

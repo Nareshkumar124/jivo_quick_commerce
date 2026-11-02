@@ -1,0 +1,11 @@
+{# Form field with label, help text and errors. Params: field (a BoundField whose widget carries unfold classes), hide_label (optional). #}
+<div class="ops-field flex flex-col{% if field.errors %} ops-field--error{% endif %}">
+    <label for="{{ field.id_for_label }}" class="block font-semibold mb-1.5 text-font-important-light text-xs dark:text-font-important-dark{% if hide_label %} sr-only{% endif %}">
+        {{ field.label }}{% if field.field.required %} <span class="text-red-600">*</span>{% endif %}
+    </label>
+    {{ field }}
+    {% if field.help_text %}<p class="mt-1 text-xs text-font-subtle-light dark:text-font-subtle-dark" id="{{ field.auto_id }}-help">{{ field.help_text }}</p>{% endif %}
+    {% for error in field.errors %}
+        <p class="mt-1 text-red-600 text-xs dark:text-red-400" role="alert">{{ error }}</p>
+    {% endfor %}
+</div>

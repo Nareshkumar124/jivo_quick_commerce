@@ -41,7 +41,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   }
 
   Future<void> _listenForSms() async {
-    final code = await _autofill.listen();
+    final code = await _autofill.listenForCode();
     final length = ref.read(authFlowProvider).challenge?.otpLength ?? 6;
     if (!mounted || code == null || code.length != length) return;
     _otp.text = code;
@@ -50,7 +50,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   @override
   void dispose() {
-    _autofill.cancel();
+    _autofill.stop();
     _otp.dispose();
     super.dispose();
   }

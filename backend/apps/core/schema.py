@@ -7,7 +7,8 @@ whose body is exactly what the server sends (see ``apps.core.errors.error_payloa
 from collections.abc import Mapping
 from typing import Any
 
-from drf_spectacular.utils import OpenApiExample, OpenApiResponse
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse
 
 from apps.core.errors import ErrorCode, error_payload
 from apps.core.serializers import ErrorEnvelopeSerializer
@@ -82,3 +83,31 @@ def app_responses(responses: Mapping[int, Any]) -> dict[int, Any]:
     result.setdefault(426, APP_UPDATE_REQUIRED)
     result.setdefault(503, MAINTENANCE)
     return result
+
+
+# Optional authentication (e.g. home, notify-me): anonymous calls are fine, but a token that is
+# sent is checked, so an expired one is refreshed instead of silently dropping personal content.
+OPTIONAL_AUTH_UNAUTHORIZED = error_response(
+    "Only when an `Authorization` header is sent and the token is invalid, expired or revoked. "
+    "Anonymous calls (no header) never get 401. Refresh once and retry, or retry without the "
+    "header after logout.",
+    error_example(
+        ErrorCode.TOKEN_INVALID, "Given token not valid for any token type", summary="Expired token"
+    ),
+)
+
+PAGINATION_PARAMETERS = [
+    OpenApiParameter(
+        "page", OpenApiTypes.INT, description="Page number (1-based). Default 1.", required=False
+    ),
+    OpenApiParameter(
+        "page_size",
+        OpenApiTypes.INT,
+        description="Items per page: default 20, max 100.",
+        required=False,
+    ),
+]
+
+PAGE_NOT_FOUND = error_example(
+    ErrorCode.NOT_FOUND, "Invalid page.", name="PAGE_NOT_FOUND", summary="Page out of range"
+)

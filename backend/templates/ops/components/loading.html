@@ -1,0 +1,5 @@
+{# Loading indicator for HTMX requests. Params: id, label (default "Loading"). Shown while a request that names it in hx-indicator runs. #}
+<span id="{{ id }}" class="htmx-indicator ops-loading text-font-subtle-light dark:text-font-subtle-dark" role="status" aria-live="polite">
+    <span class="ops-spinner" aria-hidden="true"></span>
+    <span class="text-xs">{{ label|default:"Loading" }}…</span>
+</span>

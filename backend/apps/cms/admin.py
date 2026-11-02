@@ -16,6 +16,8 @@ def _https_urls(overrides: dict) -> dict:
 
 
 class AppVersionPolicyInline(TabularInline):
+    """Force-update policy per app and platform: below the minimum, the API answers 426."""
+
     model = AppVersionPolicy
     formfield_overrides = _https_urls(TabularInline.formfield_overrides)
     extra = 0
@@ -28,8 +30,18 @@ class AppConfigAdmin(ModelAdmin):
 
     inlines = [AppVersionPolicyInline]
     formfield_overrides = _https_urls(ModelAdmin.formfield_overrides)
+    readonly_fields = ("updated_at",)
     fieldsets = (
-        ("Maintenance", {"fields": ("maintenance", "maintenance_message")}),
+        (
+            "Maintenance",
+            {
+                "fields": ("maintenance", "maintenance_message"),
+                "description": (
+                    "While on, every app API call answers 503 (MAINTENANCE) and the apps show "
+                    "this message. The API applies changes as soon as they are saved."
+                ),
+            },
+        ),
         ("Support", {"fields": ("support_phone", "support_email")}),
         ("Policies", {"fields": ("terms_url", "privacy_url", "refund_url", "terms_version")}),
         (
@@ -42,6 +54,7 @@ class AppConfigAdmin(ModelAdmin):
             },
         ),
         ("Feature flags", {"fields": ("feature_flags",)}),
+        ("Record", {"fields": ("updated_at",)}),
     )
 
     def changelist_view(self, request, extra_context=None):

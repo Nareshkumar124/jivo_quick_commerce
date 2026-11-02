@@ -44,6 +44,7 @@ const backendCodes = [
   'RATE_LIMITED',
   'SERVER_ERROR',
   'SERVICE_UNAVAILABLE',
+  'STORE_NOT_FOUND',
 ];
 
 Future<ApiError> errorFor(CaptureAdapter adapter) async {

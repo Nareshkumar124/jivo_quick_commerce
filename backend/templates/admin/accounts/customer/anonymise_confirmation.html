@@ -1,0 +1,48 @@
+{% extends "admin/base_site.html" %}
+{% load l10n unfold %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} delete-confirmation{% endblock %}
+
+{% block content %}
+    <div class="border border-base-200 rounded-default shadow-xs dark:border-base-800" data-testid="anonymise-confirmation">
+        <div class="p-4">
+            <p class="font-semibold text-font-important-light dark:text-font-important-dark">
+                Anonymise {{ eligible|length }} customer{{ eligible|length|pluralize }} now?
+            </p>
+            <p class="mt-2">
+                Their name, phone, email, saved addresses, devices and OTP records are erased and they are signed out everywhere.
+                This cannot be undone. Orders and invoices keep their own snapshots (07 §4).
+            </p>
+            {% if skipped %}
+                <p class="mt-2">
+                    {{ skipped }} selected customer{{ skipped|pluralize }} did not request deletion (or {{ skipped|pluralize:"is,are" }} already anonymised) and will be skipped.
+                </p>
+            {% endif %}
+        </div>
+
+        {% if eligible %}
+            <div class="border-t border-base-200 p-4 dark:border-base-800">
+                <ul class="leading-relaxed">
+                    {% for customer in eligible %}
+                        <li>#{{ customer.pk }} {{ customer.name|default:"(no name)" }}: deletion requested {{ customer.deleted_at|date:"d M Y, H:i" }} UTC</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <form method="post" class="border-t border-base-200 flex gap-3 items-center px-4 py-3 dark:border-base-800">
+                {% csrf_token %}
+                {% for obj in queryset %}
+                    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk|unlocalize }}">
+                {% endfor %}
+                <input type="hidden" name="action" value="anonymise_now">
+                <input type="hidden" name="confirm" value="yes">
+                {% component "unfold/components/button.html" with submit=1 variant="danger" %}Yes, anonymise{% endcomponent %}
+                <a href="{% url 'admin:accounts_customer_changelist' %}" class="text-primary-600 dark:text-primary-500">Cancel</a>
+            </form>
+        {% else %}
+            <div class="border-t border-base-200 px-4 py-3 dark:border-base-800">
+                <a href="{% url 'admin:accounts_customer_changelist' %}" class="text-primary-600 dark:text-primary-500">Back to customers</a>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

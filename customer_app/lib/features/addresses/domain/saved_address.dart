@@ -45,11 +45,17 @@ class SavedAddress {
     required this.id,
     required this.input,
     required this.isDefault,
+    this.isServiceable = true,
   });
 
   final int id;
   final AddressInput input;
   final bool isDefault;
+
+  /// Inside an active store's area (checked by the server on every read).
+  /// An unserviceable address can be saved but not used for an order; it
+  /// is shown flagged (`03 §2.4`).
+  final bool isServiceable;
 
   /// The title to show: the custom label when set.
   String? get customTitle {

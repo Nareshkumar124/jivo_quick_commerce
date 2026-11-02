@@ -19,7 +19,10 @@ SEED_STEPS: list[str] = [
     "apps.accounts.seed.seed_staff",
     "apps.accounts.seed.seed_test_customers",
     "apps.cms.seed.seed_app_config",
-    # Phase 2: store, catalog, stock ...
+    # Phase 2: demo store GGN-01 (Gurugram polygon), ~20 products, stock through the ledger
+    "apps.stores.seed.seed_stores",
+    "apps.catalog.seed.seed_catalog",
+    "apps.inventory.seed.seed_stock",
 ]
 
 

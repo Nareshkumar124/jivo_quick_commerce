@@ -1,0 +1,5 @@
+{% extends "ops/base.html" %}
+{% block content %}
+    {% include "ops/components/error_state.html" with icon="block" title="Access refused" message=message %}
+    <p class="text-center"><a class="text-primary-600 dark:text-primary-500" href="{% url 'ops:dashboard' %}">Back to the dashboard</a></p>
+{% endblock %}

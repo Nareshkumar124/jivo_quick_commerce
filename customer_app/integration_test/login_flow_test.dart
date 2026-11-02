@@ -19,12 +19,12 @@ import 'package:customer_app/features/addresses/data/address_repository.dart';
 import 'package:customer_app/features/addresses/data/device_location.dart';
 import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/data/fake_token_refresher.dart';
-import 'package:customer_app/features/auth/data/otp_autofill.dart';
 import 'package:customer_app/features/launch/data/config_repository.dart';
 import 'package:customer_app/features/profile/data/profile_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -104,9 +104,14 @@ void main() {
     await pumpUntilFound(tester, find.text('Verify your number'));
 
     await tester.enterText(find.byKey(const Key('otp-field')), otp);
+    final home = find.byKey(const Key('home-screen'));
     await pumpUntilFound(
       tester,
-      find.textContaining(RegExp('Hi, |Tell us about you')),
+      find.byWidgetPredicate(
+        (w) =>
+            w.key == const Key('home-screen') ||
+            (w is Text && w.data == 'Tell us about you'),
+      ),
     );
     expect(session.isSignedIn, isTrue);
 
@@ -116,11 +121,14 @@ void main() {
         'Integration Tester',
       );
       await tester.tap(find.text('Continue'));
-      await pumpUntilFound(tester, find.textContaining('Hi, '));
+      await pumpUntilFound(tester, home);
     }
-    expect(find.textContaining('Hi, '), findsOneWidget);
+    expect(home, findsOneWidget);
 
-    // Add an address (no map in Phase 1: the pin is the device location).
+    // Add an address from Account (the pin is the device location; the map
+    // address form is bound in Phase 2 S2-B).
+    await tester.tap(find.byTooltip('Account'));
+    await pumpUntilFound(tester, find.text('Saved addresses'));
     await tester.tap(find.text('Saved addresses'));
     await pumpUntilFound(tester, find.text('Add address'));
     await tester.tap(find.text('Add address'));
@@ -153,7 +161,6 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Account'));
     await pumpUntilFound(tester, find.textContaining('+91$phoneDigits'));
     expect(find.textContaining('+91$phoneDigits'), findsOneWidget);
 

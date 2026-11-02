@@ -1,7 +1,8 @@
 """Project-wide pytest fixtures.
 
 Tests use real PostgreSQL (`test_jivo_quick_commerce`, managed by pytest-django) and the compose
-Redis on port 6380 (DB 15). See config/settings/test.py.
+Redis on port 6380 (DB 15). Parallel runs pick their own with `POSTGRES_TEST_DB` (must start with
+`test_jivo_quick_commerce`) and `TEST_REDIS_DB` (3-15). See config/settings/test.py.
 """
 
 from urllib.parse import urlparse
@@ -40,7 +41,8 @@ def _isolated_redis_and_outbox():
     an empty SMS outbox. Only ever the dedicated test DB (config/settings/test.py)."""
     from apps.notifications import sms
 
-    assert urlparse(settings.REDIS_URL).path == "/15", "tests must use the test Redis DB"
+    expected = f"/{settings.TEST_REDIS_DB}"
+    assert urlparse(settings.REDIS_URL).path == expected, "tests must use the test Redis DB"
     cache.clear()
     sms.outbox.clear()
     yield

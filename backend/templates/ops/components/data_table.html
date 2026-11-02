@@ -1,0 +1,16 @@
+{# Data table with server-side search, filters and pagination. Param: table (tables.DataTable.context()). #}
+{# Only the results region is swapped by HTMX, so the search box keeps focus while typing. #}
+<div class="ops-table" id="{{ table.id }}" data-testid="{{ table.id }}">
+    {% if table.form.fields %}
+        <form class="ops-table__filters" role="search" action="{{ table.url }}" method="get"
+              hx-get="{{ table.url }}" hx-target="#{{ table.results_id }}" hx-swap="outerHTML"
+              hx-trigger="input delay:350ms, submit" hx-sync="this:replace"
+              hx-indicator="#{{ table.id }}-loading">
+            {% for field in table.form %}
+                {% include "ops/components/form_field.html" with field=field %}
+            {% endfor %}
+            {% include "ops/components/loading.html" with id=table.id|add:"-loading" %}
+        </form>
+    {% endif %}
+    {% include "ops/components/data_table_results.html" %}
+</div>
