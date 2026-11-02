@@ -877,6 +877,684 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Call support'**
   String get callSupport;
+
+  /// Progress through registration, documents and bank details.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {step} of {total}'**
+  String onboardingStepOf(int step, int total);
+
+  /// Server VALIDATION_ERROR on an onboarding form.
+  ///
+  /// In en, this message translates to:
+  /// **'Some details were not accepted. Check them and try again.'**
+  String get onboardingCheckDetails;
+
+  /// No description provided for @onboardingLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading your application…'**
+  String get onboardingLoading;
+
+  /// No description provided for @onboardingLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your application'**
+  String get onboardingLoadError;
+
+  /// No description provided for @fieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This is required.'**
+  String get fieldRequired;
+
+  /// No description provided for @fieldNameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name with letters only, at least 2 characters.'**
+  String get fieldNameInvalid;
+
+  /// No description provided for @fieldDobInFuture.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth can\'t be in the future.'**
+  String get fieldDobInFuture;
+
+  /// No description provided for @fieldDobUnderage.
+  ///
+  /// In en, this message translates to:
+  /// **'You must be at least {age} years old to ride with Jivo.'**
+  String fieldDobUnderage(int age);
+
+  /// No description provided for @fieldPhoneSameAsRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter someone else\'s number, not your own.'**
+  String get fieldPhoneSameAsRider;
+
+  /// No description provided for @fieldVehicleNumberInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the vehicle number as on the number plate, like DL 3C AB 1234.'**
+  String get fieldVehicleNumberInvalid;
+
+  /// No description provided for @fieldAccountNumberInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid account number (9 to 18 digits).'**
+  String get fieldAccountNumberInvalid;
+
+  /// No description provided for @fieldAccountNumbersMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The account numbers don\'t match.'**
+  String get fieldAccountNumbersMismatch;
+
+  /// No description provided for @fieldIfscInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 11-character IFSC, like HDFC0001234.'**
+  String get fieldIfscInvalid;
+
+  /// No description provided for @fieldUpiInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid UPI ID, like name@okbank.'**
+  String get fieldUpiInvalid;
+
+  /// No description provided for @fieldAadhaarInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your 12-digit Aadhaar number exactly as printed.'**
+  String get fieldAadhaarInvalid;
+
+  /// No description provided for @fieldPanInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your PAN exactly as printed, like ABCDE1234F.'**
+  String get fieldPanInvalid;
+
+  /// No description provided for @fieldDrivingLicenceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your licence number exactly as printed on the card.'**
+  String get fieldDrivingLicenceInvalid;
+
+  /// No description provided for @registerIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us about yourself and your vehicle. Next, you\'ll upload your documents.'**
+  String get registerIntro;
+
+  /// No description provided for @registerSectionAboutYou.
+  ///
+  /// In en, this message translates to:
+  /// **'About you'**
+  String get registerSectionAboutYou;
+
+  /// No description provided for @registerFullName.
+  ///
+  /// In en, this message translates to:
+  /// **'Full name (as on Aadhaar)'**
+  String get registerFullName;
+
+  /// No description provided for @registerDob.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth'**
+  String get registerDob;
+
+  /// No description provided for @registerDobHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the date'**
+  String get registerDobHint;
+
+  /// No description provided for @registerDobPickerHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Select your date of birth'**
+  String get registerDobPickerHelp;
+
+  /// No description provided for @registerSectionEmergency.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency contact'**
+  String get registerSectionEmergency;
+
+  /// No description provided for @registerEmergencyHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone Jivo can call if something happens to you on a delivery.'**
+  String get registerEmergencyHelp;
+
+  /// No description provided for @registerEmergencyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact name'**
+  String get registerEmergencyName;
+
+  /// No description provided for @registerEmergencyPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact mobile number'**
+  String get registerEmergencyPhone;
+
+  /// No description provided for @registerSectionStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferred store'**
+  String get registerSectionStore;
+
+  /// No description provided for @registerStoreLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Store you want to deliver for'**
+  String get registerStoreLabel;
+
+  /// No description provided for @registerStoreHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo confirms your store when your account is approved.'**
+  String get registerStoreHelp;
+
+  /// A dark store in the store dropdown.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, {city}'**
+  String registerStoreOption(String name, String city);
+
+  /// No description provided for @registerStoresLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading stores…'**
+  String get registerStoresLoading;
+
+  /// No description provided for @registerStoresError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the stores.'**
+  String get registerStoresError;
+
+  /// No description provided for @registerSectionVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your vehicle'**
+  String get registerSectionVehicle;
+
+  /// No description provided for @registerVehicleNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle number'**
+  String get registerVehicleNumber;
+
+  /// No description provided for @registerVehicleNumberHint.
+  ///
+  /// In en, this message translates to:
+  /// **'DL 3C AB 1234'**
+  String get registerVehicleNumberHint;
+
+  /// No description provided for @registerSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get registerSubmit;
+
+  /// No description provided for @vehicleBicycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bicycle'**
+  String get vehicleBicycle;
+
+  /// No description provided for @vehicleEBike.
+  ///
+  /// In en, this message translates to:
+  /// **'E-bike'**
+  String get vehicleEBike;
+
+  /// No description provided for @vehicleMotorbike.
+  ///
+  /// In en, this message translates to:
+  /// **'Motorbike'**
+  String get vehicleMotorbike;
+
+  /// No description provided for @vehicleScooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Scooter'**
+  String get vehicleScooter;
+
+  /// No description provided for @statusFinishTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish your application'**
+  String get statusFinishTitle;
+
+  /// No description provided for @statusFinishBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete these steps so Jivo can review your application.'**
+  String get statusFinishBody;
+
+  /// No description provided for @statusStepDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal and vehicle details'**
+  String get statusStepDetails;
+
+  /// No description provided for @statusStepDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get statusStepDocuments;
+
+  /// No description provided for @statusStepBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank details'**
+  String get statusStepBank;
+
+  /// No description provided for @statusStepDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get statusStepDone;
+
+  /// No description provided for @statusStepNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Needed'**
+  String get statusStepNeeded;
+
+  /// No description provided for @statusStepDocumentsProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} uploaded'**
+  String statusStepDocumentsProgress(int done, int total);
+
+  /// No description provided for @statusStepDocumentsFix.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 document needs a new photo} other{{count} documents need new photos}}'**
+  String statusStepDocumentsFix(int count);
+
+  /// No description provided for @statusActionUploadDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload documents'**
+  String get statusActionUploadDocuments;
+
+  /// No description provided for @statusActionAddBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bank details'**
+  String get statusActionAddBank;
+
+  /// No description provided for @statusActionCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check status'**
+  String get statusActionCheck;
+
+  /// No description provided for @statusActionViewDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'View documents'**
+  String get statusActionViewDocuments;
+
+  /// No description provided for @statusRejectedFixBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix the items below. Jivo reviews your application again after you send them.'**
+  String get statusRejectedFixBody;
+
+  /// No description provided for @statusRejectedReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason from Jivo'**
+  String get statusRejectedReasonLabel;
+
+  /// No description provided for @statusActionFixDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload documents again'**
+  String get statusActionFixDocuments;
+
+  /// No description provided for @statusActionFixBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Update bank details'**
+  String get statusActionFixBank;
+
+  /// No description provided for @statusApprovedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re approved!'**
+  String get statusApprovedTitle;
+
+  /// No description provided for @statusApprovedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your home store is {store}. You can now go online and start delivering.'**
+  String statusApprovedBody(String store);
+
+  /// No description provided for @statusActionStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start delivering'**
+  String get statusActionStart;
+
+  /// Dev flavor only: plays the ops review against the fake backend.
+  ///
+  /// In en, this message translates to:
+  /// **'Simulate review (dev)'**
+  String get statusDevReview;
+
+  /// No description provided for @statusDevApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve (fake)'**
+  String get statusDevApprove;
+
+  /// No description provided for @statusDevReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject the PAN (fake)'**
+  String get statusDevReject;
+
+  /// No description provided for @documentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get documentsTitle;
+
+  /// No description provided for @documentsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Take clear photos in good light. Each photo must show the whole document.'**
+  String get documentsIntro;
+
+  /// No description provided for @documentsProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} done. Upload every document to continue.'**
+  String documentsProgress(int done, int total);
+
+  /// No description provided for @documentsContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get documentsContinue;
+
+  /// No description provided for @docPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Your photo (selfie)'**
+  String get docPhoto;
+
+  /// No description provided for @docAadhaarFront.
+  ///
+  /// In en, this message translates to:
+  /// **'Aadhaar card: front'**
+  String get docAadhaarFront;
+
+  /// No description provided for @docAadhaarBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Aadhaar card: back'**
+  String get docAadhaarBack;
+
+  /// No description provided for @docPan.
+  ///
+  /// In en, this message translates to:
+  /// **'PAN card'**
+  String get docPan;
+
+  /// No description provided for @docDrivingLicence.
+  ///
+  /// In en, this message translates to:
+  /// **'Driving licence'**
+  String get docDrivingLicence;
+
+  /// No description provided for @docVehicleRc.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle RC'**
+  String get docVehicleRc;
+
+  /// No description provided for @docStatusNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Needed'**
+  String get docStatusNeeded;
+
+  /// No description provided for @docStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'In review'**
+  String get docStatusPending;
+
+  /// No description provided for @docStatusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get docStatusApproved;
+
+  /// No description provided for @docStatusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not accepted: upload again'**
+  String get docStatusRejected;
+
+  /// No description provided for @docActionUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get docActionUpload;
+
+  /// No description provided for @docActionReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get docActionReplace;
+
+  /// No description provided for @docActionReupload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload again'**
+  String get docActionReupload;
+
+  /// Snackbar after a document upload.
+  ///
+  /// In en, this message translates to:
+  /// **'{document} uploaded'**
+  String docUploaded(String document);
+
+  /// No description provided for @captureHintPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a clear photo of your face in good light. Remove your helmet, cap and sunglasses.'**
+  String get captureHintPhoto;
+
+  /// No description provided for @captureHintCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Put the card on a flat, dark surface. All four corners and the text must be clear, with no glare.'**
+  String get captureHintCard;
+
+  /// No description provided for @captureTakePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get captureTakePhoto;
+
+  /// No description provided for @captureChooseGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get captureChooseGallery;
+
+  /// No description provided for @captureProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the photo…'**
+  String get captureProcessing;
+
+  /// No description provided for @captureReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo ready'**
+  String get captureReady;
+
+  /// No description provided for @captureCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that the photo is sharp and nothing is cut off.'**
+  String get captureCheck;
+
+  /// No description provided for @captureUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get captureUpload;
+
+  /// No description provided for @captureRetake.
+  ///
+  /// In en, this message translates to:
+  /// **'Retake'**
+  String get captureRetake;
+
+  /// No description provided for @captureProblemPicker.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the camera or gallery. Allow Jivo Rider to use the camera in your phone settings, then try again.'**
+  String get captureProblemPicker;
+
+  /// No description provided for @captureProblemUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'That file can\'t be used. Take a new photo.'**
+  String get captureProblemUnreadable;
+
+  /// No description provided for @captureProblemTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That photo is too large. Take a new photo.'**
+  String get captureProblemTooLarge;
+
+  /// No description provided for @numberAadhaar.
+  ///
+  /// In en, this message translates to:
+  /// **'Aadhaar number'**
+  String get numberAadhaar;
+
+  /// No description provided for @numberPan.
+  ///
+  /// In en, this message translates to:
+  /// **'PAN'**
+  String get numberPan;
+
+  /// No description provided for @numberDrivingLicence.
+  ///
+  /// In en, this message translates to:
+  /// **'Driving licence number'**
+  String get numberDrivingLicence;
+
+  /// No description provided for @numberVehicleRc.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle number (as on the RC)'**
+  String get numberVehicleRc;
+
+  /// Helper under a document or account number once typed; only the masked form is shown.
+  ///
+  /// In en, this message translates to:
+  /// **'Entered: {masked}'**
+  String numberMaskedHelper(String masked);
+
+  /// No description provided for @bankTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank details'**
+  String get bankTitle;
+
+  /// No description provided for @bankIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo pays your earnings into this account.'**
+  String get bankIntro;
+
+  /// No description provided for @bankSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved account {account} · {ifsc}'**
+  String bankSaved(String account, String ifsc);
+
+  /// No description provided for @bankSavedShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Account {account}'**
+  String bankSavedShort(String account);
+
+  /// No description provided for @bankReplaceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'To change it, enter the new details below.'**
+  String get bankReplaceHint;
+
+  /// No description provided for @bankHolderName.
+  ///
+  /// In en, this message translates to:
+  /// **'Account holder name'**
+  String get bankHolderName;
+
+  /// No description provided for @bankAccountNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Account number'**
+  String get bankAccountNumber;
+
+  /// No description provided for @bankConfirmAccountNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-enter account number'**
+  String get bankConfirmAccountNumber;
+
+  /// No description provided for @bankIfsc.
+  ///
+  /// In en, this message translates to:
+  /// **'IFSC'**
+  String get bankIfsc;
+
+  /// No description provided for @bankIfscHint.
+  ///
+  /// In en, this message translates to:
+  /// **'HDFC0001234'**
+  String get bankIfscHint;
+
+  /// No description provided for @bankUpi.
+  ///
+  /// In en, this message translates to:
+  /// **'UPI ID (optional)'**
+  String get bankUpi;
+
+  /// No description provided for @bankUpiHint.
+  ///
+  /// In en, this message translates to:
+  /// **'name@okbank'**
+  String get bankUpiHint;
+
+  /// No description provided for @bankSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save bank details'**
+  String get bankSave;
+
+  /// No description provided for @bankSavedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank details saved'**
+  String get bankSavedToast;
 }
 
 class _AppLocalizationsDelegate

@@ -108,6 +108,61 @@ void main() {
       }
     });
 
+    test('application steps: open to PENDING_KYC and REJECTED only', () {
+      final steps = [
+        Routes.documents,
+        Routes.documentCapture('PAN'),
+        Routes.bankDetails,
+      ];
+      for (final status in [
+        RiderStatusEnum.PENDING_KYC,
+        RiderStatusEnum.REJECTED,
+      ]) {
+        for (final route in steps) {
+          expect(
+            redirect(
+              route,
+              sessionStatus: SessionStatus.signedIn,
+              account: loaded(status),
+            ),
+            isNull,
+            reason: '$status may open $route',
+          );
+        }
+      }
+      for (final (status, target) in [
+        (RiderStatusEnum.SUSPENDED, Routes.riderStatus),
+        (RiderStatusEnum.unknownDefaultOpenApi, Routes.riderStatus),
+        (RiderStatusEnum.NONE, Routes.register),
+        (RiderStatusEnum.ACTIVE, Routes.home),
+      ]) {
+        for (final route in steps) {
+          expect(
+            redirect(
+              route,
+              sessionStatus: SessionStatus.signedIn,
+              account: loaded(status),
+            ),
+            target,
+            reason: '$status may not open $route',
+          );
+        }
+      }
+      expect(
+        Routes.documentCapture('AADHAAR_FRONT'),
+        '/rider-status/documents/aadhaar_front',
+      );
+      // A look-alike path is not a sub-route.
+      expect(
+        redirect(
+          '/rider-statusx',
+          sessionStatus: SessionStatus.signedIn,
+          account: loaded(RiderStatusEnum.PENDING_KYC),
+        ),
+        Routes.riderStatus,
+      );
+    });
+
     test('signed in but rider_status not loaded (or /me failed): splash', () {
       expect(
         redirect(Routes.home, sessionStatus: SessionStatus.signedIn),

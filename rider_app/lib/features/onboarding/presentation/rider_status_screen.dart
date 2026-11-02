@@ -11,8 +11,10 @@ import '../../auth/presentation/rider_account_controller.dart';
 import '../../launch/presentation/blocking_message.dart';
 import '../../launch/presentation/launch_controller.dart';
 
-/// `PENDING_KYC`, `REJECTED`, `SUSPENDED` (or a status this version does not
-/// know): placeholder status screen until the P5 KYC flow (04 §2.2).
+/// Static status screen: `SUSPENDED` and statuses this version does not
+/// know, in every build. In staging and prod (no rider API yet, no fakes) it
+/// is also the Phase 1 placeholder for `PENDING_KYC` and `REJECTED`; the dev
+/// flavor and `FAKE_API` builds use `OnboardingStatusScreen` for those.
 class RiderStatusScreen extends ConsumerWidget {
   const RiderStatusScreen({super.key});
 

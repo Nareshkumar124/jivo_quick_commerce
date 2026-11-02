@@ -5,8 +5,9 @@ import '../../../shared/widgets/dev_tools_button.dart';
 import '../../auth/presentation/logout_button.dart';
 import '../../launch/presentation/blocking_message.dart';
 
-/// `rider_status: NONE`: the user has no rider profile yet. Registration and
-/// KYC come in P5 (04 §2.2); until then this placeholder.
+/// `rider_status: NONE` in staging and prod: the Phase 1 placeholder, kept
+/// until the rider API lands (no fakes there). The dev flavor and `FAKE_API`
+/// builds open `RegistrationScreen` instead.
 class RegisterPlaceholderScreen extends StatelessWidget {
   const RegisterPlaceholderScreen({super.key});
 

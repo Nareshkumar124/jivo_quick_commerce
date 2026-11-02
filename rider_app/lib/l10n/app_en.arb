@@ -248,5 +248,220 @@
   "statusSuspendedBody": "Your rider account is suspended. Contact Jivo support to continue.",
   "statusUnknownTitle": "Account status unavailable",
   "statusUnknownBody": "This version of the app can't show your account status. Update the app or contact support.",
-  "callSupport": "Call support"
+  "callSupport": "Call support",
+  "onboardingStepOf": "Step {step} of {total}",
+  "@onboardingStepOf": {
+    "description": "Progress through registration, documents and bank details.",
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "onboardingCheckDetails": "Some details were not accepted. Check them and try again.",
+  "@onboardingCheckDetails": {
+    "description": "Server VALIDATION_ERROR on an onboarding form."
+  },
+  "onboardingLoading": "Loading your application…",
+  "onboardingLoadError": "Couldn't load your application",
+  "fieldRequired": "This is required.",
+  "fieldNameInvalid": "Enter a name with letters only, at least 2 characters.",
+  "fieldDobInFuture": "Date of birth can't be in the future.",
+  "fieldDobUnderage": "You must be at least {age} years old to ride with Jivo.",
+  "@fieldDobUnderage": {
+    "placeholders": {
+      "age": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldPhoneSameAsRider": "Enter someone else's number, not your own.",
+  "fieldVehicleNumberInvalid": "Enter the vehicle number as on the number plate, like DL 3C AB 1234.",
+  "fieldAccountNumberInvalid": "Enter a valid account number (9 to 18 digits).",
+  "fieldAccountNumbersMismatch": "The account numbers don't match.",
+  "fieldIfscInvalid": "Enter the 11-character IFSC, like HDFC0001234.",
+  "fieldUpiInvalid": "Enter a valid UPI ID, like name@okbank.",
+  "fieldAadhaarInvalid": "Enter your 12-digit Aadhaar number exactly as printed.",
+  "fieldPanInvalid": "Enter your PAN exactly as printed, like ABCDE1234F.",
+  "fieldDrivingLicenceInvalid": "Enter your licence number exactly as printed on the card.",
+  "registerIntro": "Tell us about yourself and your vehicle. Next, you'll upload your documents.",
+  "registerSectionAboutYou": "About you",
+  "registerFullName": "Full name (as on Aadhaar)",
+  "registerDob": "Date of birth",
+  "registerDobHint": "Choose the date",
+  "registerDobPickerHelp": "Select your date of birth",
+  "registerSectionEmergency": "Emergency contact",
+  "registerEmergencyHelp": "Someone Jivo can call if something happens to you on a delivery.",
+  "registerEmergencyName": "Contact name",
+  "registerEmergencyPhone": "Contact mobile number",
+  "registerSectionStore": "Preferred store",
+  "registerStoreLabel": "Store you want to deliver for",
+  "registerStoreHelp": "Jivo confirms your store when your account is approved.",
+  "registerStoreOption": "{name}, {city}",
+  "@registerStoreOption": {
+    "description": "A dark store in the store dropdown.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "city": {
+        "type": "String"
+      }
+    }
+  },
+  "registerStoresLoading": "Loading stores…",
+  "registerStoresError": "Couldn't load the stores.",
+  "registerSectionVehicle": "Your vehicle",
+  "registerVehicleNumber": "Vehicle number",
+  "registerVehicleNumberHint": "DL 3C AB 1234",
+  "registerSubmit": "Continue",
+  "vehicleBicycle": "Bicycle",
+  "vehicleEBike": "E-bike",
+  "vehicleMotorbike": "Motorbike",
+  "vehicleScooter": "Scooter",
+  "statusFinishTitle": "Finish your application",
+  "statusFinishBody": "Complete these steps so Jivo can review your application.",
+  "statusStepDetails": "Personal and vehicle details",
+  "statusStepDocuments": "Documents",
+  "statusStepBank": "Bank details",
+  "statusStepDone": "Done",
+  "statusStepNeeded": "Needed",
+  "statusStepDocumentsProgress": "{done} of {total} uploaded",
+  "@statusStepDocumentsProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "statusStepDocumentsFix": "{count, plural, =1{1 document needs a new photo} other{{count} documents need new photos}}",
+  "@statusStepDocumentsFix": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "statusActionUploadDocuments": "Upload documents",
+  "statusActionAddBank": "Add bank details",
+  "statusActionCheck": "Check status",
+  "statusActionViewDocuments": "View documents",
+  "statusRejectedFixBody": "Fix the items below. Jivo reviews your application again after you send them.",
+  "statusRejectedReasonLabel": "Reason from Jivo",
+  "statusActionFixDocuments": "Upload documents again",
+  "statusActionFixBank": "Update bank details",
+  "statusApprovedTitle": "You're approved!",
+  "statusApprovedBody": "Your home store is {store}. You can now go online and start delivering.",
+  "@statusApprovedBody": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "statusActionStart": "Start delivering",
+  "statusDevReview": "Simulate review (dev)",
+  "@statusDevReview": {
+    "description": "Dev flavor only: plays the ops review against the fake backend."
+  },
+  "statusDevApprove": "Approve (fake)",
+  "statusDevReject": "Reject the PAN (fake)",
+  "documentsTitle": "Documents",
+  "documentsIntro": "Take clear photos in good light. Each photo must show the whole document.",
+  "documentsProgress": "{done} of {total} done. Upload every document to continue.",
+  "@documentsProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "documentsContinue": "Continue",
+  "docPhoto": "Your photo (selfie)",
+  "docAadhaarFront": "Aadhaar card: front",
+  "docAadhaarBack": "Aadhaar card: back",
+  "docPan": "PAN card",
+  "docDrivingLicence": "Driving licence",
+  "docVehicleRc": "Vehicle RC",
+  "docStatusNeeded": "Needed",
+  "docStatusPending": "In review",
+  "docStatusApproved": "Approved",
+  "docStatusRejected": "Not accepted: upload again",
+  "docActionUpload": "Upload",
+  "docActionReplace": "Replace",
+  "docActionReupload": "Upload again",
+  "docUploaded": "{document} uploaded",
+  "@docUploaded": {
+    "description": "Snackbar after a document upload.",
+    "placeholders": {
+      "document": {
+        "type": "String"
+      }
+    }
+  },
+  "captureHintPhoto": "Take a clear photo of your face in good light. Remove your helmet, cap and sunglasses.",
+  "captureHintCard": "Put the card on a flat, dark surface. All four corners and the text must be clear, with no glare.",
+  "captureTakePhoto": "Take photo",
+  "captureChooseGallery": "Choose from gallery",
+  "captureProcessing": "Preparing the photo…",
+  "captureReady": "Photo ready",
+  "captureCheck": "Check that the photo is sharp and nothing is cut off.",
+  "captureUpload": "Upload",
+  "captureRetake": "Retake",
+  "captureProblemPicker": "Couldn't open the camera or gallery. Allow Jivo Rider to use the camera in your phone settings, then try again.",
+  "captureProblemUnreadable": "That file can't be used. Take a new photo.",
+  "captureProblemTooLarge": "That photo is too large. Take a new photo.",
+  "numberAadhaar": "Aadhaar number",
+  "numberPan": "PAN",
+  "numberDrivingLicence": "Driving licence number",
+  "numberVehicleRc": "Vehicle number (as on the RC)",
+  "numberMaskedHelper": "Entered: {masked}",
+  "@numberMaskedHelper": {
+    "description": "Helper under a document or account number once typed; only the masked form is shown.",
+    "placeholders": {
+      "masked": {
+        "type": "String"
+      }
+    }
+  },
+  "bankTitle": "Bank details",
+  "bankIntro": "Jivo pays your earnings into this account.",
+  "bankSaved": "Saved account {account} · {ifsc}",
+  "@bankSaved": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      },
+      "ifsc": {
+        "type": "String"
+      }
+    }
+  },
+  "bankSavedShort": "Account {account}",
+  "@bankSavedShort": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "bankReplaceHint": "To change it, enter the new details below.",
+  "bankHolderName": "Account holder name",
+  "bankAccountNumber": "Account number",
+  "bankConfirmAccountNumber": "Re-enter account number",
+  "bankIfsc": "IFSC",
+  "bankIfscHint": "HDFC0001234",
+  "bankUpi": "UPI ID (optional)",
+  "bankUpiHint": "name@okbank",
+  "bankSave": "Save bank details",
+  "bankSavedToast": "Bank details saved"
 }

@@ -13,7 +13,15 @@ import '../features/launch/presentation/splash_screen.dart';
 import '../features/launch/presentation/update_screen.dart';
 import '../features/location/presentation/location_debug_screen.dart';
 import '../features/offers/presentation/offer_alert_preview_screen.dart';
+import '../features/onboarding/domain/image_picking.dart';
+import '../features/onboarding/domain/kyc_document.dart';
+import '../features/onboarding/presentation/bank_details_screen.dart';
+import '../features/onboarding/presentation/document_capture_screen.dart';
+import '../features/onboarding/presentation/documents_screen.dart';
+import '../features/onboarding/presentation/onboarding_providers.dart';
+import '../features/onboarding/presentation/onboarding_status_screen.dart';
 import '../features/onboarding/presentation/register_placeholder_screen.dart';
+import '../features/onboarding/presentation/registration_screen.dart';
 import '../features/onboarding/presentation/rider_status_screen.dart';
 import '../features/permissions/presentation/location_disclosure_screen.dart';
 import '../features/permissions/presentation/permissions_gate_screen.dart';
@@ -34,6 +42,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final env = ref.read(appEnvProvider);
   final session = ref.read(sessionManagerProvider);
   final signals = ref.read(appControlSignalsProvider);
+  final onboarding = ref.read(riderOnboardingEnabledProvider);
 
   // Rider-side state that also affects routing.
   final local = ValueNotifier<int>(0);
@@ -94,15 +103,49 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      // Registration and KYC (04 §2.2) run against the fake until the rider
+      // API lands; builds without it keep the Phase 1 placeholders.
       GoRoute(
         path: Routes.register,
-        name: 'register_placeholder',
-        builder: (_, _) => const RegisterPlaceholderScreen(),
+        name: 'register',
+        builder: (_, _) => onboarding
+            ? const RegistrationScreen()
+            : const RegisterPlaceholderScreen(),
       ),
       GoRoute(
         path: Routes.riderStatus,
         name: 'rider_status',
-        builder: (_, _) => const RiderStatusScreen(),
+        builder: (_, _) => onboarding
+            ? const OnboardingStatusScreen()
+            : const RiderStatusScreen(),
+        routes: [
+          if (onboarding) ...[
+            GoRoute(
+              path: 'documents',
+              name: 'documents',
+              builder: (_, _) => const DocumentsScreen(),
+              routes: [
+                GoRoute(
+                  path: ':type',
+                  name: 'document_capture',
+                  redirect: (_, state) =>
+                      _documentType(state) == null ? Routes.documents : null,
+                  builder: (_, state) => DocumentCaptureScreen(
+                    type: _documentType(state)!,
+                    recovered: state.extra is PickedImage
+                        ? state.extra! as PickedImage
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+            GoRoute(
+              path: 'bank',
+              name: 'bank_details',
+              builder: (_, _) => const BankDetailsScreen(),
+            ),
+          ],
+        ],
       ),
       GoRoute(
         path: Routes.home,
@@ -138,3 +181,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   });
   return router;
 });
+
+/// The document type of `/rider-status/documents/:type`, or null.
+KycDocumentType? _documentType(GoRouterState state) =>
+    KycDocumentType.fromWire(state.pathParameters['type']?.toUpperCase());

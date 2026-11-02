@@ -17,7 +17,9 @@ import 'routes.dart';
 ///    network): splash, which offers Retry;
 /// 5. optional update not dismissed: the update prompt;
 /// 6. signed out: login (the OTP step only while an OTP is pending);
-/// 7. signed in: the screen for `rider_status`.
+/// 7. signed in: the screen for `rider_status`. `PENDING_KYC` and
+///    `REJECTED` riders may also open the application steps under it
+///    (documents, bank details); everyone else gets exactly that screen.
 String? riderRedirect({
   required String location,
   required AppControlEvent? appControl,
@@ -52,7 +54,12 @@ String? riderRedirect({
     if (location == Routes.otp && hasOtpChallenge) return null;
     return _goTo(location, Routes.login);
   }
-  return _goTo(location, routeFor(destinationFor(account.riderStatus)));
+  final target = routeFor(destinationFor(account.riderStatus));
+  if (canEditApplication(account.riderStatus) &&
+      location.startsWith('$target/')) {
+    return null;
+  }
+  return _goTo(location, target);
 }
 
 /// The route of a signed-in rider's landing screen.

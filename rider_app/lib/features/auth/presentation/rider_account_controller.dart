@@ -2,12 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jivo_api/jivo_api.dart' show AuthSession;
+import 'package:jivo_api/jivo_api.dart' show AuthSession, RiderStatusEnum;
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../location/presentation/location_debug_controller.dart';
 import '../../offers/presentation/offer_alert_providers.dart';
+import '../../onboarding/presentation/onboarding_providers.dart';
 import '../domain/rider_account.dart';
 import 'auth_providers.dart';
 import 'login_controllers.dart';
@@ -47,6 +48,7 @@ class RiderAccountController extends Notifier<RiderAccountState> {
   /// `signedOut`, for both logout and an expired session.
   Future<void> _onSignOut(SignOutReason reason) async {
     await ref.read(locationDataCleanerProvider).clear();
+    await discardInterruptedKycCapture(ref);
     try {
       await ref.read(offerAlertNotificationsProvider).dismiss();
     } on Object catch (error) {
@@ -109,6 +111,17 @@ class RiderAccountController extends Notifier<RiderAccountState> {
         },
       ),
     );
+  }
+
+  /// A rider endpoint reported a new `rider_status` (registration created
+  /// the profile, or `GET /rider/me/` shows a review result). Updates the
+  /// routing without another `GET /me/`. Read the status from
+  /// [AccountLoaded.riderStatus], never from `user.riderStatus`, which is the
+  /// value at login.
+  void riderStatusChanged(RiderStatusEnum status) {
+    final current = state;
+    if (current is! AccountLoaded || current.riderStatus == status) return;
+    state = AccountLoaded(user: current.user, riderStatus: status);
   }
 
   /// Logout (04 §2.9): refused while online. Otherwise revokes the refresh

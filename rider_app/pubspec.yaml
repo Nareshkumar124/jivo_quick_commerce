@@ -43,6 +43,12 @@ dependencies:
   # template). See lib/features/auth/data/sms_otp_autofill.dart.
   smart_auth: ^3.2.0
 
+  # KYC documents (04 §2.2): camera or gallery (Android photo picker, no
+  # storage permission), then a native JPEG re-encode that strips EXIF (GPS)
+  # and steps quality/size down until the file is <= 1 MB.
+  image_picker: ^1.2.4
+  flutter_image_compress: ^2.5.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

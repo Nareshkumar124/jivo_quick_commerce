@@ -7,11 +7,21 @@ abstract final class Routes {
   static const login = '/login';
   static const otp = '/login/otp';
 
-  /// `rider_status: NONE`: registration placeholder (registration is P5).
+  /// `rider_status: NONE`: the registration form (04 §2.2, screen 3).
   static const register = '/register';
 
-  /// `PENDING_KYC`, `REJECTED`, `SUSPENDED` (and unknown values).
+  /// `PENDING_KYC`, `REJECTED`, `SUSPENDED` (and unknown values): the
+  /// approval status screen (screen 6), the hub of the application steps.
   static const riderStatus = '/rider-status';
+
+  /// Application steps under the status screen, open to `PENDING_KYC` and
+  /// `REJECTED` riders only (screens 4 and 5).
+  static const documents = '/rider-status/documents';
+  static const bankDetails = '/rider-status/bank';
+
+  /// One document's capture and upload, e.g. `/rider-status/documents/pan`.
+  static String documentCapture(String wireValue) =>
+      '$documents/${wireValue.toLowerCase()}';
 
   /// `ACTIVE`.
   static const home = '/';
