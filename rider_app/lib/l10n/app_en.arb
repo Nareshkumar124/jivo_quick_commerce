@@ -1,0 +1,252 @@
+{
+  "@@locale": "en",
+  "appTitle": "Jivo Rider",
+  "@appTitle": {
+    "description": "App name (D-06)."
+  },
+  "homeBuildLabel": "Build: {flavor}",
+  "@homeBuildLabel": {
+    "description": "Shows the build flavor on the placeholder home screen.",
+    "placeholders": {
+      "flavor": {
+        "type": "String",
+        "example": "dev"
+      }
+    }
+  },
+  "homePlaceholderBody": "Login, shifts and order offers arrive in later phases.",
+  "homeDevToolsButton": "Developer tools",
+  "retry": "Try again",
+  "done": "Done",
+  "permissionsTitle": "Before you go online",
+  "permissionsIntro": "Jivo Rider needs these to send you orders and track your deliveries.",
+  "permissionsLoadError": "Could not check permissions.",
+  "permissionsAllSet": "All set. You can go online.",
+  "gateStepDisclosure": "How we use your location",
+  "gateStepDisclosureHint": "Read this before we ask for location.",
+  "gateStepLocationWhenInUse": "Location access",
+  "gateStepLocationWhenInUseHint": "Tap Allow on the next screen.",
+  "gateStepLocationAlways": "Location: Allow all the time",
+  "gateStepLocationAlwaysHint": "On the next screen, choose \"Allow all the time\".",
+  "gateStepNotifications": "Notifications",
+  "gateStepNotificationsHint": "So you hear new orders and see that you are online.",
+  "gateStepBattery": "No battery restrictions",
+  "gateStepBatteryHint": "So your phone does not stop the app while you ride.",
+  "gateStepGps": "GPS on",
+  "gateStepGpsHint": "Switch on location in your phone settings.",
+  "gateStatusDone": "Done",
+  "gateStatusNeeded": "Needed",
+  "gateStatusBlocked": "Blocked: open settings",
+  "gateActionDisclosure": "Continue",
+  "gateActionLocationWhenInUse": "Allow location",
+  "gateActionLocationAlways": "Allow all the time",
+  "gateActionNotifications": "Allow notifications",
+  "gateActionBattery": "Remove battery restriction",
+  "gateActionGps": "Turn on GPS",
+  "gateActionOpenSettings": "Open settings",
+  "fullScreenIntentTitle": "Full-screen order alerts",
+  "fullScreenIntentBody": "Allow full-screen alerts so new orders show even when your phone is locked.",
+  "fullScreenIntentAction": "Allow full-screen alerts",
+  "oemTitle": "Keep Jivo Rider running",
+  "oemXiaomi": "Xiaomi, Redmi, POCO: open App settings, turn Autostart on, and set Battery saver to No restrictions.",
+  "oemOppo": "OPPO: open App settings > Battery, then allow background activity and auto launch.",
+  "oemVivo": "vivo, iQOO: open App settings > Battery, allow high background power use, and turn Autostart on.",
+  "oemRealme": "realme: open App settings > Battery, then allow background activity and auto launch.",
+  "oemOneplus": "OnePlus: open App settings > Battery, choose Unrestricted, and allow auto launch.",
+  "oemAction": "Open app settings",
+  "disclosureTitle": "Your location while you're online",
+  "disclosureBody": "Jivo Rider collects location data to send you delivery offers near your store, show customers where their order is, and calculate your distance pay, even when the app is closed or not in use.",
+  "disclosureOnlineOnly": "Location is collected only while you are online. It stops as soon as you go offline.",
+  "disclosureSharing": "Your live location is shared with Jivo operations and with the customer whose order you are delivering.",
+  "disclosureNextSteps": "Next, allow location and then choose \"Allow all the time\".",
+  "disclosureAccept": "Continue",
+  "disclosureDecline": "Not now",
+  "onlineNotificationTitle": "You're online",
+  "onlineNotificationText": "Jivo Rider is using your location for deliveries.",
+  "onlineChannelName": "Online status",
+  "onlineChannelDescription": "Shown while you are online and your location is shared.",
+  "offerChannelName": "New order offers",
+  "offerChannelDescription": "Rings and opens full screen when a new order is offered to you.",
+  "testOfferTitle": "New order offer (test)",
+  "testOfferBody": "Test store to Sector 21 · 2.4 km · Prepaid",
+  "offerPreviewTitle": "Test offer",
+  "offerPreviewBody": "This screen was opened by the offer alert. The real offer screen comes in Phase 5.",
+  "offerPreviewDismiss": "Dismiss",
+  "debugTitle": "Location spike (dev)",
+  "debugStatusOnline": "Online: location service running",
+  "debugStatusOffline": "Offline: no location tracking",
+  "debugGoOnline": "Go online",
+  "debugGoOffline": "Go offline",
+  "debugPermissionsButton": "Permissions gate",
+  "debugPermissionsMissing": "Some permissions are missing. Fix them before going online.",
+  "debugStartFailed": "Could not start the location service: {error}",
+  "@debugStartFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "debugModeIdle": "Idle",
+  "debugModeOnTask": "On task",
+  "debugSimulateOffline": "Simulate no network (fake uploader)",
+  "debugFlushNow": "Upload now",
+  "debugStatsIntervals": "Fix every {sample} s, upload every {upload} s",
+  "@debugStatsIntervals": {
+    "placeholders": {
+      "sample": {
+        "type": "int"
+      },
+      "upload": {
+        "type": "int"
+      }
+    }
+  },
+  "debugStatsCounts": "Buffered {buffered} · Uploaded {uploaded} · Dropped {dropped} · Rejected {rejected}",
+  "@debugStatsCounts": {
+    "placeholders": {
+      "buffered": {
+        "type": "int"
+      },
+      "uploaded": {
+        "type": "int"
+      },
+      "dropped": {
+        "type": "int"
+      },
+      "rejected": {
+        "type": "int"
+      }
+    }
+  },
+  "debugStatsLastFix": "Last fix: {lat}, {lng} (±{accuracy} m) at {time}",
+  "@debugStatsLastFix": {
+    "placeholders": {
+      "lat": {
+        "type": "String"
+      },
+      "lng": {
+        "type": "String"
+      },
+      "accuracy": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "debugStatsNoFix": "No fix yet",
+  "debugStatsLastUpload": "Last upload: {status} at {time}",
+  "@debugStatsLastUpload": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "debugStatsLastError": "Last error: {error}",
+  "@debugStatsLastError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "debugOfferSection": "Offer alert",
+  "debugOfferNow": "Show test offer now",
+  "debugOfferDelayed": "Show test offer in 10 s",
+  "debugOfferScheduled": "Test offer in 10 s. Lock the phone now.",
+  "splashLoading": "Getting things ready…",
+  "splashErrorTitle": "Couldn't connect",
+  "updateRequiredTitle": "Update required",
+  "updateRequiredBody": "This version of Jivo Rider is no longer supported. Update the app to keep receiving orders.",
+  "updateAvailableTitle": "Update available",
+  "updateAvailableBody": "A newer version of Jivo Rider is available, with fixes and improvements.",
+  "updateNow": "Update now",
+  "updateLater": "Later",
+  "updateStoreOpenFailed": "Couldn't open the Play Store. Update Jivo Rider from the Play Store app.",
+  "maintenanceTitle": "We'll be back soon",
+  "maintenanceDefaultMessage": "Jivo Rider is under maintenance. Please try again in a little while.",
+  "loginTitle": "Log in to Jivo Rider",
+  "loginSubtitle": "Enter your mobile number. We'll send you a one-time code by SMS.",
+  "loginPhoneLabel": "Mobile number",
+  "loginPhoneHint": "98765 43210",
+  "loginPhoneEmpty": "Enter your mobile number.",
+  "loginPhoneIncomplete": "Enter all 10 digits.",
+  "loginPhoneInvalid": "Enter a valid Indian mobile number starting with 6, 7, 8 or 9.",
+  "loginConsent": "By continuing, you agree to the {terms} and the {privacy}.",
+  "@loginConsent": {
+    "description": "Consent shown above the Get OTP button. {terms} and {privacy} become links; their text is loginTermsLink and loginPrivacyLink.",
+    "placeholders": {
+      "terms": {
+        "type": "String"
+      },
+      "privacy": {
+        "type": "String"
+      }
+    }
+  },
+  "loginTermsLink": "Terms of Use",
+  "loginPrivacyLink": "Privacy Policy",
+  "loginGetOtp": "Get OTP",
+  "loginSessionExpired": "Your session has ended. Please log in again.",
+  "otpTitle": "Enter the code",
+  "otpSentTo": "We sent a {length}-digit code to {phone}.",
+  "@otpSentTo": {
+    "placeholders": {
+      "length": {
+        "type": "int"
+      },
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "otpChangeNumber": "Change number",
+  "otpFieldLabel": "One-time code",
+  "otpVerify": "Verify",
+  "otpResend": "Resend code",
+  "otpResendIn": "Resend code in {seconds} s",
+  "@otpResendIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "otpGetNewCode": "Get a new code",
+  "otpWrongCode": "{count, plural, =1{Wrong code. 1 attempt left.} other{Wrong code. {count} attempts left.}}",
+  "@otpWrongCode": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "otpExpired": "This code has expired. Get a new code.",
+  "authRateLimited": "{minutes, plural, =1{Too many attempts. Try again in 1 minute.} other{Too many attempts. Try again in {minutes} minutes.}}",
+  "@authRateLimited": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "logout": "Log out",
+  "logoutBlockedOnline": "Go offline before logging out.",
+  "registerTitle": "Become a Jivo rider",
+  "registerBody": "Rider registration and document upload open in an upcoming update. You'll be able to sign up right here.",
+  "statusPendingTitle": "Documents under review",
+  "statusPendingBody": "Jivo is checking your documents. You'll be able to go online once they are approved.",
+  "statusRejectedTitle": "Documents not approved",
+  "statusRejectedBody": "Some of your documents need to be uploaded again. Contact support for details.",
+  "statusSuspendedTitle": "Account suspended",
+  "statusSuspendedBody": "Your rider account is suspended. Contact Jivo support to continue.",
+  "statusUnknownTitle": "Account status unavailable",
+  "statusUnknownBody": "This version of the app can't show your account status. Update the app or contact support.",
+  "callSupport": "Call support"
+}

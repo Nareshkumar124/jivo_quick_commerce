@@ -1,0 +1,149 @@
+# Backend CI (docs/10-testing-strategy.md §2). Uses its own throwaway service containers; it never
+# connects to the shared development database.
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "infra/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "infra/**"
+      - ".github/workflows/backend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.11.26"
+  PYTHON_VERSION: "3.13"
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  test:
+    name: Checks, tests, schema
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        # PostGIS image now, so Phase 2 (GeoDjango) needs no CI change. Phase 0 uses plain postgres.
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_DB: jivo_quick_commerce
+          POSTGRES_USER: jivo
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jivo -d jivo_quick_commerce"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: jivo_quick_commerce
+      POSTGRES_USER: jivo
+      POSTGRES_PASSWORD: ci-only-password
+      REDIS_URL: redis://localhost:6380/0
+      CELERY_BROKER_URL: redis://localhost:6380/1
+      CHANNELS_REDIS_URL: redis://localhost:6380/2
+      REDIS_TEST_URL: redis://localhost:6380/15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+
+      # Redis listens on 6380 inside and outside the container, exactly like infra/docker-compose.yml.
+      - name: Start Redis (port 6380)
+        run: |
+          docker run -d --name redis -p 6380:6380 redis:7.4.12-alpine \
+            redis-server --port 6380 --save "" --appendonly no
+          for i in $(seq 1 30); do
+            docker exec redis redis-cli -p 6380 ping && exit 0
+            sleep 1
+          done
+          echo "Redis did not start" && exit 1
+
+      - name: Django system check
+        run: uv run python manage.py check --fail-level WARNING
+
+      - name: Migrations are up to date
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Migrations apply on a fresh database
+        run: uv run python manage.py migrate --noinput
+
+      - name: Tests with coverage (fail under 80%)
+        run: uv run pytest --create-db
+
+      - name: OpenAPI schema is valid, warning-free and committed
+        run: |
+          uv run python manage.py spectacular --file "$RUNNER_TEMP/schema.yaml" --validate --fail-on-warn
+          diff -u openapi/schema.yaml "$RUNNER_TEMP/schema.yaml" || {
+            echo "::error::backend/openapi/schema.yaml is stale. Run: uv run python manage.py spectacular --file openapi/schema.yaml"
+            exit 1
+          }
+
+      - name: Deploy checks (production settings)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.production
+          DJANGO_ALLOWED_HOSTS: api.example.com
+          NUM_PROXIES: "1"
+        run: |
+          export DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')"
+          uv run python manage.py check --deploy --fail-level WARNING
+
+  audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+      - run: |
+          uv export --frozen --no-emit-project --format requirements-txt -o "$RUNNER_TEMP/requirements.txt"
+          uv run pip-audit --disable-pip --require-hashes -r "$RUNNER_TEMP/requirements.txt"
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production image (verifies GDAL/GEOS/PROJ and WeasyPrint libraries)
+        run: docker build -t jivoqc-backend:ci .

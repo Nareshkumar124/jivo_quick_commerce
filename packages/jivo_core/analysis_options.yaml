@@ -1,0 +1,6 @@
+# Lints are shared with the other Flutter projects; see ../analysis_options.yaml.
+include: ../analysis_options.yaml
+
+analyzer:
+  exclude:
+    - build/**

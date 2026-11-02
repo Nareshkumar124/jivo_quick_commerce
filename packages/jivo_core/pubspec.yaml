@@ -1,0 +1,31 @@
+name: jivo_core
+description: >-
+  Shared core for the Jivo customer and rider apps: theme and design-system
+  widgets, session/auth, env/flavor config and the dio setup.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.7
+  flutter: ">=3.47.9"
+
+dependencies:
+  dio: ^5.11.1
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_secure_storage: ^11.2.0
+  intl: ^0.20.3
+  jivo_api:
+    path: ../jivo_api
+  package_info_plus: ^10.2.2
+  sentry_flutter: ^10.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  generate: true

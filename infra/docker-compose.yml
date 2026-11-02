@@ -1,0 +1,109 @@
+# Local development stack: `docker compose -f infra/docker-compose.yml up` (from the repo root).
+#
+# PostgreSQL is NOT a service here: local development uses a remote PostgreSQL 16 server whose
+# credentials live in backend/.env (gitignored). See docs/02-system-architecture.md §4.
+#
+# Host ports (the default Redis, Postgres and Django ports are used by other projects on this machine):
+#   backend 8001 (Android emulator: http://10.0.2.2:8001) · redis 6380 · minio 9000/9001
+#   mailpit 1025 (SMTP) / 8025 (UI)
+#
+# First run:
+#   docker compose -f infra/docker-compose.yml up -d redis minio mailpit
+#   docker compose -f infra/docker-compose.yml run --rm backend python manage.py migrate
+#   docker compose -f infra/docker-compose.yml up -d backend worker beat
+
+name: jivoqc
+
+x-backend: &backend
+  build:
+    context: ../backend
+    target: dev
+  image: jivoqc-backend:dev
+  env_file:
+    - path: ../backend/.env
+      required: false
+  environment:
+    DJANGO_SETTINGS_MODULE: config.settings.local
+    REDIS_URL: redis://redis:6380/0
+    CELERY_BROKER_URL: redis://redis:6380/1
+    CHANNELS_REDIS_URL: redis://redis:6380/2
+    EMAIL_HOST: mailpit
+    EMAIL_PORT: "1025"
+    S3_ENDPOINT_URL: http://minio:9000
+    S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-jivo-local}
+    S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-jivo-local-minio-secret}
+  volumes:
+    - ../backend:/app
+  depends_on:
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  redis:
+    image: redis:7.4.12-alpine
+    # Listens on 6380 inside the container too, so the same port is used everywhere.
+    command: ["redis-server", "--port", "6380", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6380:6380"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6380", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    # The official minio/minio images are no longer published on Docker Hub or quay.io.
+    # pgsty/minio is a maintained community build of the same server (drop-in, same CLI).
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-jivo-local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-jivo-local-minio-secret}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.33.0
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+
+  backend:
+    <<: *backend
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  worker:
+    <<: *backend
+    command: ["celery", "-A", "config", "worker", "--loglevel", "INFO"]
+
+  beat:
+    <<: *backend
+    # DatabaseScheduler: run `migrate` once before starting beat.
+    command: ["celery", "-A", "config", "beat", "--loglevel", "INFO"]
+
+volumes:
+  minio-data:

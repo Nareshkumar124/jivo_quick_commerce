@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Staging and prod: HTTPS only. The dev flavor overrides this file in
+     src/dev/res/xml/ to allow the local Django stack over plain HTTP. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

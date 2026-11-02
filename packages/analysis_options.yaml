@@ -1,0 +1,14 @@
+# Shared lint configuration for the Flutter apps and packages.
+# Each project includes it with a relative path:
+#   include: ../packages/analysis_options.yaml   (customer_app, rider_app)
+#   include: ../analysis_options.yaml            (packages/jivo_core, packages/jivo_api)
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/build/**"
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+
+linter:
+  rules:

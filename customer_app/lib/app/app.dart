@@ -1,0 +1,54 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jivo_core/jivo_core.dart';
+
+import '../features/addresses/presentation/address_controllers.dart';
+import '../features/auth/presentation/auth_flow.dart';
+import '../features/profile/presentation/profile_controllers.dart';
+import '../l10n/generated/app_localizations.dart';
+import '../shared/widgets/offline_banner.dart';
+import 'launch_state.dart';
+import 'providers.dart';
+import 'router.dart';
+
+/// Clears user data when the session ends (logout, deletion, expiry).
+final signOutCleanupProvider = Provider<void>((ref) {
+  final remove = ref.watch(sessionProvider).addSignOutHook((_) async {
+    ref.invalidate(currentUserProvider);
+    ref.invalidate(addressListProvider);
+    ref.invalidate(authFlowProvider);
+    ref.read(launchStateProvider).clearUser();
+  });
+  ref.onDispose(remove);
+});
+
+/// The customer app: theme, `en_IN` localisation, the router and the global
+/// offline banner.
+class JivoCustomerApp extends ConsumerWidget {
+  const JivoCustomerApp({super.key});
+
+  /// English (India): ₹ and Indian digit grouping, IST dates (`09 §6`).
+  static const locale = Locale('en', 'IN');
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(signOutCleanupProvider);
+    return MaterialApp.router(
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+      theme: JivoTheme.light(),
+      locale: locale,
+      supportedLocales: const [locale],
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        JivoCoreLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      routerConfig: ref.watch(routerProvider),
+      builder: (context, child) =>
+          OfflineBanner(child: child ?? const SizedBox()),
+    );
+  }
+}

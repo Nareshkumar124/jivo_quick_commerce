@@ -1,0 +1,118 @@
+[project]
+name = "jivo-quick-commerce-backend"
+version = "0.1.0"
+description = "Jivo Quick Commerce backend: Django + DRF API, Channels, Celery, admin and Ops Console"
+requires-python = "==3.13.*"
+# Direct dependencies are pinned exactly (Phase 0, verified to resolve together on 2026-11-02).
+# Upgrade deliberately: change the pin, run `uv lock`, run the full suite, update docs/02 §2.1 if a
+# major version moves.
+dependencies = [
+    "django==5.2.18",                       # LTS
+    "djangorestframework==3.18.3",
+    "djangorestframework-simplejwt==5.5.1",
+    "drf-spectacular==0.30.0",
+    "django-filter==26.2",
+    "channels==4.3.2",
+    "channels-redis==4.3.0",
+    "daphne==4.2.3",                        # ASGI `runserver` for local dev (Channels)
+    "celery[redis]==5.6.3",                 # the redis extra keeps redis-py inside kombu's tested range
+    "django-celery-beat==2.9.0",
+    "redis==6.4.0",
+    "psycopg[binary]==3.3.6",
+    "python-dotenv==1.2.4",
+    "django-storages[s3]==1.14.6",
+    "django-unfold==0.110.1",
+    "django-import-export==4.4.4",
+    "django-simple-history==3.13.0",
+    "django-axes==9.0.0",                   # staff login throttling (09 §3.1)
+    "weasyprint==70.0",                     # needs pango at runtime (installed in the Docker image)
+    "sentry-sdk==2.73.0",
+    "gunicorn==26.2.0",
+    "uvicorn[standard]==0.54.0",
+    "uvicorn-worker==0.4.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.0",
+    "pytest-django==4.14.0",
+    "pytest-cov==7.1.0",
+    "factory-boy==3.3.3",
+    "freezegun==1.5.5",
+    "ruff==0.17.3",
+    "pip-audit==2.10.1",
+]
+
+[tool.uv]
+package = false
+
+# --------------------------------------------------------------------------- ruff
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["**/migrations/*.py"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "DJ",       # django
+    "C4",       # comprehensions
+    "SIM",      # simplify
+    "S",        # bandit
+    "T20",      # no print()
+    "PT",       # pytest style
+    "RUF",
+]
+ignore = [
+    "RUF012",   # Django/DRF class attributes (Meta.fields, list_display, ...) are mutable by design
+    "SIM300",   # misreads UPPER_CASE settings attributes as constants ("Yoda conditions")
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "S311"]
+"conftest.py" = ["S101", "S105", "S106"]
+"config/settings/*.py" = ["F403", "F405"]
+"**/examples.py" = ["S105"]  # fake example JWTs for the OpenAPI contract
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+# --------------------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+testpaths = ["apps", "tests"]
+python_files = ["test_*.py"]
+# --reuse-db keeps `test_jivo_quick_commerce` between runs (Django still applies new migrations).
+# Use --create-db to rebuild it from scratch.
+addopts = "--reuse-db --strict-markers -ra --cov --cov-report=term-missing:skip-covered"
+filterwarnings = [
+    "error::RuntimeWarning",
+]
+
+# --------------------------------------------------------------------------- coverage
+[tool.coverage.run]
+source = ["apps", "config"]
+branch = true
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "config/asgi.py",
+    "config/wsgi.py",
+    "config/settings/local.py",
+    "config/settings/staging.py",
+    "config/settings/production.py",
+    "config/settings/deployed.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

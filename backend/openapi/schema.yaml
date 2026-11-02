@@ -1,0 +1,2804 @@
+openapi: 3.0.3
+info:
+  title: Jivo Quick Commerce API
+  version: 0.1.0
+  description: |-
+    REST API for the Jivo customer and rider apps.
+
+    Conventions (docs/02-system-architecture.md §5): JSON with snake_case keys; money as 2-decimal strings; times in UTC ISO 8601; pagination with `page`/`page_size` (default 20, max 100). Apps send `X-App-Name`, `X-App-Version` and `X-Platform` on every request. Errors use the envelope `{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema).
+paths:
+  /api/v1/addresses/:
+    get:
+      operationId: addresses_list
+      description: The caller's addresses (deleted ones excluded), default first,
+        then newest.
+      summary: My saved addresses
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (1-based).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: 'Items per page: default 20, max 100.'
+      tags:
+      - addresses
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAddressList'
+              examples:
+                TwoAddresses:
+                  value:
+                    count: 2
+                    next: null
+                    previous: null
+                    results:
+                    - id: 12
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                      is_default: true
+                      created_at: '2026-10-20T06:35:00Z'
+                      updated_at: '2026-10-20T06:35:00Z'
+                    - id: 13
+                      label: other
+                      custom_label: Mom's place
+                      receiver_name: Sunita Verma
+                      receiver_phone: '+919812345678'
+                      house: House 18
+                      building_street: Block C, Sushant Lok 1
+                      landmark: ''
+                      area: Sushant Lok
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4646
+                      lng: 77.0864
+                      is_default: false
+                      created_at: '2026-10-25T12:00:00Z'
+                      updated_at: '2026-10-25T12:00:00Z'
+                  summary: Two addresses
+          description: One page.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+    post:
+      operationId: addresses_create
+      description: '`lat`/`lng` (the map pin) are required. `receiver_name`/`receiver_phone`
+        default to the user''s own. The user''s first address becomes the default.
+        Saving an address outside the service area is allowed; it is flagged from
+        Phase 2 (03 §2.4).'
+      summary: Add an address
+      tags:
+      - addresses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+            examples:
+              NewAddress:
+                value:
+                  label: other
+                  custom_label: Mom's place
+                  receiver_name: Sunita Verma
+                  receiver_phone: '+919812345678'
+                  house: House 18
+                  building_street: Block C, Sushant Lok 1
+                  area: Sushant Lok
+                  city: Gurugram
+                  state: Haryana
+                  pincode: '122001'
+                  lat: 28.4646
+                  lng: 77.0864
+                summary: New address
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+              examples:
+                Created:
+                  value:
+                    id: 13
+                    label: other
+                    custom_label: Mom's place
+                    receiver_name: Sunita Verma
+                    receiver_phone: '+919812345678'
+                    house: House 18
+                    building_street: Block C, Sushant Lok 1
+                    landmark: ''
+                    area: Sushant Lok
+                    city: Gurugram
+                    state: Haryana
+                    pincode: '122001'
+                    lat: 28.4646
+                    lng: 77.0864
+                    is_default: false
+                    created_at: '2026-10-25T12:00:00Z'
+                    updated_at: '2026-10-25T12:00:00Z'
+          description: Created.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        pincode:
+                        - Enter a 6-digit PIN code.
+                        lat:
+                        - This field is required.
+                        lng:
+                        - This field is required.
+                  summary: VALIDATION_ERROR
+          description: Invalid fields.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/addresses/{id}/:
+    get:
+      operationId: addresses_retrieve
+      summary: One of my addresses
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - addresses
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+              examples:
+                Home:
+                  value:
+                    id: 12
+                    label: home
+                    custom_label: ''
+                    receiver_name: Asha Verma
+                    receiver_phone: '+919876543210'
+                    house: Flat 402, Tower B
+                    building_street: Sunshine Apartments, MG Road
+                    landmark: Opposite City Mall
+                    area: Sector 14
+                    city: Gurugram
+                    state: Haryana
+                    pincode: '122001'
+                    lat: 28.4595
+                    lng: 77.0266
+                    is_default: true
+                    created_at: '2026-10-20T06:35:00Z'
+                    updated_at: '2026-10-20T06:35:00Z'
+          description: The address.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The object does not exist or does not belong to the caller.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+    patch:
+      operationId: addresses_update
+      description: Partial update. Use `set-default` to change the default.
+      summary: Edit an address
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - addresses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAddressRequest'
+            examples:
+              Edit:
+                value:
+                  landmark: Behind Galleria Market
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+              examples:
+                Updated:
+                  value:
+                    id: 12
+                    label: home
+                    custom_label: ''
+                    receiver_name: Asha Verma
+                    receiver_phone: '+919876543210'
+                    house: Flat 402, Tower B
+                    building_street: Sunshine Apartments, MG Road
+                    landmark: Behind Galleria Market
+                    area: Sector 14
+                    city: Gurugram
+                    state: Haryana
+                    pincode: '122001'
+                    lat: 28.4595
+                    lng: 77.0266
+                    is_default: true
+                    created_at: '2026-10-20T06:35:00Z'
+                    updated_at: '2026-10-20T06:35:00Z'
+          description: Updated.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        pincode:
+                        - Enter a 6-digit PIN code.
+                        lat:
+                        - This field is required.
+                        lng:
+                        - This field is required.
+                  summary: VALIDATION_ERROR
+          description: Invalid fields.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The object does not exist or does not belong to the caller.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+    delete:
+      operationId: addresses_delete
+      description: Soft delete. Deleting the default makes the most recently updated
+        remaining address the default.
+      summary: Delete an address
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - addresses
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The object does not exist or does not belong to the caller.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/addresses/{id}/set-default/:
+    post:
+      operationId: addresses_set_default
+      description: Exactly one default per user; the previous default is unset.
+      summary: Make an address the default
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - addresses
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+              examples:
+                Default:
+                  value:
+                    id: 12
+                    label: home
+                    custom_label: ''
+                    receiver_name: Asha Verma
+                    receiver_phone: '+919876543210'
+                    house: Flat 402, Tower B
+                    building_street: Sunshine Apartments, MG Road
+                    landmark: Opposite City Mall
+                    area: Sector 14
+                    city: Gurugram
+                    state: Haryana
+                    pincode: '122001'
+                    lat: 28.4595
+                    lng: 77.0266
+                    is_default: true
+                    created_at: '2026-10-20T06:35:00Z'
+                    updated_at: '2026-10-20T06:35:00Z'
+          description: The new default.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The object does not exist or does not belong to the caller.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/auth/logout/:
+    post:
+      operationId: auth_logout
+      description: 'Revokes `refresh` and, when `fcm_token` is sent, deactivates that
+        device so it gets no more pushes. Idempotent: always 204 for a signed-in caller,
+        even if the refresh token is already revoked, expired or not the caller''s
+        (then nothing happens).'
+      summary: Log out this device
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+            examples:
+              Logout:
+                value:
+                  refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                  fcm_token: dQw4w9WgXcQ:APA91bHun4MxP5egoKMwt2KZFBaFUH-1RYqx
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: Logged out.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        refresh:
+                        - This field is required.
+                  summary: VALIDATION_ERROR
+          description: No refresh token in the body.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/auth/otp/request/:
+    post:
+      operationId: auth_otp_request
+      description: |-
+        Sends a 6-digit OTP to `phone` for `app`. The response is the same whether or not the phone has an account (no account enumeration). With `purpose: delete_account` the OTP can only be used on `POST /me/delete/`; no SMS is sent if the phone has no account, but the response is identical.
+
+        Fixed-OTP test numbers exist only outside production (D-15).
+      summary: Send an OTP by SMS
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpSendRequest'
+            examples:
+              Login:
+                value:
+                  phone: '+919876543210'
+                  app: customer
+              RiderLogin:
+                value:
+                  phone: '+919811122233'
+                  app: rider
+                  purpose: login
+                summary: Rider login
+              DeleteAccount:
+                value:
+                  phone: '+919876543210'
+                  app: customer
+                  purpose: delete_account
+                summary: Delete account
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpSent'
+              examples:
+                Sent:
+                  value:
+                    otp_length: 6
+                    expires_in_seconds: 300
+                    resend_after_seconds: 30
+          description: OTP sent.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        phone:
+                        - Enter a 10-digit Indian mobile number in the form +919876543210.
+                  summary: VALIDATION_ERROR
+          description: Invalid phone, app or purpose.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPRATELIMITED:
+                  value:
+                    error:
+                      code: OTP_RATE_LIMITED
+                      message: Too many OTP requests. Try again later. Expected available
+                        in 540 seconds.
+                      details:
+                        retry_after_seconds: 540
+                  summary: OTP_RATE_LIMITED
+          description: 'Too many OTP requests or attempts (09 §3.1: 3 sends per phone
+            per 10 minutes, 10 per day, plus per-IP limits). Wait `details.retry_after_seconds`
+            (also in `Retry-After`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Sign-in is temporarily unavailable. Please try again
+                        in a minute.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: Maintenance mode (`MAINTENANCE`), or sign-in is temporarily
+            unavailable because the OTP rate-limit store is down (`SERVICE_UNAVAILABLE`;
+            fail-closed by design). Retry shortly.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+  /api/v1/auth/otp/verify/:
+    post:
+      operationId: auth_otp_verify
+      description: |-
+        Verifies a `login` OTP for `phone` + `app` and returns a token pair. Any phone can sign in on either app; a new phone creates the account (`is_new_user: true`).
+
+        - Up to 5 attempts per OTP. A wrong code returns `OTP_INVALID` with `details.attempts_remaining`; after the last attempt, or once expired (5 minutes) or used, the OTP returns `OTP_EXPIRED`: request a new one.
+        - A `delete_account` OTP never signs anyone in.
+        - Logging in during the 30-day deletion grace period restores the account (`deletion_cancelled: true`).
+        - `terms_version` is recorded with the time as the user's consent (DPDP).
+        - A deactivated account gets 403 `PERMISSION_DENIED`.
+      summary: Verify the OTP and sign in
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+            examples:
+              Customer:
+                value:
+                  phone: '+919876543210'
+                  otp: '482913'
+                  app: customer
+                  terms_version: '2026-11-01'
+              Rider:
+                value:
+                  phone: '+919811122233'
+                  otp: '482913'
+                  app: rider
+                  terms_version: '2026-11-01'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+              examples:
+                NewCustomer:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjExODAwLCJpYXQiOjE3OTM2MTA5MDAsImp0aSI6IjZmMWMyYjllOGQ3YTRjNWI5ZTBmMWEyYjNjNGQ1ZTZmIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    user:
+                      id: 42
+                      phone: '+919876543210'
+                      name: ''
+                      email: null
+                      marketing_opt_in: false
+                      is_profile_complete: false
+                      rider_status: NONE
+                      created_at: '2026-11-02T10:15:00Z'
+                    is_new_user: true
+                    rider_status: NONE
+                    deletion_cancelled: false
+                  summary: New customer
+                ReturningCustomer:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjExODAwLCJpYXQiOjE3OTM2MTA5MDAsImp0aSI6IjZmMWMyYjllOGQ3YTRjNWI5ZTBmMWEyYjNjNGQ1ZTZmIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    user:
+                      id: 42
+                      phone: '+919876543210'
+                      name: Asha Verma
+                      email: asha.verma@example.com
+                      marketing_opt_in: false
+                      is_profile_complete: true
+                      rider_status: NONE
+                      created_at: '2026-10-20T06:30:00Z'
+                    is_new_user: false
+                    rider_status: NONE
+                    deletion_cancelled: false
+                  summary: Returning customer
+                RiderApp,NoRiderProfile:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjExODAwLCJpYXQiOjE3OTM2MTA5MDAsImp0aSI6IjZmMWMyYjllOGQ3YTRjNWI5ZTBmMWEyYjNjNGQ1ZTZmIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    user:
+                      id: 42
+                      phone: '+919811122233'
+                      name: ''
+                      email: null
+                      marketing_opt_in: false
+                      is_profile_complete: false
+                      rider_status: NONE
+                      created_at: '2026-11-02T10:15:00Z'
+                    is_new_user: true
+                    rider_status: NONE
+                    deletion_cancelled: false
+                  summary: Rider app, no rider profile
+                RiderApp,KYCPending:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjExODAwLCJpYXQiOjE3OTM2MTA5MDAsImp0aSI6IjZmMWMyYjllOGQ3YTRjNWI5ZTBmMWEyYjNjNGQ1ZTZmIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    user:
+                      id: 57
+                      phone: '+919811122233'
+                      name: Ravi Kumar
+                      email: null
+                      marketing_opt_in: false
+                      is_profile_complete: true
+                      rider_status: PENDING_KYC
+                      created_at: '2026-10-28T04:00:00Z'
+                    is_new_user: false
+                    rider_status: PENDING_KYC
+                    deletion_cancelled: false
+                  summary: Rider app, KYC pending
+                DeletionCancelledByLogin:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjExODAwLCJpYXQiOjE3OTM2MTA5MDAsImp0aSI6IjZmMWMyYjllOGQ3YTRjNWI5ZTBmMWEyYjNjNGQ1ZTZmIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    user:
+                      id: 42
+                      phone: '+919876543210'
+                      name: Asha Verma
+                      email: asha.verma@example.com
+                      marketing_opt_in: false
+                      is_profile_complete: true
+                      rider_status: NONE
+                      created_at: '2026-10-20T06:30:00Z'
+                    is_new_user: false
+                    rider_status: NONE
+                    deletion_cancelled: true
+                  summary: Deletion cancelled by login
+          description: Signed in.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPINVALID:
+                  value:
+                    error:
+                      code: OTP_INVALID
+                      message: The OTP is incorrect.
+                      details:
+                        attempts_remaining: 3
+                  summary: Wrong OTP
+                OTPEXPIRED:
+                  value:
+                    error:
+                      code: OTP_EXPIRED
+                      message: The OTP has expired.
+                      details: {}
+                  summary: 'Expired, already used or out of attempts: request a new
+                    OTP'
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        otp:
+                        - Enter the 6-digit OTP.
+                  summary: VALIDATION_ERROR
+          description: Wrong or expired OTP, or invalid input.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                PERMISSIONDENIED:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This account is deactivated.
+                      details: {}
+                  summary: PERMISSION_DENIED
+          description: The account is deactivated.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPRATELIMITED:
+                  value:
+                    error:
+                      code: OTP_RATE_LIMITED
+                      message: Too many OTP requests. Try again later. Expected available
+                        in 540 seconds.
+                      details:
+                        retry_after_seconds: 540
+                  summary: OTP_RATE_LIMITED
+          description: 'Too many OTP requests or attempts (09 §3.1: 3 sends per phone
+            per 10 minutes, 10 per day, plus per-IP limits). Wait `details.retry_after_seconds`
+            (also in `Retry-After`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Sign-in is temporarily unavailable. Please try again
+                        in a minute.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: Maintenance mode (`MAINTENANCE`), or sign-in is temporarily
+            unavailable because the OTP rate-limit store is down (`SERVICE_UNAVAILABLE`;
+            fail-closed by design). Retry shortly.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+  /api/v1/auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh
+      description: |-
+        Returns a new access token **and a new refresh token**. The refresh token sent is revoked, so it works exactly once: run refreshes single-flight (one at a time), and replace both stored tokens.
+
+        Only 401 `TOKEN_INVALID` means the session is over (log out). This endpoint is exempt from 426 `APP_UPDATE_REQUIRED` and 503 `MAINTENANCE`, so a session survives maintenance and force updates.
+      summary: Rotate the refresh token
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+            examples:
+              Refresh:
+                value:
+                  refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+              examples:
+                Rotated:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjEyNzAwLCJpYXQiOjE3OTM2MTE4MDAsImp0aSI6IjdlNmQ1YzRiM2EyZjFlMGQ5YzhiN2E2ZjVlNGQzYzJiIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMzgwMCwiaWF0IjoxNzkzNjExODAwLCJqdGkiOiIxYjJjM2Q0ZTVmNmE3YjhjOWQwZTFmMmEzYjRjNWQ2ZSIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+          description: New token pair.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        refresh:
+                        - This field is required.
+                  summary: VALIDATION_ERROR
+          description: No refresh token in the body.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Token is blacklisted
+                      details: {}
+                  summary: Already used
+                TOKENINVALIDEXPIRED:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Token is expired
+                      details: {}
+                  summary: Expired (30 days)
+                TOKENINVALIDMALFORMED:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Token is invalid
+                      details: {}
+                  summary: Malformed or wrong signature
+          description: 'The refresh token is invalid, expired or already used: the
+            session is over.'
+  /api/v1/config/app/:
+    get:
+      operationId: config_app
+      description: 'Called on every app start. Versions and `store_url` are for the
+        app and platform given by the `X-App-Name` and `X-Platform` headers (null
+        without them). Never returns 426 or 503: during maintenance it answers 200
+        with `maintenance: true`.'
+      summary: App configuration (splash)
+      tags:
+      - config
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppConfig'
+              examples:
+                Normal:
+                  value:
+                    min_supported_version: 1.0.0
+                    latest_version: 1.2.0
+                    store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                    maintenance: false
+                    maintenance_message: ''
+                    support:
+                      phone: '+911800123456'
+                      email: support@jivo.in
+                    policy_urls:
+                      terms: https://jivo.in/terms
+                      privacy: https://jivo.in/privacy
+                      refund: https://jivo.in/refund-policy
+                    terms_version: '2026-11-01'
+                    otp:
+                      length: 6
+                      resend_after_seconds: 30
+                    rider_location:
+                      active_interval_seconds: 10
+                      idle_interval_seconds: 30
+                    feature_flags: {}
+                Maintenance:
+                  value:
+                    min_supported_version: 1.0.0
+                    latest_version: 1.2.0
+                    store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                    maintenance: true
+                    maintenance_message: Jivo is down for scheduled maintenance. We
+                      will be back by 6:00 AM.
+                    support:
+                      phone: '+911800123456'
+                      email: support@jivo.in
+                    policy_urls:
+                      terms: https://jivo.in/terms
+                      privacy: https://jivo.in/privacy
+                      refund: https://jivo.in/refund-policy
+                    terms_version: '2026-11-01'
+                    otp:
+                      length: 6
+                      resend_after_seconds: 30
+                    rider_location:
+                      active_interval_seconds: 10
+                      idle_interval_seconds: 30
+                    feature_flags: {}
+                NoAppHeaders:
+                  value:
+                    min_supported_version: null
+                    latest_version: null
+                    store_url: null
+                    maintenance: false
+                    maintenance_message: ''
+                    support:
+                      phone: '+911800123456'
+                      email: support@jivo.in
+                    policy_urls:
+                      terms: https://jivo.in/terms
+                      privacy: https://jivo.in/privacy
+                      refund: https://jivo.in/refund-policy
+                    terms_version: '2026-11-01'
+                    otp:
+                      length: 6
+                      resend_after_seconds: 30
+                    rider_location:
+                      active_interval_seconds: 10
+                      idle_interval_seconds: 30
+                    feature_flags: {}
+                  summary: No app headers
+          description: Configuration.
+  /api/v1/me/:
+    get:
+      operationId: me_retrieve
+      description: Also used on app start to restore routing (`rider_status`, profile
+        state).
+      summary: The signed-in user
+      tags:
+      - account
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+              examples:
+                Customer:
+                  value:
+                    id: 42
+                    phone: '+919876543210'
+                    name: Asha Verma
+                    email: asha.verma@example.com
+                    marketing_opt_in: false
+                    is_profile_complete: true
+                    rider_status: NONE
+                    created_at: '2026-10-20T06:30:00Z'
+                ProfileIncomplete:
+                  value:
+                    id: 42
+                    phone: '+919876543210'
+                    name: ''
+                    email: null
+                    marketing_opt_in: false
+                    is_profile_complete: false
+                    rider_status: NONE
+                    created_at: '2026-11-02T10:15:00Z'
+                  summary: Profile incomplete
+                Rider,KYCPending:
+                  value:
+                    id: 57
+                    phone: '+919811122233'
+                    name: Ravi Kumar
+                    email: null
+                    marketing_opt_in: false
+                    is_profile_complete: true
+                    rider_status: PENDING_KYC
+                    created_at: '2026-10-28T04:00:00Z'
+                  summary: Rider, KYC pending
+          description: The user.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+    patch:
+      operationId: me_update
+      description: Partial update. `phone` cannot be changed in v1. `name` cannot
+        be blanked. `email` is optional (null or empty string removes it). An email
+        that cannot be used (e.g. it belongs to another account) is rejected with
+        a generic message.
+      summary: Update name, email or promotional-push consent
+      tags:
+      - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMeRequest'
+            examples:
+              CompleteProfile:
+                value:
+                  name: Asha Verma
+                summary: Complete profile
+              EditProfile:
+                value:
+                  name: Asha Verma
+                  email: asha.verma@example.com
+                  marketing_opt_in: true
+                summary: Edit profile
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+              examples:
+                Updated:
+                  value:
+                    id: 42
+                    phone: '+919876543210'
+                    name: Asha Verma
+                    email: asha.verma@example.com
+                    marketing_opt_in: false
+                    is_profile_complete: true
+                    rider_status: NONE
+                    created_at: '2026-10-20T06:30:00Z'
+          description: Updated user.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                EmailUnavailable:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        email:
+                        - This email can't be used.
+                  summary: Email unavailable
+                BlankName:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        name:
+                        - This field may not be blank.
+                  summary: Blank name
+          description: Invalid fields.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/me/delete/:
+    post:
+      operationId: me_delete_account
+      description: |-
+        Two steps: (1) `POST /auth/otp/request/` with the user's own phone and `purpose: delete_account`; (2) this call with that OTP. Only a `delete_account` OTP issued to the caller's phone is accepted.
+
+        On success every refresh token of the user is revoked and their devices are deactivated: clear local data and go to the login screen. Personal data is anonymised after the grace period (`anonymise_after`, 30 days, 07 §4); order and invoice records are kept without personal data.
+      summary: Delete my account (OTP confirmed)
+      tags:
+      - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountDeleteRequest'
+            examples:
+              Delete:
+                value:
+                  otp: '739204'
+                  reason: I no longer use the app
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletion'
+              examples:
+                Scheduled:
+                  value:
+                    deleted_at: '2026-11-02T10:15:00Z'
+                    anonymise_after: '2026-12-02T10:15:00Z'
+          description: Deletion recorded.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPINVALID:
+                  value:
+                    error:
+                      code: OTP_INVALID
+                      message: The OTP is incorrect.
+                      details:
+                        attempts_remaining: 3
+                  summary: Wrong OTP
+                OTPEXPIRED:
+                  value:
+                    error:
+                      code: OTP_EXPIRED
+                      message: The OTP has expired.
+                      details: {}
+                  summary: 'Expired, already used or out of attempts: request a new
+                    OTP'
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        otp:
+                        - Enter the 6-digit OTP.
+                  summary: VALIDATION_ERROR
+          description: Wrong or expired OTP, or invalid input.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                PERMISSIONDENIED:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Staff accounts are deleted by an administrator.
+                      details: {}
+                  summary: PERMISSION_DENIED
+          description: Staff accounts cannot be deleted from the app.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPRATELIMITED:
+                  value:
+                    error:
+                      code: OTP_RATE_LIMITED
+                      message: Too many OTP requests. Try again later. Expected available
+                        in 540 seconds.
+                      details:
+                        retry_after_seconds: 540
+                  summary: OTP_RATE_LIMITED
+          description: 'Too many OTP requests or attempts (09 §3.1: 3 sends per phone
+            per 10 minutes, 10 per day, plus per-IP limits). Wait `details.retry_after_seconds`
+            (also in `Retry-After`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Sign-in is temporarily unavailable. Please try again
+                        in a minute.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: Maintenance mode (`MAINTENANCE`), or sign-in is temporarily
+            unavailable because the OTP rate-limit store is down (`SERVICE_UNAVAILABLE`;
+            fail-closed by design). Retry shortly.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+  /api/v1/me/devices/:
+    post:
+      operationId: me_device_register
+      description: 'Upsert keyed on `fcm_token`: call after login, on every FCM token
+        refresh and when the app version changes. If the token was registered to another
+        user it moves to the caller. Always 200.'
+      summary: Register or update this device's push token
+      tags:
+      - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRequest'
+            examples:
+              Register:
+                value:
+                  fcm_token: dQw4w9WgXcQ:APA91bHun4MxP5egoKMwt2KZFBaFUH-1RYqx
+                  app: customer
+                  platform: android
+                  app_version: 1.0.0+12
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+              examples:
+                Registered:
+                  value:
+                    id: 7
+                    fcm_token: dQw4w9WgXcQ:APA91bHun4MxP5egoKMwt2KZFBaFUH-1RYqx
+                    app: customer
+                    platform: android
+                    app_version: 1.0.0+12
+                    is_active: true
+                    last_seen_at: '2026-11-02T10:15:00Z'
+          description: The device.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        app_version:
+                        - This value does not match the required pattern.
+                  summary: VALIDATION_ERROR
+          description: Invalid fields.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /health/live:
+    get:
+      operationId: health_live
+      description: Returns 200 while the process can serve requests. Checks no dependencies.
+        The apps call this until `/api/v1/config/app/` exists (Phase 1).
+      summary: Liveness probe
+      tags:
+      - health
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthLive'
+              examples:
+                Alive:
+                  value:
+                    status: ok
+          description: The process is alive.
+  /health/ready:
+    get:
+      operationId: health_ready
+      description: Checks PostgreSQL (`SELECT 1`) and Redis (`PING`). Returns 200
+        when both answer, otherwise 503 `SERVICE_UNAVAILABLE` with the per-check result
+        in `details.checks`.
+      summary: Readiness probe
+      tags:
+      - health
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReady'
+              examples:
+                Ready:
+                  value:
+                    status: ok
+                    checks:
+                      database: ok
+                      redis: ok
+          description: Database and Redis are reachable.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RedisDown:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Service is not ready.
+                      details:
+                        checks:
+                          database: ok
+                          redis: error
+                  summary: Redis down
+          description: A dependency is unreachable.
+components:
+  schemas:
+    AccountDeleteRequest:
+      type: object
+      properties:
+        otp:
+          type: string
+          minLength: 1
+          description: 'OTP from `POST /auth/otp/request/` with `purpose: delete_account`
+            for the caller''s own phone. A login OTP is rejected.'
+          pattern: ^\d{6}$
+        reason:
+          type: string
+          description: Optional feedback.
+          maxLength: 500
+      required:
+      - otp
+    AccountDeletion:
+      type: object
+      properties:
+        deleted_at:
+          type: string
+          format: date-time
+          description: When the deletion was recorded.
+        anonymise_after:
+          type: string
+          format: date-time
+          description: Personal data is anonymised after this time (30-day grace period,
+            07 §4).
+      required:
+      - anonymise_after
+      - deleted_at
+    Address:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        label:
+          $ref: '#/components/schemas/AddressLabelEnum'
+        custom_label:
+          type: string
+          description: Shown instead of the label when set, e.g. "Mom's place".
+          maxLength: 40
+        receiver_name:
+          type: string
+          description: Defaults to the user's name.
+          maxLength: 120
+        receiver_phone:
+          type: string
+          description: Defaults to the user's phone.
+          pattern: ^\+91[6-9]\d{9}$
+        house:
+          type: string
+          description: House / flat / floor.
+          maxLength: 120
+        building_street:
+          type: string
+          description: Building and street.
+          maxLength: 200
+        landmark:
+          type: string
+          maxLength: 120
+        area:
+          type: string
+          maxLength: 120
+        city:
+          type: string
+          maxLength: 80
+        state:
+          type: string
+          maxLength: 80
+        pincode:
+          type: string
+          pattern: ^[1-9]\d{5}$
+        lat:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+          description: Map pin latitude (WGS84). Required. Stored to 6 decimal places.
+        lng:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+          description: Map pin longitude (WGS84). Required. Stored to 6 decimal places.
+        is_default:
+          type: boolean
+          readOnly: true
+          description: Change it with `POST /addresses/{id}/set-default/`.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - building_street
+      - city
+      - created_at
+      - house
+      - id
+      - is_default
+      - label
+      - lat
+      - lng
+      - pincode
+      - state
+      - updated_at
+    AddressLabelEnum:
+      enum:
+      - home
+      - work
+      - other
+      type: string
+      description: |-
+        * `home` - Home
+        * `work` - Work
+        * `other` - Other
+    AddressRequest:
+      type: object
+      properties:
+        label:
+          $ref: '#/components/schemas/AddressLabelEnum'
+        custom_label:
+          type: string
+          description: Shown instead of the label when set, e.g. "Mom's place".
+          maxLength: 40
+        receiver_name:
+          type: string
+          minLength: 1
+          description: Defaults to the user's name.
+          maxLength: 120
+        receiver_phone:
+          type: string
+          minLength: 1
+          description: Defaults to the user's phone.
+          pattern: ^\+91[6-9]\d{9}$
+        house:
+          type: string
+          minLength: 1
+          description: House / flat / floor.
+          maxLength: 120
+        building_street:
+          type: string
+          minLength: 1
+          description: Building and street.
+          maxLength: 200
+        landmark:
+          type: string
+          maxLength: 120
+        area:
+          type: string
+          maxLength: 120
+        city:
+          type: string
+          minLength: 1
+          maxLength: 80
+        state:
+          type: string
+          minLength: 1
+          maxLength: 80
+        pincode:
+          type: string
+          minLength: 1
+          pattern: ^[1-9]\d{5}$
+        lat:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+          description: Map pin latitude (WGS84). Required. Stored to 6 decimal places.
+        lng:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+          description: Map pin longitude (WGS84). Required. Stored to 6 decimal places.
+      required:
+      - building_street
+      - city
+      - house
+      - label
+      - lat
+      - lng
+      - pincode
+      - state
+    AppConfig:
+      type: object
+      properties:
+        min_supported_version:
+          type: string
+          nullable: true
+          description: 'For the app and platform in X-App-Name / X-Platform; null
+            when those headers are missing. Below it: blocking update screen.'
+        latest_version:
+          type: string
+          nullable: true
+          description: 'Below it: dismissible update prompt. Null without headers.'
+        store_url:
+          type: string
+          format: uri
+          nullable: true
+          description: Store page for the update button. Null without headers.
+        maintenance:
+          type: boolean
+          description: 'True: show the maintenance screen.'
+        maintenance_message:
+          type: string
+          description: Text for the maintenance screen.
+        support:
+          $ref: '#/components/schemas/SupportContacts'
+        policy_urls:
+          $ref: '#/components/schemas/PolicyUrls'
+        terms_version:
+          type: string
+          description: Current Terms & Privacy version; send it as `terms_version`
+            on OTP verify.
+        otp:
+          $ref: '#/components/schemas/OtpSettings'
+        rider_location:
+          $ref: '#/components/schemas/RiderLocationSettings'
+        feature_flags:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: Named on/off switches. Keys are added per phase; ignore unknown
+            keys.
+      required:
+      - feature_flags
+      - latest_version
+      - maintenance
+      - maintenance_message
+      - min_supported_version
+      - otp
+      - policy_urls
+      - rider_location
+      - store_url
+      - support
+      - terms_version
+    AppEnum:
+      enum:
+      - customer
+      - rider
+      type: string
+      description: |-
+        * `customer` - Customer app
+        * `rider` - Rider app
+    AuthSession:
+      type: object
+      properties:
+        access:
+          type: string
+          description: JWT access token, valid 15 minutes.
+        refresh:
+          type: string
+          description: JWT refresh token, valid 30 days, single use.
+        user:
+          $ref: '#/components/schemas/Me'
+        is_new_user:
+          type: boolean
+          description: True when this verification created the account. Show the complete-profile
+            screen when `is_new_user` is true or `user.is_profile_complete` is false.
+        rider_status:
+          allOf:
+          - $ref: '#/components/schemas/RiderStatusEnum'
+          description: |-
+            Always present (NONE without a rider profile). The rider app routes on it: NONE -> registration, PENDING_KYC/REJECTED -> status screen, ACTIVE -> home, SUSPENDED -> blocked. The customer app ignores it.
+
+            * `NONE` - No rider profile: show registration
+            * `PENDING_KYC` - Registered, waiting for KYC approval
+            * `ACTIVE` - Approved: can go online
+            * `REJECTED` - KYC rejected: see the reason, re-submit
+            * `SUSPENDED` - Suspended by ops
+        deletion_cancelled:
+          type: boolean
+          description: 'True when this login cancelled a pending account deletion
+            (login within the 30-day grace period restores the account): show a notice.
+            Normally false.'
+      required:
+      - access
+      - deletion_cancelled
+      - is_new_user
+      - refresh
+      - rider_status
+      - user
+    Device:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        fcm_token:
+          type: string
+          description: Firebase Cloud Messaging token.
+          maxLength: 512
+        app:
+          $ref: '#/components/schemas/AppEnum'
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+        app_version:
+          type: string
+          description: Installed app version, e.g. "1.4.2" or "1.4.2+37".
+          maxLength: 32
+          pattern: ^\d{1,5}(?:\.\d{1,5}){0,3}(?:\+\d{1,9})?$
+        is_active:
+          type: boolean
+          readOnly: true
+        last_seen_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - app
+      - app_version
+      - fcm_token
+      - id
+      - is_active
+      - last_seen_at
+      - platform
+    DeviceRequest:
+      type: object
+      properties:
+        fcm_token:
+          type: string
+          minLength: 1
+          description: Firebase Cloud Messaging token.
+          maxLength: 512
+        app:
+          $ref: '#/components/schemas/AppEnum'
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+        app_version:
+          type: string
+          minLength: 1
+          description: Installed app version, e.g. "1.4.2" or "1.4.2+37".
+          maxLength: 32
+          pattern: ^\d{1,5}(?:\.\d{1,5}){0,3}(?:\+\d{1,9})?$
+      required:
+      - app
+      - app_version
+      - fcm_token
+      - platform
+    ErrorBody:
+      type: object
+      description: The `error` object of every error response.
+      properties:
+        code:
+          allOf:
+          - $ref: '#/components/schemas/ErrorCodeEnum'
+          description: |-
+            Stable machine-readable error code (06 §6). Apps map codes to messages.
+
+            * `VALIDATION_ERROR` - Some fields are invalid.
+            * `OTP_INVALID` - The OTP is incorrect.
+            * `OTP_EXPIRED` - The OTP has expired.
+            * `OTP_RATE_LIMITED` - Too many OTP requests. Try again later.
+            * `AUTH_REQUIRED` - Authentication is required.
+            * `TOKEN_INVALID` - The access token is invalid or expired.
+            * `PERMISSION_DENIED` - You do not have permission to do this.
+            * `NOT_FOUND` - Not found.
+            * `APP_UPDATE_REQUIRED` - Please update the app to continue.
+            * `NOT_SERVICEABLE` - We do not deliver to this location yet.
+            * `STORE_CLOSED` - The store is not accepting orders right now.
+            * `STOCK_UNAVAILABLE` - Some items are out of stock.
+            * `MAX_QTY_EXCEEDED` - The maximum quantity for this item is exceeded.
+            * `MIN_ORDER_NOT_MET` - The minimum order value is not met.
+            * `COUPON_INVALID` - The coupon is not valid.
+            * `COUPON_EXPIRED` - The coupon has expired.
+            * `COUPON_NOT_ELIGIBLE` - This cart is not eligible for the coupon.
+            * `COUPON_USAGE_EXCEEDED` - The coupon usage limit is reached.
+            * `COD_NOT_AVAILABLE` - Cash on delivery is not available for this order.
+            * `PRICE_CHANGED` - The bill has changed. Refresh the cart.
+            * `PAYMENT_VERIFICATION_FAILED` - The payment could not be verified.
+            * `INVALID_STATE_TRANSITION` - This action is not allowed right now.
+            * `OFFER_EXPIRED` - The offer has expired.
+            * `OFFER_TAKEN` - The offer was taken by another rider.
+            * `OUTSIDE_GEOFENCE` - You are too far from the location.
+            * `DELIVERY_OTP_INVALID` - The delivery OTP is incorrect.
+            * `DELIVERY_OTP_LOCKED` - Too many wrong delivery OTP attempts.
+            * `CASH_LIMIT_EXCEEDED` - The cash-in-hand limit is exceeded.
+            * `MAINTENANCE` - The service is under maintenance.
+            * `METHOD_NOT_ALLOWED` - This HTTP method is not allowed here.
+            * `NOT_ACCEPTABLE` - The requested response format is not available.
+            * `UNSUPPORTED_MEDIA_TYPE` - The request body format is not supported.
+            * `RATE_LIMITED` - Too many requests. Try again later.
+            * `SERVER_ERROR` - Something went wrong. Please try again.
+            * `SERVICE_UNAVAILABLE` - The service is temporarily unavailable.
+        message:
+          type: string
+          description: Human-readable message (English).
+        details:
+          type: object
+          additionalProperties: {}
+          description: 'Extra data for the code; always an object, possibly empty.
+            VALIDATION_ERROR: field name -> list of messages.'
+      required:
+      - code
+      - details
+      - message
+    ErrorCodeEnum:
+      enum:
+      - VALIDATION_ERROR
+      - OTP_INVALID
+      - OTP_EXPIRED
+      - OTP_RATE_LIMITED
+      - AUTH_REQUIRED
+      - TOKEN_INVALID
+      - PERMISSION_DENIED
+      - NOT_FOUND
+      - APP_UPDATE_REQUIRED
+      - NOT_SERVICEABLE
+      - STORE_CLOSED
+      - STOCK_UNAVAILABLE
+      - MAX_QTY_EXCEEDED
+      - MIN_ORDER_NOT_MET
+      - COUPON_INVALID
+      - COUPON_EXPIRED
+      - COUPON_NOT_ELIGIBLE
+      - COUPON_USAGE_EXCEEDED
+      - COD_NOT_AVAILABLE
+      - PRICE_CHANGED
+      - PAYMENT_VERIFICATION_FAILED
+      - INVALID_STATE_TRANSITION
+      - OFFER_EXPIRED
+      - OFFER_TAKEN
+      - OUTSIDE_GEOFENCE
+      - DELIVERY_OTP_INVALID
+      - DELIVERY_OTP_LOCKED
+      - CASH_LIMIT_EXCEEDED
+      - MAINTENANCE
+      - METHOD_NOT_ALLOWED
+      - NOT_ACCEPTABLE
+      - UNSUPPORTED_MEDIA_TYPE
+      - RATE_LIMITED
+      - SERVER_ERROR
+      - SERVICE_UNAVAILABLE
+      type: string
+      description: |-
+        * `VALIDATION_ERROR` - Some fields are invalid.
+        * `OTP_INVALID` - The OTP is incorrect.
+        * `OTP_EXPIRED` - The OTP has expired.
+        * `OTP_RATE_LIMITED` - Too many OTP requests. Try again later.
+        * `AUTH_REQUIRED` - Authentication is required.
+        * `TOKEN_INVALID` - The access token is invalid or expired.
+        * `PERMISSION_DENIED` - You do not have permission to do this.
+        * `NOT_FOUND` - Not found.
+        * `APP_UPDATE_REQUIRED` - Please update the app to continue.
+        * `NOT_SERVICEABLE` - We do not deliver to this location yet.
+        * `STORE_CLOSED` - The store is not accepting orders right now.
+        * `STOCK_UNAVAILABLE` - Some items are out of stock.
+        * `MAX_QTY_EXCEEDED` - The maximum quantity for this item is exceeded.
+        * `MIN_ORDER_NOT_MET` - The minimum order value is not met.
+        * `COUPON_INVALID` - The coupon is not valid.
+        * `COUPON_EXPIRED` - The coupon has expired.
+        * `COUPON_NOT_ELIGIBLE` - This cart is not eligible for the coupon.
+        * `COUPON_USAGE_EXCEEDED` - The coupon usage limit is reached.
+        * `COD_NOT_AVAILABLE` - Cash on delivery is not available for this order.
+        * `PRICE_CHANGED` - The bill has changed. Refresh the cart.
+        * `PAYMENT_VERIFICATION_FAILED` - The payment could not be verified.
+        * `INVALID_STATE_TRANSITION` - This action is not allowed right now.
+        * `OFFER_EXPIRED` - The offer has expired.
+        * `OFFER_TAKEN` - The offer was taken by another rider.
+        * `OUTSIDE_GEOFENCE` - You are too far from the location.
+        * `DELIVERY_OTP_INVALID` - The delivery OTP is incorrect.
+        * `DELIVERY_OTP_LOCKED` - Too many wrong delivery OTP attempts.
+        * `CASH_LIMIT_EXCEEDED` - The cash-in-hand limit is exceeded.
+        * `MAINTENANCE` - The service is under maintenance.
+        * `METHOD_NOT_ALLOWED` - This HTTP method is not allowed here.
+        * `NOT_ACCEPTABLE` - The requested response format is not available.
+        * `UNSUPPORTED_MEDIA_TYPE` - The request body format is not supported.
+        * `RATE_LIMITED` - Too many requests. Try again later.
+        * `SERVER_ERROR` - Something went wrong. Please try again.
+        * `SERVICE_UNAVAILABLE` - The service is temporarily unavailable.
+    ErrorEnvelope:
+      type: object
+      description: Body of every non-2xx API response.
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+      required:
+      - error
+    HealthCheckStatusEnum:
+      enum:
+      - ok
+      - error
+      type: string
+      description: |-
+        * `ok` - ok
+        * `error` - error
+    HealthChecks:
+      type: object
+      properties:
+        database:
+          $ref: '#/components/schemas/HealthCheckStatusEnum'
+        redis:
+          $ref: '#/components/schemas/HealthCheckStatusEnum'
+      required:
+      - database
+      - redis
+    HealthLive:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatusEnum'
+      required:
+      - status
+    HealthReady:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatusEnum'
+        checks:
+          $ref: '#/components/schemas/HealthChecks'
+      required:
+      - checks
+      - status
+    HealthStatusEnum:
+      enum:
+      - ok
+      type: string
+      description: '* `ok` - ok'
+    LogoutRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+          description: The refresh token to revoke.
+        fcm_token:
+          type: string
+          minLength: 1
+          description: This device's FCM token, to stop its pushes.
+          maxLength: 512
+      required:
+      - refresh
+    Me:
+      type: object
+      description: The signed-in user. PATCH accepts `name`, `email` and `marketing_opt_in`.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        phone:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Login phone. Not editable in v1.
+        name:
+          type: string
+          description: Required to complete the profile. Cannot be blanked.
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: Optional. Send null (or an empty string) to remove it. Must
+            be unique.
+        marketing_opt_in:
+          type: boolean
+          description: Consent to promotional push notifications.
+        is_profile_complete:
+          type: boolean
+          readOnly: true
+          description: 'False until a name is set: show the complete-profile screen.'
+        rider_status:
+          allOf:
+          - $ref: '#/components/schemas/RiderStatusEnum'
+          readOnly: true
+          description: |-
+            Rider profile status; NONE without a rider profile (always NONE until Phase 5).
+
+            * `NONE` - No rider profile: show registration
+            * `PENDING_KYC` - Registered, waiting for KYC approval
+            * `ACTIVE` - Approved: can go online
+            * `REJECTED` - KYC rejected: see the reason, re-submit
+            * `SUSPENDED` - Suspended by ops
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - is_profile_complete
+      - name
+      - phone
+      - rider_status
+    OtpPurposeEnum:
+      enum:
+      - login
+      - delete_account
+      type: string
+      description: |-
+        * `login` - Log in or sign up
+        * `delete_account` - Confirm account deletion
+    OtpSendRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          minLength: 1
+          description: E.164 Indian mobile, e.g. +919876543210.
+          pattern: ^\+91[6-9]\d{9}$
+        app:
+          allOf:
+          - $ref: '#/components/schemas/AppEnum'
+          description: |-
+            The app asking. Same value as `X-App-Name`.
+
+            * `customer` - Customer app
+            * `rider` - Rider app
+        purpose:
+          allOf:
+          - $ref: '#/components/schemas/OtpPurposeEnum'
+          default: login
+          description: |-
+            `login` (default): for `/auth/otp/verify/`. `delete_account`: for `/me/delete/` only; it can never log anyone in.
+
+            * `login` - Log in or sign up
+            * `delete_account` - Confirm account deletion
+      required:
+      - app
+      - phone
+    OtpSent:
+      type: object
+      properties:
+        otp_length:
+          type: integer
+          description: Digits in the OTP (6).
+        expires_in_seconds:
+          type: integer
+          description: The OTP is valid this long (300).
+        resend_after_seconds:
+          type: integer
+          description: Enable the Resend button after this many seconds (30).
+      required:
+      - expires_in_seconds
+      - otp_length
+      - resend_after_seconds
+    OtpSettings:
+      type: object
+      properties:
+        length:
+          type: integer
+          description: OTP digits (6).
+        resend_after_seconds:
+          type: integer
+          description: Resend countdown (30).
+      required:
+      - length
+      - resend_after_seconds
+    OtpVerifyRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          minLength: 1
+          pattern: ^\+91[6-9]\d{9}$
+        otp:
+          type: string
+          minLength: 1
+          description: 6 digits.
+          pattern: ^\d{6}$
+        app:
+          allOf:
+          - $ref: '#/components/schemas/AppEnum'
+          description: |-
+            Must match the `app` the OTP was requested for. Authoritative over X-App-Name.
+
+            * `customer` - Customer app
+            * `rider` - Rider app
+        terms_version:
+          type: string
+          minLength: 1
+          description: 'The Terms & Privacy version the user accepted on the login
+            screen: send `terms_version` from `/config/app/` (DPDP consent record).'
+          maxLength: 32
+      required:
+      - app
+      - otp
+      - phone
+      - terms_version
+    PaginatedAddressList:
+      type: object
+      description: 'Standard page (02 §5): `?page=&page_size=`, default 20, max 100.'
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+      required:
+      - count
+      - next
+      - previous
+      - results
+    PatchedAddressRequest:
+      type: object
+      properties:
+        label:
+          $ref: '#/components/schemas/AddressLabelEnum'
+        custom_label:
+          type: string
+          description: Shown instead of the label when set, e.g. "Mom's place".
+          maxLength: 40
+        receiver_name:
+          type: string
+          minLength: 1
+          description: Defaults to the user's name.
+          maxLength: 120
+        receiver_phone:
+          type: string
+          minLength: 1
+          description: Defaults to the user's phone.
+          pattern: ^\+91[6-9]\d{9}$
+        house:
+          type: string
+          minLength: 1
+          description: House / flat / floor.
+          maxLength: 120
+        building_street:
+          type: string
+          minLength: 1
+          description: Building and street.
+          maxLength: 200
+        landmark:
+          type: string
+          maxLength: 120
+        area:
+          type: string
+          maxLength: 120
+        city:
+          type: string
+          minLength: 1
+          maxLength: 80
+        state:
+          type: string
+          minLength: 1
+          maxLength: 80
+        pincode:
+          type: string
+          minLength: 1
+          pattern: ^[1-9]\d{5}$
+        lat:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+          description: Map pin latitude (WGS84). Required. Stored to 6 decimal places.
+        lng:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+          description: Map pin longitude (WGS84). Required. Stored to 6 decimal places.
+    PatchedMeRequest:
+      type: object
+      description: The signed-in user. PATCH accepts `name`, `email` and `marketing_opt_in`.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Required to complete the profile. Cannot be blanked.
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          nullable: true
+          description: Optional. Send null (or an empty string) to remove it. Must
+            be unique.
+        marketing_opt_in:
+          type: boolean
+          description: Consent to promotional push notifications.
+    PlatformEnum:
+      enum:
+      - android
+      - ios
+      type: string
+      description: |-
+        * `android` - Android
+        * `ios` - iOS
+    PolicyUrls:
+      type: object
+      properties:
+        terms:
+          type: string
+          format: uri
+        privacy:
+          type: string
+          format: uri
+        refund:
+          type: string
+          format: uri
+      required:
+      - privacy
+      - refund
+      - terms
+    RiderLocationSettings:
+      type: object
+      properties:
+        active_interval_seconds:
+          type: integer
+          description: Location upload interval on an active task (5-10 s, 04 §3).
+        idle_interval_seconds:
+          type: integer
+          description: Location upload interval while online and idle (30 s).
+      required:
+      - active_interval_seconds
+      - idle_interval_seconds
+    RiderStatusEnum:
+      enum:
+      - NONE
+      - PENDING_KYC
+      - ACTIVE
+      - REJECTED
+      - SUSPENDED
+      type: string
+      description: |-
+        * `NONE` - No rider profile: show registration
+        * `PENDING_KYC` - Registered, waiting for KYC approval
+        * `ACTIVE` - Approved: can go online
+        * `REJECTED` - KYC rejected: see the reason, re-submit
+        * `SUSPENDED` - Suspended by ops
+    SupportContacts:
+      type: object
+      properties:
+        phone:
+          type: string
+          description: Support phone, E.164.
+        email:
+          type: string
+          format: email
+      required:
+      - email
+      - phone
+    TokenPair:
+      type: object
+      properties:
+        access:
+          type: string
+          description: New access token (15 minutes).
+        refresh:
+          type: string
+          description: New refresh token (30 days). Replace the stored one; the old
+            one is revoked.
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+          description: The current refresh token. It is single use.
+      required:
+      - refresh
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+tags:
+- name: health
+  description: Liveness and readiness probes. No authentication.
+- name: auth
+  description: Phone OTP sign-in, token refresh, logout (06 §2.1).
+- name: account
+  description: Profile, push devices, account deletion (06 §2.1).
+- name: addresses
+  description: Saved delivery addresses (06 §2.2).
+- name: config
+  description: 'App configuration: versions, maintenance, contacts.'

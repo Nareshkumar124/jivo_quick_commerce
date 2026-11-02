@@ -1,0 +1,8 @@
+# gen-l10n: generates lib/l10n/app_localizations*.dart from lib/l10n/*.arb on
+# `flutter pub get` / `flutter run` / `flutter gen-l10n`.
+# Import with: import 'package:rider_app/l10n/app_localizations.dart';
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false

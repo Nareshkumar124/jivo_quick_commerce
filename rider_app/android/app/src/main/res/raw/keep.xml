@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The notification icon is referenced by name from Dart/meta-data only, so
+     keep it when resource shrinking is enabled for release builds. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_rider" />
