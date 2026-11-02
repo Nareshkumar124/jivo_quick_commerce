@@ -17,13 +17,13 @@ import '../domain/rider_profile.dart';
 /// Whether the registration / KYC screens (04 §2.2, P5 lookahead) run.
 ///
 /// TODO(api): there is no rider API until the end of P4, so they run only
-/// against the fake: with `FAKE_API`, and in the dev flavor (so a real
-/// Phase 1 login with `rider_status: NONE` reaches the form). Staging and
-/// prod keep the Phase 1 placeholders; fakes never run there.
-final riderOnboardingEnabledProvider = Provider<bool>((ref) {
-  final env = ref.watch(appEnvProvider);
-  return env.useFakeApi || env.flavor == Flavor.dev;
-});
+/// against the fake, and only in the dev flavor (DL-30), with or without
+/// `FAKE_API` (so a real Phase 1 login with `rider_status: NONE` reaches the
+/// form). Staging and prod keep the Phase 1 placeholders, even with
+/// `FAKE_API`: these fakes never run there.
+final riderOnboardingEnabledProvider = Provider<bool>(
+  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
+);
 
 /// The fake rider backend (TODO(api)). Overridden in tests (no delay).
 final fakeRiderOnboardingBackendProvider = Provider<FakeRiderOnboardingBackend>(

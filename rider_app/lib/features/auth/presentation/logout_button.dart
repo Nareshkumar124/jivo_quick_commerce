@@ -20,10 +20,13 @@ class LogoutButton extends ConsumerWidget {
         final result = await ref
             .read(riderAccountControllerProvider.notifier)
             .logout();
-        if (result == LogoutResult.blockedWhileOnline) {
-          messenger.showSnackBar(
-            SnackBar(content: Text(l10n.logoutBlockedOnline)),
-          );
+        final message = switch (result) {
+          LogoutResult.blockedWhileOnline => l10n.logoutBlockedOnline,
+          LogoutResult.blockedDuringTask => l10n.logoutBlockedDuringTask,
+          LogoutResult.done => null,
+        };
+        if (message != null) {
+          messenger.showSnackBar(SnackBar(content: Text(message)));
         }
       },
     );

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -9,6 +10,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../features/offers/data/offer_alert_notifications.dart';
 import '../features/offers/presentation/offer_alert_providers.dart';
+import '../features/offers/presentation/offer_controller.dart';
 import '../l10n/app_localizations.dart';
 import 'app.dart';
 import 'env.dart';
@@ -48,11 +50,17 @@ Future<void> bootstrap(Flavor flavor) async {
     launchPayload = await offerAlerts.initialize(
       channelName: l10n.offerChannelName,
       channelDescription: l10n.offerChannelDescription,
-      onOfferSelected: (_) {
-        // P5 routes this to the real offer screen for every flavor.
-        if (env.showDevTools) {
-          container.read(routerProvider).go(Routes.offerPreview);
+      onOfferSelected: (payload) {
+        if (payload == OfferAlertNotifications.testPayload) {
+          // The Phase 0 test alert (dev only).
+          if (env.showDevTools) {
+            container.read(routerProvider).go(Routes.offerPreview);
+          }
+          return;
         }
+        // A real offer: fetch it; the router opens the offer screen once it
+        // is there (navigating first would race the fetch).
+        unawaited(container.read(offerControllerProvider.notifier).refresh());
       },
     );
   } on Object catch (error) {
@@ -69,7 +77,8 @@ Future<void> bootstrap(Flavor flavor) async {
         signals: signals,
       ),
       offerAlertNotificationsProvider.overrideWithValue(offerAlerts),
-      if (launchPayload != null && env.showDevTools)
+      if (launchPayload == OfferAlertNotifications.testPayload &&
+          env.showDevTools)
         initialLocationProvider.overrideWithValue(Routes.offerPreview),
     ],
   );

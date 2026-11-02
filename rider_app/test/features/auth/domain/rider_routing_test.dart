@@ -29,6 +29,8 @@ String? redirect(
   RiderAccountState account = const AccountUnknown(),
   bool hasOtpChallenge = false,
   bool showDevTools = true,
+  bool hasRiderTask = false,
+  bool hasOffer = false,
 }) => riderRedirect(
   location: location,
   appControl: appControl,
@@ -38,6 +40,8 @@ String? redirect(
   account: account,
   hasOtpChallenge: hasOtpChallenge,
   showDevTools: showDevTools,
+  hasRiderTask: hasRiderTask,
+  hasOffer: hasOffer,
 );
 
 void main() {
@@ -161,6 +165,56 @@ void main() {
         ),
         Routes.riderStatus,
       );
+    });
+
+    test('ACTIVE with a task: only the task screens; then an offer; then '
+        'home', () {
+      final active = loaded(RiderStatusEnum.ACTIVE);
+      String? at(String location, {bool task = false, bool offer = false}) =>
+          redirect(
+            location,
+            sessionStatus: SessionStatus.signedIn,
+            account: active,
+            hasRiderTask: task,
+            hasOffer: offer,
+          );
+
+      for (final location in [Routes.home, Routes.offer, Routes.login]) {
+        expect(at(location, task: true), Routes.task, reason: location);
+      }
+      for (final location in [Routes.task, Routes.taskScan, Routes.taskFail]) {
+        expect(at(location, task: true), isNull, reason: location);
+        expect(
+          at(location, task: true, offer: true),
+          isNull,
+          reason: 'a task outranks an offer',
+        );
+        expect(at(location), Routes.home, reason: 'no task: $location');
+      }
+      expect(at(Routes.home, offer: true), Routes.offer);
+      expect(at(Routes.offer, offer: true), isNull);
+      expect(at(Routes.offer), Routes.home);
+    });
+
+    test('task and offer flags never open work screens for other '
+        'statuses', () {
+      for (final status in [
+        RiderStatusEnum.PENDING_KYC,
+        RiderStatusEnum.NONE,
+        RiderStatusEnum.SUSPENDED,
+      ]) {
+        expect(
+          redirect(
+            Routes.task,
+            sessionStatus: SessionStatus.signedIn,
+            account: loaded(status),
+            hasRiderTask: true,
+            hasOffer: true,
+          ),
+          isNot(Routes.task),
+          reason: '$status',
+        );
+      }
     });
 
     test('signed in but rider_status not loaded (or /me failed): splash', () {

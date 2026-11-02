@@ -463,5 +463,267 @@
   "bankUpi": "UPI ID (optional)",
   "bankUpiHint": "name@okbank",
   "bankSave": "Save bank details",
-  "bankSavedToast": "Bank details saved"
+  "bankSavedToast": "Bank details saved",
+  "offerTitle": "New order",
+  "offerAlertTitle": "New order offer",
+  "@offerAlertTitle": {
+    "description": "Offer notification title (rings, full screen)."
+  },
+  "offerAlertBody": "{store} to {locality}",
+  "@offerAlertBody": {
+    "description": "Offer notification body.",
+    "placeholders": {
+      "store": {
+        "type": "String"
+      },
+      "locality": {
+        "type": "String"
+      }
+    }
+  },
+  "offerPrepaid": "Prepaid: nothing to collect",
+  "offerCod": "Cash on delivery: collect {amount}",
+  "@offerCod": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "offerPayout": "You earn about {amount}",
+  "@offerPayout": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "distanceKm": "{km} km",
+  "@distanceKm": {
+    "description": "Distance from the store to the customer, as sent by the server.",
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "offerAccept": "Accept",
+  "offerReject": "Reject",
+  "offerRejectTitle": "Why are you rejecting? (optional)",
+  "offerRejectTooFar": "Too far",
+  "offerRejectVehicle": "Vehicle problem",
+  "offerRejectBreak": "Taking a break",
+  "offerRejectOther": "Other reason",
+  "offerRejectSkip": "Reject without a reason",
+  "offerExpiredTitle": "Offer expired",
+  "offerExpiredBody": "The time to accept ran out. New orders will come to you.",
+  "offerTakenTitle": "Order taken",
+  "offerTakenBody": "Another rider accepted this order first.",
+  "offerWithdrawnTitle": "Order cancelled",
+  "offerWithdrawnBody": "This order was cancelled before pickup. Wait for the next one.",
+  "offerOk": "OK",
+  "taskOrderNumber": "Order {number}",
+  "@taskOrderNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "taskRefresh": "Refresh",
+  "taskNavigate": "Navigate",
+  "taskNoMapsApp": "No maps app found. Install Mappls or another maps app.",
+  "taskCallCustomer": "Call customer",
+  "taskStateChanged": "This order changed. The screen now shows its latest step.",
+  "taskLocationUnavailable": "Couldn't get your location. Turn on GPS and try again.",
+  "taskOutsideGeofence": "You're not close enough yet. Move closer and try again.",
+  "taskOutsideGeofenceDistance": "You're {metres} m away. Move closer and try again.",
+  "@taskOutsideGeofenceDistance": {
+    "placeholders": {
+      "metres": {
+        "type": "int"
+      }
+    }
+  },
+  "cashLimitExceeded": "Your cash in hand has reached the limit. Deposit cash at the store to get cash orders again.",
+  "taskGoToStoreTitle": "Go to the store",
+  "taskOrderPacking": "Packing…",
+  "taskOrderReady": "Ready for pickup",
+  "taskArrivedStore": "Arrived at store",
+  "taskPickupTitle": "Pick up the order",
+  "taskItemsTitle": "Check the items in the bag",
+  "pickupCodeHelp": "Scan the QR code on the bag, or type the 4-character code printed on it.",
+  "pickupCodeLabel": "Order code",
+  "pickupCodeFormat": "Enter the 4-character code from the bag.",
+  "pickupCodeWrong": "That code doesn't match this order. Check the bag and try again.",
+  "pickupNotPacked": "The order isn't packed yet. Wait until the store marks it ready.",
+  "taskPickup": "Picked up",
+  "pickupScan": "Scan QR code",
+  "scanTitle": "Scan the bag QR code",
+  "scanTypeInstead": "Type the code instead",
+  "scanNotJivoCode": "This QR isn't a Jivo order code.",
+  "scanCameraUnavailable": "The camera isn't available. Type the code from the bag instead.",
+  "taskGoToCustomerTitle": "Deliver to the customer",
+  "taskLandmark": "Landmark: {landmark}",
+  "@taskLandmark": {
+    "placeholders": {
+      "landmark": {
+        "type": "String"
+      }
+    }
+  },
+  "taskInstructions": "Note: {instructions}",
+  "@taskInstructions": {
+    "placeholders": {
+      "instructions": {
+        "type": "String"
+      }
+    }
+  },
+  "taskCollectCash": "Collect {amount} in cash",
+  "@taskCollectCash": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "taskArrivedCustomer": "Arrived at customer",
+  "taskCantDeliver": "Can't deliver",
+  "arrivedOverride": "I'm at the address: the pin is wrong",
+  "arrivedOverrideTitle": "Why are you outside the pin area?",
+  "arrivedOverridePinWrong": "The map pin is in the wrong place",
+  "arrivedOverrideGate": "I'm at the gate or lobby",
+  "otpStepTitle": "Enter the delivery code",
+  "otpStepHelp": "Ask the customer for the 4-digit code in their app or SMS.",
+  "otpStepLabel": "Delivery code",
+  "otpContinue": "Continue",
+  "taskDeliver": "Mark delivered",
+  "otpAttemptsLeft": "{count, plural, =1{1 attempt left} other{{count} attempts left}}",
+  "@otpAttemptsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deliveryOtpWrong": "That code is wrong. Ask the customer again.",
+  "deliveryOtpWrongLeft": "{count, plural, =1{Wrong code. 1 attempt left.} other{Wrong code. {count} attempts left.}}",
+  "@deliveryOtpWrongLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deliveryOtpLocked": "Too many wrong codes. Jivo support has been alerted. Call support to continue.",
+  "otpLockedTitle": "Delivery code locked",
+  "codTitle": "Collect payment",
+  "codAmountDueLabel": "Amount to collect",
+  "codExactAmount": "Collect exactly this amount.",
+  "codCashCollected": "Cash collected {amount}",
+  "@codCashCollected": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codConfirmTitle": "Confirm cash",
+  "codConfirmBody": "Did you collect exactly {amount} in cash?",
+  "@codConfirmBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codConfirmYes": "Yes, collected",
+  "codConfirmNo": "No",
+  "codCashDone": "Cash collected: {amount}",
+  "@codCashDone": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codShowUpi": "Customer pays by UPI: show QR",
+  "codUpiWaiting": "Waiting for the payment…",
+  "codUpiPaid": "Payment received",
+  "codUpiCheck": "Check payment",
+  "codChangeOtp": "Change the delivery code",
+  "codConfirmFirst": "Confirm the cash or wait for the UPI payment first.",
+  "codAmountMismatch": "The amount doesn't match what Jivo expects. Check the amount and try again.",
+  "taskDeliveredTitle": "Delivered!",
+  "taskDeliveredBody": "Great job. Wait for the next order.",
+  "taskDeliveredEarned": "You earned {amount} for this order.",
+  "@taskDeliveredEarned": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "taskReturnTitle": "Return to store",
+  "taskReturnBody": "Take the items back to the store. The store staff will mark them received.",
+  "taskCheckStatus": "Check status",
+  "taskReturnedTitle": "Items returned",
+  "taskReturnedBody": "The store received the items. You're ready for new orders.",
+  "taskCancelledTitle": "Order cancelled",
+  "taskCancelledBody": "This order was cancelled before pickup. You don't need to collect it.",
+  "taskUnassignedTitle": "Order reassigned",
+  "taskUnassignedBody": "This order is no longer assigned to you.",
+  "taskUnknownTitle": "Can't show this order",
+  "taskUnknownBody": "This app version can't show the order's status. Try again or update the app.",
+  "failTitle": "Can't deliver",
+  "failIntro": "Why can't you deliver this order?",
+  "failNotReachable": "Customer not reachable",
+  "failRefused": "Customer refused the order",
+  "failWrongAddress": "Wrong address",
+  "failOther": "Other reason",
+  "failCallsNeeded": "Call the customer at least {needed} times ({done} done)",
+  "@failCallsNeeded": {
+    "placeholders": {
+      "needed": {
+        "type": "int"
+      },
+      "done": {
+        "type": "int"
+      }
+    }
+  },
+  "failWaitLeft": "Wait at the address: {time} left",
+  "@failWaitLeft": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "failWaitDone": "You waited 10 minutes at the address",
+  "failWaitNotArrived": "Mark \"Arrived at customer\" first",
+  "failNoteOptional": "Note (optional)",
+  "failNoteRequired": "Note (required)",
+  "failAddPhoto": "Add a photo (optional)",
+  "failPhotoAdded": "Photo added",
+  "failPhotoRemove": "Remove",
+  "failPhotoError": "Couldn't use that photo. Try again.",
+  "failChooseReason": "Choose a reason.",
+  "failNotYet": "You can choose this after the calls and the 10-minute wait.",
+  "failSubmit": "Return to store",
+  "logoutBlockedDuringTask": "Finish your current order before logging out.",
+  "offlineBlockedDuringTask": "Finish your current order before going offline.",
+  "devOfferPrepaid": "Test offer (dev)",
+  "devOfferCod": "Test COD offer (dev)",
+  "devMarkPacked": "Store: packed (dev)",
+  "devCancelOrder": "Cancel order (dev)",
+  "devReturnReceived": "Store: return received (dev)",
+  "devUpiPaid": "Customer paid (dev)",
+  "codTakeCashInstead": "Customer pays cash instead",
+  "codUpiExpired": "The QR expired. Show a new one.",
+  "taskUnconfirmedTitle": "Couldn't confirm the last step",
+  "taskUnconfirmedBody": "The connection dropped before Jivo answered, and this order is no longer open. It may have gone through. Check the order status, or call support.",
+  "taskBackToOrders": "Back to orders",
+  "codQrUnavailable": "Couldn't show the QR code. Check payment again, or collect cash."
 }

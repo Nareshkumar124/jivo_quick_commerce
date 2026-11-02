@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/env.dart';
 import '../../../app/providers.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/dev_tools_button.dart';
 import '../../auth/presentation/logout_button.dart';
+import '../../task/data/fake_task_backend.dart';
+import '../../task/presentation/task_providers.dart';
 
 /// Home for `ACTIVE` riders. Placeholder until P5 (online toggle, today
 /// summary, current task); shows which flavor is running.
@@ -48,10 +51,50 @@ class HomeScreen extends ConsumerWidget {
                 style: theme.textTheme.bodyLarge,
               ),
               const Spacer(),
+              const _DevOfferButtons(),
               const DevToolsButton(),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Dev flavor with the fake only: dispatch offers an order (prepaid or COD),
+/// to walk through the offer and delivery screens on a phone.
+class _DevOfferButtons extends ConsumerWidget {
+  const _DevOfferButtons();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final repository = ref.watch(offerRepositoryProvider);
+    if (!ref.watch(appEnvProvider).showDevTools ||
+        !ref.watch(riderWorkActiveProvider) ||
+        repository is! FakeTaskBackend) {
+      return const SizedBox.shrink();
+    }
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              key: const Key('dev-offer-prepaid'),
+              onPressed: () => repository.simulateOffer(),
+              child: Text(l10n.devOfferPrepaid),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton(
+              key: const Key('dev-offer-cod'),
+              onPressed: () => repository.simulateOffer(cod: true),
+              child: Text(l10n.devOfferCod),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -861,4 +861,470 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bankSavedToast => 'Bank details saved';
+
+  @override
+  String get offerTitle => 'New order';
+
+  @override
+  String get offerAlertTitle => 'New order offer';
+
+  @override
+  String offerAlertBody(String store, String locality) {
+    return '$store to $locality';
+  }
+
+  @override
+  String get offerPrepaid => 'Prepaid: nothing to collect';
+
+  @override
+  String offerCod(String amount) {
+    return 'Cash on delivery: collect $amount';
+  }
+
+  @override
+  String offerPayout(String amount) {
+    return 'You earn about $amount';
+  }
+
+  @override
+  String distanceKm(String km) {
+    return '$km km';
+  }
+
+  @override
+  String get offerAccept => 'Accept';
+
+  @override
+  String get offerReject => 'Reject';
+
+  @override
+  String get offerRejectTitle => 'Why are you rejecting? (optional)';
+
+  @override
+  String get offerRejectTooFar => 'Too far';
+
+  @override
+  String get offerRejectVehicle => 'Vehicle problem';
+
+  @override
+  String get offerRejectBreak => 'Taking a break';
+
+  @override
+  String get offerRejectOther => 'Other reason';
+
+  @override
+  String get offerRejectSkip => 'Reject without a reason';
+
+  @override
+  String get offerExpiredTitle => 'Offer expired';
+
+  @override
+  String get offerExpiredBody =>
+      'The time to accept ran out. New orders will come to you.';
+
+  @override
+  String get offerTakenTitle => 'Order taken';
+
+  @override
+  String get offerTakenBody => 'Another rider accepted this order first.';
+
+  @override
+  String get offerWithdrawnTitle => 'Order cancelled';
+
+  @override
+  String get offerWithdrawnBody =>
+      'This order was cancelled before pickup. Wait for the next one.';
+
+  @override
+  String get offerOk => 'OK';
+
+  @override
+  String taskOrderNumber(String number) {
+    return 'Order $number';
+  }
+
+  @override
+  String get taskRefresh => 'Refresh';
+
+  @override
+  String get taskNavigate => 'Navigate';
+
+  @override
+  String get taskNoMapsApp =>
+      'No maps app found. Install Mappls or another maps app.';
+
+  @override
+  String get taskCallCustomer => 'Call customer';
+
+  @override
+  String get taskStateChanged =>
+      'This order changed. The screen now shows its latest step.';
+
+  @override
+  String get taskLocationUnavailable =>
+      'Couldn\'t get your location. Turn on GPS and try again.';
+
+  @override
+  String get taskOutsideGeofence =>
+      'You\'re not close enough yet. Move closer and try again.';
+
+  @override
+  String taskOutsideGeofenceDistance(int metres) {
+    return 'You\'re $metres m away. Move closer and try again.';
+  }
+
+  @override
+  String get cashLimitExceeded =>
+      'Your cash in hand has reached the limit. Deposit cash at the store to get cash orders again.';
+
+  @override
+  String get taskGoToStoreTitle => 'Go to the store';
+
+  @override
+  String get taskOrderPacking => 'Packing…';
+
+  @override
+  String get taskOrderReady => 'Ready for pickup';
+
+  @override
+  String get taskArrivedStore => 'Arrived at store';
+
+  @override
+  String get taskPickupTitle => 'Pick up the order';
+
+  @override
+  String get taskItemsTitle => 'Check the items in the bag';
+
+  @override
+  String get pickupCodeHelp =>
+      'Scan the QR code on the bag, or type the 4-character code printed on it.';
+
+  @override
+  String get pickupCodeLabel => 'Order code';
+
+  @override
+  String get pickupCodeFormat => 'Enter the 4-character code from the bag.';
+
+  @override
+  String get pickupCodeWrong =>
+      'That code doesn\'t match this order. Check the bag and try again.';
+
+  @override
+  String get pickupNotPacked =>
+      'The order isn\'t packed yet. Wait until the store marks it ready.';
+
+  @override
+  String get taskPickup => 'Picked up';
+
+  @override
+  String get pickupScan => 'Scan QR code';
+
+  @override
+  String get scanTitle => 'Scan the bag QR code';
+
+  @override
+  String get scanTypeInstead => 'Type the code instead';
+
+  @override
+  String get scanNotJivoCode => 'This QR isn\'t a Jivo order code.';
+
+  @override
+  String get scanCameraUnavailable =>
+      'The camera isn\'t available. Type the code from the bag instead.';
+
+  @override
+  String get taskGoToCustomerTitle => 'Deliver to the customer';
+
+  @override
+  String taskLandmark(String landmark) {
+    return 'Landmark: $landmark';
+  }
+
+  @override
+  String taskInstructions(String instructions) {
+    return 'Note: $instructions';
+  }
+
+  @override
+  String taskCollectCash(String amount) {
+    return 'Collect $amount in cash';
+  }
+
+  @override
+  String get taskArrivedCustomer => 'Arrived at customer';
+
+  @override
+  String get taskCantDeliver => 'Can\'t deliver';
+
+  @override
+  String get arrivedOverride => 'I\'m at the address: the pin is wrong';
+
+  @override
+  String get arrivedOverrideTitle => 'Why are you outside the pin area?';
+
+  @override
+  String get arrivedOverridePinWrong => 'The map pin is in the wrong place';
+
+  @override
+  String get arrivedOverrideGate => 'I\'m at the gate or lobby';
+
+  @override
+  String get otpStepTitle => 'Enter the delivery code';
+
+  @override
+  String get otpStepHelp =>
+      'Ask the customer for the 4-digit code in their app or SMS.';
+
+  @override
+  String get otpStepLabel => 'Delivery code';
+
+  @override
+  String get otpContinue => 'Continue';
+
+  @override
+  String get taskDeliver => 'Mark delivered';
+
+  @override
+  String otpAttemptsLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count attempts left',
+      one: '1 attempt left',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deliveryOtpWrong => 'That code is wrong. Ask the customer again.';
+
+  @override
+  String deliveryOtpWrongLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Wrong code. $count attempts left.',
+      one: 'Wrong code. 1 attempt left.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deliveryOtpLocked =>
+      'Too many wrong codes. Jivo support has been alerted. Call support to continue.';
+
+  @override
+  String get otpLockedTitle => 'Delivery code locked';
+
+  @override
+  String get codTitle => 'Collect payment';
+
+  @override
+  String get codAmountDueLabel => 'Amount to collect';
+
+  @override
+  String get codExactAmount => 'Collect exactly this amount.';
+
+  @override
+  String codCashCollected(String amount) {
+    return 'Cash collected $amount';
+  }
+
+  @override
+  String get codConfirmTitle => 'Confirm cash';
+
+  @override
+  String codConfirmBody(String amount) {
+    return 'Did you collect exactly $amount in cash?';
+  }
+
+  @override
+  String get codConfirmYes => 'Yes, collected';
+
+  @override
+  String get codConfirmNo => 'No';
+
+  @override
+  String codCashDone(String amount) {
+    return 'Cash collected: $amount';
+  }
+
+  @override
+  String get codShowUpi => 'Customer pays by UPI: show QR';
+
+  @override
+  String get codUpiWaiting => 'Waiting for the payment…';
+
+  @override
+  String get codUpiPaid => 'Payment received';
+
+  @override
+  String get codUpiCheck => 'Check payment';
+
+  @override
+  String get codChangeOtp => 'Change the delivery code';
+
+  @override
+  String get codConfirmFirst =>
+      'Confirm the cash or wait for the UPI payment first.';
+
+  @override
+  String get codAmountMismatch =>
+      'The amount doesn\'t match what Jivo expects. Check the amount and try again.';
+
+  @override
+  String get taskDeliveredTitle => 'Delivered!';
+
+  @override
+  String get taskDeliveredBody => 'Great job. Wait for the next order.';
+
+  @override
+  String taskDeliveredEarned(String amount) {
+    return 'You earned $amount for this order.';
+  }
+
+  @override
+  String get taskReturnTitle => 'Return to store';
+
+  @override
+  String get taskReturnBody =>
+      'Take the items back to the store. The store staff will mark them received.';
+
+  @override
+  String get taskCheckStatus => 'Check status';
+
+  @override
+  String get taskReturnedTitle => 'Items returned';
+
+  @override
+  String get taskReturnedBody =>
+      'The store received the items. You\'re ready for new orders.';
+
+  @override
+  String get taskCancelledTitle => 'Order cancelled';
+
+  @override
+  String get taskCancelledBody =>
+      'This order was cancelled before pickup. You don\'t need to collect it.';
+
+  @override
+  String get taskUnassignedTitle => 'Order reassigned';
+
+  @override
+  String get taskUnassignedBody => 'This order is no longer assigned to you.';
+
+  @override
+  String get taskUnknownTitle => 'Can\'t show this order';
+
+  @override
+  String get taskUnknownBody =>
+      'This app version can\'t show the order\'s status. Try again or update the app.';
+
+  @override
+  String get failTitle => 'Can\'t deliver';
+
+  @override
+  String get failIntro => 'Why can\'t you deliver this order?';
+
+  @override
+  String get failNotReachable => 'Customer not reachable';
+
+  @override
+  String get failRefused => 'Customer refused the order';
+
+  @override
+  String get failWrongAddress => 'Wrong address';
+
+  @override
+  String get failOther => 'Other reason';
+
+  @override
+  String failCallsNeeded(int needed, int done) {
+    return 'Call the customer at least $needed times ($done done)';
+  }
+
+  @override
+  String failWaitLeft(String time) {
+    return 'Wait at the address: $time left';
+  }
+
+  @override
+  String get failWaitDone => 'You waited 10 minutes at the address';
+
+  @override
+  String get failWaitNotArrived => 'Mark \"Arrived at customer\" first';
+
+  @override
+  String get failNoteOptional => 'Note (optional)';
+
+  @override
+  String get failNoteRequired => 'Note (required)';
+
+  @override
+  String get failAddPhoto => 'Add a photo (optional)';
+
+  @override
+  String get failPhotoAdded => 'Photo added';
+
+  @override
+  String get failPhotoRemove => 'Remove';
+
+  @override
+  String get failPhotoError => 'Couldn\'t use that photo. Try again.';
+
+  @override
+  String get failChooseReason => 'Choose a reason.';
+
+  @override
+  String get failNotYet =>
+      'You can choose this after the calls and the 10-minute wait.';
+
+  @override
+  String get failSubmit => 'Return to store';
+
+  @override
+  String get logoutBlockedDuringTask =>
+      'Finish your current order before logging out.';
+
+  @override
+  String get offlineBlockedDuringTask =>
+      'Finish your current order before going offline.';
+
+  @override
+  String get devOfferPrepaid => 'Test offer (dev)';
+
+  @override
+  String get devOfferCod => 'Test COD offer (dev)';
+
+  @override
+  String get devMarkPacked => 'Store: packed (dev)';
+
+  @override
+  String get devCancelOrder => 'Cancel order (dev)';
+
+  @override
+  String get devReturnReceived => 'Store: return received (dev)';
+
+  @override
+  String get devUpiPaid => 'Customer paid (dev)';
+
+  @override
+  String get codTakeCashInstead => 'Customer pays cash instead';
+
+  @override
+  String get codUpiExpired => 'The QR expired. Show a new one.';
+
+  @override
+  String get taskUnconfirmedTitle => 'Couldn\'t confirm the last step';
+
+  @override
+  String get taskUnconfirmedBody =>
+      'The connection dropped before Jivo answered, and this order is no longer open. It may have gone through. Check the order status, or call support.';
+
+  @override
+  String get taskBackToOrders => 'Back to orders';
+
+  @override
+  String get codQrUnavailable =>
+      'Couldn\'t show the QR code. Check payment again, or collect cash.';
 }

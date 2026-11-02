@@ -13,6 +13,8 @@ import '../features/launch/presentation/splash_screen.dart';
 import '../features/launch/presentation/update_screen.dart';
 import '../features/location/presentation/location_debug_screen.dart';
 import '../features/offers/presentation/offer_alert_preview_screen.dart';
+import '../features/offers/presentation/offer_controller.dart';
+import '../features/offers/presentation/offer_screen.dart';
 import '../features/onboarding/domain/image_picking.dart';
 import '../features/onboarding/domain/kyc_document.dart';
 import '../features/onboarding/presentation/bank_details_screen.dart';
@@ -26,6 +28,10 @@ import '../features/onboarding/presentation/rider_status_screen.dart';
 import '../features/permissions/presentation/location_disclosure_screen.dart';
 import '../features/permissions/presentation/permissions_gate_screen.dart';
 import '../features/shift/presentation/home_screen.dart';
+import '../features/task/presentation/failed_delivery_screen.dart';
+import '../features/task/presentation/pickup_scan_screen.dart';
+import '../features/task/presentation/task_flow_controller.dart';
+import '../features/task/presentation/task_screen.dart';
 import 'env.dart';
 import 'providers.dart';
 import 'route_guard.dart';
@@ -55,6 +61,11 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
   ref.listen(riderAccountControllerProvider, (_, _) => bump());
   ref.listen(otpChallengeProvider, (_, _) => bump());
+  ref.listen(
+    taskFlowControllerProvider.select((s) => s.hasTask),
+    (_, _) => bump(),
+  );
+  ref.listen(offerControllerProvider.select((s) => s.isOpen), (_, _) => bump());
 
   final router = GoRouter(
     initialLocation: ref.read(initialLocationProvider),
@@ -71,6 +82,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         account: ref.read(riderAccountControllerProvider),
         hasOtpChallenge: ref.read(otpChallengeProvider) != null,
         showDevTools: env.showDevTools,
+        hasRiderTask: ref.read(taskFlowControllerProvider).hasTask,
+        hasOffer: ref.read(offerControllerProvider).isOpen,
       );
     },
     routes: [
@@ -151,6 +164,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.home,
         name: 'home',
         builder: (_, _) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: Routes.offer,
+        name: 'offer',
+        builder: (_, _) => const OfferScreen(),
+      ),
+      GoRoute(
+        path: Routes.task,
+        name: 'task',
+        builder: (_, _) => const TaskScreen(),
+        routes: [
+          GoRoute(
+            path: 'scan',
+            name: 'task_scan',
+            builder: (_, _) => const PickupScanScreen(),
+          ),
+          GoRoute(
+            path: 'fail',
+            name: 'task_fail',
+            builder: (_, _) => const FailedDeliveryScreen(),
+          ),
+        ],
       ),
       // The Phase 0 spike screens exist in the dev flavor only.
       if (env.showDevTools) ...[
