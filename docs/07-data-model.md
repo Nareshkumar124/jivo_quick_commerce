@@ -5,11 +5,16 @@ Money fields: `DecimalField(max_digits=12, decimal_places=2)`. Geo fields: SRID 
 
 ## 1. Entity-relationship overview
 
+Updated in Phase 2 (T-204): Phase 1 entities (`OTP_REQUEST`, `APP_CONFIG`, `APP_VERSION_POLICY`) and the Phase 2 additions (`SERVICEABILITY_REQUEST`, `TRENDING_SEARCH`, variant images, collection/banner store scoping). `OTPRequest` has no foreign key: it is linked to a user by phone. Built so far: accounts, cms, stores, catalog, inventory (without `STOCK_RESERVATION`, which arrives with orders in Phase 3).
+
 ```mermaid
 erDiagram
     USER ||--o{ ADDRESS : has
     USER ||--o{ DEVICE : registers
+    USER ||--o{ OTP_REQUEST : "phone verified by"
+    APP_CONFIG ||--o{ APP_VERSION_POLICY : "per app + platform"
     USER ||--o| RIDER : "may be"
+    USER ||--o{ SERVICEABILITY_REQUEST : "notify me"
     USER ||--o{ STAFF_STORE_ACCESS : "staff scoped to"
     DARK_STORE ||--o{ STAFF_STORE_ACCESS : ""
     DARK_STORE ||--|| PRICING_CONFIG : has
@@ -23,6 +28,10 @@ erDiagram
     STORE_INVENTORY ||--o{ STOCK_MOVEMENT : ledger
     COLLECTION ||--o{ COLLECTION_ITEM : lists
     PRODUCT_VARIANT ||--o{ COLLECTION_ITEM : ""
+    PRODUCT_VARIANT ||--o{ PRODUCT_IMAGE : "own images"
+    DARK_STORE }o--o{ COLLECTION : "shown at (empty = all)"
+    DARK_STORE }o--o{ BANNER : "shown at (empty = all)"
+    TRENDING_SEARCH
     USER ||--o{ CART : owns
     CART ||--o{ CART_ITEM : contains
     DARK_STORE ||--o{ CART : "scoped to"
@@ -74,38 +83,44 @@ erDiagram
 
 **Device**: `user`, `app` (customer/rider), `platform`, `fcm_token` (unique), `app_version`, `is_active`, `last_seen_at`.
 
-**Address**: `user`, `label` (home/work/other), `custom_label`, `receiver_name`, `receiver_phone`, `house`, `building_street`, `landmark`, `area`, `city`, `state`, `pincode`, `location` (Point), `is_default`, `is_deleted`. **Until PostGIS is available (Phase 2), `location` is stored as `lat`/`lng` `Decimal(9,6)` columns**; Phase 2 migrates them to the Point field. The API shape (`lat`, `lng` numbers) does not change.
+**Address**: `user`, `label` (home/work/other), `custom_label`, `receiver_name`, `receiver_phone`, `house`, `building_street`, `landmark`, `area`, `city`, `state`, `pincode`, `location` (Point), `is_default`, `is_deleted`. **Until PostGIS is available (Phase 2), `location` is stored as `lat`/`lng` `Decimal(9,6)` columns**; Phase 2 migrates them to the Point field. The API shape (`lat`, `lng` numbers) does not change. The API's `is_serviceable` flag (Phase 2) is computed on read from the active stores' service areas, not stored.
 
-**StaffStoreAccess**: `user`, `store`. Defines which stores a store-scoped staff member can see. **Deferred to Phase 2** together with `DarkStore` (its foreign key target); Phase 1 creates the role Groups without store scoping.
+**StaffStoreAccess**: see 2.2 (built in Phase 2, in the `stores` app).
 
 **Customer** (proxy of User, non-staff users): exists only to give the Customers admin its own permissions (support/ops can block customers without editing staff accounts).
 
 ### 2.2 Stores (`stores`)
 
-**DarkStore**: `code` (unique, e.g., `DEL-01`), `name`, `address`, `city`, `state`, `pincode`, `location` (Point), `service_area` (MultiPolygon), `is_active`, `is_accepting_orders` (temporary close), `avg_prep_minutes`, `phone`, `gstin`, `fssai_license_no`, `invoice_prefix`, `auto_accept_orders` (bool), `dispatch_radius_km`.
+**DarkStore**: `code` (unique, e.g., `DEL-01`), `name`, `address`, `city`, `state`, `pincode`, `location` (Point), `service_area` (MultiPolygon, GiST index), `is_active`, `is_accepting_orders` (temporary close), `avg_prep_minutes`, `phone`, `gstin`, `fssai_license_no`, `invoice_prefix` (unique), `auto_accept_orders` (bool), `dispatch_radius_km`, `priority` (overlap tie-break: the lower number wins; added in Phase 2).
 
-**StoreTiming**: `store`, `weekday` (0–6), `opens_at`, `closes_at`. Several rows per day are allowed (split shifts).
+**StoreTiming**: `store`, `weekday` (0 = Monday … 6), `opens_at`, `closes_at` (IST wall-clock, `closes_at > opens_at`). Several rows per day are allowed (split shifts). A window past midnight is two rows (`…–23:59`, which runs to midnight, and `00:00–…`). A store with no rows is never open.
 
 **PricingConfig** (1:1 store): `min_order_value`, `delivery_fee`, `free_delivery_threshold`, `small_cart_fee`, `small_cart_threshold`, `handling_fee`, `cod_enabled`, `cod_max_order_value`.
 
 **ServiceabilityRequest**: `location` (Point), `user` (nullable), `phone` (nullable), `address_text`.
 
+**StaffStoreAccess**: `user`, `store`, unique together. Lives in the `stores` app (not `accounts`), so accounts does not depend on stores. Scope staff querysets with `apps.stores.services.stores_for(user)`: superusers and global roles see every store; Store Manager / Store Staff only theirs.
+
 > Overlapping service areas: if a point falls inside several active stores' polygons, choose the **nearest open** store (tie-break by `priority` field on DarkStore).
 
 ### 2.3 Catalog (`catalog`)
 
-**Category**: `name`, `slug` (unique), `parent` (self FK, null = top level), `image`, `sort_order`, `is_active`.
+**Category**: `name`, `slug` (unique), `parent` (self FK, null = top level), `image`, `sort_order`, `is_active`. **Two levels in v1** (top-level and sub-categories; the API publishes no deeper tree, Phase 2 R1). Slugs are never all digits, because `?category=` takes an id or a slug.
 
-**Product**: `name`, `slug`, `category`, `brand` (default "Jivo"), `short_description`, `description` (rich text), `highlights` (JSON list), `attributes` (JSON: ingredients, nutrition table, shelf life, storage, country of origin, manufacturer/marketer), `is_veg`, `hsn_code`, `gst_rate` (e.g., 5.00), `search_keywords`, `is_active`, `sort_order`.
+**Product**: `name`, `slug` (unique, never all digits), `category`, `brand` (default "Jivo"), `short_description`, `description` (**plain text**, paragraphs separated by a blank line; changed from "rich text" in Phase 2 R1 so the app needs no HTML renderer), `highlights` (JSON list), `attributes` (JSON, the label information of 09 §4; keys published in the API: `ingredients`, `nutrition` = `{columns: [str], rows: [{name, values: [str], is_sub_row}]}`, `shelf_life`, `storage_instructions`, `country_of_origin`, `manufacturer`, `marketer`, `importer`, `consumer_care`, `fssai_license_no`), `is_veg`, `hsn_code`, `gst_rate` (e.g., 5.00), `search_keywords`, `is_active`, `sort_order`.
 
-**ProductVariant (SKU)**: `product`, `sku` (unique), `name` (e.g., "1 L"), `unit_value` + `unit` (for "₹/100 ml" display), `mrp`, `selling_price` (≤ mrp), `max_qty_per_order`, `barcode`, `sap_item_code` (nullable), `weight_grams`, `is_active`, `sort_order`.
+**ProductVariant (SKU)**: `product`, `sku` (unique), `name` (e.g., "1 L"), `net_quantity` (as on the pack, e.g. "2 x 1 L"; Legal Metrology, added in Phase 2 R1), `unit_value` + `unit` (for "₹/100 ml" display: the API's `unit_price {amount, per}`), `mrp`, `selling_price` (≤ mrp), `max_qty_per_order`, `barcode`, `sap_item_code` (nullable), `weight_grams`, `is_active`, `sort_order`.
 
 **ProductImage**: `product`, `variant` (nullable), `image`, `alt_text`, `sort_order`.
 
-**Collection**: `name`, `slug`, `show_on_home`, `sort_order`, `is_active`, `stores` (M2M, empty = all).
+**Collection**: `name`, `slug`, `show_on_home`, `sort_order`, `is_active`, `stores` (M2M, empty = all). At most 100 items (the collection page is not paginated).
 **CollectionItem**: `collection`, `variant`, `sort_order`.
 
 **Banner**: `title`, `image`, `link_type` (category/collection/product/url/none), `link_value`, `stores` (M2M, empty = all), `starts_at`, `ends_at`, `sort_order`, `is_active`.
+
+**TrendingSearch** (added in Phase 2): `term` (unique), `sort_order`, `is_active`. Admin-defined trending searches (03 §2.7), returned by `search/suggest` for a blank query.
+
+Images (`Category.image`, `ProductImage.image`, `Banner.image`) are public media (`STORAGES["public"]`), validated by content (JPEG/PNG/WebP, ≤ 5 MB, ≥ 200 px), EXIF-stripped, normalised to WebP under random keys, with 256/512/1024 px renditions made on save (09 §1, §3.6). Product and category images are padded to a white square.
 
 ### 2.4 Inventory (`inventory`)
 
@@ -114,7 +129,7 @@ erDiagram
 
 **StockReservation**: `order`, `store`, `variant`, `quantity`, `status` (ACTIVE/COMMITTED/RELEASED), `expires_at` (for online-payment orders).
 
-**StockMovement** (append-only ledger): `store`, `variant`, `delta` (+/−), `type` (INWARD, SALE, RETURN, DAMAGE, AUDIT_ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT), `order` (nullable), `reason`, `created_by`, `on_hand_after`.
+**StockMovement** (append-only ledger; the model refuses updates and deletes): `store`, `variant`, `delta` (+/−, never 0), `type` (INWARD, SALE, RETURN, DAMAGE, AUDIT_ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT), `order` (nullable; the column is added with orders in Phase 3), `reason`, `created_by`, `on_hand_after`. `StoreInventory` rows are created at zero and opening stock is an INWARD movement, so a row's movements always sum to its `on_hand` (`apps.inventory.services`). Custom permissions: `inventory.adjust_stock`, `inventory.toggle_availability`.
 
 > Concurrency rule: reservations use `SELECT … FOR UPDATE` on `StoreInventory` rows (locked in a consistent order by variant id to avoid deadlocks) inside one transaction. Two customers can never reserve the same last unit.
 

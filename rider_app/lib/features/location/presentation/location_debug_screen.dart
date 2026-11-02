@@ -87,6 +87,7 @@ class LocationDebugScreen extends ConsumerWidget {
               LocationDebugError.startFailed => l10n.debugStartFailed(
                 state.errorDetail ?? '',
               ),
+              LocationDebugError.taskActive => l10n.offlineBlockedDuringTask,
             }, style: TextStyle(color: scheme.error)),
           ],
           const SizedBox(height: 16),

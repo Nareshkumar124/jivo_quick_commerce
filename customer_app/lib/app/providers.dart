@@ -1,18 +1,17 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_api/jivo_api.dart' show JivoApi;
+import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../features/location/presentation/delivery_controller.dart';
 import '../shared/links/url_opener.dart';
+import '../shared/network/store_header.dart';
 import '../shared/storage/app_flags.dart';
 
 /// The `X-App-Name` this app sends.
 const customerAppName = 'customer';
-
-/// Turns off Riverpod's automatic retry. Failed loads show an error state with
-/// an explicit Retry button instead (`03 §4`).
-Duration? noAutomaticRetry(int retryCount, Object error) => null;
 
 Never _overriddenAtStartup(String name) => throw UnimplementedError(
   '$name is overridden at startup (customerAppRoot)',
@@ -46,13 +45,15 @@ final appFlagsProvider = Provider<AppFlags>(
   (ref) => AppFlags(ref.watch(sharedPreferencesProvider)),
 );
 
-/// The Dio instance for every backend call: client-info headers, the auth
-/// interceptor (token, refresh once on 401) and the app-control interceptor
-/// (426/503). Phase 2 adds `X-Store-Id` via `dynamicHeaders:`.
+/// The Dio instance for every backend call: client-info headers,
+/// `X-Store-Id` on catalog and cart calls, the auth interceptor (token,
+/// refresh once on 401) and the app-control interceptor (426/503).
 final dioProvider = Provider<Dio>((ref) {
   final dio = createJivoDio(
     env: ref.watch(appEnvProvider),
     clientInfo: ref.watch(clientInfoProvider),
+    dynamicHeaders: (options) =>
+        storeHeaders(options.path, ref.read(currentStoreIdProvider)),
     interceptors: [
       AuthInterceptor(ref.watch(sessionProvider)),
       AppControlInterceptor(ref.watch(appControlProvider)),

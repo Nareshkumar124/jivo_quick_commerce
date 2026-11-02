@@ -1,0 +1,21 @@
+{# Pagination for a data table. Param: table. Links keep the current search and filters ({% querystring %}). #}
+{% if table.paginator.num_pages > 1 or table.paginator.count %}
+    <nav class="flex flex-wrap items-center gap-1 mt-3" aria-label="Pagination">
+        <span class="mr-auto text-xs text-font-subtle-light dark:text-font-subtle-dark" data-testid="table-count">
+            {{ table.page.start_index }}–{{ table.page.end_index }} of {{ table.paginator.count }}
+        </span>
+        {% if table.paginator.num_pages > 1 %}
+            {% for number in table.page_range %}
+                {% if number == table.paginator.ELLIPSIS %}
+                    <span class="px-2">{{ number }}</span>
+                {% elif number == table.page.number %}
+                    <span class="ops-page ops-page--current" aria-current="page">{{ number }}</span>
+                {% else %}
+                    <a class="ops-page" href="{{ table.url }}{% querystring page=number %}"
+                       hx-get="{{ table.url }}{% querystring page=number %}" hx-target="#{{ table.results_id }}" hx-swap="outerHTML"
+                       hx-indicator="#{{ table.id }}-loading">{{ number }}</a>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    </nav>
+{% endif %}

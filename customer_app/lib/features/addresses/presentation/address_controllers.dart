@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jivo_core/helpers.dart';
 
-import '../../../app/providers.dart';
 import '../../../app/repositories.dart';
 import '../data/device_location.dart';
 import '../domain/saved_address.dart';

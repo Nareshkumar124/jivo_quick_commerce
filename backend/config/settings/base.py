@@ -10,7 +10,16 @@ from pathlib import Path
 
 from celery.schedules import crontab
 
-from config.env import env_bool, env_dict, env_int, env_list, env_str, load_env_file
+from config.env import (
+    env_bool,
+    env_dict,
+    env_float,
+    env_int,
+    env_list,
+    env_str,
+    env_test_database_name,
+    load_env_file,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # backend/
 
@@ -38,7 +47,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # NOTE: no `django.contrib.gis` yet. The PostgreSQL server has no PostGIS; Phase 2 adds it.
+    # GeoDjango (Phase 2): PostGIS on the server, GDAL/GEOS on the host and in the Docker image.
+    "django.contrib.gis",
     # Third party
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
@@ -55,6 +65,10 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.cms",
     "apps.notifications",
+    "apps.stores",
+    "apps.catalog",
+    "apps.inventory",
+    "apps.ops_console",
 ]
 
 MIDDLEWARE = [
@@ -92,12 +106,16 @@ TEMPLATES = [
 ]
 
 # --------------------------------------------------------------------------- database
+# The only database tests may create or drop (the server is shared): POSTGRES_TEST_DB, default
+# `test_jivo_quick_commerce`. Any name not starting with that is refused at settings load.
+TEST_DATABASE_NAME = env_test_database_name()
+
 # Built from separate variables (never a DATABASE_URL: passwords may contain URL-reserved chars).
-# Phase 0 uses the plain PostgreSQL engine because the server has no PostGIS yet. Phase 2 switches
-# ENGINE to "django.contrib.gis.db.backends.postgis" once PostGIS is installed on the server.
+# PostGIS since Phase 2 (serviceability, distances). Migrating a test database runs
+# `CREATE EXTENSION IF NOT EXISTS postgis` (the DB user is allowed to); never run it by hand.
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
+        "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": env_str("POSTGRES_DB"),
         "USER": env_str("POSTGRES_USER"),
         "PASSWORD": env_str("POSTGRES_PASSWORD"),
@@ -109,9 +127,17 @@ DATABASES = {
         "OPTIONS": {
             "connect_timeout": env_int("POSTGRES_CONNECT_TIMEOUT", default=5),
             "sslmode": env_str("POSTGRES_SSLMODE", default="prefer"),
+            # The DB is remote: detect a dropped connection (network blip, NAT timeout) within
+            # about a minute instead of waiting forever for a reply that will never come.
+            "keepalives": 1,
+            "keepalives_idle": env_int("POSTGRES_KEEPALIVES_IDLE", default=30),
+            "keepalives_interval": 10,
+            "keepalives_count": 3,
+            "tcp_user_timeout": env_int("POSTGRES_TCP_USER_TIMEOUT_MS", default=60_000),
         },
-        # Hard-set: pytest may only ever create/drop this database on the shared server.
-        "TEST": {"NAME": "test_jivo_quick_commerce"},
+        # pytest may only ever create/drop a `test_jivo_quick_commerce*` database on the shared
+        # server. POSTGRES_TEST_DB lets parallel agents/CI jobs use separate test databases.
+        "TEST": {"NAME": TEST_DATABASE_NAME},
     }
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -177,6 +203,27 @@ STORAGES = {
             "default_acl": None,
             "file_overwrite": False,
             "querystring_auth": True,
+        },
+    },
+    # Public catalog media (product, category, banner images): plain, non-expiring URLs (cached
+    # API payloads hold them), long browser/CDN caching (keys are random and never reused).
+    # S3_PUBLIC_MEDIA_DOMAIN is the CDN host (or "10.0.2.2:9000/jivo-public" for a phone/emulator
+    # against local MinIO, with S3_PUBLIC_MEDIA_PROTOCOL=http:).
+    "public": {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": env_str("S3_PUBLIC_MEDIA_BUCKET", default="jivo-public"),
+            "endpoint_url": S3_ENDPOINT_URL,
+            "access_key": env_str("S3_ACCESS_KEY_ID", default="") or None,
+            "secret_key": env_str("S3_SECRET_ACCESS_KEY", default="") or None,
+            "region_name": env_str("S3_REGION", default="ap-south-1"),
+            "addressing_style": "path" if S3_ENDPOINT_URL else "auto",
+            "default_acl": None,
+            "file_overwrite": False,
+            "querystring_auth": False,
+            "custom_domain": env_str("S3_PUBLIC_MEDIA_DOMAIN", default="") or None,
+            "url_protocol": env_str("S3_PUBLIC_MEDIA_PROTOCOL", default="https:"),
+            "object_parameters": {"CacheControl": "public, max-age=31536000, immutable"},
         },
     },
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
@@ -342,6 +389,10 @@ SPECTACULAR_SETTINGS = {
         "OtpPurposeEnum": "apps.accounts.choices.OtpPurpose",
         "RiderStatusEnum": "apps.accounts.choices.RiderStatus",
         "AddressLabelEnum": "apps.accounts.choices.AddressLabel",
+        "ProductSortEnum": "apps.catalog.choices.ProductSort",
+        "StockStatusEnum": "apps.catalog.choices.StockStatus",
+        "BannerLinkTypeEnum": "apps.catalog.choices.BannerLinkType",
+        "SearchSuggestionTypeEnum": "apps.catalog.choices.SuggestionType",
     },
     "TAGS": [
         {"name": "health", "description": "Liveness and readiness probes. No authentication."},
@@ -349,18 +400,42 @@ SPECTACULAR_SETTINGS = {
         {"name": "account", "description": "Profile, push devices, account deletion (06 §2.1)."},
         {"name": "addresses", "description": "Saved delivery addresses (06 §2.2)."},
         {"name": "config", "description": "App configuration: versions, maintenance, contacts."},
+        {
+            "name": "serviceability",
+            "description": "Which store serves a location, and notify-me (06 §2.3).",
+        },
+        {
+            "name": "catalog",
+            "description": (
+                "Home, categories, products, search and collections for one store: every "
+                "operation takes the `X-Store-Id` header (06 §2.4)."
+            ),
+        },
     ],
     "SWAGGER_UI_SETTINGS": {"persistAuthorization": True, "displayOperationId": True},
 }
 
-# --------------------------------------------------------------------------- admin (unfold)
-UNFOLD = {
-    "SITE_TITLE": "Jivo Admin",
-    "SITE_HEADER": "Jivo Quick Commerce",
-    "SITE_SYMBOL": "local_shipping",
-    "ENVIRONMENT": "apps.core.admin.environment_callback",
-    "SHOW_HISTORY": True,
+# --------------------------------------------------------------------------- stores & catalog (P2)
+# Store opening hours (StoreTiming) are wall-clock times in this zone; the API sends UTC.
+STORE_TIME_ZONE = "Asia/Kolkata"
+# "Only N left" (LOW_STOCK) when 1 <= available <= this (DL-26, PM default 3).
+CATALOG_LOW_STOCK_UNITS = env_int("CATALOG_LOW_STOCK_UNITS", default=3)
+CATALOG_IMAGE_MAX_BYTES = 5 * 1024 * 1024  # 09 §3.6
+# Per-store Redis cache of home/catalog responses; also bounds banner start/end lag.
+CATALOG_CACHE_SECONDS = env_int("CATALOG_CACHE_SECONDS", default=300)
+# ETA (08 §8): prep + rider wait + distance x road factor / speed + buffer.
+ETA_AVG_SPEED_KMPH = env_float("ETA_AVG_SPEED_KMPH", default=20.0)
+ETA_ROAD_FACTOR = env_float("ETA_ROAD_FACTOR", default=1.3)
+ETA_BUFFER_MINUTES = env_int("ETA_BUFFER_MINUTES", default=2)
+# Typical wait for a rider at the store, used by the serviceability ETA (PM default 3 min).
+ETA_RIDER_WAIT_MINUTES = env_int("ETA_RIDER_WAIT_MINUTES", default=3)
+# Notify-me leads per user (or IP when anonymous). Fails open when Redis is down.
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
+    "notify_me": env_str("NOTIFY_ME_RATE", default="10/hour"),
 }
+
+# --------------------------------------------------------------------------- admin (unfold)
+from config.admin_ui import UNFOLD  # noqa: E402, F401  (owned by the admin panel track)
 
 # --------------------------------------------------------------------------- project flags
 # `manage.py seed_demo` is refused where this is False (production).

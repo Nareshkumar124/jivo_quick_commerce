@@ -26,16 +26,35 @@ def staff_with_role(role):
 
 
 class TestRoles:
-    def test_groups_exist_with_phase_1_permissions(self):
+    def test_groups_exist_with_their_permissions(self):
         roles.sync_roles()
         names = set(Group.objects.values_list("name", flat=True))
         assert set(roles.ROLE_PERMISSIONS) <= names
         support = {p.codename for p in Group.objects.get(name=roles.SUPPORT).permissions.all()}
-        assert support == {"view_customer", "change_customer"}
+        assert {"view_customer", "change_customer", "view_product"} <= support
+        assert not any(code.startswith(("add_", "delete_")) for code in support)
         admin_perms = Group.objects.get(name=roles.SUPER_ADMIN).permissions
         assert admin_perms.filter(codename="change_user").exists()
         assert admin_perms.filter(codename="change_appconfig").exists()
-        assert not Group.objects.get(name=roles.FINANCE).permissions.exists()
+        assert admin_perms.filter(codename="adjust_stock").exists()  # custom permission (P2)
+        finance = {p.codename for p in Group.objects.get(name=roles.FINANCE).permissions.all()}
+        assert finance == {"view_storeinventory", "view_stockmovement", "view_pricingconfig"}
+
+    @pytest.mark.parametrize(
+        ("role", "allowed", "denied"),
+        [
+            (roles.STORE_MANAGER, {"adjust_stock", "view_darkstore"}, {"change_productvariant"}),
+            (roles.STORE_STAFF, {"view_storeinventory"}, {"adjust_stock"}),
+            (roles.CATALOG_MANAGER, {"change_productvariant", "add_banner"}, {"adjust_stock"}),
+            (roles.OPS, {"view_serviceabilityrequest"}, {"adjust_stock", "change_storeinventory"}),
+        ],
+    )
+    def test_phase_2_matrix(self, role, allowed, denied):
+        """05 §3: catalog, inventory and stores rows. Price changes stay with catalog/admin."""
+        roles.sync_roles()
+        codes = {p.codename for p in Group.objects.get(name=role).permissions.all()}
+        assert allowed <= codes
+        assert not denied & codes
 
     def test_sync_is_idempotent(self):
         roles.sync_roles()
@@ -44,7 +63,7 @@ class TestRoles:
         support.permissions.clear()
         roles.sync_roles()
         assert Group.objects.count() == count
-        assert support.permissions.count() == 2
+        assert support.permissions.count() == len(roles.ROLE_PERMISSIONS[roles.SUPPORT])
 
 
 class TestCustomersAdmin:
@@ -112,7 +131,12 @@ class TestCustomersAdmin:
         client.force_login(SuperUserFactory())
         client.post(
             reverse("admin:accounts_customer_changelist"),
-            {"action": "anonymise_now", "_selected_action": [customer.pk, other.pk]},
+            # confirm=yes: the action asks first (see test_admin_roles.TestAnonymiseConfirmation)
+            {
+                "action": "anonymise_now",
+                "_selected_action": [customer.pk, other.pk],
+                "confirm": "yes",
+            },
         )
         customer.refresh_from_db()
         other.refresh_from_db()

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:customer_app/app/bootstrap.dart';
 import 'package:customer_app/app/repositories.dart';
@@ -7,13 +8,21 @@ import 'package:customer_app/features/addresses/data/address_repository.dart';
 import 'package:customer_app/features/addresses/data/device_location.dart';
 import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/data/fake_token_refresher.dart';
-import 'package:customer_app/features/auth/data/otp_autofill.dart';
+import 'package:customer_app/features/cart/data/cart_repository.dart';
+import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
+import 'package:customer_app/features/home/presentation/banner_carousel.dart';
 import 'package:customer_app/features/launch/data/config_repository.dart';
+import 'package:customer_app/features/location/data/delivery_location_store.dart';
+import 'package:customer_app/features/location/data/maps_availability.dart';
+import 'package:customer_app/features/location/data/reverse_geocoder.dart';
+import 'package:customer_app/features/location/data/serviceability_repository.dart';
+import 'package:customer_app/features/location/domain/delivery_location.dart';
 import 'package:customer_app/features/profile/data/profile_repository.dart';
 import 'package:customer_app/shared/connectivity/connectivity.dart';
-import 'package:customer_app/shared/links/url_opener.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,12 +30,23 @@ import 'test_config.dart';
 
 const signedInTokens = AuthTokens(access: 'a1', refresh: 'r1');
 
+/// A saved delivery location inside the fake store's area.
+const testDeliveryLocation = DeliveryLocation(
+  point: FakeServiceabilityRepository.storeLocation,
+  title: 'Home',
+  subtitle: 'Flat 4B, MG Road, New Delhi',
+  addressId: 1,
+);
+
 /// The whole app on fakes: no plugin, network or platform channel is used.
 class TestApp {
   TestApp({
     this.tokens,
     this.onboardingSeen = true,
     this.appVersion = '1.0.0',
+    this.deliveryLocation = testDeliveryLocation,
+    this.mapsAvailable = false,
+    this.extraOverrides = const [],
     String? autofillCode,
   }) : autofill = FakeOtpAutofill(autofillCode);
 
@@ -34,11 +54,22 @@ class TestApp {
   final bool onboardingSeen;
   final String appVersion;
 
+  /// The remembered delivery location; null starts without one.
+  final DeliveryLocation? deliveryLocation;
+  final bool mapsAvailable;
+
+  /// Added after the defaults (e.g. a fake map view).
+  final List<Override> extraOverrides;
+
   final config = FakeConfigRepository();
   final auth = FakeAuthRepository();
   final profile = FakeProfileRepository();
   final addresses = FakeAddressRepository();
   final location = FakeDeviceLocation();
+  final catalog = FakeCatalogRepository(latency: Duration.zero);
+  final serviceability = FakeServiceabilityRepository(latency: Duration.zero);
+  final cart = InMemoryCartRepository();
+  final geocoder = FakeReverseGeocoder();
   final FakeOtpAutofill autofill;
   final urls = FakeUrlOpener();
   final refresher = FakeTokenRefresher();
@@ -51,6 +82,8 @@ class TestApp {
     SharedPreferences.setMockInitialValues({
       'installed': true,
       'onboarding_seen': onboardingSeen,
+      if (deliveryLocation != null)
+        DeliveryLocationStore.key: jsonEncode(deliveryLocation!.toJson()),
     });
     final prefs = await SharedPreferences.getInstance();
     if (tokens != null) await store.write(tokens!);
@@ -78,6 +111,15 @@ class TestApp {
           otpAutofillProvider.overrideWithValue(autofill),
           urlOpenerProvider.overrideWithValue(urls),
           connectivityStreamProvider.overrideWithValue(connectivity.stream),
+          catalogRepositoryProvider.overrideWithValue(catalog),
+          serviceabilityRepositoryProvider.overrideWithValue(serviceability),
+          cartRepositoryProvider.overrideWithValue(cart),
+          mapsAvailabilityProvider.overrideWithValue(
+            FakeMapsAvailability(available: mapsAvailable),
+          ),
+          reverseGeocoderProvider.overrideWithValue(geocoder),
+          bannerAutoScrollProvider.overrideWithValue(null),
+          ...extraOverrides,
         ],
       ),
     );

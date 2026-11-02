@@ -248,5 +248,482 @@
   "statusSuspendedBody": "Your rider account is suspended. Contact Jivo support to continue.",
   "statusUnknownTitle": "Account status unavailable",
   "statusUnknownBody": "This version of the app can't show your account status. Update the app or contact support.",
-  "callSupport": "Call support"
+  "callSupport": "Call support",
+  "onboardingStepOf": "Step {step} of {total}",
+  "@onboardingStepOf": {
+    "description": "Progress through registration, documents and bank details.",
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "onboardingCheckDetails": "Some details were not accepted. Check them and try again.",
+  "@onboardingCheckDetails": {
+    "description": "Server VALIDATION_ERROR on an onboarding form."
+  },
+  "onboardingLoading": "Loading your application…",
+  "onboardingLoadError": "Couldn't load your application",
+  "fieldRequired": "This is required.",
+  "fieldNameInvalid": "Enter a name with letters only, at least 2 characters.",
+  "fieldDobInFuture": "Date of birth can't be in the future.",
+  "fieldDobUnderage": "You must be at least {age} years old to ride with Jivo.",
+  "@fieldDobUnderage": {
+    "placeholders": {
+      "age": {
+        "type": "int"
+      }
+    }
+  },
+  "fieldPhoneSameAsRider": "Enter someone else's number, not your own.",
+  "fieldVehicleNumberInvalid": "Enter the vehicle number as on the number plate, like DL 3C AB 1234.",
+  "fieldAccountNumberInvalid": "Enter a valid account number (9 to 18 digits).",
+  "fieldAccountNumbersMismatch": "The account numbers don't match.",
+  "fieldIfscInvalid": "Enter the 11-character IFSC, like HDFC0001234.",
+  "fieldUpiInvalid": "Enter a valid UPI ID, like name@okbank.",
+  "fieldAadhaarInvalid": "Enter your 12-digit Aadhaar number exactly as printed.",
+  "fieldPanInvalid": "Enter your PAN exactly as printed, like ABCDE1234F.",
+  "fieldDrivingLicenceInvalid": "Enter your licence number exactly as printed on the card.",
+  "registerIntro": "Tell us about yourself and your vehicle. Next, you'll upload your documents.",
+  "registerSectionAboutYou": "About you",
+  "registerFullName": "Full name (as on Aadhaar)",
+  "registerDob": "Date of birth",
+  "registerDobHint": "Choose the date",
+  "registerDobPickerHelp": "Select your date of birth",
+  "registerSectionEmergency": "Emergency contact",
+  "registerEmergencyHelp": "Someone Jivo can call if something happens to you on a delivery.",
+  "registerEmergencyName": "Contact name",
+  "registerEmergencyPhone": "Contact mobile number",
+  "registerSectionStore": "Preferred store",
+  "registerStoreLabel": "Store you want to deliver for",
+  "registerStoreHelp": "Jivo confirms your store when your account is approved.",
+  "registerStoreOption": "{name}, {city}",
+  "@registerStoreOption": {
+    "description": "A dark store in the store dropdown.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "city": {
+        "type": "String"
+      }
+    }
+  },
+  "registerStoresLoading": "Loading stores…",
+  "registerStoresError": "Couldn't load the stores.",
+  "registerSectionVehicle": "Your vehicle",
+  "registerVehicleNumber": "Vehicle number",
+  "registerVehicleNumberHint": "DL 3C AB 1234",
+  "registerSubmit": "Continue",
+  "vehicleBicycle": "Bicycle",
+  "vehicleEBike": "E-bike",
+  "vehicleMotorbike": "Motorbike",
+  "vehicleScooter": "Scooter",
+  "statusFinishTitle": "Finish your application",
+  "statusFinishBody": "Complete these steps so Jivo can review your application.",
+  "statusStepDetails": "Personal and vehicle details",
+  "statusStepDocuments": "Documents",
+  "statusStepBank": "Bank details",
+  "statusStepDone": "Done",
+  "statusStepNeeded": "Needed",
+  "statusStepDocumentsProgress": "{done} of {total} uploaded",
+  "@statusStepDocumentsProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "statusStepDocumentsFix": "{count, plural, =1{1 document needs a new photo} other{{count} documents need new photos}}",
+  "@statusStepDocumentsFix": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "statusActionUploadDocuments": "Upload documents",
+  "statusActionAddBank": "Add bank details",
+  "statusActionCheck": "Check status",
+  "statusActionViewDocuments": "View documents",
+  "statusRejectedFixBody": "Fix the items below. Jivo reviews your application again after you send them.",
+  "statusRejectedReasonLabel": "Reason from Jivo",
+  "statusActionFixDocuments": "Upload documents again",
+  "statusActionFixBank": "Update bank details",
+  "statusApprovedTitle": "You're approved!",
+  "statusApprovedBody": "Your home store is {store}. You can now go online and start delivering.",
+  "@statusApprovedBody": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "statusActionStart": "Start delivering",
+  "statusDevReview": "Simulate review (dev)",
+  "@statusDevReview": {
+    "description": "Dev flavor only: plays the ops review against the fake backend."
+  },
+  "statusDevApprove": "Approve (fake)",
+  "statusDevReject": "Reject the PAN (fake)",
+  "documentsTitle": "Documents",
+  "documentsIntro": "Take clear photos in good light. Each photo must show the whole document.",
+  "documentsProgress": "{done} of {total} done. Upload every document to continue.",
+  "@documentsProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "documentsContinue": "Continue",
+  "docPhoto": "Your photo (selfie)",
+  "docAadhaarFront": "Aadhaar card: front",
+  "docAadhaarBack": "Aadhaar card: back",
+  "docPan": "PAN card",
+  "docDrivingLicence": "Driving licence",
+  "docVehicleRc": "Vehicle RC",
+  "docStatusNeeded": "Needed",
+  "docStatusPending": "In review",
+  "docStatusApproved": "Approved",
+  "docStatusRejected": "Not accepted: upload again",
+  "docActionUpload": "Upload",
+  "docActionReplace": "Replace",
+  "docActionReupload": "Upload again",
+  "docUploaded": "{document} uploaded",
+  "@docUploaded": {
+    "description": "Snackbar after a document upload.",
+    "placeholders": {
+      "document": {
+        "type": "String"
+      }
+    }
+  },
+  "captureHintPhoto": "Take a clear photo of your face in good light. Remove your helmet, cap and sunglasses.",
+  "captureHintCard": "Put the card on a flat, dark surface. All four corners and the text must be clear, with no glare.",
+  "captureTakePhoto": "Take photo",
+  "captureChooseGallery": "Choose from gallery",
+  "captureProcessing": "Preparing the photo…",
+  "captureReady": "Photo ready",
+  "captureCheck": "Check that the photo is sharp and nothing is cut off.",
+  "captureUpload": "Upload",
+  "captureRetake": "Retake",
+  "captureProblemPicker": "Couldn't open the camera or gallery. Allow Jivo Rider to use the camera in your phone settings, then try again.",
+  "captureProblemUnreadable": "That file can't be used. Take a new photo.",
+  "captureProblemTooLarge": "That photo is too large. Take a new photo.",
+  "numberAadhaar": "Aadhaar number",
+  "numberPan": "PAN",
+  "numberDrivingLicence": "Driving licence number",
+  "numberVehicleRc": "Vehicle number (as on the RC)",
+  "numberMaskedHelper": "Entered: {masked}",
+  "@numberMaskedHelper": {
+    "description": "Helper under a document or account number once typed; only the masked form is shown.",
+    "placeholders": {
+      "masked": {
+        "type": "String"
+      }
+    }
+  },
+  "bankTitle": "Bank details",
+  "bankIntro": "Jivo pays your earnings into this account.",
+  "bankSaved": "Saved account {account} · {ifsc}",
+  "@bankSaved": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      },
+      "ifsc": {
+        "type": "String"
+      }
+    }
+  },
+  "bankSavedShort": "Account {account}",
+  "@bankSavedShort": {
+    "placeholders": {
+      "account": {
+        "type": "String"
+      }
+    }
+  },
+  "bankReplaceHint": "To change it, enter the new details below.",
+  "bankHolderName": "Account holder name",
+  "bankAccountNumber": "Account number",
+  "bankConfirmAccountNumber": "Re-enter account number",
+  "bankIfsc": "IFSC",
+  "bankIfscHint": "HDFC0001234",
+  "bankUpi": "UPI ID (optional)",
+  "bankUpiHint": "name@okbank",
+  "bankSave": "Save bank details",
+  "bankSavedToast": "Bank details saved",
+  "offerTitle": "New order",
+  "offerAlertTitle": "New order offer",
+  "@offerAlertTitle": {
+    "description": "Offer notification title (rings, full screen)."
+  },
+  "offerAlertBody": "{store} to {locality}",
+  "@offerAlertBody": {
+    "description": "Offer notification body.",
+    "placeholders": {
+      "store": {
+        "type": "String"
+      },
+      "locality": {
+        "type": "String"
+      }
+    }
+  },
+  "offerPrepaid": "Prepaid: nothing to collect",
+  "offerCod": "Cash on delivery: collect {amount}",
+  "@offerCod": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "offerPayout": "You earn about {amount}",
+  "@offerPayout": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "distanceKm": "{km} km",
+  "@distanceKm": {
+    "description": "Distance from the store to the customer, as sent by the server.",
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "offerAccept": "Accept",
+  "offerReject": "Reject",
+  "offerRejectTitle": "Why are you rejecting? (optional)",
+  "offerRejectTooFar": "Too far",
+  "offerRejectVehicle": "Vehicle problem",
+  "offerRejectBreak": "Taking a break",
+  "offerRejectOther": "Other reason",
+  "offerRejectSkip": "Reject without a reason",
+  "offerExpiredTitle": "Offer expired",
+  "offerExpiredBody": "The time to accept ran out. New orders will come to you.",
+  "offerTakenTitle": "Order taken",
+  "offerTakenBody": "Another rider accepted this order first.",
+  "offerWithdrawnTitle": "Order cancelled",
+  "offerWithdrawnBody": "This order was cancelled before pickup. Wait for the next one.",
+  "offerOk": "OK",
+  "taskOrderNumber": "Order {number}",
+  "@taskOrderNumber": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "taskRefresh": "Refresh",
+  "taskNavigate": "Navigate",
+  "taskNoMapsApp": "No maps app found. Install Mappls or another maps app.",
+  "taskCallCustomer": "Call customer",
+  "taskStateChanged": "This order changed. The screen now shows its latest step.",
+  "taskLocationUnavailable": "Couldn't get your location. Turn on GPS and try again.",
+  "taskOutsideGeofence": "You're not close enough yet. Move closer and try again.",
+  "taskOutsideGeofenceDistance": "You're {metres} m away. Move closer and try again.",
+  "@taskOutsideGeofenceDistance": {
+    "placeholders": {
+      "metres": {
+        "type": "int"
+      }
+    }
+  },
+  "cashLimitExceeded": "Your cash in hand has reached the limit. Deposit cash at the store to get cash orders again.",
+  "taskGoToStoreTitle": "Go to the store",
+  "taskOrderPacking": "Packing…",
+  "taskOrderReady": "Ready for pickup",
+  "taskArrivedStore": "Arrived at store",
+  "taskPickupTitle": "Pick up the order",
+  "taskItemsTitle": "Check the items in the bag",
+  "pickupCodeHelp": "Scan the QR code on the bag, or type the 4-character code printed on it.",
+  "pickupCodeLabel": "Order code",
+  "pickupCodeFormat": "Enter the 4-character code from the bag.",
+  "pickupCodeWrong": "That code doesn't match this order. Check the bag and try again.",
+  "pickupNotPacked": "The order isn't packed yet. Wait until the store marks it ready.",
+  "taskPickup": "Picked up",
+  "pickupScan": "Scan QR code",
+  "scanTitle": "Scan the bag QR code",
+  "scanTypeInstead": "Type the code instead",
+  "scanNotJivoCode": "This QR isn't a Jivo order code.",
+  "scanCameraUnavailable": "The camera isn't available. Type the code from the bag instead.",
+  "taskGoToCustomerTitle": "Deliver to the customer",
+  "taskLandmark": "Landmark: {landmark}",
+  "@taskLandmark": {
+    "placeholders": {
+      "landmark": {
+        "type": "String"
+      }
+    }
+  },
+  "taskInstructions": "Note: {instructions}",
+  "@taskInstructions": {
+    "placeholders": {
+      "instructions": {
+        "type": "String"
+      }
+    }
+  },
+  "taskCollectCash": "Collect {amount} in cash",
+  "@taskCollectCash": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "taskArrivedCustomer": "Arrived at customer",
+  "taskCantDeliver": "Can't deliver",
+  "arrivedOverride": "I'm at the address: the pin is wrong",
+  "arrivedOverrideTitle": "Why are you outside the pin area?",
+  "arrivedOverridePinWrong": "The map pin is in the wrong place",
+  "arrivedOverrideGate": "I'm at the gate or lobby",
+  "otpStepTitle": "Enter the delivery code",
+  "otpStepHelp": "Ask the customer for the 4-digit code in their app or SMS.",
+  "otpStepLabel": "Delivery code",
+  "otpContinue": "Continue",
+  "taskDeliver": "Mark delivered",
+  "otpAttemptsLeft": "{count, plural, =1{1 attempt left} other{{count} attempts left}}",
+  "@otpAttemptsLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deliveryOtpWrong": "That code is wrong. Ask the customer again.",
+  "deliveryOtpWrongLeft": "{count, plural, =1{Wrong code. 1 attempt left.} other{Wrong code. {count} attempts left.}}",
+  "@deliveryOtpWrongLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "deliveryOtpLocked": "Too many wrong codes. Jivo support has been alerted. Call support to continue.",
+  "otpLockedTitle": "Delivery code locked",
+  "codTitle": "Collect payment",
+  "codAmountDueLabel": "Amount to collect",
+  "codExactAmount": "Collect exactly this amount.",
+  "codCashCollected": "Cash collected {amount}",
+  "@codCashCollected": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codConfirmTitle": "Confirm cash",
+  "codConfirmBody": "Did you collect exactly {amount} in cash?",
+  "@codConfirmBody": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codConfirmYes": "Yes, collected",
+  "codConfirmNo": "No",
+  "codCashDone": "Cash collected: {amount}",
+  "@codCashDone": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codShowUpi": "Customer pays by UPI: show QR",
+  "codUpiWaiting": "Waiting for the payment…",
+  "codUpiPaid": "Payment received",
+  "codUpiCheck": "Check payment",
+  "codChangeOtp": "Change the delivery code",
+  "codConfirmFirst": "Confirm the cash or wait for the UPI payment first.",
+  "codAmountMismatch": "The amount doesn't match what Jivo expects. Check the amount and try again.",
+  "taskDeliveredTitle": "Delivered!",
+  "taskDeliveredBody": "Great job. Wait for the next order.",
+  "taskDeliveredEarned": "You earned {amount} for this order.",
+  "@taskDeliveredEarned": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "taskReturnTitle": "Return to store",
+  "taskReturnBody": "Take the items back to the store. The store staff will mark them received.",
+  "taskCheckStatus": "Check status",
+  "taskReturnedTitle": "Items returned",
+  "taskReturnedBody": "The store received the items. You're ready for new orders.",
+  "taskCancelledTitle": "Order cancelled",
+  "taskCancelledBody": "This order was cancelled before pickup. You don't need to collect it.",
+  "taskUnassignedTitle": "Order reassigned",
+  "taskUnassignedBody": "This order is no longer assigned to you.",
+  "taskUnknownTitle": "Can't show this order",
+  "taskUnknownBody": "This app version can't show the order's status. Try again or update the app.",
+  "failTitle": "Can't deliver",
+  "failIntro": "Why can't you deliver this order?",
+  "failNotReachable": "Customer not reachable",
+  "failRefused": "Customer refused the order",
+  "failWrongAddress": "Wrong address",
+  "failOther": "Other reason",
+  "failCallsNeeded": "Call the customer at least {needed} times ({done} done)",
+  "@failCallsNeeded": {
+    "placeholders": {
+      "needed": {
+        "type": "int"
+      },
+      "done": {
+        "type": "int"
+      }
+    }
+  },
+  "failWaitLeft": "Wait at the address: {time} left",
+  "@failWaitLeft": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "failWaitDone": "You waited 10 minutes at the address",
+  "failWaitNotArrived": "Mark \"Arrived at customer\" first",
+  "failNoteOptional": "Note (optional)",
+  "failNoteRequired": "Note (required)",
+  "failAddPhoto": "Add a photo (optional)",
+  "failPhotoAdded": "Photo added",
+  "failPhotoRemove": "Remove",
+  "failPhotoError": "Couldn't use that photo. Try again.",
+  "failChooseReason": "Choose a reason.",
+  "failNotYet": "You can choose this after the calls and the 10-minute wait.",
+  "failSubmit": "Return to store",
+  "logoutBlockedDuringTask": "Finish your current order before logging out.",
+  "offlineBlockedDuringTask": "Finish your current order before going offline.",
+  "devOfferPrepaid": "Test offer (dev)",
+  "devOfferCod": "Test COD offer (dev)",
+  "devMarkPacked": "Store: packed (dev)",
+  "devCancelOrder": "Cancel order (dev)",
+  "devReturnReceived": "Store: return received (dev)",
+  "devUpiPaid": "Customer paid (dev)",
+  "codTakeCashInstead": "Customer pays cash instead",
+  "codUpiExpired": "The QR expired. Show a new one.",
+  "taskUnconfirmedTitle": "Couldn't confirm the last step",
+  "taskUnconfirmedBody": "The connection dropped before Jivo answered, and this order is no longer open. It may have gone through. Check the order status, or call support.",
+  "taskBackToOrders": "Back to orders",
+  "codQrUnavailable": "Couldn't show the QR code. Check payment again, or collect cash."
 }

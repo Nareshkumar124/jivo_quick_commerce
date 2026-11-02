@@ -877,6 +877,1476 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Call support'**
   String get callSupport;
+
+  /// Progress through registration, documents and bank details.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {step} of {total}'**
+  String onboardingStepOf(int step, int total);
+
+  /// Server VALIDATION_ERROR on an onboarding form.
+  ///
+  /// In en, this message translates to:
+  /// **'Some details were not accepted. Check them and try again.'**
+  String get onboardingCheckDetails;
+
+  /// No description provided for @onboardingLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading your application…'**
+  String get onboardingLoading;
+
+  /// No description provided for @onboardingLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your application'**
+  String get onboardingLoadError;
+
+  /// No description provided for @fieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'This is required.'**
+  String get fieldRequired;
+
+  /// No description provided for @fieldNameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name with letters only, at least 2 characters.'**
+  String get fieldNameInvalid;
+
+  /// No description provided for @fieldDobInFuture.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth can\'t be in the future.'**
+  String get fieldDobInFuture;
+
+  /// No description provided for @fieldDobUnderage.
+  ///
+  /// In en, this message translates to:
+  /// **'You must be at least {age} years old to ride with Jivo.'**
+  String fieldDobUnderage(int age);
+
+  /// No description provided for @fieldPhoneSameAsRider.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter someone else\'s number, not your own.'**
+  String get fieldPhoneSameAsRider;
+
+  /// No description provided for @fieldVehicleNumberInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the vehicle number as on the number plate, like DL 3C AB 1234.'**
+  String get fieldVehicleNumberInvalid;
+
+  /// No description provided for @fieldAccountNumberInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid account number (9 to 18 digits).'**
+  String get fieldAccountNumberInvalid;
+
+  /// No description provided for @fieldAccountNumbersMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The account numbers don\'t match.'**
+  String get fieldAccountNumbersMismatch;
+
+  /// No description provided for @fieldIfscInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 11-character IFSC, like HDFC0001234.'**
+  String get fieldIfscInvalid;
+
+  /// No description provided for @fieldUpiInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid UPI ID, like name@okbank.'**
+  String get fieldUpiInvalid;
+
+  /// No description provided for @fieldAadhaarInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your 12-digit Aadhaar number exactly as printed.'**
+  String get fieldAadhaarInvalid;
+
+  /// No description provided for @fieldPanInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your PAN exactly as printed, like ABCDE1234F.'**
+  String get fieldPanInvalid;
+
+  /// No description provided for @fieldDrivingLicenceInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your licence number exactly as printed on the card.'**
+  String get fieldDrivingLicenceInvalid;
+
+  /// No description provided for @registerIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us about yourself and your vehicle. Next, you\'ll upload your documents.'**
+  String get registerIntro;
+
+  /// No description provided for @registerSectionAboutYou.
+  ///
+  /// In en, this message translates to:
+  /// **'About you'**
+  String get registerSectionAboutYou;
+
+  /// No description provided for @registerFullName.
+  ///
+  /// In en, this message translates to:
+  /// **'Full name (as on Aadhaar)'**
+  String get registerFullName;
+
+  /// No description provided for @registerDob.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of birth'**
+  String get registerDob;
+
+  /// No description provided for @registerDobHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the date'**
+  String get registerDobHint;
+
+  /// No description provided for @registerDobPickerHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Select your date of birth'**
+  String get registerDobPickerHelp;
+
+  /// No description provided for @registerSectionEmergency.
+  ///
+  /// In en, this message translates to:
+  /// **'Emergency contact'**
+  String get registerSectionEmergency;
+
+  /// No description provided for @registerEmergencyHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone Jivo can call if something happens to you on a delivery.'**
+  String get registerEmergencyHelp;
+
+  /// No description provided for @registerEmergencyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact name'**
+  String get registerEmergencyName;
+
+  /// No description provided for @registerEmergencyPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact mobile number'**
+  String get registerEmergencyPhone;
+
+  /// No description provided for @registerSectionStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferred store'**
+  String get registerSectionStore;
+
+  /// No description provided for @registerStoreLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Store you want to deliver for'**
+  String get registerStoreLabel;
+
+  /// No description provided for @registerStoreHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo confirms your store when your account is approved.'**
+  String get registerStoreHelp;
+
+  /// A dark store in the store dropdown.
+  ///
+  /// In en, this message translates to:
+  /// **'{name}, {city}'**
+  String registerStoreOption(String name, String city);
+
+  /// No description provided for @registerStoresLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading stores…'**
+  String get registerStoresLoading;
+
+  /// No description provided for @registerStoresError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the stores.'**
+  String get registerStoresError;
+
+  /// No description provided for @registerSectionVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your vehicle'**
+  String get registerSectionVehicle;
+
+  /// No description provided for @registerVehicleNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle number'**
+  String get registerVehicleNumber;
+
+  /// No description provided for @registerVehicleNumberHint.
+  ///
+  /// In en, this message translates to:
+  /// **'DL 3C AB 1234'**
+  String get registerVehicleNumberHint;
+
+  /// No description provided for @registerSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get registerSubmit;
+
+  /// No description provided for @vehicleBicycle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bicycle'**
+  String get vehicleBicycle;
+
+  /// No description provided for @vehicleEBike.
+  ///
+  /// In en, this message translates to:
+  /// **'E-bike'**
+  String get vehicleEBike;
+
+  /// No description provided for @vehicleMotorbike.
+  ///
+  /// In en, this message translates to:
+  /// **'Motorbike'**
+  String get vehicleMotorbike;
+
+  /// No description provided for @vehicleScooter.
+  ///
+  /// In en, this message translates to:
+  /// **'Scooter'**
+  String get vehicleScooter;
+
+  /// No description provided for @statusFinishTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish your application'**
+  String get statusFinishTitle;
+
+  /// No description provided for @statusFinishBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete these steps so Jivo can review your application.'**
+  String get statusFinishBody;
+
+  /// No description provided for @statusStepDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal and vehicle details'**
+  String get statusStepDetails;
+
+  /// No description provided for @statusStepDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get statusStepDocuments;
+
+  /// No description provided for @statusStepBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank details'**
+  String get statusStepBank;
+
+  /// No description provided for @statusStepDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get statusStepDone;
+
+  /// No description provided for @statusStepNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Needed'**
+  String get statusStepNeeded;
+
+  /// No description provided for @statusStepDocumentsProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} uploaded'**
+  String statusStepDocumentsProgress(int done, int total);
+
+  /// No description provided for @statusStepDocumentsFix.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 document needs a new photo} other{{count} documents need new photos}}'**
+  String statusStepDocumentsFix(int count);
+
+  /// No description provided for @statusActionUploadDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload documents'**
+  String get statusActionUploadDocuments;
+
+  /// No description provided for @statusActionAddBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bank details'**
+  String get statusActionAddBank;
+
+  /// No description provided for @statusActionCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check status'**
+  String get statusActionCheck;
+
+  /// No description provided for @statusActionViewDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'View documents'**
+  String get statusActionViewDocuments;
+
+  /// No description provided for @statusRejectedFixBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix the items below. Jivo reviews your application again after you send them.'**
+  String get statusRejectedFixBody;
+
+  /// No description provided for @statusRejectedReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason from Jivo'**
+  String get statusRejectedReasonLabel;
+
+  /// No description provided for @statusActionFixDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload documents again'**
+  String get statusActionFixDocuments;
+
+  /// No description provided for @statusActionFixBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Update bank details'**
+  String get statusActionFixBank;
+
+  /// No description provided for @statusApprovedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re approved!'**
+  String get statusApprovedTitle;
+
+  /// No description provided for @statusApprovedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your home store is {store}. You can now go online and start delivering.'**
+  String statusApprovedBody(String store);
+
+  /// No description provided for @statusActionStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start delivering'**
+  String get statusActionStart;
+
+  /// Dev flavor only: plays the ops review against the fake backend.
+  ///
+  /// In en, this message translates to:
+  /// **'Simulate review (dev)'**
+  String get statusDevReview;
+
+  /// No description provided for @statusDevApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve (fake)'**
+  String get statusDevApprove;
+
+  /// No description provided for @statusDevReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject the PAN (fake)'**
+  String get statusDevReject;
+
+  /// No description provided for @documentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get documentsTitle;
+
+  /// No description provided for @documentsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Take clear photos in good light. Each photo must show the whole document.'**
+  String get documentsIntro;
+
+  /// No description provided for @documentsProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} done. Upload every document to continue.'**
+  String documentsProgress(int done, int total);
+
+  /// No description provided for @documentsContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get documentsContinue;
+
+  /// No description provided for @docPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Your photo (selfie)'**
+  String get docPhoto;
+
+  /// No description provided for @docAadhaarFront.
+  ///
+  /// In en, this message translates to:
+  /// **'Aadhaar card: front'**
+  String get docAadhaarFront;
+
+  /// No description provided for @docAadhaarBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Aadhaar card: back'**
+  String get docAadhaarBack;
+
+  /// No description provided for @docPan.
+  ///
+  /// In en, this message translates to:
+  /// **'PAN card'**
+  String get docPan;
+
+  /// No description provided for @docDrivingLicence.
+  ///
+  /// In en, this message translates to:
+  /// **'Driving licence'**
+  String get docDrivingLicence;
+
+  /// No description provided for @docVehicleRc.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle RC'**
+  String get docVehicleRc;
+
+  /// No description provided for @docStatusNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Needed'**
+  String get docStatusNeeded;
+
+  /// No description provided for @docStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'In review'**
+  String get docStatusPending;
+
+  /// No description provided for @docStatusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get docStatusApproved;
+
+  /// No description provided for @docStatusRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not accepted: upload again'**
+  String get docStatusRejected;
+
+  /// No description provided for @docActionUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get docActionUpload;
+
+  /// No description provided for @docActionReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get docActionReplace;
+
+  /// No description provided for @docActionReupload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload again'**
+  String get docActionReupload;
+
+  /// Snackbar after a document upload.
+  ///
+  /// In en, this message translates to:
+  /// **'{document} uploaded'**
+  String docUploaded(String document);
+
+  /// No description provided for @captureHintPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a clear photo of your face in good light. Remove your helmet, cap and sunglasses.'**
+  String get captureHintPhoto;
+
+  /// No description provided for @captureHintCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Put the card on a flat, dark surface. All four corners and the text must be clear, with no glare.'**
+  String get captureHintCard;
+
+  /// No description provided for @captureTakePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get captureTakePhoto;
+
+  /// No description provided for @captureChooseGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get captureChooseGallery;
+
+  /// No description provided for @captureProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the photo…'**
+  String get captureProcessing;
+
+  /// No description provided for @captureReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo ready'**
+  String get captureReady;
+
+  /// No description provided for @captureCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check that the photo is sharp and nothing is cut off.'**
+  String get captureCheck;
+
+  /// No description provided for @captureUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get captureUpload;
+
+  /// No description provided for @captureRetake.
+  ///
+  /// In en, this message translates to:
+  /// **'Retake'**
+  String get captureRetake;
+
+  /// No description provided for @captureProblemPicker.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the camera or gallery. Allow Jivo Rider to use the camera in your phone settings, then try again.'**
+  String get captureProblemPicker;
+
+  /// No description provided for @captureProblemUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'That file can\'t be used. Take a new photo.'**
+  String get captureProblemUnreadable;
+
+  /// No description provided for @captureProblemTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That photo is too large. Take a new photo.'**
+  String get captureProblemTooLarge;
+
+  /// No description provided for @numberAadhaar.
+  ///
+  /// In en, this message translates to:
+  /// **'Aadhaar number'**
+  String get numberAadhaar;
+
+  /// No description provided for @numberPan.
+  ///
+  /// In en, this message translates to:
+  /// **'PAN'**
+  String get numberPan;
+
+  /// No description provided for @numberDrivingLicence.
+  ///
+  /// In en, this message translates to:
+  /// **'Driving licence number'**
+  String get numberDrivingLicence;
+
+  /// No description provided for @numberVehicleRc.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle number (as on the RC)'**
+  String get numberVehicleRc;
+
+  /// Helper under a document or account number once typed; only the masked form is shown.
+  ///
+  /// In en, this message translates to:
+  /// **'Entered: {masked}'**
+  String numberMaskedHelper(String masked);
+
+  /// No description provided for @bankTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank details'**
+  String get bankTitle;
+
+  /// No description provided for @bankIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo pays your earnings into this account.'**
+  String get bankIntro;
+
+  /// No description provided for @bankSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved account {account} · {ifsc}'**
+  String bankSaved(String account, String ifsc);
+
+  /// No description provided for @bankSavedShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Account {account}'**
+  String bankSavedShort(String account);
+
+  /// No description provided for @bankReplaceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'To change it, enter the new details below.'**
+  String get bankReplaceHint;
+
+  /// No description provided for @bankHolderName.
+  ///
+  /// In en, this message translates to:
+  /// **'Account holder name'**
+  String get bankHolderName;
+
+  /// No description provided for @bankAccountNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Account number'**
+  String get bankAccountNumber;
+
+  /// No description provided for @bankConfirmAccountNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-enter account number'**
+  String get bankConfirmAccountNumber;
+
+  /// No description provided for @bankIfsc.
+  ///
+  /// In en, this message translates to:
+  /// **'IFSC'**
+  String get bankIfsc;
+
+  /// No description provided for @bankIfscHint.
+  ///
+  /// In en, this message translates to:
+  /// **'HDFC0001234'**
+  String get bankIfscHint;
+
+  /// No description provided for @bankUpi.
+  ///
+  /// In en, this message translates to:
+  /// **'UPI ID (optional)'**
+  String get bankUpi;
+
+  /// No description provided for @bankUpiHint.
+  ///
+  /// In en, this message translates to:
+  /// **'name@okbank'**
+  String get bankUpiHint;
+
+  /// No description provided for @bankSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save bank details'**
+  String get bankSave;
+
+  /// No description provided for @bankSavedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank details saved'**
+  String get bankSavedToast;
+
+  /// No description provided for @offerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New order'**
+  String get offerTitle;
+
+  /// Offer notification title (rings, full screen).
+  ///
+  /// In en, this message translates to:
+  /// **'New order offer'**
+  String get offerAlertTitle;
+
+  /// Offer notification body.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} to {locality}'**
+  String offerAlertBody(String store, String locality);
+
+  /// No description provided for @offerPrepaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepaid: nothing to collect'**
+  String get offerPrepaid;
+
+  /// No description provided for @offerCod.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery: collect {amount}'**
+  String offerCod(String amount);
+
+  /// No description provided for @offerPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'You earn about {amount}'**
+  String offerPayout(String amount);
+
+  /// Distance from the store to the customer, as sent by the server.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km'**
+  String distanceKm(String km);
+
+  /// No description provided for @offerAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get offerAccept;
+
+  /// No description provided for @offerReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get offerReject;
+
+  /// No description provided for @offerRejectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you rejecting? (optional)'**
+  String get offerRejectTitle;
+
+  /// No description provided for @offerRejectTooFar.
+  ///
+  /// In en, this message translates to:
+  /// **'Too far'**
+  String get offerRejectTooFar;
+
+  /// No description provided for @offerRejectVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle problem'**
+  String get offerRejectVehicle;
+
+  /// No description provided for @offerRejectBreak.
+  ///
+  /// In en, this message translates to:
+  /// **'Taking a break'**
+  String get offerRejectBreak;
+
+  /// No description provided for @offerRejectOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other reason'**
+  String get offerRejectOther;
+
+  /// No description provided for @offerRejectSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject without a reason'**
+  String get offerRejectSkip;
+
+  /// No description provided for @offerExpiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer expired'**
+  String get offerExpiredTitle;
+
+  /// No description provided for @offerExpiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The time to accept ran out. New orders will come to you.'**
+  String get offerExpiredBody;
+
+  /// No description provided for @offerTakenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order taken'**
+  String get offerTakenTitle;
+
+  /// No description provided for @offerTakenBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Another rider accepted this order first.'**
+  String get offerTakenBody;
+
+  /// No description provided for @offerWithdrawnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order cancelled'**
+  String get offerWithdrawnTitle;
+
+  /// No description provided for @offerWithdrawnBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This order was cancelled before pickup. Wait for the next one.'**
+  String get offerWithdrawnBody;
+
+  /// No description provided for @offerOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get offerOk;
+
+  /// No description provided for @taskOrderNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {number}'**
+  String taskOrderNumber(String number);
+
+  /// No description provided for @taskRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get taskRefresh;
+
+  /// No description provided for @taskNavigate.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate'**
+  String get taskNavigate;
+
+  /// No description provided for @taskNoMapsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'No maps app found. Install Mappls or another maps app.'**
+  String get taskNoMapsApp;
+
+  /// No description provided for @taskCallCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Call customer'**
+  String get taskCallCustomer;
+
+  /// No description provided for @taskStateChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'This order changed. The screen now shows its latest step.'**
+  String get taskStateChanged;
+
+  /// No description provided for @taskLocationUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t get your location. Turn on GPS and try again.'**
+  String get taskLocationUnavailable;
+
+  /// No description provided for @taskOutsideGeofence.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re not close enough yet. Move closer and try again.'**
+  String get taskOutsideGeofence;
+
+  /// No description provided for @taskOutsideGeofenceDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re {metres} m away. Move closer and try again.'**
+  String taskOutsideGeofenceDistance(int metres);
+
+  /// No description provided for @cashLimitExceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Your cash in hand has reached the limit. Deposit cash at the store to get cash orders again.'**
+  String get cashLimitExceeded;
+
+  /// No description provided for @taskGoToStoreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to the store'**
+  String get taskGoToStoreTitle;
+
+  /// No description provided for @taskOrderPacking.
+  ///
+  /// In en, this message translates to:
+  /// **'Packing…'**
+  String get taskOrderPacking;
+
+  /// No description provided for @taskOrderReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready for pickup'**
+  String get taskOrderReady;
+
+  /// No description provided for @taskArrivedStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrived at store'**
+  String get taskArrivedStore;
+
+  /// No description provided for @taskPickupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick up the order'**
+  String get taskPickupTitle;
+
+  /// No description provided for @taskItemsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the items in the bag'**
+  String get taskItemsTitle;
+
+  /// No description provided for @pickupCodeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the QR code on the bag, or type the 4-character code printed on it.'**
+  String get pickupCodeHelp;
+
+  /// No description provided for @pickupCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Order code'**
+  String get pickupCodeLabel;
+
+  /// No description provided for @pickupCodeFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 4-character code from the bag.'**
+  String get pickupCodeFormat;
+
+  /// No description provided for @pickupCodeWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'That code doesn\'t match this order. Check the bag and try again.'**
+  String get pickupCodeWrong;
+
+  /// No description provided for @pickupNotPacked.
+  ///
+  /// In en, this message translates to:
+  /// **'The order isn\'t packed yet. Wait until the store marks it ready.'**
+  String get pickupNotPacked;
+
+  /// No description provided for @taskPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Picked up'**
+  String get taskPickup;
+
+  /// No description provided for @pickupScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR code'**
+  String get pickupScan;
+
+  /// No description provided for @scanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the bag QR code'**
+  String get scanTitle;
+
+  /// No description provided for @scanTypeInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the code instead'**
+  String get scanTypeInstead;
+
+  /// No description provided for @scanNotJivoCode.
+  ///
+  /// In en, this message translates to:
+  /// **'This QR isn\'t a Jivo order code.'**
+  String get scanNotJivoCode;
+
+  /// No description provided for @scanCameraUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The camera isn\'t available. Type the code from the bag instead.'**
+  String get scanCameraUnavailable;
+
+  /// No description provided for @taskGoToCustomerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver to the customer'**
+  String get taskGoToCustomerTitle;
+
+  /// No description provided for @taskLandmark.
+  ///
+  /// In en, this message translates to:
+  /// **'Landmark: {landmark}'**
+  String taskLandmark(String landmark);
+
+  /// No description provided for @taskInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Note: {instructions}'**
+  String taskInstructions(String instructions);
+
+  /// No description provided for @taskCollectCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect {amount} in cash'**
+  String taskCollectCash(String amount);
+
+  /// No description provided for @taskArrivedCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Arrived at customer'**
+  String get taskArrivedCustomer;
+
+  /// No description provided for @taskCantDeliver.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t deliver'**
+  String get taskCantDeliver;
+
+  /// No description provided for @arrivedOverride.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m at the address: the pin is wrong'**
+  String get arrivedOverride;
+
+  /// No description provided for @arrivedOverrideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you outside the pin area?'**
+  String get arrivedOverrideTitle;
+
+  /// No description provided for @arrivedOverridePinWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'The map pin is in the wrong place'**
+  String get arrivedOverridePinWrong;
+
+  /// No description provided for @arrivedOverrideGate.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'m at the gate or lobby'**
+  String get arrivedOverrideGate;
+
+  /// No description provided for @otpStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the delivery code'**
+  String get otpStepTitle;
+
+  /// No description provided for @otpStepHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the customer for the 4-digit code in their app or SMS.'**
+  String get otpStepHelp;
+
+  /// No description provided for @otpStepLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery code'**
+  String get otpStepLabel;
+
+  /// No description provided for @otpContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get otpContinue;
+
+  /// No description provided for @taskDeliver.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark delivered'**
+  String get taskDeliver;
+
+  /// No description provided for @otpAttemptsLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 attempt left} other{{count} attempts left}}'**
+  String otpAttemptsLeft(int count);
+
+  /// No description provided for @deliveryOtpWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'That code is wrong. Ask the customer again.'**
+  String get deliveryOtpWrong;
+
+  /// No description provided for @deliveryOtpWrongLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Wrong code. 1 attempt left.} other{Wrong code. {count} attempts left.}}'**
+  String deliveryOtpWrongLeft(int count);
+
+  /// No description provided for @deliveryOtpLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong codes. Jivo support has been alerted. Call support to continue.'**
+  String get deliveryOtpLocked;
+
+  /// No description provided for @otpLockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery code locked'**
+  String get otpLockedTitle;
+
+  /// No description provided for @codTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect payment'**
+  String get codTitle;
+
+  /// No description provided for @codAmountDueLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount to collect'**
+  String get codAmountDueLabel;
+
+  /// No description provided for @codExactAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Collect exactly this amount.'**
+  String get codExactAmount;
+
+  /// No description provided for @codCashCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash collected {amount}'**
+  String codCashCollected(String amount);
+
+  /// No description provided for @codConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm cash'**
+  String get codConfirmTitle;
+
+  /// No description provided for @codConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Did you collect exactly {amount} in cash?'**
+  String codConfirmBody(String amount);
+
+  /// No description provided for @codConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, collected'**
+  String get codConfirmYes;
+
+  /// No description provided for @codConfirmNo.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get codConfirmNo;
+
+  /// No description provided for @codCashDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash collected: {amount}'**
+  String codCashDone(String amount);
+
+  /// No description provided for @codShowUpi.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer pays by UPI: show QR'**
+  String get codShowUpi;
+
+  /// No description provided for @codUpiWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the payment…'**
+  String get codUpiWaiting;
+
+  /// No description provided for @codUpiPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment received'**
+  String get codUpiPaid;
+
+  /// No description provided for @codUpiCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check payment'**
+  String get codUpiCheck;
+
+  /// No description provided for @codChangeOtp.
+  ///
+  /// In en, this message translates to:
+  /// **'Change the delivery code'**
+  String get codChangeOtp;
+
+  /// No description provided for @codConfirmFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the cash or wait for the UPI payment first.'**
+  String get codConfirmFirst;
+
+  /// No description provided for @codAmountMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount doesn\'t match what Jivo expects. Check the amount and try again.'**
+  String get codAmountMismatch;
+
+  /// No description provided for @taskDeliveredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered!'**
+  String get taskDeliveredTitle;
+
+  /// No description provided for @taskDeliveredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Great job. Wait for the next order.'**
+  String get taskDeliveredBody;
+
+  /// No description provided for @taskDeliveredEarned.
+  ///
+  /// In en, this message translates to:
+  /// **'You earned {amount} for this order.'**
+  String taskDeliveredEarned(String amount);
+
+  /// No description provided for @taskReturnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to store'**
+  String get taskReturnTitle;
+
+  /// No description provided for @taskReturnBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Take the items back to the store. The store staff will mark them received.'**
+  String get taskReturnBody;
+
+  /// No description provided for @taskCheckStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Check status'**
+  String get taskCheckStatus;
+
+  /// No description provided for @taskReturnedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items returned'**
+  String get taskReturnedTitle;
+
+  /// No description provided for @taskReturnedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The store received the items. You\'re ready for new orders.'**
+  String get taskReturnedBody;
+
+  /// No description provided for @taskCancelledTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order cancelled'**
+  String get taskCancelledTitle;
+
+  /// No description provided for @taskCancelledBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This order was cancelled before pickup. You don\'t need to collect it.'**
+  String get taskCancelledBody;
+
+  /// No description provided for @taskUnassignedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order reassigned'**
+  String get taskUnassignedTitle;
+
+  /// No description provided for @taskUnassignedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This order is no longer assigned to you.'**
+  String get taskUnassignedBody;
+
+  /// No description provided for @taskUnknownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t show this order'**
+  String get taskUnknownTitle;
+
+  /// No description provided for @taskUnknownBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This app version can\'t show the order\'s status. Try again or update the app.'**
+  String get taskUnknownBody;
+
+  /// No description provided for @failTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t deliver'**
+  String get failTitle;
+
+  /// No description provided for @failIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Why can\'t you deliver this order?'**
+  String get failIntro;
+
+  /// No description provided for @failNotReachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer not reachable'**
+  String get failNotReachable;
+
+  /// No description provided for @failRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer refused the order'**
+  String get failRefused;
+
+  /// No description provided for @failWrongAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong address'**
+  String get failWrongAddress;
+
+  /// No description provided for @failOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other reason'**
+  String get failOther;
+
+  /// No description provided for @failCallsNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Call the customer at least {needed} times ({done} done)'**
+  String failCallsNeeded(int needed, int done);
+
+  /// No description provided for @failWaitLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait at the address: {time} left'**
+  String failWaitLeft(String time);
+
+  /// No description provided for @failWaitDone.
+  ///
+  /// In en, this message translates to:
+  /// **'You waited 10 minutes at the address'**
+  String get failWaitDone;
+
+  /// No description provided for @failWaitNotArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark \"Arrived at customer\" first'**
+  String get failWaitNotArrived;
+
+  /// No description provided for @failNoteOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get failNoteOptional;
+
+  /// No description provided for @failNoteRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (required)'**
+  String get failNoteRequired;
+
+  /// No description provided for @failAddPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a photo (optional)'**
+  String get failAddPhoto;
+
+  /// No description provided for @failPhotoAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo added'**
+  String get failPhotoAdded;
+
+  /// No description provided for @failPhotoRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get failPhotoRemove;
+
+  /// No description provided for @failPhotoError.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t use that photo. Try again.'**
+  String get failPhotoError;
+
+  /// No description provided for @failChooseReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a reason.'**
+  String get failChooseReason;
+
+  /// No description provided for @failNotYet.
+  ///
+  /// In en, this message translates to:
+  /// **'You can choose this after the calls and the 10-minute wait.'**
+  String get failNotYet;
+
+  /// No description provided for @failSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to store'**
+  String get failSubmit;
+
+  /// No description provided for @logoutBlockedDuringTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish your current order before logging out.'**
+  String get logoutBlockedDuringTask;
+
+  /// No description provided for @offlineBlockedDuringTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish your current order before going offline.'**
+  String get offlineBlockedDuringTask;
+
+  /// No description provided for @devOfferPrepaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Test offer (dev)'**
+  String get devOfferPrepaid;
+
+  /// No description provided for @devOfferCod.
+  ///
+  /// In en, this message translates to:
+  /// **'Test COD offer (dev)'**
+  String get devOfferCod;
+
+  /// No description provided for @devMarkPacked.
+  ///
+  /// In en, this message translates to:
+  /// **'Store: packed (dev)'**
+  String get devMarkPacked;
+
+  /// No description provided for @devCancelOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel order (dev)'**
+  String get devCancelOrder;
+
+  /// No description provided for @devReturnReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Store: return received (dev)'**
+  String get devReturnReceived;
+
+  /// No description provided for @devUpiPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer paid (dev)'**
+  String get devUpiPaid;
+
+  /// No description provided for @codTakeCashInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer pays cash instead'**
+  String get codTakeCashInstead;
+
+  /// No description provided for @codUpiExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'The QR expired. Show a new one.'**
+  String get codUpiExpired;
+
+  /// No description provided for @taskUnconfirmedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t confirm the last step'**
+  String get taskUnconfirmedTitle;
+
+  /// No description provided for @taskUnconfirmedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection dropped before Jivo answered, and this order is no longer open. It may have gone through. Check the order status, or call support.'**
+  String get taskUnconfirmedBody;
+
+  /// No description provided for @taskBackToOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to orders'**
+  String get taskBackToOrders;
+
+  /// No description provided for @codQrUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t show the QR code. Check payment again, or collect cash.'**
+  String get codQrUnavailable;
 }
 
 class _AppLocalizationsDelegate

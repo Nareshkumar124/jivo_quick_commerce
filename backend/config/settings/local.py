@@ -34,3 +34,23 @@ OTP_TEST_NUMBERS = env_dict(
         "+919000000003": "123456",  # rider app login (no rider profile until Phase 5)
     },
 )
+
+# Local MinIO from infra/docker-compose.yml unless S3_* variables are set (compose defaults).
+_LOCAL_S3 = {
+    "endpoint_url": env_str("S3_ENDPOINT_URL", default="http://localhost:9000"),
+    "access_key": env_str("S3_ACCESS_KEY_ID", default="jivo-local"),
+    "secret_key": env_str("S3_SECRET_ACCESS_KEY", default="jivo-local-minio-secret"),
+    "addressing_style": "path",
+}
+STORAGES = {
+    **STORAGES,
+    "default": {**STORAGES["default"], "OPTIONS": {**STORAGES["default"]["OPTIONS"], **_LOCAL_S3}},
+    "public": {
+        **STORAGES["public"],
+        "OPTIONS": {
+            **STORAGES["public"]["OPTIONS"],
+            **_LOCAL_S3,
+            "url_protocol": env_str("S3_PUBLIC_MEDIA_PROTOCOL", default="http:"),
+        },
+    },
+}

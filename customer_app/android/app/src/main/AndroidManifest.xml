@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Release builds need this too; Flutter only adds it to debug/profile. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Address location (Phase 1: device position instead of the map pin). -->
+    <!-- Delivery location: detect (GPS) and the map pin picker. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <application

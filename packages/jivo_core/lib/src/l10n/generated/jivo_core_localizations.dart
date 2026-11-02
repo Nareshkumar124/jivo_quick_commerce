@@ -313,6 +313,12 @@ abstract class JivoCoreLocalizations {
   /// **'Jivo is temporarily unavailable. Please try again in a few minutes.'**
   String get errorServiceUnavailable;
 
+  /// STORE_NOT_FOUND (HTTP 404): the saved store is gone.
+  ///
+  /// In en, this message translates to:
+  /// **'This store isn\'t available any more. Please choose your location again.'**
+  String get errorStoreNotFound;
+
   /// OTP_INVALID with details.attempts_remaining.
   ///
   /// In en, this message translates to:

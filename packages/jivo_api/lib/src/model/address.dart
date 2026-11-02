@@ -50,6 +50,8 @@ class Address {
 
     required this.isDefault,
 
+    required this.isServiceable,
+
     required this.createdAt,
 
     required this.updatedAt,
@@ -70,11 +72,11 @@ class Address {
   @JsonKey(name: r'custom_label', required: false, includeIfNull: false)
   final String? customLabel;
 
-  /// Defaults to the user's name.
+  /// Defaults to the user's name. Send an empty string to reset it to the user's own (copied when saved).
   @JsonKey(name: r'receiver_name', required: false, includeIfNull: false)
   final String? receiverName;
 
-  /// Defaults to the user's phone.
+  /// Defaults to the user's phone. Send an empty string to reset it to the user's own (copied when saved).
   @JsonKey(name: r'receiver_phone', required: false, includeIfNull: false)
   final String? receiverPhone;
 
@@ -117,6 +119,10 @@ class Address {
   @JsonKey(name: r'is_default', required: true, includeIfNull: false)
   final bool isDefault;
 
+  /// True when the pin is inside an active store's service area (open or not), checked on every read. An unserviceable address can be saved but not used for an order: show it flagged (03 §2.4). Added in Phase 2.
+  @JsonKey(name: r'is_serviceable', required: true, includeIfNull: false)
+  final bool isServiceable;
+
   @JsonKey(name: r'created_at', required: true, includeIfNull: false)
   final DateTime createdAt;
 
@@ -142,6 +148,7 @@ class Address {
           other.lat == lat &&
           other.lng == lng &&
           other.isDefault == isDefault &&
+          other.isServiceable == isServiceable &&
           other.createdAt == createdAt &&
           other.updatedAt == updatedAt;
 
@@ -162,6 +169,7 @@ class Address {
       lat.hashCode +
       lng.hashCode +
       isDefault.hashCode +
+      isServiceable.hashCode +
       createdAt.hashCode +
       updatedAt.hashCode;
 

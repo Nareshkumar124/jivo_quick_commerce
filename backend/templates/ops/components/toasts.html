@@ -1,0 +1,17 @@
+{# Toasts (ops.js store "toasts"): HTMX errors, HX-Trigger {"ops:toast": {...}} from the server, and Django messages below. #}
+<div class="ops-toasts" x-data aria-live="polite" aria-atomic="false">
+    <template x-for="toast in $store.toasts.items" x-bind:key="toast.id">
+        <div class="ops-toast" x-bind:class="'ops-toast--' + toast.tone" x-bind:role="toast.tone === 'danger' ? 'alert' : 'status'">
+            <span class="material-symbols-outlined md-18" x-text="toast.icon" aria-hidden="true"></span>
+            <span class="grow" x-text="toast.message"></span>
+            <button type="button" class="ops-toast__close" x-on:click="$store.toasts.dismiss(toast.id)" aria-label="Dismiss">
+                <span class="material-symbols-outlined md-18">close</span>
+            </button>
+        </div>
+    </template>
+</div>
+{% if messages %}
+    {% for message in messages %}
+        <template data-ops-message data-tone="{{ message.tags }}">{{ message }}</template>
+    {% endfor %}
+{% endif %}

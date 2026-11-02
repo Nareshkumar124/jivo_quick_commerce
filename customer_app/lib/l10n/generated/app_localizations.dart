@@ -436,18 +436,6 @@ abstract class AppLocalizations {
   /// **'This email can\'t be used.'**
   String get emailCantBeUsed;
 
-  /// Home placeholder greeting.
-  ///
-  /// In en, this message translates to:
-  /// **'Hi, {name}!'**
-  String homeGreeting(String name);
-
-  /// Phase 1 home placeholder text.
-  ///
-  /// In en, this message translates to:
-  /// **'Shopping arrives in the next update. Meanwhile, set up your account and addresses.'**
-  String get homeComingSoon;
-
   /// Account screen title.
   ///
   /// In en, this message translates to:
@@ -765,6 +753,618 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This account can\'t be deleted from the app. Please contact support.'**
   String get staffCannotDelete;
+
+  /// Bottom tab: home.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get tabHome;
+
+  /// Bottom tab and screen title: category tree.
+  ///
+  /// In en, this message translates to:
+  /// **'Categories'**
+  String get tabCategories;
+
+  /// Bottom tab: previously bought items.
+  ///
+  /// In en, this message translates to:
+  /// **'Order again'**
+  String get tabOrderAgain;
+
+  /// Bottom tab: account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get tabAccount;
+
+  /// Button on a product tile that adds one unit to the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'ADD'**
+  String get addToCart;
+
+  /// Screen-reader label of the ADD button.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {name} to cart'**
+  String addToCartSemantics(String name);
+
+  /// Screen-reader label of the stepper's minus button.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove one {name}'**
+  String stepperDecrease(String name);
+
+  /// Screen-reader label of the stepper's plus button.
+  ///
+  /// In en, this message translates to:
+  /// **'Add one more {name}'**
+  String stepperIncrease(String name);
+
+  /// Screen-reader label of the quantity between minus and plus.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} in cart'**
+  String stepperQuantity(int count);
+
+  /// Shown when plus is tapped at the cap min(stock, max per order).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{You can add only 1 of this item} other{You can add up to {count} of this item}}'**
+  String maxQtyReached(int count);
+
+  /// Label on a product that the store can't sell now.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of stock'**
+  String get outOfStock;
+
+  /// Low-stock label on a product.
+  ///
+  /// In en, this message translates to:
+  /// **'Only {count} left'**
+  String onlyLeft(int count);
+
+  /// Discount badge, percent from the server.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% OFF'**
+  String discountOff(int percent);
+
+  /// Screen-reader text for the struck-out MRP.
+  ///
+  /// In en, this message translates to:
+  /// **'MRP {price}'**
+  String mrpSemantics(String price);
+
+  /// Screen-reader text for the selling price.
+  ///
+  /// In en, this message translates to:
+  /// **'Price {price}'**
+  String priceSemantics(String price);
+
+  /// Screen-reader label of the green veg mark.
+  ///
+  /// In en, this message translates to:
+  /// **'Vegetarian'**
+  String get vegMark;
+
+  /// Screen-reader label of the brown non-veg mark.
+  ///
+  /// In en, this message translates to:
+  /// **'Non-vegetarian'**
+  String get nonVegMark;
+
+  /// Item count on the floating cart bar.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String cartItems(int count);
+
+  /// Floating cart bar action.
+  ///
+  /// In en, this message translates to:
+  /// **'View cart'**
+  String get viewCart;
+
+  /// Shown when the cart bar is tapped before the cart screen exists.
+  ///
+  /// In en, this message translates to:
+  /// **'Cart and checkout arrive in the next update.'**
+  String get cartComingSoon;
+
+  /// Home header: delivery ETA from the server.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{Delivery in 1 min} other{Delivery in {minutes} mins}}'**
+  String deliveryIn(int minutes);
+
+  /// Home header and location screen title when no location is chosen.
+  ///
+  /// In en, this message translates to:
+  /// **'Select delivery location'**
+  String get selectLocation;
+
+  /// Home header while serviceability loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking delivery…'**
+  String get checkingDelivery;
+
+  /// Home header when the location is not serviceable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not delivering here'**
+  String get notDeliveringHere;
+
+  /// Screen-reader hint of the home header address.
+  ///
+  /// In en, this message translates to:
+  /// **'Change delivery location'**
+  String get changeLocationSemantics;
+
+  /// Home search bar placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search for oils, ghee and more'**
+  String get searchHint;
+
+  /// Home section title: category grid.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop by category'**
+  String get shopByCategory;
+
+  /// Home section title: buy-again rail.
+  ///
+  /// In en, this message translates to:
+  /// **'Previously bought'**
+  String get previouslyBought;
+
+  /// Opens the full list of a home section.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get seeAll;
+
+  /// Home empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to show here yet. Pull down to refresh.'**
+  String get homeEmpty;
+
+  /// Home when no location is chosen.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a delivery location to see what\'s in stock near you.'**
+  String get homeNeedsLocation;
+
+  /// Home when the saved location is no longer serviceable.
+  ///
+  /// In en, this message translates to:
+  /// **'We don\'t deliver to this location yet.'**
+  String get notServiceableInline;
+
+  /// Button that opens the location picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Change location'**
+  String get changeLocation;
+
+  /// Store-closed banner with the opening time (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Store closed. Opens at {time}. You can browse; checkout opens then.'**
+  String storeClosedOpensAt(String time);
+
+  /// Store-closed banner without an opening time.
+  ///
+  /// In en, this message translates to:
+  /// **'Store closed right now. You can still browse.'**
+  String get storeClosed;
+
+  /// Screen-reader label of a home banner.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer: {title}'**
+  String bannerSemantics(String title);
+
+  /// Left-rail entry that shows the whole category.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get allInCategory;
+
+  /// Categories empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'No categories yet.'**
+  String get categoriesEmpty;
+
+  /// Sort sheet title.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get sortBy;
+
+  /// Sort button on the product list.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort: {option}'**
+  String sortButton(String option);
+
+  /// Sort option.
+  ///
+  /// In en, this message translates to:
+  /// **'Relevance'**
+  String get sortRelevance;
+
+  /// Sort option.
+  ///
+  /// In en, this message translates to:
+  /// **'Price: low to high'**
+  String get sortPriceLowHigh;
+
+  /// Sort option.
+  ///
+  /// In en, this message translates to:
+  /// **'Price: high to low'**
+  String get sortPriceHighLow;
+
+  /// Sort option.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount'**
+  String get sortDiscount;
+
+  /// Product list empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'No products here yet.'**
+  String get productsEmpty;
+
+  /// Footer of a product grid when the next page fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load more products.'**
+  String get loadMoreFailed;
+
+  /// Collection page empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'No products in this collection yet.'**
+  String get collectionEmpty;
+
+  /// Order again tab empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'Items you order will show up here so you can buy them again quickly.'**
+  String get orderAgainEmpty;
+
+  /// Product detail when the product does not exist.
+  ///
+  /// In en, this message translates to:
+  /// **'This product isn\'t available.'**
+  String get productNotFound;
+
+  /// Product detail: variant chips heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack size'**
+  String get packSize;
+
+  /// Savings from the server, formatted in rupees.
+  ///
+  /// In en, this message translates to:
+  /// **'You save {amount}'**
+  String youSave(String amount);
+
+  /// Product detail section.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get highlights;
+
+  /// Product detail section.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get description;
+
+  /// Product detail section: label information.
+  ///
+  /// In en, this message translates to:
+  /// **'Product information'**
+  String get productInfo;
+
+  /// Product information row.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredients'**
+  String get ingredients;
+
+  /// Product information: nutrition table title.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition information'**
+  String get nutritionInfo;
+
+  /// Product information row.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf life'**
+  String get shelfLife;
+
+  /// Product information row.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage'**
+  String get storageInfo;
+
+  /// Product information row.
+  ///
+  /// In en, this message translates to:
+  /// **'Country of origin'**
+  String get countryOfOrigin;
+
+  /// Product information row.
+  ///
+  /// In en, this message translates to:
+  /// **'Manufactured by'**
+  String get manufacturedBy;
+
+  /// Product information row.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketed by'**
+  String get marketedBy;
+
+  /// Product information row.
+  ///
+  /// In en, this message translates to:
+  /// **'FSSAI licence no.'**
+  String get fssaiLicence;
+
+  /// Product detail rail.
+  ///
+  /// In en, this message translates to:
+  /// **'Similar products'**
+  String get similarProducts;
+
+  /// Screen-reader label of a product gallery image.
+  ///
+  /// In en, this message translates to:
+  /// **'Image {index} of {count}. Double tap to zoom.'**
+  String galleryImage(int index, int count);
+
+  /// Search field placeholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search products'**
+  String get searchFieldHint;
+
+  /// Tooltip of the button that clears the search field.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get clearSearch;
+
+  /// Search section title.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent searches'**
+  String get recentSearches;
+
+  /// Clears the recent searches.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearRecentSearches;
+
+  /// Search section title.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending'**
+  String get trendingSearches;
+
+  /// Search when the typeahead fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load suggestions.'**
+  String get suggestionsFailed;
+
+  /// Search results empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'No results for \"{query}\"'**
+  String noResults(String query);
+
+  /// Search results empty state: trending suggestions follow.
+  ///
+  /// In en, this message translates to:
+  /// **'Try one of these:'**
+  String get noResultsTry;
+
+  /// Location screen heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Where should we deliver?'**
+  String get locationPrompt;
+
+  /// Detects the device location to pick the delivery location.
+  ///
+  /// In en, this message translates to:
+  /// **'Use current location'**
+  String get detectLocation;
+
+  /// Opens the map pin picker.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick on map'**
+  String get pickOnMap;
+
+  /// Title of a delivery location detected by GPS.
+  ///
+  /// In en, this message translates to:
+  /// **'Current location'**
+  String get currentLocationTitle;
+
+  /// Title of a delivery location picked on the map.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned location'**
+  String get pinnedLocationTitle;
+
+  /// Dialog when the new location has a different store.
+  ///
+  /// In en, this message translates to:
+  /// **'Change delivery location?'**
+  String get storeChangeTitle;
+
+  /// Dialog body: stock and prices are per store.
+  ///
+  /// In en, this message translates to:
+  /// **'A different store delivers to this location, so your cart will be cleared.'**
+  String get storeChangeBody;
+
+  /// Confirms the store change.
+  ///
+  /// In en, this message translates to:
+  /// **'Change and clear cart'**
+  String get storeChangeConfirm;
+
+  /// Map pin picker title.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick location on map'**
+  String get mapPickerTitle;
+
+  /// Map pin picker hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the map to place the pin on your door.'**
+  String get mapPickerHint;
+
+  /// Map pin picker preview when reverse geocoding found no address.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin at {lat}, {lng}'**
+  String pinCoordinates(String lat, String lng);
+
+  /// Map pin picker while the address under the pin loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding the address…'**
+  String get findingAddress;
+
+  /// Confirms the pinned location.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm location'**
+  String get confirmLocation;
+
+  /// Tooltip: centres the map on the device location.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to my location'**
+  String get locateMe;
+
+  /// Fallback when the build has no Maps key.
+  ///
+  /// In en, this message translates to:
+  /// **'Map isn\'t available'**
+  String get mapUnavailableTitle;
+
+  /// Fallback when the build has no Maps key.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your current location, or enter the address by hand.'**
+  String get mapUnavailableBody;
+
+  /// Opens the address form.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter address manually'**
+  String get enterAddressManually;
+
+  /// Not-serviceable screen title.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'re not in your area yet'**
+  String get notServiceableTitle;
+
+  /// Not-serviceable screen text.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo is growing fast. Tap Notify me and we\'ll tell you when we deliver here.'**
+  String get notServiceableBody;
+
+  /// Saves interest in an unserviced location.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify me'**
+  String get notifyMe;
+
+  /// After Notify me succeeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks! We\'ll let you know when we start delivering here.'**
+  String get notifyMeDone;
+
+  /// Goes back to pick another location.
+  ///
+  /// In en, this message translates to:
+  /// **'Try another address'**
+  String get tryAnotherAddress;
+
+  /// Tile caption when a product has several pack sizes.
+  ///
+  /// In en, this message translates to:
+  /// **'{variant} · {count} options'**
+  String variantOptions(String variant, int count);
+
+  /// Unit price for comparison, e.g. ₹24.90/100 ml.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount}/{per}'**
+  String unitPrice(String amount, String per);
+
+  /// Home header when the store is closed (no ETA).
+  ///
+  /// In en, this message translates to:
+  /// **'Store closed'**
+  String get storeClosedHeadline;
+
+  /// Store-closed banner when it opens tomorrow (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Store closed. Opens tomorrow at {time}. You can browse; checkout opens then.'**
+  String storeClosedOpensTomorrow(String time);
+
+  /// Product information row.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported by'**
+  String get importedBy;
+
+  /// Product information row.
+  ///
+  /// In en, this message translates to:
+  /// **'Consumer care'**
+  String get consumerCare;
+
+  /// Shown instead of ADD in builds without a cart yet (staging/prod before Phase 3).
+  ///
+  /// In en, this message translates to:
+  /// **'Cart coming soon'**
+  String get cartComingSoonLabel;
+
+  /// Flag on a saved address outside every delivery area.
+  ///
+  /// In en, this message translates to:
+  /// **'Not serviceable'**
+  String get addressNotServiceable;
 }
 
 class _AppLocalizationsDelegate

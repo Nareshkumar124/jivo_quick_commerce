@@ -143,6 +143,10 @@ class JivoCoreLocalizationsEn extends JivoCoreLocalizations {
       'Jivo is temporarily unavailable. Please try again in a few minutes.';
 
   @override
+  String get errorStoreNotFound =>
+      'This store isn\'t available any more. Please choose your location again.';
+
+  @override
   String errorOtpInvalidAttempts(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

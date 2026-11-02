@@ -30,6 +30,15 @@ String formatRupees(String amount) {
   return '${isNegative ? '-' : ''}₹$grouped$fraction';
 }
 
+/// Whether an API money string is zero (`"0.00"`, `"0"`), e.g. to hide
+/// "You save ₹0". A check on the server's value, not arithmetic.
+bool isZeroAmount(String amount) {
+  final match = _moneyPattern.firstMatch(amount.trim());
+  if (match == null) return false;
+  return int.parse(match.group(2)!) == 0 &&
+      int.parse((match.group(3) ?? '0').padRight(2, '0')) == 0;
+}
+
 /// The IST wall-clock time of [instant], for formatting only. The API sends
 /// UTC (`02 §5`); India has no daylight saving, so a fixed offset is exact.
 DateTime toIst(DateTime instant) => instant.toUtc().add(_istOffset);

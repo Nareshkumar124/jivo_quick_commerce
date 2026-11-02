@@ -214,14 +214,12 @@ void main() {
       expect(await h.tokenStore.read(), isNotNull);
     });
 
-    testWidgets('NONE: register placeholder', (tester) async {
+    testWidgets('NONE: registration form', (tester) async {
       await verify(tester, '9811122235');
       expect(find.text('Become a Jivo rider'), findsOneWidget);
     });
 
-    testWidgets('PENDING_KYC / REJECTED / SUSPENDED: status placeholder', (
-      tester,
-    ) async {
+    testWidgets('PENDING_KYC: approval status screen', (tester) async {
       await verify(tester, '9811122232');
       expect(find.text('Documents under review'), findsOneWidget);
     });
@@ -263,7 +261,7 @@ void main() {
     });
 
     testWidgets('logout is blocked while online', (tester) async {
-      await h.signedInBefore('+919811122235'); // NONE: placeholder screen
+      await h.signedInBefore('+919811122235'); // NONE: registration form
       await h.pump(tester);
       h.location.running = true;
 

@@ -1,0 +1,11 @@
+{# Error state. Params: title, message, retry_url + retry_target (optional: an HTMX retry button), icon (default "error"). #}
+<div class="ops-state flex flex-col items-center py-10 text-center" role="alert" data-testid="error-state">
+    <div class="bg-red-100 flex items-center justify-center mb-4 rounded-full text-red-700 ops-state__icon dark:bg-red-500/20 dark:text-red-400">
+        <span class="material-symbols-outlined">{{ icon|default:"error" }}</span>
+    </div>
+    <h3 class="font-semibold text-font-important-light dark:text-font-important-dark">{{ title|default:"Something went wrong" }}</h3>
+    {% if message %}<p class="ops-state__message mt-1 text-font-subtle-light dark:text-font-subtle-dark">{{ message }}</p>{% endif %}
+    {% if retry_url %}
+        <button type="button" class="ops-button mt-4" hx-get="{{ retry_url }}" hx-target="{{ retry_target }}" hx-swap="outerHTML">Try again</button>
+    {% endif %}
+</div>

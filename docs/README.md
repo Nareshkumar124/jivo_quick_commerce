@@ -48,6 +48,26 @@ The system has four deliverables:
 
 ---
 
+## Project management deliverables
+
+| # | Deliverable | Where |
+|---|-------------|-------|
+| 0 | Project requirements | [01-project-overview.md](01-project-overview.md) (scope, roles, business rules) plus the feature specs [03](03-customer-app.md), [04](04-rider-app.md), [05](05-admin-and-store-panel.md) and [08](08-order-lifecycle.md) |
+| 1 | Architecture document | [02-system-architecture.md](02-system-architecture.md); admin panel: [admin-panel-architecture.md](admin-panel-architecture.md) |
+| 2 | Project directory structure | [02-system-architecture.md §3](02-system-architecture.md#3-repository-layout-monorepo) |
+| 3 | Database ER diagram | [07-data-model.md §1](07-data-model.md#1-entity-relationship-overview) |
+| 4 | API documentation | [06-backend-modules-and-api.md](06-backend-modules-and-api.md), the contract `backend/openapi/schema.yaml`, and Swagger UI at `/api/docs/` |
+| 5 | Agent task allocation | [development-phase.md](development-phase.md) (ownership, per-phase tracks, collision rules, §9 PM rules) and [task-tracker.md](task-tracker.md) |
+| 6 | Development roadmap | [plan/00-roadmap.md](plan/00-roadmap.md) |
+| 7 | Integration checklist | [integration-checklist.md](integration-checklist.md) |
+| 8 | Final release checklist | [release-checklist.md](release-checklist.md) |
+| – | Agent responsibility matrix | [development-phase.md](development-phase.md) (ownership table at the top, §9.1 roles) |
+| – | Project status report | [project-status.md](project-status.md) |
+| – | Technical decision log (ADR index) | [decision-log.md](decision-log.md) |
+| – | Deployment documentation | [deployment.md](deployment.md) |
+| – | Open API requests from the apps | [api-requests.md](api-requests.md) |
+| – | QA plan, test cases, reports and bugs | `qa/docs/` and `qa/bugs/` (owned by the QA agent) |
+
 ## How to use the phase plan
 
 1. Work happens **one phase at a time**, in order. Each phase is a *vertical slice*: backend, admin panel and app screens are built together, so the phase can be demonstrated end to end.

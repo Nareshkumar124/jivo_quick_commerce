@@ -94,7 +94,32 @@ def test_every_example_matches_its_schema(schema):
 
 # Exempt from 426/503 by design: the splash call and the session-keeping refresh.
 NO_APP_GUARDS = {"config_app", "auth_token_refresh"}
-PUBLIC = {"auth_otp_request", "auth_otp_verify", "auth_token_refresh", "config_app"}
+PUBLIC = {
+    "auth_otp_request",
+    "auth_otp_verify",
+    "auth_token_refresh",
+    "config_app",
+    # Phase 2: browsing needs no account, and these ignore credentials entirely.
+    "serviceability_check",
+    "categories_list",
+    "products_list",
+    "products_retrieve",
+    "search_products",
+    "search_suggest",
+    "collections_retrieve",
+}
+# Anonymous allowed, but a token that is sent is checked (401 TOKEN_INVALID when invalid).
+OPTIONAL_AUTH = {"home_retrieve", "serviceability_notify_me"}
+# Phase 2: per-store operations (X-Store-Id header).
+STORE_SCOPED = {
+    "home_retrieve",
+    "categories_list",
+    "products_list",
+    "products_retrieve",
+    "search_products",
+    "search_suggest",
+    "collections_retrieve",
+}
 
 
 def test_app_endpoints_document_force_update_and_maintenance(schema):
@@ -111,6 +136,13 @@ def test_authentication_is_documented(schema):
         op_id = operation["operationId"]
         if op_id in PUBLIC:
             assert "security" not in operation, op_id
+        elif op_id in OPTIONAL_AUTH:
+            assert operation["security"] == [{"jwtAuth": []}, {}], op_id
+            codes = {
+                example["value"]["error"]["code"]
+                for example in json_content(operation["responses"]["401"])["examples"].values()
+            }
+            assert codes == {"TOKEN_INVALID"}, op_id  # anonymous calls never get AUTH_REQUIRED
         else:
             assert operation["security"] == [{"jwtAuth": []}], op_id
             assert "401" in operation["responses"], op_id
@@ -129,6 +161,67 @@ def test_phase_1_enums(schema):
         "SUSPENDED",
     ]
     assert components["AddressLabelEnum"]["enum"] == ["home", "work", "other"]
+
+
+def test_phase_2_enums(schema):
+    components = schema["components"]["schemas"]
+    assert components["StockStatusEnum"]["enum"] == ["IN_STOCK", "LOW_STOCK", "OUT_OF_STOCK"]
+    assert components["BannerLinkTypeEnum"]["enum"] == [
+        "category",
+        "collection",
+        "product",
+        "url",
+        "none",
+    ]
+    assert components["SearchSuggestionTypeEnum"]["enum"] == ["product", "category", "keyword"]
+    sort = next(
+        param
+        for param in schema["paths"]["/api/v1/products/"]["get"]["parameters"]
+        if param["name"] == "sort"
+    )
+    assert sort["schema"]["enum"] == ["relevance", "price_asc", "price_desc", "discount"]
+    assert sort["schema"]["default"] == "relevance"
+
+
+def test_store_scoped_operations_require_the_store_header(schema):
+    """06 §2.4: every catalog operation takes X-Store-Id and documents its errors."""
+    found = set()
+    for path, _method, operation in operations(schema):
+        op_id = operation["operationId"]
+        headers = {p["name"]: p for p in operation.get("parameters", []) if p["in"] == "header"}
+        if op_id not in STORE_SCOPED:
+            assert "X-Store-Id" not in headers, op_id
+            continue
+        found.add(op_id)
+        assert headers["X-Store-Id"]["required"] is True, op_id
+        assert headers["X-Store-Id"]["schema"] == {"type": "integer"}, op_id
+        bad = [
+            example["value"]["error"]["details"]
+            for example in json_content(operation["responses"]["400"])["examples"].values()
+        ]
+        assert {"X-Store-Id": ["This header is required."]} in bad, op_id
+        assert {"X-Store-Id": ["A valid store id is required."]} in bad, op_id
+        not_found = {
+            example["value"]["error"]["code"]
+            for example in json_content(operation["responses"]["404"])["examples"].values()
+        }
+        assert "STORE_NOT_FOUND" in not_found, op_id
+        assert path.startswith("/api/v1/")
+    assert found == STORE_SCOPED
+
+
+def test_money_fields_are_decimal_strings(schema):
+    """02 §5: money is a 2-decimal string, never a float."""
+    components = schema["components"]["schemas"]
+    for name, field in [
+        ("VariantSummary", "mrp"),
+        ("VariantSummary", "selling_price"),
+        ("VariantSummary", "discount_amount"),
+        ("UnitPrice", "amount"),
+    ]:
+        prop = components[name]["properties"][field]
+        assert prop["type"] == "string", (name, field)
+        assert prop["format"] == "decimal", (name, field)
 
 
 def test_patterns_are_portable(schema):

@@ -22,7 +22,16 @@ import 'package:rider_app/features/location/domain/tracking_config.dart';
 import 'package:rider_app/features/location/presentation/location_debug_controller.dart';
 import 'package:rider_app/features/offers/data/offer_alert_notifications.dart';
 import 'package:rider_app/features/offers/presentation/offer_alert_providers.dart';
+import 'package:rider_app/features/onboarding/data/fake_rider_onboarding_backend.dart';
+import 'package:rider_app/features/onboarding/domain/image_picking.dart';
+import 'package:rider_app/features/onboarding/presentation/onboarding_providers.dart';
+import 'package:rider_app/features/task/data/fake_task_backend.dart';
+import 'package:rider_app/features/task/presentation/pickup_scan_screen.dart';
+import 'package:rider_app/features/task/presentation/task_providers.dart';
 import 'package:rider_app/shared/platform/url_opener.dart';
+
+import 'kyc_image_fakes.dart';
+import 'task_fakes.dart';
 
 /// Location service stand-in: "online" is just a flag.
 class FakeLocationServiceClient implements LocationServiceClient {
@@ -126,6 +135,20 @@ class RiderTestHarness {
   final cleaner = RecordingLocationCleaner();
   final offerAlerts = NoopOfferAlerts();
 
+  /// 2026-11-02 12:00 IST.
+  DateTime now = DateTime.utc(2026, 11, 2, 6, 30);
+  late final onboarding = FakeRiderOnboardingBackend(
+    delay: Duration.zero,
+    clock: () => now,
+  );
+  final picker = FakeKycImagePicker();
+  final codec = FakeImageCodec();
+  final pendingCapture = InMemoryPendingCaptureStore();
+  late final tasks = FakeTaskBackend(delay: Duration.zero, clock: () => now);
+  final locationReader = FakeLocationReader();
+  final alerter = RecordingOfferAlerter();
+  List<String> scannerValues = const ['7K2P', 'HELLO-WORLD'];
+
   List<Override> overrides() => [
     ...riderAppOverrides(
       env: env,
@@ -141,6 +164,15 @@ class RiderTestHarness {
     locationDataCleanerProvider.overrideWithValue(cleaner),
     offerAlertNotificationsProvider.overrideWithValue(offerAlerts),
     analyticsProvider.overrideWithValue(const NoopAnalyticsClient()),
+    clockProvider.overrideWithValue(() => now),
+    fakeRiderOnboardingBackendProvider.overrideWithValue(onboarding),
+    kycImagePickerProvider.overrideWithValue(picker),
+    imageCodecProvider.overrideWithValue(codec),
+    pendingCaptureStoreProvider.overrideWithValue(pendingCapture),
+    fakeTaskBackendProvider.overrideWithValue(tasks),
+    currentLocationReaderProvider.overrideWithValue(locationReader),
+    offerAlerterProvider.overrideWithValue(alerter),
+    qrScannerBuilderProvider.overrideWith((ref) => fakeScanner(scannerValues)),
   ];
 
   /// A container for unit tests (session restored first).

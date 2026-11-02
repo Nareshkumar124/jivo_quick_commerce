@@ -46,3 +46,13 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Local --dart-define-from-file values. Never commit keys.
+*.local.json
+
+# Mappls SDK config (secrets, D-03). tool/setup_mappls.sh links the files
+# into android/app/ (also covered by the root .gitignore), and the mappls_gl
+# Gradle plugin writes the config into a per-variant assets folder.
+/android/app/*.a.olf
+/android/app/*.a.conf
+/android/app/src/*/assets/mappls-conf.txt

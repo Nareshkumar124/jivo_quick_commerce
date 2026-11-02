@@ -73,3 +73,6 @@ final analyticsProvider = Provider<AnalyticsClient>(
 final urlOpenerProvider = Provider<UrlOpener>(
   (ref) => const ExternalUrlOpener(),
 );
+
+/// The current time. Overridden in tests (age rule, upload times).
+final clockProvider = Provider<DateTime Function()>((ref) => DateTime.now);

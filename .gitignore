@@ -26,3 +26,20 @@ build/
 .DS_Store
 .idea/
 .vscode/
+
+# QA: exploit-level details of open security bugs (never pushed; repo is public)
+qa/private/
+
+# Per-agent git worktrees (module branches), managed by the PM
+.worktrees/
+
+# Mappls (MapmyIndia) SDK config files: secrets, never commit (real copies live in ~/.config/jivo-quick-commerce/mappls/)
+*.a.olf
+*.a.conf
+*.i.olf
+*.i.conf
+/*.zip
+
+# Raw inputs from Jivo: product sheets/SAP exports/photos (catalog-data) and brand assets (ui-designer). Never commit.
+data/incoming/
+design/incoming/

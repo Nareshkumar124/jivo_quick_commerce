@@ -13,6 +13,7 @@ urlpatterns = [
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="api-schema"), name="api-docs"),
     path("api/v1/", include("config.api_v1")),
     path("admin/", admin.site.urls),
+    path("ops/", include("apps.ops_console.urls")),  # Ops Console (05 §1)
 ]
 
 # JSON error envelope for /api/ and /health/ paths when DEBUG is off; HTML elsewhere.

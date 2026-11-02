@@ -93,3 +93,24 @@ def env_dict(name: str, default: object = _NOTSET) -> dict[str, str]:
             raise ImproperlyConfigured(f"{name} items must look like key:value.")
         result[key.strip()] = val.strip()
     return result
+
+
+TEST_DATABASE_PREFIX = "test_jivo_quick_commerce"
+
+
+def env_test_database_name(name: str = "POSTGRES_TEST_DB") -> str:
+    """The test database name: ``name`` or the prefix itself. The PostgreSQL server is shared, so
+    any value that does not start with ``test_jivo_quick_commerce`` is refused: a typo can never
+    point the test suite (which creates and drops it) at a real database."""
+    value = env_str(name, default=TEST_DATABASE_PREFIX).strip()
+    if not value.startswith(TEST_DATABASE_PREFIX):
+        raise ImproperlyConfigured(f"{name} must start with {TEST_DATABASE_PREFIX!r}.")
+    return value
+
+
+def env_test_redis_db(name: str = "TEST_REDIS_DB", default: int = 15) -> int:
+    """The Redis DB index for tests (3-15). DBs 0-2 are the dev cache, broker and channels."""
+    value = env_int(name, default=default)
+    if not 3 <= value <= 15:
+        raise ImproperlyConfigured(f"{name} must be between 3 and 15 (0-2 are dev DBs).")
+    return value

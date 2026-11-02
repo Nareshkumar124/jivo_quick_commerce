@@ -7,9 +7,9 @@ Status: 🟡 open · 🟢 decided · 🔵 using default (not yet confirmed)
 
 | ID | Decision | Recommended default | Needed by | Owner | Status |
 |----|----------|---------------------|-----------|-------|--------|
-| D-01 | Payment gateway | **Razorpay** (UPI intent, cards, netbanking, wallets, refunds API, QR for COD-UPI, Flutter SDK) | Phase 3 | Jivo Finance | 🟡 |
+| D-01 | Payment gateway | **Razorpay** (UPI intent, cards, netbanking, wallets, refunds API, QR for COD-UPI, Flutter SDK). **Cashfree** is the named alternative. The gateway sits behind a payments interface, so either can be used. | Phase 3 | Jivo Finance | 🟡 |
 | D-02 | SMS / OTP provider | **MSG91**, or Jivo's existing provider if it has one. Must support DLT templates. | Phase 1 | Jivo IT | 🟡 |
-| D-03 | Maps provider | **Google Maps Platform** (Maps SDK, Places autocomplete, Geocoding). Alternatives for cost: Ola Maps, Mappls (MapmyIndia). Needs a billing account and restricted API keys. | Phase 2 | Jivo IT | 🟡 |
+| D-03 | Maps provider | **MapmyIndia (Mappls)**, decided by the user on 2026-11-02 (DL-29): Mappls Flutter SDK for maps, place search and reverse geocoding. The Android SDK config has been provided; the iOS config and a web/REST key for the admin/ops maps are pending. | Phase 2 | Jivo IT | 🟢 |
 | D-04 | Staff login for the web panel | Use **Jivo Auth (auth.jivo.in)** for staff/admin SSO if it is the company standard. Customers and riders stay on phone OTP. Until integrated, staff use Django's built-in login. The `User.auth_id` column is reserved so the switch needs no data remodel. | Phase 1 (decide), integrate by Phase 7 | Jivo IT | 🟡 |
 | D-05 | Hosting | **AWS ap-south-1 (Mumbai)**: ECS/EC2 + RDS PostgreSQL (PostGIS) + ElastiCache Redis + S3 + CloudFront. Or Jivo's existing cloud/servers. | Phase 0 (staging), Phase 8 (prod) | Jivo IT | 🟡 |
 | D-06 | App names, package IDs, branding | Customer: "Jivo" / `in.jivo.quick`. Rider: "Jivo Rider" / `in.jivo.rider`. Domain e.g. `api.<jivo-domain>`. Brand kit (logo, colours, fonts) from Jivo marketing. | Phase 0 (IDs), Phase 2 (brand UI) | Jivo Marketing | 🟡 |

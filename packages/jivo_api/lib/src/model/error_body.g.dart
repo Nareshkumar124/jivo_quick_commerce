@@ -147,5 +147,6 @@ const _$ErrorCodeEnumEnumMap = {
   ErrorCodeEnum.RATE_LIMITED: 'RATE_LIMITED',
   ErrorCodeEnum.SERVER_ERROR: 'SERVER_ERROR',
   ErrorCodeEnum.SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  ErrorCodeEnum.STORE_NOT_FOUND: 'STORE_NOT_FOUND',
   ErrorCodeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

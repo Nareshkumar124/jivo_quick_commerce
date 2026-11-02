@@ -473,4 +473,858 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get callSupport => 'Call support';
+
+  @override
+  String onboardingStepOf(int step, int total) {
+    return 'Step $step of $total';
+  }
+
+  @override
+  String get onboardingCheckDetails =>
+      'Some details were not accepted. Check them and try again.';
+
+  @override
+  String get onboardingLoading => 'Loading your application…';
+
+  @override
+  String get onboardingLoadError => 'Couldn\'t load your application';
+
+  @override
+  String get fieldRequired => 'This is required.';
+
+  @override
+  String get fieldNameInvalid =>
+      'Enter a name with letters only, at least 2 characters.';
+
+  @override
+  String get fieldDobInFuture => 'Date of birth can\'t be in the future.';
+
+  @override
+  String fieldDobUnderage(int age) {
+    return 'You must be at least $age years old to ride with Jivo.';
+  }
+
+  @override
+  String get fieldPhoneSameAsRider =>
+      'Enter someone else\'s number, not your own.';
+
+  @override
+  String get fieldVehicleNumberInvalid =>
+      'Enter the vehicle number as on the number plate, like DL 3C AB 1234.';
+
+  @override
+  String get fieldAccountNumberInvalid =>
+      'Enter a valid account number (9 to 18 digits).';
+
+  @override
+  String get fieldAccountNumbersMismatch => 'The account numbers don\'t match.';
+
+  @override
+  String get fieldIfscInvalid =>
+      'Enter the 11-character IFSC, like HDFC0001234.';
+
+  @override
+  String get fieldUpiInvalid => 'Enter a valid UPI ID, like name@okbank.';
+
+  @override
+  String get fieldAadhaarInvalid =>
+      'Enter your 12-digit Aadhaar number exactly as printed.';
+
+  @override
+  String get fieldPanInvalid =>
+      'Enter your PAN exactly as printed, like ABCDE1234F.';
+
+  @override
+  String get fieldDrivingLicenceInvalid =>
+      'Enter your licence number exactly as printed on the card.';
+
+  @override
+  String get registerIntro =>
+      'Tell us about yourself and your vehicle. Next, you\'ll upload your documents.';
+
+  @override
+  String get registerSectionAboutYou => 'About you';
+
+  @override
+  String get registerFullName => 'Full name (as on Aadhaar)';
+
+  @override
+  String get registerDob => 'Date of birth';
+
+  @override
+  String get registerDobHint => 'Choose the date';
+
+  @override
+  String get registerDobPickerHelp => 'Select your date of birth';
+
+  @override
+  String get registerSectionEmergency => 'Emergency contact';
+
+  @override
+  String get registerEmergencyHelp =>
+      'Someone Jivo can call if something happens to you on a delivery.';
+
+  @override
+  String get registerEmergencyName => 'Contact name';
+
+  @override
+  String get registerEmergencyPhone => 'Contact mobile number';
+
+  @override
+  String get registerSectionStore => 'Preferred store';
+
+  @override
+  String get registerStoreLabel => 'Store you want to deliver for';
+
+  @override
+  String get registerStoreHelp =>
+      'Jivo confirms your store when your account is approved.';
+
+  @override
+  String registerStoreOption(String name, String city) {
+    return '$name, $city';
+  }
+
+  @override
+  String get registerStoresLoading => 'Loading stores…';
+
+  @override
+  String get registerStoresError => 'Couldn\'t load the stores.';
+
+  @override
+  String get registerSectionVehicle => 'Your vehicle';
+
+  @override
+  String get registerVehicleNumber => 'Vehicle number';
+
+  @override
+  String get registerVehicleNumberHint => 'DL 3C AB 1234';
+
+  @override
+  String get registerSubmit => 'Continue';
+
+  @override
+  String get vehicleBicycle => 'Bicycle';
+
+  @override
+  String get vehicleEBike => 'E-bike';
+
+  @override
+  String get vehicleMotorbike => 'Motorbike';
+
+  @override
+  String get vehicleScooter => 'Scooter';
+
+  @override
+  String get statusFinishTitle => 'Finish your application';
+
+  @override
+  String get statusFinishBody =>
+      'Complete these steps so Jivo can review your application.';
+
+  @override
+  String get statusStepDetails => 'Personal and vehicle details';
+
+  @override
+  String get statusStepDocuments => 'Documents';
+
+  @override
+  String get statusStepBank => 'Bank details';
+
+  @override
+  String get statusStepDone => 'Done';
+
+  @override
+  String get statusStepNeeded => 'Needed';
+
+  @override
+  String statusStepDocumentsProgress(int done, int total) {
+    return '$done of $total uploaded';
+  }
+
+  @override
+  String statusStepDocumentsFix(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count documents need new photos',
+      one: '1 document needs a new photo',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get statusActionUploadDocuments => 'Upload documents';
+
+  @override
+  String get statusActionAddBank => 'Add bank details';
+
+  @override
+  String get statusActionCheck => 'Check status';
+
+  @override
+  String get statusActionViewDocuments => 'View documents';
+
+  @override
+  String get statusRejectedFixBody =>
+      'Fix the items below. Jivo reviews your application again after you send them.';
+
+  @override
+  String get statusRejectedReasonLabel => 'Reason from Jivo';
+
+  @override
+  String get statusActionFixDocuments => 'Upload documents again';
+
+  @override
+  String get statusActionFixBank => 'Update bank details';
+
+  @override
+  String get statusApprovedTitle => 'You\'re approved!';
+
+  @override
+  String statusApprovedBody(String store) {
+    return 'Your home store is $store. You can now go online and start delivering.';
+  }
+
+  @override
+  String get statusActionStart => 'Start delivering';
+
+  @override
+  String get statusDevReview => 'Simulate review (dev)';
+
+  @override
+  String get statusDevApprove => 'Approve (fake)';
+
+  @override
+  String get statusDevReject => 'Reject the PAN (fake)';
+
+  @override
+  String get documentsTitle => 'Documents';
+
+  @override
+  String get documentsIntro =>
+      'Take clear photos in good light. Each photo must show the whole document.';
+
+  @override
+  String documentsProgress(int done, int total) {
+    return '$done of $total done. Upload every document to continue.';
+  }
+
+  @override
+  String get documentsContinue => 'Continue';
+
+  @override
+  String get docPhoto => 'Your photo (selfie)';
+
+  @override
+  String get docAadhaarFront => 'Aadhaar card: front';
+
+  @override
+  String get docAadhaarBack => 'Aadhaar card: back';
+
+  @override
+  String get docPan => 'PAN card';
+
+  @override
+  String get docDrivingLicence => 'Driving licence';
+
+  @override
+  String get docVehicleRc => 'Vehicle RC';
+
+  @override
+  String get docStatusNeeded => 'Needed';
+
+  @override
+  String get docStatusPending => 'In review';
+
+  @override
+  String get docStatusApproved => 'Approved';
+
+  @override
+  String get docStatusRejected => 'Not accepted: upload again';
+
+  @override
+  String get docActionUpload => 'Upload';
+
+  @override
+  String get docActionReplace => 'Replace';
+
+  @override
+  String get docActionReupload => 'Upload again';
+
+  @override
+  String docUploaded(String document) {
+    return '$document uploaded';
+  }
+
+  @override
+  String get captureHintPhoto =>
+      'Take a clear photo of your face in good light. Remove your helmet, cap and sunglasses.';
+
+  @override
+  String get captureHintCard =>
+      'Put the card on a flat, dark surface. All four corners and the text must be clear, with no glare.';
+
+  @override
+  String get captureTakePhoto => 'Take photo';
+
+  @override
+  String get captureChooseGallery => 'Choose from gallery';
+
+  @override
+  String get captureProcessing => 'Preparing the photo…';
+
+  @override
+  String get captureReady => 'Photo ready';
+
+  @override
+  String get captureCheck =>
+      'Check that the photo is sharp and nothing is cut off.';
+
+  @override
+  String get captureUpload => 'Upload';
+
+  @override
+  String get captureRetake => 'Retake';
+
+  @override
+  String get captureProblemPicker =>
+      'Couldn\'t open the camera or gallery. Allow Jivo Rider to use the camera in your phone settings, then try again.';
+
+  @override
+  String get captureProblemUnreadable =>
+      'That file can\'t be used. Take a new photo.';
+
+  @override
+  String get captureProblemTooLarge =>
+      'That photo is too large. Take a new photo.';
+
+  @override
+  String get numberAadhaar => 'Aadhaar number';
+
+  @override
+  String get numberPan => 'PAN';
+
+  @override
+  String get numberDrivingLicence => 'Driving licence number';
+
+  @override
+  String get numberVehicleRc => 'Vehicle number (as on the RC)';
+
+  @override
+  String numberMaskedHelper(String masked) {
+    return 'Entered: $masked';
+  }
+
+  @override
+  String get bankTitle => 'Bank details';
+
+  @override
+  String get bankIntro => 'Jivo pays your earnings into this account.';
+
+  @override
+  String bankSaved(String account, String ifsc) {
+    return 'Saved account $account · $ifsc';
+  }
+
+  @override
+  String bankSavedShort(String account) {
+    return 'Account $account';
+  }
+
+  @override
+  String get bankReplaceHint => 'To change it, enter the new details below.';
+
+  @override
+  String get bankHolderName => 'Account holder name';
+
+  @override
+  String get bankAccountNumber => 'Account number';
+
+  @override
+  String get bankConfirmAccountNumber => 'Re-enter account number';
+
+  @override
+  String get bankIfsc => 'IFSC';
+
+  @override
+  String get bankIfscHint => 'HDFC0001234';
+
+  @override
+  String get bankUpi => 'UPI ID (optional)';
+
+  @override
+  String get bankUpiHint => 'name@okbank';
+
+  @override
+  String get bankSave => 'Save bank details';
+
+  @override
+  String get bankSavedToast => 'Bank details saved';
+
+  @override
+  String get offerTitle => 'New order';
+
+  @override
+  String get offerAlertTitle => 'New order offer';
+
+  @override
+  String offerAlertBody(String store, String locality) {
+    return '$store to $locality';
+  }
+
+  @override
+  String get offerPrepaid => 'Prepaid: nothing to collect';
+
+  @override
+  String offerCod(String amount) {
+    return 'Cash on delivery: collect $amount';
+  }
+
+  @override
+  String offerPayout(String amount) {
+    return 'You earn about $amount';
+  }
+
+  @override
+  String distanceKm(String km) {
+    return '$km km';
+  }
+
+  @override
+  String get offerAccept => 'Accept';
+
+  @override
+  String get offerReject => 'Reject';
+
+  @override
+  String get offerRejectTitle => 'Why are you rejecting? (optional)';
+
+  @override
+  String get offerRejectTooFar => 'Too far';
+
+  @override
+  String get offerRejectVehicle => 'Vehicle problem';
+
+  @override
+  String get offerRejectBreak => 'Taking a break';
+
+  @override
+  String get offerRejectOther => 'Other reason';
+
+  @override
+  String get offerRejectSkip => 'Reject without a reason';
+
+  @override
+  String get offerExpiredTitle => 'Offer expired';
+
+  @override
+  String get offerExpiredBody =>
+      'The time to accept ran out. New orders will come to you.';
+
+  @override
+  String get offerTakenTitle => 'Order taken';
+
+  @override
+  String get offerTakenBody => 'Another rider accepted this order first.';
+
+  @override
+  String get offerWithdrawnTitle => 'Order cancelled';
+
+  @override
+  String get offerWithdrawnBody =>
+      'This order was cancelled before pickup. Wait for the next one.';
+
+  @override
+  String get offerOk => 'OK';
+
+  @override
+  String taskOrderNumber(String number) {
+    return 'Order $number';
+  }
+
+  @override
+  String get taskRefresh => 'Refresh';
+
+  @override
+  String get taskNavigate => 'Navigate';
+
+  @override
+  String get taskNoMapsApp =>
+      'No maps app found. Install Mappls or another maps app.';
+
+  @override
+  String get taskCallCustomer => 'Call customer';
+
+  @override
+  String get taskStateChanged =>
+      'This order changed. The screen now shows its latest step.';
+
+  @override
+  String get taskLocationUnavailable =>
+      'Couldn\'t get your location. Turn on GPS and try again.';
+
+  @override
+  String get taskOutsideGeofence =>
+      'You\'re not close enough yet. Move closer and try again.';
+
+  @override
+  String taskOutsideGeofenceDistance(int metres) {
+    return 'You\'re $metres m away. Move closer and try again.';
+  }
+
+  @override
+  String get cashLimitExceeded =>
+      'Your cash in hand has reached the limit. Deposit cash at the store to get cash orders again.';
+
+  @override
+  String get taskGoToStoreTitle => 'Go to the store';
+
+  @override
+  String get taskOrderPacking => 'Packing…';
+
+  @override
+  String get taskOrderReady => 'Ready for pickup';
+
+  @override
+  String get taskArrivedStore => 'Arrived at store';
+
+  @override
+  String get taskPickupTitle => 'Pick up the order';
+
+  @override
+  String get taskItemsTitle => 'Check the items in the bag';
+
+  @override
+  String get pickupCodeHelp =>
+      'Scan the QR code on the bag, or type the 4-character code printed on it.';
+
+  @override
+  String get pickupCodeLabel => 'Order code';
+
+  @override
+  String get pickupCodeFormat => 'Enter the 4-character code from the bag.';
+
+  @override
+  String get pickupCodeWrong =>
+      'That code doesn\'t match this order. Check the bag and try again.';
+
+  @override
+  String get pickupNotPacked =>
+      'The order isn\'t packed yet. Wait until the store marks it ready.';
+
+  @override
+  String get taskPickup => 'Picked up';
+
+  @override
+  String get pickupScan => 'Scan QR code';
+
+  @override
+  String get scanTitle => 'Scan the bag QR code';
+
+  @override
+  String get scanTypeInstead => 'Type the code instead';
+
+  @override
+  String get scanNotJivoCode => 'This QR isn\'t a Jivo order code.';
+
+  @override
+  String get scanCameraUnavailable =>
+      'The camera isn\'t available. Type the code from the bag instead.';
+
+  @override
+  String get taskGoToCustomerTitle => 'Deliver to the customer';
+
+  @override
+  String taskLandmark(String landmark) {
+    return 'Landmark: $landmark';
+  }
+
+  @override
+  String taskInstructions(String instructions) {
+    return 'Note: $instructions';
+  }
+
+  @override
+  String taskCollectCash(String amount) {
+    return 'Collect $amount in cash';
+  }
+
+  @override
+  String get taskArrivedCustomer => 'Arrived at customer';
+
+  @override
+  String get taskCantDeliver => 'Can\'t deliver';
+
+  @override
+  String get arrivedOverride => 'I\'m at the address: the pin is wrong';
+
+  @override
+  String get arrivedOverrideTitle => 'Why are you outside the pin area?';
+
+  @override
+  String get arrivedOverridePinWrong => 'The map pin is in the wrong place';
+
+  @override
+  String get arrivedOverrideGate => 'I\'m at the gate or lobby';
+
+  @override
+  String get otpStepTitle => 'Enter the delivery code';
+
+  @override
+  String get otpStepHelp =>
+      'Ask the customer for the 4-digit code in their app or SMS.';
+
+  @override
+  String get otpStepLabel => 'Delivery code';
+
+  @override
+  String get otpContinue => 'Continue';
+
+  @override
+  String get taskDeliver => 'Mark delivered';
+
+  @override
+  String otpAttemptsLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count attempts left',
+      one: '1 attempt left',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deliveryOtpWrong => 'That code is wrong. Ask the customer again.';
+
+  @override
+  String deliveryOtpWrongLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Wrong code. $count attempts left.',
+      one: 'Wrong code. 1 attempt left.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deliveryOtpLocked =>
+      'Too many wrong codes. Jivo support has been alerted. Call support to continue.';
+
+  @override
+  String get otpLockedTitle => 'Delivery code locked';
+
+  @override
+  String get codTitle => 'Collect payment';
+
+  @override
+  String get codAmountDueLabel => 'Amount to collect';
+
+  @override
+  String get codExactAmount => 'Collect exactly this amount.';
+
+  @override
+  String codCashCollected(String amount) {
+    return 'Cash collected $amount';
+  }
+
+  @override
+  String get codConfirmTitle => 'Confirm cash';
+
+  @override
+  String codConfirmBody(String amount) {
+    return 'Did you collect exactly $amount in cash?';
+  }
+
+  @override
+  String get codConfirmYes => 'Yes, collected';
+
+  @override
+  String get codConfirmNo => 'No';
+
+  @override
+  String codCashDone(String amount) {
+    return 'Cash collected: $amount';
+  }
+
+  @override
+  String get codShowUpi => 'Customer pays by UPI: show QR';
+
+  @override
+  String get codUpiWaiting => 'Waiting for the payment…';
+
+  @override
+  String get codUpiPaid => 'Payment received';
+
+  @override
+  String get codUpiCheck => 'Check payment';
+
+  @override
+  String get codChangeOtp => 'Change the delivery code';
+
+  @override
+  String get codConfirmFirst =>
+      'Confirm the cash or wait for the UPI payment first.';
+
+  @override
+  String get codAmountMismatch =>
+      'The amount doesn\'t match what Jivo expects. Check the amount and try again.';
+
+  @override
+  String get taskDeliveredTitle => 'Delivered!';
+
+  @override
+  String get taskDeliveredBody => 'Great job. Wait for the next order.';
+
+  @override
+  String taskDeliveredEarned(String amount) {
+    return 'You earned $amount for this order.';
+  }
+
+  @override
+  String get taskReturnTitle => 'Return to store';
+
+  @override
+  String get taskReturnBody =>
+      'Take the items back to the store. The store staff will mark them received.';
+
+  @override
+  String get taskCheckStatus => 'Check status';
+
+  @override
+  String get taskReturnedTitle => 'Items returned';
+
+  @override
+  String get taskReturnedBody =>
+      'The store received the items. You\'re ready for new orders.';
+
+  @override
+  String get taskCancelledTitle => 'Order cancelled';
+
+  @override
+  String get taskCancelledBody =>
+      'This order was cancelled before pickup. You don\'t need to collect it.';
+
+  @override
+  String get taskUnassignedTitle => 'Order reassigned';
+
+  @override
+  String get taskUnassignedBody => 'This order is no longer assigned to you.';
+
+  @override
+  String get taskUnknownTitle => 'Can\'t show this order';
+
+  @override
+  String get taskUnknownBody =>
+      'This app version can\'t show the order\'s status. Try again or update the app.';
+
+  @override
+  String get failTitle => 'Can\'t deliver';
+
+  @override
+  String get failIntro => 'Why can\'t you deliver this order?';
+
+  @override
+  String get failNotReachable => 'Customer not reachable';
+
+  @override
+  String get failRefused => 'Customer refused the order';
+
+  @override
+  String get failWrongAddress => 'Wrong address';
+
+  @override
+  String get failOther => 'Other reason';
+
+  @override
+  String failCallsNeeded(int needed, int done) {
+    return 'Call the customer at least $needed times ($done done)';
+  }
+
+  @override
+  String failWaitLeft(String time) {
+    return 'Wait at the address: $time left';
+  }
+
+  @override
+  String get failWaitDone => 'You waited 10 minutes at the address';
+
+  @override
+  String get failWaitNotArrived => 'Mark \"Arrived at customer\" first';
+
+  @override
+  String get failNoteOptional => 'Note (optional)';
+
+  @override
+  String get failNoteRequired => 'Note (required)';
+
+  @override
+  String get failAddPhoto => 'Add a photo (optional)';
+
+  @override
+  String get failPhotoAdded => 'Photo added';
+
+  @override
+  String get failPhotoRemove => 'Remove';
+
+  @override
+  String get failPhotoError => 'Couldn\'t use that photo. Try again.';
+
+  @override
+  String get failChooseReason => 'Choose a reason.';
+
+  @override
+  String get failNotYet =>
+      'You can choose this after the calls and the 10-minute wait.';
+
+  @override
+  String get failSubmit => 'Return to store';
+
+  @override
+  String get logoutBlockedDuringTask =>
+      'Finish your current order before logging out.';
+
+  @override
+  String get offlineBlockedDuringTask =>
+      'Finish your current order before going offline.';
+
+  @override
+  String get devOfferPrepaid => 'Test offer (dev)';
+
+  @override
+  String get devOfferCod => 'Test COD offer (dev)';
+
+  @override
+  String get devMarkPacked => 'Store: packed (dev)';
+
+  @override
+  String get devCancelOrder => 'Cancel order (dev)';
+
+  @override
+  String get devReturnReceived => 'Store: return received (dev)';
+
+  @override
+  String get devUpiPaid => 'Customer paid (dev)';
+
+  @override
+  String get codTakeCashInstead => 'Customer pays cash instead';
+
+  @override
+  String get codUpiExpired => 'The QR expired. Show a new one.';
+
+  @override
+  String get taskUnconfirmedTitle => 'Couldn\'t confirm the last step';
+
+  @override
+  String get taskUnconfirmedBody =>
+      'The connection dropped before Jivo answered, and this order is no longer open. It may have gone through. Check the order status, or call support.';
+
+  @override
+  String get taskBackToOrders => 'Back to orders';
+
+  @override
+  String get codQrUnavailable =>
+      'Couldn\'t show the QR code. Check payment again, or collect cash.';
 }

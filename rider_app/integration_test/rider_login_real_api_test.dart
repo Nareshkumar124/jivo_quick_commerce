@@ -140,7 +140,7 @@ void main() {
   }
 
   testWidgets('P1 rider login against the real backend: config, wrong OTP, '
-      'NONE placeholder, /me, restore, logout', (tester) async {
+      'NONE registration form, /me, restore, logout', (tester) async {
     expect(env.useFakeApi, isFalse, reason: 'this test must hit the backend');
     debugPrint('API: ${env.apiBaseUrl}, app ${clientInfo.appVersion}');
 
@@ -176,10 +176,12 @@ void main() {
       'wrong OTP shows: "${(wrongCode.evaluate().single.widget as Text).data}"',
     );
 
-    // 4. The right OTP, with terms_version from config/app: NONE → register
-    //    placeholder.
+    // 4. The right OTP, with terms_version from config/app: NONE → the
+    //    registration form (P5 lookahead; it submits to the fake until the
+    //    rider API lands, so this test does not submit it).
     await tester.enterText(find.byKey(const Key('otp-code')), validOtp);
     await pumpUntil(tester, find.text('Become a Jivo rider'));
+    expect(find.byKey(const Key('register-form')), findsOneWidget);
     final verifies = app.recorder.to('/api/v1/auth/otp/verify/');
     expect(verifies, hasLength(2));
     for (final verify in verifies) {
@@ -207,7 +209,7 @@ void main() {
     );
 
     // 6. Restart: the session comes back from secure storage and GET /me/
-    //    routes to the placeholder without logging in again.
+    //    routes to the registration form without logging in again.
     await stop(tester, app);
     app = await launch(tester);
     expect(app.session.status, SessionStatus.signedIn);

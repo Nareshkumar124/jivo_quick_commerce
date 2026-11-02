@@ -41,6 +41,7 @@ String apiErrorMessage(JivoCoreLocalizations l10n, ApiError error) =>
       ApiErrorCode.maintenance => l10n.errorMaintenance,
       ApiErrorCode.rateLimited => l10n.errorRateLimited,
       ApiErrorCode.serviceUnavailable => l10n.errorServiceUnavailable,
+      ApiErrorCode.storeNotFound => l10n.errorStoreNotFound,
       // Protocol errors are app bugs the user can't act on.
       ApiErrorCode.methodNotAllowed ||
       ApiErrorCode.notAcceptable ||

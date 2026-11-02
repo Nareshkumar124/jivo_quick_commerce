@@ -114,6 +114,7 @@ ADDRESS = {
     "lat": 28.4595,
     "lng": 77.0266,
     "is_default": True,
+    "is_serviceable": True,
     "created_at": "2026-10-20T06:35:00Z",
     "updated_at": "2026-10-20T06:35:00Z",
 }
@@ -131,6 +132,7 @@ ADDRESS_WORK = {
     "lat": 28.4646,
     "lng": 77.0864,
     "is_default": False,
+    "is_serviceable": False,
     "created_at": "2026-10-25T12:00:00Z",
     "updated_at": "2026-10-25T12:00:00Z",
 }

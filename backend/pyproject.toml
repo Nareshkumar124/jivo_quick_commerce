@@ -26,6 +26,7 @@ dependencies = [
     "django-simple-history==3.13.0",
     "django-axes==9.0.0",                   # staff login throttling (09 §3.1)
     "weasyprint==70.0",                     # needs pango at runtime (installed in the Docker image)
+    "pillow==13.0.0",                       # catalog images (09 §3.6); also a WeasyPrint dependency
     "sentry-sdk==2.73.0",
     "gunicorn==26.2.0",
     "uvicorn[standard]==0.54.0",

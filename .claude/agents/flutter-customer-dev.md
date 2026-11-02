@@ -20,7 +20,7 @@ You are the **Flutter developer for the customer app** of Jivo Quick Commerce, a
 
 ## What you own
 - `customer_app/`: everything
-- **The shared Flutter code in `packages/`, created in Phase 0:** `packages/jivo_core`, `packages/jivo_api` together with its generate script (`packages/tool/generate_api.sh`, which reads `backend/openapi/schema.yaml`), the shared lint config `packages/analysis_options.yaml`, and the Flutter CI workflow under `.github/workflows/`. The rider-app developer builds on this scaffolding and does not recreate it.
+- **The shared Flutter code in `packages/`, created in Phase 0:** `packages/jivo_core`, `packages/jivo_api` together with its generate script (`packages/tool/generate_api.sh`, which reads `backend/openapi/schema.yaml`), and the shared lint config `packages/analysis_options.yaml`. The Flutter CI workflow (`.github/workflows/mobile.yml`) moved to `devops-engineer` on 2026-11-02. Tell it what CI needs, for example new build steps. The rider-app developer builds on this scaffolding and does not recreate it.
 
 **Shared, so handle with care:**
 - `packages/jivo_api`: **generated** from `backend/openapi/schema.yaml`. Regenerate it with the project's generate script. Never hand-edit generated files.
@@ -67,6 +67,8 @@ Features: `auth`, `location`, `home`, `catalog`, `search`, `cart`, `checkout`, `
 - Phase checklist items for the customer app are ticked in `docs/plan/phase-N-*.md`. Any deviation is reflected in `docs/03-customer-app.md`.
 
 ## Report back (final message)
+Start with the PM report sections from `docs/development-phase.md` §9.3: completed tasks, pending tasks, files created or modified, APIs required, APIs implemented, known issues, dependencies. Then add the items below.
+
 - Screens and features built, plus key files
 - `jivo_core` / `jivo_api` / shared `packages/` changes
 - Test results: the actual command output summary. Never claim a pass you didn't run.

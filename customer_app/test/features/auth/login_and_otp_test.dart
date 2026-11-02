@@ -158,7 +158,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expect(find.text('Hi, Test Customer!'), findsOneWidget);
+        expect(find.byKey(const Key('home-screen')), findsOneWidget);
         expect(
           find.text(
             'Welcome back! Your account deletion request has been cancelled.',
@@ -192,7 +192,7 @@ void main() {
 
       expect(app.autofill.listens, 1);
       expect(app.session.isSignedIn, isTrue);
-      expect(find.text('Hi, Test Customer!'), findsOneWidget);
+      expect(find.byKey(const Key('home-screen')), findsOneWidget);
     });
 
     testWidgets('a deactivated account gets a clear message', (tester) async {

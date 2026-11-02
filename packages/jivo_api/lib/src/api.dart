@@ -11,8 +11,10 @@ import 'package:jivo_api/src/auth/oauth.dart';
 import 'package:jivo_api/src/api/account_api.dart';
 import 'package:jivo_api/src/api/addresses_api.dart';
 import 'package:jivo_api/src/api/auth_api.dart';
+import 'package:jivo_api/src/api/catalog_api.dart';
 import 'package:jivo_api/src/api/config_api.dart';
 import 'package:jivo_api/src/api/health_api.dart';
+import 'package:jivo_api/src/api/serviceability_api.dart';
 
 class JivoApi {
   static const String basePath = r'http://localhost';
@@ -141,6 +143,12 @@ class JivoApi {
     return AuthApi(dio);
   }
 
+  /// Get CatalogApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  CatalogApi getCatalogApi() {
+    return CatalogApi(dio);
+  }
+
   /// Get ConfigApi instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   ConfigApi getConfigApi() {
@@ -151,5 +159,11 @@ class JivoApi {
   /// by doing that all interceptors will not be executed
   HealthApi getHealthApi() {
     return HealthApi(dio);
+  }
+
+  /// Get ServiceabilityApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  ServiceabilityApi getServiceabilityApi() {
+    return ServiceabilityApi(dio);
   }
 }

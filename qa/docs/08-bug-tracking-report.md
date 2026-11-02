@@ -1,0 +1,31 @@
+# 08: Bug Tracking Report
+
+**Updated:** 2026-11-02 (QA run 1). **Build:** backend `4960527`.
+
+Severity uses `docs/10-testing-strategy.md` §5.3, with the brief's equivalent in brackets: P0 Blocker = Critical · P1 Critical = High · P2 Major = Medium · P3/P4 = Low. Security bugs keep their exploit detail in `qa/private/` (gitignored) until fixed.
+
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0001](../bugs/BUG-0001.md) | Request body over 2.5 MB returns 500 SERVER_ERROR instead of a 4xx | backend: core error envelope | P3 Minor (Low) | P2 | django-backend-dev | Open | P0-TC-08b |
+| [BUG-0002](../bugs/BUG-0002.md) | Numeric input validators accept non-ASCII characters (data integrity; security aspect private) | backend: accounts validators | P2 Major (Medium) | P1 | django-backend-dev | Open | P1-TC-04, 13, 14b, 52 |
+| [BUG-0003](../bugs/BUG-0003.md) | The refresh-token single-use rule is not enforced in all conditions (security; details private) | backend: token refresh | P2 Major (Medium) | P2 | django-backend-dev | Open | P1-TC-24c |
+| [BUG-0007](../bugs/BUG-0007.md) | Concurrent set-default calls can leave a user with no default address (all return 200 `is_default: true`) | backend: addresses service | P2 Major (Medium) | P3 | django-backend-dev | Open | P1-TC-57 |
+| [BUG-0004](../bugs/BUG-0004.md) | `addresses_list` returns 404 for an invalid page, but the contract doesn't document it | backend: OpenAPI contract | P3 Minor (Low) | P3 | django-backend-dev | Open | P1-TC-48, P1-TC-79 |
+| [BUG-0005](../bugs/BUG-0005.md) | Production settings silently default to the console SMS backend, which logs OTP codes | backend: settings / checks | P3 Minor (Low) | P2 | django-backend-dev | Open | P1-TC-96 |
+| [BUG-0006](../bugs/BUG-0006.md) | Staff session lasts a fixed 12 hours; the doc requires 8 hours, and 2 hours idle for admin roles | backend: settings (staff sessions) | P3 Minor (Low) | P3 | django-backend-dev | Open | P1-TC-95 |
+
+**Open by severity:** P0: 0 · P1: 0 · P2: 3 · P3: 4 · P4: 0.
+
+Verified fixes: none yet (first run).
+
+## Observations / to investigate (not filed as bugs)
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| OBS-01 | The remote shared PostgreSQL sometimes takes longer than the 5 s `connect_timeout` to accept a connection. Those requests return 500 `SERVER_ERROR` with `psycopg ConnectionTimeout` in the log: 5 of ~300 fuzz requests, 1 of ~330 perf requests, and 1 readiness probe. `CONN_MAX_AGE=0` opens a new DB connection on every request (connect p50 ≈ 99 ms, max 346 ms from this host). | An environmental risk of the shared remote DB, not P1 code. Recommendation for the backend and ops: connection pooling (pgbouncer, or `CONN_MAX_AGE` > 0 with health checks) on staging/production; consider 503 rather than 500 for DB-unavailable errors. Recheck on staging. |
+| OBS-02 | An access token stays valid for up to 15 minutes after logout. | Matches 06 §2.1: logout only promises refresh revocation. A deleted or blocked account's access token *is* refused (verified). |
+| OBS-03 | A JSON boolean `true` for `lat` is accepted as 1.0 (DRF `FloatField` coercion). | P4 type-strictness only; schema type is number. |
+| OBS-04 | With `DEBUG=True` (local), unmatched `/api/` URLs and non-integer path ids return Django's HTML debug 404 instead of the JSON envelope. | By design: the doc says DEBUG off. Verified JSON with DEBUG off (staging profile, P0-TC-04). |
+| OBS-05 | Mobile: no `--obfuscate --split-debug-info` release configuration found yet (09 §3.5). | Release prep (Phase 7/8). |
+| OBS-06 | The JWT `app` claim is set and survives rotation, but nothing enforces it yet (a customer-app token works with `X-App-Name: rider`). | No rider-only endpoint exists in P1. Re-test when the Phase 5 rider endpoints ship (02 §6: "header and token claims decide which app context applies"). |
+| OBS-07 | The local dev fallback `SECRET_KEY` (in the public repo's `config/settings/local.py`) signs the JWTs and OTP hashes of every server running local settings, including :8001. Anyone with the repo can mint tokens for any user id on such a server (verified on the QA instance, P1-TC-26b). | Dev-only by design; staging and production refuse it (P1-TC-26c). Keep :8001 bound to 127.0.0.1 or adb-reverse only; never expose a local-settings server on a network. |
+| OBS-08 | A user without a name gets addresses with an empty `receiver_name`. | The app forces the complete-profile step first (03 §2.2). Confirm on device (P1-TC-84/89). |

@@ -216,12 +216,22 @@ class AddressSerializer(serializers.Serializer):
         help_text='Shown instead of the label when set, e.g. "Mom\'s place".',
     )
     receiver_name = serializers.CharField(
-        max_length=120, required=False, help_text="Defaults to the user's name."
+        max_length=120,
+        required=False,
+        allow_blank=True,
+        help_text=(
+            "Defaults to the user's name. Send an empty string to reset it to the user's own "
+            "(copied when saved)."
+        ),
     )
     receiver_phone = serializers.CharField(
         required=False,
+        allow_blank=True,
         validators=[indian_mobile_validator],
-        help_text="Defaults to the user's phone.",
+        help_text=(
+            "Defaults to the user's phone. Send an empty string to reset it to the user's own "
+            "(copied when saved)."
+        ),
     )
     house = serializers.CharField(max_length=120, help_text="House / flat / floor.")
     building_street = serializers.CharField(max_length=200, help_text="Building and street.")
@@ -243,8 +253,24 @@ class AddressSerializer(serializers.Serializer):
     is_default = serializers.BooleanField(
         read_only=True, help_text="Change it with `POST /addresses/{id}/set-default/`."
     )
+    is_serviceable = serializers.SerializerMethodField(
+        help_text=(
+            "True when the pin is inside an active store's service area (open or not), checked "
+            "on every read. An unserviceable address can be saved but not used for an order: "
+            "show it flagged (03 §2.4). Added in Phase 2."
+        )
+    )
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
+
+    def get_is_serviceable(self, address) -> bool:
+        # Annotated by addresses.with_serviceability() on reads; computed for a new or moved pin.
+        value = getattr(address, "is_serviceable", None)
+        if value is None:
+            from apps.stores.services import is_point_serviceable
+
+            return is_point_serviceable(address.lat, address.lng)
+        return bool(value)
 
 
 class PaginatedAddressListSerializer(serializers.Serializer):

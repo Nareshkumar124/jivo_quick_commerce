@@ -1,0 +1,32 @@
+[project]
+name = "jivo-qa"
+version = "0.1.0"
+description = "Independent black-box QA suites for Jivo Quick Commerce (API, security, DB, performance)"
+requires-python = "==3.13.*"
+# Direct dependencies pinned exactly; uv.lock pins the rest.
+dependencies = [
+    "httpx==0.28.1",
+    "jsonschema==4.26.0",
+    "psycopg[binary]==3.3.6",
+    "pytest==9.2.0",
+    "python-dotenv==1.2.4",
+    "pyyaml==6.0.3",
+    "redis==6.4.0",
+    "schemathesis==4.33.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "smoke: regression smoke (🔥) cases",
+    "limits: rate-limit / lockout tests (stateful; clear own Redis DB counters first)",
+    "profile_staging: needs the instance started with --profile staging (DEBUG off)",
+    "profile_redis_down: needs the instance started with --profile redis-down",
+    "profile_daylimit: needs the instance started with --profile daylimit",
+    "db: read-only SQL checks against the shared database",
+    "fuzz: schemathesis property-based fuzzing (low example counts)",
+]

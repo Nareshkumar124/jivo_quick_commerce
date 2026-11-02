@@ -56,6 +56,7 @@ paths:
                       lat: 28.4595
                       lng: 77.0266
                       is_default: true
+                      is_serviceable: true
                       created_at: '2026-10-20T06:35:00Z'
                       updated_at: '2026-10-20T06:35:00Z'
                     - id: 13
@@ -73,6 +74,7 @@ paths:
                       lat: 28.4646
                       lng: 77.0864
                       is_default: false
+                      is_serviceable: false
                       created_at: '2026-10-25T12:00:00Z'
                       updated_at: '2026-10-25T12:00:00Z'
                   summary: Two addresses
@@ -191,6 +193,7 @@ paths:
                     lat: 28.4646
                     lng: 77.0864
                     is_default: false
+                    is_serviceable: false
                     created_at: '2026-10-25T12:00:00Z'
                     updated_at: '2026-10-25T12:00:00Z'
           description: Created.
@@ -309,6 +312,7 @@ paths:
                     lat: 28.4595
                     lng: 77.0266
                     is_default: true
+                    is_serviceable: true
                     created_at: '2026-10-20T06:35:00Z'
                     updated_at: '2026-10-20T06:35:00Z'
           description: The address.
@@ -385,7 +389,8 @@ paths:
             true`). `message` is the text to show.'
     patch:
       operationId: addresses_update
-      description: Partial update. Use `set-default` to change the default.
+      description: Partial update. Use `set-default` to change the default. Send `""`
+        for `receiver_name` or `receiver_phone` to reset it to the user's own (T-205).
       summary: Edit an address
       parameters:
       - in: path
@@ -404,6 +409,11 @@ paths:
               Edit:
                 value:
                   landmark: Behind Galleria Market
+              ResetReceiverToMe(T-205):
+                value:
+                  receiver_name: ''
+                  receiver_phone: ''
+                summary: Reset receiver to me (T-205)
       security:
       - jwtAuth: []
       responses:
@@ -430,6 +440,7 @@ paths:
                     lat: 28.4595
                     lng: 77.0266
                     is_default: true
+                    is_serviceable: true
                     created_at: '2026-10-20T06:35:00Z'
                     updated_at: '2026-10-20T06:35:00Z'
           description: Updated.
@@ -652,6 +663,7 @@ paths:
                     lat: 28.4595
                     lng: 77.0266
                     is_default: true
+                    is_serviceable: true
                     created_at: '2026-10-20T06:35:00Z'
                     updated_at: '2026-10-20T06:35:00Z'
           description: The new default.
@@ -1258,6 +1270,458 @@ paths:
                   summary: Malformed or wrong signature
           description: 'The refresh token is invalid, expired or already used: the
             session is over.'
+  /api/v1/categories/:
+    get:
+      operationId: categories_list
+      description: Top-level categories and their sub-categories that have products
+        at this store (Categories tab, and the left rail of the product list). Two
+        levels, not paginated.
+      summary: Category tree for a store
+      parameters:
+      - in: header
+        name: X-Store-Id
+        schema:
+          type: integer
+        description: 'The store id from `GET /serviceability/` (`store.id`) for the
+          selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR`
+          with `details: {"X-Store-Id": [...]}`. Unknown or deactivated store: 404
+          `STORE_NOT_FOUND`; drop the saved store and check serviceability again.
+          A closed store is still browsable.'
+        required: true
+      tags:
+      - catalog
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryTree'
+              examples:
+                Tree:
+                  value:
+                    results:
+                    - id: 1
+                      name: Edible Oils
+                      slug: edible-oils
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/c7a41e/edible-oils-256.webp
+                        medium: https://media.jivo.in/catalog/c7a41e/edible-oils-512.webp
+                        large: https://media.jivo.in/catalog/c7a41e/edible-oils-1024.webp
+                        alt_text: Edible oils
+                      children:
+                      - id: 11
+                        name: Canola Oil
+                        slug: canola-oil
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2e8a/canola-oil-256.webp
+                          medium: https://media.jivo.in/catalog/5d2e8a/canola-oil-512.webp
+                          large: https://media.jivo.in/catalog/5d2e8a/canola-oil-1024.webp
+                          alt_text: Canola oil
+                      - id: 12
+                        name: Olive Oil
+                        slug: olive-oil
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/9a1f07/olive-oil-256.webp
+                          medium: https://media.jivo.in/catalog/9a1f07/olive-oil-512.webp
+                          large: https://media.jivo.in/catalog/9a1f07/olive-oil-1024.webp
+                          alt_text: Olive oil
+                      - id: 13
+                        name: Mustard Oil
+                        slug: mustard-oil
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/e40c6b/mustard-oil-256.webp
+                          medium: https://media.jivo.in/catalog/e40c6b/mustard-oil-512.webp
+                          large: https://media.jivo.in/catalog/e40c6b/mustard-oil-1024.webp
+                          alt_text: Mustard oil
+                    - id: 2
+                      name: Wellness Beverages
+                      slug: wellness-beverages
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/0b93d2/wellness-beverages-256.webp
+                        medium: https://media.jivo.in/catalog/0b93d2/wellness-beverages-512.webp
+                        large: https://media.jivo.in/catalog/0b93d2/wellness-beverages-1024.webp
+                        alt_text: Wellness beverages
+                      children:
+                      - id: 21
+                        name: Health Juices
+                        slug: health-juices
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/2c8d55/health-juices-256.webp
+                          medium: https://media.jivo.in/catalog/2c8d55/health-juices-512.webp
+                          large: https://media.jivo.in/catalog/2c8d55/health-juices-1024.webp
+                          alt_text: Health juices
+                    - id: 3
+                      name: Seeds & Superfoods
+                      slug: seeds-superfoods
+                      image: null
+                      children: []
+          description: The category tree.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                XSTOREIDMISSING:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - This header is required.
+                  summary: X_STORE_ID_MISSING
+                XSTOREIDINVALID:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - A valid store id is required.
+                  summary: X_STORE_ID_INVALID
+          description: 'Invalid request: the `X-Store-Id` header is missing or malformed.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                STORENOTFOUND:
+                  value:
+                    error:
+                      code: STORE_NOT_FOUND
+                      message: This store is not available. Check serviceability again.
+                      details:
+                        store_id: 7
+                  summary: 'Unknown or deactivated store: check serviceability again'
+          description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
+            or was deactivated.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/collections/{slug}/:
+    get:
+      operationId: collections_retrieve
+      description: A collection ('See all' on a home rail, or a banner link) with
+        its products at this store. 404 `NOT_FOUND` when unknown, inactive or not
+        shown at this store.
+      summary: Collection page
+      parameters:
+      - in: header
+        name: X-Store-Id
+        schema:
+          type: integer
+        description: 'The store id from `GET /serviceability/` (`store.id`) for the
+          selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR`
+          with `details: {"X-Store-Id": [...]}`. Unknown or deactivated store: 404
+          `STORE_NOT_FOUND`; drop the saved store and check serviceability again.
+          A closed store is still browsable.'
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        description: Collection slug, e.g. "bestsellers".
+        required: true
+      tags:
+      - catalog
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionDetail'
+              examples:
+                Bestsellers:
+                  value:
+                    id: 1
+                    name: Bestsellers
+                    slug: bestsellers
+                    products:
+                    - id: 101
+                      slug: jivo-cold-pressed-canola-oil
+                      name: Jivo Cold Pressed Canola Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      default_variant_id: 1001
+                      variants:
+                      - id: 1001
+                        name: 1 L
+                        mrp: '349.00'
+                        selling_price: '279.00'
+                        discount_amount: '70.00'
+                        discount_percent: 20
+                        unit_price:
+                          amount: '27.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                          medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                          large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      - id: 1002
+                        name: 5 L
+                        mrp: '1650.00'
+                        selling_price: '1299.00'
+                        discount_amount: '351.00'
+                        discount_percent: 21
+                        unit_price:
+                          amount: '25.98'
+                          per: 100 ml
+                        stock_status: LOW_STOCK
+                        orderable_quantity: 2
+                        units_left: 2
+                        max_qty_per_order: 3
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                          medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                          large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                    - id: 102
+                      slug: jivo-pomace-olive-oil
+                      name: Jivo Pomace Olive Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                        medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                        large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                        alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      default_variant_id: 1003
+                      variants:
+                      - id: 1003
+                        name: 1 L
+                        mrp: '899.00'
+                        selling_price: '699.00'
+                        discount_amount: '200.00'
+                        discount_percent: 22
+                        unit_price:
+                          amount: '69.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                    - id: 201
+                      slug: jivo-wheatgrass-juice
+                      name: Jivo Wheatgrass Juice
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      default_variant_id: 2001
+                      variants:
+                      - id: 2001
+                        name: 500 ml
+                        mrp: '250.00'
+                        selling_price: '225.00'
+                        discount_amount: '25.00'
+                        discount_percent: 10
+                        unit_price:
+                          amount: '45.00'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 4
+                        units_left: null
+                        max_qty_per_order: 4
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                          medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                          large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                          alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                    - id: 202
+                      slug: jivo-aloe-vera-juice
+                      name: Jivo Aloe Vera Juice
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
+                        medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
+                        large: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-1024.webp
+                        alt_text: Jivo Aloe Vera Juice 1 L bottle
+                      default_variant_id: 2002
+                      variants:
+                      - id: 2002
+                        name: 1 L
+                        mrp: '299.00'
+                        selling_price: '299.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '29.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 4
+                        units_left: null
+                        max_qty_per_order: 4
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
+                          medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
+                          large: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-1024.webp
+                          alt_text: Jivo Aloe Vera Juice 1 L bottle
+                    - id: 103
+                      slug: jivo-kachi-ghani-mustard-oil
+                      name: Jivo Kachi Ghani Mustard Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                        medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                        large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                        alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                      default_variant_id: 1004
+                      variants:
+                      - id: 1004
+                        name: 1 L
+                        mrp: '210.00'
+                        selling_price: '189.00'
+                        discount_amount: '21.00'
+                        discount_percent: 10
+                        unit_price:
+                          amount: '18.90'
+                          per: 100 ml
+                        stock_status: OUT_OF_STOCK
+                        orderable_quantity: 0
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                          medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                          large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                          alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+          description: The collection.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                XSTOREIDMISSING:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - This header is required.
+                  summary: X_STORE_ID_MISSING
+                XSTOREIDINVALID:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - A valid store id is required.
+                  summary: X_STORE_ID_INVALID
+          description: 'Invalid request: the `X-Store-Id` header is missing or malformed.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                STORENOTFOUND:
+                  value:
+                    error:
+                      code: STORE_NOT_FOUND
+                      message: This store is not available. Check serviceability again.
+                      details:
+                        store_id: 7
+                  summary: 'Unknown or deactivated store: check serviceability again'
+                COLLECTIONNOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Collection not found.
+                      details: {}
+                  summary: COLLECTION_NOT_FOUND
+          description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
+            or was deactivated. `NOT_FOUND`: the requested object or page does not
+            exist.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/config/app/:
     get:
       operationId: config_app
@@ -1344,6 +1808,1201 @@ paths:
                     feature_flags: {}
                   summary: No app headers
           description: Configuration.
+  /api/v1/home/:
+    get:
+      operationId: home_retrieve
+      description: |-
+        Banners, top-level categories, collection rails and, when signed in, 'buy again' (03 §2.5), all for the store in `X-Store-Id`.
+
+        Optional authentication: send the token when signed in so `buy_again` is filled. An invalid or expired token gets 401 `TOKEN_INVALID` (refresh and retry); it is never silently treated as anonymous.
+
+        `store` is the store's current status: show the store-closed banner when `store.is_open` is false (browsing stays allowed). Pull to refresh reloads this and re-checks serviceability.
+      summary: Home feed for a store
+      parameters:
+      - in: header
+        name: X-Store-Id
+        schema:
+          type: integer
+        description: 'The store id from `GET /serviceability/` (`store.id`) for the
+          selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR`
+          with `details: {"X-Store-Id": [...]}`. Unknown or deactivated store: 404
+          `STORE_NOT_FOUND`; drop the saved store and check serviceability again.
+          A closed store is still browsable.'
+        required: true
+      tags:
+      - catalog
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeFeed'
+              examples:
+                Anonymous:
+                  value:
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: true
+                      opens_at: null
+                    banners:
+                    - id: 1
+                      title: 'Cold pressed canola oil: up to 21% off'
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/b1c9e2/banner-canola-offer-256.webp
+                        medium: https://media.jivo.in/catalog/b1c9e2/banner-canola-offer-512.webp
+                        large: https://media.jivo.in/catalog/b1c9e2/banner-canola-offer-1024.webp
+                        alt_text: Canola oil offer
+                      link_type: collection
+                      link_value: offers
+                    - id: 2
+                      title: Start your day with wheatgrass
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/f05d7a/banner-wheatgrass-256.webp
+                        medium: https://media.jivo.in/catalog/f05d7a/banner-wheatgrass-512.webp
+                        large: https://media.jivo.in/catalog/f05d7a/banner-wheatgrass-1024.webp
+                        alt_text: Jivo Wheatgrass Juice
+                      link_type: product
+                      link_value: jivo-wheatgrass-juice
+                    - id: 3
+                      title: Healthy cooking tips
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/7e44b8/banner-healthy-cooking-256.webp
+                        medium: https://media.jivo.in/catalog/7e44b8/banner-healthy-cooking-512.webp
+                        large: https://media.jivo.in/catalog/7e44b8/banner-healthy-cooking-1024.webp
+                        alt_text: Healthy cooking
+                      link_type: url
+                      link_value: https://jivo.in/healthy-cooking
+                    categories:
+                    - id: 1
+                      name: Edible Oils
+                      slug: edible-oils
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/c7a41e/edible-oils-256.webp
+                        medium: https://media.jivo.in/catalog/c7a41e/edible-oils-512.webp
+                        large: https://media.jivo.in/catalog/c7a41e/edible-oils-1024.webp
+                        alt_text: Edible oils
+                    - id: 2
+                      name: Wellness Beverages
+                      slug: wellness-beverages
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/0b93d2/wellness-beverages-256.webp
+                        medium: https://media.jivo.in/catalog/0b93d2/wellness-beverages-512.webp
+                        large: https://media.jivo.in/catalog/0b93d2/wellness-beverages-1024.webp
+                        alt_text: Wellness beverages
+                    - id: 3
+                      name: Seeds & Superfoods
+                      slug: seeds-superfoods
+                      image: null
+                    collections:
+                    - id: 1
+                      name: Bestsellers
+                      slug: bestsellers
+                      products:
+                      - id: 101
+                        slug: jivo-cold-pressed-canola-oil
+                        name: Jivo Cold Pressed Canola Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                          medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                          large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        default_variant_id: 1001
+                        variants:
+                        - id: 1001
+                          name: 1 L
+                          mrp: '349.00'
+                          selling_price: '279.00'
+                          discount_amount: '70.00'
+                          discount_percent: 20
+                          unit_price:
+                            amount: '27.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                            medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                            large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        - id: 1002
+                          name: 5 L
+                          mrp: '1650.00'
+                          selling_price: '1299.00'
+                          discount_amount: '351.00'
+                          discount_percent: 21
+                          unit_price:
+                            amount: '25.98'
+                            per: 100 ml
+                          stock_status: LOW_STOCK
+                          orderable_quantity: 2
+                          units_left: 2
+                          max_qty_per_order: 3
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                            medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                            large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      - id: 102
+                        slug: jivo-pomace-olive-oil
+                        name: Jivo Pomace Olive Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                        default_variant_id: 1003
+                        variants:
+                        - id: 1003
+                          name: 1 L
+                          mrp: '899.00'
+                          selling_price: '699.00'
+                          discount_amount: '200.00'
+                          discount_percent: 22
+                          unit_price:
+                            amount: '69.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                            medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                            large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                            alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      - id: 201
+                        slug: jivo-wheatgrass-juice
+                        name: Jivo Wheatgrass Juice
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                          medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                          large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                          alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                        default_variant_id: 2001
+                        variants:
+                        - id: 2001
+                          name: 500 ml
+                          mrp: '250.00'
+                          selling_price: '225.00'
+                          discount_amount: '25.00'
+                          discount_percent: 10
+                          unit_price:
+                            amount: '45.00'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 4
+                          units_left: null
+                          max_qty_per_order: 4
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                            medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                            large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                            alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      has_more: true
+                    - id: 2
+                      name: Offers
+                      slug: offers
+                      products:
+                      - id: 101
+                        slug: jivo-cold-pressed-canola-oil
+                        name: Jivo Cold Pressed Canola Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                          medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                          large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                        default_variant_id: 1002
+                        variants:
+                        - id: 1001
+                          name: 1 L
+                          mrp: '349.00'
+                          selling_price: '279.00'
+                          discount_amount: '70.00'
+                          discount_percent: 20
+                          unit_price:
+                            amount: '27.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                            medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                            large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        - id: 1002
+                          name: 5 L
+                          mrp: '1650.00'
+                          selling_price: '1299.00'
+                          discount_amount: '351.00'
+                          discount_percent: 21
+                          unit_price:
+                            amount: '25.98'
+                            per: 100 ml
+                          stock_status: LOW_STOCK
+                          orderable_quantity: 2
+                          units_left: 2
+                          max_qty_per_order: 3
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                            medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                            large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      - id: 102
+                        slug: jivo-pomace-olive-oil
+                        name: Jivo Pomace Olive Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                        default_variant_id: 1003
+                        variants:
+                        - id: 1003
+                          name: 1 L
+                          mrp: '899.00'
+                          selling_price: '699.00'
+                          discount_amount: '200.00'
+                          discount_percent: 22
+                          unit_price:
+                            amount: '69.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                            medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                            large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                            alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      - id: 103
+                        slug: jivo-kachi-ghani-mustard-oil
+                        name: Jivo Kachi Ghani Mustard Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                          medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                          large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                          alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                        default_variant_id: 1004
+                        variants:
+                        - id: 1004
+                          name: 1 L
+                          mrp: '210.00'
+                          selling_price: '189.00'
+                          discount_amount: '21.00'
+                          discount_percent: 10
+                          unit_price:
+                            amount: '18.90'
+                            per: 100 ml
+                          stock_status: OUT_OF_STOCK
+                          orderable_quantity: 0
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                            medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                            large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                            alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                      has_more: false
+                    buy_again: []
+                SignedIn,WithBuyAgain:
+                  value:
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: true
+                      opens_at: null
+                    banners:
+                    - id: 1
+                      title: 'Cold pressed canola oil: up to 21% off'
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/b1c9e2/banner-canola-offer-256.webp
+                        medium: https://media.jivo.in/catalog/b1c9e2/banner-canola-offer-512.webp
+                        large: https://media.jivo.in/catalog/b1c9e2/banner-canola-offer-1024.webp
+                        alt_text: Canola oil offer
+                      link_type: collection
+                      link_value: offers
+                    - id: 2
+                      title: Start your day with wheatgrass
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/f05d7a/banner-wheatgrass-256.webp
+                        medium: https://media.jivo.in/catalog/f05d7a/banner-wheatgrass-512.webp
+                        large: https://media.jivo.in/catalog/f05d7a/banner-wheatgrass-1024.webp
+                        alt_text: Jivo Wheatgrass Juice
+                      link_type: product
+                      link_value: jivo-wheatgrass-juice
+                    - id: 3
+                      title: Healthy cooking tips
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/7e44b8/banner-healthy-cooking-256.webp
+                        medium: https://media.jivo.in/catalog/7e44b8/banner-healthy-cooking-512.webp
+                        large: https://media.jivo.in/catalog/7e44b8/banner-healthy-cooking-1024.webp
+                        alt_text: Healthy cooking
+                      link_type: url
+                      link_value: https://jivo.in/healthy-cooking
+                    categories:
+                    - id: 1
+                      name: Edible Oils
+                      slug: edible-oils
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/c7a41e/edible-oils-256.webp
+                        medium: https://media.jivo.in/catalog/c7a41e/edible-oils-512.webp
+                        large: https://media.jivo.in/catalog/c7a41e/edible-oils-1024.webp
+                        alt_text: Edible oils
+                    - id: 2
+                      name: Wellness Beverages
+                      slug: wellness-beverages
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/0b93d2/wellness-beverages-256.webp
+                        medium: https://media.jivo.in/catalog/0b93d2/wellness-beverages-512.webp
+                        large: https://media.jivo.in/catalog/0b93d2/wellness-beverages-1024.webp
+                        alt_text: Wellness beverages
+                    - id: 3
+                      name: Seeds & Superfoods
+                      slug: seeds-superfoods
+                      image: null
+                    collections:
+                    - id: 1
+                      name: Bestsellers
+                      slug: bestsellers
+                      products:
+                      - id: 101
+                        slug: jivo-cold-pressed-canola-oil
+                        name: Jivo Cold Pressed Canola Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                          medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                          large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        default_variant_id: 1001
+                        variants:
+                        - id: 1001
+                          name: 1 L
+                          mrp: '349.00'
+                          selling_price: '279.00'
+                          discount_amount: '70.00'
+                          discount_percent: 20
+                          unit_price:
+                            amount: '27.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                            medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                            large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        - id: 1002
+                          name: 5 L
+                          mrp: '1650.00'
+                          selling_price: '1299.00'
+                          discount_amount: '351.00'
+                          discount_percent: 21
+                          unit_price:
+                            amount: '25.98'
+                            per: 100 ml
+                          stock_status: LOW_STOCK
+                          orderable_quantity: 2
+                          units_left: 2
+                          max_qty_per_order: 3
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                            medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                            large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      - id: 102
+                        slug: jivo-pomace-olive-oil
+                        name: Jivo Pomace Olive Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                        default_variant_id: 1003
+                        variants:
+                        - id: 1003
+                          name: 1 L
+                          mrp: '899.00'
+                          selling_price: '699.00'
+                          discount_amount: '200.00'
+                          discount_percent: 22
+                          unit_price:
+                            amount: '69.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                            medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                            large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                            alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      - id: 201
+                        slug: jivo-wheatgrass-juice
+                        name: Jivo Wheatgrass Juice
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                          medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                          large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                          alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                        default_variant_id: 2001
+                        variants:
+                        - id: 2001
+                          name: 500 ml
+                          mrp: '250.00'
+                          selling_price: '225.00'
+                          discount_amount: '25.00'
+                          discount_percent: 10
+                          unit_price:
+                            amount: '45.00'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 4
+                          units_left: null
+                          max_qty_per_order: 4
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                            medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                            large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                            alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      has_more: true
+                    - id: 2
+                      name: Offers
+                      slug: offers
+                      products:
+                      - id: 101
+                        slug: jivo-cold-pressed-canola-oil
+                        name: Jivo Cold Pressed Canola Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                          medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                          large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                        default_variant_id: 1002
+                        variants:
+                        - id: 1001
+                          name: 1 L
+                          mrp: '349.00'
+                          selling_price: '279.00'
+                          discount_amount: '70.00'
+                          discount_percent: 20
+                          unit_price:
+                            amount: '27.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                            medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                            large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        - id: 1002
+                          name: 5 L
+                          mrp: '1650.00'
+                          selling_price: '1299.00'
+                          discount_amount: '351.00'
+                          discount_percent: 21
+                          unit_price:
+                            amount: '25.98'
+                            per: 100 ml
+                          stock_status: LOW_STOCK
+                          orderable_quantity: 2
+                          units_left: 2
+                          max_qty_per_order: 3
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                            medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                            large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      - id: 102
+                        slug: jivo-pomace-olive-oil
+                        name: Jivo Pomace Olive Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                        default_variant_id: 1003
+                        variants:
+                        - id: 1003
+                          name: 1 L
+                          mrp: '899.00'
+                          selling_price: '699.00'
+                          discount_amount: '200.00'
+                          discount_percent: 22
+                          unit_price:
+                            amount: '69.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                            medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                            large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                            alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      - id: 103
+                        slug: jivo-kachi-ghani-mustard-oil
+                        name: Jivo Kachi Ghani Mustard Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                          medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                          large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                          alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                        default_variant_id: 1004
+                        variants:
+                        - id: 1004
+                          name: 1 L
+                          mrp: '210.00'
+                          selling_price: '189.00'
+                          discount_amount: '21.00'
+                          discount_percent: 10
+                          unit_price:
+                            amount: '18.90'
+                            per: 100 ml
+                          stock_status: OUT_OF_STOCK
+                          orderable_quantity: 0
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                            medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                            large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                            alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                      has_more: false
+                    buy_again:
+                    - id: 102
+                      slug: jivo-pomace-olive-oil
+                      name: Jivo Pomace Olive Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                        medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                        large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                        alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      default_variant_id: 1003
+                      variants:
+                      - id: 1003
+                        name: 1 L
+                        mrp: '899.00'
+                        selling_price: '699.00'
+                        discount_amount: '200.00'
+                        discount_percent: 22
+                        unit_price:
+                          amount: '69.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                    - id: 101
+                      slug: jivo-cold-pressed-canola-oil
+                      name: Jivo Cold Pressed Canola Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                        medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                        large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      default_variant_id: 1002
+                      variants:
+                      - id: 1001
+                        name: 1 L
+                        mrp: '349.00'
+                        selling_price: '279.00'
+                        discount_amount: '70.00'
+                        discount_percent: 20
+                        unit_price:
+                          amount: '27.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                          medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                          large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      - id: 1002
+                        name: 5 L
+                        mrp: '1650.00'
+                        selling_price: '1299.00'
+                        discount_amount: '351.00'
+                        discount_percent: 21
+                        unit_price:
+                          amount: '25.98'
+                          per: 100 ml
+                        stock_status: LOW_STOCK
+                        orderable_quantity: 2
+                        units_left: 2
+                        max_qty_per_order: 3
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                          medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                          large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                    - id: 202
+                      slug: jivo-aloe-vera-juice
+                      name: Jivo Aloe Vera Juice
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
+                        medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
+                        large: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-1024.webp
+                        alt_text: Jivo Aloe Vera Juice 1 L bottle
+                      default_variant_id: 2002
+                      variants:
+                      - id: 2002
+                        name: 1 L
+                        mrp: '299.00'
+                        selling_price: '299.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '29.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 4
+                        units_left: null
+                        max_qty_per_order: 4
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
+                          medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
+                          large: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-1024.webp
+                          alt_text: Jivo Aloe Vera Juice 1 L bottle
+                  summary: Signed in, with buy again
+                StoreClosed:
+                  value:
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: false
+                      opens_at: '2026-11-03T01:30:00Z'
+                    banners:
+                    - id: 1
+                      title: 'Cold pressed canola oil: up to 21% off'
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/b1c9e2/banner-canola-offer-256.webp
+                        medium: https://media.jivo.in/catalog/b1c9e2/banner-canola-offer-512.webp
+                        large: https://media.jivo.in/catalog/b1c9e2/banner-canola-offer-1024.webp
+                        alt_text: Canola oil offer
+                      link_type: collection
+                      link_value: offers
+                    - id: 2
+                      title: Start your day with wheatgrass
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/f05d7a/banner-wheatgrass-256.webp
+                        medium: https://media.jivo.in/catalog/f05d7a/banner-wheatgrass-512.webp
+                        large: https://media.jivo.in/catalog/f05d7a/banner-wheatgrass-1024.webp
+                        alt_text: Jivo Wheatgrass Juice
+                      link_type: product
+                      link_value: jivo-wheatgrass-juice
+                    - id: 3
+                      title: Healthy cooking tips
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/7e44b8/banner-healthy-cooking-256.webp
+                        medium: https://media.jivo.in/catalog/7e44b8/banner-healthy-cooking-512.webp
+                        large: https://media.jivo.in/catalog/7e44b8/banner-healthy-cooking-1024.webp
+                        alt_text: Healthy cooking
+                      link_type: url
+                      link_value: https://jivo.in/healthy-cooking
+                    categories:
+                    - id: 1
+                      name: Edible Oils
+                      slug: edible-oils
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/c7a41e/edible-oils-256.webp
+                        medium: https://media.jivo.in/catalog/c7a41e/edible-oils-512.webp
+                        large: https://media.jivo.in/catalog/c7a41e/edible-oils-1024.webp
+                        alt_text: Edible oils
+                    - id: 2
+                      name: Wellness Beverages
+                      slug: wellness-beverages
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/0b93d2/wellness-beverages-256.webp
+                        medium: https://media.jivo.in/catalog/0b93d2/wellness-beverages-512.webp
+                        large: https://media.jivo.in/catalog/0b93d2/wellness-beverages-1024.webp
+                        alt_text: Wellness beverages
+                    - id: 3
+                      name: Seeds & Superfoods
+                      slug: seeds-superfoods
+                      image: null
+                    collections:
+                    - id: 1
+                      name: Bestsellers
+                      slug: bestsellers
+                      products:
+                      - id: 101
+                        slug: jivo-cold-pressed-canola-oil
+                        name: Jivo Cold Pressed Canola Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                          medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                          large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        default_variant_id: 1001
+                        variants:
+                        - id: 1001
+                          name: 1 L
+                          mrp: '349.00'
+                          selling_price: '279.00'
+                          discount_amount: '70.00'
+                          discount_percent: 20
+                          unit_price:
+                            amount: '27.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                            medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                            large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        - id: 1002
+                          name: 5 L
+                          mrp: '1650.00'
+                          selling_price: '1299.00'
+                          discount_amount: '351.00'
+                          discount_percent: 21
+                          unit_price:
+                            amount: '25.98'
+                            per: 100 ml
+                          stock_status: LOW_STOCK
+                          orderable_quantity: 2
+                          units_left: 2
+                          max_qty_per_order: 3
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                            medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                            large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      - id: 102
+                        slug: jivo-pomace-olive-oil
+                        name: Jivo Pomace Olive Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                        default_variant_id: 1003
+                        variants:
+                        - id: 1003
+                          name: 1 L
+                          mrp: '899.00'
+                          selling_price: '699.00'
+                          discount_amount: '200.00'
+                          discount_percent: 22
+                          unit_price:
+                            amount: '69.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                            medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                            large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                            alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      - id: 201
+                        slug: jivo-wheatgrass-juice
+                        name: Jivo Wheatgrass Juice
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                          medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                          large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                          alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                        default_variant_id: 2001
+                        variants:
+                        - id: 2001
+                          name: 500 ml
+                          mrp: '250.00'
+                          selling_price: '225.00'
+                          discount_amount: '25.00'
+                          discount_percent: 10
+                          unit_price:
+                            amount: '45.00'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 4
+                          units_left: null
+                          max_qty_per_order: 4
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                            medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                            large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                            alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      has_more: true
+                    - id: 2
+                      name: Offers
+                      slug: offers
+                      products:
+                      - id: 101
+                        slug: jivo-cold-pressed-canola-oil
+                        name: Jivo Cold Pressed Canola Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                          medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                          large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                        default_variant_id: 1002
+                        variants:
+                        - id: 1001
+                          name: 1 L
+                          mrp: '349.00'
+                          selling_price: '279.00'
+                          discount_amount: '70.00'
+                          discount_percent: 20
+                          unit_price:
+                            amount: '27.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                            medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                            large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        - id: 1002
+                          name: 5 L
+                          mrp: '1650.00'
+                          selling_price: '1299.00'
+                          discount_amount: '351.00'
+                          discount_percent: 21
+                          unit_price:
+                            amount: '25.98'
+                            per: 100 ml
+                          stock_status: LOW_STOCK
+                          orderable_quantity: 2
+                          units_left: 2
+                          max_qty_per_order: 3
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                            medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                            large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      - id: 102
+                        slug: jivo-pomace-olive-oil
+                        name: Jivo Pomace Olive Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                        default_variant_id: 1003
+                        variants:
+                        - id: 1003
+                          name: 1 L
+                          mrp: '899.00'
+                          selling_price: '699.00'
+                          discount_amount: '200.00'
+                          discount_percent: 22
+                          unit_price:
+                            amount: '69.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                            medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                            large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                            alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      - id: 103
+                        slug: jivo-kachi-ghani-mustard-oil
+                        name: Jivo Kachi Ghani Mustard Oil
+                        brand: Jivo
+                        is_veg: true
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                          medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                          large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                          alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                        default_variant_id: 1004
+                        variants:
+                        - id: 1004
+                          name: 1 L
+                          mrp: '210.00'
+                          selling_price: '189.00'
+                          discount_amount: '21.00'
+                          discount_percent: 10
+                          unit_price:
+                            amount: '18.90'
+                            per: 100 ml
+                          stock_status: OUT_OF_STOCK
+                          orderable_quantity: 0
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                            medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                            large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                            alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                      has_more: false
+                    buy_again:
+                    - id: 102
+                      slug: jivo-pomace-olive-oil
+                      name: Jivo Pomace Olive Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                        medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                        large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                        alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      default_variant_id: 1003
+                      variants:
+                      - id: 1003
+                        name: 1 L
+                        mrp: '899.00'
+                        selling_price: '699.00'
+                        discount_amount: '200.00'
+                        discount_percent: 22
+                        unit_price:
+                          amount: '69.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                    - id: 101
+                      slug: jivo-cold-pressed-canola-oil
+                      name: Jivo Cold Pressed Canola Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                        medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                        large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      default_variant_id: 1002
+                      variants:
+                      - id: 1001
+                        name: 1 L
+                        mrp: '349.00'
+                        selling_price: '279.00'
+                        discount_amount: '70.00'
+                        discount_percent: 20
+                        unit_price:
+                          amount: '27.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                          medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                          large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      - id: 1002
+                        name: 5 L
+                        mrp: '1650.00'
+                        selling_price: '1299.00'
+                        discount_amount: '351.00'
+                        discount_percent: 21
+                        unit_price:
+                          amount: '25.98'
+                          per: 100 ml
+                        stock_status: LOW_STOCK
+                        orderable_quantity: 2
+                        units_left: 2
+                        max_qty_per_order: 3
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                          medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                          large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                    - id: 202
+                      slug: jivo-aloe-vera-juice
+                      name: Jivo Aloe Vera Juice
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
+                        medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
+                        large: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-1024.webp
+                        alt_text: Jivo Aloe Vera Juice 1 L bottle
+                      default_variant_id: 2002
+                      variants:
+                      - id: 2002
+                        name: 1 L
+                        mrp: '299.00'
+                        selling_price: '299.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '29.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 4
+                        units_left: null
+                        max_qty_per_order: 4
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
+                          medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
+                          large: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-1024.webp
+                          alt_text: Jivo Aloe Vera Juice 1 L bottle
+                  summary: Store closed
+          description: The home feed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: Only when an `Authorization` header is sent and the token is
+            invalid, expired or revoked. Anonymous calls (no header) never get 401.
+            Refresh once and retry, or retry without the header after logout.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                XSTOREIDMISSING:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - This header is required.
+                  summary: X_STORE_ID_MISSING
+                XSTOREIDINVALID:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - A valid store id is required.
+                  summary: X_STORE_ID_INVALID
+          description: 'Invalid request: the `X-Store-Id` header is missing or malformed.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                STORENOTFOUND:
+                  value:
+                    error:
+                      code: STORE_NOT_FOUND
+                      message: This store is not available. Check serviceability again.
+                      details:
+                        store_id: 7
+                  summary: 'Unknown or deactivated store: check serviceability again'
+          description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
+            or was deactivated.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/me/:
     get:
       operationId: me_retrieve
@@ -1857,6 +3516,1611 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/products/:
+    get:
+      operationId: products_list
+      description: Product tiles with their variants, prices and stock at this store,
+        paginated (infinite scroll). Filter by `category` (a top-level category includes
+        its sub-categories) and/or `collection`; with neither, all products of the
+        store. Products the store does not sell are never listed; out-of-stock ones
+        are listed after in-stock ones, greyed out.
+      summary: Product list (category, collection or all)
+      parameters:
+      - in: header
+        name: X-Store-Id
+        schema:
+          type: integer
+        description: 'The store id from `GET /serviceability/` (`store.id`) for the
+          selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR`
+          with `details: {"X-Store-Id": [...]}`. Unknown or deactivated store: 404
+          `STORE_NOT_FOUND`; drop the saved store and check serviceability again.
+          A closed store is still browsable.'
+        required: true
+      - in: query
+        name: category
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description: 'Category id or slug. A top-level category includes its sub-categories.
+          Unknown or inactive: 404 `NOT_FOUND`.'
+      - in: query
+        name: collection
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description: 'Collection id or slug. Unknown or inactive: 404 `NOT_FOUND`.'
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (1-based). Default 1.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: 'Items per page: default 20, max 100.'
+      - in: query
+        name: sort
+        schema:
+          enum:
+          - relevance
+          - price_asc
+          - price_desc
+          - discount
+          type: string
+          default: relevance
+          minLength: 1
+        description: |-
+          relevance (default): admin order (collection order with `collection`). Prices use each product's default variant. In-stock products always come first.
+
+          * `relevance` - Relevance (default)
+          * `price_asc` - Price: low to high
+          * `price_desc` - Price: high to low
+          * `discount` - Discount: highest first
+      tags:
+      - catalog
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductCardList'
+              examples:
+                CategoryEdible-oils:
+                  value:
+                    count: 3
+                    next: null
+                    previous: null
+                    results:
+                    - id: 101
+                      slug: jivo-cold-pressed-canola-oil
+                      name: Jivo Cold Pressed Canola Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      default_variant_id: 1001
+                      variants:
+                      - id: 1001
+                        name: 1 L
+                        mrp: '349.00'
+                        selling_price: '279.00'
+                        discount_amount: '70.00'
+                        discount_percent: 20
+                        unit_price:
+                          amount: '27.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                          medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                          large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      - id: 1002
+                        name: 5 L
+                        mrp: '1650.00'
+                        selling_price: '1299.00'
+                        discount_amount: '351.00'
+                        discount_percent: 21
+                        unit_price:
+                          amount: '25.98'
+                          per: 100 ml
+                        stock_status: LOW_STOCK
+                        orderable_quantity: 2
+                        units_left: 2
+                        max_qty_per_order: 3
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                          medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                          large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                    - id: 102
+                      slug: jivo-pomace-olive-oil
+                      name: Jivo Pomace Olive Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                        medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                        large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                        alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      default_variant_id: 1003
+                      variants:
+                      - id: 1003
+                        name: 1 L
+                        mrp: '899.00'
+                        selling_price: '699.00'
+                        discount_amount: '200.00'
+                        discount_percent: 22
+                        unit_price:
+                          amount: '69.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                    - id: 103
+                      slug: jivo-kachi-ghani-mustard-oil
+                      name: Jivo Kachi Ghani Mustard Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                        medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                        large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                        alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                      default_variant_id: 1004
+                      variants:
+                      - id: 1004
+                        name: 1 L
+                        mrp: '210.00'
+                        selling_price: '189.00'
+                        discount_amount: '21.00'
+                        discount_percent: 10
+                        unit_price:
+                          amount: '18.90'
+                          per: 100 ml
+                        stock_status: OUT_OF_STOCK
+                        orderable_quantity: 0
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                          medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                          large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                          alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                  summary: Category edible-oils
+                SortedByPrice,FirstOfSeveralPages:
+                  value:
+                    count: 23
+                    next: https://api.jivo.in/api/v1/products/?category=wellness-beverages&page=2&page_size=2&sort=price_asc
+                    previous: null
+                    results:
+                    - id: 201
+                      slug: jivo-wheatgrass-juice
+                      name: Jivo Wheatgrass Juice
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      default_variant_id: 2001
+                      variants:
+                      - id: 2001
+                        name: 500 ml
+                        mrp: '250.00'
+                        selling_price: '225.00'
+                        discount_amount: '25.00'
+                        discount_percent: 10
+                        unit_price:
+                          amount: '45.00'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 4
+                        units_left: null
+                        max_qty_per_order: 4
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                          medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                          large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                          alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                    - id: 202
+                      slug: jivo-aloe-vera-juice
+                      name: Jivo Aloe Vera Juice
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
+                        medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
+                        large: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-1024.webp
+                        alt_text: Jivo Aloe Vera Juice 1 L bottle
+                      default_variant_id: 2002
+                      variants:
+                      - id: 2002
+                        name: 1 L
+                        mrp: '299.00'
+                        selling_price: '299.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '29.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 4
+                        units_left: null
+                        max_qty_per_order: 4
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
+                          medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
+                          large: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-1024.webp
+                          alt_text: Jivo Aloe Vera Juice 1 L bottle
+                  summary: Sorted by price, first of several pages
+                NoProducts:
+                  value:
+                    count: 0
+                    next: null
+                    previous: null
+                    results: []
+                  summary: No products
+          description: One page of products.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                XSTOREIDMISSING:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - This header is required.
+                  summary: X_STORE_ID_MISSING
+                XSTOREIDINVALID:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - A valid store id is required.
+                  summary: X_STORE_ID_INVALID
+                InvalidSort:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        sort:
+                        - '"cheapest" is not a valid choice.'
+                  summary: Invalid sort
+          description: 'Invalid request: the `X-Store-Id` header is missing or malformed,
+            or a query parameter is invalid.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                STORENOTFOUND:
+                  value:
+                    error:
+                      code: STORE_NOT_FOUND
+                      message: This store is not available. Check serviceability again.
+                      details:
+                        store_id: 7
+                  summary: 'Unknown or deactivated store: check serviceability again'
+                CATEGORYNOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Category not found.
+                      details: {}
+                  summary: CATEGORY_NOT_FOUND
+                COLLECTIONNOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Collection not found.
+                      details: {}
+                  summary: COLLECTION_NOT_FOUND
+                PAGENOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Invalid page.
+                      details: {}
+                  summary: Page out of range
+          description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
+            or was deactivated. `NOT_FOUND`: the requested object or page does not
+            exist.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/products/{id_or_slug}/:
+    get:
+      operationId: products_retrieve
+      description: All variants this store sells (with price and stock), the gallery
+        per variant, highlights, the label information required by FSSAI and Legal
+        Metrology (09 §4) and similar products. 404 `NOT_FOUND` when the product is
+        unknown, inactive, or not sold at this store.
+      summary: Product detail
+      parameters:
+      - in: header
+        name: X-Store-Id
+        schema:
+          type: integer
+        description: 'The store id from `GET /serviceability/` (`store.id`) for the
+          selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR`
+          with `details: {"X-Store-Id": [...]}`. Unknown or deactivated store: 404
+          `STORE_NOT_FOUND`; drop the saved store and check serviceability again.
+          A closed store is still browsable.'
+        required: true
+      - in: path
+        name: id_or_slug
+        schema:
+          type: string
+        description: Product id (e.g. "101") or slug (e.g. "jivo-cold-pressed-canola-oil").
+        required: true
+      tags:
+      - catalog
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetail'
+              examples:
+                CanolaOil,TwoVariants:
+                  value:
+                    id: 101
+                    slug: jivo-cold-pressed-canola-oil
+                    name: Jivo Cold Pressed Canola Oil
+                    brand: Jivo
+                    is_veg: true
+                    category:
+                      id: 11
+                      name: Canola Oil
+                      slug: canola-oil
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/5d2e8a/canola-oil-256.webp
+                        medium: https://media.jivo.in/catalog/5d2e8a/canola-oil-512.webp
+                        large: https://media.jivo.in/catalog/5d2e8a/canola-oil-1024.webp
+                        alt_text: Canola oil
+                    short_description: Cold pressed canola oil, rich in omega-3 and
+                      low in saturated fat.
+                    description: |-
+                      Jivo Cold Pressed Canola Oil is extracted without heat to keep its natural nutrients.
+
+                      Its light taste and high smoke point suit everyday Indian cooking: sauteing, shallow frying and baking.
+                    highlights:
+                    - Lowest saturated fat among common cooking oils
+                    - Rich in omega-3 (ALA) and vitamin E
+                    - Cholesterol free
+                    default_variant_id: 1001
+                    variants:
+                    - id: 1001
+                      name: 1 L
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      discount_amount: '70.00'
+                      discount_percent: 20
+                      unit_price:
+                        amount: '27.90'
+                        per: 100 ml
+                      stock_status: IN_STOCK
+                      orderable_quantity: 5
+                      units_left: null
+                      max_qty_per_order: 5
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      sku: JV-CAN-CP-1L
+                      net_quantity: 1 L
+                      images:
+                      - thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      - thumbnail: https://media.jivo.in/catalog/3a6f9c/canola-1l-back-256.webp
+                        medium: https://media.jivo.in/catalog/3a6f9c/canola-1l-back-512.webp
+                        large: https://media.jivo.in/catalog/3a6f9c/canola-1l-back-1024.webp
+                        alt_text: 'Back label: nutrition table'
+                      - thumbnail: https://media.jivo.in/catalog/c18e47/canola-cooking-256.webp
+                        medium: https://media.jivo.in/catalog/c18e47/canola-cooking-512.webp
+                        large: https://media.jivo.in/catalog/c18e47/canola-cooking-1024.webp
+                        alt_text: Cooking with canola oil
+                    - id: 1002
+                      name: 5 L
+                      mrp: '1650.00'
+                      selling_price: '1299.00'
+                      discount_amount: '351.00'
+                      discount_percent: 21
+                      unit_price:
+                        amount: '25.98'
+                        per: 100 ml
+                      stock_status: LOW_STOCK
+                      orderable_quantity: 2
+                      units_left: 2
+                      max_qty_per_order: 3
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                        medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                        large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      sku: JV-CAN-CP-5L
+                      net_quantity: 5 L
+                      images:
+                      - thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                        medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                        large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                      - thumbnail: https://media.jivo.in/catalog/c18e47/canola-cooking-256.webp
+                        medium: https://media.jivo.in/catalog/c18e47/canola-cooking-512.webp
+                        large: https://media.jivo.in/catalog/c18e47/canola-cooking-1024.webp
+                        alt_text: Cooking with canola oil
+                    ingredients: Cold pressed canola oil (100%).
+                    nutrition:
+                      columns:
+                      - Per 100 ml
+                      - Per serving (15 ml)
+                      rows:
+                      - name: Energy (kcal)
+                        values:
+                        - '828'
+                        - '124'
+                        is_sub_row: false
+                      - name: Total fat (g)
+                        values:
+                        - '92'
+                        - '13.8'
+                        is_sub_row: false
+                      - name: Saturated fat (g)
+                        values:
+                        - '6.4'
+                        - '1'
+                        is_sub_row: true
+                      - name: Monounsaturated fat (g)
+                        values:
+                        - '58'
+                        - '8.7'
+                        is_sub_row: true
+                      - name: Polyunsaturated fat (g)
+                        values:
+                        - '27.6'
+                        - '4.1'
+                        is_sub_row: true
+                      - name: Trans fat (g)
+                        values:
+                        - '0'
+                        - '0'
+                        is_sub_row: true
+                      - name: Cholesterol (mg)
+                        values:
+                        - '0'
+                        - '0'
+                        is_sub_row: false
+                    shelf_life: 9 months from the date of manufacture
+                    storage_instructions: Store in a cool, dry place away from direct
+                      sunlight.
+                    country_of_origin: India
+                    manufacturer: Jivo Wellness Pvt. Ltd., Plot 21, HSIIDC Industrial
+                      Estate, Kundli, Sonipat, Haryana
+                    marketer: ''
+                    importer: ''
+                    consumer_care: 'Consumer care: 1800-123-4567 (toll free), care@jivo.in.
+                      Jivo Wellness Pvt. Ltd.'
+                    fssai_license_no: '10020064000123'
+                    similar_products:
+                    - id: 102
+                      slug: jivo-pomace-olive-oil
+                      name: Jivo Pomace Olive Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                        medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                        large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                        alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      default_variant_id: 1003
+                      variants:
+                      - id: 1003
+                        name: 1 L
+                        mrp: '899.00'
+                        selling_price: '699.00'
+                        discount_amount: '200.00'
+                        discount_percent: 22
+                        unit_price:
+                          amount: '69.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                    - id: 103
+                      slug: jivo-kachi-ghani-mustard-oil
+                      name: Jivo Kachi Ghani Mustard Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                        medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                        large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                        alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                      default_variant_id: 1004
+                      variants:
+                      - id: 1004
+                        name: 1 L
+                        mrp: '210.00'
+                        selling_price: '189.00'
+                        discount_amount: '21.00'
+                        discount_percent: 10
+                        unit_price:
+                          amount: '18.90'
+                          per: 100 ml
+                        stock_status: OUT_OF_STOCK
+                        orderable_quantity: 0
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                          medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                          large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                          alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                  summary: Canola oil, two variants
+                ImportedOliveOil:
+                  value:
+                    id: 102
+                    slug: jivo-pomace-olive-oil
+                    name: Jivo Pomace Olive Oil
+                    brand: Jivo
+                    is_veg: true
+                    category:
+                      id: 12
+                      name: Olive Oil
+                      slug: olive-oil
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/9a1f07/olive-oil-256.webp
+                        medium: https://media.jivo.in/catalog/9a1f07/olive-oil-512.webp
+                        large: https://media.jivo.in/catalog/9a1f07/olive-oil-1024.webp
+                        alt_text: Olive oil
+                    short_description: Olive oil for high-heat Indian cooking.
+                    description: Pomace olive oil from Spain, suited to deep frying
+                      and tadka.
+                    highlights:
+                    - Imported from Spain
+                    - High smoke point
+                    - Neutral taste
+                    default_variant_id: 1003
+                    variants:
+                    - id: 1003
+                      name: 1 L
+                      mrp: '899.00'
+                      selling_price: '699.00'
+                      discount_amount: '200.00'
+                      discount_percent: 22
+                      unit_price:
+                        amount: '69.90'
+                        per: 100 ml
+                      stock_status: IN_STOCK
+                      orderable_quantity: 5
+                      units_left: null
+                      max_qty_per_order: 5
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                        medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                        large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                        alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      sku: JV-OLV-POM-1L
+                      net_quantity: 1 L
+                      images:
+                      - thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                        medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                        large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                        alt_text: Jivo Pomace Olive Oil 1 L bottle
+                    ingredients: Refined olive-pomace oil and virgin olive oil.
+                    nutrition:
+                      columns:
+                      - Per 100 ml
+                      rows:
+                      - name: Energy (kcal)
+                        values:
+                        - '828'
+                        is_sub_row: false
+                      - name: Total fat (g)
+                        values:
+                        - '92'
+                        is_sub_row: false
+                      - name: Saturated fat (g)
+                        values:
+                        - '14'
+                        is_sub_row: true
+                    shelf_life: 18 months from the date of packing
+                    storage_instructions: Store in a cool, dark place. Close the cap
+                      after use.
+                    country_of_origin: Spain
+                    manufacturer: Almazara Ejemplo S.L. (example packer), Poligono
+                      Industrial, Jaen, Spain
+                    marketer: Jivo Wellness Pvt. Ltd., Plot 21, HSIIDC Industrial
+                      Estate, Kundli, Sonipat, Haryana
+                    importer: Jivo Wellness Pvt. Ltd., Plot 21, HSIIDC Industrial
+                      Estate, Kundli, Sonipat, Haryana
+                    consumer_care: 'Consumer care: 1800-123-4567 (toll free), care@jivo.in.
+                      Jivo Wellness Pvt. Ltd.'
+                    fssai_license_no: '10020064000123'
+                    similar_products:
+                    - id: 101
+                      slug: jivo-cold-pressed-canola-oil
+                      name: Jivo Cold Pressed Canola Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      default_variant_id: 1001
+                      variants:
+                      - id: 1001
+                        name: 1 L
+                        mrp: '349.00'
+                        selling_price: '279.00'
+                        discount_amount: '70.00'
+                        discount_percent: 20
+                        unit_price:
+                          amount: '27.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                          medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                          large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      - id: 1002
+                        name: 5 L
+                        mrp: '1650.00'
+                        selling_price: '1299.00'
+                        discount_amount: '351.00'
+                        discount_percent: 21
+                        unit_price:
+                          amount: '25.98'
+                          per: 100 ml
+                        stock_status: LOW_STOCK
+                        orderable_quantity: 2
+                        units_left: 2
+                        max_qty_per_order: 3
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                          medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                          large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                    - id: 103
+                      slug: jivo-kachi-ghani-mustard-oil
+                      name: Jivo Kachi Ghani Mustard Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                        medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                        large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                        alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                      default_variant_id: 1004
+                      variants:
+                      - id: 1004
+                        name: 1 L
+                        mrp: '210.00'
+                        selling_price: '189.00'
+                        discount_amount: '21.00'
+                        discount_percent: 10
+                        unit_price:
+                          amount: '18.90'
+                          per: 100 ml
+                        stock_status: OUT_OF_STOCK
+                        orderable_quantity: 0
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                          medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                          large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                          alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                  summary: Imported olive oil
+          description: The product.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                XSTOREIDMISSING:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - This header is required.
+                  summary: X_STORE_ID_MISSING
+                XSTOREIDINVALID:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - A valid store id is required.
+                  summary: X_STORE_ID_INVALID
+          description: 'Invalid request: the `X-Store-Id` header is missing or malformed.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                STORENOTFOUND:
+                  value:
+                    error:
+                      code: STORE_NOT_FOUND
+                      message: This store is not available. Check serviceability again.
+                      details:
+                        store_id: 7
+                  summary: 'Unknown or deactivated store: check serviceability again'
+                PRODUCTNOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Product not found.
+                      details: {}
+                  summary: Unknown, inactive, or not sold at this store
+          description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
+            or was deactivated. `NOT_FOUND`: the requested object or page does not
+            exist.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/search/:
+    get:
+      operationId: search_products
+      description: 'Same tiles as the product list, best match first. Matches product
+        name, variant, tags and category. No results: 200 with `count: 0`; show the
+        empty state with trending searches from `GET /search/suggest/`.'
+      summary: Search products
+      parameters:
+      - in: header
+        name: X-Store-Id
+        schema:
+          type: integer
+        description: 'The store id from `GET /serviceability/` (`store.id`) for the
+          selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR`
+          with `details: {"X-Store-Id": [...]}`. Unknown or deactivated store: 404
+          `STORE_NOT_FOUND`; drop the saved store and check serviceability again.
+          A closed store is still browsable.'
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (1-based). Default 1.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: 'Items per page: default 20, max 100.'
+      - in: query
+        name: q
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description: Search text (trimmed). Matches product name, variant, tags and
+          category.
+        required: true
+      - in: query
+        name: sort
+        schema:
+          enum:
+          - relevance
+          - price_asc
+          - price_desc
+          - discount
+          type: string
+          default: relevance
+          minLength: 1
+        description: |-
+          relevance (default): best match first. In-stock products always come first.
+
+          * `relevance` - Relevance (default)
+          * `price_asc` - Price: low to high
+          * `price_desc` - Price: high to low
+          * `discount` - Discount: highest first
+      tags:
+      - catalog
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProductCardList'
+              examples:
+                ResultsFor"oil":
+                  value:
+                    count: 3
+                    next: null
+                    previous: null
+                    results:
+                    - id: 101
+                      slug: jivo-cold-pressed-canola-oil
+                      name: Jivo Cold Pressed Canola Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      default_variant_id: 1001
+                      variants:
+                      - id: 1001
+                        name: 1 L
+                        mrp: '349.00'
+                        selling_price: '279.00'
+                        discount_amount: '70.00'
+                        discount_percent: 20
+                        unit_price:
+                          amount: '27.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                          medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                          large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      - id: 1002
+                        name: 5 L
+                        mrp: '1650.00'
+                        selling_price: '1299.00'
+                        discount_amount: '351.00'
+                        discount_percent: 21
+                        unit_price:
+                          amount: '25.98'
+                          per: 100 ml
+                        stock_status: LOW_STOCK
+                        orderable_quantity: 2
+                        units_left: 2
+                        max_qty_per_order: 3
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
+                          medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
+                          large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
+                          alt_text: Jivo Cold Pressed Canola Oil 5 L jar
+                    - id: 102
+                      slug: jivo-pomace-olive-oil
+                      name: Jivo Pomace Olive Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                        medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                        large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                        alt_text: Jivo Pomace Olive Oil 1 L bottle
+                      default_variant_id: 1003
+                      variants:
+                      - id: 1003
+                        name: 1 L
+                        mrp: '899.00'
+                        selling_price: '699.00'
+                        discount_amount: '200.00'
+                        discount_percent: 22
+                        unit_price:
+                          amount: '69.90'
+                          per: 100 ml
+                        stock_status: IN_STOCK
+                        orderable_quantity: 5
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
+                          medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
+                          large: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-1024.webp
+                          alt_text: Jivo Pomace Olive Oil 1 L bottle
+                    - id: 103
+                      slug: jivo-kachi-ghani-mustard-oil
+                      name: Jivo Kachi Ghani Mustard Oil
+                      brand: Jivo
+                      is_veg: true
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                        medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                        large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                        alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                      default_variant_id: 1004
+                      variants:
+                      - id: 1004
+                        name: 1 L
+                        mrp: '210.00'
+                        selling_price: '189.00'
+                        discount_amount: '21.00'
+                        discount_percent: 10
+                        unit_price:
+                          amount: '18.90'
+                          per: 100 ml
+                        stock_status: OUT_OF_STOCK
+                        orderable_quantity: 0
+                        units_left: null
+                        max_qty_per_order: 5
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
+                          medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
+                          large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
+                          alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
+                  summary: Results for "oil"
+                NoResults:
+                  value:
+                    count: 0
+                    next: null
+                    previous: null
+                    results: []
+                  summary: No results
+          description: One page of results.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                XSTOREIDMISSING:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - This header is required.
+                  summary: X_STORE_ID_MISSING
+                XSTOREIDINVALID:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - A valid store id is required.
+                  summary: X_STORE_ID_INVALID
+                MissingQ:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        q:
+                        - This field is required.
+                  summary: Missing q
+                BlankQ:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        q:
+                        - This field may not be blank.
+                  summary: Blank q
+                InvalidSort:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        sort:
+                        - '"cheapest" is not a valid choice.'
+                  summary: Invalid sort
+          description: 'Invalid request: the `X-Store-Id` header is missing or malformed,
+            or a query parameter is invalid.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                STORENOTFOUND:
+                  value:
+                    error:
+                      code: STORE_NOT_FOUND
+                      message: This store is not available. Check serviceability again.
+                      details:
+                        store_id: 7
+                  summary: 'Unknown or deactivated store: check serviceability again'
+                PAGENOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Invalid page.
+                      details: {}
+                  summary: Page out of range
+          description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
+            or was deactivated. `NOT_FOUND`: the requested object or page does not
+            exist.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/search/suggest/:
+    get:
+      operationId: search_suggest
+      description: 'Call while typing (debounced 300 ms). Up to 10 suggestions: products
+        and categories open directly (`slug`), keywords run a search (`query`). With
+        a blank or missing `q`, returns the trending searches (03 §2.7) as `keyword`
+        items. Recent searches are kept on the device.'
+      summary: Typeahead suggestions, or trending searches
+      parameters:
+      - in: header
+        name: X-Store-Id
+        schema:
+          type: integer
+        description: 'The store id from `GET /serviceability/` (`store.id`) for the
+          selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR`
+          with `details: {"X-Store-Id": [...]}`. Unknown or deactivated store: 404
+          `STORE_NOT_FOUND`; drop the saved store and check serviceability again.
+          A closed store is still browsable.'
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 100
+        description: 'Text typed so far (debounce 300 ms). Blank or missing: trending
+          searches.'
+      tags:
+      - catalog
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchSuggestions'
+              examples:
+                Typing"can":
+                  value:
+                    query: can
+                    suggestions:
+                    - type: product
+                      text: Jivo Cold Pressed Canola Oil
+                      query: canola oil
+                      id: 101
+                      slug: jivo-cold-pressed-canola-oil
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                    - type: category
+                      text: Canola Oil
+                      query: canola oil
+                      id: 11
+                      slug: canola-oil
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/5d2e8a/canola-oil-256.webp
+                        medium: https://media.jivo.in/catalog/5d2e8a/canola-oil-512.webp
+                        large: https://media.jivo.in/catalog/5d2e8a/canola-oil-1024.webp
+                        alt_text: Canola oil
+                    - type: keyword
+                      text: canola oil 5 l
+                      query: canola oil 5 l
+                      id: null
+                      slug: null
+                      image: null
+                  summary: Typing "can"
+                Trending(blankQ):
+                  value:
+                    query: ''
+                    suggestions:
+                    - type: keyword
+                      text: olive oil
+                      query: olive oil
+                      id: null
+                      slug: null
+                      image: null
+                    - type: keyword
+                      text: wheatgrass juice
+                      query: wheatgrass juice
+                      id: null
+                      slug: null
+                      image: null
+                    - type: keyword
+                      text: mustard oil
+                      query: mustard oil
+                      id: null
+                      slug: null
+                      image: null
+                  summary: Trending (blank q)
+                NoMatch:
+                  value:
+                    query: xyz
+                    suggestions: []
+                  summary: No match
+          description: Suggestions.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                XSTOREIDMISSING:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - This header is required.
+                  summary: X_STORE_ID_MISSING
+                XSTOREIDINVALID:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - A valid store id is required.
+                  summary: X_STORE_ID_INVALID
+                QTooLong:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        q:
+                        - Ensure this field has no more than 100 characters.
+                  summary: q too long
+          description: 'Invalid request: the `X-Store-Id` header is missing or malformed,
+            or a query parameter is invalid.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                STORENOTFOUND:
+                  value:
+                    error:
+                      code: STORE_NOT_FOUND
+                      message: This store is not available. Check serviceability again.
+                      details:
+                        store_id: 7
+                  summary: 'Unknown or deactivated store: check serviceability again'
+          description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
+            or was deactivated.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/serviceability/:
+    get:
+      operationId: serviceability_check
+      description: |-
+        Call it after the user picks a location (GPS or map pin), on app start for the selected address, and on pull-to-refresh. Save `store.id` and send it as `X-Store-Id` on catalog calls.
+
+        A valid point **always answers 200**: not serviceable is `serviceable: false` with `store: null`, and a closed store is `serviceable: true` with `store.is_open: false` (browsing allowed, checkout disabled). This endpoint never returns `NOT_SERVICEABLE` or `STORE_CLOSED`; those are 422 errors of the actions that need an open store (cart address and order placement, Phase 3).
+
+        When service areas overlap, the nearest open store is chosen (07 §2.2). `eta_minutes` follows 08 §8.
+      summary: Is this location serviceable, and by which store?
+      parameters:
+      - in: query
+        name: lat
+        schema:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+        description: Latitude (WGS84, decimal degrees).
+        required: true
+      - in: query
+        name: lng
+        schema:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+        description: Longitude (WGS84, decimal degrees).
+        required: true
+      tags:
+      - serviceability
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Serviceability'
+              examples:
+                Serviceable,StoreOpen:
+                  value:
+                    serviceable: true
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: true
+                      opens_at: null
+                    eta_minutes: 14
+                    message: null
+                  summary: Serviceable, store open
+                Serviceable,StoreClosedForTheNight:
+                  value:
+                    serviceable: true
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: false
+                      opens_at: '2026-11-03T01:30:00Z'
+                    eta_minutes: null
+                    message: The store is closed now. It opens at 7:00 AM.
+                  summary: Serviceable, store closed for the night
+                Serviceable,StorePaused:
+                  value:
+                    serviceable: true
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: false
+                      opens_at: null
+                    eta_minutes: null
+                    message: The store is not taking orders right now. Please check
+                      back soon.
+                  summary: Serviceable, store paused
+                NotServiceable:
+                  value:
+                    serviceable: false
+                    store: null
+                    eta_minutes: null
+                    message: We're not in your area yet. Tap Notify me and we'll tell
+                      you when we arrive.
+                  summary: Not serviceable
+          description: Serviceability of the point.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MissingCoordinates:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        lat:
+                        - This field is required.
+                        lng:
+                        - This field is required.
+                  summary: Missing coordinates
+                LatitudeOutOfRange:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        lat:
+                        - Ensure this value is less than or equal to 90.
+                  summary: Latitude out of range
+          description: '`lat`/`lng` missing or out of range.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/serviceability/notify-me/:
+    post:
+      operationId: serviceability_notify_me
+      description: |-
+        Saves interest in an unserviced location (the 'Notify me' button on the not serviceable screen). Works signed in or anonymous: send the token when signed in, so the request is linked to the user and `phone` defaults to theirs.
+
+        Always 201 for a valid request; repeating it is harmless (the server may merge duplicates). Rate-limited per user and IP (429 `RATE_LIMITED`).
+      summary: Notify me when you deliver here
+      tags:
+      - serviceability
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotifyMeRequest'
+            examples:
+              SignedIn:
+                value:
+                  lat: 28.6692
+                  lng: 77.4538
+                  address_text: Raj Nagar Extension, Ghaziabad, Uttar Pradesh 201017
+                summary: Signed in
+              AnonymousWithPhone:
+                value:
+                  lat: 28.6692
+                  lng: 77.4538
+                  address_text: Raj Nagar Extension, Ghaziabad, Uttar Pradesh 201017
+                  phone: '+919876543210'
+                summary: Anonymous with phone
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotifyMe'
+              examples:
+                Saved:
+                  value:
+                    id: 301
+                    lat: 28.6692
+                    lng: 77.4538
+                    address_text: Raj Nagar Extension, Ghaziabad, Uttar Pradesh 201017
+                    phone: '+919876543210'
+                    created_at: '2026-11-02T10:15:00Z'
+          description: Interest saved.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        lat:
+                        - This field is required.
+                        phone:
+                        - Enter a 10-digit Indian mobile number in the form +919876543210.
+                  summary: VALIDATION_ERROR
+          description: Invalid fields.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: Only when an `Authorization` header is sent and the token is
+            invalid, expired or revoked. Anonymous calls (no header) never get 401.
+            Refresh once and retry, or retry without the header after logout.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 1800 seconds.
+                      details:
+                        retry_after_seconds: 1800
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            `Retry-After`).
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /health/live:
     get:
       operationId: health_live
@@ -1962,12 +5226,17 @@ components:
           maxLength: 40
         receiver_name:
           type: string
-          description: Defaults to the user's name.
+          description: Defaults to the user's name. Send an empty string to reset
+            it to the user's own (copied when saved).
           maxLength: 120
         receiver_phone:
-          type: string
-          description: Defaults to the user's phone.
-          pattern: ^\+91[6-9]\d{9}$
+          description: Defaults to the user's phone. Send an empty string to reset
+            it to the user's own (copied when saved).
+          oneOf:
+          - type: string
+            pattern: ^\+91[6-9]\d{9}$
+          - type: string
+            maxLength: 0
         house:
           type: string
           description: House / flat / floor.
@@ -2007,6 +5276,13 @@ components:
           type: boolean
           readOnly: true
           description: Change it with `POST /addresses/{id}/set-default/`.
+        is_serviceable:
+          type: boolean
+          readOnly: true
+          description: 'True when the pin is inside an active store''s service area
+            (open or not), checked on every read. An unserviceable address can be
+            saved but not used for an order: show it flagged (03 §2.4). Added in Phase
+            2.'
         created_at:
           type: string
           format: date-time
@@ -2022,6 +5298,7 @@ components:
       - house
       - id
       - is_default
+      - is_serviceable
       - label
       - lat
       - lng
@@ -2049,14 +5326,17 @@ components:
           maxLength: 40
         receiver_name:
           type: string
-          minLength: 1
-          description: Defaults to the user's name.
+          description: Defaults to the user's name. Send an empty string to reset
+            it to the user's own (copied when saved).
           maxLength: 120
         receiver_phone:
-          type: string
-          minLength: 1
-          description: Defaults to the user's phone.
-          pattern: ^\+91[6-9]\d{9}$
+          description: Defaults to the user's phone. Send an empty string to reset
+            it to the user's own (copied when saved).
+          oneOf:
+          - type: string
+            pattern: ^\+91[6-9]\d{9}$
+          - type: string
+            maxLength: 0
         house:
           type: string
           minLength: 1
@@ -2205,6 +5485,127 @@ components:
       - refresh
       - rider_status
       - user
+    BannerLinkTypeEnum:
+      enum:
+      - category
+      - collection
+      - product
+      - url
+      - none
+      type: string
+      description: |-
+        * `category` - Product list of the category whose slug is link_value
+        * `collection` - Collection page whose slug is link_value
+        * `product` - Product detail whose slug is link_value
+        * `url` - External https URL in link_value (open in the browser)
+        * `none` - Not tappable
+    CategoryNode:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+          pattern: ^[-a-zA-Z0-9_]+$
+        image:
+          allOf:
+          - $ref: '#/components/schemas/ImageSet'
+          nullable: true
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryTile'
+          description: 'Sub-categories with products at this store (the left rail
+            of the product list). Empty when the category has none: list it directly.'
+      required:
+      - children
+      - id
+      - image
+      - name
+      - slug
+    CategoryTile:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          description: e.g. "Edible Oils".
+        slug:
+          type: string
+          description: Use as `category` on `GET /products/`.
+          pattern: ^[-a-zA-Z0-9_]+$
+        image:
+          allOf:
+          - $ref: '#/components/schemas/ImageSet'
+          nullable: true
+          description: Square image. Null when none.
+      required:
+      - id
+      - image
+      - name
+      - slug
+    CategoryTree:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryNode'
+          description: Top-level categories with products at this store, in admin
+            order. Two levels in v1 (top-level and sub-categories). Not paginated.
+      required:
+      - results
+    CollectionDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+          pattern: ^[-a-zA-Z0-9_]+$
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductCard'
+          description: All products of the collection that this store sells (at most
+            100), in the collection's order, out-of-stock last. For sorting or paging
+            use `GET /products/?collection={slug}`.
+      required:
+      - id
+      - name
+      - products
+      - slug
+    CollectionRail:
+      type: object
+      description: A horizontal product rail on home ('Bestsellers', 'Offers', ...).
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+          description: '''See all'' opens `GET /collections/{slug}/`.'
+          pattern: ^[-a-zA-Z0-9_]+$
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductCard'
+          description: Up to 10 products in the collection's order, out-of-stock last.
+        has_more:
+          type: boolean
+          description: True when the collection has more products.
+      required:
+      - has_more
+      - id
+      - name
+      - products
+      - slug
     Device:
       type: object
       properties:
@@ -2307,6 +5708,7 @@ components:
             * `RATE_LIMITED` - Too many requests. Try again later.
             * `SERVER_ERROR` - Something went wrong. Please try again.
             * `SERVICE_UNAVAILABLE` - The service is temporarily unavailable.
+            * `STORE_NOT_FOUND` - This store is not available. Check serviceability again.
         message:
           type: string
           description: Human-readable message (English).
@@ -2356,6 +5758,7 @@ components:
       - RATE_LIMITED
       - SERVER_ERROR
       - SERVICE_UNAVAILABLE
+      - STORE_NOT_FOUND
       type: string
       description: |-
         * `VALIDATION_ERROR` - Some fields are invalid.
@@ -2393,6 +5796,7 @@ components:
         * `RATE_LIMITED` - Too many requests. Try again later.
         * `SERVER_ERROR` - Something went wrong. Please try again.
         * `SERVICE_UNAVAILABLE` - The service is temporarily unavailable.
+        * `STORE_NOT_FOUND` - This store is not available. Check serviceability again.
     ErrorEnvelope:
       type: object
       description: Body of every non-2xx API response.
@@ -2441,6 +5845,95 @@ components:
       - ok
       type: string
       description: '* `ok` - ok'
+    HomeBanner:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+          description: Accessibility label / analytics name.
+        image:
+          allOf:
+          - $ref: '#/components/schemas/ImageSet'
+          description: Wide banner image (about 2.25:1).
+        link_type:
+          $ref: '#/components/schemas/BannerLinkTypeEnum'
+        link_value:
+          type: string
+          description: 'category/collection/product: the target''s slug. url: an absolute
+            https URL. none: "". Ignore a banner whose target no longer opens (404).'
+      required:
+      - id
+      - image
+      - link_type
+      - link_value
+      - title
+    HomeFeed:
+      type: object
+      properties:
+        store:
+          allOf:
+          - $ref: '#/components/schemas/StoreStatus'
+          description: Current status of the store in `X-Store-Id` (store-closed banner).
+        banners:
+          type: array
+          items:
+            $ref: '#/components/schemas/HomeBanner'
+          description: Active banners for this store, in admin order (auto-scrolling
+            carousel).
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryTile'
+          description: Top-level categories with products at this store, in admin
+            order.
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionRail'
+          description: Collections shown on home for this store, in admin order. Empty
+            rails omitted.
+        buy_again:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductCard'
+          description: '''Previously bought'': up to 10 variants from the user''s
+            delivered orders that this store sells, most recent first (`default_variant_id`
+            is the bought variant). Empty when anonymous or without history (hide
+            the rail).'
+      required:
+      - banners
+      - buy_again
+      - categories
+      - collections
+      - store
+    ImageSet:
+      type: object
+      description: |-
+        One picture in three widths (made at upload, 09 §1). Product and category images are
+        square on a white background; banner images are wide (about 2.25:1).
+      properties:
+        thumbnail:
+          type: string
+          format: uri
+          description: 'About 256 px wide: cart lines, suggestions.'
+        medium:
+          type: string
+          format: uri
+          description: 'About 512 px wide: product tiles, category grid.'
+        large:
+          type: string
+          format: uri
+          description: 'About 1024 px wide: detail gallery and zoom, banners.'
+        alt_text:
+          type: string
+          description: Accessibility label (may be empty).
+      required:
+      - alt_text
+      - large
+      - medium
+      - thumbnail
     LogoutRequest:
       type: object
       properties:
@@ -2507,6 +6000,116 @@ components:
       - name
       - phone
       - rider_status
+    NotifyMe:
+      type: object
+      description: '`POST /serviceability/notify-me/`: interest in delivery to an
+        unserviced location.'
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        lat:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+          description: Latitude (WGS84, decimal degrees).
+        lng:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+          description: Longitude (WGS84, decimal degrees).
+        phone:
+          type: string
+          nullable: true
+          description: 'Contact for the ''we now deliver here'' message. Optional:
+            defaults to the signed-in user''s phone; anonymous requests without it
+            are kept as a demand signal only.'
+          pattern: ^\+91[6-9]\d{9}$
+        address_text:
+          type: string
+          description: The reverse-geocoded address shown on the map screen (for ops
+            planning).
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - lat
+      - lng
+    NotifyMeRequest:
+      type: object
+      description: '`POST /serviceability/notify-me/`: interest in delivery to an
+        unserviced location.'
+      properties:
+        lat:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+          description: Latitude (WGS84, decimal degrees).
+        lng:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+          description: Longitude (WGS84, decimal degrees).
+        phone:
+          type: string
+          nullable: true
+          minLength: 1
+          description: 'Contact for the ''we now deliver here'' message. Optional:
+            defaults to the signed-in user''s phone; anonymous requests without it
+            are kept as a demand signal only.'
+          pattern: ^\+91[6-9]\d{9}$
+        address_text:
+          type: string
+          description: The reverse-geocoded address shown on the map screen (for ops
+            planning).
+          maxLength: 500
+      required:
+      - lat
+      - lng
+    NutritionRow:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Nutrient, e.g. "Energy (kcal)".
+        values:
+          type: array
+          items:
+            type: string
+          description: One value per column, as printed, e.g. ["900", "135"]. "" =
+            not stated.
+        is_sub_row:
+          type: boolean
+          description: Indent under the previous row (e.g. "Saturated fat" under "Total
+            fat").
+      required:
+      - is_sub_row
+      - name
+      - values
+    NutritionTable:
+      type: object
+      description: The nutrition table as printed on the label (FSSAI).
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+          description: Column headings, e.g. ["Per 100 ml", "Per serving (15 ml)"].
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/NutritionRow'
+      required:
+      - columns
+      - rows
     OtpPurposeEnum:
       enum:
       - login
@@ -2625,6 +6228,29 @@ components:
       - next
       - previous
       - results
+    PaginatedProductCardList:
+      type: object
+      description: 'Standard page (02 §5): `?page=&page_size=`, default 20, max 100.'
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductCard'
+      required:
+      - count
+      - next
+      - previous
+      - results
     PatchedAddressRequest:
       type: object
       properties:
@@ -2636,14 +6262,17 @@ components:
           maxLength: 40
         receiver_name:
           type: string
-          minLength: 1
-          description: Defaults to the user's name.
+          description: Defaults to the user's name. Send an empty string to reset
+            it to the user's own (copied when saved).
           maxLength: 120
         receiver_phone:
-          type: string
-          minLength: 1
-          description: Defaults to the user's phone.
-          pattern: ^\+91[6-9]\d{9}$
+          description: Defaults to the user's phone. Send an empty string to reset
+            it to the user's own (copied when saved).
+          oneOf:
+          - type: string
+            pattern: ^\+91[6-9]\d{9}$
+          - type: string
+            maxLength: 0
         house:
           type: string
           minLength: 1
@@ -2726,6 +6355,155 @@ components:
       - privacy
       - refund
       - terms
+    ProductCard:
+      type: object
+      description: 'A product tile (03 §2.5): used by home rails, lists, search, collections,
+        similar items.'
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+          description: 'For product links: `GET /products/{slug}/`.'
+          pattern: ^[-a-zA-Z0-9_]+$
+        name:
+          type: string
+          description: e.g. "Jivo Cold Pressed Canola Oil".
+        brand:
+          type: string
+          description: '"Jivo" for every product in v1.'
+        is_veg:
+          type: boolean
+          description: FSSAI veg mark (green dot) when true.
+        image:
+          allOf:
+          - $ref: '#/components/schemas/ImageSet'
+          nullable: true
+          description: Image of the default variant (see `default_variant_id`). Null
+            when none.
+        default_variant_id:
+          type: integer
+          description: 'The variant the tile shows and ADD adds: the one this list
+            is about (e.g. the collection item or past purchase), else the first in-stock
+            variant, else the first. Always one of `variants`.'
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/VariantSummary'
+          description: Every active variant this store sells, in display order (the
+            chips on the detail page), including out-of-stock ones. With more than
+            one, ADD opens a variant picker. Never empty.
+      required:
+      - brand
+      - default_variant_id
+      - id
+      - image
+      - is_veg
+      - name
+      - slug
+      - variants
+    ProductDetail:
+      type: object
+      description: |-
+        Product detail (03 §2.6) with the mandatory label information (09 §4: FSSAI and Legal
+        Metrology). Label text fields are "" when not applicable: hide the row.
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+          pattern: ^[-a-zA-Z0-9_]+$
+        name:
+          type: string
+        brand:
+          type: string
+        is_veg:
+          type: boolean
+          description: FSSAI veg mark (green dot) when true.
+        category:
+          allOf:
+          - $ref: '#/components/schemas/CategoryTile'
+          description: The product's category (breadcrumb, links).
+        short_description:
+          type: string
+          description: One or two lines.
+        description:
+          type: string
+          description: Plain text; paragraphs are separated by a blank line. No HTML
+            or Markdown.
+        highlights:
+          type: array
+          items:
+            type: string
+          description: Key highlights (bullet points).
+        default_variant_id:
+          type: integer
+          description: Variant selected when the page opens (the one tapped, else
+            first in stock).
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/VariantDetail'
+          description: Every active variant this store sells, in chip order (1 L /
+            2 L / 5 L), including out-of-stock ones. Never empty.
+        ingredients:
+          type: string
+        nutrition:
+          allOf:
+          - $ref: '#/components/schemas/NutritionTable'
+          nullable: true
+          description: Null when the product has no nutrition table.
+        shelf_life:
+          type: string
+          description: Best-before guidance, e.g. "9 months from manufacture".
+        storage_instructions:
+          type: string
+        country_of_origin:
+          type: string
+        manufacturer:
+          type: string
+          description: Name and address of the manufacturer or packer.
+        marketer:
+          type: string
+          description: Name and address of the marketer, when different.
+        importer:
+          type: string
+          description: Name and address of the importer, for imported products.
+        consumer_care:
+          type: string
+          description: Consumer care details (phone, email, address).
+        fssai_license_no:
+          type: string
+          description: FSSAI licence number printed on the label (14 digits).
+        similar_products:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductCard'
+          description: Up to 10 products from the same category at this store, in
+            stock first.
+      required:
+      - brand
+      - category
+      - consumer_care
+      - country_of_origin
+      - default_variant_id
+      - description
+      - fssai_license_no
+      - highlights
+      - id
+      - importer
+      - ingredients
+      - is_veg
+      - manufacturer
+      - marketer
+      - name
+      - nutrition
+      - shelf_life
+      - short_description
+      - similar_products
+      - slug
+      - storage_instructions
+      - variants
     RiderLocationSettings:
       type: object
       properties:
@@ -2752,6 +6530,133 @@ components:
         * `ACTIVE` - Approved: can go online
         * `REJECTED` - KYC rejected: see the reason, re-submit
         * `SUSPENDED` - Suspended by ops
+    SearchSuggestion:
+      type: object
+      properties:
+        type:
+          $ref: '#/components/schemas/SearchSuggestionTypeEnum'
+        text:
+          type: string
+          description: What to show in the suggestion row.
+        query:
+          type: string
+          description: The search term to run (and save in recent searches) when tapped.
+        id:
+          type: integer
+          nullable: true
+          description: Product or category id; null for keywords.
+        slug:
+          type: string
+          nullable: true
+          description: Product or category slug to open; null for keywords.
+          pattern: ^[-a-zA-Z0-9_]+$
+        image:
+          allOf:
+          - $ref: '#/components/schemas/ImageSet'
+          nullable: true
+          description: Product or category image, if any.
+      required:
+      - id
+      - image
+      - query
+      - slug
+      - text
+      - type
+    SearchSuggestionTypeEnum:
+      enum:
+      - product
+      - category
+      - keyword
+      type: string
+      description: |-
+        * `product` - A product: open its detail page (slug)
+        * `category` - A category: open its product list (slug)
+        * `keyword` - A search term (typed match or trending): run the search with `query`
+    SearchSuggestions:
+      type: object
+      properties:
+        query:
+          type: string
+          description: The `q` these are for (match it to the latest keystroke).
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchSuggestion'
+          description: 'Up to 10, best first. For a blank `q`: the trending searches
+            (`keyword`), possibly empty.'
+      required:
+      - query
+      - suggestions
+    Serviceability:
+      type: object
+      properties:
+        serviceable:
+          type: boolean
+          description: 'True when the point is inside an active store''s service area
+            (whether or not the store is open). False: show ''We''re not in your area
+            yet'' with Notify me.'
+        store:
+          allOf:
+          - $ref: '#/components/schemas/StoreStatus'
+          nullable: true
+          description: The store that serves this point (the nearest open one when
+            service areas overlap). Null when not serviceable.
+        eta_minutes:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Estimated delivery time in minutes for the home header ('Delivery
+            in 14 mins'), 08 §8. Null when not serviceable or when the store is closed.
+        message:
+          type: string
+          nullable: true
+          description: Text to show when the location is not serviceable or the store
+            is closed (times in IST). Null when serviceable and open.
+      required:
+      - eta_minutes
+      - message
+      - serviceable
+      - store
+    StockStatusEnum:
+      enum:
+      - IN_STOCK
+      - LOW_STOCK
+      - OUT_OF_STOCK
+      type: string
+      description: |-
+        * `IN_STOCK` - In stock
+        * `LOW_STOCK` - In stock, only a few left: show 'Only {units_left} left'
+        * `OUT_OF_STOCK` - Out of stock: grey the tile out, no ADD button
+    StoreStatus:
+      type: object
+      description: The dark store serving a location, and whether it takes orders
+        right now.
+      properties:
+        id:
+          type: integer
+          description: Send it as the `X-Store-Id` header on every catalog (and, from
+            P3, cart) call.
+        name:
+          type: string
+          description: Display name, e.g. "Jivo Sector 14, Gurugram".
+        is_open:
+          type: boolean
+          description: 'True when the store is inside its opening hours and accepting
+            orders. When false, browsing still works but checkout is disabled: show
+            the store-closed banner.'
+        opens_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: UTC time of the next opening (show it in IST, e.g. 'Opens at
+            7:00 AM' or 'Opens tomorrow at 7:00 AM'). Null when the store is open,
+            and null when it is temporarily not accepting orders with no known reopening
+            time.
+      required:
+      - id
+      - is_open
+      - name
+      - opens_at
     SupportContacts:
       type: object
       properties:
@@ -2786,6 +6691,184 @@ components:
           description: The current refresh token. It is single use.
       required:
       - refresh
+    UnitPrice:
+      type: object
+      description: Unit sale price for comparison (Legal Metrology), e.g. ₹27.90 per
+        100 ml.
+      properties:
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Selling price per `per`.
+        per:
+          type: string
+          description: The unit quantity, e.g. "100 ml", "100 g", "1 kg".
+      required:
+      - amount
+      - per
+    VariantDetail:
+      type: object
+      description: A sellable variant (SKU) with its price and stock at the store.
+      properties:
+        id:
+          type: integer
+          description: 'Variant id: what the cart adds (Phase 3).'
+        name:
+          type: string
+          description: Variant label shown on tiles and chips, e.g. "1 L".
+        mrp:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: MRP (inclusive of all taxes). Show struck out when above `selling_price`.
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Price at this store (the store's price override when set).
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: '`mrp` - `selling_price`, "0.00" when none ("You save ₹70").'
+        discount_percent:
+          type: integer
+          maximum: 99
+          minimum: 0
+          description: Whole percent off MRP, rounded down (never overstated). Show
+            the badge ('20% OFF') only when above 0.
+        unit_price:
+          allOf:
+          - $ref: '#/components/schemas/UnitPrice'
+          nullable: true
+          description: Unit sale price; null when not applicable.
+        stock_status:
+          $ref: '#/components/schemas/StockStatusEnum'
+        orderable_quantity:
+          type: integer
+          minimum: 0
+          description: 'Units a customer can add right now: min(units in stock at
+            this store, `max_qty_per_order`). 0 when out of stock. Cap the ADD stepper
+            here.'
+        units_left:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'Set only when `stock_status` is LOW_STOCK: the units left,
+            for ''Only 2 left''. Null otherwise (exact stock is not published).'
+        max_qty_per_order:
+          type: integer
+          minimum: 1
+          description: Per-order limit for this variant (also enforced by the cart).
+        image:
+          allOf:
+          - $ref: '#/components/schemas/ImageSet'
+          nullable: true
+          description: The variant's own first image, else the product's. Null when
+            none.
+        sku:
+          type: string
+          description: Stock keeping unit (support, analytics).
+        net_quantity:
+          type: string
+          description: Net quantity as on the pack (Legal Metrology), e.g. "1 L" or
+            "2 x 1 L".
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageSet'
+          description: 'Gallery when this variant is selected: its own images first,
+            then the product''s shared images. May be empty (show a placeholder).'
+      required:
+      - discount_amount
+      - discount_percent
+      - id
+      - image
+      - images
+      - max_qty_per_order
+      - mrp
+      - name
+      - net_quantity
+      - orderable_quantity
+      - selling_price
+      - sku
+      - stock_status
+      - unit_price
+      - units_left
+    VariantSummary:
+      type: object
+      description: A sellable variant (SKU) with its price and stock at the store.
+      properties:
+        id:
+          type: integer
+          description: 'Variant id: what the cart adds (Phase 3).'
+        name:
+          type: string
+          description: Variant label shown on tiles and chips, e.g. "1 L".
+        mrp:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: MRP (inclusive of all taxes). Show struck out when above `selling_price`.
+        selling_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Price at this store (the store's price override when set).
+        discount_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: '`mrp` - `selling_price`, "0.00" when none ("You save ₹70").'
+        discount_percent:
+          type: integer
+          maximum: 99
+          minimum: 0
+          description: Whole percent off MRP, rounded down (never overstated). Show
+            the badge ('20% OFF') only when above 0.
+        unit_price:
+          allOf:
+          - $ref: '#/components/schemas/UnitPrice'
+          nullable: true
+          description: Unit sale price; null when not applicable.
+        stock_status:
+          $ref: '#/components/schemas/StockStatusEnum'
+        orderable_quantity:
+          type: integer
+          minimum: 0
+          description: 'Units a customer can add right now: min(units in stock at
+            this store, `max_qty_per_order`). 0 when out of stock. Cap the ADD stepper
+            here.'
+        units_left:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'Set only when `stock_status` is LOW_STOCK: the units left,
+            for ''Only 2 left''. Null otherwise (exact stock is not published).'
+        max_qty_per_order:
+          type: integer
+          minimum: 1
+          description: Per-order limit for this variant (also enforced by the cart).
+        image:
+          allOf:
+          - $ref: '#/components/schemas/ImageSet'
+          nullable: true
+          description: The variant's own first image, else the product's. Null when
+            none.
+      required:
+      - discount_amount
+      - discount_percent
+      - id
+      - image
+      - max_qty_per_order
+      - mrp
+      - name
+      - orderable_quantity
+      - selling_price
+      - stock_status
+      - unit_price
+      - units_left
   securitySchemes:
     jwtAuth:
       type: http
@@ -2802,3 +6885,8 @@ tags:
   description: Saved delivery addresses (06 §2.2).
 - name: config
   description: 'App configuration: versions, maintenance, contacts.'
+- name: serviceability
+  description: Which store serves a location, and notify-me (06 §2.3).
+- name: catalog
+  description: 'Home, categories, products, search and collections for one store:
+    every operation takes the `X-Store-Id` header (06 §2.4).'

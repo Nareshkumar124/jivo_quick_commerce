@@ -29,6 +29,8 @@ String? redirect(
   RiderAccountState account = const AccountUnknown(),
   bool hasOtpChallenge = false,
   bool showDevTools = true,
+  bool hasRiderTask = false,
+  bool hasOffer = false,
 }) => riderRedirect(
   location: location,
   appControl: appControl,
@@ -38,6 +40,8 @@ String? redirect(
   account: account,
   hasOtpChallenge: hasOtpChallenge,
   showDevTools: showDevTools,
+  hasRiderTask: hasRiderTask,
+  hasOffer: hasOffer,
 );
 
 void main() {
@@ -104,6 +108,111 @@ void main() {
             account: pending,
           ),
           Routes.riderStatus,
+        );
+      }
+    });
+
+    test('application steps: open to PENDING_KYC and REJECTED only', () {
+      final steps = [
+        Routes.documents,
+        Routes.documentCapture('PAN'),
+        Routes.bankDetails,
+      ];
+      for (final status in [
+        RiderStatusEnum.PENDING_KYC,
+        RiderStatusEnum.REJECTED,
+      ]) {
+        for (final route in steps) {
+          expect(
+            redirect(
+              route,
+              sessionStatus: SessionStatus.signedIn,
+              account: loaded(status),
+            ),
+            isNull,
+            reason: '$status may open $route',
+          );
+        }
+      }
+      for (final (status, target) in [
+        (RiderStatusEnum.SUSPENDED, Routes.riderStatus),
+        (RiderStatusEnum.unknownDefaultOpenApi, Routes.riderStatus),
+        (RiderStatusEnum.NONE, Routes.register),
+        (RiderStatusEnum.ACTIVE, Routes.home),
+      ]) {
+        for (final route in steps) {
+          expect(
+            redirect(
+              route,
+              sessionStatus: SessionStatus.signedIn,
+              account: loaded(status),
+            ),
+            target,
+            reason: '$status may not open $route',
+          );
+        }
+      }
+      expect(
+        Routes.documentCapture('AADHAAR_FRONT'),
+        '/rider-status/documents/aadhaar_front',
+      );
+      // A look-alike path is not a sub-route.
+      expect(
+        redirect(
+          '/rider-statusx',
+          sessionStatus: SessionStatus.signedIn,
+          account: loaded(RiderStatusEnum.PENDING_KYC),
+        ),
+        Routes.riderStatus,
+      );
+    });
+
+    test('ACTIVE with a task: only the task screens; then an offer; then '
+        'home', () {
+      final active = loaded(RiderStatusEnum.ACTIVE);
+      String? at(String location, {bool task = false, bool offer = false}) =>
+          redirect(
+            location,
+            sessionStatus: SessionStatus.signedIn,
+            account: active,
+            hasRiderTask: task,
+            hasOffer: offer,
+          );
+
+      for (final location in [Routes.home, Routes.offer, Routes.login]) {
+        expect(at(location, task: true), Routes.task, reason: location);
+      }
+      for (final location in [Routes.task, Routes.taskScan, Routes.taskFail]) {
+        expect(at(location, task: true), isNull, reason: location);
+        expect(
+          at(location, task: true, offer: true),
+          isNull,
+          reason: 'a task outranks an offer',
+        );
+        expect(at(location), Routes.home, reason: 'no task: $location');
+      }
+      expect(at(Routes.home, offer: true), Routes.offer);
+      expect(at(Routes.offer, offer: true), isNull);
+      expect(at(Routes.offer), Routes.home);
+    });
+
+    test('task and offer flags never open work screens for other '
+        'statuses', () {
+      for (final status in [
+        RiderStatusEnum.PENDING_KYC,
+        RiderStatusEnum.NONE,
+        RiderStatusEnum.SUSPENDED,
+      ]) {
+        expect(
+          redirect(
+            Routes.task,
+            sessionStatus: SessionStatus.signedIn,
+            account: loaded(status),
+            hasRiderTask: true,
+            hasOffer: true,
+          ),
+          isNot(Routes.task),
+          reason: '$status',
         );
       }
     });

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../permissions/presentation/permissions_gate_controller.dart';
+import '../../task/presentation/task_block.dart';
 import '../data/foreground_location_service.dart';
 import '../domain/location_service_client.dart';
 import '../domain/tracker_stats.dart';
@@ -13,7 +14,13 @@ final locationServiceClientProvider = Provider<LocationServiceClient>(
   (ref) => ForegroundLocationService(),
 );
 
-enum LocationDebugError { permissionsMissing, startFailed }
+enum LocationDebugError {
+  permissionsMissing,
+  startFailed,
+
+  /// Going offline is blocked while a delivery task is active (rule 7).
+  taskActive,
+}
 
 @immutable
 class LocationDebugState {
@@ -126,6 +133,10 @@ class LocationDebugController extends Notifier<LocationDebugState> {
 
   Future<void> goOffline() async {
     if (state.busy) return;
+    if (ref.read(taskBlocksGoingOfflineProvider)) {
+      state = state.copyWith(error: LocationDebugError.taskActive);
+      return;
+    }
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _client.stop();
