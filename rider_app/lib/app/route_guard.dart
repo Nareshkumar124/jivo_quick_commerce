@@ -19,7 +19,8 @@ import 'routes.dart';
 /// 5. optional update not dismissed: the update prompt;
 /// 6. signed out: login (the OTP step only while an OTP is pending);
 /// 7. signed in and ACTIVE: the task screens while a task is active (or its
-///    end is unread), else the offer screen while an offer is open;
+///    end is unread), else the offer screen while an offer is open, else
+///    home or the rider's records (earnings, cash, history, profile);
 /// 8. signed in: the screen for `rider_status`. `PENDING_KYC` and
 ///    `REJECTED` riders may also open the application steps under it
 ///    (documents, bank details); everyone else gets exactly that screen.
@@ -64,6 +65,8 @@ String? riderRedirect({
     // ended) keeps them on the task screens, then an open offer.
     if (hasRiderTask) return Routes.isTaskRoute(location) ? null : Routes.task;
     if (hasOffer) return _goTo(location, Routes.offer);
+    // Between orders: home and the rider's own records.
+    if (Routes.isAccountRoute(location)) return null;
   }
   final target = routeFor(destinationFor(account.riderStatus));
   if (canEditApplication(account.riderStatus) &&

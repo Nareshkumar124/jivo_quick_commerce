@@ -8,6 +8,7 @@
   cached snapshot of the store areas (GEOS in-process, no database on the hot path).
 - `serviceable_exists()` / `address_point_expression()`: PostGIS `EXISTS` for address lists.
 - `stores_for(user)`: the stores a staff user may see (05 §3).
+- `set_accepting_orders()`: pause / resume orders at a store (panel), actor recorded.
 """
 
 import logging
@@ -311,6 +312,47 @@ def is_point_serviceable(lat, lng) -> bool:
     return any(area.area.contains(point) for area in store_areas())
 
 
+# --------------------------------------------------------------------------- store operations
+
+LOG_PAUSED = "Stopped accepting orders (temporarily closed)."
+LOG_RESUMED = "Accepting orders again."
+
+
+def set_accepting_orders(store: DarkStore, accepting: bool, *, actor) -> bool:
+    """Pause or resume orders at a store (`is_accepting_orders`: customers can still browse,
+    not check out). For the panel's store screens. Atomic, with the store row locked; returns
+    whether anything changed. The actor is recorded as an admin `LogEntry` on the store (like
+    the customer moderation services, until the audit log of P4-P8). The store snapshot
+    (serviceability, `X-Store-Id`) is refreshed by the DarkStore save signal, and the store's
+    catalog cache is invalidated after commit."""
+    from django.contrib.admin.models import CHANGE, LogEntry
+    from django.contrib.contenttypes.models import ContentType
+
+    from apps.catalog.cache import invalidate_store_on_commit
+
+    if actor is None or actor.pk is None:
+        raise ValueError("set_accepting_orders needs the acting staff user (`actor`).")
+    accepting = bool(accepting)
+    with transaction.atomic():
+        locked = DarkStore.objects.select_for_update().get(pk=store.pk)
+        if locked.is_accepting_orders == accepting:
+            store.is_accepting_orders = accepting
+            return False
+        locked.is_accepting_orders = accepting
+        locked.save(update_fields=["is_accepting_orders", "updated_at"])
+        LogEntry.objects.create(
+            user_id=actor.pk,
+            content_type=ContentType.objects.get_for_model(DarkStore),
+            object_id=str(locked.pk),
+            object_repr=str(locked)[:200],
+            action_flag=CHANGE,
+            change_message=LOG_RESUMED if accepting else LOG_PAUSED,
+        )
+        invalidate_store_on_commit(locked.pk)
+    store.is_accepting_orders = accepting
+    return True
+
+
 # --------------------------------------------------------------------------- notify-me
 
 
@@ -343,18 +385,25 @@ def record_notify_me(
 
 
 def stores_for(user) -> QuerySet[DarkStore]:
-    """Stores a staff user may see (05 §3): every store for superusers and global roles (Super
-    Admin, Ops, Catalog, Support, Finance); only StaffStoreAccess stores for Store Manager /
-    Store Staff; none for anyone else."""
+    """Stores a staff user may see (05 §3). Fail closed:
+
+    - every store: superusers, and staff in a global role (`roles.GLOBAL_ROLES`: Super Admin,
+      Ops, Catalog Manager, Support, Finance) **and in no store-scoped role**;
+    - only their `StaffStoreAccess` stores: anyone in a store-scoped role (Store Manager,
+      Store Staff), even if they are also in a global or any other group (the stricter role
+      wins, PM decision 2026-11-03);
+    - none: everyone else (non-staff, inactive, no role, or only unknown groups). Unknown groups
+      never widen access.
+    """
     if not (user and user.is_authenticated and user.is_active and user.is_staff):
         return DarkStore.objects.none()
     if user.is_superuser:
         return DarkStore.objects.all()
     groups = set(user.groups.values_list("name", flat=True))
-    if groups - roles.STORE_SCOPED_ROLES:
-        return DarkStore.objects.all()
-    if groups:
+    if groups & roles.STORE_SCOPED_ROLES:
         return DarkStore.objects.filter(staff_access__user=user).distinct()
+    if groups & roles.GLOBAL_ROLES:
+        return DarkStore.objects.all()
     return DarkStore.objects.none()
 
 

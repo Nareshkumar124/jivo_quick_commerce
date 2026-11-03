@@ -9,9 +9,13 @@ Rules:
 - `on_hand` can never drop below `reserved` (stock held by placed orders).
 - Errors are `django.core.exceptions.ValidationError` with a field -> message dict, so the admin
   shows them on the form and the API renders `VALIDATION_ERROR`.
+- `on_hand`/`reserved` writes happen only inside `stock_write()` (the model refuses them
+  elsewhere, review #4). Quantities are bounded (`MAX_QUANTITY`, `MAX_ON_HAND`).
 - Catalog caches for the store are invalidated after commit by the `StoreInventory` post-save
-  signal (`apps.catalog.apps`); every write here goes through `save()`/`create()`. A future
-  `update()`/`bulk_*` path must call `apps.catalog.cache.invalidate_store_on_commit()`.
+  signal (`apps.catalog.apps`), only when what the catalog publishes changes (stock status,
+  orderable quantity, units left, availability switch, price override). Every write here goes
+  through `save()`/`create()`. A future `update()`/`bulk_*` path must call
+  `apps.catalog.cache.invalidate_store_on_commit()`.
 
 Permission and store-scope checks belong to the caller (admin/ops views): use
 `can_adjust_stock(user, store)` before calling these.
@@ -27,13 +31,17 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from apps.catalog.models import ProductVariant
-from apps.inventory.models import MovementType, StockMovement, StoreInventory
+from apps.inventory.models import MovementType, StockMovement, StoreInventory, stock_write
 from apps.stores.models import DarkStore
 
 logger = logging.getLogger(__name__)
 
 MANUAL_TYPES = frozenset({MovementType.INWARD, MovementType.DAMAGE, MovementType.AUDIT_ADJUSTMENT})
 MAX_REASON = 255
+# Bounds (review #5): a typo such as 10000000000 is a form error, never a database error (500).
+MAX_QUANTITY = 1_000_000  # one adjustment, one CSV line, or one audit count
+MAX_ON_HAND = 100_000_000  # far below the integer column's limit
+MSG_TOO_LARGE = f"At most {MAX_QUANTITY:,} units at a time."
 
 
 def ensure_inventory(store: DarkStore, variant: ProductVariant) -> StoreInventory:
@@ -44,14 +52,24 @@ def ensure_inventory(store: DarkStore, variant: ProductVariant) -> StoreInventor
 
 def _lock(store: DarkStore, variant: ProductVariant) -> StoreInventory:
     ensure_inventory(store, variant)
-    return StoreInventory.objects.select_for_update().get(store=store, variant=variant)
+    inventory = StoreInventory.objects.select_for_update().get(store=store, variant=variant)
+    inventory.variant = variant  # already loaded: the catalog cache signal reads it
+    return inventory
 
 
-def _check_manual(delta: int, movement_type: str, reason: str) -> None:
+def _is_quantity(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _check_manual(delta: int, movement_type: str, reason: str, *, bounded: bool = True) -> None:
     if movement_type not in MANUAL_TYPES:
         raise ValidationError({"type": "Use inward, damage or audit correction."})
+    if not _is_quantity(delta):
+        raise ValidationError({"delta": "The quantity must be a whole number."})
     if delta == 0:
         raise ValidationError({"delta": "The quantity cannot be zero."})
+    if bounded and abs(delta) > MAX_QUANTITY:
+        raise ValidationError({"delta": MSG_TOO_LARGE})
     if movement_type == MovementType.INWARD and delta < 0:
         raise ValidationError({"delta": "Inward stock must be a positive quantity."})
     if movement_type == MovementType.DAMAGE and delta > 0:
@@ -73,8 +91,11 @@ def _apply(inventory: StoreInventory, delta: int, movement_type: str, reason: st
                 )
             }
         )
+    if new_on_hand > MAX_ON_HAND:
+        raise ValidationError({"delta": f"On hand cannot exceed {MAX_ON_HAND:,} units."})
     inventory.on_hand = new_on_hand
-    inventory.save(update_fields=["on_hand", "updated_at"])
+    with stock_write():
+        inventory.save(update_fields=["on_hand", "updated_at"])
     movement = StockMovement.objects.create(
         store_id=inventory.store_id,
         variant_id=inventory.variant_id,
@@ -111,8 +132,12 @@ def set_counted_stock(
     *, store: DarkStore, variant: ProductVariant, counted: int, reason: str, actor=None
 ) -> StockMovement | None:
     """Audit count: set `on_hand` to `counted` with an AUDIT_ADJUSTMENT. None if unchanged."""
+    if not _is_quantity(counted):
+        raise ValidationError({"counted": "The count must be a whole number."})
     if counted < 0:
         raise ValidationError({"counted": "The count cannot be negative."})
+    if counted > MAX_QUANTITY:
+        raise ValidationError({"counted": MSG_TOO_LARGE})
     if not reason.strip():
         raise ValidationError({"reason": "Give a reason for the adjustment."})
     with transaction.atomic():
@@ -120,7 +145,8 @@ def set_counted_stock(
         delta = counted - inventory.on_hand
         if delta == 0:
             return None
-        _check_manual(delta, MovementType.AUDIT_ADJUSTMENT, reason)
+        # The count itself is bounded above; the correction may be any size.
+        _check_manual(delta, MovementType.AUDIT_ADJUSTMENT, reason, bounded=False)
         return _apply(inventory, delta, MovementType.AUDIT_ADJUSTMENT, reason, actor)
 
 
@@ -143,16 +169,17 @@ def apply_inward_batch(
     if not reason.strip():
         raise ValidationError({"reason": "Give a reason for the adjustment."})
     codes = {row.sku.strip() for row in rows}
-    variants = {v.sku: v for v in ProductVariant.objects.filter(sku__in=codes)}
-    variants.update(
-        {v.sap_item_code: v for v in ProductVariant.objects.filter(sap_item_code__in=codes)}
-    )
+    # SKU first: a SAP item code only matches a code that is no variant's SKU (review #5).
+    variants = {v.sap_item_code: v for v in ProductVariant.objects.filter(sap_item_code__in=codes)}
+    variants.update({v.sku: v for v in ProductVariant.objects.filter(sku__in=codes)})
     errors = []
     for line, row in enumerate(rows, start=1):
         if row.sku.strip() not in variants:
             errors.append(f"line {line}: unknown SKU {row.sku.strip()!r}.")
-        elif not isinstance(row.quantity, int) or row.quantity <= 0:
+        elif not _is_quantity(row.quantity) or row.quantity <= 0:
             errors.append(f"line {line}: the quantity must be a whole number above 0.")
+        elif row.quantity > MAX_QUANTITY:
+            errors.append(f"line {line}: {MSG_TOO_LARGE}")
     if errors:
         raise ValidationError({"rows": errors})
     with transaction.atomic():
@@ -248,9 +275,17 @@ def availability(
     return Availability(StockStatus.IN_STOCK, orderable, None)
 
 
+def override_applies(price_override: Decimal | None, mrp: Decimal) -> bool:
+    """A store override counts only when set, above 0 and at most the MRP. One left above the
+    MRP (the MRP was cut after the override was set) is ignored, never sold above MRP."""
+    return price_override is not None and Decimal(0) < price_override <= mrp
+
+
 def effective_price(inventory: StoreInventory | None, variant: ProductVariant) -> Decimal:
-    """The selling price at a store: the store override when set, else the variant's."""
-    if inventory is not None and inventory.price_override is not None:
+    """The selling price at a store: the store override when it applies, else the variant's.
+    Python twin of `apps.catalog.services.effective_price_expression` (the catalog's SQL);
+    `cart.services.compute_bill()` uses this from Phase 3."""
+    if inventory is not None and override_applies(inventory.price_override, variant.mrp):
         return inventory.price_override
     return variant.selling_price
 

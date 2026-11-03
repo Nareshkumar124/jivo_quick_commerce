@@ -18,6 +18,7 @@ from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal
 
 from django.db.models import (
     Case,
+    DecimalField,
     Exists,
     F,
     FilteredRelation,
@@ -30,7 +31,6 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce
 from django.utils import timezone
 from rest_framework.exceptions import NotFound
 
@@ -61,6 +61,22 @@ MAX_SEARCH_TERMS = 5
 # --------------------------------------------------------------------------- querysets
 
 
+def effective_price_expression(override_ref: str):
+    """SQL twin of `apps.inventory.services.effective_price` (keep them identical): the store
+    override when it is set, above 0 and at most the variant's MRP, else the variant's
+    `selling_price`. An override left above the MRP by a later MRP cut is ignored, never sold."""
+    return Case(
+        When(
+            Q(**{f"{override_ref}__isnull": False})
+            & Q(**{f"{override_ref}__gt": 0})
+            & Q(**{f"{override_ref}__lte": F("mrp")}),
+            then=F(override_ref),
+        ),
+        default=F("selling_price"),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+
+
 def sold_variants(store: DarkStore) -> QuerySet[ProductVariant]:
     """Active variants sold at `store`, annotated with the store's stock and effective price."""
     return (
@@ -73,7 +89,7 @@ def sold_variants(store: DarkStore) -> QuerySet[ProductVariant]:
             inv_on_hand=F("store_inv__on_hand"),
             inv_reserved=F("store_inv__reserved"),
             inv_is_available=F("store_inv__is_available"),
-            inv_price=Coalesce(F("store_inv__price_override"), F("selling_price")),
+            inv_price=effective_price_expression("store_inv__price_override"),
             in_stock=Case(
                 When(
                     Q(store_inv__is_available=True)
@@ -265,11 +281,32 @@ def cards(products: Iterable[Product], preferred: dict[int, int] | None = None) 
 # --------------------------------------------------------------------------- lookups
 
 
-def _id_or_slug(queryset: QuerySet, value: str):
+# ASCII only: `str.isdigit()` is also true for "²" or "٣" (which `int()` then rejects), and a
+# NUL character must never reach PostgreSQL (psycopg refuses it). Anything that is neither an
+# id nor a well-formed slug is simply "not found", without a query.
+_DIGITS_RE = re.compile(r"[0-9]+")
+_SLUG_RE = re.compile(r"[-a-zA-Z0-9_]+")
+_MAX_ID_DIGITS = 18  # bigint
+
+
+def parse_id_or_slug(value: str | None) -> int | str | None:
+    """`"101"` -> 101, `"canola-oil"` -> `"canola-oil"`, anything else -> None (slugs are
+    never all digits, so a too-long number is neither)."""
     value = (value or "").strip()
-    if value.isdigit():
-        return queryset.filter(pk=int(value)).first()
-    return queryset.filter(slug=value).first()
+    if _DIGITS_RE.fullmatch(value):
+        return int(value) if len(value) <= _MAX_ID_DIGITS else None
+    if _SLUG_RE.fullmatch(value):
+        return value
+    return None
+
+
+def _id_or_slug(queryset: QuerySet, value: str):
+    key = parse_id_or_slug(value)
+    if key is None:
+        return None
+    if isinstance(key, int):
+        return queryset.filter(pk=key).first()
+    return queryset.filter(slug=key).first()
 
 
 def _active_categories() -> QuerySet[Category]:

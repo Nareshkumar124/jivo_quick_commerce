@@ -196,6 +196,59 @@ void main() {
       expect(at(Routes.offer), Routes.home);
     });
 
+    test('records (earnings, cash, history, payouts, profile): ACTIVE '
+        'riders between orders only', () {
+      final records = [
+        Routes.earnings,
+        Routes.payouts,
+        Routes.cash,
+        Routes.history,
+        Routes.profile,
+        Routes.profileDocuments,
+      ];
+      for (final route in records) {
+        expect(
+          redirect(
+            route,
+            sessionStatus: SessionStatus.signedIn,
+            account: loaded(RiderStatusEnum.ACTIVE),
+          ),
+          isNull,
+          reason: route,
+        );
+        expect(
+          redirect(
+            route,
+            sessionStatus: SessionStatus.signedIn,
+            account: loaded(RiderStatusEnum.ACTIVE),
+            hasRiderTask: true,
+          ),
+          Routes.task,
+          reason: 'during a task: $route',
+        );
+        expect(
+          redirect(
+            route,
+            sessionStatus: SessionStatus.signedIn,
+            account: loaded(RiderStatusEnum.ACTIVE),
+            hasOffer: true,
+          ),
+          Routes.offer,
+          reason: 'with an open offer: $route',
+        );
+        expect(
+          redirect(
+            route,
+            sessionStatus: SessionStatus.signedIn,
+            account: loaded(RiderStatusEnum.PENDING_KYC),
+          ),
+          Routes.riderStatus,
+          reason: 'not active: $route',
+        );
+      }
+      expect(Routes.isAccountRoute('/earningsx'), isFalse);
+    });
+
     test('task and offer flags never open work screens for other '
         'statuses', () {
       for (final status in [

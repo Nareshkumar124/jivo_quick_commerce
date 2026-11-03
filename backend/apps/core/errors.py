@@ -57,6 +57,8 @@ class ErrorCode(models.TextChoices):
         "STORE_NOT_FOUND",
         "This store is not available. Check serviceability again.",
     )
+    # --- Added in Phase 2 R3 (BUG-0001) -------------------------------------------------------
+    PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE", "The request body is too large."
 
 
 ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
@@ -96,6 +98,7 @@ ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.SERVER_ERROR: 500,
     ErrorCode.SERVICE_UNAVAILABLE: 503,
     ErrorCode.STORE_NOT_FOUND: 404,
+    ErrorCode.PAYLOAD_TOO_LARGE: 413,
 }
 
 

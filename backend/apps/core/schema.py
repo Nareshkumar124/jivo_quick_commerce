@@ -111,3 +111,17 @@ PAGINATION_PARAMETERS = [
 PAGE_NOT_FOUND = error_example(
     ErrorCode.NOT_FOUND, "Invalid page.", name="PAGE_NOT_FOUND", summary="Page out of range"
 )
+
+INVALID_PAGE = error_response(
+    "`page` is not a page of this list: 0, past the last page, or not a number. Go back to page 1.",
+    PAGE_NOT_FOUND,
+)
+
+
+def paginated_responses(responses: Mapping[int, Any]) -> dict[int, Any]:
+    """`app_responses()` for a paginated list: also documents the invalid-page 404 (BUG-0004),
+    unless the operation already documents its own 404 (which must then include
+    `PAGE_NOT_FOUND`)."""
+    result = app_responses(responses)
+    result.setdefault(404, INVALID_PAGE)
+    return result

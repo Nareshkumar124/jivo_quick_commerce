@@ -6,9 +6,9 @@ import '../domain/delivery_location.dart';
 /// Serviceability and notify-me (`06 §2.3`). Implementations throw
 /// `ApiError`.
 ///
-/// TODO(api): add `ApiServiceabilityRepository` on the generated client when
-/// the Phase 2 contract lands; until then the app uses
-/// [FakeServiceabilityRepository].
+/// The app uses `ApiServiceabilityRepository` (the generated
+/// `ServiceabilityApi`). [FakeServiceabilityRepository] is only a test double
+/// and the dev flavor's `FAKE_API=true` stand-in.
 abstract interface class ServiceabilityRepository {
   /// `GET /serviceability/?lat=&lng=`.
   Future<Serviceability> check(GeoPoint point);
@@ -19,8 +19,9 @@ abstract interface class ServiceabilityRepository {
   Future<void> notifyMe(GeoPoint point, {String? addressText});
 }
 
-/// TODO(api): placeholder. One demo store in central New Delhi serves a
-/// [radiusMeters] circle; everything else is not serviceable.
+/// Test double and dev `FAKE_API` stand-in, never used in staging or prod.
+/// One demo store in central New Delhi serves a [radiusMeters] circle;
+/// everything else is not serviceable.
 class FakeServiceabilityRepository implements ServiceabilityRepository {
   FakeServiceabilityRepository({
     this.latency = const Duration(milliseconds: 300),

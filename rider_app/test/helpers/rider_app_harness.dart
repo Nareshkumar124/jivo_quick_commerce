@@ -25,6 +25,8 @@ import 'package:rider_app/features/offers/presentation/offer_alert_providers.dar
 import 'package:rider_app/features/onboarding/data/fake_rider_onboarding_backend.dart';
 import 'package:rider_app/features/onboarding/domain/image_picking.dart';
 import 'package:rider_app/features/onboarding/presentation/onboarding_providers.dart';
+import 'package:rider_app/features/earnings/data/fake_rider_records_backend.dart';
+import 'package:rider_app/features/earnings/presentation/records_providers.dart';
 import 'package:rider_app/features/task/data/fake_task_backend.dart';
 import 'package:rider_app/features/task/presentation/pickup_scan_screen.dart';
 import 'package:rider_app/features/task/presentation/task_providers.dart';
@@ -146,6 +148,7 @@ class RiderTestHarness {
   final pendingCapture = InMemoryPendingCaptureStore();
   late final tasks = FakeTaskBackend(delay: Duration.zero, clock: () => now);
   final locationReader = FakeLocationReader();
+  final records = FakeRiderRecordsBackend(delay: Duration.zero);
   final alerter = RecordingOfferAlerter();
   List<String> scannerValues = const ['7K2P', 'HELLO-WORLD'];
 
@@ -170,6 +173,7 @@ class RiderTestHarness {
     imageCodecProvider.overrideWithValue(codec),
     pendingCaptureStoreProvider.overrideWithValue(pendingCapture),
     fakeTaskBackendProvider.overrideWithValue(tasks),
+    fakeRiderRecordsBackendProvider.overrideWithValue(records),
     currentLocationReaderProvider.overrideWithValue(locationReader),
     offerAlerterProvider.overrideWithValue(alerter),
     qrScannerBuilderProvider.overrideWith((ref) => fakeScanner(scannerValues)),

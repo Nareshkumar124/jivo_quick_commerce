@@ -1,7 +1,11 @@
 """SMS behind a small interface (D-02). The gateway (e.g. MSG91) is chosen by SMS_BACKEND.
 
 - ConsoleSmsBackend (local): logs the message, phone masked, so developers can read the OTP.
+  It writes OTP codes to the log, so deployed environments refuse it (system check
+  `accounts.E003`, BUG-0005); staging may opt in with SMS_CONSOLE_BACKEND_ALLOWED until D-02.
 - LocmemSmsBackend (tests): keeps messages in `outbox`. Tests never call a real gateway.
+- UnconfiguredSmsBackend: the deployed default until a gateway is configured. Every send fails
+  loudly (an error, never a silent drop, and never the message text in the log).
 A real DLT-registered gateway backend is added when Jivo picks the provider.
 """
 
@@ -9,6 +13,7 @@ import logging
 from dataclasses import dataclass
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 
 logger = logging.getLogger(__name__)
@@ -48,6 +53,23 @@ class ConsoleSmsBackend(BaseSmsBackend):
             message.body,
         )
 
+
+class UnconfiguredSmsBackend(BaseSmsBackend):
+    def send(self, message: SmsMessage) -> None:
+        # Not SmsError: retrying cannot help. The task fails and is reported (Sentry).
+        raise ImproperlyConfigured(
+            "No SMS gateway is configured (SMS_BACKEND, D-02): an SMS to "
+            f"{mask_phone(message.to)} was not sent."
+        )
+
+
+# Backends that never deliver an SMS. Refused in deployed environments (accounts.E003).
+NON_DELIVERING_BACKENDS = frozenset(
+    {
+        "apps.notifications.sms.ConsoleSmsBackend",
+        "apps.notifications.sms.LocmemSmsBackend",
+    }
+)
 
 outbox: list[SmsMessage] = []
 

@@ -2347,6 +2347,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t show the QR code. Check payment again, or collect cash.'**
   String get codQrUnavailable;
+
+  /// No description provided for @listLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get listLoadMore;
+
+  /// A range of dates.
+  ///
+  /// In en, this message translates to:
+  /// **'{from} – {to}'**
+  String dateRange(String from, String to);
+
+  /// No description provided for @earningsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Earnings'**
+  String get earningsTitle;
+
+  /// No description provided for @earningsToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get earningsToday;
+
+  /// No description provided for @earningsThisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get earningsThisWeek;
+
+  /// No description provided for @earningsChooseDates.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose dates'**
+  String get earningsChooseDates;
+
+  /// No description provided for @earningsOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No orders} =1{1 order} other{{count} orders}}'**
+  String earningsOrders(int count);
+
+  /// No description provided for @earningsPerOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Per order'**
+  String get earningsPerOrder;
+
+  /// No description provided for @earningsAdjustments.
+  ///
+  /// In en, this message translates to:
+  /// **'Incentives and penalties'**
+  String get earningsAdjustments;
+
+  /// No description provided for @earningBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Base pay'**
+  String get earningBase;
+
+  /// No description provided for @earningDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance pay'**
+  String get earningDistance;
+
+  /// No description provided for @earningTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get earningTip;
+
+  /// No description provided for @earningIncentive.
+  ///
+  /// In en, this message translates to:
+  /// **'Incentives'**
+  String get earningIncentive;
+
+  /// No description provided for @earningPenalty.
+  ///
+  /// In en, this message translates to:
+  /// **'Penalties'**
+  String get earningPenalty;
+
+  /// No description provided for @payoutsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payouts'**
+  String get payoutsTitle;
+
+  /// No description provided for @payoutsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No payouts yet.'**
+  String get payoutsEmpty;
+
+  /// No description provided for @payoutPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get payoutPaid;
+
+  /// No description provided for @payoutPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get payoutPending;
+
+  /// No description provided for @payoutReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference {reference}'**
+  String payoutReference(String reference);
+
+  /// No description provided for @payoutPaidOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid on {date}'**
+  String payoutPaidOn(String date);
+
+  /// No description provided for @cashTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash in hand'**
+  String get cashTitle;
+
+  /// No description provided for @cashEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No cash entries yet.'**
+  String get cashEmpty;
+
+  /// No description provided for @cashInHand.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash in hand'**
+  String get cashInHand;
+
+  /// No description provided for @cashLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Limit {amount}'**
+  String cashLimit(String amount);
+
+  /// No description provided for @cashDepositTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit cash'**
+  String get cashDepositTitle;
+
+  /// No description provided for @cashDepositBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve reached the cash limit of {limit}. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.'**
+  String cashDepositBody(String limit);
+
+  /// No description provided for @cashCodCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash collected · Order {order}'**
+  String cashCodCollected(String order);
+
+  /// No description provided for @cashDeposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposited at the store'**
+  String get cashDeposit;
+
+  /// No description provided for @cashAdjustment.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment'**
+  String get cashAdjustment;
+
+  /// No description provided for @cashBalanceAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance {amount}'**
+  String cashBalanceAfter(String amount);
+
+  /// No description provided for @historyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get historyTitle;
+
+  /// No description provided for @historyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No past orders yet.'**
+  String get historyEmpty;
+
+  /// No description provided for @historyRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'{store} → {drop}'**
+  String historyRoute(String store, String drop);
+
+  /// No description provided for @historyDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get historyDelivered;
+
+  /// No description provided for @historyReturned.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned'**
+  String get historyReturned;
+
+  /// No description provided for @historyCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get historyCancelled;
+
+  /// No description provided for @historyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not delivered'**
+  String get historyFailed;
+
+  /// No description provided for @historyOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get historyOther;
+
+  /// No description provided for @profileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profileTitle;
+
+  /// No description provided for @profileHomeStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Home store'**
+  String get profileHomeStore;
+
+  /// No description provided for @profileVehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle'**
+  String get profileVehicle;
+
+  /// No description provided for @profileKycStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'KYC status'**
+  String get profileKycStatus;
+
+  /// No description provided for @profileKycApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get profileKycApproved;
+
+  /// No description provided for @profileRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get profileRating;
+
+  /// No description provided for @profileRatingValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{rating} ★'**
+  String profileRatingValue(String rating);
+
+  /// No description provided for @profileNoRating.
+  ///
+  /// In en, this message translates to:
+  /// **'No ratings yet'**
+  String get profileNoRating;
 }
 
 class _AppLocalizationsDelegate

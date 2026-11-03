@@ -3,8 +3,8 @@ import re
 from django.conf import settings
 from django.core.checks import Error, register
 
-_PHONE = re.compile(r"^\+91[6-9]\d{9}$")
-_CODE = re.compile(r"^\d{6}$")
+_PHONE = re.compile(r"^\+91[6-9][0-9]{9}$")
+_CODE = re.compile(r"^[0-9]{6}$")
 
 
 @register()
@@ -24,3 +24,31 @@ def check_otp_test_numbers(app_configs, **kwargs):
                 )
             )
     return errors
+
+
+@register()
+def check_sms_backend(app_configs, **kwargs):
+    """BUG-0005: deployed environments never use an SMS backend that logs or drops messages
+    (the console backend writes OTP codes to the log, 09 §3.1/§3.3). Production never; staging
+    only with SMS_CONSOLE_BACKEND_ALLOWED=true (explicit opt-in until D-02)."""
+    from apps.notifications.sms import NON_DELIVERING_BACKENDS
+
+    environment = settings.APP_ENVIRONMENT
+    if environment not in ("staging", "production"):
+        return []
+    if settings.SMS_BACKEND not in NON_DELIVERING_BACKENDS:
+        return []
+    if environment == "staging" and getattr(settings, "SMS_CONSOLE_BACKEND_ALLOWED", False):
+        return []
+    return [
+        Error(
+            f"SMS_BACKEND {settings.SMS_BACKEND.rsplit('.', 1)[-1]} logs or drops messages and "
+            f"is not allowed in {environment}.",
+            hint=(
+                "Set SMS_BACKEND to the gateway backend (D-02), or leave it unset to use "
+                "UnconfiguredSmsBackend (sends fail loudly). Staging only: "
+                "SMS_CONSOLE_BACKEND_ALLOWED=true."
+            ),
+            id="accounts.E003",
+        )
+    ]

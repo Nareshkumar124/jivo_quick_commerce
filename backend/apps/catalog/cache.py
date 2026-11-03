@@ -59,6 +59,40 @@ def invalidate_store_on_commit(store_id: int) -> None:
     transaction.on_commit(lambda: bump_store_version(store_id))
 
 
+def inventory_change_is_published(inventory) -> bool:
+    """Did this `StoreInventory` save change anything the catalog publishes? Compares the
+    values before the save (`inventory.loaded_values`) with the new ones (review #6):
+
+    - the availability switch or the price override changed: yes;
+    - otherwise only if `availability()` (stock status, orderable quantity, units left) differs.
+
+    So an order reservation that moves `available` from 40 to 39 on an item limited to 5 per
+    order does not empty the store's catalog cache (from Phase 3, every order saves rows)."""
+    from apps.inventory.services import availability
+
+    before = inventory.loaded_values
+    if (
+        before["is_available"] != inventory.is_available
+        or before["price_override"] != inventory.price_override
+    ):
+        return True
+    if (before["on_hand"], before["reserved"]) == (inventory.on_hand, inventory.reserved):
+        return False
+    max_qty = inventory.variant.max_qty_per_order
+
+    def published(on_hand: int, reserved: int):
+        return availability(
+            on_hand=on_hand,
+            reserved=reserved,
+            is_available=inventory.is_available,
+            max_qty_per_order=max_qty,
+        )
+
+    return published(before["on_hand"], before["reserved"]) != published(
+        inventory.on_hand, inventory.reserved
+    )
+
+
 def cached(kind: str, store_id: int, parts: tuple, build: Callable[[], Any]) -> Any:
     """`build()` cached under (kind, store, versions, parts). Falls back to `build()` on errors."""
     try:

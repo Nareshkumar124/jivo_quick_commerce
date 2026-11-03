@@ -38,4 +38,10 @@ CSRF_COOKIE_SECURE = True
 
 API_DOCS_PUBLIC = False
 
+# BUG-0005: never fall back to the console SMS backend, which logs OTP codes. Until a gateway is
+# chosen (D-02) sends fail loudly; the console/locmem backends are refused by accounts.E003
+# (staging may opt in explicitly with SMS_CONSOLE_BACKEND_ALLOWED=true).
+SMS_BACKEND = env_str("SMS_BACKEND", default="apps.notifications.sms.UnconfiguredSmsBackend")
+SMS_CONSOLE_BACKEND_ALLOWED = env_bool("SMS_CONSOLE_BACKEND_ALLOWED", default=False)
+
 init_sentry()

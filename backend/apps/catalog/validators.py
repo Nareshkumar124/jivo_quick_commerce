@@ -21,8 +21,9 @@ MAX_HIGHLIGHTS = 10
 
 
 def validate_not_all_digits(value: str) -> None:
-    """Slugs share `?category=` / `/products/{id_or_slug}/` with numeric ids."""
-    if value.isdigit():
+    """Slugs share `?category=` / `/products/{id_or_slug}/` with numeric ids. Same ASCII rule
+    as `apps.catalog.services.parse_id_or_slug` (`str.isdigit()` would also match "²")."""
+    if re.fullmatch(r"[0-9]+", value or ""):
         raise ValidationError("A slug cannot be only digits.", code="slug_digits")
 
 

@@ -23,5 +23,8 @@ def init_sentry() -> bool:
         release=env_str("SENTRY_RELEASE", default="") or None,
         traces_sample_rate=env_float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
         send_default_pii=False,  # 09 §3.3: no PII in error reports
+        # No frame locals: a database connection error's frames hold the full conninfo,
+        # password included, and Sentry's scrubber only matches variable names.
+        include_local_variables=False,
     )
     return True

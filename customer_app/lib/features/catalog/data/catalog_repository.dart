@@ -5,8 +5,9 @@ import '../domain/catalog_models.dart';
 /// `ApiError`; a 404 `STORE_NOT_FOUND` means the saved store is gone (drop
 /// it and check serviceability again).
 ///
-/// TODO(api): add `ApiCatalogRepository` on the generated client when the
-/// Phase 2 contract lands. Until then the app uses [FakeCatalogRepository].
+/// The app uses `ApiCatalogRepository` (the generated `CatalogApi`).
+/// `FakeCatalogRepository` is only a test double and the dev flavor's
+/// `FAKE_API=true` stand-in; staging and prod never use it.
 abstract interface class CatalogRepository {
   /// `GET /home/`.
   Future<HomeFeed> home();

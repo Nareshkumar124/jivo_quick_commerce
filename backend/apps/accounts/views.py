@@ -6,12 +6,12 @@ user's id is a 404). The 426/503 guard runs in `apps.cms.middleware`.
 """
 
 from django.shortcuts import get_object_or_404
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenRefreshView as SimpleJWTTokenRefreshView
 
 from apps.accounts import examples as ex
@@ -38,10 +38,12 @@ from apps.core.net import client_ip
 from apps.core.pagination import StandardPagination
 from apps.core.schema import (
     NOT_FOUND,
+    PAGINATION_PARAMETERS,
     UNAUTHORIZED,
     app_responses,
     error_example,
     error_response,
+    paginated_responses,
     validation_error,
 )
 
@@ -245,7 +247,9 @@ class OtpVerifyView(OtpThrottleMixin, _PublicView):
 
 
 class TokenRefreshView(SimpleJWTTokenRefreshView):
-    """simplejwt refresh with rotation: the old refresh token is blacklisted on use."""
+    """Refresh with rotation: the old refresh token is redeemed exactly once, atomically
+    (`auth.rotate_refresh_token`). Subclasses simplejwt's view for its `WWW-Authenticate`
+    header on 401 (DRF would turn a 401 into a 403 without one)."""
 
     @extend_schema(
         operation_id="auth_token_refresh",
@@ -289,7 +293,13 @@ class TokenRefreshView(SimpleJWTTokenRefreshView):
         },
     )
     def post(self, request: Request, *args, **kwargs) -> Response:
-        return super().post(request, *args, **kwargs)
+        serializer = TokenRefreshSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            access, refresh = auth.rotate_refresh_token(serializer.validated_data["refresh"])
+        except TokenError as exc:
+            raise InvalidToken(exc.args[0]) from exc
+        return Response({"access": access, "refresh": refresh})
 
 
 class LogoutView(APIView):
@@ -514,18 +524,8 @@ class AddressListCreateView(APIView):
         tags=["addresses"],
         summary="My saved addresses",
         description="The caller's addresses (deleted ones excluded), default first, then newest.",
-        parameters=[
-            OpenApiParameter(
-                "page", OpenApiTypes.INT, description="Page number (1-based).", required=False
-            ),
-            OpenApiParameter(
-                "page_size",
-                OpenApiTypes.INT,
-                description="Items per page: default 20, max 100.",
-                required=False,
-            ),
-        ],
-        responses=app_responses(
+        parameters=PAGINATION_PARAMETERS,
+        responses=paginated_responses(
             {
                 200: _ok(
                     PaginatedAddressListSerializer, "One page.", ("Two addresses", ex.ADDRESS_PAGE)
