@@ -197,28 +197,99 @@ class TestCustomerAdmin:
             == 403
         )
 
-    def test_read_only_roles_cannot_run_actions(self, client, customer):
+    @pytest.mark.parametrize("action", ["block", "unblock", "anonymise_now"])
+    def test_read_only_roles_cannot_run_actions(self, client, customer, action):
+        """A viewer has no actions at all, so an action POST (even a confirmed anonymise) is
+        just the list page again and changes nothing."""
+        customer.is_active = action != "block"
+        customer.deleted_at = timezone.now() if action == "anonymise_now" else None
+        customer.save()
         viewer = StaffUserFactory()
         viewer.user_permissions.add(
             Permission.objects.get(codename="view_customer", content_type__app_label="accounts")
         )
         client.force_login(viewer)
         response = client.post(
+            reverse(self.URL),
+            {"action": action, "_selected_action": [customer.pk], "confirm": "yes"},
+        )
+        assert response.status_code == 200
+        before = (customer.is_active, customer.anonymised_at)
+        customer.refresh_from_db()
+        assert (customer.is_active, customer.anonymised_at) == before
+
+
+class TestBlockAdapter:
+    """Block / unblock go through one adapter (`set_customer_blocked`), to be replaced by the
+    backend's block_customer / unblock_customer services after the merge."""
+
+    URL = "admin:accounts_customer_changelist"
+
+    def test_block_deactivates_and_bumps_updated_at(self, client, customer):
+        before = customer.updated_at
+        client.force_login(staff_in_role(roles.SUPPORT))
+        response = client.post(
             reverse(self.URL), {"action": "block", "_selected_action": [customer.pk]}
         )
+        assert response.status_code == 302
         customer.refresh_from_db()
-        assert customer.is_active
-        assert response.status_code in (200, 302, 403)
+        assert customer.is_active is False
+        assert customer.updated_at > before
+
+    def test_unblock_saves_each_row_and_bumps_updated_at(self, client, customer):
+        customer.is_active = False
+        customer.save()
+        before = customer.updated_at
+        client.force_login(staff_in_role(roles.OPS))
+        client.post(reverse(self.URL), {"action": "unblock", "_selected_action": [customer.pk]})
+        customer.refresh_from_db()
+        assert customer.is_active is True
+        assert customer.updated_at > before
+
+    def test_unblock_never_revives_an_anonymised_account(self, client, customer):
+        customer.is_active = False
+        customer.deleted_at = timezone.now()
+        customer.anonymised_at = timezone.now()
+        customer.save()
+        client.force_login(staff_in_role(roles.OPS))
+        response = client.post(
+            reverse(self.URL),
+            {"action": "unblock", "_selected_action": [customer.pk]},
+            follow=True,
+        )
+        customer.refresh_from_db()
+        assert customer.is_active is False
+        assert "Skipped 1 anonymised account(s)" in response.content.decode()
+
+    def test_block_needs_the_csrf_token(self, customer):
+        from django.test import Client
+
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(staff_in_role(roles.SUPPORT))
+        url = reverse(self.URL)
+        data = {"action": "block", "_selected_action": [customer.pk]}
+        assert client.post(url, data).status_code == 403
+        customer.refresh_from_db()
+        assert customer.is_active is True
+        token = client.get(url).cookies["csrftoken"].value
+        response = client.post(url, {**data, "csrfmiddlewaretoken": token})
+        assert response.status_code == 302
+        customer.refresh_from_db()
+        assert customer.is_active is False
 
 
 class TestAnonymiseConfirmation:
+    """DL-35 (PM default, awaiting the user's confirmation): superusers only."""
+
+    URL = "admin:accounts_customer_changelist"
+
     def test_first_post_asks_and_changes_nothing(self, client, customer):
         customer.deleted_at = timezone.now()
         customer.save()
         other = UserFactory(name="Not Leaving")
-        client.force_login(staff_in_role(roles.SUPPORT))
+        client.force_login(SuperUserFactory())
         response = client.post(
-            reverse("admin:accounts_customer_changelist"),
+            reverse(self.URL),
             {"action": "anonymise_now", "_selected_action": [customer.pk, other.pk]},
         )
         assert response.status_code == 200
@@ -233,9 +304,9 @@ class TestAnonymiseConfirmation:
         customer.deleted_at = timezone.now()
         customer.save()
         other = UserFactory(name="Not Leaving")
-        client.force_login(staff_in_role(roles.SUPPORT))
+        client.force_login(SuperUserFactory())
         response = client.post(
-            reverse("admin:accounts_customer_changelist"),
+            reverse(self.URL),
             {
                 "action": "anonymise_now",
                 "_selected_action": [customer.pk, other.pk],
@@ -249,6 +320,32 @@ class TestAnonymiseConfirmation:
         assert customer.phone is None
         assert not Address.objects.filter(user=customer).exists()
         assert other.anonymised_at is None
+
+    @pytest.mark.parametrize("role", [roles.SUPPORT, roles.OPS, roles.SUPER_ADMIN])
+    @pytest.mark.parametrize("confirm", [False, True])
+    def test_roles_without_the_superuser_flag_cannot_anonymise(
+        self, client, customer, role, confirm
+    ):
+        """Support and Ops hold change_customer, and a Super Admin group member without the
+        superuser flag holds everything else; none of them gets the action. The POST comes
+        back to the list with "No action selected" (302) and nothing is erased."""
+        customer.deleted_at = timezone.now()
+        customer.save()
+        client.force_login(staff_in_role(role))
+        changelist = client.get(reverse(self.URL)).content.decode()
+        assert "anonymise_now" not in changelist
+        data = {"action": "anonymise_now", "_selected_action": [customer.pk]}
+        if confirm:
+            data["confirm"] = "yes"
+        response = client.post(reverse(self.URL), data)
+        assert response.status_code == 302
+        customer.refresh_from_db()
+        assert customer.anonymised_at is None
+        assert customer.phone is not None
+
+    def test_superuser_sees_the_action(self, client, customer):
+        client.force_login(SuperUserFactory())
+        assert "anonymise_now" in client.get(reverse(self.URL)).content.decode()
 
 
 class TestRolesAdmin:
@@ -341,3 +438,73 @@ def test_customer_proxy_excludes_staff():
     UserFactory()
     StaffUserFactory()
     assert Customer.objects.count() == 1
+
+
+class TestStaffStoreAccess:
+    """05 §2 "store assignment for store staff/managers", saved through the stores services."""
+
+    def change_data(self, response) -> dict:
+        """The change form's current values, as the browser would post them."""
+        form = response.context["adminform"].form
+        data = {}
+        for name, field in form.fields.items():
+            if name in ("password",) or field.disabled:
+                continue
+            value = form.initial.get(name, field.initial)
+            if isinstance(value, bool):
+                if value:
+                    data[name] = "on"
+            elif isinstance(value, list | tuple):
+                data[name] = [getattr(item, "pk", item) for item in value]
+            elif hasattr(value, "all"):
+                data[name] = [item.pk for item in value.all()]
+            elif value is not None:
+                data[name] = value
+        for inline in response.context["inline_admin_formsets"]:
+            management = inline.formset.management_form
+            for name in management.fields:
+                data[f"{management.prefix}-{name}"] = management.initial.get(name, 0)
+            for index, inline_form in enumerate(inline.formset.forms):
+                prefix = inline.formset.prefix
+                data[f"{prefix}-{index}-id"] = inline_form.instance.pk or ""
+                data[f"{prefix}-{index}-user"] = inline_form.instance.user_id or ""
+        data["_save"] = "Save"
+        return data
+
+    def test_super_admin_assigns_and_removes_a_store(self, client):
+        from apps.stores.models import StaffStoreAccess
+        from apps.stores.tests.factories import DarkStoreFactory
+
+        store = DarkStoreFactory(code="GGN-01")
+        manager = staff_in_role(roles.STORE_MANAGER, email="manager@jivo.test")
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        url = reverse("admin:accounts_user_change", args=[manager.pk])
+        response = client.get(url)
+        assert "Store access" in response.content.decode()
+        data = self.change_data(response)
+        data.update(
+            {
+                "store_access-TOTAL_FORMS": 1,
+                "store_access-0-id": "",
+                "store_access-0-user": manager.pk,
+                "store_access-0-store": store.pk,
+            }
+        )
+        response = client.post(url, data)
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        access = StaffStoreAccess.objects.get(user=manager)
+        assert access.store == store
+        from django.contrib.admin.models import LogEntry
+
+        entry = LogEntry.objects.filter(object_id=str(manager.pk)).latest("action_time")
+        assert "Added staff store access" in entry.get_change_message()  # the admin audit trail
+
+        data = self.change_data(client.get(url))
+        data["store_access-0-DELETE"] = "on"
+        assert client.post(url, data).status_code == 302
+        assert not StaffStoreAccess.objects.filter(user=manager).exists()
+
+    def test_customers_have_no_store_access_section(self, client, customer):
+        client.force_login(SuperUserFactory())
+        html = client.get(reverse("admin:accounts_user_change", args=[customer.pk])).content
+        assert b"store_access-TOTAL_FORMS" not in html

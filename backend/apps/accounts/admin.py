@@ -202,14 +202,19 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
         if formset.model is not StaffStoreAccess:
             return super().save_formset(request, form, formset, change)
         user = form.instance
+        # What formset.save() would record, for the admin's change message (LogEntry).
+        formset.new_objects, formset.changed_objects, formset.deleted_objects = [], [], []
         for inline_form in formset.deleted_forms:
             if inline_form.instance.pk:
                 revoke_store_access(user, inline_form.instance.store)
+                formset.deleted_objects.append(inline_form.instance)
         for inline_form in formset.forms:
             if inline_form in formset.deleted_forms or not inline_form.has_changed():
                 continue
-            if inline_form.instance.pk is None and inline_form.cleaned_data.get("store"):
-                grant_store_access(user, inline_form.cleaned_data["store"])
+            store = inline_form.cleaned_data.get("store")
+            if inline_form.instance.pk is None and store is not None:
+                grant_store_access(user, store)
+                formset.new_objects.append(StaffStoreAccess.objects.get(user=user, store=store))
         return None
 
     @display(description="Roles")
