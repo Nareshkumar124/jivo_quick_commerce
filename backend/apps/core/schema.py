@@ -113,8 +113,7 @@ PAGE_NOT_FOUND = error_example(
 )
 
 INVALID_PAGE = error_response(
-    "`page` is not a page of this list: 0, past the last page, or not a number. "
-    "Go back to page 1.",
+    "`page` is not a page of this list: 0, past the last page, or not a number. Go back to page 1.",
     PAGE_NOT_FOUND,
 )
 

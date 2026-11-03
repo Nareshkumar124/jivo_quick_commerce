@@ -170,9 +170,7 @@ def apply_inward_batch(
         raise ValidationError({"reason": "Give a reason for the adjustment."})
     codes = {row.sku.strip() for row in rows}
     # SKU first: a SAP item code only matches a code that is no variant's SKU (review #5).
-    variants = {
-        v.sap_item_code: v for v in ProductVariant.objects.filter(sap_item_code__in=codes)
-    }
+    variants = {v.sap_item_code: v for v in ProductVariant.objects.filter(sap_item_code__in=codes)}
     variants.update({v.sku: v for v in ProductVariant.objects.filter(sku__in=codes)})
     errors = []
     for line, row in enumerate(rows, start=1):

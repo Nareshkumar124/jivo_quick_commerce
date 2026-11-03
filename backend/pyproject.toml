@@ -18,11 +18,14 @@ dependencies = [
     "celery[redis]==5.6.3",                 # the redis extra keeps redis-py inside kombu's tested range
     "django-celery-beat==2.9.0",
     "redis==6.4.0",
-    "psycopg[binary]==3.3.6",
+    "psycopg[binary,pool]==3.3.6",
+    "psycopg-pool==3.3.3",                  # T-218: connection pool for the ASGI web process
     "python-dotenv==1.2.4",
     "django-storages[s3]==1.14.6",
     "django-unfold==0.110.1",
     "django-import-export==4.4.4",
+    "tablib[xlsx]==3.10.0",                 # Excel import/export in the admin (05 §2); same tablib
+    "openpyxl==3.1.5",                      #   as import-export already uses, plus its xlsx extra
     "django-simple-history==3.13.0",
     "django-axes==9.0.0",                   # staff login throttling (09 §3.1)
     "weasyprint==70.0",                     # needs pango at runtime (installed in the Docker image)
@@ -89,7 +92,10 @@ testpaths = ["apps", "tests"]
 python_files = ["test_*.py"]
 # --reuse-db keeps `test_jivo_quick_commerce` between runs (Django still applies new migrations).
 # Use --create-db to rebuild it from scratch.
-addopts = "--reuse-db --strict-markers -ra --cov --cov-report=term-missing:skip-covered"
+# --tb=short: long tracebacks print function arguments, and a database connection error then
+# shows the full conninfo, password included (seen during the 2026-11-03 outage). Never use
+# --tb=long or --showlocals against a real database.
+addopts = "--reuse-db --strict-markers -ra --tb=short --cov --cov-report=term-missing:skip-covered"
 filterwarnings = [
     "error::RuntimeWarning",
 ]

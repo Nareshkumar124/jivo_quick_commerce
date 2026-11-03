@@ -34,13 +34,16 @@ DATABASES = {
     "default": {
         **DATABASES["default"],
         "OPTIONS": {
-            **DATABASES["default"]["OPTIONS"],
+            **{k: v for k, v in DATABASES["default"]["OPTIONS"].items() if k != "pool"},
             "options": (
                 f"-c idle_in_transaction_session_timeout={TEST_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS}"
             ),
         },
     }
 }
+# No connection pool in tests (T-218): test database creation and transactional tests manage
+# connections themselves.
+POSTGRES_POOL = False
 
 # A dedicated Redis DB so tests (which may clear the cache) never touch dev data. REDIS_TEST_URL
 # gives the server; TEST_REDIS_DB (default 15) picks the DB index and overrides the URL's path, so

@@ -284,15 +284,17 @@ def cards(products: Iterable[Product], preferred: dict[int, int] | None = None) 
 # ASCII only: `str.isdigit()` is also true for "²" or "٣" (which `int()` then rejects), and a
 # NUL character must never reach PostgreSQL (psycopg refuses it). Anything that is neither an
 # id nor a well-formed slug is simply "not found", without a query.
-_ID_RE = re.compile(r"[0-9]{1,18}")
+_DIGITS_RE = re.compile(r"[0-9]+")
 _SLUG_RE = re.compile(r"[-a-zA-Z0-9_]+")
+_MAX_ID_DIGITS = 18  # bigint
 
 
 def parse_id_or_slug(value: str | None) -> int | str | None:
-    """`"101"` -> 101, `"canola-oil"` -> `"canola-oil"`, anything else -> None."""
+    """`"101"` -> 101, `"canola-oil"` -> `"canola-oil"`, anything else -> None (slugs are
+    never all digits, so a too-long number is neither)."""
     value = (value or "").strip()
-    if _ID_RE.fullmatch(value):
-        return int(value)
+    if _DIGITS_RE.fullmatch(value):
+        return int(value) if len(value) <= _MAX_ID_DIGITS else None
     if _SLUG_RE.fullmatch(value):
         return value
     return None

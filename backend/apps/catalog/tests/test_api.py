@@ -387,6 +387,7 @@ class TestQueryCounts:
         from apps.inventory.tests.factories import stock
 
         with mock.patch("apps.catalog.views.cached", side_effect=_bypass_cache):
+            store_client.get("/api/v1/home/")  # warm the store snapshot (cached separately)
             with django_assert_max_num_queries(200) as before:
                 store_client.get("/api/v1/home/")
             for _ in range(5):
