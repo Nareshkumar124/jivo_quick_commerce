@@ -4,4 +4,5 @@
 - `auth`: OTP login, token issue/revoke, logout, account deletion and anonymisation
 - `profile`: profile update and push-device registration
 - `addresses`: saved addresses and the default-address rules
+- `customers`: block / unblock a customer from the panel (actor recorded)
 """

@@ -6,9 +6,12 @@ from datetime import timedelta
 from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from rest_framework_simplejwt.exceptions import TokenError
+from django.utils.translation import gettext_lazy as _
+from rest_framework_simplejwt.exceptions import AuthenticationFailed, TokenError
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.utils import datetime_from_epoch
 
 from apps.accounts.choices import OtpPurpose
 from apps.accounts.models import Address, Device, OTPRequest, User
@@ -67,6 +70,57 @@ def login_with_otp(
         user.save()
     access, refresh = issue_tokens(user, app)
     return LoginResult(user, access, refresh, is_new_user, deletion_cancelled)
+
+
+def _outstanding_row(token: RefreshToken) -> OutstandingToken:
+    """The token's `OutstandingToken` row, locked (`SELECT ... FOR UPDATE`). Every token this
+    app issues has one; a validly signed token without one gets it created first."""
+    jti = token.payload[jwt_settings.JTI_CLAIM]
+    row = OutstandingToken.objects.select_for_update().filter(jti=jti).first()
+    if row is not None:
+        return row
+    user_id = token.payload.get(jwt_settings.USER_ID_CLAIM)
+    OutstandingToken.objects.get_or_create(
+        jti=jti,
+        defaults={
+            "user": User.objects.filter(pk=user_id).first() if user_id else None,
+            "created_at": token.current_time,
+            "token": str(token),
+            "expires_at": datetime_from_epoch(token.payload["exp"]),
+        },
+    )
+    return OutstandingToken.objects.select_for_update().get(jti=jti)
+
+
+def rotate_refresh_token(raw: str) -> tuple[str, str]:
+    """`POST /auth/token/refresh/`: redeem a refresh token exactly once (BUG-0003).
+
+    Returns `(access, new_refresh)`. The new refresh token keeps the old one's claims (`app`).
+    Redemption is atomic: the token's outstanding row is locked and the blacklist row is
+    inserted under that lock, so of several concurrent requests with one token exactly one
+    succeeds and the rest get "Token is blacklisted". Raises `TokenError` (invalid, expired or
+    already used) or `AuthenticationFailed` (blocked, deleted or unknown user); the view maps
+    both to 401 `TOKEN_INVALID`.
+    """
+    token = RefreshToken(raw)  # signature, expiry, and a fast blacklist check
+    user_id = token.payload.get(jwt_settings.USER_ID_CLAIM)
+    user = User.objects.filter(pk=user_id).first() if user_id else None
+    if not jwt_settings.USER_AUTHENTICATION_RULE(user):
+        raise AuthenticationFailed(
+            _("No active account found for the given token."), "no_active_account"
+        )
+    with transaction.atomic():
+        _blacklisted, created = BlacklistedToken.objects.get_or_create(
+            token=_outstanding_row(token)
+        )
+        if not created:
+            raise TokenError(_("Token is blacklisted"))
+        access = str(token.access_token)
+        token.set_jti()
+        token.set_exp()
+        token.set_iat()
+        token.outstand()
+    return access, str(token)
 
 
 def revoke_all_tokens(user: User) -> int:
@@ -133,7 +187,26 @@ def anonymise_user(user_id: int) -> bool:
         if phone:
             OTPRequest.objects.filter(phone=phone).delete()
         revoke_all_tokens(user)
+        _scrub_admin_log(user)
     return True
+
+
+def _scrub_admin_log(user: User) -> None:
+    """Admin `LogEntry` rows about this user (block/unblock, staff edits) keep who did what and
+    when, but their `object_repr` (Django fills it with `str(user)`, i.e. the phone) is
+    replaced with a neutral label."""
+    from django.contrib.admin.models import LogEntry
+    from django.contrib.contenttypes.models import ContentType
+
+    from apps.accounts.models import Customer
+
+    content_types = [
+        ContentType.objects.get_for_model(User),
+        ContentType.objects.get_for_model(Customer, for_concrete_model=False),
+    ]
+    LogEntry.objects.filter(content_type__in=content_types, object_id=str(user.pk)).update(
+        object_repr=f"Customer {user.pk}"
+    )
 
 
 def anonymise_due_accounts() -> int:

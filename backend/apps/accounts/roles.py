@@ -71,8 +71,22 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
     SUPPORT: [*CUSTOMER_CARE, *CATALOG_VIEW],  # 05 §3: Customers (PII) ✔
     FINANCE: [*INVENTORY_VIEW, "stores.view_pricingconfig"],
 }
-# Roles limited to the stores in StaffStoreAccess; every other role sees all stores.
+# Roles limited to the stores in StaffStoreAccess.
 STORE_SCOPED_ROLES = frozenset({STORE_MANAGER, STORE_STAFF})
+# Roles that see every store (05 §3). An explicit allow-list: any other group (unknown, or a
+# future role not yet classified) never widens store access. See stores.services.stores_for.
+GLOBAL_ROLES = frozenset({SUPER_ADMIN, OPS, CATALOG_MANAGER, SUPPORT, FINANCE})
+
+
+def is_store_staff_only(user) -> bool:
+    """Staff session policy (05 §5, BUG-0006): True when every role of the user is a store role
+    (Store Manager / Store Staff), so the 8-hour session applies without the 2-hour idle
+    timeout. Superusers, global roles, mixed roles and staff with no role get the stricter
+    admin-role policy."""
+    if user.is_superuser:
+        return False
+    groups = set(user.groups.values_list("name", flat=True))
+    return bool(groups) and groups <= STORE_SCOPED_ROLES
 
 
 def _permissions_for(role: str) -> list[Permission]:

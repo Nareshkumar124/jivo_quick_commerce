@@ -7,12 +7,43 @@ the sum of a row's movement deltas always equals its `on_hand`. `StockReservatio
 movement's `order` link) arrive with orders in Phase 3.
 """
 
+import contextvars
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from simple_history.models import HistoricalRecords
 
 from apps.core.models import TimeStampedModel
+
+STOCK_FIELDS = ("on_hand", "reserved")
+# Fields whose change can change what the catalog publishes (see apps.catalog.apps).
+TRACKED_FIELDS = (*STOCK_FIELDS, "is_available", "price_override")
+MSG_STOCK_GUARD = (
+    "on_hand and reserved change only through apps.inventory.services (every on_hand change "
+    "writes a StockMovement)."
+)
+_stock_write_allowed = contextvars.ContextVar("inventory_stock_write_allowed", default=False)
+
+
+@contextmanager
+def stock_write() -> Iterator[None]:
+    """Allow writes to `on_hand`/`reserved` inside the block. Only `apps.inventory.services`
+    (and the order/reservation services from Phase 3) open it; tests use the factories."""
+    token = _stock_write_allowed.set(True)
+    try:
+        yield
+    finally:
+        _stock_write_allowed.reset(token)
+
+
+class StoreInventoryQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        if set(STOCK_FIELDS) & kwargs.keys() and not _stock_write_allowed.get():
+            raise ValidationError(MSG_STOCK_GUARD)
+        return super().update(**kwargs)
 
 
 class StoreInventory(TimeStampedModel):
@@ -41,6 +72,8 @@ class StoreInventory(TimeStampedModel):
     )
     rack_location = models.CharField(max_length=30, blank=True)
     history = HistoricalRecords()
+
+    objects = StoreInventoryQuerySet.as_manager()
 
     class Meta:
         verbose_name_plural = "store inventory"
@@ -73,6 +106,51 @@ class StoreInventory(TimeStampedModel):
     def available(self) -> int:
         return self.on_hand - self.reserved
 
+    # --- direct-write guard (review #4) and change tracking (catalog cache, review #6) --------
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._remember_loaded()
+        return instance
+
+    def refresh_from_db(self, *args, **kwargs) -> None:
+        super().refresh_from_db(*args, **kwargs)
+        self._remember_loaded()
+
+    def _remember_loaded(self) -> None:
+        self._loaded = {name: self.__dict__.get(name) for name in TRACKED_FIELDS}
+
+    @property
+    def loaded_values(self) -> dict:
+        """The tracked fields as last read from or written to the database (a new row: its
+        defaults, i.e. zero stock)."""
+        loaded = getattr(self, "_loaded", None)
+        if loaded is None:
+            return {"on_hand": 0, "reserved": 0, "is_available": True, "price_override": None}
+        return loaded
+
+    def save(self, *args, **kwargs) -> None:
+        if not _stock_write_allowed.get():
+            update_fields = kwargs.get("update_fields")
+            for name in STOCK_FIELDS:
+                if update_fields is not None and name not in update_fields:
+                    continue
+                if self.__dict__.get(name) != self.loaded_values[name]:
+                    raise ValidationError({name: MSG_STOCK_GUARD})
+        super().save(*args, **kwargs)
+        self._remember_loaded()
+
+    def clean(self) -> None:
+        super().clean()
+        if self.price_override is not None:
+            if self.price_override <= 0:
+                raise ValidationError({"price_override": "Must be above 0."})
+            if self.variant_id is not None and self.price_override > self.variant.mrp:
+                raise ValidationError(
+                    {"price_override": f"Cannot be above the MRP ({self.variant.mrp})."}
+                )
+
 
 class MovementType(models.TextChoices):
     INWARD = "INWARD", "Inward (received)"
@@ -82,6 +160,17 @@ class MovementType(models.TextChoices):
     AUDIT_ADJUSTMENT = "AUDIT_ADJUSTMENT", "Audit correction"
     TRANSFER_IN = "TRANSFER_IN", "Transfer in"
     TRANSFER_OUT = "TRANSFER_OUT", "Transfer out"
+
+
+class StockMovementQuerySet(models.QuerySet):
+    """Append-only: no bulk update or delete either (review #4). Django's SET_NULL on
+    `created_by` when a user is deleted runs as a direct SQL update, so it still works."""
+
+    def update(self, **kwargs):
+        raise ValidationError("Stock movements are append-only.")
+
+    def delete(self):
+        raise ValidationError("Stock movements are append-only.")
 
 
 class StockMovement(models.Model):
@@ -105,6 +194,8 @@ class StockMovement(models.Model):
     )
     on_hand_after = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = StockMovementQuerySet.as_manager()
 
     class Meta:
         ordering = ["-created_at", "-id"]

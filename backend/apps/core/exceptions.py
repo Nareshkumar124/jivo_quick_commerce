@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.core.exceptions import RequestDataTooBig, SuspiciousOperation
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import Http404
 from rest_framework import exceptions as drf_exceptions
@@ -127,7 +128,20 @@ def _validation_details(data: Any) -> dict[str, Any]:
 
 
 def _normalise(exc: Exception) -> Exception:
-    """Convert Django exceptions into their DRF equivalents."""
+    """Convert Django exceptions into their DRF equivalents.
+
+    `SuspiciousOperation` is the client's fault, never a 500 (BUG-0001): a body over
+    `DATA_UPLOAD_MAX_MEMORY_SIZE` is 413 `PAYLOAD_TOO_LARGE`; the others (too many fields,
+    files, ...) are 400 `VALIDATION_ERROR`, as Django itself answers them. Logged at WARNING on
+    the `django.security` loggers, like Django does."""
+    if isinstance(exc, SuspiciousOperation):
+        logging.getLogger(f"django.security.{type(exc).__name__}").warning("%s", exc)
+        if isinstance(exc, RequestDataTooBig):
+            return ApiError(ErrorCode.PAYLOAD_TOO_LARGE)
+        return ApiError(
+            ErrorCode.VALIDATION_ERROR,
+            details={"non_field_errors": ["The request could not be processed."]},
+        )
     if isinstance(exc, Http404):
         return drf_exceptions.NotFound()
     if isinstance(exc, DjangoPermissionDenied):

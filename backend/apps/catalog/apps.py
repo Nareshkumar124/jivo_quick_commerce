@@ -9,7 +9,8 @@ class CatalogConfig(AppConfig):
 
     def ready(self) -> None:
         """Catalog cache invalidation (apps.catalog.cache): any catalog change bumps the global
-        version; a stock row change bumps its store's version. Both after commit."""
+        version; a stock row change bumps its store's version only when it changes what the
+        catalog publishes (review #6). Both after commit."""
         from apps.catalog import models
         from apps.catalog.cache import invalidate_catalog_on_commit, invalidate_store_on_commit
         from apps.inventory.models import StoreInventory
@@ -34,10 +35,16 @@ class CatalogConfig(AppConfig):
                 dispatch_uid=f"catalog-cache-{through.__name__}",
             )
 
-        def store_row_changed(sender, instance, **kwargs) -> None:
+        from apps.catalog.cache import inventory_change_is_published
+
+        def store_row_saved(sender, instance, created, **kwargs) -> None:
+            if created or inventory_change_is_published(instance):
+                invalidate_store_on_commit(instance.store_id)
+
+        def store_row_deleted(sender, instance, **kwargs) -> None:
             invalidate_store_on_commit(instance.store_id)
 
-        post_save.connect(store_row_changed, sender=StoreInventory, dispatch_uid="inv-cache-s")
-        post_delete.connect(store_row_changed, sender=StoreInventory, dispatch_uid="inv-cache-d")
-        # Keep a reference: signal receivers are weak by default.
-        self._store_row_changed = store_row_changed
+        post_save.connect(store_row_saved, sender=StoreInventory, dispatch_uid="inv-cache-s")
+        post_delete.connect(store_row_deleted, sender=StoreInventory, dispatch_uid="inv-cache-d")
+        # Keep references: signal receivers are weak by default.
+        self._store_row_receivers = (store_row_saved, store_row_deleted)
