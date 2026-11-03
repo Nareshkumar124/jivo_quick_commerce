@@ -454,9 +454,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get viewCart => 'View cart';
 
   @override
-  String get cartComingSoon => 'Cart and checkout arrive in the next update.';
-
-  @override
   String deliveryIn(int minutes) {
     String _temp0 = intl.Intl.pluralLogic(
       minutes,
@@ -735,4 +732,366 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addressNotServiceable => 'Not serviceable';
+
+  @override
+  String get cartTitle => 'Cart';
+
+  @override
+  String get cartEmpty =>
+      'Your cart is empty. Add a few Jivo favourites to get started.';
+
+  @override
+  String get startShopping => 'Start shopping';
+
+  @override
+  String get deliverTo => 'Deliver to';
+
+  @override
+  String get changeAddress => 'Change';
+
+  @override
+  String get chooseSavedAddress => 'Choose a saved address to place the order.';
+
+  @override
+  String get selectAddress => 'Select address';
+
+  @override
+  String removeItem(String name) {
+    return 'Remove $name';
+  }
+
+  @override
+  String onlyAvailable(int count) {
+    return 'Only $count available';
+  }
+
+  @override
+  String updateQuantityTo(int count) {
+    return 'Update to $count';
+  }
+
+  @override
+  String get removeAction => 'Remove';
+
+  @override
+  String get cartProblemsBanner =>
+      'Some items changed since you added them. Fix them to continue.';
+
+  @override
+  String freeDeliveryNudge(String amount) {
+    return 'Add $amount more for FREE delivery';
+  }
+
+  @override
+  String get applyCoupon => 'Apply coupon';
+
+  @override
+  String couponApplied(String code) {
+    return '$code applied';
+  }
+
+  @override
+  String couponSaves(String amount) {
+    return 'You save $amount';
+  }
+
+  @override
+  String couponNoLongerApplies(String code) {
+    return '$code no longer applies to this cart';
+  }
+
+  @override
+  String get couponsTitle => 'Coupons';
+
+  @override
+  String get couponCodeLabel => 'Coupon code';
+
+  @override
+  String get couponApply => 'Apply';
+
+  @override
+  String couponApplySemantics(String code) {
+    return 'Apply coupon $code';
+  }
+
+  @override
+  String get couponsEmpty => 'No coupons available right now.';
+
+  @override
+  String couponSavesOnCart(String amount) {
+    return 'Save $amount on this order';
+  }
+
+  @override
+  String couponAddMore(String amount) {
+    return 'Add $amount more to use this coupon';
+  }
+
+  @override
+  String get couponBelowMinimum =>
+      'Your cart is below this coupon\'s minimum order';
+
+  @override
+  String get couponExpired => 'This coupon has expired';
+
+  @override
+  String get couponUsed => 'You\'ve already used this coupon';
+
+  @override
+  String get couponNotApplicable => 'Not applicable on this cart';
+
+  @override
+  String couponAppliedMessage(String code, String amount) {
+    return '$code applied. You save $amount.';
+  }
+
+  @override
+  String get couponCodeRequired => 'Enter a coupon code';
+
+  @override
+  String get tipTitle => 'Tip your delivery partner';
+
+  @override
+  String get tipBody =>
+      'Say thanks with a tip. It goes to your delivery partner.';
+
+  @override
+  String get tipCustom => 'Custom';
+
+  @override
+  String get tipCustomTitle => 'Enter a tip';
+
+  @override
+  String get tipCustomLabel => 'Tip in ₹';
+
+  @override
+  String tipCustomInvalid(int max) {
+    return 'Enter a whole amount from ₹1 to ₹$max';
+  }
+
+  @override
+  String tipChipSemantics(String amount) {
+    return 'Tip $amount';
+  }
+
+  @override
+  String get instructionsTitle => 'Delivery instructions';
+
+  @override
+  String get instructionDontRingBell => 'Don\'t ring the bell';
+
+  @override
+  String get instructionLeaveAtDoor => 'Leave at the door';
+
+  @override
+  String get instructionAvoidCalling => 'Avoid calling';
+
+  @override
+  String get instructionsNoteLabel => 'Note for the delivery partner';
+
+  @override
+  String get instructionsSaved => 'Instructions saved';
+
+  @override
+  String get billTitle => 'Bill details';
+
+  @override
+  String get billItemTotal => 'Item total (MRP)';
+
+  @override
+  String get billProductDiscount => 'Product discount';
+
+  @override
+  String get billCouponDiscount => 'Coupon discount';
+
+  @override
+  String billCouponDiscountCode(String code) {
+    return 'Coupon ($code)';
+  }
+
+  @override
+  String get billDeliveryFee => 'Delivery fee';
+
+  @override
+  String get billFree => 'FREE';
+
+  @override
+  String get billSmallCartFee => 'Small cart fee';
+
+  @override
+  String get billHandlingFee => 'Handling fee';
+
+  @override
+  String get billTip => 'Delivery partner tip';
+
+  @override
+  String get billToPay => 'To pay';
+
+  @override
+  String billSavings(String amount) {
+    return 'You save $amount on this order';
+  }
+
+  @override
+  String minusAmount(String amount) {
+    return '−$amount';
+  }
+
+  @override
+  String minimumOrderShortfall(String amount, String shortfall) {
+    return 'Minimum order is $amount. Add $shortfall more to check out.';
+  }
+
+  @override
+  String minimumOrderNotMet(String amount) {
+    return 'Minimum order is $amount.';
+  }
+
+  @override
+  String get cartStoreClosed =>
+      'The store is closed right now. You can check out when it opens.';
+
+  @override
+  String get proceedToCheckout => 'Proceed to checkout';
+
+  @override
+  String get cartReviewChanges =>
+      'Some items in your cart changed. Please review them.';
+
+  @override
+  String get checkoutTitle => 'Payment';
+
+  @override
+  String get payWith => 'Pay with';
+
+  @override
+  String get payOnline => 'Pay online';
+
+  @override
+  String get payOnlineSubtitle => 'UPI, cards, net banking and wallets';
+
+  @override
+  String get payCod => 'Cash on delivery';
+
+  @override
+  String get payCodSubtitle => 'Pay by cash or UPI when your order arrives';
+
+  @override
+  String get placeOrder => 'Place order';
+
+  @override
+  String payAmount(String amount) {
+    return 'Pay $amount';
+  }
+
+  @override
+  String get checkoutPlacing => 'Placing your order…';
+
+  @override
+  String get checkoutPaying => 'Waiting for your payment…';
+
+  @override
+  String get checkoutVerifying => 'Confirming your payment…';
+
+  @override
+  String get orderPlacedTitle => 'Order placed!';
+
+  @override
+  String orderNumber(String number) {
+    return 'Order $number';
+  }
+
+  @override
+  String orderEta(int minutes) {
+    return 'Arriving in about $minutes min';
+  }
+
+  @override
+  String paidOnlineAmount(String amount) {
+    return 'Paid $amount online';
+  }
+
+  @override
+  String payOnDeliveryAmount(String amount) {
+    return 'Pay $amount on delivery';
+  }
+
+  @override
+  String get trackOrder => 'Track order';
+
+  @override
+  String get continueShopping => 'Continue shopping';
+
+  @override
+  String get trackingComingSoon => 'Order tracking arrives in a later update.';
+
+  @override
+  String get paymentFailedTitle => 'Payment failed';
+
+  @override
+  String paymentNotCompleted(String number) {
+    return 'The payment for order $number wasn\'t completed.';
+  }
+
+  @override
+  String get paymentCancelled => 'You closed the payment before it finished.';
+
+  @override
+  String paymentPayBy(String time) {
+    return 'Pay by $time to keep this order.';
+  }
+
+  @override
+  String get retryPayment => 'Retry payment';
+
+  @override
+  String get changePaymentMethod => 'Change payment method';
+
+  @override
+  String get cancelOrder => 'Cancel order';
+
+  @override
+  String get cancelOrderConfirm => 'Cancel this order?';
+
+  @override
+  String get keepOrder => 'Keep order';
+
+  @override
+  String get orderCancelled => 'Order cancelled';
+
+  @override
+  String paymentWindowOver(String number) {
+    return 'The time to pay for order $number has run out, so it wasn\'t placed. Your items are still in your cart.';
+  }
+
+  @override
+  String paymentOrderCancelled(String number) {
+    return 'Order $number was cancelled.';
+  }
+
+  @override
+  String get backToCart => 'Back to cart';
+
+  @override
+  String get fakePaymentTitle => 'Test payment (dev build)';
+
+  @override
+  String fakePaymentBody(String amount) {
+    return 'No real money moves. Choose how paying $amount ends.';
+  }
+
+  @override
+  String get fakePaymentSucceed => 'Payment succeeds';
+
+  @override
+  String get fakePaymentBadSignature => 'Succeeds with a bad signature';
+
+  @override
+  String get fakePaymentFail => 'Payment fails';
+
+  @override
+  String get fakePaymentWallet => 'External wallet (result by webhook)';
+
+  @override
+  String get fakePaymentCancel => 'Close checkout';
 }

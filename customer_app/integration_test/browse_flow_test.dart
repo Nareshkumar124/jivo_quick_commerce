@@ -1,6 +1,7 @@
 // Phase 2 critical flow (T-209): log in, detect the delivery location
 // (serviceability), home with the store's products, a product page, search,
-// add to the in-memory cart (dev flavor only until the Phase 3 cart API).
+// add to the dev fake cart (dev flavor only until the Phase 3 cart API is
+// wired at S3-A; TODO(api)).
 //
 // Against the real backend (the default; Android emulator, dev flavor):
 //   flutter test integration_test/browse_flow_test.dart --flavor dev \
@@ -218,7 +219,7 @@ void main() {
       );
       expect(results, isNotEmpty);
 
-      // 6. Add a single-variant, in-stock result to the in-memory cart.
+      // 6. Add a single-variant, in-stock result to the (dev fake) cart.
       final pick = results.firstWhere(
         (p) => p.variants.length == 1 && p.defaultVariant.inStock,
         orElse: () => fail('no single-variant in-stock result'),

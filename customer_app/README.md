@@ -211,6 +211,29 @@ The iOS config pair (`.i.olf`/`.i.conf`) is still pending. On a Mac:
 
 Until then iOS always shows the no-map fallback.
 
+## Payments: Razorpay (D-01)
+
+`razorpay_flutter` 1.4.7 sits behind `PaymentLauncher`
+(`lib/features/checkout/data/`). The app never trusts the SDK's answer: an
+order is shown as placed only after `POST /payments/razorpay/verify/` (or
+the order's server status) confirms it (`08 §4`).
+- **Staging / prod:** `RazorpayPaymentLauncher` opens Standard Checkout with
+  the `key_id`, Razorpay `order_id`, amount and prefill that `POST /orders/`
+  returns. Only the public key id ever reaches the app.
+- **Dev:** there are no Razorpay test keys yet, so `FakePaymentLauncher`
+  shows a "Test payment (dev build)" sheet: success, a bad signature,
+  failure, an external wallet (result by webhook) or closing checkout. Its
+  signature scheme is a `// TODO(api)` until the backend publishes its fake
+  gateway's scheme.
+- **Release builds (R8):** `android/app/proguard-rules.pro` holds Razorpay's
+  documented keep rules; the Flutter Gradle plugin adds that file to every
+  release build automatically. The plugin depends on
+  `com.razorpay:checkout:1.6.+`, a floating version, so a rebuild can pick
+  up a newer 1.6.x SDK. Check the resolved version after builds
+  (`./gradlew :app:dependencies --configuration devReleaseRuntimeClasspath | grep razorpay`).
+- `razorpay_flutter` registers through `GeneratedPluginRegistrant` like any
+  plugin; the Mappls strip task removes only `MapplsMapsPlugin`.
+
 ## Tests
 
 ```sh
@@ -222,7 +245,7 @@ Integration tests run on an emulator or device, one file at a time:
 | File | Flow | Default backend |
 |------|------|-----------------|
 | `integration_test/login_flow_test.dart` | P1: phone, OTP, profile, address, logout | fakes; `--dart-define=REAL_API=true` for the real API |
-| `integration_test/browse_flow_test.dart` | P2: login, detect location (serviceability), home, product, search, add to the dev in-memory cart | **real API**; `--dart-define=FAKE_API=true` for fakes |
+| `integration_test/browse_flow_test.dart` | P2: login, detect location (serviceability), home, product, search, add to the dev fake cart (TODO(api) until S3-A) | **real API**; `--dart-define=FAKE_API=true` for fakes |
 | `integration_test/map_picker_test.dart` | Mappls map or fallback (D-03) | none |
 
 ```sh

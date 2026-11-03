@@ -53,7 +53,10 @@ class AddStepper extends ConsumerWidget {
         semanticsLabel: l10n.addToCartSemantics(productName),
         onPressed: pending
             ? null
-            : () => _run(context, () => cart.increment(variant)),
+            : () => _run(
+                context,
+                () => cart.increment(variant, productName: productName),
+              ),
       );
     }
     return QuantityStepper(
@@ -65,7 +68,10 @@ class AddStepper extends ConsumerWidget {
           : () => _run(context, () => cart.decrement(variant)),
       onIncrement: pending
           ? null
-          : () => _run(context, () => cart.increment(variant)),
+          : () => _run(
+              context,
+              () => cart.increment(variant, productName: productName),
+            ),
     );
   }
 }

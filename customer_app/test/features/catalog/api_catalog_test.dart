@@ -4,6 +4,7 @@ import 'package:customer_app/app/providers.dart';
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/auth/data/fake_token_refresher.dart';
 import 'package:customer_app/features/cart/data/cart_repository.dart';
+import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/catalog/data/api_catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
@@ -288,9 +289,11 @@ void main() {
         dev.read(serviceabilityRepositoryProvider),
         isA<ApiServiceabilityRepository>(),
       );
-      // The in-memory cart is dev-only, until the Phase 3 server cart.
+      // The fake cart and orders are dev-only, until the Phase 3 cart API
+      // is wired (S3-A).
       expect(dev.read(cartAvailableProvider), isTrue);
-      expect(dev.read(cartRepositoryProvider), isA<InMemoryCartRepository>());
+      expect(dev.read(cartRepositoryProvider), isA<FakeCommerceBackend>());
+      expect(dev.read(orderRepositoryProvider), isA<FakeCommerceBackend>());
 
       final fake = await containerFor(
         AppEnv.resolve(flavor: Flavor.dev, useFakeApi: true),

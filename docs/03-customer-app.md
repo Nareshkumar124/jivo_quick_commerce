@@ -35,7 +35,7 @@ flowchart TD
     P --> HS[Help & support]
 ```
 
-A floating **cart bar** ("2 items · ₹348 · View cart") stays visible on Home, Category, Product list, Product detail and Search when the cart is not empty. The amount is the server's cart total; until the cart API (P3) it shows the item count only.
+A floating **cart bar** ("2 items · ₹348 · View cart") stays visible on Home, Category, Product list, Product detail and Search when the cart is not empty. The amount is the server's item total (`bill.item_total`), shown only when the server sends it; it opens the cart.
 
 Until a delivery location is chosen, Home shows a "Choose a delivery location" prompt that opens the location screen (instead of a forced redirect after login); catalog data needs a store.
 
@@ -89,7 +89,7 @@ Until a delivery location is chosen, Home shows a "Choose a delivery location" p
 | Previously bought | Rail of variants from past delivered orders (when logged in and history exists) |
 | Pull to refresh | Reloads home and re-checks serviceability |
 
-**Phase 2 cart stand-in** (until the Phase 3 cart API, §2.8): the **dev** flavor keeps ADD/stepper quantities in memory, and its cart bar shows the item count only, because the app never computes money. **Staging and prod** show "Cart coming soon" in place of ADD and no cart bar. Catalog data is always the real API (`GET /home/`, `/categories/`, `/products/`, `/collections/{slug}/`, `/search/`, `/search/suggest/`, each with `X-Store-Id`). The fake catalog only serves tests and the dev flavor's `FAKE_API=true`.
+**Cart stand-in until the Phase 3 cart API is wired (S3-A)** (§2.8): the **dev** flavor uses a fake server cart and order backend (`FakeCommerceBackend`, `// TODO(api)`) that plays the server, including a bill from demo rule values (D-09 undecided); it is the only code in the app that adds money up, and the screens render its bill exactly as they will render the API's. **Staging and prod** still show "Cart coming soon" in place of ADD and no cart bar. Catalog data is always the real API (`GET /home/`, `/categories/`, `/products/`, `/collections/{slug}/`, `/search/`, `/search/suggest/`, each with `X-Store-Id`). The fake catalog only serves tests and the dev flavor's `FAKE_API=true`.
 
 All product tiles show the image, name, variant (e.g., 1 L), selling price, struck-out MRP, a discount badge ("12% OFF", the server's `discount_percent` when above 0) and an **ADD** button that becomes a − qty + stepper. Out-of-stock tiles are greyed out with "Out of stock". A product with several variants shows "1 L · 3 options"; its ADD (and its stepper, which shows the total over its variants) opens a variant picker with a stepper per variant.
 
@@ -131,6 +131,17 @@ All product tiles show the image, name, variant (e.g., 1 L), selling price, stru
 | Payment result | Success leads to verify-on-server then the success screen. Failure or cancel shows "Payment failed" with **Retry** (within 15 min) and **Change method**. |
 | Order success | Animation, order number, ETA, "Track order" |
 | Edge cases | App killed mid-payment: on next launch, pending orders are fetched and the server status (webhook-confirmed) is shown. Double-tap protection on Place Order. |
+
+**How the P3 screens behave** (built 2026-11-03 against fakes; the open points are listed for the backend and Jivo):
+- **Money is rendered, never derived.** Bill rows are the server's strings; zero rows are hidden (delivery shows FREE). The "Add ₹X more for free delivery" nudge, "You save ₹X", the minimum-order message and COD eligibility appear **only when the server sends those fields**; the app does not compute them.
+- **Stock re-validation:** the cart reloads on open and again on "Proceed to checkout". Reduced or unavailable lines show a flag with a fix action ("Update to N" / "Remove"), and checkout stays disabled until they are fixed. Checkout is also disabled below the minimum order, while the store is closed, and while a change to the bill is in flight.
+- **Saved address required:** `POST /orders/` needs an `address_id`, so a detected or pinned location without a saved address shows "Choose a saved address to place the order" and Place order stays disabled.
+- **Tip:** ₹10 / ₹20 / ₹30 chips; tapping the selected chip removes the tip. Custom tips accept whole rupees from ₹1 to ₹500 (provisional until D-09; the server validates).
+- **Instructions:** the three chips save as they are toggled; the note (up to 200 characters, provisional) saves with its button or the keyboard's Done.
+- **Place order:** online is the default method. The button is disabled while the order is placed and paid, Back is blocked during that time, and an `Idempotency-Key` is reused when the outcome is unknown (timeout, lost connection), so a retry can't create a second order.
+- **Payment failed screen** first re-reads the order's status from the server, so a webhook-confirmed payment moves on to success. For a `PAYMENT_PENDING` order it offers **Retry payment** (until the payment window ends, "Pay by 3:45 pm"), **Change payment method** (cancels the unpaid order, T5, and reopens checkout with the cart intact) and **Cancel order** (T5, after a confirmation). An expired order (`PAYMENT_FAILED`, T4) shows "the time to pay has run out" and Back to cart. Back from this screen goes Home.
+- **Order success** is reached only after the server confirmed the order (COD placed, or verify succeeded). Back goes Home, never to checkout. "Track order" says tracking arrives later until the order detail (P4) and live tracking (P6) screens exist.
+- **Dev builds** have no Razorpay test keys yet (D-01): a "Test payment (dev build)" sheet stands in for Razorpay checkout and lets the tester choose success, a bad signature, failure, an external wallet or closing checkout. Staging and prod use the real Razorpay SDK.
 
 ### 2.10 Orders & tracking [P4 history, P6 live]
 | Feature | Details |

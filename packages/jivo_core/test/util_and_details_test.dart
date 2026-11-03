@@ -23,6 +23,27 @@ void main() {
       expect(isVersionBelow('1.0.0', null), isFalse);
       expect(isVersionBelow('1.0.0', ''), isFalse);
     });
+
+    // The rider app's old version tests, kept when it moved to jivo_core.
+    test('isVersionBelow ignores a build suffix', () {
+      expect(isVersionBelow('1.0.0+7', '1.0.1'), isTrue);
+      expect(isVersionBelow('1.0.1+7', '1.0.1'), isFalse);
+      expect(isVersionBelow('1.0.2+1', '1.0.1'), isFalse);
+    });
+
+    test('isVersionBelow pads a short version with zeros', () {
+      expect(isVersionBelow('1', '1.0.1'), isTrue);
+      expect(isVersionBelow('1.0.1', '1'), isFalse);
+      expect(isVersionBelow('1', '1.0.0'), isFalse);
+      expect(isVersionBelow('2', '1.9.9'), isFalse);
+    });
+
+    test('isVersionBelow trims surrounding spaces', () {
+      expect(isVersionBelow(' 1.0.0 ', '1.0.1'), isTrue);
+      expect(isVersionBelow('1.0.1', '  1.0.1  '), isFalse);
+      expect(isVersionBelow(' 1.0.1+3 ', ' 1.0.1 '), isFalse);
+      expect(isVersionBelow('1.0.0', '   '), isFalse); // blank minimum
+    });
   });
 
   group('apiErrorMessageWithDetails', () {

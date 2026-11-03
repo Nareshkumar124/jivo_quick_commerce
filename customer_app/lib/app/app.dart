@@ -5,11 +5,14 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../features/addresses/presentation/address_controllers.dart';
 import '../features/auth/presentation/auth_flow.dart';
+import '../features/cart/presentation/cart_controller.dart';
+import '../features/checkout/presentation/checkout_controller.dart';
 import '../features/profile/presentation/profile_controllers.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/offline_banner.dart';
 import 'launch_state.dart';
 import 'providers.dart';
+import 'repositories.dart';
 import 'router.dart';
 
 /// Clears user data when the session ends (logout, deletion, expiry).
@@ -18,6 +21,11 @@ final signOutCleanupProvider = Provider<void>((ref) {
     ref.invalidate(currentUserProvider);
     ref.invalidate(addressListProvider);
     ref.invalidate(authFlowProvider);
+    // The cart and any unknown-outcome Idempotency-Key belong to the user
+    // who signed out (the dev fake backend plays a per-user server).
+    ref.invalidate(fakeCommerceBackendProvider);
+    ref.invalidate(cartProvider);
+    ref.invalidate(checkoutProvider);
     ref.read(launchStateProvider).clearUser();
   });
   ref.onDispose(remove);
