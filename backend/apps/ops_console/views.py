@@ -1,5 +1,6 @@
 """Ops Console views (05 §1). Thin: access checks in `access.ops_view`, reads in `selectors`,
-state changes only through the owning app's services (none in Phase 1)."""
+state changes only through the owning app's services (none yet: Phase 2 changes are in the
+admin)."""
 
 from django.contrib import admin
 from django.shortcuts import render
@@ -40,7 +41,21 @@ def dashboard(request):
         context["staff_roles"] = selectors.staff_per_role()
     if user.has_perm(VIEW_APP_CONFIG):
         context["app_config"] = selectors.app_config_status()
+    operations = selectors.operations_stats(user)
+    if operations.any:
+        context["operations"] = operations
     return render(request, "ops/dashboard.html", context)
+
+
+@ops_view()
+def dashboard_operations(request):
+    """HTMX partial: the store, catalog and stock cards (polled every 60 s). Each card checks its
+    own permission inside `operations_stats`; a role with none gets an empty fragment."""
+    return render(
+        request,
+        "ops/partials/operations_kpis.html",
+        {"operations": selectors.operations_stats(request.user)},
+    )
 
 
 @ops_view(VIEW_CUSTOMERS)

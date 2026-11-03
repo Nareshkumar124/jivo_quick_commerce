@@ -1,0 +1,6 @@
+{# Above the notify-me leads list (ServiceabilityRequestAdmin.list_before_template): the newest leads and the store areas on a read-only map. #}
+<section class="mb-6" data-testid="leads-map" aria-labelledby="leads-map-heading">
+    <h2 id="leads-map-heading" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Where customers are asking for us</h2>
+    <p class="mb-3 text-xs text-font-subtle-light dark:text-font-subtle-dark">Orange dots: the newest notify-me requests (up to 500, list filters do not apply). Shaded: active store service areas.</p>
+    {{ leads_map }}
+</section>
