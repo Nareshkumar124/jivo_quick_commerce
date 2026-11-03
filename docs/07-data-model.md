@@ -148,7 +148,7 @@ Coupon (built in Phase 3 R2a): `code` stored in capitals, unique on `upper(code)
 **Order**
 | Field | Notes |
 |-------|-------|
-| `order_number` | Human-friendly, unique, e.g., `JV-261102-000123` |
+| `order_number` | Human-friendly, unique, e.g., `JV-261102-000123`: the IST date and the order's own id (Phase 3: the id is taken from the table's sequence before the insert) |
 | `pickup_code` | 4-char alphanumeric for rider pickup (unique among active orders in the store) |
 | `user`, `store` | |
 | `address_snapshot` | JSON copy of the address at order time + `delivery_location` (Point) |
@@ -182,7 +182,7 @@ Phase 3 R2a additions to Order: `payment_expires_at` (PAYMENT_PENDING only: the 
 
 **Payment**: `order`, `gateway` (RAZORPAY / COD / RAZORPAY_QR), `gateway_order_id`, `gateway_payment_id`, `amount`, `currency`, `status` (CREATED/AUTHORIZED/CAPTURED/FAILED), `method` (upi/card/netbanking/wallet/cash), `error_code`, `error_description`, `raw` (JSON). Several attempts per order are allowed (retries). Phase 3 adds `captured_at` and `idempotency_key` (the retry-payment key, unique per order when set); amount > 0.
 
-**Refund**: `payment`, `order`, `amount`, `reason`, `gateway_refund_id`, `status` (PENDING/PROCESSED/FAILED), `initiated_by` (null = automatic), `processed_at`, `idempotency_key` (unique; Phase 3, so the refund task is safe to retry, e.g. `t3a:<payment id>`). Built in Phase 3 R2a for the T3a automatic refund.
+**Refund**: `payment`, `order`, `amount`, `reason`, `gateway_refund_id`, `status` (PENDING/PROCESSED/FAILED), `initiated_by` (null = automatic), `processed_at`, `idempotency_key` (unique; Phase 3, so the refund task is safe to retry, e.g. `t3a:<payment id>`). Built in Phase 3 R2a for the T3a automatic refund. `reason` (Phase 3): `late_capture` (the order had failed or was cancelled: settles the order to REFUNDED and adds to `amount_refunded`) or `duplicate_capture` (a second capture on a paid order: the order is untouched).
 
 **PaymentWebhookEvent**: `event_id` (unique, from `X-Razorpay-Event-Id`), `event_type`, `payload`, `signature_valid`, `processed_at`, `error`, `created_at`. Only events with a valid signature are stored, so nobody can claim an `event_id` before the gateway's real event arrives.
 

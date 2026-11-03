@@ -24,7 +24,7 @@ from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Protocol
 
-from django.db import transaction
+from django.db import connection
 from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 
@@ -322,30 +322,41 @@ def offer_body(check: CouponCheck, *, applied: bool) -> dict:
 
 
 def _use(order, coupon: Coupon, discount: Decimal, status: RedemptionStatus) -> CouponRedemption:
-    """Count `coupon` against its limits for `order`, after re-checking them under a lock."""
-    with transaction.atomic():
-        Coupon.objects.select_for_update().filter(pk=coupon.pk).first()
-        usage = usage_for([coupon], order.user).get(coupon.pk, Usage())
-        if coupon.usage_limit_total is not None and usage.total >= coupon.usage_limit_total:
-            raise CouponCheck(
-                coupon, ErrorCode.COUPON_USAGE_EXCEEDED, MSG_USED_UP, scope="total"
-            ).as_error()
-        if coupon.usage_limit_per_user is not None and usage.by_user >= coupon.usage_limit_per_user:
-            raise CouponCheck(
-                coupon, ErrorCode.COUPON_USAGE_EXCEEDED, MSG_USED_BY_YOU, scope="per_user"
-            ).as_error()
-        return CouponRedemption.objects.create(
-            coupon=coupon, user=order.user, order=order, discount_amount=discount, status=status
-        )
+    """Count `coupon` against its limits for `order`, re-checked on the **locked** coupon row
+    (code review F2). Must run inside the order-placement transaction, so the row lock is held
+    until the order commits: two orders racing for a coupon's last use serialise here and the
+    second sees the first's redemption. Lock order: see `apps.orders.services` (cart, coupon,
+    then stock rows by variant id)."""
+    if not connection.in_atomic_block:
+        raise RuntimeError("Coupon use must run inside the order-placement transaction.")
+    locked = Coupon.objects.select_for_update().get(pk=coupon.pk)
+    now = timezone.now()
+    if not is_live(locked, now):
+        raise CouponCheck(locked, ErrorCode.COUPON_INVALID, MSG_INVALID).as_error()
+    if is_expired(locked, now):
+        raise CouponCheck(locked, ErrorCode.COUPON_EXPIRED, MSG_EXPIRED).as_error()
+    usage = usage_for([locked], order.user).get(locked.pk, Usage())
+    if locked.usage_limit_total is not None and usage.total >= locked.usage_limit_total:
+        raise CouponCheck(
+            locked, ErrorCode.COUPON_USAGE_EXCEEDED, MSG_USED_UP, scope="total"
+        ).as_error()
+    if locked.usage_limit_per_user is not None and usage.by_user >= locked.usage_limit_per_user:
+        raise CouponCheck(
+            locked, ErrorCode.COUPON_USAGE_EXCEEDED, MSG_USED_BY_YOU, scope="per_user"
+        ).as_error()
+    return CouponRedemption.objects.create(
+        coupon=locked, user=order.user, order=order, discount_amount=discount, status=status
+    )
 
 
 def hold_coupon(order, coupon: Coupon, discount: Decimal) -> CouponRedemption:
-    """08 T1: an online order awaiting payment holds the coupon (it counts against limits)."""
+    """08 T1: an online order awaiting payment holds the coupon (it counts against limits).
+    Inside the placement transaction only (see `_use`)."""
     return _use(order, coupon, discount, RedemptionStatus.HELD)
 
 
 def apply_coupon_now(order, coupon: Coupon, discount: Decimal) -> CouponRedemption:
-    """08 T2: a COD order uses the coupon at once."""
+    """08 T2: a COD order uses the coupon at once. Inside the placement transaction only."""
     return _use(order, coupon, discount, RedemptionStatus.APPLIED)
 
 

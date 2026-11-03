@@ -4,8 +4,8 @@ The server decides payment success: a valid checkout signature on verify, or a s
 `payment.captured` webhook, whichever arrives first (the second is a no-op). The app's callback
 alone is never trusted, and the amount always comes from the server-side order.
 
-Phase 3 R1 (contract): verify authenticates and validates, the webhook checks its signature and
-headers; both then answer 503 until the internals land in R2.
+Views are thin: validate, then `apps.payments.services` (which ends in
+`orders.services.capture_payment()`).
 """
 
 from drf_spectacular.types import OpenApiTypes
@@ -27,11 +27,12 @@ from apps.core.schema import (
     request_examples,
     validation_error,
 )
-from apps.core.stubs import not_available_yet
 from apps.core.throttling import RATE_LIMITED, PaymentThrottle
 from apps.orders import examples as order_ex
+from apps.orders import presenters
 from apps.orders.serializers import OrderSerializer
 from apps.payments import examples as ex
+from apps.payments import services
 from apps.payments.gateways import get_gateway
 from apps.payments.serializers import (
     PaymentVerifySerializer,
@@ -105,8 +106,17 @@ class RazorpayVerifyView(APIView):
         ),
     )
     def post(self, request: Request) -> Response:
-        PaymentVerifySerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet()
+        serializer = PaymentVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        order = services.verify_payment(
+            request.user,
+            order_id=data["order_id"],
+            razorpay_order_id=data["razorpay_order_id"],
+            razorpay_payment_id=data["razorpay_payment_id"],
+            signature=data["razorpay_signature"],
+        )
+        return Response(presenters.order_body(order))
 
 
 class RazorpayWebhookView(APIView):
@@ -173,7 +183,8 @@ class RazorpayWebhookView(APIView):
         body = request.body
         if not get_gateway().verify_webhook_signature(body, request.headers.get(SIGNATURE_HEADER)):
             raise ApiError(ErrorCode.PAYMENT_VERIFICATION_FAILED, INVALID_WEBHOOK_SIGNATURE)
-        if not (request.headers.get(EVENT_ID_HEADER) or "").strip():
+        event_id = (request.headers.get(EVENT_ID_HEADER) or "").strip()
+        if not event_id or len(event_id) > 64:
             raise ValidationError({EVENT_ID_HEADER: [HEADER_REQUIRED]})
         RazorpayWebhookEventSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet()
+        return Response({"status": services.handle_webhook(event_id, request.data)})

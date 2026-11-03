@@ -1,10 +1,10 @@
 """Payment gateway behind one small interface (DL-21, D-01): Razorpay by default, Cashfree as the
 named alternative. `PAYMENT_GATEWAY` (a dotted path) picks the implementation.
 
-- `RazorpayGateway`: the real gateway. Keys come only from the environment
-  (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`). The signature checks
-  are implemented; the HTTP calls (create order, list payments, refund) arrive in Phase 3 R2b.
-  Missing keys fail loudly when it is used, never silently.
+- `RazorpayGateway`: the real gateway (Razorpay REST API v1, HTTPS + basic auth, standard
+  library only). Keys come only from the environment (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`,
+  `RAZORPAY_WEBHOOK_SECRET`). Missing keys fail loudly when it is used, never silently. Network
+  and HTTP errors raise `PaymentGatewayError` (no key or secret in the message).
 - `FakeRazorpayGateway`: local development and tests only. No network, no keys. It uses
   Razorpay's own signature algorithms with **published, dev-only** constants, so a dev build of
   the customer app can produce a payment that `POST /payments/razorpay/verify/` accepts without
@@ -15,19 +15,31 @@ The server decides payment success (08 §4): a valid signature on verify, or a s
 The amount always comes from the server-side order, never from the client.
 """
 
+import base64
 import hashlib
 import hmac
+import json
 import secrets
 import string
+import urllib.error
+import urllib.parse
+import urllib.request
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 
 DEPLOYED_ENVIRONMENTS = frozenset({"staging", "production"})
+RAZORPAY_API_BASE = "https://api.razorpay.com/v1"
 _ID_ALPHABET = string.ascii_letters + string.digits
+
+
+def to_paise(amount) -> int:
+    """₹753.00 -> 75300. Amounts are already rounded to the paisa (08 §6.2)."""
+    return int((Decimal(amount) * 100).to_integral_value())
 
 
 class PaymentGatewayError(Exception):
@@ -149,14 +161,63 @@ class RazorpayGateway(PaymentGateway):
     def _webhook_secret(self) -> str:
         return self._setting("RAZORPAY_WEBHOOK_SECRET")
 
+    def _call(self, method: str, path: str, body: dict | None = None) -> dict:
+        token = base64.b64encode(f"{self.key_id}:{self._key_secret()}".encode()).decode()
+        request = urllib.request.Request(  # noqa: S310 - fixed https base URL
+            f"{RAZORPAY_API_BASE}{path}",
+            data=json.dumps(body).encode() if body is not None else None,
+            method=method,
+            headers={"Authorization": f"Basic {token}", "Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(  # noqa: S310 - fixed https base URL
+                request, timeout=settings.RAZORPAY_TIMEOUT_SECONDS
+            ) as response:
+                return json.loads(response.read() or b"{}")
+        except urllib.error.HTTPError as exc:
+            raise PaymentGatewayError(f"Razorpay {method} {path}: HTTP {exc.code}") from exc
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+            raise PaymentGatewayError(f"Razorpay {method} {path}: {type(exc).__name__}") from exc
+
     def create_order(self, *, amount_paise: int, receipt: str, notes: dict) -> GatewayOrder:
-        raise NotImplementedError("Razorpay API calls arrive in Phase 3 R2b.")
+        data = self._call(
+            "POST",
+            "/orders",
+            {"amount": amount_paise, "currency": "INR", "receipt": receipt, "notes": notes},
+        )
+        return GatewayOrder(
+            id=data["id"],
+            amount_paise=data["amount"],
+            currency=data.get("currency", "INR"),
+            receipt=data.get("receipt", receipt),
+        )
 
     def fetch_order_payments(self, gateway_order_id: str) -> list[GatewayPayment]:
-        raise NotImplementedError("Razorpay API calls arrive in Phase 3 R2b.")
+        data = self._call("GET", f"/orders/{urllib.parse.quote(gateway_order_id)}/payments")
+        return [
+            GatewayPayment(
+                id=item["id"],
+                order_id=item.get("order_id", gateway_order_id),
+                amount_paise=item["amount"],
+                status=item["status"],
+                method=item.get("method") or "",
+                raw=item,
+            )
+            for item in data.get("items", [])
+        ]
 
     def refund(self, *, payment_id: str, amount_paise: int, notes: dict) -> GatewayRefund:
-        raise NotImplementedError("Razorpay API calls arrive in Phase 3 R2b.")
+        data = self._call(
+            "POST",
+            f"/payments/{urllib.parse.quote(payment_id)}/refund",
+            {"amount": amount_paise, "notes": notes, "speed": "normal"},
+        )
+        return GatewayRefund(
+            id=data["id"],
+            payment_id=data.get("payment_id", payment_id),
+            amount_paise=data["amount"],
+            status=data.get("status", "pending"),
+        )
 
 
 # --------------------------------------------------------------------------- fake (local/test)
@@ -197,8 +258,22 @@ class FakeRazorpayGateway(PaymentGateway):
         )
 
     def fetch_order_payments(self, gateway_order_id: str) -> list[GatewayPayment]:
-        # R2b: answered from the captures the server learnt through verify or a signed webhook.
-        raise NotImplementedError("The fake gateway's payment lookup arrives in Phase 3 R2b.")
+        """The fake has no payment service: it reports the captures the server itself learnt
+        (through verify or a signed webhook). A dev payment never verified is never captured."""
+        from apps.payments.models import Payment, PaymentAttemptStatus
+
+        return [
+            GatewayPayment(
+                id=payment.gateway_payment_id,
+                order_id=gateway_order_id,
+                amount_paise=to_paise(payment.amount),
+                status="captured",
+                method=payment.method,
+            )
+            for payment in Payment.objects.filter(
+                gateway_order_id=gateway_order_id, status=PaymentAttemptStatus.CAPTURED
+            ).exclude(gateway_payment_id=None)
+        ]
 
     def refund(self, *, payment_id: str, amount_paise: int, notes: dict) -> GatewayRefund:
         return GatewayRefund(

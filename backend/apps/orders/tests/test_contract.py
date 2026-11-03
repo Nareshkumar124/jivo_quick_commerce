@@ -106,10 +106,10 @@ class TestCreate:
         }
 
     @pytest.mark.parametrize("body", [ex.ORDER_CREATE_ONLINE_REQUEST, ex.ORDER_CREATE_COD_REQUEST])
-    def test_valid_requests_reach_the_r1_stub(self, auth_client, store_headers, body):
+    def test_valid_request_with_an_empty_cart(self, auth_client, store_headers, body):
         response = auth_client.post(self.PATH, body, headers=store_headers)
-        assert response.status_code == 503
-        assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
+        assert response.status_code == 400
+        assert response.json()["error"]["details"] == {"non_field_errors": ["Your cart is empty."]}
 
 
 @pytest.mark.django_db
@@ -120,19 +120,21 @@ class TestOtherOperations:
         assert response.json()["error"]["details"] == {"status": ['"open" is not a valid choice.']}
 
     @pytest.mark.parametrize("query", ["", "?status=active", "?status=past"])
-    def test_list_reaches_the_r1_stub(self, auth_client, query):
-        assert auth_client.get(f"/api/v1/orders/{query}").status_code == 503
+    def test_list_without_orders(self, auth_client, query):
+        response = auth_client.get(f"/api/v1/orders/{query}")
+        assert response.status_code == 200
+        assert response.json() == {"count": 0, "next": None, "previous": None, "results": []}
 
     def test_retry_needs_an_idempotency_key(self, auth_client):
         response = auth_client.post("/api/v1/orders/5012/retry-payment/")
         assert response.status_code == 400
         assert response.json()["error"]["details"] == {"Idempotency-Key": [KEY_REQUIRED]}
 
-    def test_retry_reaches_the_r1_stub(self, auth_client):
+    def test_retry_unknown_order(self, auth_client):
         response = auth_client.post(
             "/api/v1/orders/5012/retry-payment/", headers={"Idempotency-Key": KEY}
         )
-        assert response.status_code == 503
+        assert response.status_code == 404
 
     def test_cancel_reason_validation(self, auth_client):
         response = auth_client.post("/api/v1/orders/5012/cancel/", {"reason": "BORED"})
@@ -140,8 +142,8 @@ class TestOtherOperations:
         assert response.json()["error"]["details"] == {"reason": ['"BORED" is not a valid choice.']}
 
     @pytest.mark.parametrize("body", [ex.ORDER_CANCEL_REQUEST, ex.ORDER_CANCEL_OTHER_REQUEST])
-    def test_cancel_reaches_the_r1_stub(self, auth_client, body):
-        assert auth_client.post("/api/v1/orders/5012/cancel/", body).status_code == 503
+    def test_cancel_unknown_order(self, auth_client, body):
+        assert auth_client.post("/api/v1/orders/5012/cancel/", body).status_code == 404
 
 
 class TestSerializers:
@@ -207,7 +209,7 @@ class TestOrderExamples:
         assert order["can_retry_payment"] is pending
         assert (order["placed_at"] is None) is (order["status"] in {"PAYMENT_PENDING", "CANCELLED"})
         assert (order["eta_at"] is not None) is (order["status"] == "PLACED")
-        assert order["can_cancel"] is (order["status"] in {"PAYMENT_PENDING", "PLACED"})
+        assert order["can_cancel"] is (order["status"] == "PAYMENT_PENDING")  # Phase 3
         if pending:
             assert at(order["payment_expires_at"]) - at(order["created_at"]) == PAYMENT_WINDOW
             assert order["payment_status"] == "PENDING"
@@ -268,7 +270,7 @@ class TestThrottles:
         assert response.status_code == 429
         assert response.json()["error"]["code"] == "RATE_LIMITED"
         assert "retry_after_seconds" in response.json()["error"]["details"]
-        assert auth_client.get("/api/v1/orders/").status_code == 503  # reading is not limited
+        assert auth_client.get("/api/v1/orders/").status_code == 200  # reading is not limited
         other = make_auth_client(UserFactory())
         assert other.post("/api/v1/orders/", {}).status_code == 400  # per user
 
