@@ -3,15 +3,22 @@ import 'dart:convert';
 import 'package:customer_app/app/providers.dart';
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/auth/data/fake_token_refresher.dart';
+import 'package:customer_app/features/cart/data/api_cart_repository.dart';
 import 'package:customer_app/features/cart/data/cart_repository.dart';
+import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/catalog/data/api_catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_controllers.dart';
+import 'package:customer_app/features/checkout/data/fake_payment_launcher.dart';
+import 'package:customer_app/features/checkout/data/gateway_payment_launcher.dart';
+import 'package:customer_app/features/checkout/data/razorpay_payment_launcher.dart';
 import 'package:customer_app/features/location/data/api_serviceability_repository.dart';
 import 'package:customer_app/features/location/data/delivery_location_store.dart';
 import 'package:customer_app/features/location/data/serviceability_repository.dart';
 import 'package:customer_app/features/location/presentation/delivery_controller.dart';
+import 'package:customer_app/features/orders/data/api_order_repository.dart';
+import 'package:customer_app/features/orders/data/order_repository.dart';
 import 'package:customer_app/features/search/presentation/search_controller.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -278,6 +285,16 @@ void main() {
           container.read(cartRepositoryProvider),
           isA<UnavailableCartRepository>(),
         );
+        expect(
+          container.read(orderRepositoryProvider),
+          isA<UnavailableOrderRepository>(),
+        );
+        // Real Razorpay only: no fake behind it.
+        final launcher = container.read(paymentLauncherProvider);
+        expect(launcher, isA<GatewayPaymentLauncher>());
+        launcher as GatewayPaymentLauncher;
+        expect(launcher.real, isA<RazorpayPaymentLauncher>());
+        expect(launcher.fake, isNull);
       }
     });
 
@@ -288,9 +305,14 @@ void main() {
         dev.read(serviceabilityRepositoryProvider),
         isA<ApiServiceabilityRepository>(),
       );
-      // The in-memory cart is dev-only, until the Phase 3 server cart.
+      // The cart is dev-only until S3-B; dev talks to the real API.
       expect(dev.read(cartAvailableProvider), isTrue);
-      expect(dev.read(cartRepositoryProvider), isA<InMemoryCartRepository>());
+      expect(dev.read(cartRepositoryProvider), isA<ApiCartRepository>());
+      expect(dev.read(orderRepositoryProvider), isA<ApiOrderRepository>());
+      final launcher =
+          dev.read(paymentLauncherProvider) as GatewayPaymentLauncher;
+      expect(launcher.real, isA<RazorpayPaymentLauncher>());
+      expect(launcher.fake, isA<FakePaymentLauncher>()); // rzp_fake_ keys
 
       final fake = await containerFor(
         AppEnv.resolve(flavor: Flavor.dev, useFakeApi: true),
@@ -302,6 +324,14 @@ void main() {
       expect(
         fake.read(serviceabilityRepositoryProvider),
         isA<FakeServiceabilityRepository>(),
+      );
+      expect(fake.read(cartRepositoryProvider), isA<FakeCommerceBackend>());
+      expect(
+        identical(
+          fake.read(cartRepositoryProvider),
+          fake.read(orderRepositoryProvider),
+        ),
+        isTrue,
       );
     });
   });

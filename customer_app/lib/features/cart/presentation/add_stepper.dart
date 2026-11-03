@@ -6,7 +6,9 @@ import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../catalog/domain/catalog_models.dart';
+import '../domain/cart.dart';
 import 'cart_controller.dart';
+import 'cart_texts.dart';
 
 /// ADD, which becomes − qty + once the variant is in the cart (`03 §2.5`).
 ///
@@ -26,7 +28,11 @@ class AddStepper extends ConsumerWidget {
   final String productName;
 
   Future<void> _run(BuildContext context, Future<void> Function() change) =>
-      runCartChange(context, change);
+      runCartChange(
+        context,
+        change,
+        names: {variant.id: '$productName ${variant.name}'},
+      );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -53,7 +59,10 @@ class AddStepper extends ConsumerWidget {
         semanticsLabel: l10n.addToCartSemantics(productName),
         onPressed: pending
             ? null
-            : () => _run(context, () => cart.increment(variant)),
+            : () => _run(
+                context,
+                () => cart.increment(variant, productName: productName),
+              ),
       );
     }
     return QuantityStepper(
@@ -65,16 +74,22 @@ class AddStepper extends ConsumerWidget {
           : () => _run(context, () => cart.decrement(variant)),
       onIncrement: pending
           ? null
-          : () => _run(context, () => cart.increment(variant)),
+          : () => _run(
+              context,
+              () => cart.increment(variant, productName: productName),
+            ),
     );
   }
 }
 
-/// Runs a cart change and shows the cap or server error as a message.
+/// Runs a cart change and shows the cap or server error as a message, with
+/// the server's details (e.g. how many can be ordered now).
 Future<void> runCartChange(
   BuildContext context,
-  Future<void> Function() change,
-) async {
+  Future<void> Function() change, {
+  CartSnapshot? cart,
+  Map<int, String> names = const {},
+}) async {
   try {
     await change();
   } on CartLimitException catch (e) {
@@ -83,12 +98,15 @@ Future<void> runCartChange(
     }
   } catch (error) {
     if (context.mounted) {
-      showMessage(context, describeErrorWithDetails(context, error));
+      showMessage(
+        context,
+        cartErrorText(context, error, cart: cart, names: names),
+      );
     }
   }
 }
 
-/// Staging and prod before the Phase 3 cart: no ADD yet.
+/// Staging and prod until the cart is enabled there (S3-B): no ADD yet.
 class CartComingSoonLabel extends StatelessWidget {
   const CartComingSoonLabel({super.key});
 

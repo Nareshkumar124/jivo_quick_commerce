@@ -1,6 +1,7 @@
 import 'package:customer_app/app/bootstrap.dart';
 import 'package:customer_app/features/home/presentation/home_screen.dart';
 import 'package:customer_app/features/location/domain/delivery_location.dart';
+import 'package:customer_app/shared/formatting/formatters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -50,7 +51,7 @@ void main() {
     }
   });
 
-  testWidgets('ADD on a rail shows the floating cart bar, without a total', (
+  testWidgets("ADD on a rail shows the cart bar with the server's total", (
     tester,
   ) async {
     tallView(tester);
@@ -60,8 +61,9 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add-1001')).first);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('cart-bar')), findsOneWidget);
-    expect(find.text('1 item'), findsOneWidget);
-    expect(find.textContaining('· ₹'), findsNothing);
+    // The item total is the (fake) server's, not a sum in the app.
+    final total = (await app.cart.load()).itemTotal!;
+    expect(find.text('1 item · ${formatRupees(total)}'), findsOneWidget);
     expect(find.text('View cart'), findsOneWidget);
   });
 
@@ -193,7 +195,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('add-102')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('qty-102')), findsOneWidget);
-    expect(find.text('1 item'), findsOneWidget);
+    expect(find.textContaining('1 item · ₹'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('gallery-0')));
     await tester.pumpAndSettle();
