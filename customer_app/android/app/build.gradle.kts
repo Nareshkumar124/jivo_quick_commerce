@@ -72,3 +72,58 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // MainActivity's Mappls preflight calls the SDK's own config check
+    // (com.mappls.sdk.core.MapplsInitialiser). The runtime copy comes from
+    // mappls_gl; this must stay the exact version mappls_gl 2.0.7 resolves
+    // (mappls-android-sdk 9.0.4 -> rest-apis 6.0.3 -> mappls-core 1.0.2).
+    compileOnly("com.mappls.sdk:mappls-core:1.0.2")
+}
+
+// Mappls must never start at app launch (README "Why Mappls starts lazily").
+// mappls_gl's MapplsMapsPlugin calls Mappls.getInstance() in
+// onAttachedToEngine, and the SDK then validates its config on a background
+// thread and throws an uncaught IllegalStateException when the config is
+// missing or not registered for this package/fingerprint, killing the app.
+// The flutter tool writes GeneratedPluginRegistrant.java (gitignored) before
+// Gradle runs, so remove the plugin's registration block from it here.
+// MainActivity registers the plugin later, only after the config passed the
+// SDK's own check. Idempotent; fails the build if the block can't be removed.
+val generatedPluginRegistrant: File =
+    file("src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java")
+val stripMapplsAutoRegistration by tasks.registering {
+    description = "Removes MapplsMapsPlugin from GeneratedPluginRegistrant (lazy Mappls start)."
+    val registrant = generatedPluginRegistrant
+    doLast {
+        if (!registrant.isFile) return@doLast
+        val original = registrant.readText()
+        val block = Regex(
+            """\n[ \t]*try \{\s*flutterEngine\.getPlugins\(\)\.add\(""" +
+                """new com\.mappls\.sdk\.maps\.flutter\.MapplsMapsPlugin\(\)\);""" +
+                """\s*\} catch \(Exception e\) \{[^}]*\}""",
+        )
+        val stripped = original.replace(block, "")
+        if (stripped.contains("MapplsMapsPlugin")) {
+            throw GradleException(
+                "MapplsMapsPlugin is still registered in ${registrant.path}: the " +
+                    "generated registrant's format changed. Update " +
+                    "stripMapplsAutoRegistration in android/app/build.gradle.kts, " +
+                    "or the app crashes at launch without a valid Mappls config.",
+            )
+        }
+        if (stripped != original) {
+            registrant.writeText(stripped)
+            logger.lifecycle("Mappls: removed MapplsMapsPlugin from GeneratedPluginRegistrant.")
+        }
+    }
+}
+stripMapplsAutoRegistration.configure {
+    mustRunAfter(tasks.matching { it.name.startsWith("compileFlutterBuild") })
+}
+tasks.named("preBuild") { dependsOn(stripMapplsAutoRegistration) }
+tasks
+    .matching {
+        it.name.startsWith("compile") &&
+            (it.name.endsWith("JavaWithJavac") || it.name.endsWith("Kotlin"))
+    }.configureEach { dependsOn(stripMapplsAutoRegistration) }
