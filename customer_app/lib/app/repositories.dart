@@ -7,12 +7,14 @@ import '../features/addresses/data/address_repository.dart';
 import '../features/addresses/data/device_location.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/data/otp_autofill.dart';
+import '../features/cart/data/api_cart_repository.dart';
 import '../features/cart/data/cart_repository.dart';
 import '../features/cart/data/fake_commerce_backend.dart';
 import '../features/catalog/data/api_catalog_repository.dart';
 import '../features/catalog/data/catalog_repository.dart';
 import '../features/catalog/data/fake_catalog_repository.dart';
 import '../features/checkout/data/fake_payment_launcher.dart';
+import '../features/checkout/data/gateway_payment_launcher.dart';
 import '../features/checkout/data/payment_flow.dart';
 import '../features/checkout/data/payment_launcher.dart';
 import '../features/checkout/data/razorpay_payment_launcher.dart';
@@ -24,6 +26,7 @@ import '../features/location/data/maps_availability.dart';
 import '../features/location/data/reverse_geocoder.dart';
 import '../features/location/data/serviceability_repository.dart';
 import '../features/location/presentation/delivery_controller.dart';
+import '../features/orders/data/api_order_repository.dart';
 import '../features/orders/data/order_repository.dart';
 import '../features/profile/data/profile_repository.dart';
 import 'providers.dart';
@@ -86,36 +89,45 @@ final serviceabilityRepositoryProvider = Provider<ServiceabilityRepository>(
       : ApiServiceabilityRepository(ref.watch(jivoApiProvider)),
 );
 
-/// Whether this build has a cart. Until the Phase 3 cart API is wired
-/// (S3-A), only the dev flavor has one (the fake backend below), and
-/// staging/prod show "cart coming soon" instead of ADD (DL-30/DL-32).
+/// Whether this build has a cart: the dev flavor until the cart is proven
+/// against the real backend at S3-B. Staging and prod show "cart coming
+/// soon" instead of ADD (DL-30/DL-32).
 final cartAvailableProvider = Provider<bool>(
   (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
 );
 
-/// TODO(api): the stand-in for the server cart and orders (`06 §2.5`,
-/// `§2.6`) in the dev flavor until S3-A. One instance serves both
+/// The stand-in for the server cart and orders (`06 §2.5`, `§2.6`) for the
+/// dev flavor's `FAKE_API=true` and tests. One instance serves both
 /// repositories, so placing an order clears the cart. Never built for
-/// staging or prod: the providers below only read it when
-/// [cartAvailableProvider] is true.
+/// staging or prod.
 final fakeCommerceBackendProvider = Provider<FakeCommerceBackend>(
   (ref) => FakeCommerceBackend(),
 );
 
-/// TODO(api): the server cart (`06 §2.5`) at S3-A.
-final cartRepositoryProvider = Provider<CartRepository>(
-  (ref) => ref.watch(cartAvailableProvider)
-      ? ref.watch(fakeCommerceBackendProvider)
-      : const UnavailableCartRepository(),
-);
+/// The server cart (`06 §2.5`): the API in the dev flavor, the fake with
+/// `FAKE_API=true`, nothing in staging/prod yet.
+final cartRepositoryProvider = Provider<CartRepository>((ref) {
+  if (!ref.watch(cartAvailableProvider)) {
+    return const UnavailableCartRepository();
+  }
+  if (_fake(ref)) return ref.watch(fakeCommerceBackendProvider);
+  return ApiCartRepository(
+    ref.watch(jivoApiProvider),
+    () => ref.read(currentStoreIdProvider),
+  );
+});
 
-/// TODO(api): `POST /orders/`, verify, retry-payment and cancel (`06 §2.6`)
-/// at S3-A.
-final orderRepositoryProvider = Provider<OrderRepository>(
-  (ref) => ref.watch(cartAvailableProvider)
-      ? ref.watch(fakeCommerceBackendProvider)
-      : const UnavailableOrderRepository(),
-);
+/// Orders and payments (`06 §2.6`), wired like [cartRepositoryProvider].
+final orderRepositoryProvider = Provider<OrderRepository>((ref) {
+  if (!ref.watch(cartAvailableProvider)) {
+    return const UnavailableOrderRepository();
+  }
+  if (_fake(ref)) return ref.watch(fakeCommerceBackendProvider);
+  return ApiOrderRepository(
+    ref.watch(jivoApiProvider),
+    () => ref.read(currentStoreIdProvider),
+  );
+});
 
 /// The root navigator, for sheets opened outside a widget (the dev fake
 /// payment sheet).
@@ -123,16 +135,21 @@ final rootNavigatorKeyProvider = Provider<GlobalKey<NavigatorState>>(
   (ref) => GlobalKey<NavigatorState>(debugLabel: 'root'),
 );
 
-/// Razorpay checkout; in the dev flavor a fake sheet, because there are no
-/// Razorpay test keys yet (D-01). TODO(api): the dev flavor keeps the fake
-/// against the backend's fake gateway once its signature scheme is known.
+/// Razorpay checkout, chosen by the key the server sends: in the dev flavor
+/// the server's local fake gateway (`rzp_fake_…`, `06 §2.6`) is paid with
+/// the fake sheet; any other key opens real Razorpay. Staging and prod
+/// never get the fake.
 final paymentLauncherProvider = Provider<PaymentLauncher>((ref) {
-  if (ref.watch(appEnvProvider).flavor != Flavor.dev) {
-    return RazorpayPaymentLauncher();
-  }
+  final flavor = ref.watch(appEnvProvider).flavor;
   final navigatorKey = ref.watch(rootNavigatorKeyProvider);
-  return FakePaymentLauncher(
-    choose: (request) => showFakePaymentSheet(navigatorKey, request),
+  return GatewayPaymentLauncher(
+    flavor: flavor,
+    real: RazorpayPaymentLauncher(),
+    fake: flavor == Flavor.dev
+        ? FakePaymentLauncher(
+            choose: (request) => showFakePaymentSheet(navigatorKey, request),
+          )
+        : null,
   );
 });
 

@@ -93,9 +93,17 @@ void main() {
           tip: '20.00',
           grandTotal: '203.00',
           totalSavings: '77.00',
-          freeDeliveryShortfall: '51.00',
         ),
-        coupon: const AppliedCoupon(code: 'WELCOME10', discount: '10.00'),
+        thresholds: const CartThresholds(
+          minOrderValue: '49.00',
+          freeDeliveryThreshold: '199.00',
+          amountToFreeDelivery: '51.00',
+        ),
+        coupon: const AppliedCoupon(
+          code: 'WELCOME10',
+          title: '10% off',
+          discount: '10.00',
+        ),
       ),
     );
     await openCart(
@@ -166,15 +174,25 @@ void main() {
     expect((await app.cart.load()).lines.single.quantity, 2);
   });
 
-  testWidgets('below the minimum order, checkout shows why and waits', (
+  testWidgets("a server blocker disables checkout and says why", (
     tester,
   ) async {
+    // The server's blocker decides; the text is the app's, filled with the
+    // server's amounts (`thresholds`).
     final stub = StubCartRepository(
       cartSnapshot(
-        minimumOrder: const MinimumOrder(
-          met: false,
-          amount: '99.00',
-          shortfall: '20.00',
+        thresholds: const CartThresholds(
+          minOrderValue: '99.00',
+          amountToMinOrder: '20.00',
+        ),
+        checkout: const CheckoutStatus(
+          canPlaceOrder: false,
+          blockers: [
+            CheckoutBlocker(
+              code: CheckoutBlockerCode.minOrderNotMet,
+              message: 'server text',
+            ),
+          ],
         ),
       ),
     );
@@ -218,9 +236,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('coupon-sheet')), findsOneWidget);
     expect(find.text('Save ₹50 on this order'), findsOneWidget);
-    expect(find.text("You've already used this coupon"), findsOneWidget);
-    expect(find.text('This coupon has expired'), findsOneWidget);
-    expect(find.byKey(const ValueKey('coupon-apply-OILFEST')), findsNothing);
+    // The server lists no expired or used-up coupons.
+    expect(find.byKey(const ValueKey('coupon-OILFEST')), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('coupon-apply-JIVO50')));
     await tester.pumpAndSettle();
@@ -228,6 +245,14 @@ void main() {
     expect(find.text('JIVO50 applied. You save ₹50.'), findsOneWidget);
     expect(find.text('JIVO50 applied'), findsOneWidget);
     expect(textOf(tester, 'bill-coupon-discount'), '−₹50');
+
+    // The sheet marks the coupon on the cart as applied.
+    await tester.tap(find.byKey(const Key('applied-coupon')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('coupon-applied-JIVO50')), findsOneWidget);
+    expect(find.byKey(const ValueKey('coupon-apply-JIVO50')), findsNothing);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('remove-coupon')));
     await tester.pumpAndSettle();
@@ -252,10 +277,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text("This coupon code isn't valid."), findsOneWidget);
 
+    await tester.enterText(find.byKey(const Key('coupon-code')), 'oilfest');
+    await tester.tap(find.byKey(const Key('coupon-apply-code')));
+    await tester.pumpAndSettle();
+    expect(find.text('This coupon has expired.'), findsOneWidget);
+
+    // COUPON_NOT_ELIGIBLE with details.amount_to_unlock.
     await tester.enterText(find.byKey(const Key('coupon-code')), 'jivo50');
     await tester.tap(find.byKey(const Key('coupon-apply-code')));
     await tester.pumpAndSettle();
-    expect(find.text('Add ₹50 more to use this coupon'), findsWidgets);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('coupon-code')),
+        matching: find.text('Add ₹50 more to use this coupon'),
+      ),
+      findsOneWidget,
+    );
+    // The listed coupon says the same, from its amount_to_unlock.
+    expect(find.byKey(const ValueKey('coupon-problem-JIVO50')), findsOneWidget);
     expect(find.byKey(const Key('coupon-sheet')), findsOneWidget);
   });
 
@@ -358,8 +397,8 @@ void main() {
               CartLineTile(
                 line: cartLine(
                   name: 'Jivo Cold Pressed Canola Oil Pouch',
-                  issue: CartLineIssue.reduced,
-                  available: 1,
+                  orderable: 1,
+                  issue: CartIssueCode.quantityUnavailable,
                 ),
               ),
               const BillDetails(bill: inconsistentBill),

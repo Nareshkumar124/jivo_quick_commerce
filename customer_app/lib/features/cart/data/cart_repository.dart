@@ -3,23 +3,19 @@ import 'package:jivo_core/jivo_core.dart';
 import '../domain/cart.dart';
 
 /// The customer's server-side cart for the selected store (`03 §2.8`,
-/// `06 §2.5`; every call carries `X-Store-Id`). Every write returns the
-/// whole cart with its fresh bill, so the screens never patch money
-/// locally. TODO(api): confirm the write endpoints return the full cart.
+/// `06 §2.5`; every call carries `X-Store-Id`). Every call returns the whole
+/// cart with its fresh bill, so the screens never patch money locally.
 ///
 /// Implementations throw `ApiError` (e.g. `STOCK_UNAVAILABLE`,
-/// `MAX_QTY_EXCEEDED`, the `COUPON_*` codes).
+/// `MAX_QTY_EXCEEDED`, the `COUPON_*` codes, `STORE_NOT_FOUND`).
 abstract interface class CartRepository {
   /// `GET /cart/?address_id=`: lines, stock flags and the bill. The bill
   /// is computed for [addressId] when given.
   Future<CartSnapshot> load({int? addressId});
 
-  /// Sets [variantId] to [quantity]; 0 removes the line.
-  ///
-  /// The stepper works in variant ids, the API in cart line ids: `POST
-  /// /cart/items/ {variant_id, quantity}` when the variant has no line yet,
-  /// `PATCH /cart/items/{line_id}/ {quantity}` to change it and `DELETE
-  /// /cart/items/{line_id}/` at 0. [preview] is for the fake cart only.
+  /// `POST /cart/items/ {variant_id, quantity}`: **sets** the line's
+  /// quantity (not an increment, so a retried request never doubles it);
+  /// 0 removes the line. [preview] is for the fake backend only.
   Future<CartSnapshot> setQuantity(
     int variantId,
     int quantity, {
@@ -43,7 +39,7 @@ abstract interface class CartRepository {
   Future<CartSnapshot> update(CartUpdate update);
 }
 
-/// Staging and prod until the Phase 3 cart API is wired (S3-A): there is no
+/// Staging and prod until the cart is enabled there (S3-B): there is no
 /// cart yet. The UI checks `cartAvailableProvider` and never calls this.
 class UnavailableCartRepository implements CartRepository {
   const UnavailableCartRepository();

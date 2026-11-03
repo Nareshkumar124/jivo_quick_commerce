@@ -73,6 +73,20 @@ flutter {
     source = "../.."
 }
 
+// razorpay_flutter 1.4.7 depends on com.razorpay:checkout:1.6.+, and checkout
+// on com.razorpay:standard-core:latest.integration: both float, so a rebuild
+// could silently pick up a newer SDK. Pin the set the release build was checked
+// with (R8 keep rules, merged manifest and permissions; see README "Payments"
+// and "Play Data Safety / permissions"). Bump them together, deliberately, and
+// re-run those checks.
+configurations.configureEach {
+    resolutionStrategy.force(
+        "com.razorpay:checkout:1.6.41",
+        "com.razorpay:standard-core:1.7.22",
+        "com.razorpay:core:1.0.22",
+    )
+}
+
 dependencies {
     // MainActivity's Mappls preflight calls the SDK's own config check
     // (com.mappls.sdk.core.MapplsInitialiser). The runtime copy comes from

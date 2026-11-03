@@ -6,6 +6,7 @@ import '../../../app/providers.dart';
 import '../../../app/repositories.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../orders/domain/order.dart';
+import '../../orders/presentation/pending_payment.dart';
 import '../domain/checkout_result.dart';
 import '../domain/idempotency_key.dart';
 
@@ -19,6 +20,7 @@ class CheckoutState {
     this.step = CheckoutStep.idle,
     this.result,
     this.error,
+    this.pendingOrderId,
   });
 
   final PaymentMethod method;
@@ -30,6 +32,11 @@ class CheckoutState {
 
   /// Why placing the order failed (shown once, then acknowledged).
   final ApiError? error;
+
+  /// Another order is still waiting for payment (409
+  /// `INVALID_STATE_TRANSITION` with `details.pending_order_id`): offer to
+  /// retry or cancel that one (DL-44).
+  final int? pendingOrderId;
 
   /// The Place order button stays disabled (double-tap protection).
   bool get busy => step != CheckoutStep.idle;
@@ -43,9 +50,11 @@ class CheckoutState {
 /// - COD: the server answers `PLACED` and the flow ends in success.
 /// - ONLINE: Razorpay opens; success is reported only after the server's
 ///   verify call confirms the order (`08 §4`).
-/// - `PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `MIN_ORDER_NOT_MET` and
-///   `COD_NOT_AVAILABLE` reload the cart, so the screens show the server's
-///   new bill and flags. TODO(api): show exactly what changed at S3-A.
+/// - `PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `MIN_ORDER_NOT_MET`,
+///   `COD_NOT_AVAILABLE` and the coupon errors reload the cart, so the
+///   screens show the server's new bill and flags; the message says what
+///   changed, from the error's `details` (`cartErrorText`).
+/// - Another order awaiting payment: [CheckoutState.pendingOrderId].
 class CheckoutController extends Notifier<CheckoutState> {
   String? _idempotencyKey;
 
@@ -88,7 +97,14 @@ class CheckoutController extends Notifier<CheckoutState> {
       if (_cartChanged(apiError)) {
         await ref.read(cartProvider.notifier).refresh(addressId: addressId);
       }
-      if (ref.mounted) state = CheckoutState(method: method, error: apiError);
+      final pending = apiError.code == ApiErrorCode.invalidStateTransition
+          ? apiError.details['pending_order_id']
+          : null;
+      if (ref.mounted) {
+        state = pending is num
+            ? CheckoutState(method: method, pendingOrderId: pending.toInt())
+            : CheckoutState(method: method, error: apiError);
+      }
       return;
     }
     _idempotencyKey = null;
@@ -118,8 +134,16 @@ class CheckoutController extends Notifier<CheckoutState> {
   /// Publishes [result] first, so the screen leaves checkout before the
   /// (now empty) cart reloads and checkout would flash its empty state.
   Future<void> _finish(PaymentMethod method, CheckoutResult result) async {
+    // Checkout opens this order's screen itself: Home must not open it a
+    // second time when the pending-order check below finds it.
+    ref.read(pendingPaymentProvider.notifier).takeAutoOpen(result.order.id);
     if (ref.mounted) state = CheckoutState(method: method, result: result);
-    if (result is OrderConfirmed) await onOrderConfirmed(ref, result.order);
+    if (result is OrderConfirmed) {
+      await onOrderConfirmed(ref, result.order);
+    } else {
+      // An order left unpaid: Home shows it until it is paid or cancelled.
+      refreshPendingPayment(ref);
+    }
   }
 
   /// The screen handled [CheckoutState.result] / [CheckoutState.error].
@@ -157,6 +181,7 @@ Future<void> onOrderConfirmed(Ref ref, PlacedOrder order) async {
         },
       );
   await ref.read(cartProvider.notifier).refresh();
+  refreshPendingPayment(ref);
 }
 
 /// Kept for the session (not auto-disposed) so an unknown-outcome

@@ -11,6 +11,7 @@ import '../../../shared/widgets/state_views.dart';
 import '../../location/presentation/delivery_controller.dart';
 import '../domain/cart.dart';
 import 'cart_controller.dart';
+import 'cart_texts.dart';
 import 'widgets/bill_details.dart';
 import 'widgets/cart_line_tile.dart';
 import 'widgets/coupon_sheet.dart';
@@ -51,12 +52,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     setState(() => _proceeding = false);
     final cart = ref.read(cartProvider);
     final error = cart.loadError;
+    final l10n = AppLocalizations.of(context);
     if (cart.load == CartLoad.failed && error != null) {
-      showMessage(context, describeErrorWithDetails(context, error));
+      showMessage(context, cartErrorText(context, error));
     } else if (cart.snapshot.hasProblems) {
-      showMessage(context, AppLocalizations.of(context).cartReviewChanges);
-    } else if (!cart.snapshot.isEmpty &&
-        (cart.snapshot.minimumOrder?.met ?? true)) {
+      showMessage(context, l10n.cartReviewChanges);
+    } else if (!cart.snapshot.checkout.canPlaceOrder) {
+      final reason = checkoutBlockerText(l10n, cart.snapshot);
+      if (reason != null) showMessage(context, reason);
+    } else {
       await context.push(Routes.checkout);
     }
   }
@@ -127,7 +131,7 @@ class _CartContent extends StatelessWidget {
     final theme = Theme.of(context);
     final snapshot = cart.snapshot;
     final bill = snapshot.bill;
-    final nudge = bill?.freeDeliveryShortfall;
+    final nudge = snapshot.thresholds?.amountToFreeDelivery;
     final loadError = cart.loadError;
     const gap = SizedBox(height: JivoSpacing.lg);
 
@@ -233,26 +237,25 @@ class _CouponRow extends ConsumerWidget {
         ),
       );
     }
-    final problem = applied.problem;
+    final applies = applied.isApplicable;
     return Card(
       key: const Key('applied-coupon'),
       margin: EdgeInsets.zero,
       child: ListTile(
         minTileHeight: kJivoMinTouchTarget,
         leading: Icon(
-          problem == null ? Icons.check_circle : Icons.error_outline,
-          color: problem == null
-              ? context.jivoColors.success
-              : theme.colorScheme.error,
+          applies ? Icons.check_circle : Icons.error_outline,
+          color: applies ? context.jivoColors.success : theme.colorScheme.error,
         ),
         title: Text(
-          problem == null
+          applies
               ? l10n.couponApplied(applied.code)
               : l10n.couponNoLongerApplies(applied.code),
         ),
-        subtitle: problem == null
+        // The server's reason has no amount to fill into an ARB string.
+        subtitle: applies
             ? Text(l10n.couponSaves(formatRupees(applied.discount)))
-            : Text(couponProblemText(l10n, problem)),
+            : (applied.message == null ? null : Text(applied.message!)),
         onTap: () => showCouponSheet(context),
         trailing: TextButton(
           key: const Key('remove-coupon'),
@@ -321,27 +324,11 @@ class _CheckoutBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final storeClosed = ref.watch(
-      deliveryProvider.select((s) => s.serviceability?.storeClosed ?? false),
-    );
-    final blocked = storeClosed
-        ? l10n.cartStoreClosed
-        : switch (snapshot.minimumOrder) {
-            MinimumOrder(
-              met: false,
-              :final amount,
-              shortfall: final shortfall?,
-            ) =>
-              l10n.minimumOrderShortfall(
-                formatRupees(amount),
-                formatRupees(shortfall),
-              ),
-            MinimumOrder(met: false, :final amount) => l10n.minimumOrderNotMet(
-              formatRupees(amount),
-            ),
-            _ when snapshot.hasProblems => l10n.cartProblemsBanner,
-            _ => null,
-          };
+    // Checkout is the server's call (`Cart.checkout`); its first blocker
+    // says why not.
+    final blocked = snapshot.checkout.canPlaceOrder
+        ? null
+        : checkoutBlockerText(l10n, snapshot);
 
     return Material(
       elevation: 8,
@@ -392,7 +379,9 @@ class _CheckoutBar extends ConsumerWidget {
                       key: const Key('proceed-to-checkout'),
                       label: l10n.proceedToCheckout,
                       busy: proceeding,
-                      onPressed: blocked != null || busy ? null : onProceed,
+                      onPressed: !snapshot.checkout.canPlaceOrder || busy
+                          ? null
+                          : onProceed,
                     ),
                   ),
                 ],

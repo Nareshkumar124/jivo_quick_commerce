@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:customer_app/features/cart/data/cart_repository.dart';
 import 'package:customer_app/features/cart/domain/cart.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
+import 'package:customer_app/features/orders/domain/order.dart';
 
-/// A cart line as the server would send it.
+/// A cart line as the server would send it. [orderable] is the variant's
+/// `orderable_quantity`; [issue] its flag.
 CartLine cartLine({
   int id = 1,
   int variantId = 101,
@@ -14,21 +16,25 @@ CartLine cartLine({
   String mrp = '299.00',
   int quantity = 2,
   String lineTotal = '498.00',
+  String lineMrpTotal = '598.00',
   int orderable = 5,
-  CartLineIssue issue = CartLineIssue.none,
-  int? available,
+  CartIssueCode? issue,
 }) => CartLine(
   id: id,
-  variantId: variantId,
   productName: name,
-  variantName: variantName,
-  sellingPrice: price,
-  mrp: mrp,
+  variant: CatalogVariant(
+    id: variantId,
+    name: variantName,
+    sellingPrice: price,
+    mrp: mrp,
+    stockStatus: orderable > 0 ? StockStatus.inStock : StockStatus.outOfStock,
+    orderableQuantity: orderable,
+    maxQtyPerOrder: 5,
+  ),
   quantity: quantity,
+  lineMrpTotal: lineMrpTotal,
   lineTotal: lineTotal,
-  orderableQuantity: orderable,
-  issue: issue,
-  availableQuantity: available,
+  issue: issue == null ? null : CartLineIssue(code: issue, message: 'x'),
 );
 
 /// A bill whose numbers deliberately do **not** add up: any screen that
@@ -43,23 +49,37 @@ const inconsistentBill = CartBill(
   handlingFee: '5.00',
   tip: '0.00',
   grandTotal: '999.00',
+  totalSavings: '0.00',
 );
+
+const okCheckout = CheckoutStatus(canPlaceOrder: true);
+
+const bothMethods = [
+  PaymentOption(method: PaymentMethod.online, available: true),
+  PaymentOption(method: PaymentMethod.cod, available: true),
+];
 
 CartSnapshot cartSnapshot({
   List<CartLine>? lines,
   CartBill bill = inconsistentBill,
   AppliedCoupon? coupon,
-  MinimumOrder? minimumOrder = const MinimumOrder(met: true, amount: '49.00'),
-  bool codAvailable = true,
+  CartThresholds thresholds = const CartThresholds(minOrderValue: '49.00'),
+  CheckoutStatus checkout = okCheckout,
+  List<PaymentOption> paymentOptions = bothMethods,
   int? addressId = 1,
-}) => CartSnapshot.fromLines(
-  lines: lines ?? [cartLine()],
-  bill: bill,
-  coupon: coupon,
-  minimumOrder: minimumOrder,
-  codAvailable: codAvailable,
-  addressId: addressId,
-);
+}) {
+  final all = lines ?? [cartLine()];
+  return CartSnapshot.fromLines(
+    lines: all,
+    itemCount: all.fold(0, (sum, line) => sum + line.quantity),
+    bill: bill,
+    coupon: coupon,
+    thresholds: thresholds,
+    checkout: checkout,
+    paymentOptions: paymentOptions,
+    addressId: addressId,
+  );
+}
 
 /// Returns [snapshot] for every call; [gate], when set, holds each call.
 class StubCartRepository implements CartRepository {

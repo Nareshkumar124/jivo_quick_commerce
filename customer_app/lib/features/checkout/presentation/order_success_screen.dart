@@ -71,7 +71,7 @@ class _Confirmed extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final success = context.jivoColors.success;
-    final eta = order.etaMinutes;
+    final eta = order.etaAt;
     final amount = formatRupees(order.grandTotal);
 
     return Center(
@@ -109,7 +109,10 @@ class _Confirmed extends StatelessWidget {
             ),
             if (eta != null) ...[
               const SizedBox(height: JivoSpacing.xs),
-              Text(l10n.orderEta(eta), style: theme.textTheme.bodyLarge),
+              Text(
+                l10n.arrivingBy(formatTime(eta)),
+                style: theme.textTheme.bodyLarge,
+              ),
             ],
             const SizedBox(height: JivoSpacing.xs),
             Text(
@@ -125,7 +128,8 @@ class _Confirmed extends StatelessWidget {
               width: double.infinity,
               child: FilledButton(
                 key: const Key('track-order'),
-                // TODO(P4/P6): order detail (P4) and live tracking (P6).
+                // Until order detail (Phase 4) and live tracking (Phase 6)
+                // exist, this says tracking arrives later.
                 onPressed: () => showMessage(context, l10n.trackingComingSoon),
                 child: Text(l10n.trackOrder),
               ),

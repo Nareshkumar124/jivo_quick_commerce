@@ -8,6 +8,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../cart/presentation/cart_controller.dart';
+import '../../cart/presentation/cart_texts.dart';
 import '../../cart/presentation/widgets/bill_details.dart';
 import '../../cart/presentation/widgets/delivery_address_card.dart';
 import '../../location/presentation/delivery_controller.dart';
@@ -32,9 +33,6 @@ class CheckoutScreen extends ConsumerWidget {
     final controller = ref.read(checkoutProvider.notifier);
     final snapshot = ref.watch(cartProvider.select((c) => c.snapshot));
     final location = ref.watch(deliveryProvider.select((s) => s.location));
-    final storeClosed = ref.watch(
-      deliveryProvider.select((s) => s.serviceability?.storeClosed ?? false),
-    );
 
     ref
       ..listen(checkoutProvider.select((s) => s.result), (_, result) {
@@ -57,11 +55,17 @@ class CheckoutScreen extends ConsumerWidget {
       ..listen(checkoutProvider.select((s) => s.error), (_, error) {
         if (error == null) return;
         controller.acknowledge();
-        showMessage(context, describeErrorWithDetails(context, error));
+        // What changed, from the error's details; the cart was reloaded.
+        showMessage(context, cartErrorText(context, error, cart: snapshot));
         // Flagged lines are fixed on the cart screen.
         if (error.code == ApiErrorCode.stockUnavailable && context.canPop()) {
           context.pop();
         }
+      })
+      ..listen(checkoutProvider.select((s) => s.pendingOrderId), (_, id) {
+        if (id == null) return;
+        controller.acknowledge();
+        _showPendingOrder(context, id);
       });
 
     final bill = snapshot.bill;
@@ -79,17 +83,26 @@ class CheckoutScreen extends ConsumerWidget {
       );
     }
 
-    final method =
-        checkout.method == PaymentMethod.cod && !snapshot.codAvailable
-        ? PaymentMethod.online
-        : checkout.method;
+    // Only the methods the server offers for this cart (`payment_methods`;
+    // COD only when eligible, `03 §2.9`).
+    final offered = [
+      for (final m in PaymentMethod.values)
+        if (snapshot.offers(m)) m,
+    ];
+    final method = offered.contains(checkout.method)
+        ? checkout.method
+        : (offered.isEmpty ? checkout.method : offered.first);
     final addressId = location?.addressId;
+    // The server decides (`Cart.checkout`); the order also needs a saved
+    // address id and an offered method.
     final canPlace =
         !checkout.busy &&
         addressId != null &&
-        !storeClosed &&
-        !snapshot.hasProblems &&
-        (snapshot.minimumOrder?.met ?? true);
+        snapshot.checkout.canPlaceOrder &&
+        offered.contains(method);
+    final blocker = snapshot.checkout.canPlaceOrder
+        ? null
+        : checkoutBlockerText(l10n, snapshot);
     final progress = switch (checkout.step) {
       CheckoutStep.idle => null,
       CheckoutStep.placing => l10n.checkoutPlacing,
@@ -122,15 +135,16 @@ class CheckoutScreen extends ConsumerWidget {
                 },
                 child: Column(
                   children: [
-                    RadioListTile<PaymentMethod>(
-                      key: const Key('pay-online'),
-                      value: PaymentMethod.online,
-                      enabled: !checkout.busy,
-                      secondary: const Icon(Icons.account_balance_outlined),
-                      title: Text(l10n.payOnline),
-                      subtitle: Text(l10n.payOnlineSubtitle),
-                    ),
-                    if (snapshot.codAvailable)
+                    if (snapshot.offers(PaymentMethod.online))
+                      RadioListTile<PaymentMethod>(
+                        key: const Key('pay-online'),
+                        value: PaymentMethod.online,
+                        enabled: !checkout.busy,
+                        secondary: const Icon(Icons.account_balance_outlined),
+                        title: Text(l10n.payOnline),
+                        subtitle: Text(l10n.payOnlineSubtitle),
+                      ),
+                    if (snapshot.offers(PaymentMethod.cod))
                       RadioListTile<PaymentMethod>(
                         key: const Key('pay-cod'),
                         value: PaymentMethod.cod,
@@ -164,6 +178,17 @@ class CheckoutScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (blocker != null && !checkout.busy)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
+                      child: Text(
+                        blocker,
+                        key: const Key('checkout-blocked'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                    ),
                   if (progress != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
@@ -200,5 +225,32 @@ class CheckoutScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// Another order is waiting for payment: offer to open it (retry or cancel
+/// there) instead of placing a second one (DL-44).
+Future<void> _showPendingOrder(BuildContext context, int orderId) async {
+  final l10n = AppLocalizations.of(context);
+  final open = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l10n.pendingOrderTitle),
+      content: Text(l10n.pendingOrderBody),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(l10n.cancel),
+        ),
+        TextButton(
+          key: const Key('open-pending-order'),
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(l10n.pendingOrderAction),
+        ),
+      ],
+    ),
+  );
+  if ((open ?? false) && context.mounted) {
+    await context.push(Routes.paymentFailed(orderId));
   }
 }

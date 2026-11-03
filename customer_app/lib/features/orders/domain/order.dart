@@ -1,11 +1,9 @@
 import 'package:flutter/foundation.dart';
 
-/// Orders as the checkout screens use them (`06 §2.6`, `08 §1`).
-///
-/// TODO(api): field names follow `06 §2.6` until the Phase 3 contract is
-/// published; the API repository maps the generated models at S3-A.
+/// Orders as the checkout screens use them (`06 §2.6`, schema `Order`,
+/// `OrderSummary`, `OrderPlacement`, `RazorpayCheckout`).
 
-/// `08 §1` order states. Customer-facing labels live in the ARB file.
+/// `08 §1` order states (`OrderStatusEnum`).
 enum OrderStatus {
   paymentPending('PAYMENT_PENDING'),
   placed('PLACED'),
@@ -32,8 +30,8 @@ enum OrderStatus {
   );
 
   /// The server has the order: paid online or confirmed as COD. Only these
-  /// statuses lead to the success screen (`02` rule 2: success only after
-  /// the server confirms).
+  /// statuses lead to the success screen (success only after the server
+  /// confirms, `08 §4`).
   bool get isConfirmed => switch (this) {
     placed ||
     accepted ||
@@ -45,7 +43,7 @@ enum OrderStatus {
   };
 }
 
-/// How the customer pays (`03 §2.9`).
+/// How the customer pays (`PaymentMethodEnum`).
 enum PaymentMethod {
   online('ONLINE'),
   cod('COD');
@@ -55,9 +53,22 @@ enum PaymentMethod {
   final String wireValue;
 }
 
-/// What `razorpay_flutter` needs to open checkout, as `POST /orders/` (and
-/// retry-payment) return it: `razorpay: {key_id, order_id, amount,
-/// prefill}` (`06 §2.6`).
+/// Why an order is cancelled (`CancelReasonEnum`).
+enum CancelReason {
+  changePaymentMethod('CHANGE_PAYMENT_METHOD'),
+  paymentProblem('PAYMENT_PROBLEM'),
+  orderedByMistake('ORDERED_BY_MISTAKE'),
+  changedMind('CHANGED_MIND'),
+  deliveryTooSlow('DELIVERY_TOO_SLOW'),
+  other('OTHER');
+
+  const CancelReason(this.wireValue);
+
+  final String wireValue;
+}
+
+/// Options for Razorpay checkout (`RazorpayCheckout`), all set by the
+/// server and passed to the SDK unchanged.
 @immutable
 class RazorpayCheckout {
   const RazorpayCheckout({
@@ -65,29 +76,49 @@ class RazorpayCheckout {
     required this.orderId,
     required this.amountPaise,
     this.currency = 'INR',
+    this.name = '',
+    this.description = '',
     this.prefillName,
     this.prefillEmail,
     this.prefillContact,
+    this.expiresAt,
+    this.timeoutSeconds,
   });
 
-  /// The public key id (never the secret).
+  /// The key id the server chose. `rzp_fake_…` means the server's local
+  /// fake gateway (`06 §2.6`): pay with the dev-only scheme instead of
+  /// opening Razorpay.
   final String keyId;
 
   /// The Razorpay order id (`order_…`), not ours.
   final String orderId;
 
-  /// Passed to Razorpay as is. TODO(api): `06 §2.6` doesn't say whether
-  /// `amount` is integer paise (what Razorpay expects) or a rupee string;
-  /// the app never converts it.
+  /// `grand_total` in integer paise, as the server sent it. Display the
+  /// order's `bill.grand_total` instead.
   final int amountPaise;
   final String currency;
+
+  /// Merchant name and description shown in checkout.
+  final String name;
+  final String description;
   final String? prefillName;
   final String? prefillEmail;
   final String? prefillContact;
+
+  /// The end of the payment window (UTC).
+  final DateTime? expiresAt;
+
+  /// Seconds left in the window, Razorpay's `timeout`.
+  final int? timeoutSeconds;
+
+  /// The server's local fake gateway key (`06 §2.6`).
+  bool get isFakeGateway => keyId.startsWith(fakeGatewayKeyPrefix);
+
+  static const fakeGatewayKeyPrefix = 'rzp_fake_';
 }
 
-/// An order as checkout sees it: `POST /orders/`, verify, retry-payment and
-/// `GET /orders/{id}/`.
+/// An order as checkout sees it: `OrderPlacement`, `Order` and
+/// `OrderSummary` all map to this.
 @immutable
 class PlacedOrder {
   const PlacedOrder({
@@ -96,43 +127,41 @@ class PlacedOrder {
     required this.status,
     required this.paymentMethod,
     required this.grandTotal,
-    this.etaMinutes,
+    this.etaAt,
     this.paymentExpiresAt,
+    this.canCancel = false,
+    this.canRetryPayment = false,
     this.razorpay,
   });
 
   final int id;
 
-  /// The customer-facing order number.
+  /// `order_number`, e.g. "JV-261103-000123".
   final String number;
   final OrderStatus status;
   final PaymentMethod paymentMethod;
 
-  /// The server's grand total for this order.
+  /// The server's `bill.grand_total` for this order.
   final String grandTotal;
-  final int? etaMinutes;
 
-  /// When a `PAYMENT_PENDING` order stops accepting payment (UTC; the
-  /// 15-minute window, `08` T1/T4). TODO(api): not in `06 §2.6` yet.
+  /// Promised delivery time (UTC); null until PLACED.
+  final DateTime? etaAt;
+
+  /// `PAYMENT_PENDING` only: the end of the payment window (UTC). A hint for
+  /// the "Pay by" line; whether retry is allowed is [canRetryPayment].
   final DateTime? paymentExpiresAt;
 
-  /// Set for ONLINE orders awaiting payment.
-  final RazorpayCheckout? razorpay;
+  /// The server allows `POST /orders/{id}/cancel/` now.
+  final bool canCancel;
 
-  PlacedOrder copyWith({OrderStatus? status, RazorpayCheckout? razorpay}) =>
-      PlacedOrder(
-        id: id,
-        number: number,
-        status: status ?? this.status,
-        paymentMethod: paymentMethod,
-        grandTotal: grandTotal,
-        etaMinutes: etaMinutes,
-        paymentExpiresAt: paymentExpiresAt,
-        razorpay: razorpay ?? this.razorpay,
-      );
+  /// The server allows `POST /orders/{id}/retry-payment/` now.
+  final bool canRetryPayment;
+
+  /// Set while an ONLINE order awaits payment (`OrderPlacement.razorpay`).
+  final RazorpayCheckout? razorpay;
 }
 
-/// `POST /orders/` body (`06 §2.6`).
+/// `POST /orders/` body (`OrderCreateRequest`).
 @immutable
 class PlaceOrderRequest {
   const PlaceOrderRequest({
@@ -144,12 +173,22 @@ class PlaceOrderRequest {
   final int addressId;
   final PaymentMethod paymentMethod;
 
-  /// The grand total the customer saw, echoed back so the server can answer
-  /// `PRICE_CHANGED` (`08` T1 guard). TODO(api): not in `06 §2.6` yet.
+  /// The cart's `bill.grand_total` exactly as displayed; a different server
+  /// total is 409 `PRICE_CHANGED`.
   final String expectedGrandTotal;
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlaceOrderRequest &&
+      other.addressId == addressId &&
+      other.paymentMethod == paymentMethod &&
+      other.expectedGrandTotal == expectedGrandTotal;
+
+  @override
+  int get hashCode => Object.hash(addressId, paymentMethod, expectedGrandTotal);
 }
 
-/// `POST /payments/razorpay/verify/` body (`06 §2.6`).
+/// `POST /payments/razorpay/verify/` body (`PaymentVerifyRequest`).
 @immutable
 class PaymentProof {
   const PaymentProof({

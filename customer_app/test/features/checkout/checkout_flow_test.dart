@@ -85,8 +85,10 @@ void main() {
 
     expect(find.byType(OrderSuccessScreen), findsOneWidget);
     expect(find.text('Order placed!'), findsOneWidget);
-    expect(find.text('Order JQ001001'), findsOneWidget);
-    expect(find.text('Arriving in about 15 min'), findsOneWidget);
+    final number = app.cart.orders.single.number;
+    expect(number, matches(RegExp(r'^JV-\d{6}-001001$')));
+    expect(find.text('Order $number'), findsOneWidget);
+    expect(find.textContaining('Arriving by '), findsOneWidget);
     expect(find.text('Pay ₹503 on delivery'), findsOneWidget);
     expect(app.payments.requests, isEmpty); // no gateway for COD
     final order = app.cart.orders.single;
@@ -107,7 +109,7 @@ void main() {
     await placeOrder(tester);
 
     final request = app.payments.requests.single;
-    expect(request.checkout.keyId, 'rzp_test_fake');
+    expect(request.checkout.keyId, 'rzp_fake_jivo_local');
     expect(request.checkout.amountPaise, 50300); // the server's, as sent
     expect(request.grandTotal, '503.00');
     expect(find.byType(OrderSuccessScreen), findsOneWidget);
@@ -153,7 +155,10 @@ void main() {
 
     expect(find.byType(PaymentFailedScreen), findsOneWidget);
     expect(
-      find.text('The payment for order JQ001001 wasn\'t completed.'),
+      find.text(
+        "The payment for order ${app.cart.orders.single.number} wasn't "
+        'completed.',
+      ),
       findsOneWidget,
     );
     expect(
@@ -251,7 +256,7 @@ void main() {
     expect(app.cart.orders.single.status, OrderStatus.paymentFailed);
     expect(
       find.text(
-        'The time to pay for order JQ001001 has run out, so it wasn\'t '
+        'The time to pay for order JV-261103-001001 has run out, so it wasn\'t '
         'placed. Your items are still in your cart.',
       ),
       findsOneWidget,

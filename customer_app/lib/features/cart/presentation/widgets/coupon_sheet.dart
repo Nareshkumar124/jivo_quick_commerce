@@ -8,27 +8,13 @@ import '../../../../shared/formatting/formatters.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../../domain/cart.dart';
 import '../cart_controller.dart';
+import '../cart_texts.dart';
 
 /// Coupons for the current cart, with eligibility and savings
 /// (`GET /cart/coupons/`).
 final cartCouponsProvider = FutureProvider.autoDispose<List<CouponOffer>>(
   (ref) => ref.watch(cartRepositoryProvider).coupons(),
 );
-
-/// The reason a coupon can't be used (`03 §2.8`: "clear error reasons").
-String couponProblemText(
-  AppLocalizations l10n,
-  CouponProblem problem, {
-  String? shortfall,
-}) => switch (problem) {
-  CouponProblem.minOrderNotMet when shortfall != null => l10n.couponAddMore(
-    formatRupees(shortfall),
-  ),
-  CouponProblem.minOrderNotMet => l10n.couponBelowMinimum,
-  CouponProblem.expired => l10n.couponExpired,
-  CouponProblem.usageExceeded => l10n.couponUsed,
-  CouponProblem.notEligible => l10n.couponNotApplicable,
-};
 
 /// Opens the coupon sheet (`03 §3` #21).
 Future<void> showCouponSheet(BuildContext context) =>
@@ -102,20 +88,8 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
     }
   }
 
-  /// The server's coupon error, with its shortfall when it sent one.
-  String _describe(Object error) {
-    final apiError = ApiError.from(error);
-    final shortfall = apiError.details['shortfall'];
-    if (apiError.code == ApiErrorCode.couponNotEligible &&
-        shortfall is String) {
-      return couponProblemText(
-        AppLocalizations.of(context),
-        CouponProblem.minOrderNotMet,
-        shortfall: shortfall,
-      );
-    }
-    return describeErrorWithDetails(context, error);
-  }
+  /// The server's coupon error, with its details (e.g. how much to add).
+  String _describe(Object error) => cartErrorText(context, error);
 
   @override
   Widget build(BuildContext context) {
@@ -239,8 +213,9 @@ class _CouponCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final problem = offer.problem;
+    final eligible = offer.isEligible;
     final savings = offer.savings;
+    final endsAt = offer.endsAt;
     final muted = theme.colorScheme.onSurfaceVariant;
 
     return Card(
@@ -260,31 +235,31 @@ class _CouponCard extends StatelessWidget {
                       offer.code,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: problem == null ? null : muted,
+                        color: eligible ? null : muted,
                       ),
                     ),
                     Text(offer.title, style: theme.textTheme.bodyMedium),
-                    if (offer.description != null)
+                    Text(
+                      offer.description,
+                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                    ),
+                    if (endsAt != null)
                       Text(
-                        offer.description!,
+                        l10n.couponExpiresOn(formatDate(endsAt)),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: muted,
                         ),
                       ),
-                    if (problem == null && savings != null)
+                    if (eligible && savings != null)
                       Text(
                         l10n.couponSavesOnCart(formatRupees(savings)),
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: context.jivoColors.success,
                         ),
                       ),
-                    if (problem != null)
+                    if (!eligible)
                       Text(
-                        couponProblemText(
-                          l10n,
-                          problem,
-                          shortfall: offer.shortfall,
-                        ),
+                        couponIneligibleText(l10n, offer),
                         key: ValueKey('coupon-problem-${offer.code}'),
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: theme.colorScheme.error,
@@ -294,7 +269,18 @@ class _CouponCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (offer.eligible)
+            if (eligible && offer.isApplied)
+              Padding(
+                padding: const EdgeInsets.all(JivoSpacing.sm),
+                child: Text(
+                  l10n.couponAppliedBadge,
+                  key: ValueKey('coupon-applied-${offer.code}'),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: context.jivoColors.success,
+                  ),
+                ),
+              )
+            else if (eligible)
               TextButton(
                 key: ValueKey('coupon-apply-${offer.code}'),
                 onPressed: onApply,

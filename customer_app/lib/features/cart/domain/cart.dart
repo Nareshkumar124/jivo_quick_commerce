@@ -1,18 +1,16 @@
 import 'package:flutter/foundation.dart';
 
 import '../../catalog/domain/catalog_models.dart';
+import '../../orders/domain/order.dart';
 
-/// The cart as the server reports it (`03 §2.8`, `06 §2.5`).
+/// The cart as the server reports it (`03 §2.8`, `06 §2.5`, schema `Cart`).
 ///
 /// Money is never computed in the app (`08 §6`). Every amount here is the
 /// server's decimal string (`"249.00"`), shown only with `formatRupees`.
-/// Totals, discounts, fees, savings and the free-delivery and minimum-order
-/// gaps all come from the server; when a field is missing the screen hides
-/// it rather than deriving it.
-///
-/// TODO(api): field names follow `06 §2.5` and `08 §6.2` until the Phase 3
-/// contract (`backend/openapi/schema.yaml`) is published. The API repository
-/// maps the generated `jivo_api` models into these types at S3-A.
+/// Totals, discounts, fees, savings, the "add ₹X more" amounts and whether
+/// checkout is allowed all come from the server. `ApiCartRepository` maps
+/// the generated `jivo_api` models into these types, so widgets don't depend
+/// on the generated client.
 @immutable
 class CartSnapshot {
   const CartSnapshot({
@@ -22,36 +20,45 @@ class CartSnapshot {
     this.lines = const [],
     this.bill,
     this.coupon,
+    this.tip = '0.00',
     this.instructions = DeliveryInstructions.none,
     this.addressId,
-    this.minimumOrder,
-    this.codAvailable = false,
+    this.thresholds,
+    this.paymentOptions = const [],
+    this.checkout = CheckoutStatus.unknown,
+    this.storeOpen = true,
   });
 
-  /// A snapshot built from the server's lines: [quantities] and
-  /// [itemCount] are read from them (unit counts, not money).
+  /// A snapshot built from the server's lines: [quantities] is read from
+  /// them (unit counts, not money).
   factory CartSnapshot.fromLines({
     required List<CartLine> lines,
+    required int itemCount,
     CartBill? bill,
     AppliedCoupon? coupon,
+    String tip = '0.00',
     DeliveryInstructions instructions = DeliveryInstructions.none,
     int? addressId,
-    MinimumOrder? minimumOrder,
-    bool codAvailable = false,
-    int? itemCount,
+    CartThresholds? thresholds,
+    List<PaymentOption> paymentOptions = const [],
+    CheckoutStatus checkout = CheckoutStatus.unknown,
+    bool storeOpen = true,
   }) => CartSnapshot(
     quantities: Map.unmodifiable({
       for (final line in lines) line.variantId: line.quantity,
     }),
-    itemCount: itemCount ?? lines.fold(0, (sum, line) => sum + line.quantity),
+    itemCount: itemCount,
     itemTotal: bill?.itemTotal,
     lines: List.unmodifiable(lines),
     bill: bill,
     coupon: coupon,
+    tip: tip,
     instructions: instructions,
     addressId: addressId,
-    minimumOrder: minimumOrder,
-    codAvailable: codAvailable,
+    thresholds: thresholds,
+    paymentOptions: List.unmodifiable(paymentOptions),
+    checkout: checkout,
+    storeOpen: storeOpen,
   );
 
   static const empty = CartSnapshot();
@@ -59,34 +66,41 @@ class CartSnapshot {
   /// Quantity per variant id.
   final Map<int, int> quantities;
 
-  /// Units in the cart, as the server counts them.
+  /// Units in the cart (`item_count`), for the cart bar.
   final int itemCount;
 
   /// The server's item total (the cart bar amount), or null when not known.
   final String? itemTotal;
 
-  /// The cart lines, in the server's order.
+  /// The cart lines, in the order they were added.
   final List<CartLine> lines;
 
-  /// The bill from the pricing engine; null for an empty cart.
+  /// The bill from `compute_bill` (all zeros for an empty cart).
   final CartBill? bill;
 
   /// The applied coupon, if any.
   final AppliedCoupon? coupon;
 
+  /// The chosen rider tip (`Cart.tip`; kept while the cart is empty).
+  final String tip;
+
   /// What the customer asked the delivery partner to do.
   final DeliveryInstructions instructions;
 
-  /// The address the bill was computed for (`GET /cart/?address_id=`).
+  /// The saved address the cart is checked against (`Cart.address.id`).
   final int? addressId;
 
-  /// Whether the cart meets the store's minimum order. Null when the server
-  /// did not say; checkout then relies on the server's `MIN_ORDER_NOT_MET`.
-  final MinimumOrder? minimumOrder;
+  /// The store's thresholds and how far the cart is from them.
+  final CartThresholds? thresholds;
 
-  /// Whether Cash on Delivery may be offered for this cart (`03 §2.9`:
-  /// "shown only if eligible"). TODO(api): not in `06 §2.5` yet.
-  final bool codAvailable;
+  /// ONLINE then COD, each with its availability for this cart.
+  final List<PaymentOption> paymentOptions;
+
+  /// Whether the order can be placed now, and what stops it.
+  final CheckoutStatus checkout;
+
+  /// `Cart.store.is_open`.
+  final bool storeOpen;
 
   bool get isEmpty => itemCount == 0;
 
@@ -100,71 +114,90 @@ class CartSnapshot {
     return null;
   }
 
-  /// Lines the server flagged as unavailable or reduced (`03 §2.8`, stock
-  /// re-validation). Checkout stays disabled until they are fixed.
+  /// Lines the server flagged (`CartLine.issue`), to fix before checkout.
   List<CartLine> get problemLines =>
-      lines.where((line) => line.issue != CartLineIssue.none).toList();
+      lines.where((line) => line.issue != null).toList();
 
-  bool get hasProblems => lines.any((line) => line.issue != CartLineIssue.none);
+  bool get hasProblems => lines.any((line) => line.issue != null);
+
+  /// Whether the server offers [method] for this cart.
+  bool offers(PaymentMethod method) => paymentOptions.any(
+    (option) => option.method == method && option.available,
+  );
+
+  /// Cash on Delivery is shown only when eligible (`03 §2.9`).
+  bool get codAvailable => offers(PaymentMethod.cod);
 }
 
-/// A stock problem on a cart line (`03 §2.8`).
-enum CartLineIssue {
-  none,
+/// `CartLineIssueCodeEnum`.
+enum CartIssueCode {
+  /// Nothing can be ordered: remove the line.
+  outOfStock,
 
-  /// Fewer units are available than in the cart: [CartLine.availableQuantity].
-  reduced,
+  /// Fewer units can be ordered: reduce to `variant.orderable_quantity`.
+  quantityUnavailable,
 
-  /// None available.
-  unavailable,
+  /// A code this build doesn't know.
+  unknown,
 }
 
-/// One cart line (`06 §2.5`).
+/// Why a line can't be ordered as it is (`CartLineIssue`).
+@immutable
+class CartLineIssue {
+  const CartLineIssue({required this.code, required this.message});
+
+  final CartIssueCode code;
+
+  /// The server's display text; used only when [code] is unknown.
+  final String message;
+}
+
+/// One cart line (`CartLine`): the variant priced and checked against stock
+/// at the store right now.
 @immutable
 class CartLine {
   const CartLine({
     required this.id,
-    required this.variantId,
     required this.productName,
-    required this.variantName,
-    required this.sellingPrice,
-    required this.mrp,
+    required this.variant,
     required this.quantity,
+    required this.lineMrpTotal,
     required this.lineTotal,
-    required this.orderableQuantity,
+    this.productId,
     this.productSlug,
-    this.imageUrl,
-    this.issue = CartLineIssue.none,
-    this.availableQuantity,
+    this.issue,
   });
 
-  /// The server's line id: `PATCH`/`DELETE /cart/items/{id}/`.
+  /// The server's line id.
   final int id;
-  final int variantId;
+  final int? productId;
   final String? productSlug;
   final String productName;
 
-  /// e.g. "1 L".
-  final String variantName;
-  final String? imageUrl;
-
-  /// Unit price and MRP at this store.
-  final String sellingPrice;
-  final String mrp;
+  /// The variant with its current price and stock (`VariantSummary`).
+  final CatalogVariant variant;
   final int quantity;
 
-  /// The server's `selling_price × quantity`.
+  /// The server's `mrp × quantity` and `selling_price × quantity`.
+  final String lineMrpTotal;
   final String lineTotal;
 
-  /// The stepper cap: the server's `min(stock, max_qty_per_order)`.
-  final int orderableQuantity;
-  final CartLineIssue issue;
+  /// Null when the line is fine.
+  final CartLineIssue? issue;
 
-  /// Units available now, set when [issue] is [CartLineIssue.reduced].
-  final int? availableQuantity;
+  int get variantId => variant.id;
+  String get variantName => variant.name;
+  String get sellingPrice => variant.sellingPrice;
+  String get mrp => variant.mrp;
+  String? get imageUrl => variant.imageUrl;
+
+  /// The stepper cap and the fix target: the server's
+  /// `orderable_quantity` (0 when it can't be ordered).
+  int get orderableQuantity => variant.maxSelectable;
 }
 
-/// The bill from `cart.services.compute_bill` (`08 §6.2`), as sent.
+/// The bill from `cart.services.compute_bill` (`08 §6.2`, schema `Bill`),
+/// as sent. The same shape is the order's bill.
 @immutable
 class CartBill {
   const CartBill({
@@ -177,8 +210,7 @@ class CartBill {
     required this.handlingFee,
     required this.tip,
     required this.grandTotal,
-    this.totalSavings,
-    this.freeDeliveryShortfall,
+    required this.totalSavings,
   });
 
   final String mrpTotal;
@@ -195,99 +227,169 @@ class CartBill {
   /// **To pay.**
   final String grandTotal;
 
-  /// "You save ₹X" (`03 §2.8`). TODO(api): needs a server field; the app
-  /// does not add the discounts up. Hidden when null.
-  final String? totalSavings;
-
-  /// "Add ₹X more for free delivery" (`03 §2.8`). TODO(api): needs a server
-  /// field; the app does not subtract from the threshold. Hidden when null
-  /// or zero.
-  final String? freeDeliveryShortfall;
+  /// "You save ₹X": the server's product + coupon discount.
+  final String totalSavings;
 }
 
-/// The store's minimum order for this cart (`03 §2.8`), as the server
-/// judged it.
+/// The store's thresholds and how far the cart is from them
+/// (`CartThresholds`), computed by the server.
 @immutable
-class MinimumOrder {
-  const MinimumOrder({required this.met, required this.amount, this.shortfall});
+class CartThresholds {
+  const CartThresholds({
+    required this.minOrderValue,
+    this.amountToMinOrder,
+    this.freeDeliveryThreshold,
+    this.amountToFreeDelivery,
+  });
 
-  final bool met;
+  final String minOrderValue;
 
-  /// The minimum item total.
-  final String amount;
+  /// Item value still needed for the minimum; null when reached.
+  final String? amountToMinOrder;
+  final String? freeDeliveryThreshold;
 
-  /// How much more to add, when not [met].
-  final String? shortfall;
+  /// For "Add ₹X more for FREE delivery"; null when delivery is free.
+  final String? amountToFreeDelivery;
 }
 
-/// The coupon on the cart.
+/// `PaymentUnavailableReasonEnum`.
+enum PaymentUnavailableReason { codDisabled, aboveLimit, notAllowed, unknown }
+
+/// One payment method with its availability (`PaymentOption`).
+@immutable
+class PaymentOption {
+  const PaymentOption({
+    required this.method,
+    required this.available,
+    this.reason,
+    this.message,
+  });
+
+  final PaymentMethod method;
+  final bool available;
+  final PaymentUnavailableReason? reason;
+  final String? message;
+}
+
+/// `CheckoutBlockerCodeEnum`.
+enum CheckoutBlockerCode {
+  cartEmpty,
+  addressRequired,
+  notServiceable,
+  storeClosed,
+  stockUnavailable,
+  minOrderNotMet,
+  couponInvalid,
+  couponExpired,
+  couponNotEligible,
+  couponUsageExceeded,
+
+  /// A code this build doesn't know: its server message is shown.
+  unknown,
+}
+
+/// Something that stops the order now (`CheckoutBlocker`).
+@immutable
+class CheckoutBlocker {
+  const CheckoutBlocker({required this.code, required this.message});
+
+  final CheckoutBlockerCode code;
+
+  /// The server's display text; used only when [code] is unknown.
+  final String message;
+}
+
+/// `CheckoutStatus`: enable checkout only when [canPlaceOrder].
+@immutable
+class CheckoutStatus {
+  const CheckoutStatus({required this.canPlaceOrder, this.blockers = const []});
+
+  /// Before the first answer from the server.
+  static const unknown = CheckoutStatus(canPlaceOrder: false);
+
+  final bool canPlaceOrder;
+
+  /// Most important first.
+  final List<CheckoutBlocker> blockers;
+}
+
+/// The coupon on the cart (`AppliedCoupon`).
 @immutable
 class AppliedCoupon {
   const AppliedCoupon({
     required this.code,
+    required this.title,
     required this.discount,
-    this.title,
-    this.problem,
+    this.isApplicable = true,
+    this.message,
   });
 
   final String code;
+  final String title;
 
-  /// The server's coupon discount on this cart.
+  /// The discount it gives this cart now (`"0.00"` when it doesn't apply).
   final String discount;
-  final String? title;
 
-  /// Set when the coupon no longer applies (e.g. the cart dropped below its
-  /// minimum); [discount] is then zero. TODO(api): confirm the server keeps
-  /// the coupon and flags it rather than removing it.
-  final CouponProblem? problem;
+  /// False when the cart no longer qualifies: it stays applied, gives
+  /// nothing, and checkout is blocked until it is removed or the cart
+  /// qualifies again.
+  final bool isApplicable;
+
+  /// The server's reason when it doesn't apply.
+  final String? message;
 }
 
-/// Why a coupon can't be used (`03 §2.8`: "clear error reasons").
-enum CouponProblem {
-  minOrderNotMet('MIN_ORDER_NOT_MET'),
-  expired('EXPIRED'),
-  usageExceeded('USAGE_EXCEEDED'),
-  notEligible('NOT_ELIGIBLE');
-
-  const CouponProblem(this.wireValue);
-
-  final String wireValue;
-
-  static CouponProblem fromWire(String? value) => values.firstWhere(
-    (problem) => problem.wireValue == value,
-    orElse: () => notEligible,
-  );
+/// `CouponIneligibleReasonEnum`.
+enum CouponIneligibility {
+  minOrderValue,
+  firstOrderOnly,
+  noEligibleItems,
+  store,
+  unknown,
 }
 
-/// One coupon in the coupon sheet (`GET /cart/coupons/`).
+/// One coupon in the coupon sheet (`CouponOffer`). Expired and used-up
+/// coupons are not listed by the server.
 @immutable
 class CouponOffer {
   const CouponOffer({
     required this.code,
     required this.title,
-    this.description,
+    required this.description,
+    required this.isEligible,
+    this.isApplied = false,
     this.savings,
-    this.problem,
-    this.shortfall,
+    this.ineligibility,
+    this.message,
+    this.amountToUnlock,
+    this.endsAt,
   });
 
   final String code;
   final String title;
-  final String? description;
 
-  /// What it saves on this cart, when eligible.
+  /// Terms in one line.
+  final String description;
+  final bool isEligible;
+
+  /// The coupon on the cart now.
+  final bool isApplied;
+
+  /// What it saves on this cart now, when eligible.
   final String? savings;
+  final CouponIneligibility? ineligibility;
 
-  /// Why it can't be applied; null when eligible.
-  final CouponProblem? problem;
+  /// The server's reason text, used for unknown reasons.
+  final String? message;
 
-  /// "Add ₹X more", for [CouponProblem.minOrderNotMet].
-  final String? shortfall;
+  /// For [CouponIneligibility.minOrderValue]: item value still needed.
+  final String? amountToUnlock;
 
-  bool get eligible => problem == null;
+  /// UTC expiry, or null.
+  final DateTime? endsAt;
 }
 
-/// The delivery-instruction chips (`03 §2.8`).
+/// The delivery-instruction chips (`DeliveryInstructionChipEnum`).
 enum InstructionTag {
   dontRingBell('DONT_RING_BELL'),
   leaveAtDoor('LEAVE_AT_DOOR'),
@@ -295,18 +397,18 @@ enum InstructionTag {
 
   const InstructionTag(this.wireValue);
 
-  /// TODO(api): the wire format of `instructions` is not in `06 §2.5`.
   final String wireValue;
 }
 
-/// Chips plus free text.
+/// Chips plus free text (`DeliveryInstructions`). [tags] keeps the order
+/// the chips were chosen in.
 @immutable
 class DeliveryInstructions {
   const DeliveryInstructions({this.tags = const {}, this.note = ''});
 
   static const none = DeliveryInstructions();
 
-  /// Longest free-text note the app accepts. TODO(api): confirm the limit.
+  /// `note` max length in the schema.
   static const maxNoteLength = 200;
 
   final Set<InstructionTag> tags;
@@ -339,33 +441,15 @@ class CartUpdate {
 }
 
 /// What the tile knew about a variant when it was added. Only the fake
-/// cart uses it (TODO(api)): the server already knows the variant, and the
-/// API repository ignores it.
+/// backend uses it (the server knows the variant); the API repository
+/// ignores it.
 @immutable
 class CartLinePreview {
-  const CartLinePreview({
-    required this.productName,
-    required this.variantName,
-    required this.sellingPrice,
-    required this.mrp,
-    required this.orderableQuantity,
-    this.imageUrl,
-  });
+  const CartLinePreview({required this.productName, required this.variant});
 
   factory CartLinePreview.of(CatalogVariant variant, String productName) =>
-      CartLinePreview(
-        productName: productName,
-        variantName: variant.name,
-        sellingPrice: variant.sellingPrice,
-        mrp: variant.mrp,
-        orderableQuantity: variant.maxSelectable,
-        imageUrl: variant.imageUrl,
-      );
+      CartLinePreview(productName: productName, variant: variant);
 
   final String productName;
-  final String variantName;
-  final String sellingPrice;
-  final String mrp;
-  final int orderableQuantity;
-  final String? imageUrl;
+  final CatalogVariant variant;
 }

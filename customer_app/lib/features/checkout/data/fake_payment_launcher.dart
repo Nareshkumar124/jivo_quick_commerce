@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:jivo_core/jivo_core.dart';
 
@@ -11,11 +15,33 @@ typedef FakePaymentSigner = String Function(
   String razorpayPaymentId,
 );
 
-/// TODO(api): the backend's dev-only fake-payment signature scheme (backend
-/// P3 R1, D-01: no Razorpay test keys yet). Until the PM sends the scheme
-/// at the sync point, only the app's own fake backend checks this value.
+/// The fake gateway's published key secret (`06 §2.6`, local development
+/// only). Deliberately public, not a secret: it works only with the
+/// server's fake gateway, which staging and production refuse.
+const fakeGatewayKeySecret = 'jivo-fake-razorpay-key-secret-local-only';
+
+/// The fake gateway's payment signature (`06 §2.6`): Razorpay's own
+/// algorithm, lowercase hex HMAC-SHA256 of `"<order_id>|<payment_id>"`,
+/// keyed with [fakeGatewayKeySecret]. The server's verify runs the same
+/// code as for real payments.
 String fakePaymentSignature(String razorpayOrderId, String razorpayPaymentId) =>
-    'fake_signature:$razorpayOrderId:$razorpayPaymentId';
+    Hmac(
+      sha256,
+      utf8.encode(fakeGatewayKeySecret),
+    ).convert(utf8.encode('$razorpayOrderId|$razorpayPaymentId')).toString();
+
+const _alphanumerics =
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+/// A made-up payment id: `"pay_"` + 14 letters/digits (`06 §2.6`).
+String newFakePaymentId([Random? random]) {
+  final rng = random ?? Random.secure();
+  final suffix = String.fromCharCodes([
+    for (var i = 0; i < 14; i++)
+      _alphanumerics.codeUnitAt(rng.nextInt(_alphanumerics.length)),
+  ]);
+  return 'pay_$suffix';
+}
 
 /// How a fake payment ends.
 enum FakePaymentChoice {
@@ -29,19 +55,22 @@ enum FakePaymentChoice {
   externalWallet,
 }
 
-/// The **dev-flavor** payment launcher while there are no Razorpay test
-/// keys (D-01). No SDK and no money: [choose] decides the outcome (a sheet
-/// on the phone, a fixed answer in tests), and success carries a
-/// [signer]-made signature for the server's verify call.
+/// The **dev-flavor** stand-in for Razorpay checkout when the server uses
+/// its local fake gateway (`razorpay.key_id` starts with `rzp_fake_`,
+/// `06 §2.6`): no SDK and no money. [choose] decides the outcome (a sheet
+/// on the phone, a fixed answer in tests); success carries a made-up
+/// payment id and the [signer]'s signature for the server's verify call.
+/// Only `GatewayPaymentLauncher` in the dev flavor ever opens it.
 class FakePaymentLauncher implements PaymentLauncher {
   FakePaymentLauncher({
     required this.choose,
     this.signer = fakePaymentSignature,
-  });
+    String Function()? newPaymentId,
+  }) : _newPaymentId = newPaymentId ?? newFakePaymentId;
 
   final Future<FakePaymentChoice?> Function(PaymentRequest request) choose;
   final FakePaymentSigner signer;
-  int _sequence = 1;
+  final String Function() _newPaymentId;
 
   /// The requests seen (tests).
   final requests = <PaymentRequest>[];
@@ -51,7 +80,7 @@ class FakePaymentLauncher implements PaymentLauncher {
     requests.add(request);
     final choice = await choose(request) ?? FakePaymentChoice.cancel;
     final orderId = request.checkout.orderId;
-    final paymentId = 'pay_fake_${_sequence++}';
+    final paymentId = _newPaymentId();
     return switch (choice) {
       FakePaymentChoice.succeed => PaymentAuthorized(
         razorpayOrderId: orderId,
@@ -61,7 +90,7 @@ class FakePaymentLauncher implements PaymentLauncher {
       FakePaymentChoice.badSignature => PaymentAuthorized(
         razorpayOrderId: orderId,
         razorpayPaymentId: paymentId,
-        razorpaySignature: 'bad_signature',
+        razorpaySignature: signer(orderId, '${paymentId}x'),
       ),
       FakePaymentChoice.fail => const PaymentNotCompleted(
         PaymentFailureReason.unknown,

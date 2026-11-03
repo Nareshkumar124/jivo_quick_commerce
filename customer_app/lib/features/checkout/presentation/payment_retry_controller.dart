@@ -5,6 +5,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/repositories.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../orders/domain/order.dart';
+import '../../orders/presentation/pending_payment.dart';
 import '../data/payment_launcher.dart';
 import '../domain/checkout_result.dart';
 import '../domain/idempotency_key.dart';
@@ -20,6 +21,7 @@ enum AfterCancel { cart, checkout }
 class PaymentRetryState {
   const PaymentRetryState({
     this.order,
+    this.serverChecked = false,
     this.loading = false,
     this.loadError,
     this.action,
@@ -30,16 +32,23 @@ class PaymentRetryState {
     this.retried = false,
   });
 
-  /// The order as the server last reported it.
+  /// The order as the server last reported it on this screen.
   final PlacedOrder? order;
+
+  /// A server status read succeeded during this visit, and no payment
+  /// attempt has ended unconfirmed since. Retry, Cancel and Change method
+  /// need it: without a fresh read the order may already be paid.
+  final bool serverChecked;
   final bool loading;
+
+  /// The last status read failed.
   final Object? loadError;
   final RetryAction? action;
 
-  /// What the gateway reported on the last attempt.
+  /// What the gateway reported on the last attempt here.
   final PaymentFailureReason? reason;
 
-  /// The last action's failure (shown once).
+  /// The last action's failure (shown inline).
   final Object? error;
 
   /// The server confirmed the order: go to the success screen.
@@ -54,10 +63,21 @@ class PaymentRetryState {
 
   bool get busy => action != null;
 
+  /// Retry only on the server's word: a fresh read that allows it
+  /// (`can_retry_payment`, which already accounts for the window).
+  bool get canRetry =>
+      serverChecked && !busy && !loading && (order?.canRetryPayment ?? false);
+
+  /// Cancel and Change method only on the server's word (`can_cancel`).
+  bool get canCancel =>
+      serverChecked && !busy && !loading && (order?.canCancel ?? false);
+
   PaymentRetryState copyWith({
     PlacedOrder? order,
+    bool? serverChecked,
     bool? loading,
     Object? loadError,
+    bool clearLoadError = false,
     RetryAction? action,
     bool clearAction = false,
     PaymentFailureReason? reason,
@@ -69,8 +89,9 @@ class PaymentRetryState {
     bool? retried,
   }) => PaymentRetryState(
     order: order ?? this.order,
+    serverChecked: serverChecked ?? this.serverChecked,
     loading: loading ?? this.loading,
-    loadError: loadError,
+    loadError: clearLoadError ? null : (loadError ?? this.loadError),
     action: clearAction ? null : (action ?? this.action),
     reason: clearReason ? null : (reason ?? this.reason),
     error: clearError ? null : (error ?? this.error),
@@ -80,10 +101,15 @@ class PaymentRetryState {
   );
 }
 
-/// The payment-failed screen for one order (`03 §2.9`, screen #23): it
-/// first asks the server for the order's status (the webhook may have
-/// confirmed a payment the app never heard about), then offers Retry
-/// (within the payment window), Change method and Cancel order (T5).
+/// The payment-failed screen for one order (`03 §2.9`, screen #23).
+///
+/// It first reads the order's status from the server (the webhook may have
+/// confirmed a payment the app never heard about). The server's status and
+/// flags are authoritative: Retry needs `can_retry_payment`, Cancel and
+/// Change method need `can_cancel`, and both need a read that succeeded on
+/// this visit. After an attempt that ends unconfirmed the status is read
+/// again before anything else is allowed. The device clock only drives the
+/// "Pay by" hint.
 class PaymentRetryController extends Notifier<PaymentRetryState> {
   PaymentRetryController(this.orderId);
 
@@ -96,27 +122,33 @@ class PaymentRetryController extends Notifier<PaymentRetryState> {
     return const PaymentRetryState(loading: true);
   }
 
+  /// Reads the order's status from the server.
   Future<void> reload() async {
     if (!ref.mounted) return;
-    state = state.copyWith(loading: true);
+    state = state.copyWith(loading: true, clearLoadError: true);
     try {
       final order = await ref.read(orderRepositoryProvider).getOrder(orderId);
       if (!ref.mounted) return;
       state = state.copyWith(
         order: order,
+        serverChecked: true,
         loading: false,
         confirmed: order.status.isConfirmed ? order : null,
       );
     } catch (error) {
       if (ref.mounted) {
-        state = state.copyWith(loading: false, loadError: error);
+        state = state.copyWith(
+          serverChecked: false,
+          loading: false,
+          loadError: error,
+        );
       }
     }
   }
 
   /// `POST /orders/{id}/retry-payment/`, then the gateway and verify.
   Future<void> retry() async {
-    if (state.busy) return;
+    if (!state.canRetry) return;
     state = state.copyWith(
       action: RetryAction.retrying,
       clearError: true,
@@ -134,34 +166,43 @@ class PaymentRetryController extends Notifier<PaymentRetryState> {
       final apiError = ApiError.from(error);
       if (!isOutcomeUnknown(apiError)) _idempotencyKey = null;
       if (!ref.mounted) return;
-      state = state.copyWith(clearAction: true, error: apiError);
+      state = state.copyWith(
+        clearAction: true,
+        serverChecked: false,
+        error: apiError,
+      );
       // The order may have moved on (paid by webhook, or expired).
-      if (apiError.code == ApiErrorCode.invalidStateTransition) await reload();
+      await reload();
       return;
     }
     final result = await ref.read(paymentFlowProvider).pay(order);
-    if (result is OrderConfirmed) await onOrderConfirmed(ref, result.order);
     if (!ref.mounted) return;
-    state = switch (result) {
-      OrderConfirmed(:final order) => state.copyWith(
-        order: order,
-        clearAction: true,
-        confirmed: order,
-      ),
-      PaymentIncomplete(:final order, :final reason, :final error) =>
-        state.copyWith(
+    switch (result) {
+      case OrderConfirmed(:final order):
+        state = state.copyWith(
           order: order,
+          clearAction: true,
+          confirmed: order,
+        );
+        await onOrderConfirmed(ref, order);
+      case PaymentIncomplete(:final order, :final reason, :final error):
+        state = state.copyWith(
+          order: order,
+          serverChecked: false,
           clearAction: true,
           reason: reason,
           error: error,
-        ),
-    };
+        );
+        // Ask the server before allowing anything else.
+        await reload();
+    }
   }
 
   /// T5: abandon the unpaid order. With [changeMethod] the customer goes
-  /// back to checkout to pick another method; otherwise to the cart.
+  /// back to checkout to pick another method (reason
+  /// `CHANGE_PAYMENT_METHOD`); otherwise to the cart (`PAYMENT_PROBLEM`).
   Future<void> cancel({bool changeMethod = false}) async {
-    if (state.busy) return;
+    if (!state.canCancel) return;
     state = state.copyWith(
       action: changeMethod
           ? RetryAction.changingMethod
@@ -171,9 +212,15 @@ class PaymentRetryController extends Notifier<PaymentRetryState> {
     try {
       final order = await ref
           .read(orderRepositoryProvider)
-          .cancelOrder(orderId);
+          .cancelOrder(
+            orderId,
+            reason: changeMethod
+                ? CancelReason.changePaymentMethod
+                : CancelReason.paymentProblem,
+          );
       await ref.read(cartProvider.notifier).refresh();
       if (!ref.mounted) return;
+      refreshPendingPayment(ref);
       state = state.copyWith(
         order: order,
         clearAction: true,
@@ -181,7 +228,11 @@ class PaymentRetryController extends Notifier<PaymentRetryState> {
       );
     } catch (error) {
       if (!ref.mounted) return;
-      state = state.copyWith(clearAction: true, error: ApiError.from(error));
+      state = state.copyWith(
+        clearAction: true,
+        serverChecked: false,
+        error: ApiError.from(error),
+      );
       await reload();
     }
   }

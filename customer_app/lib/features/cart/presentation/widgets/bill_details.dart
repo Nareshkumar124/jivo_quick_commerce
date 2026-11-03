@@ -87,7 +87,7 @@ class BillDetails extends StatelessWidget {
           value: formatRupees(bill.grandTotal),
           emphasised: true,
         ),
-        if (savings != null && !isZeroAmount(savings)) ...[
+        if (!isZeroAmount(savings)) ...[
           const SizedBox(height: JivoSpacing.md),
           SavingsBanner(amount: savings),
         ],

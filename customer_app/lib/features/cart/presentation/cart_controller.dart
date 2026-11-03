@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/repositories.dart';
 import '../../catalog/domain/catalog_models.dart';
+import '../../location/presentation/delivery_controller.dart';
 import '../data/cart_repository.dart';
 import '../domain/cart.dart';
 
@@ -87,8 +89,21 @@ class CartController extends Notifier<CartState> {
 
   @override
   CartState build() {
+    // The store-change reload is [cartStoreSyncProvider]'s job: the cart
+    // must not depend on the delivery state, which reads the cart.
     Future.microtask(refresh);
     return const CartState();
+  }
+
+  /// The server says the store is gone: re-check the location, as catalog
+  /// calls do (`storeScoped`). A missing store on this side (no location
+  /// yet) is not reported: the store-scope listener reloads once it's known.
+  void _checkStore(Object error) {
+    final apiError = ApiError.from(error);
+    if (apiError.code == ApiErrorCode.storeNotFound &&
+        apiError.rawCode != null) {
+      Future.microtask(ref.read(deliveryProvider.notifier).storeGone);
+    }
   }
 
   CartRepository get _repository => ref.read(cartRepositoryProvider);
@@ -117,6 +132,7 @@ class CartController extends Notifier<CartState> {
         state = state.copyWith(load: CartLoad.ready, clearLoadError: true);
       }
     } catch (error) {
+      _checkStore(error);
       // Only the latest load decides the loading/error state.
       if (ref.mounted && ticket == _latestLoad) {
         state = state.copyWith(load: CartLoad.failed, loadError: error);
@@ -156,13 +172,11 @@ class CartController extends Notifier<CartState> {
 
   Future<void> removeLine(CartLine line) => _set(line.variantId, 0);
 
-  /// The "fix" action on a flagged line: down to what is available, or
-  /// out of the cart when nothing is.
-  Future<void> fixLine(CartLine line) => switch (line.issue) {
-    CartLineIssue.reduced => _set(line.variantId, line.availableQuantity ?? 0),
-    CartLineIssue.unavailable => _set(line.variantId, 0),
-    CartLineIssue.none => Future.value(),
-  };
+  /// The "fix" action on a flagged line (`06 §2.5`): set it to the
+  /// server's `orderable_quantity`, which removes it at 0.
+  Future<void> fixLine(CartLine line) => line.issue == null
+      ? Future.value()
+      : _set(line.variantId, line.orderableQuantity);
 
   /// Empties the cart (store change).
   Future<void> clear() async {
@@ -193,6 +207,9 @@ class CartController extends Notifier<CartState> {
     state = state.copyWith(updating: true);
     try {
       _apply(ticket, await call(_repository));
+    } catch (error) {
+      _checkStore(error);
+      rethrow;
     } finally {
       if (ref.mounted) state = state.copyWith(updating: false);
     }
@@ -211,6 +228,9 @@ class CartController extends Notifier<CartState> {
         ticket,
         await _repository.setQuantity(variantId, quantity, preview: preview),
       );
+    } catch (error) {
+      _checkStore(error);
+      rethrow;
     } finally {
       if (ref.mounted) {
         state = state.copyWith(pending: {...state.pending}..remove(variantId));
@@ -222,3 +242,13 @@ class CartController extends Notifier<CartState> {
 final cartProvider = NotifierProvider<CartController, CartState>(
   CartController.new,
 );
+
+/// The cart follows `X-Store-Id` (`06 §2.5`): reload it when the store, or
+/// its generation after `STORE_NOT_FOUND`, changes. Watched by the app
+/// widget; kept outside [CartController] so the cart doesn't depend on the
+/// delivery state (which reads the cart: a circular dependency).
+final cartStoreSyncProvider = Provider<void>((ref) {
+  ref.listen(storeScopeProvider, (previous, next) {
+    if (previous != next) ref.read(cartProvider.notifier).refresh();
+  });
+});

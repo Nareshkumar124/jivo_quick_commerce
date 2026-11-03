@@ -55,6 +55,7 @@ void main() {
         ),
         analyticsProvider.overrideWithValue(const NoopAnalyticsClient()),
         idempotencyKeyProvider.overrideWithValue(() => 'key-${++issued}'),
+        cartAvailableProvider.overrideWithValue(false),
       ],
     );
     addTearDown(container.dispose);

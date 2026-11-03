@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +20,7 @@ import '../../location/domain/delivery_location.dart';
 import '../../location/presentation/delivery_controller.dart';
 import '../../location/presentation/location_options.dart';
 import '../../location/presentation/store_closed_banner.dart';
+import '../../orders/presentation/pending_payment.dart';
 import 'banner_carousel.dart';
 
 /// Home (`03 §2.5`): ETA and address header, search bar, banners, category
@@ -47,6 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _refresh() async {
+    unawaited(ref.read(pendingPaymentProvider.notifier).check());
     await ref.read(deliveryProvider.notifier).refresh();
     ref.invalidate(homeFeedProvider);
     try {
@@ -85,6 +89,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               const SliverToBoxAdapter(child: _UpdatePrompt()),
+              const SliverToBoxAdapter(child: PendingPaymentBanner()),
               if (store != null && !store.isOpen)
                 SliverToBoxAdapter(child: StoreClosedBanner(store: store)),
               ..._content(context, delivery),

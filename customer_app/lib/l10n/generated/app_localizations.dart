@@ -1390,10 +1390,10 @@ abstract class AppLocalizations {
   /// **'Change'**
   String get changeAddress;
 
-  /// Shown when the delivery location is a pin without a saved address.
+  /// Shown when the delivery location is a pin without a saved address (orders need address_id).
   ///
   /// In en, this message translates to:
-  /// **'Choose a saved address to place the order.'**
+  /// **'Save this location as an address, or choose a saved one, to place the order.'**
   String get chooseSavedAddress;
 
   /// Opens the address switcher to choose a saved address.
@@ -1509,18 +1509,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your cart is below this coupon\'s minimum order'**
   String get couponBelowMinimum;
-
-  /// Coupon not eligible: expired.
-  ///
-  /// In en, this message translates to:
-  /// **'This coupon has expired'**
-  String get couponExpired;
-
-  /// Coupon not eligible: usage limit reached.
-  ///
-  /// In en, this message translates to:
-  /// **'You\'ve already used this coupon'**
-  String get couponUsed;
 
   /// Coupon not eligible: other reason.
   ///
@@ -1804,12 +1792,6 @@ abstract class AppLocalizations {
   /// **'Order {number}'**
   String orderNumber(String number);
 
-  /// Order success ETA.
-  ///
-  /// In en, this message translates to:
-  /// **'Arriving in about {minutes} min'**
-  String orderEta(int minutes);
-
   /// Order success payment line.
   ///
   /// In en, this message translates to:
@@ -1959,6 +1941,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close checkout'**
   String get fakePaymentCancel;
+
+  /// Checkout blocker NOT_SERVICEABLE.
+  ///
+  /// In en, this message translates to:
+  /// **'We don\'t deliver to this address from this store. Choose another address.'**
+  String get blockerNotServiceable;
+
+  /// Checkout blocker COUPON_NOT_ELIGIBLE.
+  ///
+  /// In en, this message translates to:
+  /// **'Your coupon no longer applies. Remove it or add items to continue.'**
+  String get blockerCouponNotEligible;
+
+  /// Checkout blocker COUPON_EXPIRED.
+  ///
+  /// In en, this message translates to:
+  /// **'Your coupon has expired. Remove it to continue.'**
+  String get blockerCouponExpired;
+
+  /// Checkout blocker COUPON_INVALID.
+  ///
+  /// In en, this message translates to:
+  /// **'Your coupon isn\'t valid any more. Remove it to continue.'**
+  String get blockerCouponInvalid;
+
+  /// Checkout blocker COUPON_USAGE_EXCEEDED.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve already used this coupon. Remove it to continue.'**
+  String get blockerCouponUsed;
+
+  /// Coupon not eligible: FIRST_ORDER_ONLY.
+  ///
+  /// In en, this message translates to:
+  /// **'Only for your first order'**
+  String get couponFirstOrderOnly;
+
+  /// Coupon not eligible: NO_ELIGIBLE_ITEMS.
+  ///
+  /// In en, this message translates to:
+  /// **'No items in your cart qualify for this coupon'**
+  String get couponNoEligibleItems;
+
+  /// Coupon not eligible: STORE.
+  ///
+  /// In en, this message translates to:
+  /// **'Not valid at this store'**
+  String get couponWrongStore;
+
+  /// Coupon sheet: the coupon already on the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied'**
+  String get couponAppliedBadge;
+
+  /// Coupon expiry date (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Expires on {date}'**
+  String couponExpiresOn(String date);
+
+  /// PRICE_CHANGED with the server's old and new totals.
+  ///
+  /// In en, this message translates to:
+  /// **'Your total changed from {before} to {after}. Please check the updated bill.'**
+  String priceChangedDetail(String before, String after);
+
+  /// STOCK_UNAVAILABLE for a line that can't be ordered at all.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is now out of stock.'**
+  String stockOutDetail(String name);
+
+  /// STOCK_UNAVAILABLE with the server's orderable quantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Only {count} of {name} can be ordered now.'**
+  String stockOnlyDetail(int count, String name);
+
+  /// Dialog when placing an order while another awaits payment.
+  ///
+  /// In en, this message translates to:
+  /// **'An order is waiting for payment'**
+  String get pendingOrderTitle;
+
+  /// Dialog body (409 with pending_order_id).
+  ///
+  /// In en, this message translates to:
+  /// **'Finish or cancel the payment for that order before placing a new one.'**
+  String get pendingOrderBody;
+
+  /// Opens the pending order's payment screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to that order'**
+  String get pendingOrderAction;
+
+  /// Home banner for a PAYMENT_PENDING order (recovery after the app was closed).
+  ///
+  /// In en, this message translates to:
+  /// **'Order {number} is waiting for payment'**
+  String pendingPaymentBanner(String number);
+
+  /// Home banner action: opens the order's payment screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay now'**
+  String get pendingPaymentAction;
+
+  /// Order success ETA (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Arriving by {time}'**
+  String arrivingBy(String time);
+
+  /// Payment screen when the server status read failed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t check this order\'s payment status, so payment can\'t be retried yet.'**
+  String get paymentStatusUnchecked;
+
+  /// Re-reads the order's status from the server.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get checkAgain;
+
+  /// Payment screen while the server status loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the payment status…'**
+  String get checkingPayment;
 }
 
 class _AppLocalizationsDelegate

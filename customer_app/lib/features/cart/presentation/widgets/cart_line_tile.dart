@@ -9,6 +9,7 @@ import '../../../catalog/presentation/widgets/price_tags.dart';
 import '../../domain/cart.dart';
 import '../add_stepper.dart';
 import '../cart_controller.dart';
+import '../cart_texts.dart';
 
 /// One cart line (`03 §2.8`): image, name, pack size, the server's price
 /// and MRP, a stepper capped at `orderable_quantity`, the line total and a
@@ -28,20 +29,12 @@ class CartLineTile extends ConsumerWidget {
     final cart = ref.read(cartProvider.notifier);
     final id = '${line.variantId}';
     Future<void> run(Future<void> Function() change) =>
-        runCartChange(context, change);
+        runCartChange(context, change, cart: ref.read(cartProvider).snapshot);
 
-    final issueText = switch (line.issue) {
-      CartLineIssue.none => null,
-      CartLineIssue.reduced => l10n.onlyAvailable(line.availableQuantity ?? 0),
-      CartLineIssue.unavailable => l10n.outOfStock,
-    };
-    final fixLabel = switch (line.issue) {
-      CartLineIssue.none => null,
-      CartLineIssue.reduced => l10n.updateQuantityTo(
-        line.availableQuantity ?? 0,
-      ),
-      CartLineIssue.unavailable => l10n.removeAction,
-    };
+    final flagged = line.issue != null;
+    final issueText = flagged ? lineIssueText(l10n, line) : null;
+    final fixLabel = flagged ? lineFixText(l10n, line) : null;
+    final outOfStock = flagged && line.orderableQuantity == 0;
 
     return Padding(
       key: ValueKey('cart-line-$id'),
@@ -106,7 +99,7 @@ class CartLineTile extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (line.issue != CartLineIssue.unavailable)
+              if (!outOfStock)
                 SizedBox(
                   width: 112,
                   child: QuantityStepper(

@@ -142,17 +142,21 @@ void main() {
     expect(c.read(cartProvider).snapshot.lines, hasLength(2));
   });
 
-  test('the fix action reduces to what is available, or removes', () async {
+  test("the fix sets the server's orderable_quantity (0 removes)", () async {
     final stub = StubCartRepository(cartSnapshot());
     final c = containerWith(stub);
     final controller = c.read(cartProvider.notifier);
     await controller.fixLine(
-      cartLine(quantity: 4, issue: CartLineIssue.reduced, available: 2),
+      cartLine(
+        quantity: 4,
+        orderable: 2,
+        issue: CartIssueCode.quantityUnavailable,
+      ),
     );
     await controller.fixLine(
-      cartLine(variantId: 102, issue: CartLineIssue.unavailable),
+      cartLine(variantId: 102, orderable: 0, issue: CartIssueCode.outOfStock),
     );
-    await controller.fixLine(cartLine(variantId: 103));
+    await controller.fixLine(cartLine(variantId: 103)); // no issue: nothing
     expect(writes(stub), ['set:101:2', 'set:102:0']);
   });
 

@@ -750,7 +750,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changeAddress => 'Change';
 
   @override
-  String get chooseSavedAddress => 'Choose a saved address to place the order.';
+  String get chooseSavedAddress =>
+      'Save this location as an address, or choose a saved one, to place the order.';
 
   @override
   String get selectAddress => 'Select address';
@@ -830,12 +831,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get couponBelowMinimum =>
       'Your cart is below this coupon\'s minimum order';
-
-  @override
-  String get couponExpired => 'This coupon has expired';
-
-  @override
-  String get couponUsed => 'You\'ve already used this coupon';
 
   @override
   String get couponNotApplicable => 'Not applicable on this cart';
@@ -1002,11 +997,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String orderEta(int minutes) {
-    return 'Arriving in about $minutes min';
-  }
-
-  @override
   String paidOnlineAmount(String amount) {
     return 'Paid $amount online';
   }
@@ -1094,4 +1084,90 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fakePaymentCancel => 'Close checkout';
+
+  @override
+  String get blockerNotServiceable =>
+      'We don\'t deliver to this address from this store. Choose another address.';
+
+  @override
+  String get blockerCouponNotEligible =>
+      'Your coupon no longer applies. Remove it or add items to continue.';
+
+  @override
+  String get blockerCouponExpired =>
+      'Your coupon has expired. Remove it to continue.';
+
+  @override
+  String get blockerCouponInvalid =>
+      'Your coupon isn\'t valid any more. Remove it to continue.';
+
+  @override
+  String get blockerCouponUsed =>
+      'You\'ve already used this coupon. Remove it to continue.';
+
+  @override
+  String get couponFirstOrderOnly => 'Only for your first order';
+
+  @override
+  String get couponNoEligibleItems =>
+      'No items in your cart qualify for this coupon';
+
+  @override
+  String get couponWrongStore => 'Not valid at this store';
+
+  @override
+  String get couponAppliedBadge => 'Applied';
+
+  @override
+  String couponExpiresOn(String date) {
+    return 'Expires on $date';
+  }
+
+  @override
+  String priceChangedDetail(String before, String after) {
+    return 'Your total changed from $before to $after. Please check the updated bill.';
+  }
+
+  @override
+  String stockOutDetail(String name) {
+    return '$name is now out of stock.';
+  }
+
+  @override
+  String stockOnlyDetail(int count, String name) {
+    return 'Only $count of $name can be ordered now.';
+  }
+
+  @override
+  String get pendingOrderTitle => 'An order is waiting for payment';
+
+  @override
+  String get pendingOrderBody =>
+      'Finish or cancel the payment for that order before placing a new one.';
+
+  @override
+  String get pendingOrderAction => 'Go to that order';
+
+  @override
+  String pendingPaymentBanner(String number) {
+    return 'Order $number is waiting for payment';
+  }
+
+  @override
+  String get pendingPaymentAction => 'Pay now';
+
+  @override
+  String arrivingBy(String time) {
+    return 'Arriving by $time';
+  }
+
+  @override
+  String get paymentStatusUnchecked =>
+      'We couldn\'t check this order\'s payment status, so payment can\'t be retried yet.';
+
+  @override
+  String get checkAgain => 'Check again';
+
+  @override
+  String get checkingPayment => 'Checking the payment status…';
 }

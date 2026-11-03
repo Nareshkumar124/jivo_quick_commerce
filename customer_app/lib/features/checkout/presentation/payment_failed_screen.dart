@@ -8,6 +8,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../orders/domain/order.dart';
+import '../../orders/presentation/pending_payment.dart';
 import '../data/payment_launcher.dart';
 import 'payment_retry_controller.dart';
 
@@ -39,6 +40,13 @@ class PaymentFailedScreen extends ConsumerStatefulWidget {
 }
 
 class _PaymentFailedScreenState extends ConsumerState<PaymentFailedScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Seen now: Home won't open it again by itself this session.
+    ref.read(pendingPaymentProvider.notifier).takeAutoOpen(widget.orderId);
+  }
+
   Future<void> _confirmCancel() async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -107,6 +115,7 @@ class _PaymentFailedScreenState extends ConsumerState<PaymentFailedScreen> {
         onRetry: controller.retry,
         onChangeMethod: () => controller.cancel(changeMethod: true),
         onCancel: _confirmCancel,
+        onCheckAgain: controller.reload,
       );
     }
 
@@ -142,6 +151,7 @@ class _Body extends StatelessWidget {
     required this.onRetry,
     required this.onChangeMethod,
     required this.onCancel,
+    required this.onCheckAgain,
   });
 
   final PlacedOrder order;
@@ -151,17 +161,20 @@ class _Body extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback onChangeMethod;
   final VoidCallback onCancel;
+  final VoidCallback onCheckAgain;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final expiresAt = order.paymentExpiresAt;
-    final windowOpen =
-        expiresAt == null || DateTime.now().toUtc().isBefore(expiresAt);
+    // The device clock only hides the "Pay by" hint after the window;
+    // whether Retry is allowed is the server's `can_retry_payment`.
+    final hintOpen =
+        expiresAt != null && DateTime.now().toUtc().isBefore(expiresAt);
     final pending = order.status == OrderStatus.paymentPending;
-    final disabled = state.busy || state.loading;
     final error = this.error;
+    final unchecked = !state.serverChecked && !state.loading;
 
     final String headline;
     final List<String> details;
@@ -180,8 +193,10 @@ class _Body extends StatelessWidget {
             describeErrorWithDetails(context, error)
           else if (reason == PaymentFailureReason.cancelled)
             l10n.paymentCancelled,
-          if (pending && expiresAt != null && windowOpen)
+          if (pending && hintOpen && order.canRetryPayment)
             l10n.paymentPayBy(formatTime(expiresAt)),
+          if (state.loading) l10n.checkingPayment,
+          if (unchecked) l10n.paymentStatusUnchecked,
         ];
     }
 
@@ -211,26 +226,37 @@ class _Body extends StatelessWidget {
                 child: Text(text, textAlign: TextAlign.center),
               ),
             const SizedBox(height: JivoSpacing.xl),
+            if (unchecked && pending) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  key: const Key('check-again'),
+                  onPressed: onCheckAgain,
+                  child: Text(l10n.checkAgain),
+                ),
+              ),
+              const SizedBox(height: JivoSpacing.sm),
+            ],
             if (pending) ...[
               BusyButton(
                 key: const Key('retry-payment'),
                 label: l10n.retryPayment,
                 busy: state.action == RetryAction.retrying,
-                onPressed: disabled || !windowOpen ? null : onRetry,
+                onPressed: state.canRetry ? onRetry : null,
               ),
               const SizedBox(height: JivoSpacing.sm),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
                   key: const Key('change-payment-method'),
-                  onPressed: disabled ? null : onChangeMethod,
+                  onPressed: state.canCancel ? onChangeMethod : null,
                   child: Text(l10n.changePaymentMethod),
                 ),
               ),
               const SizedBox(height: JivoSpacing.sm),
               TextButton(
                 key: const Key('cancel-order'),
-                onPressed: disabled ? null : onCancel,
+                onPressed: state.canCancel ? onCancel : null,
                 child: Text(l10n.cancelOrder),
               ),
             ] else

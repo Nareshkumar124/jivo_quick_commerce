@@ -7,6 +7,7 @@ import '../features/addresses/presentation/address_controllers.dart';
 import '../features/auth/presentation/auth_flow.dart';
 import '../features/cart/presentation/cart_controller.dart';
 import '../features/checkout/presentation/checkout_controller.dart';
+import '../features/orders/presentation/pending_payment.dart';
 import '../features/profile/presentation/profile_controllers.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/offline_banner.dart';
@@ -26,6 +27,7 @@ final signOutCleanupProvider = Provider<void>((ref) {
     ref.invalidate(fakeCommerceBackendProvider);
     ref.invalidate(cartProvider);
     ref.invalidate(checkoutProvider);
+    ref.invalidate(pendingPaymentProvider);
     ref.read(launchStateProvider).clearUser();
   });
   ref.onDispose(remove);
@@ -41,7 +43,9 @@ class JivoCustomerApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(signOutCleanupProvider);
+    ref
+      ..watch(signOutCleanupProvider)
+      ..watch(cartStoreSyncProvider);
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: JivoTheme.light(),
