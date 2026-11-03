@@ -195,6 +195,24 @@ class ProductVariant(TimeStampedModel):
                 raise ValidationError({"selling_price": "Must be above 0."})
             if self.selling_price > self.mrp:
                 raise ValidationError({"selling_price": "Cannot be above the MRP."})
+        if self.pk is not None and self.mrp is not None:
+            # A store price override must stay at most the MRP (review #3): lower the overrides
+            # first. (The catalog also ignores an override above the MRP, as a backstop.)
+            above = (
+                self.inventory.filter(price_override__gt=self.mrp)
+                .select_related("store")
+                .order_by("store__code")
+            )
+            codes = [row.store.code for row in above[:5]]
+            if codes:
+                raise ValidationError(
+                    {
+                        "mrp": (
+                            "Stores sell this item above the new MRP with a price override "
+                            f"({', '.join(codes)}). Lower or remove those overrides first."
+                        )
+                    }
+                )
         if (self.unit_value is None) != (not self.unit):
             raise ValidationError({"unit": "Set both the unit value and the unit, or neither."})
 

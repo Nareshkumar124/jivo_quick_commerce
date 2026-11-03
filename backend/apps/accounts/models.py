@@ -3,6 +3,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import PermissionsMixin
 from django.contrib.gis.db import models as gis_models
+from django.contrib.gis.geos import Point
 from django.core.validators import RegexValidator
 from django.db import models
 
@@ -18,7 +19,7 @@ from apps.core.models import TimeStampedModel
 # E.164 within the documented char(15): "+" and up to 14 digits. India: +91 and 10 digits.
 # Phase 1 adds the +91 rule for OTP login.
 phone_validator = RegexValidator(
-    regex=r"^\+[1-9]\d{6,13}$",
+    regex=r"^\+[1-9][0-9]{6,13}$",
     message="Enter the phone number in E.164 format, e.g. +919876543210.",
 )
 
@@ -117,6 +118,11 @@ class Customer(User):
         proxy = True
         verbose_name = "customer"
         verbose_name_plural = "customers"
+        # DL-35: "Anonymise now" is Super Admin only (Super Admin holds every accounts
+        # permission; no other role is granted this one).
+        permissions = [
+            ("anonymise_customer", "Can anonymise a customer now (deletion requested only)"),
+        ]
 
 
 class OTPRequest(TimeStampedModel):
@@ -217,3 +223,14 @@ class Address(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.get_label_display()} address {self.pk}"
+
+    def save(self, *args, **kwargs) -> None:
+        """`location` always follows `lat`/`lng`, whoever writes them (service, admin, shell).
+        A save limited to other fields (`update_fields` without lat/lng) leaves it alone."""
+        update_fields = kwargs.get("update_fields")
+        writes_coordinates = update_fields is None or bool({"lat", "lng"} & set(update_fields))
+        if writes_coordinates and self.lat is not None and self.lng is not None:
+            self.location = Point(float(self.lng), float(self.lat), srid=4326)
+            if update_fields is not None:
+                kwargs["update_fields"] = {*update_fields, "location"}
+        super().save(*args, **kwargs)

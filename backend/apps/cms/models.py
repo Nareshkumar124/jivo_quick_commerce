@@ -7,7 +7,7 @@ from apps.core.models import TimeStampedModel
 SINGLETON_ID = 1
 
 release_version_validator = RegexValidator(
-    regex=r"^\d{1,5}(\.\d{1,5}){0,3}$", message='Enter a version such as "1.4.0".'
+    regex=r"^[0-9]{1,5}(\.[0-9]{1,5}){0,3}$", message='Enter a version such as "1.4.0".'
 )
 
 
