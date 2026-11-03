@@ -172,26 +172,71 @@ void main() {
     expect(http.body(2), {'reason': 'CHANGE_PAYMENT_METHOD'});
   });
 
-  test('active orders, and an order found by id in the lists', () async {
-    answer = (r) => r.query.contains('status=active')
-        ? contractExample('orders_list/200/ActiveOrders')
-        : contractExample('orders_list/200/PastOrders');
-    final active = await repository.activeOrders();
-    expect(active.first.id, 5012);
-    expect(active.first.status, OrderStatus.paymentPending);
-    expect(active.first.canRetryPayment, isTrue);
-    expect(http.requests.single.uri.queryParameters['status'], 'active');
+  test(
+    'active orders from the list; one order from GET /orders/{id}/',
+    () async {
+      answer = (r) => r.path == '/api/v1/orders/'
+          ? contractExample('orders_list/200/ActiveOrders')
+          : contractExample('orders_retrieve/200/AwaitingPayment');
+      final active = await repository.activeOrders();
+      expect(active.first.id, 5012);
+      expect(active.first.status, OrderStatus.paymentPending);
+      expect(active.first.canRetryPayment, isTrue);
+      expect(http.requests.single.uri.queryParameters['status'], 'active');
 
-    // Until GET /orders/{id}/ is in the schema, the lists are searched.
-    final found = await repository.getOrder(5012);
-    expect(found.number, 'JV-261103-000123');
-    expect(found.canCancel, isTrue);
+      final order = await repository.getOrder(5012);
+      expect(http.requests.last.method, 'GET');
+      expect(http.requests.last.uri.path, '/api/v1/orders/5012/');
+      expect(order.number, 'JV-261103-000123');
+      expect(order.status, OrderStatus.paymentPending);
+      // The server's own flags, not derived from the status.
+      expect(order.canCancel, isTrue);
+      expect(order.canRetryPayment, isTrue);
 
-    answer = (r) => contractExample('orders_list/200/NoOrders');
+      for (final (name, status, retry) in [
+        ('PaidOnline', OrderStatus.placed, false),
+        ('CashOnDelivery', OrderStatus.placed, false),
+        ('CancelledBeforePaying', OrderStatus.cancelled, false),
+      ]) {
+        answer = (_) => contractExample('orders_retrieve/200/$name');
+        final other = await repository.getOrder(5012);
+        expect(other.status, status, reason: name);
+        expect(other.canRetryPayment, retry, reason: name);
+      }
+
+      answer = (_) => (404, contractExample('orders_retrieve/404/NOTFOUND'));
+      await expectLater(
+        repository.getOrder(999),
+        throwsA(
+          isA<ApiError>().having((e) => e.code, 'c', ApiErrorCode.notFound),
+        ),
+      );
+    },
+  );
+
+  test('an unknown status or method decodes, without a guess', () async {
+    final json =
+        contractExample('orders_retrieve/200/AwaitingPayment')!
+            as Map<String, Object?>;
+    json['status'] = 'ON_HOLD';
+    json['payment_method'] = 'PAY_LATER';
+    json['payment_status'] = 'DISPUTED';
+    answer = (_) => json;
+    final order = await repository.getOrder(5012);
+    expect(order.status, OrderStatus.unknown);
+    expect(order.status.isConfirmed, isFalse); // never "success"
+    expect(order.paymentMethod, isNull); // not defaulted to ONLINE
+  });
+
+  test('a second order while one awaits payment names that order', () async {
+    answer = (_) =>
+        (409, contractExample('orders_create/409/PAYMENTPENDINGORDEREXISTS'));
     await expectLater(
-      repository.getOrder(999),
+      repository.placeOrder(request, idempotencyKey: 'k-4-pending'),
       throwsA(
-        isA<ApiError>().having((e) => e.code, 'c', ApiErrorCode.notFound),
+        isA<ApiError>()
+            .having((e) => e.code, 'code', ApiErrorCode.invalidStateTransition)
+            .having((e) => e.details['pending_order_id'], 'pending', 5012),
       ),
     );
   });

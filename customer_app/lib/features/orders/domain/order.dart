@@ -139,7 +139,10 @@ class PlacedOrder {
   /// `order_number`, e.g. "JV-261103-000123".
   final String number;
   final OrderStatus status;
-  final PaymentMethod paymentMethod;
+
+  /// Null for a method this build doesn't know (a newer server): the app
+  /// shows no method rather than guessing one.
+  final PaymentMethod? paymentMethod;
 
   /// The server's `bill.grand_total` for this order.
   final String grandTotal;

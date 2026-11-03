@@ -116,6 +116,10 @@ class PaymentRetryController extends Notifier<PaymentRetryState> {
   final int orderId;
   String? _idempotencyKey;
 
+  /// The latest status read: only its answer counts, so a slow, older read
+  /// can't overwrite a newer one.
+  int _latestLoad = 0;
+
   @override
   PaymentRetryState build() {
     Future.microtask(reload);
@@ -125,10 +129,11 @@ class PaymentRetryController extends Notifier<PaymentRetryState> {
   /// Reads the order's status from the server.
   Future<void> reload() async {
     if (!ref.mounted) return;
+    final ticket = ++_latestLoad;
     state = state.copyWith(loading: true, clearLoadError: true);
     try {
       final order = await ref.read(orderRepositoryProvider).getOrder(orderId);
-      if (!ref.mounted) return;
+      if (!ref.mounted || ticket != _latestLoad) return;
       state = state.copyWith(
         order: order,
         serverChecked: true,
@@ -136,7 +141,7 @@ class PaymentRetryController extends Notifier<PaymentRetryState> {
         confirmed: order.status.isConfirmed ? order : null,
       );
     } catch (error) {
-      if (ref.mounted) {
+      if (ref.mounted && ticket == _latestLoad) {
         state = state.copyWith(
           serverChecked: false,
           loading: false,

@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../fixtures/contract_examples.dart';
 import '../cart/cart_fixtures.dart';
 
 /// Records the Idempotency-Key of every `POST /orders/`; [failures] are
@@ -91,6 +92,20 @@ void main() {
       ..selectMethod(PaymentMethod.cod); // a different order now
     await place();
     expect(backend.keys, ['key-1', 'key-2']);
+  });
+
+  test('the contract\'s pending-order 409 offers that order', () async {
+    backend.failures.add(
+      ApiError.tryParseEnvelope(
+        contractExample('orders_create/409/PAYMENTPENDINGORDEREXISTS'),
+        statusCode: 409,
+      )!,
+    );
+    await place();
+    final state = container.read(checkoutProvider);
+    expect(state.pendingOrderId, 5012);
+    expect(state.error, isNull);
+    expect(state.busy, isFalse);
   });
 
   test('a definite answer retires the key', () async {

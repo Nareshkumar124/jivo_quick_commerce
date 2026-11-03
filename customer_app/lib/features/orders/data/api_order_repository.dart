@@ -14,7 +14,7 @@ class ApiOrderRepository implements OrderRepository {
   /// The store the cart is priced at (`X-Store-Id` on `POST /orders/`).
   final int? Function() _storeId;
 
-  /// Rows read per page when looking an order up in the list.
+  /// Rows read for the active-orders list (one page).
   static const listPageSize = 100;
 
   api.OrdersApi get _orders => _api.getOrdersApi();
@@ -77,22 +77,12 @@ class ApiOrderRepository implements OrderRepository {
     return orderFromApi(order);
   });
 
-  /// TODO(api): `GET /orders/{id}/` (backend P3 R2a) is not in the schema
-  /// yet. Until it is, the order is found in the generated order list:
-  /// active orders first, then past ones.
+  /// `GET /orders/{id}/`: the order with the server's `can_cancel` and
+  /// `can_retry_payment`.
   @override
-  Future<PlacedOrder> getOrder(int orderId) => _guard(() async {
-    for (final status in const ['active', 'past']) {
-      final page = (await _orders.ordersList(
-        status: status,
-        pageSize: listPageSize,
-      )).data!;
-      for (final row in page.results) {
-        if (row.id == orderId) return summaryFromApi(row);
-      }
-    }
-    throw const ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-  });
+  Future<PlacedOrder> getOrder(int orderId) => _guard(
+    () async => orderFromApi((await _orders.ordersRetrieve(id: orderId)).data!),
+  );
 
   @override
   Future<List<PlacedOrder>> activeOrders() => _guard(() async {
@@ -115,8 +105,7 @@ PlacedOrder orderFromApi(api.Order o, {api.RazorpayCheckout? razorpay}) =>
       id: o.id,
       number: o.orderNumber,
       status: OrderStatus.fromWire(o.status.value),
-      paymentMethod:
-          paymentMethodFromApi(o.paymentMethod) ?? PaymentMethod.online,
+      paymentMethod: paymentMethodFromApi(o.paymentMethod),
       grandTotal: o.bill.grandTotal,
       etaAt: o.etaAt,
       paymentExpiresAt: o.paymentExpiresAt,
@@ -125,25 +114,20 @@ PlacedOrder orderFromApi(api.Order o, {api.RazorpayCheckout? razorpay}) =>
       razorpay: razorpay == null ? null : _checkout(razorpay),
     );
 
-/// `OrderSummary` (a list row) as the app's [PlacedOrder].
-PlacedOrder summaryFromApi(api.OrderSummary s) {
-  final status = OrderStatus.fromWire(s.status.value);
-  return PlacedOrder(
-    id: s.id,
-    number: s.orderNumber,
-    status: status,
-    paymentMethod:
-        paymentMethodFromApi(s.paymentMethod) ?? PaymentMethod.online,
-    grandTotal: s.grandTotal,
-    etaAt: s.etaAt,
-    paymentExpiresAt: s.paymentExpiresAt,
-    // TODO(api): `OrderSummary` has no `can_cancel`; in Phase 3 the server
-    // allows a cancel exactly in PAYMENT_PENDING (`06 §2.6`). Use the
-    // order's own flag once `GET /orders/{id}/` exists.
-    canCancel: status == OrderStatus.paymentPending,
-    canRetryPayment: s.canRetryPayment,
-  );
-}
+/// `OrderSummary` (a list row) as the app's [PlacedOrder]. A row has no
+/// `can_cancel`, so [PlacedOrder.canCancel] stays false: rows only find
+/// the pending order, and its payment screen reads the order itself
+/// ([OrderRepository.getOrder]) before offering anything.
+PlacedOrder summaryFromApi(api.OrderSummary s) => PlacedOrder(
+  id: s.id,
+  number: s.orderNumber,
+  status: OrderStatus.fromWire(s.status.value),
+  paymentMethod: paymentMethodFromApi(s.paymentMethod),
+  grandTotal: s.grandTotal,
+  etaAt: s.etaAt,
+  paymentExpiresAt: s.paymentExpiresAt,
+  canRetryPayment: s.canRetryPayment,
+);
 
 /// `PaymentMethodEnum`, or null for a method this build doesn't know.
 PaymentMethod? paymentMethodFromApi(api.PaymentMethodEnum m) => switch (m) {

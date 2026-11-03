@@ -249,6 +249,10 @@ final cartProvider = NotifierProvider<CartController, CartState>(
 /// delivery state (which reads the cart: a circular dependency).
 final cartStoreSyncProvider = Provider<void>((ref) {
   ref.listen(storeScopeProvider, (previous, next) {
-    if (previous != next) ref.read(cartProvider.notifier).refresh();
+    // A cart not built yet loads by itself when first read: reloading it
+    // here would build it and send a second request.
+    if (previous != next && ref.exists(cartProvider)) {
+      ref.read(cartProvider.notifier).refresh();
+    }
   });
 });

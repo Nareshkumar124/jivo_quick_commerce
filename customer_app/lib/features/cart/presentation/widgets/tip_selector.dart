@@ -17,8 +17,8 @@ class TipSelector extends ConsumerWidget {
   /// The preset chips, in rupees (`03 §2.8`).
   static const presets = [10, 20, 30];
 
-  /// The largest custom tip the app accepts. TODO(api)/D-09: the server's
-  /// limit is not specified; the server validates it either way.
+  /// The largest custom tip the app accepts: the server's `CART_MAX_TIP`
+  /// default (₹500, `06 §2.5`, DL-44). The server still validates it.
   static const maxCustomTip = 500;
 
   static String _amount(int rupees) => '$rupees.00';

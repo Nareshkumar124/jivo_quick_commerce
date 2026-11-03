@@ -93,6 +93,54 @@ void main() {
     expect((await repository.load()).isEmpty, isTrue);
   });
 
+  test('codes this build does not know decode to unknown, never throw', () {
+    // A newer server: every enum the cart uses gets a value from the future.
+    final json =
+        contractExample(
+              'cart_retrieve/200/StockChanged:LinesToFix,CODAboveLimit',
+            )!
+            as Map<String, Object?>;
+    final items = json['items']! as List<Object?>;
+    final line = items.first! as Map<String, Object?>;
+    (line['issue']! as Map<String, Object?>)['code'] = 'BATCH_RECALLED';
+    (line['variant']! as Map<String, Object?>)['stock_status'] = 'PREORDER';
+    final methods = json['payment_methods']! as List<Object?>;
+    (methods.last! as Map<String, Object?>)['unavailable_reason'] = 'NEW_RULE';
+    methods.add({
+      'method': 'PAY_LATER',
+      'is_available': true,
+      'unavailable_reason': null,
+      'message': null,
+    });
+    final checkout = json['checkout']! as Map<String, Object?>;
+    (checkout['blockers']! as List<Object?>).add({
+      'code': 'KYC_REQUIRED',
+      'message': 'Verify your account to order.',
+    });
+    (json['instructions']! as Map<String, Object?>)['chips'] = [
+      'LEAVE_AT_DOOR',
+      'RING_TWICE',
+    ];
+    answer = (_, _) => json;
+
+    return repository.load().then((cart) {
+      expect(cart.lines.first.issue!.code, CartIssueCode.unknown);
+      expect(cart.lines.first.issue!.message, isNotEmpty); // shown as is
+      expect(cart.lines.first.variant.inStock, isFalse); // not sellable
+      expect(
+        cart.paymentOptions.map((o) => o.method),
+        [PaymentMethod.online, PaymentMethod.cod], // PAY_LATER is skipped
+      );
+      expect(cart.paymentOptions.last.reason, PaymentUnavailableReason.unknown);
+      expect(cart.checkout.blockers.last.code, CheckoutBlockerCode.unknown);
+      expect(
+        cart.checkout.blockers.last.message,
+        'Verify your account to order.',
+      );
+      expect(cart.instructions.tags, {InstructionTag.leaveAtDoor});
+    });
+  });
+
   test('a quantity is set with POST /cart/items/ (0 removes)', () async {
     answer = (_, _) => contractExample('cart_items_add/200/Updated');
     await repository.setQuantity(1001, 2);

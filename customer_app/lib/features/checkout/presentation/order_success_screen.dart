@@ -114,15 +114,21 @@ class _Confirmed extends StatelessWidget {
                 style: theme.textTheme.bodyLarge,
               ),
             ],
-            const SizedBox(height: JivoSpacing.xs),
-            Text(
-              order.paymentMethod == PaymentMethod.cod
-                  ? l10n.payOnDeliveryAmount(amount)
-                  : l10n.paidOnlineAmount(amount),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            if (switch (order.paymentMethod) {
+                  PaymentMethod.cod => l10n.payOnDeliveryAmount(amount),
+                  PaymentMethod.online => l10n.paidOnlineAmount(amount),
+                  // A method this build doesn't know: no line, no guess.
+                  null => null,
+                }
+                case final paymentLine?) ...[
+              const SizedBox(height: JivoSpacing.xs),
+              Text(
+                paymentLine,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: JivoSpacing.xxl),
             SizedBox(
               width: double.infinity,

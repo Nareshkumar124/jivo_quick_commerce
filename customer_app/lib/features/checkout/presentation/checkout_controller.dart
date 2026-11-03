@@ -177,7 +177,7 @@ Future<void> onOrderConfirmed(Ref ref, PlacedOrder order) async {
         'purchase',
         parameters: {
           'order_id': '${order.id}',
-          'payment_method': order.paymentMethod.wireValue,
+          'payment_method': order.paymentMethod?.wireValue ?? 'UNKNOWN',
         },
       );
   await ref.read(cartProvider.notifier).refresh();
