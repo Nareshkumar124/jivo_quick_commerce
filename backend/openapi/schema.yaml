@@ -1400,6 +1400,7 @@ paths:
                       discount: '50.00'
                       is_applicable: true
                       message: null
+                      amount_to_unlock: null
                     tip: '20.00'
                     instructions:
                       chips:
@@ -1544,6 +1545,7 @@ paths:
                       discount: '50.00'
                       is_applicable: true
                       message: null
+                      amount_to_unlock: null
                     tip: '0.00'
                     instructions:
                       chips: []
@@ -1957,6 +1959,7 @@ paths:
                       discount: '0.00'
                       is_applicable: false
                       message: Add items worth ₹74 more to use this coupon.
+                      amount_to_unlock: '74.00'
                     tip: '0.00'
                     instructions:
                       chips: []
@@ -2258,6 +2261,7 @@ paths:
                       discount: '50.00'
                       is_applicable: true
                       message: null
+                      amount_to_unlock: null
                     tip: '20.00'
                     instructions:
                       chips:
@@ -2551,6 +2555,7 @@ paths:
                       discount: '50.00'
                       is_applicable: true
                       message: null
+                      amount_to_unlock: null
                     tip: '20.00'
                     instructions:
                       chips:
@@ -3035,6 +3040,7 @@ paths:
                       discount: '50.00'
                       is_applicable: true
                       message: null
+                      amount_to_unlock: null
                     tip: '20.00'
                     instructions:
                       chips:
@@ -3796,6 +3802,7 @@ paths:
                       discount: '50.00'
                       is_applicable: true
                       message: null
+                      amount_to_unlock: null
                     tip: '20.00'
                     instructions:
                       chips:
@@ -4115,6 +4122,7 @@ paths:
                       discount: '50.00'
                       is_applicable: true
                       message: null
+                      amount_to_unlock: null
                     tip: '20.00'
                     instructions:
                       chips:
@@ -7355,7 +7363,7 @@ paths:
                       placed_at: '2026-11-03T06:30:00Z'
                       payment_expires_at: null
                       eta_at: '2026-11-03T06:44:00Z'
-                      can_cancel: true
+                      can_cancel: false
                       can_retry_payment: false
                     razorpay: null
                   summary: Cash on delivery
@@ -7538,7 +7546,7 @@ paths:
                       placed_at: '2026-11-03T06:32:10Z'
                       payment_expires_at: null
                       eta_at: '2026-11-03T06:46:00Z'
-                      can_cancel: true
+                      can_cancel: false
                       can_retry_payment: false
                     razorpay: null
                   summary: 'Replay: already paid'
@@ -8028,7 +8036,7 @@ paths:
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
-                    can_cancel: true
+                    can_cancel: false
                     can_retry_payment: false
                   summary: Paid online
                 CashOnDelivery:
@@ -8108,7 +8116,7 @@ paths:
                     placed_at: '2026-11-03T06:30:00Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:44:00Z'
-                    can_cancel: true
+                    can_cancel: false
                     can_retry_payment: false
                   summary: Cash on delivery
                 CancelledBeforePaying:
@@ -8883,7 +8891,7 @@ paths:
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
-                    can_cancel: true
+                    can_cancel: false
                     can_retry_payment: false
           description: 'Paid: the order is PLACED.'
         '400':
@@ -11092,7 +11100,16 @@ components:
           nullable: true
           description: Why it does not apply (e.g. 'Add items worth ₹74 more'); null
             when it does.
+        amount_to_unlock:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          description: 'When it does not apply because the item total is below its
+            minimum: the item value still needed (for the app''s own ''Add items worth
+            ₹X more''). Null otherwise. Added in Phase 3 R2b, like `CouponOffer.amount_to_unlock`.'
       required:
+      - amount_to_unlock
       - code
       - discount
       - is_applicable

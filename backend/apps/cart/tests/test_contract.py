@@ -32,7 +32,7 @@ CART_OPERATIONS = [
     ("post", "/api/v1/cart/coupon/"),
     ("delete", "/api/v1/cart/coupon/"),
 ]
-# A valid body for each operation (the stubs answer 503 after validating it).
+# A valid body for each operation.
 VALID_BODIES = {
     ("patch", "/api/v1/cart/"): ex.CART_UPDATE_REQUEST,
     ("post", "/api/v1/cart/items/"): ex.ITEM_ADD_REQUEST,
@@ -249,6 +249,11 @@ class TestCartExamples:
         assert ("STORE_CLOSED" in codes) == (not cart["store"]["is_open"])
         coupon_bad = cart["coupon"] is not None and not cart["coupon"]["is_applicable"]
         assert any(code.startswith("COUPON_") for code in codes) == coupon_bad
+        if cart["coupon"] is not None:
+            unlock = cart["coupon"]["amount_to_unlock"]
+            assert (unlock is not None) == ("MIN_ORDER_NOT_MET" in codes or "Add items" in (
+                cart["coupon"]["message"] or ""
+            ))  # fmt: skip
 
 
 def test_thresholds_are_checked_before_the_coupon():

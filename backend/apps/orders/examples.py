@@ -80,7 +80,7 @@ ORDER_COD_PLACED = {
     "placed_at": PLACED_AT,
     "payment_expires_at": None,
     "eta_at": "2026-11-03T06:44:00Z",
-    "can_cancel": True,
+    "can_cancel": False,  # Phase 3: only unpaid orders; Phase 4 allows PLACED/ACCEPTED (08 §7)
     "can_retry_payment": False,
 }
 ORDER_ONLINE_PENDING = {
@@ -104,6 +104,7 @@ ORDER_ONLINE_PLACED = {
     "placed_at": "2026-11-03T06:32:10Z",
     "payment_expires_at": None,
     "eta_at": "2026-11-03T06:46:00Z",
+    "can_cancel": False,
     "can_retry_payment": False,
 }
 # T5: the customer gave up on paying ("Cancel order" on the payment-failed screen).

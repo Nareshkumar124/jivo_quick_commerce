@@ -194,6 +194,29 @@ class TestNotifyMe:
         api_client.post(self.URL, accounts_ex_point(), format="json")
         assert ServiceabilityRequest.objects.count() == 3  # anonymous without phone: not merged
 
+    def test_bug_0008_two_anonymous_callers_get_only_their_own_data(self, api_client):
+        """BUG-0008 (P2-TC-18): an anonymous caller who types someone else's phone near their
+        location must never get that person's stored details back."""
+        phone = "+919876543210"
+        victim = {"lat": 28.6692, "lng": 77.4538, "phone": phone, "address_text": "Flat 9, Tower C"}
+        prober = {"lat": 28.6694, "lng": 77.4539, "phone": phone, "address_text": "anything"}
+        first = api_client.post(self.URL, victim, format="json").json()
+        second = api_client.post(self.URL, prober, format="json").json()
+        assert second["address_text"] == "anything"
+        assert (second["lat"], second["lng"]) == (28.6694, 77.4539)
+        assert "Flat 9" not in str(second)
+        assert second["id"] != first["id"]  # never merged into a lead with other details
+        assert ServiceabilityRequest.objects.count() == 2
+
+    def test_bug_0008_a_double_tap_is_merged_and_echoes_the_callers_values(self, api_client):
+        body = {"lat": 28.6692, "lng": 77.4538, "phone": "+919876543210", "address_text": " A1 "}
+        first = api_client.post(self.URL, body, format="json").json()
+        nearby = {**body, "lat": 28.6693}
+        again = api_client.post(self.URL, nearby, format="json").json()
+        assert again["id"] == first["id"]
+        assert (again["lat"], again["address_text"]) == (28.6693, "A1")  # the caller's values
+        assert ServiceabilityRequest.objects.count() == 1
+
     def test_throttled(self, api_client):
         from apps.stores.views import NotifyMeThrottle
 
