@@ -1,7 +1,6 @@
 from django.core.validators import RegexValidator
 
-# ASCII digits only: `[0-9]`, never `\d`. In Python `\d` also matches other scripts' digits
-# (Devanagari, full-width, Arabic-Indic), which would give one phone number many spellings
+# ASCII digits only: `[0-9]`, never `\d`, which in Python also matches other scripts' digits
 # (BUG-0002). The same literal patterns are published in the OpenAPI contract.
 
 # 03 §2.2: Indian mobile numbers only, sent in E.164 form.

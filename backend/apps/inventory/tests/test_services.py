@@ -15,7 +15,7 @@ from apps.catalog.cache import STORE_VERSION_KEY
 from apps.catalog.choices import StockStatus
 from apps.catalog.tests.factories import VariantFactory
 from apps.inventory import services
-from apps.inventory.models import MovementType, StockMovement, StoreInventory
+from apps.inventory.models import MovementType, StockMovement, StoreInventory, stock_write
 from apps.inventory.services import InwardRow
 from apps.inventory.tasks import low_stock_alert
 from apps.inventory.tests.factories import stock
@@ -327,7 +327,8 @@ class TestLowStockTask:
         inventory = stock(store, variant, 2)
         assert low_stock_alert(store.pk, variant.pk) == "alerted"
         inventory.on_hand = 40
-        inventory.save()
+        with stock_write():
+            inventory.save()
         assert low_stock_alert(store.pk, variant.pk) == "skipped"
         assert low_stock_alert(store.pk, 999_999) == "skipped"
 
@@ -337,7 +338,7 @@ class TestDatabaseGuarantees:
         inventory = stock(store, variant, 2)
         for field, value in [("reserved", 3), ("on_hand", -1), ("reserved", -1)]:
             setattr(inventory, field, value)
-            with pytest.raises(IntegrityError), transaction.atomic():
+            with pytest.raises(IntegrityError), transaction.atomic(), stock_write():
                 inventory.save()
             inventory.refresh_from_db()
 

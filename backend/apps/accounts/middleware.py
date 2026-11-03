@@ -3,9 +3,10 @@
 Staff sign in to the admin and the Ops Console with a Django session (Jivo Auth later, D-04).
 05 §5: "Session timeout 8 hours (store staff) / 2 hours idle (admin roles)". Implemented as:
 
-- **Every staff session** ends `SESSION_COOKIE_AGE` (8 h) after login, however active it is. The
-  login time is stamped in the session (`user_logged_in`), because Django's own cookie age
-  restarts whenever the session is saved and is therefore not an absolute limit.
+- **Every staff session** ends `STAFF_SESSION_MAX_AGE_SECONDS` (8 h) after login, however
+  active it is. The login time is stamped in the session (`user_logged_in`), because Django's
+  own cookie age (`SESSION_COOKIE_AGE`, also 8 h by default) restarts whenever the session is
+  saved and is therefore not an absolute limit.
 - **Admin roles** (everyone except staff whose only roles are Store Manager / Store Staff:
   superusers, global roles, mixed roles, staff with no role) also end after
   `STAFF_SESSION_IDLE_SECONDS` (2 h) without a request. Interpretation recorded in 05 §5.
@@ -44,7 +45,7 @@ def has_idle_timeout(user) -> bool:
 
 
 def _deadline(login_at: float, last_seen: float, *, idle: bool) -> float:
-    deadline = login_at + settings.SESSION_COOKIE_AGE
+    deadline = login_at + settings.STAFF_SESSION_MAX_AGE_SECONDS
     if idle:
         deadline = min(deadline, last_seen + settings.STAFF_SESSION_IDLE_SECONDS)
     return deadline

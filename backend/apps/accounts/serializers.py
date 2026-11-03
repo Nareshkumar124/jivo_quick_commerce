@@ -221,7 +221,7 @@ class AddressSerializer(serializers.Serializer):
         allow_blank=True,
         help_text=(
             "Defaults to the user's name. Send an empty string to reset it to the user's own "
-            "(copied when saved)."
+            "(copied when saved). Omit it to keep the current value; null is rejected."
         ),
     )
     receiver_phone = serializers.CharField(
@@ -230,7 +230,7 @@ class AddressSerializer(serializers.Serializer):
         validators=[indian_mobile_validator],
         help_text=(
             "Defaults to the user's phone. Send an empty string to reset it to the user's own "
-            "(copied when saved)."
+            "(copied when saved). Omit it to keep the current value; null is rejected."
         ),
     )
     house = serializers.CharField(max_length=120, help_text="House / flat / floor.")

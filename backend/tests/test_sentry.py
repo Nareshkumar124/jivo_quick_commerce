@@ -17,4 +17,5 @@ def test_environment_defaults_to_settings_module(monkeypatch):
     assert init_sentry() is True
     assert captured["environment"] == "staging"
     assert captured["send_default_pii"] is False
+    assert captured["include_local_variables"] is False  # never the DB conninfo
     assert captured["traces_sample_rate"] == 0.0

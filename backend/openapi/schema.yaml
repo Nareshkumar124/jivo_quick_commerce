@@ -5,7 +5,7 @@ info:
   description: |-
     REST API for the Jivo customer and rider apps.
 
-    Conventions (docs/02-system-architecture.md §5): JSON with snake_case keys; money as 2-decimal strings; times in UTC ISO 8601; pagination with `page`/`page_size` (default 20, max 100). Apps send `X-App-Name`, `X-App-Version` and `X-Platform` on every request. Errors use the envelope `{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema).
+    Conventions (docs/02-system-architecture.md §5): JSON with snake_case keys; money as 2-decimal strings; times in UTC ISO 8601; pagination with `page`/`page_size` (default 20, max 100). Apps send `X-App-Name`, `X-App-Version` and `X-Platform` on every request. Errors use the envelope `{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema). Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`.
 paths:
   /api/v1/addresses/:
     get:
@@ -18,7 +18,7 @@ paths:
         name: page
         schema:
           type: integer
-        description: Page number (1-based).
+        description: Page number (1-based). Default 1.
       - in: query
         name: page_size
         schema:
@@ -136,6 +136,21 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                PAGENOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Invalid page.
+                      details: {}
+                  summary: Page out of range
+          description: '`page` is not a page of this list: 0, past the last page,
+            or not a number. Go back to page 1.'
     post:
       operationId: addresses_create
       description: '`lat`/`lng` (the map pin) are required. `receiver_name`/`receiver_phone`
@@ -5190,7 +5205,7 @@ components:
           minLength: 1
           description: 'OTP from `POST /auth/otp/request/` with `purpose: delete_account`
             for the caller''s own phone. A login OTP is rejected.'
-          pattern: ^\d{6}$
+          pattern: ^[0-9]{6}$
         reason:
           type: string
           description: Optional feedback.
@@ -5227,14 +5242,16 @@ components:
         receiver_name:
           type: string
           description: Defaults to the user's name. Send an empty string to reset
-            it to the user's own (copied when saved).
+            it to the user's own (copied when saved). Omit it to keep the current
+            value; null is rejected.
           maxLength: 120
         receiver_phone:
           description: Defaults to the user's phone. Send an empty string to reset
-            it to the user's own (copied when saved).
+            it to the user's own (copied when saved). Omit it to keep the current
+            value; null is rejected.
           oneOf:
           - type: string
-            pattern: ^\+91[6-9]\d{9}$
+            pattern: ^\+91[6-9][0-9]{9}$
           - type: string
             maxLength: 0
         house:
@@ -5259,7 +5276,7 @@ components:
           maxLength: 80
         pincode:
           type: string
-          pattern: ^[1-9]\d{5}$
+          pattern: ^[1-9][0-9]{5}$
         lat:
           type: number
           format: double
@@ -5327,14 +5344,16 @@ components:
         receiver_name:
           type: string
           description: Defaults to the user's name. Send an empty string to reset
-            it to the user's own (copied when saved).
+            it to the user's own (copied when saved). Omit it to keep the current
+            value; null is rejected.
           maxLength: 120
         receiver_phone:
           description: Defaults to the user's phone. Send an empty string to reset
-            it to the user's own (copied when saved).
+            it to the user's own (copied when saved). Omit it to keep the current
+            value; null is rejected.
           oneOf:
           - type: string
-            pattern: ^\+91[6-9]\d{9}$
+            pattern: ^\+91[6-9][0-9]{9}$
           - type: string
             maxLength: 0
         house:
@@ -5364,7 +5383,7 @@ components:
         pincode:
           type: string
           minLength: 1
-          pattern: ^[1-9]\d{5}$
+          pattern: ^[1-9][0-9]{5}$
         lat:
           type: number
           format: double
@@ -5624,7 +5643,7 @@ components:
           type: string
           description: Installed app version, e.g. "1.4.2" or "1.4.2+37".
           maxLength: 32
-          pattern: ^\d{1,5}(?:\.\d{1,5}){0,3}(?:\+\d{1,9})?$
+          pattern: ^[0-9]{1,5}(?:\.[0-9]{1,5}){0,3}(?:\+[0-9]{1,9})?$
         is_active:
           type: boolean
           readOnly: true
@@ -5657,7 +5676,7 @@ components:
           minLength: 1
           description: Installed app version, e.g. "1.4.2" or "1.4.2+37".
           maxLength: 32
-          pattern: ^\d{1,5}(?:\.\d{1,5}){0,3}(?:\+\d{1,9})?$
+          pattern: ^[0-9]{1,5}(?:\.[0-9]{1,5}){0,3}(?:\+[0-9]{1,9})?$
       required:
       - app
       - app_version
@@ -5709,6 +5728,7 @@ components:
             * `SERVER_ERROR` - Something went wrong. Please try again.
             * `SERVICE_UNAVAILABLE` - The service is temporarily unavailable.
             * `STORE_NOT_FOUND` - This store is not available. Check serviceability again.
+            * `PAYLOAD_TOO_LARGE` - The request body is too large.
         message:
           type: string
           description: Human-readable message (English).
@@ -5759,6 +5779,7 @@ components:
       - SERVER_ERROR
       - SERVICE_UNAVAILABLE
       - STORE_NOT_FOUND
+      - PAYLOAD_TOO_LARGE
       type: string
       description: |-
         * `VALIDATION_ERROR` - Some fields are invalid.
@@ -5797,6 +5818,7 @@ components:
         * `SERVER_ERROR` - Something went wrong. Please try again.
         * `SERVICE_UNAVAILABLE` - The service is temporarily unavailable.
         * `STORE_NOT_FOUND` - This store is not available. Check serviceability again.
+        * `PAYLOAD_TOO_LARGE` - The request body is too large.
     ErrorEnvelope:
       type: object
       description: Body of every non-2xx API response.
@@ -6026,7 +6048,7 @@ components:
           description: 'Contact for the ''we now deliver here'' message. Optional:
             defaults to the signed-in user''s phone; anonymous requests without it
             are kept as a demand signal only.'
-          pattern: ^\+91[6-9]\d{9}$
+          pattern: ^\+91[6-9][0-9]{9}$
         address_text:
           type: string
           description: The reverse-geocoded address shown on the map screen (for ops
@@ -6065,7 +6087,7 @@ components:
           description: 'Contact for the ''we now deliver here'' message. Optional:
             defaults to the signed-in user''s phone; anonymous requests without it
             are kept as a demand signal only.'
-          pattern: ^\+91[6-9]\d{9}$
+          pattern: ^\+91[6-9][0-9]{9}$
         address_text:
           type: string
           description: The reverse-geocoded address shown on the map screen (for ops
@@ -6125,7 +6147,7 @@ components:
           type: string
           minLength: 1
           description: E.164 Indian mobile, e.g. +919876543210.
-          pattern: ^\+91[6-9]\d{9}$
+          pattern: ^\+91[6-9][0-9]{9}$
         app:
           allOf:
           - $ref: '#/components/schemas/AppEnum'
@@ -6180,12 +6202,12 @@ components:
         phone:
           type: string
           minLength: 1
-          pattern: ^\+91[6-9]\d{9}$
+          pattern: ^\+91[6-9][0-9]{9}$
         otp:
           type: string
           minLength: 1
           description: 6 digits.
-          pattern: ^\d{6}$
+          pattern: ^[0-9]{6}$
         app:
           allOf:
           - $ref: '#/components/schemas/AppEnum'
@@ -6263,14 +6285,16 @@ components:
         receiver_name:
           type: string
           description: Defaults to the user's name. Send an empty string to reset
-            it to the user's own (copied when saved).
+            it to the user's own (copied when saved). Omit it to keep the current
+            value; null is rejected.
           maxLength: 120
         receiver_phone:
           description: Defaults to the user's phone. Send an empty string to reset
-            it to the user's own (copied when saved).
+            it to the user's own (copied when saved). Omit it to keep the current
+            value; null is rejected.
           oneOf:
           - type: string
-            pattern: ^\+91[6-9]\d{9}$
+            pattern: ^\+91[6-9][0-9]{9}$
           - type: string
             maxLength: 0
         house:
@@ -6300,7 +6324,7 @@ components:
         pincode:
           type: string
           minLength: 1
-          pattern: ^[1-9]\d{5}$
+          pattern: ^[1-9][0-9]{5}$
         lat:
           type: number
           format: double

@@ -234,6 +234,8 @@ class TestOtpTestNumberSafety:
         assert ids == {"accounts.E002"}
         settings.OTP_TEST_NUMBERS = {"+919000000001": "123456"}
         settings.APP_ENVIRONMENT = "production"
+        # Production's SMS default (the test settings' locmem backend is E003, BUG-0005).
+        settings.SMS_BACKEND = "apps.notifications.sms.UnconfiguredSmsBackend"
         ids = {error.id for error in run_checks() if error.id.startswith("accounts.")}
         assert ids == {"accounts.E001"}
 
