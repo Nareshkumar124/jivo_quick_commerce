@@ -7,12 +7,15 @@ import 'package:customer_app/features/cart/data/cart_repository.dart';
 import 'package:customer_app/features/catalog/data/api_catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
+import 'package:customer_app/features/catalog/presentation/catalog_controllers.dart';
 import 'package:customer_app/features/location/data/api_serviceability_repository.dart';
 import 'package:customer_app/features/location/data/delivery_location_store.dart';
 import 'package:customer_app/features/location/data/serviceability_repository.dart';
 import 'package:customer_app/features/location/presentation/delivery_controller.dart';
+import 'package:customer_app/features/search/presentation/search_controller.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -90,9 +93,101 @@ Map<String, Object?> cardJson() => {
   'variants': [variantJson()],
 };
 
-/// Answers like the backend: serviceability, home, products.
+const tileJson = {
+  'id': 1,
+  'name': 'Edible Oils',
+  'slug': 'edible-oils',
+  'image': null,
+};
+
+Map<String, Object?> detailJson() => {
+  'id': 1,
+  'slug': 'jivo-canola-oil',
+  'name': 'Jivo Canola Oil',
+  'brand': 'Jivo',
+  'is_veg': true,
+  'category': tileJson,
+  'short_description': 'Light taste for daily cooking.',
+  'description': 'Jivo Canola Oil.',
+  'highlights': ['Light taste'],
+  'default_variant_id': 101,
+  'variants': [
+    {
+      ...variantJson(),
+      'sku': 'JV-CAN-RF-1L',
+      'net_quantity': '1 L',
+      'images': <Object>[],
+    },
+  ],
+  'ingredients': 'Refined canola oil.',
+  'nutrition': null,
+  'shelf_life': '9 months',
+  'storage_instructions': 'Store in a cool, dry place.',
+  'country_of_origin': 'India',
+  'manufacturer': 'Jivo Wellness',
+  'marketer': '',
+  'importer': '',
+  'consumer_care': 'care@example.in',
+  'fssai_license_no': '10020064000123',
+  'similar_products': <Object>[],
+};
+
+/// Answers like the backend: serviceability and every catalog endpoint.
 (int, Object?) backend(RequestOptions request) {
   final path = request.path;
+  if (path.startsWith('/api/v1/categories/')) {
+    return (
+      200,
+      {
+        'results': [
+          {...tileJson, 'children': <Object>[]},
+        ],
+      },
+    );
+  }
+  if (path.startsWith('/api/v1/collections/')) {
+    return (
+      200,
+      {
+        'id': 1,
+        'name': 'Bestsellers',
+        'slug': 'bestsellers',
+        'products': [cardJson()],
+      },
+    );
+  }
+  if (path.startsWith('/api/v1/search/suggest/')) {
+    return (
+      200,
+      {
+        'query': '${request.queryParameters['q'] ?? ''}',
+        'suggestions': [
+          {
+            'id': 1,
+            'type': 'product',
+            'text': 'Jivo Canola Oil',
+            'query': 'Jivo Canola Oil',
+            'slug': 'jivo-canola-oil',
+            'image': null,
+          },
+        ],
+      },
+    );
+  }
+  if (path.startsWith('/api/v1/search/')) {
+    return (
+      200,
+      {
+        'count': 1,
+        'next': null,
+        'previous': null,
+        'results': [cardJson()],
+      },
+    );
+  }
+  if (path == '/api/v1/products/jivo-canola-oil/') {
+    return (200, detailJson());
+  }
   if (path.startsWith('/api/v1/serviceability/')) {
     return (
       200,
@@ -242,6 +337,81 @@ void main() {
     }
     expect(feed.store?.name, 'Jivo Sector 14, Gurugram');
   });
+
+  test(
+    'every catalog provider sends X-Store-Id through the shared Dio',
+    () async {
+      final container = await containerFor(
+        testEnv,
+        prefs: {
+          DeliveryLocationStore.key: jsonEncode(testDeliveryLocation.toJson()),
+        },
+      );
+      final http = FakeHttp(backend);
+      container.read(dioProvider).httpClientAdapter = http;
+      container.read(deliveryProvider);
+      await pumpEventQueue();
+      expect(container.read(currentStoreIdProvider), 7);
+
+      /// Keeps an auto-dispose provider alive while its future loads.
+      Future<T> load<T>(ProviderListenable<Future<T>> provider) {
+        final subscription = container.listen(provider, (_, _) {});
+        addTearDown(subscription.close);
+        return subscription.read();
+      }
+
+      await load(homeFeedProvider.future);
+      await load(categoriesProvider.future);
+      await load(productDetailProvider('jivo-canola-oil').future);
+      await load(trendingSearchesProvider.future);
+      const category = CategoryQuery('edible-oils');
+      final first = await load(pagedProductsProvider(category).future);
+      expect(first.hasMore, isTrue);
+      // The paged list's next page goes through the same path.
+      await container.read(pagedProductsProvider(category).notifier).loadMore();
+      await load(
+        pagedProductsProvider(const CollectionQuery('bestsellers')).future,
+      );
+      await load(pagedProductsProvider(const SearchQuery('canola')).future);
+      // Typeahead from the search screen, after the debounce.
+      final search = container.listen(searchControllerProvider, (_, _) {});
+      addTearDown(search.close);
+      container.read(searchControllerProvider.notifier).onChanged('can');
+      await Future<void>.delayed(
+        kSearchDebounce + const Duration(milliseconds: 50),
+      );
+      await pumpEventQueue();
+
+      final catalogCalls = http.requests
+          .where((r) => !r.path.startsWith('/api/v1/serviceability/'))
+          .toList();
+      expect(
+        {for (final r in catalogCalls) r.path},
+        {
+          '/api/v1/home/',
+          '/api/v1/categories/',
+          '/api/v1/products/jivo-canola-oil/',
+          '/api/v1/search/suggest/',
+          '/api/v1/products/',
+          '/api/v1/collections/bestsellers/',
+          '/api/v1/search/',
+        },
+      );
+      for (final r in catalogCalls) {
+        expect('${r.headers['X-Store-Id']}', '7', reason: r.uri.toString());
+      }
+      final productPages = [
+        for (final r in catalogCalls)
+          if (r.path == '/api/v1/products/') r.queryParameters['page'],
+      ];
+      expect(productPages, [1, 2]);
+      final suggestQueries = [
+        for (final r in catalogCalls)
+          if (r.path == '/api/v1/search/suggest/') r.queryParameters['q'],
+      ];
+      expect(suggestQueries, ['', 'can']);
+    },
+  );
 
   test('the API repository maps the contract into the app models', () async {
     final http = FakeHttp(backend);

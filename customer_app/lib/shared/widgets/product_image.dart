@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 /// Every product, category and banner image goes through this widget, so
-/// switching to `cached_network_image` when the API is bound touches one
-/// file. Without a URL (placeholder data) or on a load error it shows a
+/// switching to `cached_network_image` touches one file. Without a URL (placeholder data) or on a load error it shows a
 /// neutral placeholder. Decorative: callers provide the semantics.
 class ProductImage extends StatelessWidget {
   const ProductImage({
@@ -24,7 +23,8 @@ class ProductImage extends StatelessWidget {
     final placeholder = _Placeholder(icon: icon);
     final source = url;
     if (source == null || source.isEmpty) return placeholder;
-    // TODO(api): cached_network_image once the catalog API serves images.
+    // TODO(perf): cached_network_image (disk cache across launches); the
+    // catalog API serves image URLs since Phase 2.
     return Image.network(
       source,
       fit: fit,

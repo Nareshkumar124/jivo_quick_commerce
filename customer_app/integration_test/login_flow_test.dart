@@ -28,27 +28,14 @@ import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'support.dart';
+
 const realApi = bool.fromEnvironment('REAL_API');
 const phoneDigits = String.fromEnvironment(
   'TEST_PHONE',
   defaultValue: '9000000002',
 );
 const otp = String.fromEnvironment('TEST_OTP', defaultValue: '123456');
-
-/// Pumps until [finder] matches. `pumpAndSettle` alone returns while an
-/// HTTP request is still pending if nothing animates (e.g. a skeleton).
-Future<void> pumpUntilFound(
-  WidgetTester tester,
-  Finder finder, {
-  Duration timeout = const Duration(seconds: 20),
-}) async {
-  final end = DateTime.now().add(timeout);
-  while (finder.evaluate().isEmpty) {
-    if (DateTime.now().isAfter(end)) fail('timed out waiting for $finder');
-    await tester.pump(const Duration(milliseconds: 100));
-  }
-  await tester.pumpAndSettle();
-}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

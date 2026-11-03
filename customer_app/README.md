@@ -150,9 +150,26 @@ Until then iOS always shows the no-map fallback.
 
 ```sh
 flutter test                                    # unit + widget tests
-flutter test integration_test --flavor dev -d <device>          # needs the local backend
-flutter test integration_test --flavor dev -d <device> --dart-define=FAKE_API=true
 ```
+
+Integration tests run on an emulator or device, one file at a time:
+
+| File | Flow | Default backend |
+|------|------|-----------------|
+| `integration_test/login_flow_test.dart` | P1: phone, OTP, profile, address, logout | fakes; `--dart-define=REAL_API=true` for the real API |
+| `integration_test/browse_flow_test.dart` | P2: login, detect location (serviceability), home, product, search, add to the dev in-memory cart | **real API**; `--dart-define=FAKE_API=true` for fakes |
+| `integration_test/map_picker_test.dart` | Mappls map or fallback (D-03) | none |
+
+```sh
+# P2 browse against the local backend from the Android emulator. The fake
+# device location is Sector 14, Gurugram (seeded store id 1).
+flutter test integration_test/browse_flow_test.dart --flavor dev \
+  -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:8001
+```
+
+The browse test prints `BROWSE ...` lines (mode, store, products, search
+results, cart, and the `X-Store-Id` on each request) as evidence of which
+backend it ran against.
 
 ## iOS: what still needs Xcode
 

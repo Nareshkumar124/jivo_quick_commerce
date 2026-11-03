@@ -7,8 +7,8 @@ import '../../location/domain/delivery_location.dart';
 /// They follow the Phase 2 contract (`backend/openapi/schema.yaml`:
 /// `ProductCard`, `VariantSummary`, `VariantDetail`, `ProductDetail`,
 /// `HomeFeed`, `CategoryTree`, `SearchSuggestions`).
-/// TODO(api): `ApiCatalogRepository` maps the generated `jivo_api` models
-/// into these, so the widgets don't change when the API is bound.
+/// `ApiCatalogRepository` maps the generated `jivo_api` models into these,
+/// so the widgets don't depend on the generated client.
 ///
 /// Money fields are the API's decimal strings (`"249.00"`) and are only ever
 /// formatted with `formatRupees`. Prices, discounts, savings and the stepper
