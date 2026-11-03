@@ -11,7 +11,9 @@ import '../../../app/providers.dart';
 import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../launch/presentation/launch_controller.dart';
-import '../domain/indian_mobile.dart';
+
+import 'package:jivo_core/helpers.dart';
+
 import 'auth_error_text.dart';
 import 'login_controllers.dart';
 

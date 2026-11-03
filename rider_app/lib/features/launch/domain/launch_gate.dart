@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:jivo_api/jivo_api.dart' show AppConfig;
-
-import 'app_version.dart';
+import 'package:jivo_core/jivo_core.dart' show isVersionBelow;
 
 /// What the app must show before anything else, decided from
 /// `GET /api/v1/config/app/` (04 §2.1 "Force update / maintenance") or from a
@@ -72,16 +71,13 @@ LaunchGate launchGateFor(
   bool softUpdateDismissed = false,
 }) {
   final storeUrl = storeUriOf(config.storeUrl);
-  final min = config.minSupportedVersion;
-  if (min != null && compareVersions(appVersion, min) < 0) {
+  if (isVersionBelow(appVersion, config.minSupportedVersion)) {
     return LaunchUpdate(forced: true, storeUrl: storeUrl);
   }
   if (config.maintenance) return LaunchMaintenance(config.maintenanceMessage);
 
-  final latest = config.latestVersion;
   if (!softUpdateDismissed &&
-      latest != null &&
-      compareVersions(appVersion, latest) < 0) {
+      isVersionBelow(appVersion, config.latestVersion)) {
     return LaunchUpdate(forced: false, storeUrl: storeUrl);
   }
   return const LaunchProceed();

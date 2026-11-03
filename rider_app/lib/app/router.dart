@@ -91,6 +91,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         showDevTools: env.showDevTools,
         hasRiderTask: ref.read(taskFlowControllerProvider).hasTask,
         hasOffer: ref.read(offerControllerProvider).isOpen,
+        recordsEnabled: work,
       );
     },
     routes: [

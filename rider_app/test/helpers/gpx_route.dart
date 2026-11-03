@@ -11,9 +11,14 @@ List<GeoPoint> parseGpx(String gpx) => [
 /// A ride from ~700 m south-west of the fake store (Jivo Sector 18, Noida)
 /// to the store, then on to the fake customer in Sector 21: two points stop
 /// short of each geofence (200 m), so the server-side check is exercised.
+///
+/// The same track is in `integration_test/routes/sector18_to_sector21.gpx`
+/// for a mock-location app on the phone (P5 device run); a test keeps the
+/// two identical. Inline here because a test on the phone cannot read the
+/// host's files.
 const sector18ToSector21Gpx = '''
 <?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="jivo-rider-tests">
+<gpx version="1.1" creator="jivo-rider-tests" xmlns="http://www.topografix.com/GPX/1/1">
   <trk><name>Sector 18 store to Sector 21 drop</name><trkseg>
     <trkpt lat="28.5650" lon="77.3230"><time>2026-11-02T06:30:00Z</time></trkpt>
     <trkpt lat="28.5680" lon="77.3245"><time>2026-11-02T06:31:00Z</time></trkpt>

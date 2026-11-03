@@ -2510,6 +2510,12 @@ abstract class AppLocalizations {
   /// **'Cash collected · Order {order}'**
   String cashCodCollected(String order);
 
+  /// No description provided for @cashCodCollectedNoOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash collected'**
+  String get cashCodCollectedNoOrder;
+
   /// No description provided for @cashDeposit.
   ///
   /// In en, this message translates to:

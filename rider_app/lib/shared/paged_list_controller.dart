@@ -32,11 +32,21 @@ class PagedListState<T, H> {
 }
 
 /// Loads a paged list: the first page on start, the next one on "Load
-/// more", the first again on refresh. One request at a time.
+/// more", the first again on refresh.
+///
+/// - "Load more" waits for any load in flight; a refresh never waits: it
+///   supersedes whatever is in flight, whose late answer is dropped.
+/// - Page-number paging shifts when new rows arrive between two pages (a
+///   delivery adds a ledger entry), so a row can come back on the next
+///   page. With [keyOf], rows already listed are skipped.
 class PagedListNotifier<T, H> extends Notifier<PagedListState<T, H>> {
-  PagedListNotifier(this._fetch);
+  PagedListNotifier(this._fetch, {this._keyOf});
 
   final Future<(Page<T>, H?)> Function(Ref ref, int page) _fetch;
+  final Object Function(T item)? _keyOf;
+
+  /// Bumped by every load; an answer for an older one is dropped.
+  int _generation = 0;
 
   @override
   PagedListState<T, H> build() {
@@ -54,7 +64,8 @@ class PagedListNotifier<T, H> extends Notifier<PagedListState<T, H>> {
   }
 
   Future<void> _load(int page, {required bool replace}) async {
-    if (state.loading && state.loaded) return;
+    if (!ref.mounted) return;
+    final generation = ++_generation;
     state = PagedListState(
       items: state.items,
       header: state.header,
@@ -64,16 +75,16 @@ class PagedListNotifier<T, H> extends Notifier<PagedListState<T, H>> {
     );
     try {
       final (result, header) = await _fetch(ref, page);
-      if (!ref.mounted) return;
+      if (!ref.mounted || generation != _generation) return;
       state = PagedListState(
-        items: replace ? result.items : [...state.items, ...result.items],
+        items: replace ? result.items : _append(state.items, result.items),
         header: header ?? state.header,
         nextPage: result.nextPage,
         loaded: true,
       );
     } on Object catch (e) {
       final error = ApiError.from(e);
-      if (!ref.mounted) return;
+      if (!ref.mounted || generation != _generation) return;
       reportAppControlError(ref, error);
       state = PagedListState(
         items: state.items,
@@ -83,5 +94,16 @@ class PagedListNotifier<T, H> extends Notifier<PagedListState<T, H>> {
         error: error,
       );
     }
+  }
+
+  List<T> _append(List<T> current, List<T> more) {
+    final keyOf = _keyOf;
+    if (keyOf == null) return [...current, ...more];
+    final seen = {for (final item in current) keyOf(item)};
+    return [
+      ...current,
+      for (final item in more)
+        if (seen.add(keyOf(item))) item,
+    ];
   }
 }
