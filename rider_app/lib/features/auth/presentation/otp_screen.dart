@@ -5,8 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../data/otp_autofill.dart';
-import '../domain/indian_mobile.dart';
+
+import 'package:jivo_core/helpers.dart';
+
 import 'auth_error_text.dart';
 import 'auth_providers.dart';
 import 'login_controllers.dart';

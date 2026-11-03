@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="jivo-rider-tests" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk><name>Sector 18 store to Sector 21 drop</name><trkseg>
+    <trkpt lat="28.5650" lon="77.3230"><time>2026-11-02T06:30:00Z</time></trkpt>
+    <trkpt lat="28.5680" lon="77.3245"><time>2026-11-02T06:31:00Z</time></trkpt>
+    <trkpt lat="28.5703" lon="77.3259"><time>2026-11-02T06:32:30Z</time></trkpt>
+    <trkpt lat="28.5740" lon="77.3300"><time>2026-11-02T06:40:00Z</time></trkpt>
+    <trkpt lat="28.5790" lon="77.3360"><time>2026-11-02T06:43:00Z</time></trkpt>
+    <trkpt lat="28.5815" lon="77.3395"><time>2026-11-02T06:45:00Z</time></trkpt>
+    <trkpt lat="28.5830" lon="77.3410"><time>2026-11-02T06:46:30Z</time></trkpt>
+  </trkseg></trk>
+</gpx>

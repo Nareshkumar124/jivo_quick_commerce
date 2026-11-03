@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
 // jivo_api also exports a generated `ApiError` model; the app uses jivo_core's.
 import 'package:jivo_api/jivo_api.dart' show JivoApi;
@@ -8,10 +9,6 @@ import '../shared/platform/url_opener.dart';
 
 /// The `X-App-Name` this app sends.
 const riderAppName = 'rider';
-
-/// Turns off Riverpod's automatic retry. Failed loads show an error state with
-/// an explicit Retry button instead.
-Duration? noAutomaticRetry(int retryCount, Object error) => null;
 
 /// The flavor configuration. Overridden in `bootstrap()`.
 final appEnvProvider = Provider<AppEnv>(

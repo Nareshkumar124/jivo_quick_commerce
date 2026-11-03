@@ -6,7 +6,7 @@ import '../../../shared/format/ist_format.dart';
 import '../../../shared/widgets/paged_list_view.dart';
 import '../../task/domain/task_rules.dart';
 import '../domain/earnings.dart';
-import 'records_providers.dart';
+import 'earnings_providers.dart';
 
 /// Payout history (04 §2.8): period, amount, status and the bank
 /// reference, as Finance recorded them.
@@ -72,7 +72,7 @@ class _PayoutTile extends StatelessWidget {
                   if (payout.reference case final reference?)
                     Text(l10n.payoutReference(reference)),
                   if (payout.paidAt case final paidAt?)
-                    Text(l10n.payoutPaidOn(istDate(context, paidAt))),
+                    Text(l10n.payoutPaidOn(istDayOf(context, paidAt))),
                 ],
               ),
             ),
