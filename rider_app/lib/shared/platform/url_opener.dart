@@ -1,13 +1,10 @@
 import 'package:flutter/foundation.dart';
+import 'package:jivo_core/helpers.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Opens a link in another app (browser, Play Store). Behind an interface so
-/// widget tests can run without the url_launcher platform channel.
-abstract interface class UrlOpener {
-  /// Returns false if no app could open [uri].
-  Future<bool> open(Uri uri);
-}
-
+/// Opens a link in another app (browser, Play Store, maps, dialer) with
+/// url_launcher. The [UrlOpener] interface and its test double
+/// (`FakeUrlOpener`) live in jivo_core.
 class ExternalUrlOpener implements UrlOpener {
   const ExternalUrlOpener();
 

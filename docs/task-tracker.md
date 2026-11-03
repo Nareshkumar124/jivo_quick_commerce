@@ -22,7 +22,7 @@
 - `PM` = the main session
 - `USER` = you or Jivo
 
-Last updated: 2026-11-02 (Phase 2 kickoff).
+Last updated: 2026-11-03 (Phase 3 kickoff).
 
 ## Phase 1: built, awaiting QA verification
 | ID | Task | Owner | Pri | Deliverables | Acceptance criteria | Status |
@@ -31,6 +31,17 @@ Last updated: 2026-11-02 (Phase 2 kickoff).
 | T-102 | P1 `jivo_core` session layer | CUS | P0 | Session manager, refresh interceptor, app-control signals | 75 tests green; QA verifies | Testing |
 | T-103 | P1 customer app: login, profile, addresses, delete account | CUS | P0 | `customer_app` P1 screens | 62 tests and the real-API itest green; QA functional check | Testing |
 | T-104 | P1 rider app: login, routing by status | RID | P0 | `rider_app` P1 screens | 112 tests and the real-API itest green; QA functional check | Testing |
+
+## Phase 3: Cart, checkout, payments (started 2026-11-03, DL-42)
+| ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
+|----|------|-------|-----|-----------|--------------|---------------------|--------|
+| T-301 | P3 API contract (R1): `06 §2.5` cart and coupons, P3 rows of `§2.6` (orders, verify, retry, webhook, active orders); apps `cart`, `promotions`, `orders`, `payments`; fake-gateway scheme | BE | P0 | – | Serializers, routes, examples, schema | Schema validates with no warnings; examples for every error code; deployed settings refuse the fake gateway | In Review (`7886fd1`: 15 operations as 503 stubs, fake gateway + `payments.E001`; 1657 tests, 96.98%; code review running) |
+| T-302 | P3 R2a: models and migrations (pricing config, coupons, cart, orders, payments), `compute_bill`, cart | BE | P0 | T-301 | Models, `compute_bill` (`08 §6.2`), cart API | D-09 defaults; thresholds before coupon; coverage ≥ 90% on cart | In Progress (decisions DL-43..DL-45 ⚠) |
+| T-303 | P3 R2b: `place_order` with reservations and `Idempotency-Key`, `transition()` T1–T5 + T3a, Razorpay verify, webhook, retry, `expire_unpaid_orders`; BUG-0008 fix | BE | P0 | T-302 | Services, tasks, tests | `08` exactly; coverage ≥ 90% on payments and inventory | Not Started |
+| T-304 | P3 admin: pricing config, coupons, payments | ADM | P1 | T-302 (models) | `admin.py` for the P3 apps | Role matrix; state changes only through services | Not Started |
+| T-305 | Customer P3 Start: cart, bill breakdown (server bill), coupon sheet, tip and instructions, payment method, success/failure, `PaymentLauncher` + `razorpay_flutter` (dev fake launcher) | CUS | P0 | – | Screens with fakes | Widget tests; no client-side money; fakes only in tests and dev; R8 release build works | In Progress |
+| T-306 | Customer P3 after S3-A/S3-B: real API, `Idempotency-Key`, `PRICE_CHANGED`/`STOCK_UNAVAILABLE`, `PAYMENT_PENDING` recovery, server cart behind the stepper, integration tests | CUS | P0 | T-301, T-303 | Real repositories, integration tests | COD and test-payment checkout pass on the phone | Not Started |
+| T-307 | Review of T-225 (incl. the unreviewed `b6b6eff`) and of each P3 module branch before merge | REVIEW | P0 | each run | Review verdicts | No Blockers before merge | In Progress (T-225/T-211: Approve with fixes, all fixed, merged; open for CUS: add jivo_core `isVersionBelow` tests for build suffix and short versions) |
 
 ## Phase 2: Stores, catalog, inventory, home
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
@@ -47,8 +58,8 @@ Last updated: 2026-11-02 (Phase 2 kickoff).
 | T-209 | Customer binds P2 to the real contract and API | CUS | P0 | T-201, T-203 | Generated types and real repositories | Real-API integration test: browse | In Progress (`jivo_api` regenerated with `CatalogApi` and `ServiceabilityApi`; the P2 API is live on 8001) |
 | T-210 | Rider lookahead: registration, KYC (≤ 1 MB), bank details, status | RID | P1 | – | Screens and local models with fakes | Tests; masking; accepted at the P5 gate | Testing (201 tests green; merged to `develop` in `84bad46`; device test pending) |
 | T-224 | Rider P3 lookahead: offers, task flow, pickup, OTP, COD, failed delivery (fakes) | RID | P1 | – | Screens and controller | 300 tests; code review fixes applied; accepted at the P5 gate | Testing (merged `7dbce4f`) |
-| T-225 | Rider P4 lookahead: earnings, cash ledger, history, payouts, profile and documents; accept → deliver integration harness with GPX | RID | P2 | – | Screens with fakes, an integration test | Tests green; accepted at the P5 gate | Blocked (paused by the PM to save quota during the P2 push; WIP committed as `b6b6eff` and merged to `develop`/`main` on 2026-11-03 at the user's request, unreviewed) |
-| T-211 | Rider adopts the promoted `jivo_core` helpers | RID | P2 | T-208 merged | Imports switched | Tests green | Not Started |
+| T-225 | Rider P4 lookahead: earnings, cash ledger, history, payouts, profile and documents; accept → deliver integration harness with GPX | RID | P2 | – | Screens with fakes, an integration test | Tests green; accepted at the P5 gate | Testing (merged to `develop`; review Approve with fixes, all fixed in `8f4e040`; 342 tests; device run of the GPX harness pending; accepted at the P5 gate) |
+| T-211 | Rider adopts the promoted `jivo_core` helpers | RID | P2 | T-208 merged | Imports switched | Tests green | Testing (merged to `develop` with T-225) |
 | T-212 | QA run 1: verify P0/P1, create the QA docs and black-box suite | QA | P0 | – | `qa/` (10 docs, suite, bugs) | P1 readiness verdict with evidence | Completed (`94854f7`: 130 cases, 7 bugs, verdict **P1 Not ready**) |
 | T-213 | QA: admin role-matrix tests | QA | P1 | T-206 | Test results | Every role tested | Not Started |
 | T-214 | QA: device test of the P1 apps | QA | P1 | free emulator | Functional report | Cases executed | Not Started |
@@ -59,13 +70,14 @@ Last updated: 2026-11-02 (Phase 2 kickoff).
 ### QA bugs (from QA run 1; owner BE; fix in the backend's next run after R2, then QA re-verifies)
 | ID | Bug | Sev | Status |
 |----|-----|-----|--------|
-| BUG-0002 | Numeric validators (phone, OTP, PIN code) accept non-ASCII digits (security details in `qa/private/`) | P2 | Not Started |
-| BUG-0003 | The refresh-token single-use rule is not enforced in all conditions (security details in `qa/private/`) | P2 | Not Started |
-| BUG-0007 | Concurrent set-default calls can leave a user with no default address (the address is read before the lock) | P2 | Not Started |
-| BUG-0001 | A request body over 2.5 MB returns 500 instead of a 4xx | P3 | Not Started |
-| BUG-0004 | `addresses_list` returns 404 for an invalid page, which the contract doesn't document | P3 | Not Started |
-| BUG-0005 | Production settings silently default to the console SMS backend, which would log OTPs | P3 | Not Started |
-| BUG-0006 | Staff sessions last a fixed 12 h; 05 §5 needs 8 h, and 2 h idle for admin roles | P3 | Not Started |
+| BUG-0002 | Numeric validators (phone, OTP, PIN code) accept non-ASCII digits (security details in `qa/private/`) | P2 | Completed (fixed `96a2117`; QA verified in run 2) |
+| BUG-0003 | The refresh-token single-use rule is not enforced in all conditions (security details in `qa/private/`) | P2 | Completed (fixed `96a2117`; QA verified in run 2) |
+| BUG-0007 | Concurrent set-default calls can leave a user with no default address (the address is read before the lock) | P2 | Completed (fixed `96a2117`; QA verified in run 2) |
+| BUG-0001 | A request body over 2.5 MB returns 500 instead of a 4xx | P3 | Completed (fixed `96a2117`; QA verified in run 2) |
+| BUG-0004 | `addresses_list` returns 404 for an invalid page, which the contract doesn't document | P3 | Completed (fixed `96a2117`; QA verified in run 2) |
+| BUG-0005 | Production settings silently default to the console SMS backend, which would log OTPs | P3 | Completed (fixed `96a2117`; QA verified in run 2) |
+| BUG-0008 | An anonymous notify-me repeat echoes an earlier lead's stored data (privacy; details in `qa/private/`) | P2 | Not Started (in the P3 backend R2, T-303) |
+| BUG-0006 | Staff sessions last a fixed 12 h; 05 §5 needs 8 h, and 2 h idle for admin roles | P3 | Testing (fixed `96a2117`; QA re-verification pending) |
 | T-218 | DB connection reuse/pooling (`CONN_MAX_AGE` or a psycopg pool): new connections to the remote DB take about 99 ms, with occasional > 5 s timeouts returning 500s | P1 | Not Started |
 | T-219 | Enforce the token `app` claim (a customer token currently works with `X-App-Name: rider`); retest in P5 | P2 | Not Started |
 
@@ -97,7 +109,7 @@ flowchart LR
 ```
 
 ## Open API requests
-These are tracked in [`api-requests.md`](api-requests.md): rider location requests #2–#5, targeted at the P5 contract.
+These are tracked in [`api-requests.md`](api-requests.md): rider requests #2–#24, all targeted at the P5 contract.
 
 ## Waiting on you or Jivo
 | ID | Item | Status | Needed by |

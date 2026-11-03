@@ -44,4 +44,8 @@ API_DOCS_PUBLIC = False
 SMS_BACKEND = env_str("SMS_BACKEND", default="apps.notifications.sms.UnconfiguredSmsBackend")
 SMS_CONSOLE_BACKEND_ALLOWED = env_bool("SMS_CONSOLE_BACKEND_ALLOWED", default=False)
 
+# Phase 3: the real Razorpay gateway (base.py default). The fake gateway is refused here by the
+# system check payments.E001 and by its own constructor; there is no opt-in. The RAZORPAY_* keys
+# come from the environment; without them payments fail loudly when used.
+
 init_sentry()

@@ -806,6 +806,7 @@
       }
     }
   },
+  "cashCodCollectedNoOrder": "Cash collected",
   "cashDeposit": "Deposited at the store",
   "cashAdjustment": "Adjustment",
   "cashBalanceAfter": "Balance {amount}",

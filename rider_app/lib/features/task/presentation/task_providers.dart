@@ -16,11 +16,13 @@ import '../domain/rider_task.dart';
 import '../domain/task_repositories.dart';
 import '../domain/task_rules.dart';
 
-/// Whether the offer and delivery screens (P5, built ahead in P3) run.
+/// Whether the rider work screens run: offers and delivery (P5, built ahead
+/// in P3) and the rider's records (earnings, payouts, cash, history,
+/// profile; built ahead in P4).
 ///
 /// TODO(api): no rider API until the end of P4, so they run only against the
-/// fake, gated like onboarding (DL-30): the dev flavor only (also with the
-/// real login). Staging and prod keep the Phase 1 home, even with
+/// fakes, gated like onboarding (DL-30, DL-32): the dev flavor only (also
+/// with the real login). Staging and prod keep the Phase 1 home, even with
 /// `FAKE_API`.
 final riderWorkEnabledProvider = Provider<bool>(
   (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jivo_core/helpers.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rider_app/app/app.dart';
-import 'package:rider_app/app/providers.dart';
 import 'package:rider_app/app/router.dart';
 import 'package:rider_app/app/routes.dart';
 import 'package:rider_app/features/permissions/domain/permission_snapshot.dart';

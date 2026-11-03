@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
+import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../features/offers/data/offer_alert_notifications.dart';
