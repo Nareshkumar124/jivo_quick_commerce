@@ -132,23 +132,42 @@ def _oversized_post(api, path="/api/v1/auth/otp/verify/", headers=None):
     )
 
 
-@pytest.mark.xfail(strict=True, reason="BUG-0001: body > DATA_UPLOAD_MAX_MEMORY_SIZE -> 500")
+@pytest.mark.any_profile
 def test_p0_tc08b_oversized_body_is_a_client_error(api):
-    """P0-TC-08b A ~3 MB JSON body (over Django's 2.5 MB DATA_UPLOAD_MAX_MEMORY_SIZE) must be
-    rejected as a client error (400/413), never a 500 SERVER_ERROR."""
+    """P0-TC-08b A ~3 MB JSON body (over Django's 2.5 MB DATA_UPLOAD_MAX_MEMORY_SIZE) is rejected
+    as 413 PAYLOAD_TOO_LARGE (06 §6, BUG-0001 fix), never a 500 SERVER_ERROR: unauthenticated
+    (OTP verify), authenticated (PATCH /me/) and on the P2 notify-me endpoint."""
+    from conftest import login
+    from qa_support import QA_PHONES
+
     r = _oversized_post(api)
-    assert r.status_code in (400, 413), describe(r)
+    assert_error(r, 413, "PAYLOAD_TOO_LARGE")
+    # 413 is documented globally in the schema info ("Any request whose body is larger than 2.5 MB
+    # gets 413"), not per operation (OBS-12).
+    assert "413" in openapi()["info"]["description"]
+    s = login(QA_PHONES["d"])
+    big = json.dumps({"name": "x" * 3_000_000}).encode()
+    r = api.patch("/api/v1/me/", content=big, headers={"Content-Type": "application/json", **s.headers})
+    assert_error(r, 413, "PAYLOAD_TOO_LARGE")
+    r = _oversized_post(api, path="/api/v1/serviceability/notify-me/")
+    assert_error(r, 413, "PAYLOAD_TOO_LARGE")
 
 
+@pytest.mark.profile_db_down
 def test_p0_tc09_server_error_hides_internals(api):
-    """P0-TC-09 A 5xx (triggered here by BUG-0001) is the bare SERVER_ERROR envelope: no
-    traceback, exception class, settings name or file path in the body."""
-    r = _oversized_post(api)
-    if r.status_code != 500:
-        pytest.skip("no 500 trigger available (BUG-0001 fixed)")
-    err = assert_error(r, 500, "SERVER_ERROR")
+    """P0-TC-09 A 5xx is the bare SERVER_ERROR envelope: no traceback, exception class, settings
+    name, DB host or file path in the body. Trigger since BUG-0001 was fixed: the db-down profile
+    (database host = a closed local port), so an endpoint that needs the DB fails."""
+    from qa_support import bearer
+
+    r = api.get("/api/v1/me/", headers=bearer("eyJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoxfQ.x"))
+    if r.status_code not in (500, 503):
+        r = api.post("/api/v1/auth/otp/request/", json={"phone": "+919000000104", "app": "customer"})
+    assert r.status_code in (500, 503), describe(r)
+    err = assert_error(r, r.status_code, r.json()["error"]["code"])
+    assert err["code"] in ("SERVER_ERROR", "SERVICE_UNAVAILABLE")
     assert err["details"] == {}
-    for leak in ("Traceback", "RequestDataTooBig", "DATA_UPLOAD", "/tmp/", ".py"):
+    for leak in ("Traceback", "RequestDataTooBig", "DATA_UPLOAD", "/tmp/", ".py", "6398", "psycopg", "OperationalError", "127.0.0.1"):
         assert leak not in r.text
 
 

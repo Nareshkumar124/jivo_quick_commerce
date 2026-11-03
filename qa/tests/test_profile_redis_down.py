@@ -58,3 +58,34 @@ def test_p1_tc63c_test_numbers_and_session_keep_working():
         assert r.status_code == 204
         r = c.get("/api/v1/addresses/", headers=s.headers)
         assert r.status_code == 200
+
+
+def test_p2_tc12b_catalog_and_serviceability_without_redis():
+    """P2-TC-12b Redis down (06 §2.3/§2.4): serviceability loads the store snapshot from PostGIS and
+    still answers 200 (inside and outside); X-Store-Id is resolved from the database; home,
+    categories, products, detail, search, suggest and collections are served from the database
+    (200, schema-valid); an unknown store is still 404 STORE_NOT_FOUND; notify-me's throttle
+    fails open (201, no 500)."""
+    from qa_support import MUMBAI, STORE_HEADERS, STORE_POINT
+
+    with client() as c:
+        r = c.get("/api/v1/serviceability/", params={"lat": STORE_POINT[0], "lng": STORE_POINT[1]})
+        assert r.status_code == 200 and r.json()["serviceable"] is True, describe(r)
+        r = c.get("/api/v1/serviceability/", params={"lat": MUMBAI[0], "lng": MUMBAI[1]})
+        assert r.status_code == 200 and r.json()["serviceable"] is False, describe(r)
+        for op, path, params in [
+            ("home_retrieve", "/api/v1/home/", {}),
+            ("categories_list", "/api/v1/categories/", {}),
+            ("products_list", "/api/v1/products/", {"sort": "price_asc"}),
+            ("products_retrieve", "/api/v1/products/1/", {}),
+            ("search_products", "/api/v1/search/", {"q": "oil"}),
+            ("search_suggest", "/api/v1/search/suggest/", {}),
+            ("collections_retrieve", "/api/v1/collections/bestsellers/", {}),
+        ]:
+            r = c.get(path, params=params, headers=STORE_HEADERS)
+            assert r.status_code == 200, f"{op}: {describe(r)}"
+            validate_response(r, op)
+        r = c.get("/api/v1/categories/", headers={"X-Store-Id": "9999999"})
+        assert_error(r, 404, "STORE_NOT_FOUND")
+        r = c.post("/api/v1/serviceability/notify-me/", json={"lat": MUMBAI[0], "lng": MUMBAI[1], "phone": QA_PHONES["e"]})
+        assert r.status_code == 201, describe(r)

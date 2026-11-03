@@ -249,3 +249,36 @@ def test_p1_tc32_public_endpoints_ignore_bad_bearer(api):
     assert r.status_code == 200, describe(r)
     r = api.post("/api/v1/auth/token/refresh/", json={"refresh": "garbage"}, headers=junk)
     assert_error(r, 401, "TOKEN_INVALID")
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("trial", range(5))
+def test_p1_tc24c_concurrent_reuse_of_one_refresh_token(api, trial):
+    """P1-TC-24c (BUG-0003, verified fixed in QA run 2) Ten concurrent refreshes with the same
+    refresh token, 5 trials: exactly one 200; every other request 401 TOKEN_INVALID (never 200,
+    409 or 500); exactly one new outstanding refresh token was minted from it (read-only SQL); the
+    winner's new token works once more. Moved here from qa/private/tests once verified."""
+    s = login(QA_PHONES["a"])
+    token = s.refresh
+    before = _outstanding_count(s.user["id"])
+
+    def call(_):
+        with httpx.Client(base_url=BASE_URL, headers=APP_HEADERS, timeout=30) as c:
+            return _refresh(c, token)
+
+    with ThreadPoolExecutor(10) as pool:
+        responses = list(pool.map(call, range(10)))
+    codes = [r.status_code for r in responses]
+    assert codes.count(200) == 1, f"refresh token accepted {codes.count(200)} times concurrently: {codes}"
+    for r in responses:
+        if r.status_code != 200:
+            assert_error(r, 401, "TOKEN_INVALID")
+    assert _outstanding_count(s.user["id"]) == before + 1
+    winner = next(r for r in responses if r.status_code == 200).json()
+    r = _refresh(api, winner["refresh"])
+    assert r.status_code == 200, describe(r)
+
+
+def _outstanding_count(user_id: int) -> int:
+    ((n,),) = db_query("select count(*) from token_blacklist_outstandingtoken where user_id = %s", (user_id,))
+    return n

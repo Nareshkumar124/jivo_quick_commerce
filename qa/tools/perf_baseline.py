@@ -20,7 +20,31 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tests"))
 from conftest import ADDRESS, TERMS_VERSION, login  # noqa: E402
-from qa_support import APP_HEADERS, BASE_URL, QA_PHONES, TEST_OTP, bearer, db_connect  # noqa: E402
+from qa_support import (  # noqa: E402
+    instance_db,
+    APP_HEADERS,
+    BASE_URL,
+    QA_PHONES,
+    STORE_HEADERS,
+    TEST_OTP,
+    bearer,
+    clear_catalog_cache,
+    db_connect,
+)
+
+# Phase 2 read endpoints (09 §1: serviceability p95 < 150 ms; catalog reads p95 < 300 ms).
+P2_PLANS = [
+    ("GET /api/v1/serviceability/ (inside)", "/api/v1/serviceability/", {"params": {"lat": 28.471, "lng": 77.044}}),
+    ("GET /api/v1/serviceability/ (outside)", "/api/v1/serviceability/", {"params": {"lat": 19.076, "lng": 72.8777}}),
+    ("GET /api/v1/home/", "/api/v1/home/", {"headers": STORE_HEADERS}),
+    ("GET /api/v1/categories/", "/api/v1/categories/", {"headers": STORE_HEADERS}),
+    ("GET /api/v1/products/", "/api/v1/products/", {"headers": STORE_HEADERS}),
+    ("GET /api/v1/products/?sort=price_asc&category=edible-oils", "/api/v1/products/", {"headers": STORE_HEADERS, "params": {"sort": "price_asc", "category": "edible-oils"}}),
+    ("GET /api/v1/products/{slug}/", "/api/v1/products/jivo-cold-pressed-canola-oil/", {"headers": STORE_HEADERS}),
+    ("GET /api/v1/search/?q=oil", "/api/v1/search/", {"headers": STORE_HEADERS, "params": {"q": "oil"}}),
+    ("GET /api/v1/search/suggest/?q=can", "/api/v1/search/suggest/", {"headers": STORE_HEADERS, "params": {"q": "can"}}),
+    ("GET /api/v1/collections/bestsellers/", "/api/v1/collections/bestsellers/", {"headers": STORE_HEADERS}),
+]
 
 
 def pct(values: list[float], p: float) -> float:
@@ -51,6 +75,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=30)
     ap.add_argument("--burst", type=int, default=20)
+    ap.add_argument("--p2-only", action="store_true", help="only the Phase 2 endpoints")
     args = ap.parse_args()
     assert args.burst <= 20, "keep bursts <= 20 (shared DB)"
 
@@ -73,7 +98,27 @@ def main() -> None:
     results = []
     with httpx.Client(base_url=BASE_URL, headers=APP_HEADERS, timeout=60) as c:
         c.get("/health/live")  # warm-up
-        plans = [
+        # Phase 2: cold (catalog cache and store snapshot cleared before each call; builds from
+        # the DB) and warm (served from the per-store Redis cache: no DB query when warm).
+        for name, path, kw in P2_PLANS:
+            cold, cold_st = [], []
+            for _ in range(min(args.n, 10)):
+                clear_catalog_cache()
+                ms, st = timed(c, "GET", path, **kw)
+                cold.append(ms)
+                cold_st.append(st)
+            results.append(summarise(f"COLD {name}", cold, cold_st))
+            c.get(path, **kw)
+            warm, warm_st = [], []
+            for _ in range(args.n):
+                ms, st = timed(c, "GET", path, **kw)
+                warm.append(ms)
+                warm_st.append(st)
+            results.append(summarise(f"WARM {name}", warm, warm_st))
+        if args.p2_only:
+            plans = []
+        else:
+          plans = [
             ("GET /health/live", "GET", "/health/live", {}),
             ("GET /health/ready", "GET", "/health/ready", {}),
             ("GET /api/v1/config/app/", "GET", "/api/v1/config/app/", {}),
@@ -137,7 +182,11 @@ def main() -> None:
             results.append(summarise("DELETE /api/v1/addresses/{id}/", d_samples, d_status))
 
     # Concurrency bursts (<= 20 in flight).
-    def burst(name: str, method: str, path: str, **kw) -> dict:
+    def burst(name: str, method: str, path: str, warm: bool = False, **kw) -> dict:
+        if warm:  # one request first, so the burst measures cache hits (not a stampede)
+            with httpx.Client(base_url=BASE_URL, headers=APP_HEADERS, timeout=60) as cc:
+                cc.request(method, path, **kw)
+
         def one(_):
             with httpx.Client(base_url=BASE_URL, headers=APP_HEADERS, timeout=60) as cc:
                 return timed(cc, method, path, **kw)
@@ -153,15 +202,32 @@ def main() -> None:
     results.append(burst("GET /api/v1/config/app/", "GET", "/api/v1/config/app/"))
     results.append(burst("GET /api/v1/me/", "GET", "/api/v1/me/", headers=auth))
     results.append(burst("GET /api/v1/addresses/", "GET", "/api/v1/addresses/", headers=auth))
+    results.append(burst("GET /api/v1/serviceability/ (warm)", "GET", "/api/v1/serviceability/", warm=True, params={"lat": 28.471, "lng": 77.044}))
+    results.append(burst("GET /api/v1/home/ (warm)", "GET", "/api/v1/home/", warm=True, headers=STORE_HEADERS))
+    results.append(burst("GET /api/v1/products/ (warm)", "GET", "/api/v1/products/", warm=True, headers=STORE_HEADERS))
+    results.append(burst("GET /api/v1/search/?q=oil (warm)", "GET", "/api/v1/search/", warm=True, headers=STORE_HEADERS, params={"q": "oil"}))
+    # Cold start: the cache was just invalidated and 20 requests arrive at once (cache stampede:
+    # every request misses and rebuilds the body; there is no single-flight on a miss).
+    for label, path, extra in [
+        ("GET /api/v1/home/", "/api/v1/home/", {}),
+        ("GET /api/v1/products/", "/api/v1/products/", {}),
+        ("GET /api/v1/products/{slug}/", "/api/v1/products/jivo-cold-pressed-canola-oil/", {}),
+    ]:
+        clear_catalog_cache()
+        results.append(burst(f"{label} (cold start, stampede)", "GET", path, headers=STORE_HEADERS, **extra))
+
+    from qa_support import instance_commit, instance_db
 
     report = {
         "date": time.strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "commit": instance_commit(),
+        "db": instance_db(),
         "base_url": BASE_URL,
         "db_connect_ms": {"p50": round(statistics.median(db_connect_ms), 1), "max": round(max(db_connect_ms), 1)},
         "db_select1_ms": {"p50": round(statistics.median(db_query_ms), 1), "max": round(max(db_query_ms), 1)},
         "results": results,
     }
-    out = Path(__file__).resolve().parent.parent / "private" / "runs" / f"perf-{time.strftime('%H%M')}.json"
+    out = Path(__file__).resolve().parent.parent / "private" / "runs" / f"perf-{instance_db()}-{time.strftime('%H%M')}.json"
     out.write_text(json.dumps(report, indent=2))
     print(json.dumps(report["db_connect_ms"]), json.dumps(report["db_select1_ms"]))
     print(f"{'endpoint':52} {'n':>3} {'p50':>7} {'p95':>7} {'max':>7} 5xx statuses")
