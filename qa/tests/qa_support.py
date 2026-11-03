@@ -31,6 +31,36 @@ QA_DIR = Path(__file__).resolve().parent.parent
 REPO = QA_DIR.parent
 PRIVATE = QA_DIR / "private"
 
+
+def _main_checkout() -> Path:
+    """The main checkout when QA runs from a git worktree (.worktrees/qa has no backend/.env)."""
+    try:
+        common = subprocess.run(
+            ["git", "-C", str(REPO), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        return Path(common).parent
+    except (OSError, subprocess.CalledProcessError):
+        return REPO
+
+
+def backend_env_file(name: str = ".env") -> Path:
+    """backend/.env (or .env.localdb): QA_BACKEND_ENV override, this checkout, else the main
+    checkout. The file is only ever read, never printed or copied."""
+    override = os.environ.get("QA_BACKEND_ENV") if name == ".env" else None
+    if override:
+        return Path(override)
+    local = REPO / "backend" / name
+    return local if local.exists() else _main_checkout() / "backend" / name
+
+
+def instance_db() -> str:
+    """Which database the running QA instance uses: remote (backend/.env) or localdb."""
+    marker = PRIVATE / ".instance-db"
+    return marker.read_text().strip() if marker.exists() else "remote"
+
 BASE_URL = os.environ.get("QA_BASE_URL", "http://127.0.0.1:8004")
 if urlsplit(BASE_URL).port == 8001:
     raise SystemExit("Refusing to run against 8001 (the shared dev server). Use the QA instance.")
@@ -249,11 +279,37 @@ def qa_redis():
 
 def clear_rate_limits() -> int:
     """Delete only the QA instance's rate-limit counters (`jqc:rl:*`) in the QA Redis DB."""
+    return _delete_matching("jqc:rl:*")
+
+
+def _delete_matching(*patterns: str) -> int:
     r = qa_redis()
-    keys = list(r.scan_iter(match="jqc:rl:*", count=500))
+    keys = [k for p in patterns for k in r.scan_iter(match=p, count=500)]
     if keys:
         r.delete(*keys)
     return len(keys)
+
+
+def clear_catalog_cache() -> int:
+    """Drop the QA instance's catalog bodies and store snapshot (QA Redis DB 5 only), so API
+    output can be compared with SQL without the 300 s cache lag (changes made through :8001 do
+    not invalidate the QA instance's cache)."""
+    return _delete_matching("jqc:1:catalog:*", "jqc:1:stores:areas:*")
+
+
+def clear_throttle(scope: str) -> int:
+    """Drop the QA instance's DRF throttle history for one scope (e.g. notify_me)."""
+    return _delete_matching(f"jqc:1:throttle_{scope}_*")
+
+
+def redis_keys(pattern: str) -> list[str]:
+    return [k.decode() for k in qa_redis().scan_iter(match=pattern, count=500)]
+
+
+STORE_ID = 1  # the seeded GGN-01 store (the only store in the shared dev DB)
+STORE_HEADERS = {**APP_HEADERS, "X-Store-Id": str(STORE_ID)}
+STORE_POINT = (28.471, 77.044)  # GGN-01 location (lat, lng)
+MUMBAI = (19.076, 72.8777)
 
 
 # --------------------------------------------------------------------------- DB (read-only)
@@ -264,7 +320,10 @@ def db_connect():
     import psycopg
     from dotenv import dotenv_values
 
-    env = {**dotenv_values(REPO / "backend/.env"), **{k: v for k, v in os.environ.items()}}
+    env = dict(dotenv_values(backend_env_file(".env")))
+    if instance_db() == "localdb":  # read the same database the instance under test uses
+        env.update(dotenv_values(backend_env_file(".env.localdb")))
+    env.update(os.environ)
     try:
         conn = psycopg.connect(
             host=env["POSTGRES_HOST"],

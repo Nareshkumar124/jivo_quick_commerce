@@ -1,6 +1,8 @@
-"""Property-based fuzzing of the Phase 0/1 contract with schemathesis (low example counts).
+"""Property-based fuzzing of the Phase 0/1/2 contract with schemathesis (low example counts).
 
 Excluded on purpose:
+- serviceability_notify_me (P2): every valid example writes a lead row to the shared DB (covered
+  by the hand-written suite with a handful of requests).
 - auth_otp_request / auth_otp_verify: generated phones would be valid +91 numbers that may belong
   to real people and would land in the shared DB (covered by the hand-written suites instead).
 - me_delete_account: could delete the fuzz user; health_ready: covered elsewhere.
@@ -8,6 +10,8 @@ Generated receiver phones are replaced with a QA number before sending. The fuzz
 user D; its addresses are soft-deleted and its profile restored afterwards."""
 
 from __future__ import annotations
+
+import re
 
 import httpx
 import pytest
@@ -39,6 +43,15 @@ FUZZED = [
     "addresses_update",
     "addresses_delete",
     "addresses_set_default",
+    # Phase 2 (read-only)
+    "serviceability_check",
+    "home_retrieve",
+    "categories_list",
+    "products_list",
+    "products_retrieve",
+    "search_products",
+    "search_suggest",
+    "collections_retrieve",
 ]
 
 schema = schemathesis.openapi.from_path(str(schema_path())).include(operation_id=FUZZED)
@@ -83,8 +96,12 @@ def test_p1_tc79_fuzz_contract(case):
         # A non-integer id does not route; with DEBUG on (local) Django answers its HTML debug 404
         # (JSON envelope with DEBUG off: P0-TC-04). Only "no 5xx" applies here.
         checks = [not_a_server_error]
-    if case.operation.label == "GET /api/v1/addresses/" and (case.query or {}).get("page") is not None:
-        # Invalid/out-of-range page -> 404 NOT_FOUND by design (pagination), but 404 is not
-        # documented for addresses_list: BUG-0004. Keep the other checks.
-        checks = [c for c in checks if c is not status_code_conformance]
+    # BUG-0004 verified fixed in QA run 2: the invalid-page 404 is documented, no exemption.
+    if case.headers is not None and "X-Store-Id" in case.headers:
+        # The X-Store-Id rules are covered by P2-TC-21; fuzz the parameters against the real store.
+        case.headers["X-Store-Id"] = "1"
+    if case.path_parameters and "slug" in case.path_parameters and not re.fullmatch(r"[-a-zA-Z0-9_]+", str(case.path_parameters["slug"])):
+        # A non-slug collection path does not route; with DEBUG on Django answers its HTML debug
+        # 404 (JSON envelope with DEBUG off: P2-TC-39). Only "no 5xx" applies here.
+        checks = [not_a_server_error]
     case.call_and_validate(base_url=BASE_URL, headers=headers, checks=checks)

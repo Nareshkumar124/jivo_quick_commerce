@@ -124,3 +124,20 @@ def test_p1_tc20_rate_limit_keys_hold_no_pii(api):
 
 def _ceil(x: float) -> int:
     return math.ceil(x)
+
+
+def test_p1_tc14b_unicode_spelling_does_not_bypass_phone_limit(api):
+    """P1-TC-14b (BUG-0002, verified fixed in QA run 2) After one phone hits its 10-minute send
+    limit, another spelling of the same number with a non-ASCII digit (Devanagari zero) must not
+    get a second counter: it is rejected (400) or shares the limit (429). Moved here from
+    qa/private/tests once the fix was verified."""
+    phone = f"{NONTEST_PREFIX}62"
+    for _ in range(3):
+        assert request_otp(api, phone).status_code == 200
+    _assert_rate_limited(request_otp(api, phone), 600)
+    for variant in (phone.replace("0", "०", 1), phone.replace("6", "６"), phone[:-1] + "٢"):
+        assert variant != phone and len(variant) == len(phone)
+        r = request_otp(api, variant)
+        assert r.status_code in (400, 429), describe(r)
+        if r.status_code == 400:
+            assert_error(r, 400, "VALIDATION_ERROR")

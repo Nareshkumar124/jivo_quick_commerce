@@ -19,7 +19,8 @@ from qa_support import (
     validate_response,
 )
 
-_BUG2 = pytest.mark.xfail(strict=True, reason="BUG-0002: validators accept non-ASCII digits")
+# BUG-0002 (non-ASCII digits) verified fixed in QA run 2 (0b801d1): plain regression cases now.
+_BUG2 = ()
 
 
 def _list(api, session, **params):
@@ -101,9 +102,9 @@ def test_p1_tc49_retrieve_and_patch(api, user_a, make_address):
     validate_response(r, "addresses_update")
     b = r.json()
     assert b["landmark"] == "QA Behind Market" and b["lat"] == 28.5
-    assert {k: v for k, v in b.items() if k not in ("landmark", "lat", "updated_at")} == {
-        k: v for k, v in a.items() if k not in ("landmark", "lat", "updated_at")
-    }
+    # is_serviceable (P2, additive) is recomputed from the pin: 28.5 is on the polygon's edge.
+    moved = ("landmark", "lat", "updated_at", "is_serviceable")
+    assert {k: v for k, v in b.items() if k not in moved} == {k: v for k, v in a.items() if k not in moved}
     r = api.put(f"/api/v1/addresses/{a['id']}/", json=ADDRESS, headers=user_a.headers)
     assert_error(r, 405, "METHOD_NOT_ALLOWED")
 
@@ -296,7 +297,6 @@ def test_p1_tc56_is_default_read_only(api, fresh_user, make_address):
 
 
 @pytest.mark.db
-@pytest.mark.xfail(strict=False, reason="BUG-0007: race can leave zero defaults (intermittent)")
 def test_p1_tc57_concurrent_default_changes(api, fresh_user, make_address):
     """P1-TC-57 Ten concurrent set-default calls on different addresses (and a concurrent burst
     of creates for an address-less user) leave exactly one live default (07 §2.1)."""
