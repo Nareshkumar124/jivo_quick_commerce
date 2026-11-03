@@ -57,6 +57,94 @@ MODULES: tuple[NavSection, ...] = (
         (NavItem("Dashboard", "dashboard", "ops:dashboard", surface=OPS),),
     ),
     NavSection(
+        "Products",
+        (
+            NavItem(
+                "Products",
+                "inventory_2",
+                "admin:catalog_product_changelist",
+                ("catalog.view_product",),
+            ),
+            NavItem(
+                "SKUs (variants)",
+                "barcode",
+                "admin:catalog_productvariant_changelist",
+                ("catalog.view_productvariant",),
+            ),
+            NavItem(
+                "Categories",
+                "category",
+                "admin:catalog_category_changelist",
+                ("catalog.view_category",),
+            ),
+            NavItem(
+                "Collections",
+                "collections_bookmark",
+                "admin:catalog_collection_changelist",
+                ("catalog.view_collection",),
+            ),
+            NavItem(
+                "Banners",
+                "view_carousel",
+                "admin:catalog_banner_changelist",
+                ("catalog.view_banner",),
+            ),
+            NavItem(
+                "Trending searches",
+                "trending_up",
+                "admin:catalog_trendingsearch_changelist",
+                ("catalog.view_trendingsearch",),
+            ),
+        ),
+    ),
+    NavSection(
+        "Inventory",
+        (
+            NavItem(
+                "Stock per store",
+                "warehouse",
+                "admin:inventory_storeinventory_changelist",
+                ("inventory.view_storeinventory",),
+            ),
+            NavItem(
+                "Low stock",
+                "warning",
+                "admin:inventory_storeinventory_changelist",
+                ("inventory.view_storeinventory",),
+                query="stock=low&on_sale=1",
+            ),
+            NavItem(
+                "Stock inward (CSV)",
+                "upload_file",
+                "admin:inventory_storeinventory_inward",
+                ("inventory.adjust_stock",),
+            ),
+            NavItem(
+                "Stock ledger",
+                "receipt_long",
+                "admin:inventory_stockmovement_changelist",
+                ("inventory.view_stockmovement",),
+            ),
+        ),
+    ),
+    NavSection(
+        "Stores",
+        (
+            NavItem(
+                "Dark stores",
+                "store",
+                "admin:stores_darkstore_changelist",
+                ("stores.view_darkstore",),
+            ),
+            NavItem(
+                "Notify-me leads",
+                "person_pin_circle",
+                "admin:stores_serviceabilityrequest_changelist",
+                ("stores.view_serviceabilityrequest",),
+            ),
+        ),
+    ),
+    NavSection(
         "Customers",
         (
             NavItem(

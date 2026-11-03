@@ -1,0 +1,69 @@
+{% extends "admin/base_site.html" %}
+{% load unfold %}
+{# Stock adjustment for one store x variant row (05 §2 Inventory). Posts to the same URL; the view calls inventory.services (adjust_stock / set_counted_stock). #}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% endblock %}
+
+{% block content %}
+    <div class="flex flex-col gap-6 lg:flex-row" data-testid="stock-adjust">
+        <section class="bg-white border border-base-200 flex-1 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800">
+            <div class="border-b border-base-200 px-4 py-3 dark:border-base-800">
+                <h2 class="font-semibold text-font-important-light dark:text-font-important-dark">{{ inventory.store.code }} {{ inventory.store.name }}</h2>
+                <p class="text-xs text-font-subtle-light dark:text-font-subtle-dark">SKU {{ inventory.variant.sku }}</p>
+            </div>
+            <dl class="grid grid-cols-3 gap-4 p-4">
+                <div><dt class="text-xs text-font-subtle-light dark:text-font-subtle-dark">On hand</dt><dd class="font-semibold text-lg" data-testid="on-hand">{{ inventory.on_hand }}</dd></div>
+                <div><dt class="text-xs text-font-subtle-light dark:text-font-subtle-dark">Reserved by orders</dt><dd class="font-semibold text-lg">{{ inventory.reserved }}</dd></div>
+                <div><dt class="text-xs text-font-subtle-light dark:text-font-subtle-dark">Available</dt><dd class="font-semibold text-lg">{{ inventory.available }}</dd></div>
+            </dl>
+
+            <form method="post" novalidate class="border-t border-base-200 p-4 dark:border-base-800">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="mb-4 text-red-600 dark:text-red-400" role="alert">
+                        {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+                    </div>
+                {% endif %}
+                {% include "unfold/helpers/field.html" with field=form.kind %}
+                {% include "unfold/helpers/field.html" with field=form.quantity %}
+                {% include "unfold/helpers/field.html" with field=form.reason %}
+                <p class="mb-4 text-xs text-font-subtle-light dark:text-font-subtle-dark">On hand can never go below the units reserved by orders. Every change is written to the stock ledger with your name.</p>
+                <div class="flex gap-3 items-center">
+                    {% component "unfold/components/button.html" with submit=1 %}Save adjustment{% endcomponent %}
+                    <a href="{% url 'admin:inventory_storeinventory_change' inventory.pk %}" class="text-primary-600 dark:text-primary-500">Cancel</a>
+                </div>
+            </form>
+        </section>
+
+        <section class="bg-white border border-base-200 flex-1 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800">
+            <div class="border-b border-base-200 flex items-center px-4 py-3 dark:border-base-800">
+                <h2 class="font-semibold text-font-important-light dark:text-font-important-dark">Recent movements</h2>
+                <a class="ml-auto text-primary-600 text-xs dark:text-primary-500" href="{% url 'admin:inventory_stockmovement_changelist' %}?store={{ inventory.store_id }}&variant={{ inventory.variant_id }}">Full ledger</a>
+            </div>
+            {% if recent %}
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-xs">
+                            <th scope="col" class="border-b border-base-200 font-semibold px-4 py-2 dark:border-base-800">When</th>
+                            <th scope="col" class="border-b border-base-200 font-semibold px-4 py-2 dark:border-base-800">Type</th>
+                            <th scope="col" class="border-b border-base-200 font-semibold px-4 py-2 text-right dark:border-base-800">Change</th>
+                            <th scope="col" class="border-b border-base-200 font-semibold px-4 py-2 text-right dark:border-base-800">After</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movement in recent %}
+                            <tr>
+                                <td class="border-b border-base-200 px-4 py-2 whitespace-nowrap dark:border-base-800">{{ movement.created_at|date:"d M Y, H:i" }}</td>
+                                <td class="border-b border-base-200 px-4 py-2 dark:border-base-800" title="{{ movement.reason }}">{{ movement.get_type_display }}</td>
+                                <td class="border-b border-base-200 px-4 py-2 text-right dark:border-base-800">{% if movement.delta > 0 %}+{% endif %}{{ movement.delta }}</td>
+                                <td class="border-b border-base-200 px-4 py-2 text-right dark:border-base-800">{{ movement.on_hand_after }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="p-4 text-font-subtle-light dark:text-font-subtle-dark">No movements yet.</p>
+            {% endif %}
+        </section>
+    </div>
+{% endblock %}

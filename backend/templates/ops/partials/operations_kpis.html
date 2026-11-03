@@ -1,0 +1,24 @@
+{# Stores, catalog and stock cards (Phase 2 data, 05 §1.1). Polls itself every 60 s. Context: operations (selectors.OperationsStats); a group appears only when its permission allowed it. Definitions: docs/admin-panel-architecture.md §9. #}
+<div id="operations-kpis" hx-get="{% url 'ops:dashboard-operations' %}" hx-trigger="every 60s" hx-swap="outerHTML" data-testid="operations-kpis">
+    {% if operations.any %}
+        <div class="ops-grid-kpi">
+            {% if operations.stores %}
+                {% url 'admin:stores_darkstore_changelist' as stores_url %}
+                {% include "ops/components/kpi_card.html" with label="Active stores" value=operations.stores.active icon="store" href=stores_url testid="kpi-stores-active" %}
+                {% include "ops/components/kpi_card.html" with label="Open now" value=operations.stores.open_now icon="door_open" tone="success" hint="Active, taking orders, inside opening hours (IST)" testid="kpi-stores-open" %}
+                {% include "ops/components/kpi_card.html" with label="Paused" value=operations.stores.paused icon="pause_circle" tone="warning" hint="Not taking orders (temporarily closed)" testid="kpi-stores-paused" %}
+            {% endif %}
+            {% if operations.catalog %}
+                {% url 'admin:catalog_product_changelist' as products_url %}
+                {% url 'admin:catalog_productvariant_changelist' as variants_url %}
+                {% include "ops/components/kpi_card.html" with label="Active products" value=operations.catalog.active_products icon="inventory_2" href=products_url testid="kpi-products" %}
+                {% include "ops/components/kpi_card.html" with label="Active SKUs" value=operations.catalog.active_variants icon="barcode" hint="Active variants of active products" href=variants_url testid="kpi-variants" %}
+            {% endif %}
+            {% if operations.stock %}
+                {% url 'admin:inventory_storeinventory_changelist' as stock_url %}
+                {% include "ops/components/kpi_card.html" with label="Low-stock SKUs" value=operations.stock.low icon="warning" tone="warning" hint="On sale, available below the threshold" href=stock_url|add:"?stock=low&on_sale=1" testid="kpi-low-stock" %}
+                {% include "ops/components/kpi_card.html" with label="Out of stock" value=operations.stock.out icon="remove_shopping_cart" tone="danger" hint="On sale, nothing available" href=stock_url|add:"?stock=out&on_sale=1" testid="kpi-out-of-stock" %}
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
