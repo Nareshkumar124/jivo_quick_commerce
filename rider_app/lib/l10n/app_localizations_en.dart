@@ -1327,4 +1327,169 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get codQrUnavailable =>
       'Couldn\'t show the QR code. Check payment again, or collect cash.';
+
+  @override
+  String get listLoadMore => 'Load more';
+
+  @override
+  String dateRange(String from, String to) {
+    return '$from – $to';
+  }
+
+  @override
+  String get earningsTitle => 'Earnings';
+
+  @override
+  String get earningsToday => 'Today';
+
+  @override
+  String get earningsThisWeek => 'This week';
+
+  @override
+  String get earningsChooseDates => 'Choose dates';
+
+  @override
+  String earningsOrders(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count orders',
+      one: '1 order',
+      zero: 'No orders',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get earningsPerOrder => 'Per order';
+
+  @override
+  String get earningsAdjustments => 'Incentives and penalties';
+
+  @override
+  String get earningBase => 'Base pay';
+
+  @override
+  String get earningDistance => 'Distance pay';
+
+  @override
+  String get earningTip => 'Tips';
+
+  @override
+  String get earningIncentive => 'Incentives';
+
+  @override
+  String get earningPenalty => 'Penalties';
+
+  @override
+  String get payoutsTitle => 'Payouts';
+
+  @override
+  String get payoutsEmpty => 'No payouts yet.';
+
+  @override
+  String get payoutPaid => 'Paid';
+
+  @override
+  String get payoutPending => 'Pending';
+
+  @override
+  String payoutReference(String reference) {
+    return 'Reference $reference';
+  }
+
+  @override
+  String payoutPaidOn(String date) {
+    return 'Paid on $date';
+  }
+
+  @override
+  String get cashTitle => 'Cash in hand';
+
+  @override
+  String get cashEmpty => 'No cash entries yet.';
+
+  @override
+  String get cashInHand => 'Cash in hand';
+
+  @override
+  String cashLimit(String amount) {
+    return 'Limit $amount';
+  }
+
+  @override
+  String get cashDepositTitle => 'Deposit cash';
+
+  @override
+  String cashDepositBody(String limit) {
+    return 'You\'ve reached the cash limit of $limit. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.';
+  }
+
+  @override
+  String cashCodCollected(String order) {
+    return 'Cash collected · Order $order';
+  }
+
+  @override
+  String get cashDeposit => 'Deposited at the store';
+
+  @override
+  String get cashAdjustment => 'Adjustment';
+
+  @override
+  String cashBalanceAfter(String amount) {
+    return 'Balance $amount';
+  }
+
+  @override
+  String get historyTitle => 'History';
+
+  @override
+  String get historyEmpty => 'No past orders yet.';
+
+  @override
+  String historyRoute(String store, String drop) {
+    return '$store → $drop';
+  }
+
+  @override
+  String get historyDelivered => 'Delivered';
+
+  @override
+  String get historyReturned => 'Returned';
+
+  @override
+  String get historyCancelled => 'Cancelled';
+
+  @override
+  String get historyFailed => 'Not delivered';
+
+  @override
+  String get historyOther => 'Ended';
+
+  @override
+  String get profileTitle => 'Profile';
+
+  @override
+  String get profileHomeStore => 'Home store';
+
+  @override
+  String get profileVehicle => 'Vehicle';
+
+  @override
+  String get profileKycStatus => 'KYC status';
+
+  @override
+  String get profileKycApproved => 'Verified';
+
+  @override
+  String get profileRating => 'Rating';
+
+  @override
+  String profileRatingValue(String rating) {
+    return '$rating ★';
+  }
+
+  @override
+  String get profileNoRating => 'No ratings yet';
 }

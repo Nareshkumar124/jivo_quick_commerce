@@ -38,6 +38,23 @@ abstract final class Routes {
   static bool isTaskRoute(String location) =>
       location == task || location.startsWith('$task/');
 
+  /// ACTIVE riders, between orders: earnings and payouts (screen 15), cash
+  /// (16), history (17), profile and documents (18).
+  static const earnings = '/earnings';
+  static const payouts = '/payouts';
+  static const cash = '/cash';
+  static const history = '/history';
+  static const profile = '/profile';
+  static const profileDocuments = '/profile/documents';
+
+  static bool isAccountRoute(String location) => [
+    earnings,
+    payouts,
+    cash,
+    history,
+    profile,
+  ].any((root) => location == root || location.startsWith('$root/'));
+
   // Dev flavor only (Phase 0 spike).
   /// Permissions gate (04 §2.1). Becomes the go-online guard in P5.
   static const permissions = '/permissions';

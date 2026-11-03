@@ -17,7 +17,11 @@ import 'onboarding_text.dart';
 /// and the masked number. Tapping one opens its capture screen (upload,
 /// replace or re-upload). Approved documents are locked.
 class DocumentsScreen extends ConsumerStatefulWidget {
-  const DocumentsScreen({super.key});
+  const DocumentsScreen({this.readOnly = false, super.key});
+
+  /// From the ACTIVE rider's profile (04 §2.9): statuses and masked numbers
+  /// only, no uploads (those go through the application steps).
+  final bool readOnly;
 
   @override
   ConsumerState<DocumentsScreen> createState() => _DocumentsScreenState();
@@ -27,7 +31,9 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPhoto());
+    if (!widget.readOnly) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPhoto());
+    }
   }
 
   /// Android may have stopped the app while the camera was open (low RAM):
@@ -84,6 +90,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
           : const Center(child: CircularProgressIndicator());
     } else {
       final firstTime =
+          !widget.readOnly &&
           profile.stage == OnboardingStage.needsDocuments &&
           profile.rejectedDocuments.isEmpty;
       body = ListView(
@@ -100,7 +107,11 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
           Text(l10n.documentsIntro, style: theme.textTheme.bodyLarge),
           const SizedBox(height: 16),
           for (final type in profile.requiredDocuments)
-            _DocumentTile(type: type, document: profile.documentOf(type)),
+            _DocumentTile(
+              type: type,
+              document: profile.documentOf(type),
+              readOnly: widget.readOnly,
+            ),
         ],
       );
       // The bottom bar, so the "uploaded" snack bar appears above Continue
@@ -121,13 +132,19 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.documentsTitle)),
       body: body,
-      bottomNavigationBar: bottom,
+      bottomNavigationBar: widget.readOnly ? null : bottom,
     );
   }
 }
 
 class _DocumentTile extends StatelessWidget {
-  const _DocumentTile({required this.type, required this.document});
+  const _DocumentTile({
+    required this.type,
+    required this.document,
+    this.readOnly = false,
+  });
+
+  final bool readOnly;
 
   final KycDocumentType type;
   final RiderDocument? document;
@@ -154,7 +171,7 @@ class _DocumentTile extends StatelessWidget {
       DocumentReviewStatus.approved => scheme.primary,
       DocumentReviewStatus.rejected => scheme.error,
     };
-    final canOpen = doc?.canReplace ?? true;
+    final canOpen = !readOnly && (doc?.canReplace ?? true);
     final action = doc == null
         ? l10n.docActionUpload
         : status == DocumentReviewStatus.rejected
@@ -220,7 +237,7 @@ class _DocumentTile extends StatelessWidget {
                       color: scheme.primary,
                     ),
                   )
-                else
+                else if (status == DocumentReviewStatus.approved)
                   Icon(Icons.verified, color: scheme.primary),
               ],
             ),
