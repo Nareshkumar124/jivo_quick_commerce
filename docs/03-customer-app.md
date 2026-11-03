@@ -63,7 +63,7 @@ Until a delivery location is chosen, Home shows a "Choose a delivery location" p
 ### 2.3 Location & serviceability [P2]
 | Feature | Details |
 |---------|---------|
-| Detect location | Asks for location permission and uses GPS. If denied, falls back to manual search or map pick. |
+| Detect location | Asks for location permission and uses GPS. If denied, falls back to manual search or map pick. When the build can show a map, the fix opens the map picker so the customer can fine-tune the pin; otherwise the fix is selected directly. |
 | Pick on map | Mappls (MapmyIndia) map, D-03. Draggable pin, reverse-geocoded address preview (Mappls reverse geocoding; it falls back to the pin's coordinates), "Confirm location". The address is kept with the location and sent as notify-me's `address_text`. Builds without the Mappls SDK config files, and maps that fail to authenticate, show a "Map isn't available" fallback (current location or manual address entry). |
 | Serviceability check | `GET /serviceability/?lat=&lng=` always returns 200: `serviceable`, `store` (`id`, `name`, `is_open`, `opens_at`; null when not serviceable), `eta_minutes` (null when not serviceable or closed) and `message`. `store.id` is sent as `X-Store-Id` on catalog and cart calls. A `404 STORE_NOT_FOUND` on those calls drops the saved store and re-checks serviceability. |
 | Not serviceable | Friendly screen: "We're not in your area yet". "Notify me" saves the interest. "Try another address". |
@@ -85,9 +85,11 @@ Until a delivery location is chosen, Home shows a "Choose a delivery location" p
 | Search bar | Opens Search |
 | Banner carousel | Admin-managed and auto-scrolling. Tap opens a category, collection, product or external URL. Can be store-specific with start/end dates. |
 | Category grid | Top-level categories with images |
-| Collections | Horizontal product rails, e.g., "Bestsellers", "Offers", "New launches". Admin-managed order. |
+| Collections | Horizontal product rails, e.g., "Bestsellers", "Offers", "New launches". Admin-managed order. When a rail has more (`has_more`), "See all" opens the collection page: `GET /collections/{slug}/` returns its name and up to 100 products in one page (no infinite scroll). |
 | Previously bought | Rail of variants from past delivered orders (when logged in and history exists) |
 | Pull to refresh | Reloads home and re-checks serviceability |
+
+**Phase 2 cart stand-in** (until the Phase 3 cart API, §2.8): the **dev** flavor keeps ADD/stepper quantities in memory, and its cart bar shows the item count only, because the app never computes money. **Staging and prod** show "Cart coming soon" in place of ADD and no cart bar. Catalog data is always the real API (`GET /home/`, `/categories/`, `/products/`, `/collections/{slug}/`, `/search/`, `/search/suggest/`, each with `X-Store-Id`). The fake catalog only serves tests and the dev flavor's `FAKE_API=true`.
 
 All product tiles show the image, name, variant (e.g., 1 L), selling price, struck-out MRP, a discount badge ("12% OFF", the server's `discount_percent` when above 0) and an **ADD** button that becomes a − qty + stepper. Out-of-stock tiles are greyed out with "Out of stock". A product with several variants shows "1 L · 3 options"; its ADD (and its stepper, which shows the total over its variants) opens a variant picker with a stepper per variant.
 
