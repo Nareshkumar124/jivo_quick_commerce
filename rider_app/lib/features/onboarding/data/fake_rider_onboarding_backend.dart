@@ -291,6 +291,28 @@ class FakeRiderOnboardingBackend implements RiderOnboardingRepository {
       ),
     );
     return switch (rider.status) {
+      RiderStatusEnum.ACTIVE => RiderProfile(
+        status: RiderStatusEnum.ACTIVE,
+        fullName: base.fullName,
+        dateOfBirth: base.dateOfBirth,
+        emergencyContactName: base.emergencyContactName,
+        emergencyContactPhone: base.emergencyContactPhone,
+        preferredStore: base.preferredStore,
+        homeStore: stores.first,
+        vehicleType: base.vehicleType,
+        vehicleNumber: base.vehicleNumber,
+        rating: '4.8',
+        bankAccount: base.bankAccount,
+        documents: [
+          for (final d in base.documents)
+            RiderDocument(
+              type: d.type,
+              status: DocumentReviewStatus.approved,
+              numberMasked: d.numberMasked,
+              uploadedAt: d.uploadedAt,
+            ),
+        ],
+      ),
       RiderStatusEnum.PENDING_KYC => base,
       RiderStatusEnum.SUSPENDED => base.copyWith(homeStore: stores.first),
       RiderStatusEnum.REJECTED =>
@@ -305,9 +327,7 @@ class FakeRiderOnboardingBackend implements RiderOnboardingRepository {
               ),
             )
             .copyWith(rejectionReason: rejectionReason),
-      RiderStatusEnum.ACTIVE ||
-      RiderStatusEnum.NONE ||
-      RiderStatusEnum.unknownDefaultOpenApi => null,
+      RiderStatusEnum.NONE || RiderStatusEnum.unknownDefaultOpenApi => null,
     };
   }
 

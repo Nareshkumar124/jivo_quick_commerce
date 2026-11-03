@@ -13,6 +13,10 @@ import '../features/launch/presentation/splash_screen.dart';
 import '../features/launch/presentation/update_screen.dart';
 import '../features/location/presentation/location_debug_screen.dart';
 import '../features/offers/presentation/offer_alert_preview_screen.dart';
+import '../features/cash/presentation/cash_screen.dart';
+import '../features/earnings/presentation/earnings_screen.dart';
+import '../features/earnings/presentation/payouts_screen.dart';
+import '../features/history/presentation/history_screen.dart';
 import '../features/offers/presentation/offer_controller.dart';
 import '../features/offers/presentation/offer_screen.dart';
 import '../features/onboarding/domain/image_picking.dart';
@@ -27,10 +31,12 @@ import '../features/onboarding/presentation/registration_screen.dart';
 import '../features/onboarding/presentation/rider_status_screen.dart';
 import '../features/permissions/presentation/location_disclosure_screen.dart';
 import '../features/permissions/presentation/permissions_gate_screen.dart';
+import '../features/profile/presentation/profile_screen.dart';
 import '../features/shift/presentation/home_screen.dart';
 import '../features/task/presentation/failed_delivery_screen.dart';
 import '../features/task/presentation/pickup_scan_screen.dart';
 import '../features/task/presentation/task_flow_controller.dart';
+import '../features/task/presentation/task_providers.dart';
 import '../features/task/presentation/task_screen.dart';
 import 'env.dart';
 import 'providers.dart';
@@ -49,6 +55,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   final session = ref.read(sessionManagerProvider);
   final signals = ref.read(appControlSignalsProvider);
   final onboarding = ref.read(riderOnboardingEnabledProvider);
+  final work = ref.read(riderWorkEnabledProvider);
 
   // Rider-side state that also affects routing.
   final local = ValueNotifier<int>(0);
@@ -165,6 +172,40 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'home',
         builder: (_, _) => const HomeScreen(),
       ),
+      if (work) ...[
+        GoRoute(
+          path: Routes.earnings,
+          name: 'earnings',
+          builder: (_, _) => const EarningsScreen(),
+        ),
+        GoRoute(
+          path: Routes.payouts,
+          name: 'payouts',
+          builder: (_, _) => const PayoutsScreen(),
+        ),
+        GoRoute(
+          path: Routes.cash,
+          name: 'cash',
+          builder: (_, _) => const CashScreen(),
+        ),
+        GoRoute(
+          path: Routes.history,
+          name: 'history',
+          builder: (_, _) => const HistoryScreen(),
+        ),
+        GoRoute(
+          path: Routes.profile,
+          name: 'profile',
+          builder: (_, _) => const ProfileScreen(),
+          routes: [
+            GoRoute(
+              path: 'documents',
+              name: 'profile_documents',
+              builder: (_, _) => const DocumentsScreen(readOnly: true),
+            ),
+          ],
+        ),
+      ],
       GoRoute(
         path: Routes.offer,
         name: 'offer',

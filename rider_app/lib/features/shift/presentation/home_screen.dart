@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/env.dart';
 import '../../../app/providers.dart';
+import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/dev_tools_button.dart';
 import '../../auth/presentation/logout_button.dart';
@@ -26,35 +28,33 @@ class HomeScreen extends ConsumerWidget {
         actions: const [LogoutButton()],
       ),
       body: SafeArea(
-        child: Padding(
+        child: ListView(
+          key: const Key('home-list'),
           padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
-              Icon(
-                Icons.delivery_dining,
-                size: 96,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                l10n.homeBuildLabel(env.flavor.name),
-                key: const Key('home-flavor'),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                l10n.homePlaceholderBody,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge,
-              ),
-              const Spacer(),
-              const _DevOfferButtons(),
-              const DevToolsButton(),
-            ],
-          ),
+          children: [
+            Icon(
+              Icons.delivery_dining,
+              size: 96,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              l10n.homeBuildLabel(env.flavor.name),
+              key: const Key('home-flavor'),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              l10n.homePlaceholderBody,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 24),
+            const _RecordsMenu(),
+            const _DevOfferButtons(),
+            const DevToolsButton(),
+          ],
         ),
       ),
     );
@@ -96,6 +96,50 @@ class _DevOfferButtons extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The rider's own records (screens 15–18). Only where the records fake
+/// runs (dev flavor) until the rider API lands.
+class _RecordsMenu extends ConsumerWidget {
+  const _RecordsMenu();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(riderWorkActiveProvider)) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    Widget item(String key, IconData icon, String label, String route) =>
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: OutlinedButton.icon(
+            key: Key(key),
+            style: OutlinedButton.styleFrom(alignment: Alignment.centerLeft),
+            onPressed: () => context.push(route),
+            icon: Icon(icon),
+            label: Text(label),
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        item(
+          'home-earnings',
+          Icons.account_balance_wallet,
+          l10n.earningsTitle,
+          Routes.earnings,
+        ),
+        item('home-cash', Icons.payments, l10n.cashTitle, Routes.cash),
+        item('home-history', Icons.history, l10n.historyTitle, Routes.history),
+        item(
+          'home-payouts',
+          Icons.receipt_long,
+          l10n.payoutsTitle,
+          Routes.payouts,
+        ),
+        item('home-profile', Icons.person, l10n.profileTitle, Routes.profile),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }
