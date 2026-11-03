@@ -306,6 +306,84 @@ class OrdersApi {
     );
   }
 
+  /// One of my orders
+  /// The order with its bill, items and state (added to Phase 3, PM decision): poll it after checkout while the payment is being confirmed (e.g. verify&#39;s response was lost), and for the success screen. Another user&#39;s order id is a 404. Phase 4 adds the status timeline and invoice to the same shape.
+  ///
+  /// Parameters:
+  /// * [id] - `Order.id`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Order] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Order>> ordersRetrieve({
+    required int id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/orders/{id}/'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Order? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<Order, Order>(rawData, 'Order', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Order>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Retry the online payment
   /// For an ONLINE order in PAYMENT_PENDING before &#x60;payment_expires_at&#x60; (the &#39;Payment failed&#39; screen&#39;s Retry, 03 §2.9): creates a new Razorpay order for the same amount and returns new checkout options. The payment window is **not** extended. To pay another way, cancel the order (&#x60;POST /orders/{id}/cancel/&#x60;) and place a new one: the cart is still there.
   ///
