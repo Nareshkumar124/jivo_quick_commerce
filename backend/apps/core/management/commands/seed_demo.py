@@ -23,6 +23,8 @@ SEED_STEPS: list[str] = [
     "apps.stores.seed.seed_stores",
     "apps.catalog.seed.seed_catalog",
     "apps.inventory.seed.seed_stock",
+    # Phase 3: D-09 pricing on the demo store (stores step above), demo coupons
+    "apps.promotions.seed.seed_coupons",
 ]
 
 

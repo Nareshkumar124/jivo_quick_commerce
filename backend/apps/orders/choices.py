@@ -65,3 +65,13 @@ class CancelReason(models.TextChoices):
     CHANGED_MIND = "CHANGED_MIND", "I changed my mind"
     DELIVERY_TOO_SLOW = "DELIVERY_TOO_SLOW", "Delivery is taking too long"
     OTHER = "OTHER", "Other"
+
+
+class ActorType(models.TextChoices):
+    """Who made a state change (07 §2.6 `OrderStatusHistory.actor_type`, `cancelled_by_type`)."""
+
+    CUSTOMER = "customer", "Customer"
+    STORE = "store", "Store staff"
+    RIDER = "rider", "Rider"
+    OPS = "ops", "Ops / support"
+    SYSTEM = "system", "System"

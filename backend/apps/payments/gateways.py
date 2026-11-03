@@ -79,7 +79,12 @@ def razorpay_webhook_signature(secret: str, body: bytes) -> str:
 
 
 def _matches(expected: str, given: str | None) -> bool:
-    return bool(given) and hmac.compare_digest(expected, given.strip().lower())
+    """Constant-time comparison of hex signatures. Anything that is not ASCII is refused first:
+    `hmac.compare_digest` raises `TypeError` on non-ASCII `str`, which would turn a forged
+    header into a 500 instead of a 400 (code review of R1)."""
+    if not given or not given.isascii():
+        return False
+    return hmac.compare_digest(expected.encode("ascii"), given.strip().lower().encode("ascii"))
 
 
 class PaymentGateway(ABC):

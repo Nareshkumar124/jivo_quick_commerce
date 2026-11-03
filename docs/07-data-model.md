@@ -5,7 +5,7 @@ Money fields: `DecimalField(max_digits=12, decimal_places=2)`. Geo fields: SRID 
 
 ## 1. Entity-relationship overview
 
-Updated in Phase 2 (T-204): Phase 1 entities (`OTP_REQUEST`, `APP_CONFIG`, `APP_VERSION_POLICY`) and the Phase 2 additions (`SERVICEABILITY_REQUEST`, `TRENDING_SEARCH`, variant images, collection/banner store scoping). `OTPRequest` has no foreign key: it is linked to a user by phone. Built so far: accounts, cms, stores, catalog, inventory (without `STOCK_RESERVATION`, which arrives with orders in Phase 3).
+Updated in Phase 2 (T-204): Phase 1 entities (`OTP_REQUEST`, `APP_CONFIG`, `APP_VERSION_POLICY`) and the Phase 2 additions (`SERVICEABILITY_REQUEST`, `TRENDING_SEARCH`, variant images, collection/banner store scoping). `OTPRequest` has no foreign key: it is linked to a user by phone. Built so far: accounts, cms, stores, catalog, inventory; Phase 3 R2a adds cart, promotions, orders, payments and `STOCK_RESERVATION` (models and migrations; the order and payment flows land in R2b).
 
 ```mermaid
 erDiagram
@@ -78,6 +78,7 @@ erDiagram
 | deletion_reason | char(500) | Optional feedback given on deletion. Cleared on restore and on anonymisation. |
 | anonymised_at | datetime, nullable | Set when `anonymise_deleted_accounts` erased the personal data (makes the job idempotent). |
 | terms_version, terms_accepted_at | char(32), datetime | DPDP consent: the Terms & Privacy version accepted at OTP login and when; updated whenever the version changes. |
+| cod_blocked | bool, default false | Added in Phase 3 (PM default): cash on delivery is not offered (08 T2; the cart shows COD `NOT_ALLOWED`). Set by ops for now; repeated refused deliveries set it from Phase 5. |
 
 **OTPRequest**: `phone`, `app` (customer/rider), `purpose` (login/delete_account; added in Phase 1 for the OTP-confirmed account deletion), `code_hash` (never plain: HMAC-SHA256 keyed with the secret key), `expires_at` (5 min), `attempts`, `verified_at`, `sms_sent_at` (keeps `send_otp_sms` idempotent), `ip`, `user_agent`.
 
@@ -95,7 +96,7 @@ erDiagram
 
 **StoreTiming**: `store`, `weekday` (0 = Monday … 6), `opens_at`, `closes_at` (IST wall-clock, `closes_at > opens_at`). Several rows per day are allowed (split shifts). A window past midnight is two rows (`…–23:59`, which runs to midnight, and `00:00–…`). A store with no rows is never open.
 
-**PricingConfig** (1:1 store): `min_order_value`, `delivery_fee`, `free_delivery_threshold`, `small_cart_fee`, `small_cart_threshold`, `handling_fee`, `cod_enabled`, `cod_max_order_value`.
+**PricingConfig** (1:1 store): `min_order_value`, `delivery_fee`, `free_delivery_threshold`, `small_cart_fee`, `small_cart_threshold`, `handling_fee`, `cod_enabled`, `cod_max_order_value`. Defaults are the D-09 values since Phase 3 (99 / 25 / 299 / 15 / 149 / 0 / COD on / 2000; PM default ⚠); migration `stores.0004` gives them to rows still at the old all-zero defaults and leaves edited rows alone. A store without a row is billed with the defaults.
 
 **ServiceabilityRequest**: `location` (Point), `user` (nullable), `phone` (nullable), `address_text`.
 
@@ -127,19 +128,20 @@ Images (`Category.image`, `ProductImage.image`, `Banner.image`) are public media
 **StoreInventory**: unique (`store`, `variant`). Fields: `on_hand` (int ≥ 0), `reserved` (int ≥ 0), `low_stock_threshold`, `is_available` (manual kill switch), `price_override` (nullable), `rack_location` (nullable).
 `available = on_hand − reserved`. DB check constraints enforce `on_hand ≥ 0`, `reserved ≥ 0` and `reserved ≤ on_hand`. `on_hand`/`reserved` can be written only inside `apps.inventory.models.stock_write()`, which only the inventory (and, from Phase 3, reservation) services open: `save()` and `QuerySet.update()` refuse them elsewhere (P2 R3). Quantities per adjustment, CSV line or count are at most 1,000,000. `price_override` applies only when it is above 0 and at most the variant's MRP: an MRP edit below an existing override is refused, and an override left above the MRP is ignored (the variant's `selling_price` is used) in both `effective_price()` and the catalog's SQL.
 
-**StockReservation**: `order`, `store`, `variant`, `quantity`, `status` (ACTIVE/COMMITTED/RELEASED), `expires_at` (for online-payment orders).
+**StockReservation** (built in Phase 3 R2a): `order`, `store`, `variant`, `quantity` (≥ 1), `status` (ACTIVE/COMMITTED/RELEASED), `expires_at` (online orders: the payment window end; null for COD). Unique (`order`, `variant`); indexes (`status`, `expires_at`) and (`store`, `variant`, `status`). ACTIVE reservations of a (store, variant) sum to `StoreInventory.reserved`.
 
-**StockMovement** (append-only ledger; the model and its querysets refuse updates and deletes): `store`, `variant`, `delta` (+/−, never 0), `type` (INWARD, SALE, RETURN, DAMAGE, AUDIT_ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT), `order` (nullable; the column is added with orders in Phase 3), `reason`, `created_by`, `on_hand_after`. `StoreInventory` rows are created at zero and opening stock is an INWARD movement, so a row's movements always sum to its `on_hand` (`apps.inventory.services`). Custom permissions: `inventory.adjust_stock`, `inventory.toggle_availability`.
+**StockMovement** (append-only ledger; the model and its querysets refuse updates and deletes): `store`, `variant`, `delta` (+/−, never 0), `type` (INWARD, SALE, RETURN, DAMAGE, AUDIT_ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT), `order` (nullable FK, added in Phase 3: the order behind a SALE or RETURN), `reason`, `created_by`, `on_hand_after`. `StoreInventory` rows are created at zero and opening stock is an INWARD movement, so a row's movements always sum to its `on_hand` (`apps.inventory.services`). Custom permissions: `inventory.adjust_stock`, `inventory.toggle_availability`.
 
 > Concurrency rule: reservations use `SELECT … FOR UPDATE` on `StoreInventory` rows (locked in a consistent order by variant id to avoid deadlocks) inside one transaction. Two customers can never reserve the same last unit.
 
 ### 2.5 Cart & promotions (`cart`, `promotions`)
 
-**Cart**: `user`, `store`, `coupon` (nullable), `address` (nullable), `tip`, `instructions` (JSON chips + text). One active cart per user.
+**Cart**: `user` (1:1: one cart per user), `store` (the store of the last cart call, `X-Store-Id`), `coupon` (nullable, SET_NULL), `address` (nullable, SET_NULL; a soft-deleted address counts as none), `tip` (≥ 0), `instructions` (JSON `{chips, note}`). Holds no money: the bill is computed on read.
 **CartItem**: `cart`, `variant`, `quantity`. Unique (`cart`, `variant`).
 
 **Coupon**: `code` (unique, case-insensitive), `title`, `description`, `discount_type` (FLAT/PERCENT), `value`, `max_discount`, `min_order_value`, `starts_at`, `ends_at`, `usage_limit_total`, `usage_limit_per_user`, `first_order_only`, `stores` (M2M), `categories` (M2M, applies to item subtotal in those categories), `is_active`, `is_visible` (listed in the app or hidden code).
-**CouponRedemption**: `coupon`, `user`, `order` (unique), `discount_amount`, `status` (APPLIED/REVERSED).
+Coupon (built in Phase 3 R2a): `code` stored in capitals, unique on `upper(code)`; `usage_limit_per_user` defaults to 1 (empty = unlimited); `starts_at`/`ends_at` nullable (no bound); check constraints: value > 0, PERCENT ≤ 100, `max_discount` > 0 when set, `ends_at` > `starts_at`. History kept (simple-history).
+**CouponRedemption**: `coupon`, `user`, `order` (unique), `discount_amount`, `status` (HELD/APPLIED/RELEASED/REVERSED; Phase 3 adds HELD = the order awaits online payment and RELEASED = that hold ended without a sale). HELD and APPLIED count against the usage limits; using a coupon locks its row and re-checks them.
 
 ### 2.6 Orders (`orders`)
 
@@ -166,9 +168,11 @@ Images (`Category.image`, `ProductImage.image`, `Banner.image`) are public media
 | `idempotency_key` | Unique per user |
 | `client_app_version`, `client_platform` | |
 
-**OrderItem**: `order`, `variant`, snapshots (`product_name`, `variant_name`, `sku`, `hsn_code`, `gst_rate`, `image_url`), `mrp`, `selling_price`, `quantity`, `quantity_unavailable` (set by the store), `line_total`, `tax_amount` (derived from inclusive price).
+Phase 3 R2a additions to Order: `payment_expires_at` (PAYMENT_PENDING only: the payment window end, from `AppConfig.payment_window_minutes`), `payment_failed_at` / `delivery_failed_at` / `returned_at` (one timestamp per reachable state), `cancel_note` (with `cancel_reason`, now the API's reason code), `request_fingerprint` (hash of the placement request: a reused `idempotency_key` with another body is refused), and `delivery_location` (Point) next to `address_snapshot`. Unique (`store`, `pickup_code`) among active orders with a code. Database check constraints keep the bill consistent: money ≥ 0, `grand_total = item_total − coupon_discount + delivery_fee + small_cart_fee + handling_fee + tip`, `product_discount = mrp_total − item_total`, `coupon_discount ≤ item_total`, `amount_refunded ≤ grand_total`. Index (`status`, `payment_expires_at`) for `expire_unpaid_orders`.
 
-**OrderStatusHistory**: `order`, `from_status`, `to_status`, `actor` (user nullable), `actor_type` (customer/store/rider/ops/system), `note`, `created_at`. Append-only.
+**OrderItem**: `order`, `variant`, `product` (FK, Phase 3), snapshots (`product_name`, `variant_name`, `sku`, `hsn_code`, `gst_rate`, `image` = the ImageSet JSON), `mrp`, `selling_price`, `quantity`, `quantity_unavailable` (set by the store), `line_total`, `tax_amount` (derived from inclusive price). Unique (`order`, `variant`).
+
+**OrderStatusHistory**: `order`, `from_status`, `to_status`, `actor` (user nullable), `actor_type` (customer/store/rider/ops/system), `note`, `created_at`. Append-only (the model and its queryset refuse updates and deletes, like `StockMovement`).
 
 **Invoice**: `order` (1:1), `invoice_number` (per store GSTIN, per financial year sequence, e.g., `DEL01/26-27/000123`), `issued_at`, `pdf`, `taxable_value`, `cgst`, `sgst`, `igst`, `total`. Credit notes for refunds after invoicing: `CreditNote` with the same structure (Phase 4).
 
@@ -176,11 +180,11 @@ Images (`Category.image`, `ProductImage.image`, `Banner.image`) are public media
 
 ### 2.7 Payments (`payments`)
 
-**Payment**: `order`, `gateway` (RAZORPAY / COD / RAZORPAY_QR), `gateway_order_id`, `gateway_payment_id`, `amount`, `currency`, `status` (CREATED/AUTHORIZED/CAPTURED/FAILED), `method` (upi/card/netbanking/wallet/cash), `error_code`, `error_description`, `raw` (JSON). Several attempts per order are allowed (retries).
+**Payment**: `order`, `gateway` (RAZORPAY / COD / RAZORPAY_QR), `gateway_order_id`, `gateway_payment_id`, `amount`, `currency`, `status` (CREATED/AUTHORIZED/CAPTURED/FAILED), `method` (upi/card/netbanking/wallet/cash), `error_code`, `error_description`, `raw` (JSON). Several attempts per order are allowed (retries). Phase 3 adds `captured_at` and `idempotency_key` (the retry-payment key, unique per order when set); amount > 0.
 
-**Refund**: `payment`, `order`, `amount`, `reason`, `gateway_refund_id`, `status` (PENDING/PROCESSED/FAILED), `initiated_by`, `processed_at`.
+**Refund**: `payment`, `order`, `amount`, `reason`, `gateway_refund_id`, `status` (PENDING/PROCESSED/FAILED), `initiated_by` (null = automatic), `processed_at`, `idempotency_key` (unique; Phase 3, so the refund task is safe to retry, e.g. `t3a:<payment id>`). Built in Phase 3 R2a for the T3a automatic refund.
 
-**PaymentWebhookEvent**: `event_id` (unique), `event_type`, `payload`, `signature_valid`, `processed_at`, `error`.
+**PaymentWebhookEvent**: `event_id` (unique, from `X-Razorpay-Event-Id`), `event_type`, `payload`, `signature_valid`, `processed_at`, `error`, `created_at`. Only events with a valid signature are stored, so nobody can claim an `event_id` before the gateway's real event arrives.
 
 ### 2.8 Delivery (`delivery`)
 
@@ -214,7 +218,7 @@ Images (`Category.image`, `ProductImage.image`, `Banner.image`) are public media
 **Page**: `slug`, `title`, `body_html`, `is_published`.
 **AppConfig** (singleton / key-value): app versions per app+platform, maintenance flag + message, support contacts, global settings (payment window, cancel window, offer timeout, max offer attempts, geofence radii, OTP length/expiry, location intervals).
 
-Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, support phone/email, terms/privacy/refund URLs, `terms_version`, rider location intervals, `feature_flags` JSON); `cms.AppVersionPolicy` holds one row per (app, platform): `min_supported_version`, `latest_version`, `store_url`. Later phases add their global settings as fields on `AppConfig`. OTP length (6) and expiry (5 min) stay fixed in code because the API contract validates them.
+Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, support phone/email, terms/privacy/refund URLs, `terms_version`, rider location intervals, `feature_flags` JSON); `cms.AppVersionPolicy` holds one row per (app, platform): `min_supported_version`, `latest_version`, `store_url`. Later phases add their global settings as fields on `AppConfig`: Phase 3 adds `payment_window_minutes` (default 15, 5–60; applies to orders placed after a change). OTP length (6) and expiry (5 min) stay fixed in code because the API contract validates them.
 
 ### 2.10 Audit
 

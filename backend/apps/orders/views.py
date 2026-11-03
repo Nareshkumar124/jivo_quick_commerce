@@ -34,6 +34,7 @@ from apps.core.schema import (
     validation_error,
 )
 from apps.core.stubs import not_available_yet
+from apps.core.throttling import RATE_LIMITED, OrderPlacementThrottle, PaymentThrottle
 from apps.orders import examples as ex
 from apps.orders.serializers import (
     OrderCancelSerializer,
@@ -86,6 +87,10 @@ COUPON_ERRORS = (
 
 
 class OrderListCreateView(APIView):
+    def get_throttles(self):
+        # Placing orders is rate limited per user; reading the list is not.
+        return [OrderPlacementThrottle()] if self.request.method == "POST" else []
+
     @extend_schema(
         operation_id="orders_list",
         tags=TAGS,
@@ -168,10 +173,20 @@ class OrderListCreateView(APIView):
                     "`PRICE_CHANGED`: the bill is not the one the customer saw; reload the cart "
                     "and show it. `STOCK_UNAVAILABLE`: some lines cannot be supplied "
                     "(`details.items` with the `orderable_quantity` now); reload the cart, "
-                    "whose lines show the fix.",
+                    "whose lines show the fix. `INVALID_STATE_TRANSITION` with "
+                    "`details.pending_order_id`: another of the customer's orders is still "
+                    "awaiting payment; offer to complete it (retry-payment) or cancel it first "
+                    "(PM decision, Phase 3: one unpaid order at a time, so stock is never held "
+                    "twice).",
                     error_example(ErrorCode.PRICE_CHANGED, details=ex.PRICE_CHANGED_DETAILS),
                     error_example(
                         ErrorCode.STOCK_UNAVAILABLE, details=ex.STOCK_UNAVAILABLE_DETAILS
+                    ),
+                    error_example(
+                        ErrorCode.INVALID_STATE_TRANSITION,
+                        "You have an order awaiting payment. Complete or cancel it first.",
+                        {"pending_order_id": 5012},
+                        name="PAYMENT_PENDING_ORDER_EXISTS",
                     ),
                 ),
                 422: error_response(
@@ -199,6 +214,7 @@ class OrderListCreateView(APIView):
                     ),
                     *COUPON_ERRORS,
                 ),
+                429: RATE_LIMITED,
                 503: PAYMENT_UNAVAILABLE,
             },
             bad_request=(
@@ -221,7 +237,40 @@ class OrderListCreateView(APIView):
         not_available_yet()
 
 
+class OrderDetailView(APIView):
+    @extend_schema(
+        operation_id="orders_retrieve",
+        tags=TAGS,
+        summary="One of my orders",
+        description=(
+            "The order with its bill, items and state (added to Phase 3, PM decision): poll it "
+            "after checkout while the payment is being confirmed (e.g. verify's response was "
+            "lost), and for the success screen. Another user's order id is a 404. Phase 4 adds "
+            "the status timeline and invoice to the same shape."
+        ),
+        parameters=[ORDER_ID],
+        responses=app_responses(
+            {
+                200: ok_response(
+                    OrderSerializer,
+                    "The order.",
+                    ("Awaiting payment", ex.ORDER_ONLINE_PENDING),
+                    ("Paid online", ex.ORDER_ONLINE_PLACED),
+                    ("Cash on delivery", ex.ORDER_COD_PLACED),
+                    ("Cancelled before paying", ex.ORDER_PAYMENT_CANCELLED),
+                ),
+                401: UNAUTHORIZED,
+                404: ORDER_NOT_FOUND,
+            }
+        ),
+    )
+    def get(self, request: Request, id: int) -> Response:
+        not_available_yet()
+
+
 class OrderRetryPaymentView(APIView):
+    throttle_classes = [PaymentThrottle]
+
     @extend_schema(
         operation_id="orders_retry_payment",
         tags=TAGS,
@@ -265,6 +314,7 @@ class OrderRetryPaymentView(APIView):
                         name="ALREADY_PAID",
                     ),
                 ),
+                429: RATE_LIMITED,
                 503: PAYMENT_UNAVAILABLE,
             }
         ),

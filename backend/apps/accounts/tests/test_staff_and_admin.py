@@ -38,7 +38,20 @@ class TestRoles:
         assert admin_perms.filter(codename="change_appconfig").exists()
         assert admin_perms.filter(codename="adjust_stock").exists()  # custom permission (P2)
         finance = {p.codename for p in Group.objects.get(name=roles.FINANCE).permissions.all()}
-        assert finance == {"view_storeinventory", "view_stockmovement", "view_pricingconfig"}
+        assert finance == {
+            "view_storeinventory",
+            "view_stockmovement",
+            "view_pricingconfig",
+            # Phase 3: coupons, orders and payments, view only
+            "view_coupon",
+            "view_couponredemption",
+            "view_order",
+            "view_orderitem",
+            "view_orderstatushistory",
+            "view_payment",
+            "view_refund",
+            "view_paymentwebhookevent",
+        }
 
     @pytest.mark.parametrize(
         ("role", "allowed", "denied"),
@@ -55,6 +68,28 @@ class TestRoles:
         codes = {p.codename for p in Group.objects.get(name=role).permissions.all()}
         assert allowed <= codes
         assert not denied & codes
+
+    @pytest.mark.parametrize(
+        ("role", "allowed", "denied"),
+        [
+            (roles.CATALOG_MANAGER, {"add_coupon", "change_coupon"}, {"view_payment"}),
+            (roles.SUPPORT, {"view_coupon", "view_order", "view_refund"}, {"change_coupon"}),
+            (roles.OPS, {"view_order"}, {"change_order", "view_coupon", "view_payment"}),
+            (roles.STORE_MANAGER, {"view_order"}, {"change_order", "view_payment"}),
+            (roles.STORE_STAFF, {"view_order"}, {"view_coupon", "view_payment"}),
+            (roles.FINANCE, {"view_payment", "view_refund"}, {"change_coupon", "change_order"}),
+        ],
+    )
+    def test_phase_3_matrix(self, role, allowed, denied):
+        """05 §3 Coupons, Refund, order board and packing console rows (PM default)."""
+        roles.sync_roles()
+        codes = {p.codename for p in Group.objects.get(name=role).permissions.all()}
+        assert allowed <= codes
+        assert not denied & codes
+        admin = Group.objects.get(name=roles.SUPER_ADMIN).permissions
+        assert (
+            admin.filter(codename__in=["change_coupon", "view_cart", "view_payment"]).count() == 3
+        )
 
     def test_sync_is_idempotent(self):
         roles.sync_roles()
