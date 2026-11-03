@@ -19,7 +19,8 @@ from qa_support import (
     validate_response,
 )
 
-_BUG2 = pytest.mark.xfail(strict=True, reason="BUG-0002: validators accept non-ASCII digits")
+# BUG-0002 (non-ASCII digits) verified fixed in QA run 2 (0b801d1): plain regression cases now.
+_BUG2 = ()
 
 OTP_SENT = {"otp_length": 6, "expires_in_seconds": 300, "resend_after_seconds": 30}
 

@@ -16,6 +16,7 @@ from dotenv import dotenv_values
 
 from conftest import login
 from qa_support import (
+    backend_env_file,
     APP_HEADERS,
     BASE_URL,
     QA_PHONES,
@@ -45,7 +46,7 @@ def _post_login(c: httpx.Client, username: str, password: str) -> httpx.Response
 
 
 def _staff_password() -> str:
-    pw = dotenv_values(REPO / "backend/.env").get("SEED_DEMO_STAFF_PASSWORD")
+    pw = dotenv_values(backend_env_file(".env")).get("SEED_DEMO_STAFF_PASSWORD")
     if not pw:
         pytest.skip("SEED_DEMO_STAFF_PASSWORD not set")
     return pw
