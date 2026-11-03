@@ -504,6 +504,10 @@ ETA_RIDER_WAIT_MINUTES = env_int("ETA_RIDER_WAIT_MINUTES", default=3)
 # Notify-me leads per user (or IP when anonymous). Fails open when Redis is down.
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
     "notify_me": env_str("NOTIFY_ME_RATE", default="10/hour"),
+    # Phase 3 (code review of R1): per user, fail open (apps.core.throttling). Generous: a
+    # customer places a few orders a day; these only stop scripted abuse.
+    "orders_create": env_str("ORDERS_CREATE_RATE", default="30/hour"),
+    "payments": env_str("PAYMENTS_RATE", default="60/hour"),
 }
 
 # --------------------------------------------------------------------------- cart & payments (P3)

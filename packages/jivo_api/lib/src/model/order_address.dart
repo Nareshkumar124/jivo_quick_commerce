@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/model/address_label_enum.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -46,22 +47,31 @@ class OrderAddress {
     required this.lng,
   });
 
-  /// home / work / other.
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
-  final String label;
+  @JsonKey(
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: AddressLabelEnum.unknownDefaultOpenApi,
+  )
+  final AddressLabelEnum label;
 
+  /// Shown instead of the label when set, e.g. \"Mom's place\".
   @JsonKey(name: r'custom_label', required: true, includeIfNull: false)
   final String customLabel;
 
+  /// Who receives the order, as it was at order time.
   @JsonKey(name: r'receiver_name', required: true, includeIfNull: false)
   final String receiverName;
 
+  /// The receiver's phone at order time (E.164).
   @JsonKey(name: r'receiver_phone', required: true, includeIfNull: false)
   final String receiverPhone;
 
+  /// House / flat / floor.
   @JsonKey(name: r'house', required: true, includeIfNull: false)
   final String house;
 
+  /// Building and street.
   @JsonKey(name: r'building_street', required: true, includeIfNull: false)
   final String buildingStreet;
 
@@ -80,9 +90,15 @@ class OrderAddress {
   @JsonKey(name: r'pincode', required: true, includeIfNull: false)
   final String pincode;
 
+  /// Map pin latitude (WGS84). Required. Stored to 6 decimal places.
+  // minimum: -90
+  // maximum: 90
   @JsonKey(name: r'lat', required: true, includeIfNull: false)
   final double lat;
 
+  /// Map pin longitude (WGS84). Required. Stored to 6 decimal places.
+  // minimum: -180
+  // maximum: 180
   @JsonKey(name: r'lng', required: true, includeIfNull: false)
   final double lng;
 

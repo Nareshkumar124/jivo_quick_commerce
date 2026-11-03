@@ -29,8 +29,8 @@ KEY_REQUIRED = "This header is required."
 KEY_INVALID = "Use 8-64 letters, digits, hyphens or underscores (a UUID is recommended)."
 KEY_REUSED = "This key was already used for a different request. Use a new key."
 
-KEY_PATTERN = r"^[A-Za-z0-9_-]{8,64}$"
-_KEY_RE = re.compile(KEY_PATTERN)
+KEY_PATTERN = r"^[A-Za-z0-9_-]{8,64}$"  # published; checked with fullmatch (no "$" newline gap)
+_KEY_RE = re.compile(r"[A-Za-z0-9_-]{8,64}")
 
 
 def idempotency_key_from_header(request: Request) -> str:
@@ -38,7 +38,7 @@ def idempotency_key_from_header(request: Request) -> str:
     raw = (request.headers.get(IDEMPOTENCY_HEADER) or "").strip()
     if not raw:
         raise ValidationError({IDEMPOTENCY_HEADER: [KEY_REQUIRED]})
-    if not _KEY_RE.match(raw):
+    if not _KEY_RE.fullmatch(raw):
         raise ValidationError({IDEMPOTENCY_HEADER: [KEY_INVALID]})
     return raw
 

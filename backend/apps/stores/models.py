@@ -114,14 +114,28 @@ class StoreTiming(TimeStampedModel):
         return f"{self.get_weekday_display()} {self.opens_at:%H:%M}-{self.closes_at:%H:%M}"
 
 
-def _money(**kwargs) -> models.DecimalField:
+def _money(default: str = "0.00", **kwargs) -> models.DecimalField:
     return models.DecimalField(
         max_digits=12,
         decimal_places=2,
-        default=Decimal("0.00"),
+        default=Decimal(default),
         validators=[MinValueValidator(Decimal("0.00"))],
         **kwargs,
     )
+
+
+# D-09 business rule defaults (01 §5), placeholders until Jivo confirms them (PM default, Phase
+# 3). A new store starts with these; each store's values are edited in the admin.
+D09_PRICING = {
+    "min_order_value": Decimal("99.00"),
+    "delivery_fee": Decimal("25.00"),
+    "free_delivery_threshold": Decimal("299.00"),
+    "small_cart_fee": Decimal("15.00"),
+    "small_cart_threshold": Decimal("149.00"),
+    "handling_fee": Decimal("0.00"),
+    "cod_enabled": True,
+    "cod_max_order_value": Decimal("2000.00"),
+}
 
 
 PRICING_MONEY_FIELDS = (
@@ -136,18 +150,25 @@ PRICING_MONEY_FIELDS = (
 
 
 class PricingConfig(TimeStampedModel):
-    """Per-store bill rules (08 §6.2). Used by `cart.services.compute_bill()` from Phase 3.
-    Values come from D-09; the defaults are zero so nothing is charged until they are set."""
+    """Per-store bill rules (08 §6.2), read by `cart.services.compute_bill()`. Defaults are the
+    D-09 values (Phase 3, PM default); a store without a row is billed with them too.
+    All thresholds compare against the item total before the coupon."""
 
     store = models.OneToOneField(DarkStore, on_delete=models.CASCADE, related_name="pricing")
-    min_order_value = _money()
-    delivery_fee = _money()
-    free_delivery_threshold = _money()
-    small_cart_fee = _money()
-    small_cart_threshold = _money()
-    handling_fee = _money()
-    cod_enabled = models.BooleanField(default=False)
-    cod_max_order_value = _money()
+    min_order_value = _money("99.00", help_text="Minimum item total to place an order.")
+    delivery_fee = _money("25.00")
+    free_delivery_threshold = _money(
+        "299.00", help_text="Delivery is free when the item total is at least this."
+    )
+    small_cart_fee = _money("15.00")
+    small_cart_threshold = _money(
+        "149.00", help_text="The small-cart fee applies when the item total is below this."
+    )
+    handling_fee = _money("0.00")
+    cod_enabled = models.BooleanField(default=True)
+    cod_max_order_value = _money(
+        "2000.00", help_text="Cash on delivery only up to this amount to pay."
+    )
     history = HistoricalRecords()
 
     class Meta:

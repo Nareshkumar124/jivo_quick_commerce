@@ -28,6 +28,7 @@ from apps.core.schema import (
     validation_error,
 )
 from apps.core.stubs import not_available_yet
+from apps.core.throttling import RATE_LIMITED, PaymentThrottle
 from apps.orders import examples as order_ex
 from apps.orders.serializers import OrderSerializer
 from apps.payments import examples as ex
@@ -46,6 +47,8 @@ INVALID_WEBHOOK_SIGNATURE = "The webhook signature is invalid."
 
 
 class RazorpayVerifyView(APIView):
+    throttle_classes = [PaymentThrottle]
+
     @extend_schema(
         operation_id="payments_razorpay_verify",
         tags=TAGS,
@@ -97,6 +100,7 @@ class RazorpayVerifyView(APIView):
                         {"status": "PAYMENT_FAILED"},
                     ),
                 ),
+                429: RATE_LIMITED,
             }
         ),
     )

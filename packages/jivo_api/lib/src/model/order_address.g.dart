@@ -7,7 +7,7 @@ part of 'order_address.dart';
 // **************************************************************************
 
 abstract class _$OrderAddressCWProxy {
-  OrderAddress label(String label);
+  OrderAddress label(AddressLabelEnum label);
 
   OrderAddress customLabel(String customLabel);
 
@@ -40,7 +40,7 @@ abstract class _$OrderAddressCWProxy {
   /// OrderAddress(...).copyWith(id: 12, name: "My name")
   /// ````
   OrderAddress call({
-    String label,
+    AddressLabelEnum label,
     String customLabel,
     String receiverName,
     String receiverPhone,
@@ -63,7 +63,7 @@ class _$OrderAddressCWProxyImpl implements _$OrderAddressCWProxy {
   final OrderAddress _value;
 
   @override
-  OrderAddress label(String label) => this(label: label);
+  OrderAddress label(AddressLabelEnum label) => this(label: label);
 
   @override
   OrderAddress customLabel(String customLabel) =>
@@ -131,7 +131,7 @@ class _$OrderAddressCWProxyImpl implements _$OrderAddressCWProxy {
       label: label == const $CopyWithPlaceholder()
           ? _value.label
           // ignore: cast_nullable_to_non_nullable
-          : label as String,
+          : label as AddressLabelEnum,
       customLabel: customLabel == const $CopyWithPlaceholder()
           ? _value.customLabel
           // ignore: cast_nullable_to_non_nullable
@@ -218,7 +218,14 @@ OrderAddress _$OrderAddressFromJson(Map<String, dynamic> json) =>
           ],
         );
         final val = OrderAddress(
-          label: $checkedConvert('label', (v) => v as String),
+          label: $checkedConvert(
+            'label',
+            (v) => $enumDecode(
+              _$AddressLabelEnumEnumMap,
+              v,
+              unknownValue: AddressLabelEnum.unknownDefaultOpenApi,
+            ),
+          ),
           customLabel: $checkedConvert('custom_label', (v) => v as String),
           receiverName: $checkedConvert('receiver_name', (v) => v as String),
           receiverPhone: $checkedConvert('receiver_phone', (v) => v as String),
@@ -247,7 +254,7 @@ OrderAddress _$OrderAddressFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$OrderAddressToJson(OrderAddress instance) =>
     <String, dynamic>{
-      'label': instance.label,
+      'label': _$AddressLabelEnumEnumMap[instance.label]!,
       'custom_label': instance.customLabel,
       'receiver_name': instance.receiverName,
       'receiver_phone': instance.receiverPhone,
@@ -261,3 +268,10 @@ Map<String, dynamic> _$OrderAddressToJson(OrderAddress instance) =>
       'lat': instance.lat,
       'lng': instance.lng,
     };
+
+const _$AddressLabelEnumEnumMap = {
+  AddressLabelEnum.home: 'home',
+  AddressLabelEnum.work: 'work',
+  AddressLabelEnum.other: 'other',
+  AddressLabelEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
