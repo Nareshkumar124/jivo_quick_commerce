@@ -166,7 +166,7 @@ class AddressesApi {
   /// The caller&#39;s addresses (deleted ones excluded), default first, then newest.
   ///
   /// Parameters:
-  /// * [page] - Page number (1-based).
+  /// * [page] - Page number (1-based). Default 1.
   /// * [pageSize] - Items per page: default 20, max 100.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
