@@ -1,7 +1,10 @@
 """Stores admin (05 §2 "Dark stores", "Serviceability requests"; 05 §3 "Stores & service areas":
 Super Admin edits, Ops views, Store Manager views own; notify-me leads for Super Admin and Ops)."""
 
+import re
+
 import pytest
+from django.contrib.admin.models import LogEntry
 from django.contrib.auth.models import Permission
 from django.contrib.gis.geos import Point
 from django.db import connection
@@ -155,16 +158,29 @@ class TestStorePages:
         assert client.get(url).status_code == 403
 
     def test_pause_and_resume_orders(self, client, stores):
-        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        """Through `stores.services.set_accepting_orders`, which records who did it."""
+        admin_user = staff_in_role(roles.SUPER_ADMIN)
+        client.force_login(admin_user)
         url = reverse("admin:stores_darkstore_changelist")
-        client.post(url, {"action": "pause_orders", "_selected_action": [stores["own"].pk]})
+        response = client.post(
+            url, {"action": "pause_orders", "_selected_action": [stores["own"].pk]}, follow=True
+        )
+        assert "Paused orders at 1 store(s)." in response.content.decode()
         stores["own"].refresh_from_db()
         assert stores["own"].is_accepting_orders is False
         html = client.get(url).content.decode()
         assert "Paused" in html
-        client.post(url, {"action": "resume_orders", "_selected_action": [stores["own"].pk]})
+        entries = LogEntry.objects.filter(object_id=str(stores["own"].pk), user=admin_user)
+        assert entries.count() == 1
+        client.post(
+            url,
+            {"action": "resume_orders", "_selected_action": [stores["own"].pk, stores["other"].pk]},
+        )
         stores["own"].refresh_from_db()
         assert stores["own"].is_accepting_orders is True
+        assert entries.count() == 2
+        # The other store was already accepting orders: nothing changed, nothing recorded.
+        assert not LogEntry.objects.filter(object_id=str(stores["other"].pk)).exists()
 
     @pytest.mark.parametrize("role", [roles.OPS, roles.STORE_MANAGER])
     def test_view_roles_cannot_pause(self, client, stores, role):
@@ -214,6 +230,22 @@ class TestLeads:
         assert "+919811122233" not in html
         assert "+91 XXXXXX2233" in html
         assert reverse("admin:accounts_customer_change", args=[lead.user_id]) not in html
+
+    def test_coordinates_are_rounded_to_about_100_m(self, client):
+        """DL-40: the text column shows 3 decimals; the map keeps the point."""
+        precise = ServiceabilityRequest.objects.create(
+            location=Point(77.204567, 28.612345, srid=4326), address_text="Precise lead"
+        )
+        client.force_login(staff_in_role(roles.OPS))
+        html = client.get(reverse(self.URL)).content.decode()
+        cells = re.findall(r'class="[^"]*field-coordinates[^"]*"[^>]*>(.*?)</t[dh]>', html, re.S)
+        assert [cell.strip() for cell in cells] == ["28.612, 77.205"]
+        assert "28.612345" in html  # the map still has the point
+        detail = client.get(
+            reverse("admin:stores_serviceabilityrequest_change", args=[precise.pk])
+        ).content.decode()
+        assert "28.612, 77.205" in detail
+        assert "28.61234, 77.20457" not in detail
 
     def test_leads_are_read_only(self, client, lead):
         client.force_login(staff_in_role(roles.OPS))

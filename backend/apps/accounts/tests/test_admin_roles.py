@@ -3,7 +3,10 @@
 Allowed: 200. Staff without the permission: 403. Not staff or signed out: 302 to the admin login.
 """
 
+import re
+
 import pytest
+from django.contrib.admin.models import CHANGE, LogEntry
 from django.contrib.auth.models import Group, Permission
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -219,47 +222,77 @@ class TestCustomerAdmin:
         assert (customer.is_active, customer.anonymised_at) == before
 
 
-class TestBlockAdapter:
-    """Block / unblock go through one adapter (`set_customer_blocked`), to be replaced by the
-    backend's block_customer / unblock_customer services after the merge."""
+class TestBlockUnblock:
+    """Block / unblock call `accounts.services.customers.block_customer` / `unblock_customer`
+    once per selected customer; their refusals are shown as warnings, never a 500."""
 
     URL = "admin:accounts_customer_changelist"
 
-    def test_block_deactivates_and_bumps_updated_at(self, client, customer):
-        before = customer.updated_at
-        client.force_login(staff_in_role(roles.SUPPORT))
-        response = client.post(
-            reverse(self.URL), {"action": "block", "_selected_action": [customer.pk]}
+    def post(self, client, action, *customers, follow=False):
+        return client.post(
+            reverse(self.URL),
+            {"action": action, "_selected_action": [customer.pk for customer in customers]},
+            follow=follow,
         )
-        assert response.status_code == 302
+
+    def test_block_signs_out_everywhere_and_records_the_actor(self, client, customer):
+        device = Device.objects.create(
+            user=customer,
+            app="customer",
+            platform="android",
+            fcm_token="t",
+            is_active=True,
+            last_seen_at=timezone.now(),
+        )
+        before = customer.updated_at
+        agent = staff_in_role(roles.SUPPORT)
+        client.force_login(agent)
+        response = self.post(client, "block", customer, follow=True)
+        assert "Blocked 1 customer(s)." in response.content.decode()
         customer.refresh_from_db()
+        device.refresh_from_db()
         assert customer.is_active is False
         assert customer.updated_at > before
+        assert device.is_active is False
+        entry = LogEntry.objects.get(object_id=str(customer.pk), action_flag=CHANGE)
+        assert entry.user_id == agent.pk
+        assert entry.object_repr == f"Customer {customer.pk}"  # never the phone
+        assert customer.phone not in entry.change_message
 
-    def test_unblock_saves_each_row_and_bumps_updated_at(self, client, customer):
+    def test_unblock_reactivates_and_records_the_actor(self, client, customer):
         customer.is_active = False
         customer.save()
-        before = customer.updated_at
-        client.force_login(staff_in_role(roles.OPS))
-        client.post(reverse(self.URL), {"action": "unblock", "_selected_action": [customer.pk]})
+        agent = staff_in_role(roles.OPS)
+        client.force_login(agent)
+        response = self.post(client, "unblock", customer, follow=True)
+        assert "Unblocked 1 customer(s)." in response.content.decode()
         customer.refresh_from_db()
         assert customer.is_active is True
-        assert customer.updated_at > before
+        assert LogEntry.objects.filter(object_id=str(customer.pk), user=agent).exists()
 
-    def test_unblock_never_revives_an_anonymised_account(self, client, customer):
+    def test_customers_already_in_that_state_are_counted_apart(self, client, customer):
+        blocked = UserFactory(name="Already Blocked", is_active=False)
+        client.force_login(staff_in_role(roles.SUPPORT))
+        html = self.post(client, "block", customer, blocked, follow=True).content.decode()
+        assert "Blocked 1 customer(s)." in html
+        assert "1 customer(s) were already blocked." in html
+
+    @pytest.mark.parametrize("action", ["block", "unblock"])
+    def test_anonymised_accounts_are_refused_with_a_message(self, client, customer, action):
         customer.is_active = False
         customer.deleted_at = timezone.now()
         customer.anonymised_at = timezone.now()
         customer.save()
         client.force_login(staff_in_role(roles.OPS))
-        response = client.post(
-            reverse(self.URL),
-            {"action": "unblock", "_selected_action": [customer.pk]},
-            follow=True,
+        response = self.post(client, action, customer, follow=True)
+        assert response.status_code == 200
+        assert (
+            "Skipped 1 customer(s): This account has been anonymised; it cannot be blocked or "
+            "unblocked." in response.content.decode()
         )
         customer.refresh_from_db()
         assert customer.is_active is False
-        assert "Skipped 1 anonymised account(s)" in response.content.decode()
+        assert not LogEntry.objects.filter(object_id=str(customer.pk)).exists()
 
     def test_block_needs_the_csrf_token(self, customer):
         from django.test import Client
@@ -278,8 +311,30 @@ class TestBlockAdapter:
         assert customer.is_active is False
 
 
+def super_admin_without_anonymise():
+    """A Super Admin group member whose group lacks `accounts.anonymise_customer` (as if the
+    role were changed): holds change_customer and everything else, but not this."""
+    user = staff_in_role(roles.SUPER_ADMIN)
+    Group.objects.get(name=roles.SUPER_ADMIN).permissions.remove(
+        Permission.objects.get(codename="anonymise_customer", content_type__app_label="accounts")
+    )
+    return user
+
+
+def customer_care_with_anonymise():
+    """Not in any role: view + change customer and the anonymise permission, granted directly."""
+    user = StaffUserFactory()
+    user.user_permissions.add(
+        *Permission.objects.filter(
+            content_type__app_label="accounts",
+            codename__in=["view_customer", "change_customer", "anonymise_customer"],
+        )
+    )
+    return user
+
+
 class TestAnonymiseConfirmation:
-    """DL-35 (PM default, awaiting the user's confirmation): superusers only."""
+    """DL-35 / DL-39: "Anonymise now" needs `accounts.anonymise_customer` (Super Admin only)."""
 
     URL = "admin:accounts_customer_changelist"
 
@@ -297,6 +352,7 @@ class TestAnonymiseConfirmation:
         assert 'data-testid="anonymise-confirmation"' in html
         assert "Anonymise 1 customer now?" in html
         assert "1 selected customer did not request deletion" in html
+        assert re.search(r"\d{2}:\d{2} IST", html)  # the deletion time, in the panel's zone
         customer.refresh_from_db()
         assert customer.anonymised_at is None
 
@@ -321,17 +377,25 @@ class TestAnonymiseConfirmation:
         assert not Address.objects.filter(user=customer).exists()
         assert other.anonymised_at is None
 
-    @pytest.mark.parametrize("role", [roles.SUPPORT, roles.OPS, roles.SUPER_ADMIN])
+    @pytest.mark.parametrize(
+        "make_user",
+        [
+            lambda: staff_in_role(roles.SUPPORT),
+            lambda: staff_in_role(roles.OPS),
+            super_admin_without_anonymise,
+        ],
+        ids=["Support", "Ops", "Super Admin group without the permission"],
+    )
     @pytest.mark.parametrize("confirm", [False, True])
-    def test_roles_without_the_superuser_flag_cannot_anonymise(
-        self, client, customer, role, confirm
+    def test_roles_without_the_permission_cannot_anonymise(
+        self, client, customer, make_user, confirm
     ):
-        """Support and Ops hold change_customer, and a Super Admin group member without the
-        superuser flag holds everything else; none of them gets the action. The POST comes
-        back to the list with "No action selected" (302) and nothing is erased."""
+        """Support and Ops hold change_customer; the third user holds every other permission.
+        None of them gets the action: the POST comes back to the list with "No action
+        selected" (302) and nothing is erased."""
         customer.deleted_at = timezone.now()
         customer.save()
-        client.force_login(staff_in_role(role))
+        client.force_login(make_user())
         changelist = client.get(reverse(self.URL)).content.decode()
         assert "anonymise_now" not in changelist
         data = {"action": "anonymise_now", "_selected_action": [customer.pk]}
@@ -343,9 +407,40 @@ class TestAnonymiseConfirmation:
         assert customer.anonymised_at is None
         assert customer.phone is not None
 
-    def test_superuser_sees_the_action(self, client, customer):
-        client.force_login(SuperUserFactory())
+    @pytest.mark.parametrize(
+        "make_user",
+        [lambda: staff_in_role(roles.SUPER_ADMIN), SuperUserFactory, customer_care_with_anonymise],
+        ids=["Super Admin group", "superuser flag", "direct permission"],
+    )
+    def test_permission_holders_can_anonymise(self, client, customer, make_user):
+        customer.deleted_at = timezone.now()
+        customer.save()
+        client.force_login(make_user())
         assert "anonymise_now" in client.get(reverse(self.URL)).content.decode()
+        response = client.post(
+            reverse(self.URL),
+            {"action": "anonymise_now", "_selected_action": [customer.pk], "confirm": "yes"},
+        )
+        assert response.status_code == 302
+        customer.refresh_from_db()
+        assert customer.anonymised_at is not None
+        assert customer.phone is None
+
+    def test_the_action_rechecks_the_permission(self, rf, customer):
+        """Hiding the action is not the check: the action itself refuses a user without the
+        permission even when called directly."""
+        from django.contrib import admin
+        from django.core.exceptions import PermissionDenied
+
+        customer.deleted_at = timezone.now()
+        customer.save()
+        model_admin = admin.site._registry[Customer]
+        request = rf.post("/", {"confirm": "yes"})
+        request.user = staff_in_role(roles.SUPPORT)
+        with pytest.raises(PermissionDenied):
+            model_admin.anonymise_now(request, Customer.objects.filter(pk=customer.pk))
+        customer.refresh_from_db()
+        assert customer.anonymised_at is None
 
 
 class TestRolesAdmin:

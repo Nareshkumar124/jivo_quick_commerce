@@ -33,9 +33,9 @@ Owner: `admin-panel-dev`. Spec: `05-admin-and-store-panel.md`. This page records
 | `/ops/dashboard/customer-kpis/` | `ops:dashboard-kpis` (HTMX partial, polled every 60 s) | `accounts.view_customer` |
 | `/ops/dashboard/signups/` | `ops:dashboard-signups` (HTMX partial: results of the data table) | `accounts.view_customer` |
 | `/ops/dashboard/operations/` | `ops:dashboard-operations` (HTMX partial: stores, catalog and stock cards, polled every 60 s) | any active staff; each card group needs its own permission (§9) |
-| `/admin/stores/darkstore/` | Dark stores (map editor, opening hours inline, pause/resume actions) | `stores.view_darkstore`, scoped; edit: `stores.change_darkstore` |
-| `/admin/stores/serviceabilityrequest/` | Notify-me leads with a map | `stores.view_serviceabilityrequest` |
-| `/admin/catalog/{category,product,productvariant,collection,banner,trendingsearch}/` | Catalog CRUD; `import/` and `export/` on categories, products and variants | view: `catalog.view_*`; edit and import: add + change |
+| `/admin/stores/darkstore/` | Dark stores (map editor, opening hours inline, pause/resume actions through `stores.services.set_accepting_orders`) | `stores.view_darkstore`, scoped; edit: `stores.change_darkstore` |
+| `/admin/stores/serviceabilityrequest/` | Notify-me leads with a map; coordinates in the text columns rounded to 3 decimals (about 100 m, DL-40) | `stores.view_serviceabilityrequest` |
+| `/admin/catalog/{category,product,productvariant,collection,banner,trendingsearch}/` | Catalog CRUD; `import/` and `export/` (CSV and Excel) on categories, products and variants | view: `catalog.view_*`; edit and import: add + change |
 | `/admin/inventory/storeinventory/` | Stock per store × variant | `inventory.view_storeinventory`, scoped |
 | `/admin/inventory/storeinventory/<id>/adjust/` | Adjust one row (inward / damage / audit count) | `inventory.adjust_stock` + the row's store (`can_adjust_stock`) |
 | `/admin/inventory/storeinventory/inward/` | Bulk stock inward (CSV upload or pasted rows, preview first) | `inventory.adjust_stock`; stores limited to the user's |
@@ -55,7 +55,8 @@ backend/
     access.py      ops_view(*perms): staff gate, permission gate, HTMX-aware refusals, IST rendering
     navigation.py  module registry → unfold sidebar + Ops sidebar
     scoping.py     store scoping for querysets and list filters (stores_for)
-    admin_support.py  service errors on forms, dry_run(), read-only scoped history, import/export permissions
+    admin_support.py  service errors on forms, dry_run(), read-only scoped history, import/export
+                      permissions, upload limits (LimitedImportForm), formula unescaping on import
     maps.py        map editor widget + read-only maps (swap point for Mappls)
     selectors.py   read-only queries (never write, not even get_or_create)
     dashboard.py   dashboard blocks (chart spec, tables)
@@ -71,7 +72,8 @@ backend/
     partials/                 HTMX fragments per screen
     errors/403.html, errors/403_partial.html
   templates/admin/<app>/<model>/...   admin overrides (e.g. anonymise confirmation, stock adjust / inward pages)
-  templates/admin/import_export/      unfold-styled Import / Export buttons (until unfold.contrib.import_export is installed)
+                                      (import/export and history screens: unfold.contrib.import_export and
+                                      unfold.contrib.simple_history templates, no overrides)
   apps/catalog/admin/                 package: ModelAdmins (__init__), forms, import/export resources
   static/ops/{vendor,css,js}/
 ```
@@ -100,14 +102,19 @@ backend/
   - **Customers admin.** Requires full-PII access, which is `accounts.view_customer` per 05 §3 "Customers (PII)". "Limited" roles (Store Manager, Store Staff) are refused even if granted `change_customer`, because the screen shows phones in titles, breadcrumbs and search.
   - **Address and device inlines** follow that same check. They are read-only.
   - **The 7 managed roles** are read-only in the Groups admin and cannot be deleted. `sync_roles()` resets their permissions on every migrate, so admin edits would be silently lost. Custom groups stay editable.
-- **Store scoping (Phase 2+).** `get_queryset` is filtered by `stores.services.stores_for(user)` (`ops_console.scoping.StoreScopedAdminMixin`). Never fetch by id and then check: scope the queryset.
+- **Store scoping (Phase 2+).** `get_queryset` is filtered by `stores.services.stores_for(user)` (`ops_console.scoping.StoreScopedAdminMixin`). Never fetch by id and then check: scope the queryset. `stores_for` fails closed: a user in a store role (Store Manager, Store Staff) sees only their `StaffStoreAccess` stores even if also in a global role (the stricter role wins, DL-39), and unknown groups never widen access.
   - Another store's object is a **404** everywhere: the admin change, delete and history views (`StoreScopedAdminMixin.get_object` raises `Http404` instead of Django's redirect to the index), custom views (`get_object_or_404` on the scoped queryset) and simple-history pages.
   - Store list filters list only the user's stores (`ScopedStoreFilter`); the default related-field filter would show every store's name.
   - Store assignment is an inline on the staff user (Super Admin), saved through `grant_store_access` / `revoke_store_access`; the admin LogEntry records it.
 - **History pages** (django-simple-history) are read-only and scoped (`admin_support.ReadOnlyHistoryAdmin`): stock `SimpleHistoryAdmin` falls back to the historical record for objects outside `get_queryset()` and accepts a revert POST even when revert is disabled.
 - **Import/export.** django-import-export lets any staff member import when `IMPORT_EXPORT_IMPORT_PERMISSION_CODE` is unset, so every import admin uses `ImportExportPermissionsMixin`: import needs add + change on the model, export needs view.
+  - **Formats** come only from `IMPORT_EXPORT_FORMATS` (`apps.core.export_formats`: CSV and Excel, owned by the backend). Their export escapes spreadsheet formulas: a text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return gets a leading `'`; plain numbers such as `-3` stay as they are. An admin never sets `import_formats` / `export_formats` back to django-import-export's stock CSV (guard test `apps/catalog/tests/test_admin_import_export.py`).
+  - **Import normalisation** (`admin_support.SpreadsheetImportMixin` on every catalog resource): empty rows dropped, empty Excel cells read as empty text like CSV, and the export's apostrophe removed again, so an exported file (CSV or Excel) imports back unchanged.
+  - **Uploads** go through `admin_support.LimitedImportForm`: at most 1 MB and 2000 rows (records, not lines), CSV must be UTF-8, and an .xlsx must be a real workbook that unpacks to at most 20 MB. It runs when the form validates, before django-import-export stores the file (Redis) or parses it. The stock inward CSV uses the same limits.
 - **Store price override.** Super Admin / Catalog Manager only (`apps/accounts/roles.py`). Until a dedicated permission exists it is gated on `catalog.change_productvariant` (the price authority).
-- **Anonymise now** (irreversible): superusers only (DL-35, a PM default awaiting the user's confirmation), hidden from everyone else and checked again inside the action.
+- **Anonymise now** (irreversible): needs `accounts.anonymise_customer`, held only by Super Admin (DL-35, DL-39; superusers hold every permission). The action is hidden from everyone else and checked again inside it.
+- **Block / unblock** need `accounts.change_customer` (Super Admin, Ops, Support) and call `accounts.services.customers.block_customer` / `unblock_customer` once per selected customer. Their refusals (staff, anonymised or unknown accounts) are shown as warnings, grouped by reason.
+- **Notify-me leads** (Super Admin, Ops): the text columns round coordinates to 3 decimals, about 100 m (DL-40). The leads map keeps the points for expansion planning.
 - **PII masking.** `pii.display_phone(user, phone)` and `{{ phone|phone_for:request.user }}` show the full number only with `accounts.view_customer`. Everyone else sees `+91 XXXXXX2233`. Masking first applies on order screens (P4). Order screens must also avoid rendering `str(user)`, which is the phone.
 - **Hiding a link is not a permission.** The sidebars hide refused links, but every view and ModelAdmin checks again.
 - **Tests.** Each screen has a role-matrix test covering the 7 roles, a superuser flag, a non-staff user and an anonymous visitor (`apps/ops_console/tests/helpers.py`). From P2, each screen also needs an other-store test.
@@ -119,11 +126,13 @@ backend/
 - The panel only displays money and never computes it. Amounts come from records produced by `cart.services.compute_bill()` and the payment services.
 - Every staff mutation on orders, stock, prices, refunds, riders and config goes through the backend's audit mechanism (`AuditLog`, P4–P8; django-simple-history where the backend enabled it).
   - **With history:** `ProductVariant` (prices), `StoreInventory` (availability, threshold, store price) and `PricingConfig`. Stock itself is audited by the `StockMovement` ledger (who, when, why).
-  - **Without history (gap, reported):** `DarkStore` (accepting orders, GSTIN, invoice prefix), `StoreTiming`, `Product` (GST, HSN), `Category`, `Collection`, `Banner`, `StaffStoreAccess`, and the Phase 1 mutations (customer block, unblock and anonymise, `AppConfig`, `AppVersionPolicy`, staff role membership). Until then Django's `LogEntry` (admin history) is the only trail.
+  - **Recorded by the services as an admin `LogEntry`** (until `AuditLog`): customer block and unblock (`object_repr` is "Customer <id>", never the phone) and store pause / resume (`set_accepting_orders`).
+  - **Without history (gap, reported):** `DarkStore` field edits (GSTIN, invoice prefix, areas), `StoreTiming`, `Product` (GST, HSN), `Category`, `Collection`, `Banner`, `StaffStoreAccess`, and the Phase 1 mutations (anonymise, `AppConfig`, `AppVersionPolicy`, staff role membership). Until then Django's `LogEntry` (admin history) is the only trail.
 - **Inventory (Phase 2).** The admin never writes stock fields:
   - `on_hand` and `reserved` are read-only in every admin, inline and form; there is no import resource for `StoreInventory`; `StockMovement` has no add, change, delete or actions, even for superusers (guard test: `apps/inventory/tests/test_admin.py`).
   - Adjustments call `adjust_stock` / `set_counted_stock`; bulk inward calls `apply_inward_batch`; settings call `set_availability`, `update_inventory_settings` and `set_price_override`.
   - Forms validate by running the service inside a rolled-back transaction (`admin_support.dry_run`), so the service's messages (MRP limit, reserved stock, quantity bounds) show on the form instead of a 500. The CSV inward preview is the same dry run.
+  - If the real call still fails after validation (another user lowered the MRP in between), the inventory change view rolls back the whole save, including settings applied before the failing one, and redirects back to the form with the message. No "changed successfully" and no history row.
 
 ## 6. Static assets (vendored and pinned)
 
@@ -151,7 +160,9 @@ backend/
 | 404 / 5xx / network / timeout | Standard | Warning or error toast. Error responses are never swapped in. |
 | Success messages | `HX-Trigger: {"ops:toast": {"message", "tone"}}` or Django `messages` | Toast |
 
-**Other client settings.** Ops responses are `never_cache`. The htmx history cache is turned off (`historyCacheSize = 0`) so PII never lands in `localStorage`. Views render in IST (`timezone.override`), while stored times stay UTC.
+**Other client settings.** Ops responses are `never_cache`. The htmx history cache is turned off (`historyCacheSize = 0`) so PII never lands in `localStorage`. Views render in IST (`timezone.override`), while stored times stay UTC. The backend's staff time-zone middleware (`apps.core.middleware.staff_timezone_middleware`) also renders `/admin` in IST, and admin forms take times in IST.
+
+**Sessions** (backend, `apps/accounts/middleware.py`, 05 §5): every staff session ends 8 h after login; admin roles (everyone except staff whose only roles are Store Manager / Store Staff) also after 2 h without a request. Expired sessions are signed out before the view runs, so `/ops` HTMX requests get the 401 + `HX-Redirect` above.
 
 ## 8. Module rollout per phase
 
@@ -200,7 +211,9 @@ Order, GMV and rider cards are **absent** until their phases. The panel never sh
 The contract with the `catalog-data` agent and Jivo's SAP exports (D-17). Defined in `apps/catalog/admin/resources.py`; change both together.
 
 **General rules**
-- **Files.** UTF-8 CSV (a BOM is fine), comma-separated, header row first with exactly these column names. One file per resource, imported in this order: categories, products, variants. Excel needs `tablib[xlsx]`, which is not installed yet (backend gap).
+- **Files.** UTF-8 CSV (a BOM is fine), comma-separated, or an Excel workbook (.xlsx, first sheet). Header row first with exactly these column names. One file per resource, imported in this order: categories, products, variants. Choose the format that matches the file (CSV or xlsx); old .xls files must be saved as .xlsx first.
+- **Limits.** At most 1 MB and 2000 rows per file (a quoted cell with line breaks is one row). Rows with no value at all (Excel's formatted empty rows) are ignored, and an empty Excel cell means the same as an empty CSV cell (rules below). Error messages count rows after those empty rows are removed. Larger catalogs: split the file.
+- **Formula escaping.** Export writes a text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return with a leading apostrophe (`'=1+1`), so a spreadsheet shows it as text and never runs it. Import removes exactly that apostrophe again, so an exported file imports back unchanged. Plain numbers (`-3`, `349.00`) are never escaped. Known gap (backend): Excel exports currently store numbers as text cells, because django-import-export only sends native types for its own exact XLSX class (strict xfail test `test_xlsx_numbers_stay_numbers`); they still import back correctly.
 - **Where.** Admin → Categories / Products / SKUs → Import. Import needs add + change on the model (Super Admin, Catalog Manager); export needs view. The import first shows a **dry run** preview (nothing saved), then **Confirm import** saves it.
 - **Matching.** Rows match existing records by their key (category and product `slug`, variant `sku`): an existing key updates the record, a new key creates it. **Imports never delete.** Unchanged rows are skipped.
 - **Validation.** Every row runs the model validation, and any error blocks the whole file. The checks:

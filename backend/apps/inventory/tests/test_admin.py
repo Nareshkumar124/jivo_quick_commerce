@@ -223,8 +223,7 @@ class TestAdjustThroughTheService:
 
     def test_service_error_is_shown_on_the_form(self, client, shop):
         """On hand cannot drop below the units reserved by orders (the service's rule)."""
-        row = shop["own_row"]
-        StoreInventory.objects.filter(pk=row.pk).update(reserved=8)  # orders arrive in P3
+        row = stock(shop["own"], shop["variant"], 0, reserved=8)  # orders arrive in P3
         client.force_login(manager_of(shop["own"]))
         response = client.post(
             self.url(row), {"kind": "damage", "quantity": "5", "reason": "Broken"}
@@ -320,6 +319,98 @@ class TestStockFieldsAreNeverEditable:
         )
         row.refresh_from_db()
         assert row.price_override is None
+
+    def test_catalog_manager_post_changes_only_the_price(self, client, shop):
+        """Tamper: the Catalog Manager's form holds only `price_override`; forged values for
+        the other settings and the stock numbers are ignored."""
+        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+        row = shop["own_row"]
+        before = (row.is_available, row.low_stock_threshold, row.rack_location)
+        response = client.post(
+            self.change_url(row),
+            {
+                "price_override": "299.00",
+                # is_available omitted: an unticked checkbox, i.e. "switch off"
+                "low_stock_threshold": "1",
+                "rack_location": "FORGED",
+                "on_hand": "999",
+                "reserved": "9",
+                "_save": "Save",
+            },
+        )
+        assert response.status_code == 302
+        row.refresh_from_db()
+        assert str(row.price_override) == "299.00"
+        assert (row.is_available, row.low_stock_threshold, row.rack_location) == before
+        assert (row.on_hand, row.reserved) == (10, 0)
+        assert ledger(shop["own"], shop["variant"]).count() == 1
+
+    def test_store_staff_post_is_refused(self, client, shop):
+        """Tamper: Store Staff may change nothing here, so a forged change POST is a 403."""
+        client.force_login(manager_of(shop["own"], roles.STORE_STAFF))
+        row = shop["own_row"]
+        response = client.post(
+            self.change_url(row),
+            {
+                "low_stock_threshold": "1",
+                "rack_location": "FORGED",
+                "price_override": "1.00",
+                "on_hand": "999",
+                "_save": "Save",
+            },
+        )
+        assert response.status_code == 403
+        row.refresh_from_db()
+        assert (row.is_available, row.low_stock_threshold, row.rack_location) == (True, 5, "")
+        assert (row.price_override, row.on_hand) == (None, 10)
+
+    def test_a_change_between_check_and_save_is_a_message_not_a_500(
+        self, client, shop, monkeypatch
+    ):
+        """The form validates (dry run and model checks pass), then another user lowers the MRP
+        below the new store price before the real save. Nothing is saved, not even the settings
+        applied before the failing one, and the page says why."""
+        from decimal import Decimal
+
+        from apps.catalog.models import ProductVariant
+        from apps.inventory import admin as inventory_admin
+
+        real_apply = inventory_admin.apply_settings
+        calls = []
+
+        def apply_settings(*args, **kwargs):
+            calls.append(args)
+            if len(calls) == 2:  # 1: the form's dry run; 2: save_model, after validation
+                ProductVariant.objects.filter(pk=shop["variant"].pk).update(
+                    mrp=Decimal("250.00"), selling_price=Decimal("199.00")
+                )
+            return real_apply(*args, **kwargs)
+
+        monkeypatch.setattr(inventory_admin, "apply_settings", apply_settings)
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        row = shop["own_row"]
+        history_before = row.history.count()
+        url = self.change_url(row)
+        response = client.post(
+            url,
+            {
+                # is_available unticked (switch off) is applied before the price fails
+                "low_stock_threshold": "7",
+                "rack_location": "B-1",
+                "price_override": "299.00",
+                "_save": "Save",
+            },
+        )
+        assert response.status_code == 302
+        assert len(calls) == 2
+        assert response["Location"] == url
+        page = client.get(url).content.decode()
+        assert "Not saved: Cannot be above the MRP (250.00)." in page
+        assert "was changed successfully" not in page
+        row.refresh_from_db()
+        assert row.price_override is None
+        assert (row.is_available, row.low_stock_threshold, row.rack_location) == (True, 5, "")
+        assert row.history.count() == history_before  # the rolled-back save left no history
 
     def test_view_roles_get_a_read_only_page(self, client, shop):
         client.force_login(manager_of(shop["own"], roles.STORE_STAFF))

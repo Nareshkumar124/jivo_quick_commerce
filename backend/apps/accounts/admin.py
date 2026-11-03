@@ -6,8 +6,7 @@ from django.contrib.admin import helpers
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
-from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Count, Q
 from django.template.response import TemplateResponse
 from django.utils.html import format_html_join
@@ -18,7 +17,8 @@ from unfold.forms import AdminPasswordChangeForm
 from apps.accounts import roles
 from apps.accounts.forms import UserChangeForm, UserCreationForm
 from apps.accounts.models import Address, Customer, Device, User
-from apps.accounts.services.auth import anonymise_user, revoke_all_tokens
+from apps.accounts.services.auth import anonymise_user
+from apps.accounts.services.customers import block_customer, unblock_customer
 from apps.ops_console import status
 from apps.ops_console.pii import can_view_full_phone
 from apps.ops_console.selectors import CUSTOMER_STATUS_FILTERS
@@ -281,31 +281,12 @@ class CustomerStatusFilter(admin.SimpleListFilter):
 _STATUS_LABELS = {badge.label: badge.tone for badge in status.BADGES[status.CUSTOMER].values()}
 
 
-def set_customer_blocked(customer_id: int, *, blocked: bool, actor) -> bool:
-    """Block (deactivate and sign out everywhere) or unblock one customer; True if it changed.
-    Anonymised accounts are never unblocked.
-
-    TODO(merge): the backend is adding `apps.accounts.services.block_customer` /
-    `unblock_customer` (atomic, row lock, token revocation, actor recorded). When it lands,
-    this body becomes a call to those services; the admin actions below stay as they are.
-    """
-    with transaction.atomic():
-        customer = Customer.objects.select_for_update().filter(pk=customer_id).first()
-        if customer is None or customer.anonymised_at is not None:
-            return False
-        if customer.is_active != blocked:  # already in the requested state
-            return False
-        customer.is_active = not blocked
-        customer.save(update_fields=["is_active", "updated_at"])
-        if blocked:
-            revoke_all_tokens(customer)
-    return True
+# DL-35 / DL-39: "Anonymise now" is irreversible; only Super Admin holds this permission.
+ANONYMISE_CUSTOMER = "accounts.anonymise_customer"
 
 
 def can_anonymise(user) -> bool:
-    """DL-35 (PM default, awaiting the user's confirmation): anonymisation is irreversible, so
-    only superusers run it until the backend adds a dedicated permission."""
-    return bool(user.is_active and user.is_staff and user.is_superuser)
+    return bool(user.is_active and user.is_staff and user.has_perm(ANONYMISE_CUSTOMER))
 
 
 @admin.register(Customer)
@@ -391,36 +372,47 @@ class CustomerAdmin(ModelAdmin):
     def has_delete_permission(self, request, obj=None) -> bool:
         return False  # deletion is the anonymisation flow (07 §4)
 
+    def _moderate(self, request, queryset, service, *, done: str, already: str) -> None:
+        """Run `service(user_id, by=...)` (accounts.services.customers) for each selected
+        customer, one transaction each. Refusals (staff, anonymised, gone) become warnings,
+        grouped by reason."""
+        changed = unchanged = 0
+        refused: dict[str, int] = {}
+        for pk in queryset.order_by("pk").values_list("pk", flat=True):
+            try:
+                if service(pk, by=request.user):
+                    changed += 1
+                else:
+                    unchanged += 1
+            except ValidationError as error:
+                for message in error.messages:
+                    refused[message] = refused.get(message, 0) + 1
+        self.message_user(request, f"{done} {changed} customer(s).", messages.SUCCESS)
+        if unchanged:
+            self.message_user(request, f"{unchanged} customer(s) {already}.", messages.INFO)
+        for message, count in refused.items():
+            self.message_user(request, f"Skipped {count} customer(s): {message}", messages.WARNING)
+
     @action(description="Block: deactivate and sign out everywhere", permissions=["change"])
     def block(self, request, queryset):
-        ids = queryset.filter(is_active=True).values_list("pk", flat=True)
-        count = sum(set_customer_blocked(pk, blocked=True, actor=request.user) for pk in ids)
-        self.message_user(request, f"Blocked {count} customer(s).", messages.SUCCESS)
+        self._moderate(
+            request, queryset, block_customer, done="Blocked", already="were already blocked"
+        )
 
     @action(description="Unblock", permissions=["change"])
     def unblock(self, request, queryset):
-        candidates = list(queryset.filter(is_active=False).values_list("pk", "anonymised_at"))
-        count = sum(
-            set_customer_blocked(pk, blocked=False, actor=request.user)
-            for pk, anonymised_at in candidates
-            if anonymised_at is None
+        self._moderate(
+            request, queryset, unblock_customer, done="Unblocked", already="were not blocked"
         )
-        skipped = sum(1 for _pk, anonymised_at in candidates if anonymised_at is not None)
-        self.message_user(request, f"Unblocked {count} customer(s).", messages.SUCCESS)
-        if skipped:
-            self.message_user(
-                request,
-                f"Skipped {skipped} anonymised account(s): they can never be unblocked.",
-                messages.WARNING,
-            )
 
     def has_anonymise_permission(self, request) -> bool:
         return can_anonymise(request.user) and self.has_change_permission(request)
 
     @action(description="Anonymise now (deletion requested only)", permissions=["anonymise"])
     def anonymise_now(self, request, queryset):
-        """Irreversible, so it asks for confirmation first (like Django's bulk delete). Superusers
-        only (DL-35): the action is hidden from everyone else and refused here as well."""
+        """Irreversible, so it asks for confirmation first (like Django's bulk delete). Needs
+        `accounts.anonymise_customer` (Super Admin only, DL-35/DL-39): the action is hidden from
+        everyone else and refused here as well."""
         if not self.has_anonymise_permission(request):
             raise PermissionDenied
         eligible = queryset.filter(deleted_at__isnull=False, anonymised_at__isnull=True)

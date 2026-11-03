@@ -24,7 +24,7 @@
             <div class="border-t border-base-200 p-4 dark:border-base-800">
                 <ul class="leading-relaxed">
                     {% for customer in eligible %}
-                        <li>#{{ customer.pk }} {{ customer.name|default:"(no name)" }}: deletion requested {{ customer.deleted_at|date:"d M Y, H:i" }} UTC</li>
+                        <li>#{{ customer.pk }} {{ customer.name|default:"(no name)" }}: deletion requested {{ customer.deleted_at|date:"d M Y, H:i T" }}</li>
                     {% endfor %}
                 </ul>
             </div>

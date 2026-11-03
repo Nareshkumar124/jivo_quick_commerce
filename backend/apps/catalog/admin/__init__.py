@@ -13,9 +13,8 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from import_export.admin import ImportExportModelAdmin
-from import_export.formats.base_formats import CSV
 from unfold.admin import ModelAdmin, StackedInline, TabularInline
-from unfold.contrib.import_export.forms import ExportForm, ImportForm
+from unfold.contrib.import_export.forms import ExportForm
 from unfold.decorators import display
 
 from apps.catalog.admin.forms import (
@@ -40,17 +39,24 @@ from apps.catalog.models import (
     TrendingSearch,
 )
 from apps.catalog.validators import LABEL_TEXT_KEYS
-from apps.ops_console.admin_support import ImportExportPermissionsMixin, ReadOnlyHistoryAdmin
+from apps.ops_console.admin_support import (
+    ImportExportPermissionsMixin,
+    LimitedImportForm,
+    ReadOnlyHistoryAdmin,
+)
 
 
 class CatalogImportExportAdmin(ImportExportPermissionsMixin, ModelAdmin, ImportExportModelAdmin):
-    """CSV import/export with unfold's forms. Import needs add + change on the model (catalog
-    roles), export needs view. Excel needs `tablib[xlsx]` (not installed; reported)."""
+    """CSV and Excel (.xlsx) import/export with unfold's forms (docs/admin-panel-architecture.md
+    §10). Import needs add + change on the model (catalog roles), export needs view.
 
-    import_form_class = ImportForm
+    The formats are the project's (`IMPORT_EXPORT_FORMATS` = `apps.core.export_formats`), which
+    escape spreadsheet formulas on export: never set `import_formats` / `export_formats` here
+    (guard test in apps/catalog/tests/test_admin_import_export.py). Uploads are limited by
+    `LimitedImportForm` (1 MB, 2000 rows, UTF-8 CSV or a readable .xlsx)."""
+
+    import_form_class = LimitedImportForm
     export_form_class = ExportForm
-    import_formats = [CSV]
-    export_formats = [CSV]
 
 
 def thumbnail(image, size: int = 40) -> str:
@@ -467,7 +473,7 @@ class BannerAdmin(ModelAdmin):
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         field = super().formfield_for_dbfield(db_field, request, **kwargs)
         if db_field.name in ("starts_at", "ends_at") and field is not None:
-            # Until the staff IST middleware lands the admin works in UTC; say which.
+            # The staff time-zone middleware shows and takes admin times in IST; say which.
             zone = timezone.get_current_timezone_name()
             empty = "starts immediately" if db_field.name == "starts_at" else "never ends"
             field.help_text = f"Time zone: {zone}. Empty: {empty}."
