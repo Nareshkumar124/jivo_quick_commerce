@@ -725,5 +725,128 @@
   "taskUnconfirmedTitle": "Couldn't confirm the last step",
   "taskUnconfirmedBody": "The connection dropped before Jivo answered, and this order is no longer open. It may have gone through. Check the order status, or call support.",
   "taskBackToOrders": "Back to orders",
-  "codQrUnavailable": "Couldn't show the QR code. Check payment again, or collect cash."
+  "codQrUnavailable": "Couldn't show the QR code. Check payment again, or collect cash.",
+  "listLoadMore": "Load more",
+  "dateRange": "{from} – {to}",
+  "@dateRange": {
+    "description": "A range of dates.",
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "earningsTitle": "Earnings",
+  "earningsToday": "Today",
+  "earningsThisWeek": "This week",
+  "earningsChooseDates": "Choose dates",
+  "earningsOrders": "{count, plural, =0{No orders} =1{1 order} other{{count} orders}}",
+  "@earningsOrders": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "earningsPerOrder": "Per order",
+  "earningsAdjustments": "Incentives and penalties",
+  "earningBase": "Base pay",
+  "earningDistance": "Distance pay",
+  "earningTip": "Tips",
+  "earningIncentive": "Incentives",
+  "earningPenalty": "Penalties",
+  "payoutsTitle": "Payouts",
+  "payoutsEmpty": "No payouts yet.",
+  "payoutPaid": "Paid",
+  "payoutPending": "Pending",
+  "payoutReference": "Reference {reference}",
+  "@payoutReference": {
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  },
+  "payoutPaidOn": "Paid on {date}",
+  "@payoutPaidOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "cashTitle": "Cash in hand",
+  "cashEmpty": "No cash entries yet.",
+  "cashInHand": "Cash in hand",
+  "cashLimit": "Limit {amount}",
+  "@cashLimit": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "cashDepositTitle": "Deposit cash",
+  "cashDepositBody": "You've reached the cash limit of {limit}. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.",
+  "@cashDepositBody": {
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "cashCodCollected": "Cash collected · Order {order}",
+  "@cashCodCollected": {
+    "placeholders": {
+      "order": {
+        "type": "String"
+      }
+    }
+  },
+  "cashDeposit": "Deposited at the store",
+  "cashAdjustment": "Adjustment",
+  "cashBalanceAfter": "Balance {amount}",
+  "@cashBalanceAfter": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "historyTitle": "History",
+  "historyEmpty": "No past orders yet.",
+  "historyRoute": "{store} → {drop}",
+  "@historyRoute": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      },
+      "drop": {
+        "type": "String"
+      }
+    }
+  },
+  "historyDelivered": "Delivered",
+  "historyReturned": "Returned",
+  "historyCancelled": "Cancelled",
+  "historyFailed": "Not delivered",
+  "historyOther": "Ended",
+  "profileTitle": "Profile",
+  "profileHomeStore": "Home store",
+  "profileVehicle": "Vehicle",
+  "profileKycStatus": "KYC status",
+  "profileKycApproved": "Verified",
+  "profileRating": "Rating",
+  "profileRatingValue": "{rating} ★",
+  "@profileRatingValue": {
+    "placeholders": {
+      "rating": {
+        "type": "String"
+      }
+    }
+  },
+  "profileNoRating": "No ratings yet"
 }

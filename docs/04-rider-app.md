@@ -169,3 +169,9 @@ flowchart TD
   - **UPI QR image:** loaded only from an https URL; anything else shows an error, and cash stays possible.
   - **Navigation:** a generic `geo:` intent, so the Mappls app (DL-29) or any maps app handles it. If no app can, the rider sees a message.
   - **Failed delivery:** "not reachable" needs 2 calls and a 10-minute wait from the server's arrival time (both open questions). "Other" needs a note. The optional photo goes straight through the camera and compressor, never through the KYC capture flow.
+- **Earnings, cash, history, payouts and profile (§2.7–§2.9), built ahead in P4 against a fake; accepted at the P5 gate.** Local models and repositories (`rider_app/lib/features/earnings/`, `cash/`, `history/`, `profile/`), dev flavor only (DL-30). Behaviour until the rider API confirms it:
+  - **Server amounts only:** every amount is shown exactly as sent, including the per-order totals, the totals per kind, the period total, cash in hand and each running balance. The app never adds anything up. The "Deposit cash" banner follows the server's `limit_reached`, not a comparison on the phone.
+  - **Periods:** "Today" and "This week" (Monday to today) are IST calendar dates; "Choose dates" uses a date-range picker. Lists (cash ledger, history, payouts) are paged with "Load more"; ledger entries are grouped by IST day for display.
+  - **Reachability:** the records open from home for ACTIVE riders between orders. During a task or an open offer the router keeps the rider on those screens.
+  - **Profile:** comes from `GET /rider/me/`. Its photo loads only from an https URL. The documents list reuses the onboarding view, read-only.
+  - **Integration-test harness:** `integration_test/accept_to_deliver_fake_test.dart` drives accept → arrived store → pickup → arrived customer → deliver along a GPX route, against the fakes with a distance-checked geofence. The same driver runs as a widget test in CI.

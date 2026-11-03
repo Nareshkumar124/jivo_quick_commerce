@@ -77,6 +77,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.accounts.middleware.staff_session_policy_middleware",  # 05 §5 staff session limits
+    "apps.core.middleware.staff_timezone_middleware",  # staff panel in IST, storage UTC
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "simple_history.middleware.HistoryRequestMiddleware",
@@ -154,7 +156,12 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 # Staff use Django session login until Jivo Auth (D-04). User.auth_id is reserved for that.
-SESSION_COOKIE_AGE = env_int("DJANGO_SESSION_COOKIE_AGE", default=60 * 60 * 12)
+# 05 §5 (BUG-0006): a staff session ends 8 h after login (absolute, enforced from a login stamp
+# by apps.accounts.middleware), and admin roles also after 2 h without a request.
+SESSION_COOKIE_AGE = env_int("DJANGO_SESSION_COOKIE_AGE", default=8 * 60 * 60)
+STAFF_SESSION_IDLE_SECONDS = env_int("DJANGO_STAFF_SESSION_IDLE_SECONDS", default=2 * 60 * 60)
+# The panel (admin, Ops Console) shows and takes times in IST for signed-in staff.
+STAFF_TIME_ZONE = "Asia/Kolkata"
 AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesStandaloneBackend",  # must be first
     "django.contrib.auth.backends.ModelBackend",
@@ -337,7 +344,10 @@ OTP_RETENTION_DAYS = 30  # 07 §4
 OTP_TEST_NUMBERS: dict[str, str] = env_dict("OTP_TEST_NUMBERS", default={})
 
 # --------------------------------------------------------------------------- SMS (D-02)
+# Local default: the console backend (logs the OTP). Deployed environments default to
+# UnconfiguredSmsBackend and refuse console/locmem (deployed.py, accounts.E003; BUG-0005).
 SMS_BACKEND = env_str("SMS_BACKEND", default="apps.notifications.sms.ConsoleSmsBackend")
+SMS_CONSOLE_BACKEND_ALLOWED = False  # staging only, see deployed.py
 SMS_SENDER_ID = env_str("SMS_SENDER_ID", default="")
 SMS_OTP_DLT_TEMPLATE_ID = env_str("SMS_OTP_DLT_TEMPLATE_ID", default="")
 # Must match the DLT-registered template text exactly. {app_hash} is the Android SMS Retriever
@@ -367,7 +377,8 @@ SPECTACULAR_SETTINGS = {
         "2-decimal strings; times in UTC ISO 8601; pagination with `page`/`page_size` "
         "(default 20, max 100). Apps send `X-App-Name`, `X-App-Version` and `X-Platform` on "
         "every request. Errors use the envelope "
-        '`{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema).'
+        '`{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema). '
+        "Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`."
     ),
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,

@@ -6,6 +6,8 @@ from django.contrib.admin import helpers
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Count, Q
 from django.template.response import TemplateResponse
 from django.utils.html import format_html_join
@@ -20,6 +22,8 @@ from apps.accounts.services.auth import anonymise_user, revoke_all_tokens
 from apps.ops_console import status
 from apps.ops_console.pii import can_view_full_phone
 from apps.ops_console.selectors import CUSTOMER_STATUS_FILTERS
+from apps.stores.models import StaffStoreAccess
+from apps.stores.services import grant_store_access, revoke_store_access
 
 # --------------------------------------------------------------------------- roles (Groups)
 
@@ -111,6 +115,22 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
 # --------------------------------------------------------------------------- staff users
 
 
+class StaffStoreAccessInline(TabularInline):
+    """05 §2 "store assignment for store staff/managers": the stores a Store Manager or Store
+    Staff member sees (`stores_for`). Rows are added or removed (never edited) and saved through
+    `stores.services.grant_store_access` / `revoke_store_access` (see UserAdmin.save_formset)."""
+
+    model = StaffStoreAccess
+    fk_name = "user"
+    fields = ("store",)
+    extra = 0
+    verbose_name = "store access"
+    verbose_name_plural = "Store access (Store Manager / Store Staff only)"
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return False  # remove the row and add another store instead
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin, ModelAdmin):
     """Every account (Super Admin only). The sidebar's "Staff users" link opens it filtered to
@@ -149,7 +169,8 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
                 "fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions"),
                 "description": (
                     "Staff need “Staff status” and one role (group) from 05 §3. Prefer roles "
-                    "over individual permissions. Store assignment arrives with stores."
+                    "over individual permissions. Store Manager and Store Staff see only the "
+                    "stores listed under Store access below; every other role sees all stores."
                 ),
             },
         ),
@@ -166,8 +187,30 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
         ),
     )
 
+    inlines = [StaffStoreAccessInline]
+
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related("groups")
+
+    def get_inline_instances(self, request, obj=None):
+        # Store access only means something for staff accounts.
+        if obj is None or not obj.is_staff:
+            return []
+        return super().get_inline_instances(request, obj)
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model is not StaffStoreAccess:
+            return super().save_formset(request, form, formset, change)
+        user = form.instance
+        for inline_form in formset.deleted_forms:
+            if inline_form.instance.pk:
+                revoke_store_access(user, inline_form.instance.store)
+        for inline_form in formset.forms:
+            if inline_form in formset.deleted_forms or not inline_form.has_changed():
+                continue
+            if inline_form.instance.pk is None and inline_form.cleaned_data.get("store"):
+                grant_store_access(user, inline_form.cleaned_data["store"])
+        return None
 
     @display(description="Roles")
     def role_list(self, obj) -> str:
@@ -231,6 +274,33 @@ class CustomerStatusFilter(admin.SimpleListFilter):
 
 
 _STATUS_LABELS = {badge.label: badge.tone for badge in status.BADGES[status.CUSTOMER].values()}
+
+
+def set_customer_blocked(customer_id: int, *, blocked: bool, actor) -> bool:
+    """Block (deactivate and sign out everywhere) or unblock one customer; True if it changed.
+    Anonymised accounts are never unblocked.
+
+    TODO(merge): the backend is adding `apps.accounts.services.block_customer` /
+    `unblock_customer` (atomic, row lock, token revocation, actor recorded). When it lands,
+    this body becomes a call to those services; the admin actions below stay as they are.
+    """
+    with transaction.atomic():
+        customer = Customer.objects.select_for_update().filter(pk=customer_id).first()
+        if customer is None or customer.anonymised_at is not None:
+            return False
+        if customer.is_active != blocked:  # already in the requested state
+            return False
+        customer.is_active = not blocked
+        customer.save(update_fields=["is_active", "updated_at"])
+        if blocked:
+            revoke_all_tokens(customer)
+    return True
+
+
+def can_anonymise(user) -> bool:
+    """DL-35 (PM default, awaiting the user's confirmation): anonymisation is irreversible, so
+    only superusers run it until the backend adds a dedicated permission."""
+    return bool(user.is_active and user.is_staff and user.is_superuser)
 
 
 @admin.register(Customer)
@@ -318,22 +388,36 @@ class CustomerAdmin(ModelAdmin):
 
     @action(description="Block: deactivate and sign out everywhere", permissions=["change"])
     def block(self, request, queryset):
-        count = 0
-        for customer in queryset.filter(is_active=True):
-            customer.is_active = False
-            customer.save(update_fields=["is_active", "updated_at"])
-            revoke_all_tokens(customer)
-            count += 1
+        ids = queryset.filter(is_active=True).values_list("pk", flat=True)
+        count = sum(set_customer_blocked(pk, blocked=True, actor=request.user) for pk in ids)
         self.message_user(request, f"Blocked {count} customer(s).", messages.SUCCESS)
 
     @action(description="Unblock", permissions=["change"])
     def unblock(self, request, queryset):
-        count = queryset.filter(is_active=False, anonymised_at__isnull=True).update(is_active=True)
+        candidates = list(queryset.filter(is_active=False).values_list("pk", "anonymised_at"))
+        count = sum(
+            set_customer_blocked(pk, blocked=False, actor=request.user)
+            for pk, anonymised_at in candidates
+            if anonymised_at is None
+        )
+        skipped = sum(1 for _pk, anonymised_at in candidates if anonymised_at is not None)
         self.message_user(request, f"Unblocked {count} customer(s).", messages.SUCCESS)
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped {skipped} anonymised account(s): they can never be unblocked.",
+                messages.WARNING,
+            )
 
-    @action(description="Anonymise now (deletion requested only)", permissions=["change"])
+    def has_anonymise_permission(self, request) -> bool:
+        return can_anonymise(request.user) and self.has_change_permission(request)
+
+    @action(description="Anonymise now (deletion requested only)", permissions=["anonymise"])
     def anonymise_now(self, request, queryset):
-        """Irreversible, so it asks for confirmation first (like Django's bulk delete)."""
+        """Irreversible, so it asks for confirmation first (like Django's bulk delete). Superusers
+        only (DL-35): the action is hidden from everyone else and refused here as well."""
+        if not self.has_anonymise_permission(request):
+            raise PermissionDenied
         eligible = queryset.filter(deleted_at__isnull=False, anonymised_at__isnull=True)
         if request.POST.get("confirm") != "yes":
             context = {

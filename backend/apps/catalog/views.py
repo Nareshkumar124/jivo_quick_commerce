@@ -31,7 +31,7 @@ from apps.catalog.serializers import (
     SuggestQuerySerializer,
 )
 from apps.core.errors import ErrorCode
-from apps.core.pagination import StandardPagination
+from apps.core.pagination import CanonicalPagination, canonical_page_query
 from apps.core.schema import (
     OPTIONAL_AUTH_UNAUTHORIZED,
     PAGE_NOT_FOUND,
@@ -78,17 +78,18 @@ class _PublicStoreView(APIView):
     authentication_classes: list = []
     permission_classes = [AllowAny]
 
-    def page(self, request: Request, queryset, store) -> dict:
-        paginator = StandardPagination()
+    def page(self, request: Request, queryset, store, link_params: dict) -> dict:
+        paginator = CanonicalPagination(link_params)
         products = paginator.paginate_queryset(
             services.with_card_data(queryset, store), request, view=self
         )
         return paginator.get_paginated_response(services.page_cards(products)).data
 
 
-def _page_key(request: Request) -> tuple:
-    """Pagination bodies hold absolute URLs: key on host and full path."""
-    return (request.get_host(), request.get_full_path())
+def _page_key(request: Request, link_params: dict, page: str) -> tuple:
+    """Pagination bodies hold absolute URLs: key on the host, the path and the canonical query
+    (validated parameters only; review #6), never the raw query string."""
+    return (request.get_host(), request.path, tuple(sorted(link_params.items())), page)
 
 
 class HomeView(APIView):
@@ -190,6 +191,8 @@ class ProductListView(_PublicStoreView):
         query.is_valid(raise_exception=True)
         params = query.validated_data
 
+        link_params, page = canonical_page_query(request, params)
+
         def build() -> dict:
             queryset = services.product_list_queryset(
                 store,
@@ -197,9 +200,10 @@ class ProductListView(_PublicStoreView):
                 collection=params.get("collection"),
                 sort=params["sort"],
             )
-            return self.page(request, queryset, store)
+            return self.page(request, queryset, store, link_params)
 
-        return Response(cached("products", store.pk, _page_key(request), build))
+        key = _page_key(request, link_params, page)
+        return Response(cached("products", store.pk, key, build))
 
 
 class ProductDetailView(_PublicStoreView):
@@ -280,11 +284,14 @@ class SearchView(_PublicStoreView):
         query.is_valid(raise_exception=True)
         params = query.validated_data
 
+        link_params, page = canonical_page_query(request, params)
+
         def build() -> dict:
             queryset = services.search_queryset(store, params["q"], params["sort"])
-            return self.page(request, queryset, store)
+            return self.page(request, queryset, store, link_params)
 
-        return Response(cached("search", store.pk, _page_key(request), build))
+        key = _page_key(request, link_params, page)
+        return Response(cached("search", store.pk, key, build))
 
 
 class SearchSuggestView(_PublicStoreView):

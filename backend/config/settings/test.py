@@ -25,6 +25,23 @@ ALLOWED_HOSTS = ["testserver", "localhost"]
 
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
+# The DB server is shared: a test run that is interrupted (Ctrl-C, killed agent) must not leave
+# a session idle inside a transaction, holding row locks, for other test runs to wait on.
+# PostgreSQL ends such a session after this long. Test databases only: in local, staging and
+# production `select_for_update` transactions are legitimate and must not be cut off.
+TEST_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS = 5 * 60 * 1000
+DATABASES = {
+    "default": {
+        **DATABASES["default"],
+        "OPTIONS": {
+            **DATABASES["default"]["OPTIONS"],
+            "options": (
+                f"-c idle_in_transaction_session_timeout={TEST_DB_IDLE_IN_TRANSACTION_TIMEOUT_MS}"
+            ),
+        },
+    }
+}
+
 # A dedicated Redis DB so tests (which may clear the cache) never touch dev data. REDIS_TEST_URL
 # gives the server; TEST_REDIS_DB (default 15) picks the DB index and overrides the URL's path, so
 # test runs in parallel (e.g. two agents) use separate DBs. DBs 0-2 are dev (cache, broker,

@@ -1,0 +1,74 @@
+{% extends "admin/base_site.html" %}
+{% load unfold %}
+{# Bulk stock inward (05 §2 Inventory, D-17). Step 1 uploads and previews (the service runs and is rolled back); step 2 applies the previewed rows through inventory.services.apply_inward_batch. Format: docs/admin-panel-architecture.md §10. #}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% endblock %}
+
+{% block content %}
+    {% if preview %}
+        <section class="bg-white border border-base-200 mb-6 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" data-testid="inward-preview">
+            <div class="border-b border-base-200 px-4 py-3 dark:border-base-800">
+                <h2 class="font-semibold text-font-important-light dark:text-font-important-dark">Check before applying: {{ preview|length }} line{{ preview|length|pluralize }}</h2>
+                <p class="text-xs text-font-subtle-light dark:text-font-subtle-dark">Nothing has changed yet. "After" is what on hand becomes if you apply now.</p>
+            </div>
+            <table class="w-full">
+                <thead>
+                    <tr class="text-left text-xs">
+                        <th scope="col" class="border-b border-base-200 font-semibold px-4 py-2 dark:border-base-800">SKU</th>
+                        <th scope="col" class="border-b border-base-200 font-semibold px-4 py-2 dark:border-base-800">Item</th>
+                        <th scope="col" class="border-b border-base-200 font-semibold px-4 py-2 text-right dark:border-base-800">Inward</th>
+                        <th scope="col" class="border-b border-base-200 font-semibold px-4 py-2 text-right dark:border-base-800">Before</th>
+                        <th scope="col" class="border-b border-base-200 font-semibold px-4 py-2 text-right dark:border-base-800">After</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in preview %}
+                        <tr>
+                            <td class="border-b border-base-200 px-4 py-2 dark:border-base-800">{{ row.sku }}</td>
+                            <td class="border-b border-base-200 px-4 py-2 dark:border-base-800">{{ row.item }}</td>
+                            <td class="border-b border-base-200 px-4 py-2 text-right dark:border-base-800">+{{ row.quantity }}</td>
+                            <td class="border-b border-base-200 px-4 py-2 text-right dark:border-base-800">{{ row.before }}</td>
+                            <td class="border-b border-base-200 font-semibold px-4 py-2 text-right dark:border-base-800">{{ row.after }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <form method="post" class="flex gap-3 items-center px-4 py-3">
+                {% csrf_token %}
+                <input type="hidden" name="confirm" value="yes">
+                <input type="hidden" name="store" value="{{ form.store.value }}">
+                <input type="hidden" name="reason" value="{{ form.reason.value }}">
+                {# A textarea keeps the line breaks (input values may lose them). #}
+                <textarea name="payload" hidden readonly aria-hidden="true">{{ form.payload.value }}</textarea>
+                {% component "unfold/components/button.html" with submit=1 %}Apply inward{% endcomponent %}
+                <a href="{% url 'admin:inventory_storeinventory_inward' %}" class="text-primary-600 dark:text-primary-500">Start again</a>
+            </form>
+        </section>
+    {% else %}
+        <section class="bg-white border border-base-200 max-w-3xl rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" data-testid="inward-form">
+            <div class="border-b border-base-200 px-4 py-3 dark:border-base-800">
+                <h2 class="font-semibold text-font-important-light dark:text-font-important-dark">Receive stock into a store</h2>
+                <p class="text-xs text-font-subtle-light dark:text-font-subtle-dark">
+                    CSV with the header <code>{{ header }}</code>, one SKU (or SAP item code) and a whole quantity per line, at most {{ max_rows }} lines.
+                    All lines are applied together or not at all. You see a preview first.
+                </p>
+            </div>
+            <form method="post" enctype="multipart/form-data" novalidate class="p-4">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="mb-4 text-red-600 dark:text-red-400" role="alert">
+                        {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+                    </div>
+                {% endif %}
+                {% include "unfold/helpers/field.html" with field=form.store %}
+                {% include "unfold/helpers/field.html" with field=form.file %}
+                {% include "unfold/helpers/field.html" with field=form.pasted %}
+                {% include "unfold/helpers/field.html" with field=form.reason %}
+                <div class="flex gap-3 items-center">
+                    {% component "unfold/components/button.html" with submit=1 %}Preview{% endcomponent %}
+                    <a href="{% url 'admin:inventory_storeinventory_changelist' %}" class="text-primary-600 dark:text-primary-500">Cancel</a>
+                </div>
+            </form>
+        </section>
+    {% endif %}
+{% endblock %}

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:jivo_core/jivo_core.dart';
 
@@ -60,6 +61,11 @@ class FakeTaskBackend
 
   /// The next arrived-at-store / arrived-at-customer is outside the geofence.
   bool outsideGeofenceNext = false;
+
+  /// Check arrivals against the real distance, like the server (~200 m,
+  /// 04 §2.5–§2.6). Off by default; the GPX integration harness turns it on.
+  bool enforceGeofence = false;
+  static const geofenceRadiusM = 200;
 
   /// The next accept loses the race to another rider.
   bool takenNext = false;
@@ -191,7 +197,7 @@ class FakeTaskBackend
   Future<RiderTask> arrivedAtStore(int taskId, GeoPoint at) async {
     await _call('arrivedAtStore');
     final task = _require(taskId, TaskStatus.assigned);
-    _geofence();
+    _geofence(at, task.store.location);
     return _update(task.copyWith(status: TaskStatus.atStore));
   }
 
@@ -231,7 +237,7 @@ class FakeTaskBackend
       'arrivedAtCustomer${overrideReason == null ? '' : ' override'}',
     );
     final task = _require(taskId, TaskStatus.pickedUp);
-    if (overrideReason == null) _geofence();
+    if (overrideReason == null) _geofence(at, task.customer?.location);
     return _update(
       task.copyWith(
         status: TaskStatus.atCustomer,
@@ -382,14 +388,38 @@ class FakeTaskBackend
     return task;
   }
 
-  void _geofence() {
-    if (!outsideGeofenceNext) return;
-    outsideGeofenceNext = false;
-    throw _error(
-      ApiErrorCode.outsideGeofence,
-      422,
-      details: {'distance_m': 450, 'radius_m': 200},
-    );
+  void _geofence(GeoPoint at, GeoPoint? target) {
+    if (outsideGeofenceNext) {
+      outsideGeofenceNext = false;
+      throw _error(
+        ApiErrorCode.outsideGeofence,
+        422,
+        details: {'distance_m': 450, 'radius_m': geofenceRadiusM},
+      );
+    }
+    if (!enforceGeofence || target == null) return;
+    final distance = distanceMetres(at, target).round();
+    if (distance > geofenceRadiusM) {
+      throw _error(
+        ApiErrorCode.outsideGeofence,
+        422,
+        details: {'distance_m': distance, 'radius_m': geofenceRadiusM},
+      );
+    }
+  }
+
+  /// Great-circle distance (haversine), for the fake geofence only.
+  static double distanceMetres(GeoPoint a, GeoPoint b) {
+    const earthRadiusM = 6371000.0;
+    double rad(double deg) => deg * math.pi / 180;
+    final dLat = rad(b.lat - a.lat);
+    final dLng = rad(b.lng - a.lng);
+    final h =
+        math.pow(math.sin(dLat / 2), 2) +
+        math.cos(rad(a.lat)) *
+            math.cos(rad(b.lat)) *
+            math.pow(math.sin(dLng / 2), 2);
+    return 2 * earthRadiusM * math.asin(math.sqrt(h));
   }
 
   RiderTask _update(RiderTask task) {

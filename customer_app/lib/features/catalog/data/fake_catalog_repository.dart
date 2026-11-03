@@ -4,7 +4,8 @@ import '../../location/domain/delivery_location.dart';
 import '../domain/catalog_models.dart';
 import 'catalog_repository.dart';
 
-/// TODO(api): placeholder catalog until the Phase 2 API is bound. It stands
+/// A placeholder catalog: a test double and the dev flavor's `FAKE_API=true`
+/// stand-in (staging and prod always use `ApiCatalogRepository`). It stands
 /// in for the server: prices, discounts, savings and orderable quantities
 /// below are server-style values, never computed by the app's own code.
 class FakeCatalogRepository implements CatalogRepository {

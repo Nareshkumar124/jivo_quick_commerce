@@ -18,8 +18,10 @@ PLATFORMS = frozenset({"android", "ios"})
 # "1.4.2" or "1.4.2+37" (Flutter version+build).
 # APP_VERSION_PATTERN: the same rule without named groups, portable to the OpenAPI contract
 # (Dart/JS regex engines reject Python's (?P<name>...)). Used to validate request fields.
-APP_VERSION_PATTERN = r"^\d{1,5}(?:\.\d{1,5}){0,3}(?:\+\d{1,9})?$"
-APP_VERSION_RE = re.compile(r"^(?P<version>\d{1,5}(?:\.\d{1,5}){0,3})(?:\+(?P<build>\d{1,9}))?$")
+APP_VERSION_PATTERN = r"^[0-9]{1,5}(?:\.[0-9]{1,5}){0,3}(?:\+[0-9]{1,9})?$"
+APP_VERSION_RE = re.compile(
+    r"^(?P<version>[0-9]{1,5}(?:\.[0-9]{1,5}){0,3})(?:\+(?P<build>[0-9]{1,9}))?$"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +68,33 @@ def client_info_middleware(get_response):
 
     def middleware(request):
         request.client_info = ClientInfo.from_headers(request.headers)
+        return get_response(request)
+
+    return middleware
+
+
+# --------------------------------------------------------------------------- staff time zone
+
+STAFF_PANEL_PREFIXES = ("/admin/", "/ops/")
+
+
+def staff_timezone_middleware(get_response):
+    """Signed-in staff see the admin and the Ops Console in IST (`STAFF_TIME_ZONE`): form
+    inputs and displayed datetimes are local, storage stays UTC (02 §5). `timezone.override`
+    per request, so nothing leaks into the next request served by the same thread."""
+    from zoneinfo import ZoneInfo
+
+    from django.conf import settings
+    from django.utils import timezone
+
+    staff_tz = ZoneInfo(settings.STAFF_TIME_ZONE)
+
+    def middleware(request):
+        if request.path.startswith(STAFF_PANEL_PREFIXES):
+            user = getattr(request, "user", None)
+            if user is not None and user.is_authenticated and user.is_staff:
+                with timezone.override(staff_tz):
+                    return get_response(request)
         return get_response(request)
 
     return middleware

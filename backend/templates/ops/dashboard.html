@@ -2,8 +2,18 @@
 {% load ops %}
 
 {% block content %}
-    {% if not customers and not staff_roles and not app_config %}
-        {% include "ops/components/empty_state.html" with icon="space_dashboard" title="No dashboard cards for your role yet" message="Your modules are in the menu. Cards for orders, stock and riders appear here as those modules go live." %}
+    {% if not customers and not staff_roles and not app_config and not operations %}
+        {% include "ops/components/empty_state.html" with icon="space_dashboard" title="No dashboard cards for your role yet" message="Your modules are in the menu. Cards for orders and riders appear here as those modules go live." %}
+    {% endif %}
+
+    {% if operations %}
+        <section class="mb-8" aria-labelledby="operations-heading">
+            <div class="flex items-center gap-3 mb-3">
+                <h2 id="operations-heading" class="font-semibold text-base text-font-important-light dark:text-font-important-dark">Stores and stock</h2>
+                <span class="text-xs text-font-subtle-light dark:text-font-subtle-dark">{% if operations.scoped %}Your assigned stores only.{% else %}All stores.{% endif %} Refreshes every minute.</span>
+            </div>
+            {% include "ops/partials/operations_kpis.html" %}
+        </section>
     {% endif %}
 
     {% if customers %}

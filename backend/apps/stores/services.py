@@ -343,18 +343,25 @@ def record_notify_me(
 
 
 def stores_for(user) -> QuerySet[DarkStore]:
-    """Stores a staff user may see (05 §3): every store for superusers and global roles (Super
-    Admin, Ops, Catalog, Support, Finance); only StaffStoreAccess stores for Store Manager /
-    Store Staff; none for anyone else."""
+    """Stores a staff user may see (05 §3). Fail closed:
+
+    - every store: superusers, and staff in a global role (`roles.GLOBAL_ROLES`: Super Admin,
+      Ops, Catalog Manager, Support, Finance) **and in no store-scoped role**;
+    - only their `StaffStoreAccess` stores: anyone in a store-scoped role (Store Manager,
+      Store Staff), even if they are also in a global or any other group (the stricter role
+      wins; PM to confirm for mixed global + store roles);
+    - none: everyone else (non-staff, inactive, no role, or only unknown groups). Unknown groups
+      never widen access.
+    """
     if not (user and user.is_authenticated and user.is_active and user.is_staff):
         return DarkStore.objects.none()
     if user.is_superuser:
         return DarkStore.objects.all()
     groups = set(user.groups.values_list("name", flat=True))
-    if groups - roles.STORE_SCOPED_ROLES:
-        return DarkStore.objects.all()
-    if groups:
+    if groups & roles.STORE_SCOPED_ROLES:
         return DarkStore.objects.filter(staff_access__user=user).distinct()
+    if groups & roles.GLOBAL_ROLES:
+        return DarkStore.objects.all()
     return DarkStore.objects.none()
 
 

@@ -89,6 +89,8 @@ class RiderProfile {
     this.rejectionReason,
     this.documents = const [],
     this.bankAccount,
+    this.photoUrl,
+    this.rating,
   });
 
   final RiderStatusEnum status;
@@ -114,6 +116,13 @@ class RiderProfile {
   final String? rejectionReason;
   final List<RiderDocument> documents;
   final BankAccountSummary? bankAccount;
+
+  /// The approved selfie, as a short-lived https URL (private bucket,
+  /// 09 §3.3). Null before approval.
+  final String? photoUrl;
+
+  /// `rating_avg` as the server sends it (`"4.8"`), null without ratings.
+  final String? rating;
 
   List<KycDocumentType> get requiredDocuments =>
       requiredDocumentsFor(vehicleType);
@@ -183,6 +192,8 @@ class RiderProfile {
         : rejectionReason ?? this.rejectionReason,
     documents: documents ?? this.documents,
     bankAccount: bankAccount ?? this.bankAccount,
+    photoUrl: photoUrl,
+    rating: rating,
   );
 
   /// This profile with [document] added or replacing the one of its type.
