@@ -54,3 +54,8 @@ STORAGES = {
         },
     },
 }
+
+# Phase 3: the fake payment gateway (no keys, no money; dev-only signing scheme in 06 §2.6).
+# Set PAYMENT_GATEWAY=apps.payments.gateways.RazorpayGateway plus the RAZORPAY_* keys in .env to
+# use Razorpay test mode locally.
+PAYMENT_GATEWAY = env_str("PAYMENT_GATEWAY", default="apps.payments.gateways.FakeRazorpayGateway")
