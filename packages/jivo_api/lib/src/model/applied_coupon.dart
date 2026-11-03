@@ -28,6 +28,8 @@ class AppliedCoupon {
     required this.isApplicable,
 
     required this.message,
+
+    required this.amountToUnlock,
   });
 
   @JsonKey(name: r'code', required: true, includeIfNull: false)
@@ -49,6 +51,10 @@ class AppliedCoupon {
   @JsonKey(name: r'message', required: true, includeIfNull: true)
   final String? message;
 
+  /// When it does not apply because the item total is below its minimum: the item value still needed (for the app's own 'Add items worth ₹X more'). Null otherwise. Added in Phase 3 R2b, like `CouponOffer.amount_to_unlock`.
+  @JsonKey(name: r'amount_to_unlock', required: true, includeIfNull: true)
+  final String? amountToUnlock;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -57,7 +63,8 @@ class AppliedCoupon {
           other.title == title &&
           other.discount == discount &&
           other.isApplicable == isApplicable &&
-          other.message == message;
+          other.message == message &&
+          other.amountToUnlock == amountToUnlock;
 
   @override
   int get hashCode =>
@@ -65,7 +72,8 @@ class AppliedCoupon {
       title.hashCode +
       discount.hashCode +
       isApplicable.hashCode +
-      (message == null ? 0 : message.hashCode);
+      (message == null ? 0 : message.hashCode) +
+      (amountToUnlock == null ? 0 : amountToUnlock.hashCode);
 
   factory AppliedCoupon.fromJson(Map<String, dynamic> json) =>
       _$AppliedCouponFromJson(json);
