@@ -58,8 +58,8 @@ Last updated: 2026-11-03 (Phase 3 kickoff).
 | T-209 | Customer binds P2 to the real contract and API | CUS | P0 | T-201, T-203 | Generated types and real repositories | Real-API integration test: browse | In Progress (`jivo_api` regenerated with `CatalogApi` and `ServiceabilityApi`; the P2 API is live on 8001) |
 | T-210 | Rider lookahead: registration, KYC (≤ 1 MB), bank details, status | RID | P1 | – | Screens and local models with fakes | Tests; masking; accepted at the P5 gate | Testing (201 tests green; merged to `develop` in `84bad46`; device test pending) |
 | T-224 | Rider P3 lookahead: offers, task flow, pickup, OTP, COD, failed delivery (fakes) | RID | P1 | – | Screens and controller | 300 tests; code review fixes applied; accepted at the P5 gate | Testing (merged `7dbce4f`) |
-| T-225 | Rider P4 lookahead: earnings, cash ledger, history, payouts, profile and documents; accept → deliver integration harness with GPX | RID | P2 | – | Screens with fakes, an integration test | Tests green; accepted at the P5 gate | In Progress (P3 run, branch `rider/phase-3`; WIP `b6b6eff` to be reviewed with it, T-307) |
-| T-211 | Rider adopts the promoted `jivo_core` helpers | RID | P2 | T-208 merged | Imports switched | Tests green | In Progress (P3 run) |
+| T-225 | Rider P4 lookahead: earnings, cash ledger, history, payouts, profile and documents; accept → deliver integration harness with GPX | RID | P2 | – | Screens with fakes, an integration test | Tests green; accepted at the P5 gate | In Review (done in `73b88f1` on `rider/phase-3`: 333 tests, analyze clean, dev APK builds; code review of `b6b6eff`+`73b88f1` running, T-307; device run of the GPX harness pending) |
+| T-211 | Rider adopts the promoted `jivo_core` helpers | RID | P2 | T-208 merged | Imports switched | Tests green | In Review (`73b88f1`, with T-225) |
 | T-212 | QA run 1: verify P0/P1, create the QA docs and black-box suite | QA | P0 | – | `qa/` (10 docs, suite, bugs) | P1 readiness verdict with evidence | Completed (`94854f7`: 130 cases, 7 bugs, verdict **P1 Not ready**) |
 | T-213 | QA: admin role-matrix tests | QA | P1 | T-206 | Test results | Every role tested | Not Started |
 | T-214 | QA: device test of the P1 apps | QA | P1 | free emulator | Functional report | Cases executed | Not Started |
@@ -109,7 +109,7 @@ flowchart LR
 ```
 
 ## Open API requests
-These are tracked in [`api-requests.md`](api-requests.md): rider location requests #2–#5, targeted at the P5 contract.
+These are tracked in [`api-requests.md`](api-requests.md): rider requests #2–#24, all targeted at the P5 contract.
 
 ## Waiting on you or Jivo
 | ID | Item | Status | Needed by |
