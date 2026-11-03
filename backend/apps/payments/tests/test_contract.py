@@ -44,6 +44,11 @@ class TestVerify:
             "razorpay_signature": ["This value does not match the required pattern."]
         }
 
+    def test_non_ascii_signature_is_a_validation_error(self, auth_client):
+        response = auth_client.post(VERIFY, {**ex.VERIFY_REQUEST, "razorpay_signature": "é" * 64})
+        assert response.status_code == 400
+        assert set(response.json()["error"]["details"]) == {"razorpay_signature"}
+
     def test_valid_request_reaches_the_r1_stub(self, auth_client):
         response = auth_client.post(VERIFY, ex.VERIFY_REQUEST)
         assert response.status_code == 503
@@ -94,6 +99,15 @@ class TestWebhook:
             "message": "The webhook signature is invalid.",
             "details": {},
         }
+
+    @pytest.mark.parametrize("signature", ["é" * 64, "\u0663" * 64])
+    def test_non_ascii_signature_is_400_not_500(self, api_client, signature):
+        """Code review of R1: compare_digest on non-ASCII str raised TypeError (500)."""
+        raw, _ = signed(ex.WEBHOOK_PAYMENT_CAPTURED)
+        headers = {"X-Razorpay-Signature": signature, "X-Razorpay-Event-Id": EVENT_ID}
+        response = post_raw(api_client, raw, headers)
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "PAYMENT_VERIFICATION_FAILED"
 
     def test_signature_covers_the_exact_bytes(self, api_client):
         """Re-serialising the same JSON differently breaks the signature (raw body HMAC)."""

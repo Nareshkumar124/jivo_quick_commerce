@@ -5,9 +5,11 @@ stored (Phase 3 R2a). Phase 4 adds the order detail (timeline, invoice) to the s
 shape; additions are backward compatible.
 """
 
+import copy
+
 from rest_framework import serializers
 
-from apps.accounts.validators import indian_mobile_validator
+from apps.accounts.serializers import AddressSerializer
 from apps.cart.serializers import BillSerializer, DeliveryInstructionsSerializer
 from apps.catalog.serializers import ImageSetSerializer, money
 from apps.orders.choices import (
@@ -26,23 +28,49 @@ class OrderStoreSerializer(serializers.Serializer):
     name = serializers.CharField(help_text='e.g. "Jivo Sector 14, Gurugram".')
 
 
+# The fields of `AddressSerializer` a delivery address snapshot keeps (07 §2.6): no id, default
+# or serviceability flags, no timestamps. Same field definitions, so the snapshot serialises
+# exactly like the saved address (types, bounds, 6-decimal coordinates).
+ORDER_ADDRESS_FIELDS = (
+    "label",
+    "custom_label",
+    "receiver_name",
+    "receiver_phone",
+    "house",
+    "building_street",
+    "landmark",
+    "area",
+    "city",
+    "state",
+    "pincode",
+    "lat",
+    "lng",
+)
+
+
+# The Address help texts of these fields describe editing (reset with ""); a snapshot is final.
+SNAPSHOT_HELP = {
+    "receiver_name": "Who receives the order, as it was at order time.",
+    "receiver_phone": "The receiver's phone at order time (E.164).",
+}
+
+
 class OrderAddressSerializer(serializers.Serializer):
     """The delivery address as it was when the order was placed (a snapshot: later edits to the
-    saved address do not change it)."""
+    saved address do not change it). Same fields and types as `Address`."""
 
-    label = serializers.CharField(help_text="home / work / other.")
-    custom_label = serializers.CharField(allow_blank=True)
-    receiver_name = serializers.CharField()
-    receiver_phone = serializers.CharField(validators=[indian_mobile_validator])
-    house = serializers.CharField()
-    building_street = serializers.CharField()
-    landmark = serializers.CharField(allow_blank=True)
-    area = serializers.CharField(allow_blank=True)
-    city = serializers.CharField()
-    state = serializers.CharField()
-    pincode = serializers.CharField()
-    lat = serializers.FloatField()
-    lng = serializers.FloatField()
+    def get_fields(self):
+        source = AddressSerializer().get_fields()
+        fields = {}
+        for name in ORDER_ADDRESS_FIELDS:
+            field = copy.deepcopy(source[name])
+            # A snapshot always has every field (the saved address filled the defaults).
+            field.required = True
+            field.read_only = False
+            if name in SNAPSHOT_HELP:
+                field.help_text = SNAPSHOT_HELP[name]
+            fields[name] = field
+        return fields
 
 
 class OrderLineSerializer(serializers.Serializer):

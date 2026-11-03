@@ -85,17 +85,6 @@ class TestAccessAndHeaders:
         assert response.status_code == 404
         assert response.json()["error"]["code"] == "STORE_NOT_FOUND"
 
-    @pytest.mark.parametrize(("method", "path"), CART_OPERATIONS)
-    def test_valid_requests_reach_the_r1_stub(self, auth_client, method, path):
-        from apps.stores.tests.factories import DarkStoreFactory
-
-        store = DarkStoreFactory()
-        response = getattr(auth_client, method)(
-            path, VALID_BODIES.get((method, path)), headers={"X-Store-Id": str(store.pk)}
-        )
-        assert response.status_code == 503
-        assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
-
     def test_get_validates_address_id(self, auth_client):
         from apps.stores.tests.factories import DarkStoreFactory
 

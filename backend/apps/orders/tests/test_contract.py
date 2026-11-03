@@ -9,6 +9,7 @@ from decimal import Decimal
 import pytest
 from django.urls import reverse
 
+from apps.accounts.tests.factories import UserFactory
 from apps.cart import examples as cart_ex
 from apps.core.idempotency import KEY_INVALID, KEY_REQUIRED
 from apps.orders import examples as ex
@@ -25,6 +26,7 @@ PAYMENT_WINDOW = timedelta(minutes=15)
 
 def test_routes():
     assert reverse("order-list") == "/api/v1/orders/"
+    assert reverse("order-detail", args=[5012]) == "/api/v1/orders/5012/"
     assert reverse("order-retry-payment", args=[5012]) == "/api/v1/orders/5012/retry-payment/"
     assert reverse("order-cancel", args=[5012]) == "/api/v1/orders/5012/cancel/"
 
@@ -43,6 +45,7 @@ class TestAccess:
         ("method", "path"),
         [
             ("get", "/api/v1/orders/"),
+            ("get", "/api/v1/orders/5012/"),
             ("post", "/api/v1/orders/"),
             ("post", "/api/v1/orders/5012/retry-payment/"),
             ("post", "/api/v1/orders/5012/cancel/"),
@@ -248,3 +251,66 @@ class TestCheckoutExamples:
         assert active <= ACTIVE_STATUSES
         assert past <= TERMINAL_STATUSES
         assert ex.ORDERS_ACTIVE["results"][0]["grand_total"] == "753.00"
+
+
+@pytest.mark.django_db
+class TestThrottles:
+    """Code review of R1: order placement and payment calls are rate limited per user, and fail
+    open when Redis is down (a lost limit is better than a lost order)."""
+
+    def test_placement_is_limited_per_user(self, auth_client, make_auth_client, monkeypatch):
+        from apps.core.throttling import OrderPlacementThrottle
+
+        monkeypatch.setattr(OrderPlacementThrottle, "THROTTLE_RATES", {"orders_create": "2/hour"})
+        for _ in range(2):
+            assert auth_client.post("/api/v1/orders/", {}).status_code == 400  # no key
+        response = auth_client.post("/api/v1/orders/", {})
+        assert response.status_code == 429
+        assert response.json()["error"]["code"] == "RATE_LIMITED"
+        assert "retry_after_seconds" in response.json()["error"]["details"]
+        assert auth_client.get("/api/v1/orders/").status_code == 503  # reading is not limited
+        other = make_auth_client(UserFactory())
+        assert other.post("/api/v1/orders/", {}).status_code == 400  # per user
+
+    def test_payment_calls_are_limited(self, auth_client, monkeypatch):
+        from apps.core.throttling import PaymentThrottle
+
+        monkeypatch.setattr(PaymentThrottle, "THROTTLE_RATES", {"payments": "1/hour"})
+        assert auth_client.post("/api/v1/orders/5012/retry-payment/").status_code == 400
+        assert auth_client.post("/api/v1/payments/razorpay/verify/", {}).status_code == 429
+
+    def test_fails_open_when_redis_is_down(self, auth_client, monkeypatch):
+        from apps.core.throttling import OrderPlacementThrottle
+
+        class BrokenCache:
+            def get(self, *args, **kwargs):
+                raise ConnectionError("redis down")
+
+        monkeypatch.setattr(OrderPlacementThrottle, "THROTTLE_RATES", {"orders_create": "1/hour"})
+        monkeypatch.setattr(OrderPlacementThrottle, "cache", BrokenCache())
+        for _ in range(3):
+            assert auth_client.post("/api/v1/orders/", {}).status_code == 400
+
+
+def test_pending_order_conflict_is_documented():
+    """PM decision (Phase 3): one unpaid order at a time."""
+    from drf_spectacular.generators import SchemaGenerator
+
+    schema = SchemaGenerator().get_schema(request=None, public=True)
+    responses = schema["paths"]["/api/v1/orders/"]["post"]["responses"]
+    examples = responses["409"]["content"]["application/json"]["examples"]
+    pending = next(
+        example["value"]["error"]
+        for example in examples.values()
+        if example.get("summary") == "PAYMENT_PENDING_ORDER_EXISTS"
+    )
+    assert (pending["code"], pending["details"]) == (
+        "INVALID_STATE_TRANSITION",
+        {"pending_order_id": 5012},
+    )
+    for path, method in [
+        ("/api/v1/orders/", "post"),
+        ("/api/v1/orders/{id}/retry-payment/", "post"),
+        ("/api/v1/payments/razorpay/verify/", "post"),
+    ]:
+        assert "429" in schema["paths"][path][method]["responses"], path

@@ -6,8 +6,9 @@ so lines keep their quantities and take that store's prices and stock. Every cha
 whole cart with its bill, so the app never computes money. The cart never reserves stock; only
 placing an order does (08 §6.1).
 
-Phase 3 R1 (contract): the views authenticate, check the store header and validate the request,
-then answer 503 until the internals land in R2.
+Views are thin: resolve the store (`X-Store-Id`), validate, call `apps.cart.services`, return
+`services.cart_body()`. The cart is always the caller's own (`get_cart(request.user, ...)`), so
+another user's line or address id is never reachable.
 """
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -16,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.cart import examples as ex
+from apps.cart import services
 from apps.cart.serializers import (
     CartItemAddSerializer,
     CartItemUpdateSerializer,
@@ -33,7 +35,6 @@ from apps.core.schema import (
     request_examples,
     validation_error,
 )
-from apps.core.stubs import not_available_yet
 from apps.promotions import examples as promo
 from apps.promotions.serializers import CouponListSerializer
 from apps.stores.context import get_store
@@ -84,6 +85,12 @@ CART_EXAMPLES = (
 LINE_ID = OpenApiParameter("id", int, OpenApiParameter.PATH, description="Cart line `id`.")
 
 
+def _cart(request: Request, cart, store) -> Response:
+    """The whole cart after a change (fresh from the database: lines, coupon, address)."""
+    cart.refresh_from_db()
+    return Response(services.cart_body(cart, store, request.user))
+
+
 class CartView(APIView):
     http_method_names = ["get", "patch", "delete", "options"]
 
@@ -109,9 +116,14 @@ class CartView(APIView):
         ),
     )
     def get(self, request: Request) -> Response:
-        get_store(request)
-        CartQuerySerializer(data=request.query_params).is_valid(raise_exception=True)
-        not_available_yet()
+        store = get_store(request)
+        query = CartQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        address = None
+        if "address_id" in query.validated_data:
+            address = services.resolve_address(request.user, query.validated_data["address_id"])
+        cart = services.get_cart(request.user, store)
+        return Response(services.cart_body(cart, store, request.user, address=address))
 
     @extend_schema(
         operation_id="cart_update",
@@ -150,9 +162,12 @@ class CartView(APIView):
         ),
     )
     def patch(self, request: Request) -> Response:
-        get_store(request)
-        CartUpdateSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet()
+        store = get_store(request)
+        serializer = CartUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        cart = services.get_cart(request.user, store)
+        services.update_cart(cart, store, request.user, serializer.validated_data)
+        return _cart(request, cart, store)
 
     @extend_schema(
         operation_id="cart_clear",
@@ -172,8 +187,10 @@ class CartView(APIView):
         ),
     )
     def delete(self, request: Request) -> Response:
-        get_store(request)
-        not_available_yet()
+        store = get_store(request)
+        cart = services.get_cart(request.user, store)
+        services.clear_cart(cart)
+        return _cart(request, cart, store)
 
 
 class CartItemListView(APIView):
@@ -209,9 +226,13 @@ class CartItemListView(APIView):
         ),
     )
     def post(self, request: Request) -> Response:
-        get_store(request)
-        CartItemAddSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet()
+        store = get_store(request)
+        serializer = CartItemAddSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        cart = services.get_cart(request.user, store)
+        data = serializer.validated_data
+        services.set_quantity(cart, store, data["variant_id"], data["quantity"])
+        return _cart(request, cart, store)
 
 
 class CartItemDetailView(APIView):
@@ -245,9 +266,12 @@ class CartItemDetailView(APIView):
         ),
     )
     def patch(self, request: Request, id: int) -> Response:
-        get_store(request)
-        CartItemUpdateSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet()
+        store = get_store(request)
+        serializer = CartItemUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        cart = services.get_cart(request.user, store)
+        services.update_line(cart, store, id, serializer.validated_data["quantity"])
+        return _cart(request, cart, store)
 
     @extend_schema(
         operation_id="cart_items_delete",
@@ -267,8 +291,10 @@ class CartItemDetailView(APIView):
         ),
     )
     def delete(self, request: Request, id: int) -> Response:
-        get_store(request)
-        not_available_yet()
+        store = get_store(request)
+        cart = services.get_cart(request.user, store)
+        services.delete_line(cart, id)
+        return _cart(request, cart, store)
 
 
 class CartCouponListView(APIView):
@@ -294,8 +320,9 @@ class CartCouponListView(APIView):
         ),
     )
     def get(self, request: Request) -> Response:
-        get_store(request)
-        not_available_yet()
+        store = get_store(request)
+        cart = services.get_cart(request.user, store)
+        return Response(services.coupon_list_body(cart, store, request.user))
 
 
 class CartCouponView(APIView):
@@ -364,9 +391,12 @@ class CartCouponView(APIView):
         ),
     )
     def post(self, request: Request) -> Response:
-        get_store(request)
-        CouponApplySerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet()
+        store = get_store(request)
+        serializer = CouponApplySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        cart = services.get_cart(request.user, store)
+        services.apply_coupon(cart, store, request.user, serializer.validated_data["code"])
+        return _cart(request, cart, store)
 
     @extend_schema(
         operation_id="cart_coupon_remove",
@@ -385,5 +415,7 @@ class CartCouponView(APIView):
         ),
     )
     def delete(self, request: Request) -> Response:
-        get_store(request)
-        not_available_yet()
+        store = get_store(request)
+        cart = services.get_cart(request.user, store)
+        services.remove_coupon(cart)
+        return _cart(request, cart, store)

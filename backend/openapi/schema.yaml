@@ -7597,10 +7597,22 @@ paths:
                           requested_quantity: 1
                           orderable_quantity: 0
                   summary: STOCK_UNAVAILABLE
+                PAYMENTPENDINGORDEREXISTS:
+                  value:
+                    error:
+                      code: INVALID_STATE_TRANSITION
+                      message: You have an order awaiting payment. Complete or cancel
+                        it first.
+                      details:
+                        pending_order_id: 5012
+                  summary: PAYMENT_PENDING_ORDER_EXISTS
           description: '`PRICE_CHANGED`: the bill is not the one the customer saw;
             reload the cart and show it. `STOCK_UNAVAILABLE`: some lines cannot be
             supplied (`details.items` with the `orderable_quantity` now); reload the
-            cart, whose lines show the fix.'
+            cart, whose lines show the fix. `INVALID_STATE_TRANSITION` with `details.pending_order_id`:
+            another of the customer''s orders is still awaiting payment; offer to
+            complete it (retry-payment) or cancel it first (PM decision, Phase 3:
+            one unpaid order at a time, so stock is never held twice).'
         '422':
           content:
             application/json:
@@ -7675,6 +7687,22 @@ paths:
                   summary: COUPON_USAGE_EXCEEDED
           description: The cart cannot be ordered as it is (the cart's `checkout.blockers`
             show the same problems in advance).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
         '503':
           content:
             application/json:
@@ -7816,6 +7844,425 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+  /api/v1/orders/{id}/:
+    get:
+      operationId: orders_retrieve
+      description: 'The order with its bill, items and state (added to Phase 3, PM
+        decision): poll it after checkout while the payment is being confirmed (e.g.
+        verify''s response was lost), and for the success screen. Another user''s
+        order id is a 404. Phase 4 adds the status timeline and invoice to the same
+        shape.'
+      summary: One of my orders
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: '`Order.id`.'
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+              examples:
+                AwaitingPayment:
+                  value:
+                    id: 5012
+                    order_number: JV-261103-000123
+                    status: PAYMENT_PENDING
+                    payment_method: ONLINE
+                    payment_status: PENDING
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      line_mrp_total: '698.00'
+                      line_total: '558.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 3
+                    bill:
+                      mrp_total: '948.00'
+                      item_total: '783.00'
+                      product_discount: '165.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '753.00'
+                      total_savings: '215.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    placed_at: null
+                    payment_expires_at: '2026-11-03T06:45:00Z'
+                    eta_at: null
+                    can_cancel: true
+                    can_retry_payment: true
+                  summary: Awaiting payment
+                PaidOnline:
+                  value:
+                    id: 5012
+                    order_number: JV-261103-000123
+                    status: PLACED
+                    payment_method: ONLINE
+                    payment_status: PAID
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      line_mrp_total: '698.00'
+                      line_total: '558.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 3
+                    bill:
+                      mrp_total: '948.00'
+                      item_total: '783.00'
+                      product_discount: '165.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '753.00'
+                      total_savings: '215.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    placed_at: '2026-11-03T06:32:10Z'
+                    payment_expires_at: null
+                    eta_at: '2026-11-03T06:46:00Z'
+                    can_cancel: true
+                    can_retry_payment: false
+                  summary: Paid online
+                CashOnDelivery:
+                  value:
+                    id: 5011
+                    order_number: JV-261103-000122
+                    status: PLACED
+                    payment_method: COD
+                    payment_status: COD_PENDING
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      line_mrp_total: '698.00'
+                      line_total: '558.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 3
+                    bill:
+                      mrp_total: '948.00'
+                      item_total: '783.00'
+                      product_discount: '165.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '753.00'
+                      total_savings: '215.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    placed_at: '2026-11-03T06:30:00Z'
+                    payment_expires_at: null
+                    eta_at: '2026-11-03T06:44:00Z'
+                    can_cancel: true
+                    can_retry_payment: false
+                  summary: Cash on delivery
+                CancelledBeforePaying:
+                  value:
+                    id: 5012
+                    order_number: JV-261103-000123
+                    status: CANCELLED
+                    payment_method: ONLINE
+                    payment_status: FAILED
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      line_mrp_total: '698.00'
+                      line_total: '558.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 3
+                    bill:
+                      mrp_total: '948.00'
+                      item_total: '783.00'
+                      product_discount: '165.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '753.00'
+                      total_savings: '215.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    placed_at: null
+                    payment_expires_at: null
+                    eta_at: null
+                    can_cancel: false
+                    can_retry_payment: false
+                  summary: Cancelled before paying
+          description: The order.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Order not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The order does not exist or is not the caller's.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/orders/{id}/cancel/:
     post:
       operationId: orders_cancel
@@ -8265,6 +8712,22 @@ paths:
           description: '`INVALID_STATE_TRANSITION`: the order is not awaiting payment
             any more (paid, failed or cancelled; `details.status`), or the window
             has ended.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
         '503':
           content:
             application/json:
@@ -8502,6 +8965,22 @@ paths:
                   summary: INVALID_STATE_TRANSITION
           description: '`INVALID_STATE_TRANSITION`: the order is no longer awaiting
             payment (`details.status` PAYMENT_FAILED or CANCELLED).'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
         '426':
           content:
             application/json:
@@ -11910,38 +12389,60 @@ components:
       type: object
       description: |-
         The delivery address as it was when the order was placed (a snapshot: later edits to the
-        saved address do not change it).
+        saved address do not change it). Same fields and types as `Address`.
       properties:
         label:
-          type: string
-          description: home / work / other.
+          $ref: '#/components/schemas/AddressLabelEnum'
         custom_label:
           type: string
+          description: Shown instead of the label when set, e.g. "Mom's place".
+          maxLength: 40
         receiver_name:
           type: string
+          description: Who receives the order, as it was at order time.
+          maxLength: 120
         receiver_phone:
-          type: string
-          pattern: ^\+91[6-9][0-9]{9}$
+          description: The receiver's phone at order time (E.164).
+          oneOf:
+          - type: string
+            pattern: ^\+91[6-9][0-9]{9}$
+          - type: string
+            maxLength: 0
         house:
           type: string
+          description: House / flat / floor.
+          maxLength: 120
         building_street:
           type: string
+          description: Building and street.
+          maxLength: 200
         landmark:
           type: string
+          maxLength: 120
         area:
           type: string
+          maxLength: 120
         city:
           type: string
+          maxLength: 80
         state:
           type: string
+          maxLength: 80
         pincode:
           type: string
+          pattern: ^[1-9][0-9]{5}$
         lat:
           type: number
           format: double
+          maximum: 90
+          minimum: -90
+          description: Map pin latitude (WGS84). Required. Stored to 6 decimal places.
         lng:
           type: number
           format: double
+          maximum: 180
+          minimum: -180
+          description: Map pin longitude (WGS84). Required. Stored to 6 decimal places.
       required:
       - area
       - building_street

@@ -260,3 +260,77 @@ class TestPaymentGatewayCheck:
         for settings_module in loaded.values():
             assert settings_module.PAYMENT_GATEWAY == RAZORPAY
             assert settings_module.PAYMENT_GATEWAY not in gateways.FAKE_GATEWAYS
+
+
+class TestNonAsciiSignatures:
+    """Code review of R1: a non-ASCII signature must be a refusal, never a TypeError (500)."""
+
+    @pytest.mark.parametrize("signature", ["é" * 64, "bc4bcc84é", "٣" * 64, " é "])
+    def test_payment_signature(self, signature):
+        assert not FakeRazorpayGateway().verify_payment_signature(
+            order_id=ex.VERIFY_REQUEST["razorpay_order_id"],
+            payment_id=ex.VERIFY_REQUEST["razorpay_payment_id"],
+            signature=signature,
+        )
+
+    @pytest.mark.parametrize("signature", ["é" * 64, "٣" * 64])
+    def test_webhook_signature(self, signature):
+        assert not FakeRazorpayGateway().verify_webhook_signature(b"{}", signature)
+
+
+@pytest.mark.django_db
+class TestRazorpayKeysCheck:
+    """payments.E003 (code review of R1): `check --deploy` flags a real deployment of the
+    Razorpay gateway without keys; CI's dry run (example.com hosts, no keys) stays green."""
+
+    def errors(self, settings, *, environment="production", hosts=("api.jivo.in",), **keys):
+        settings.APP_ENVIRONMENT = environment
+        settings.OTP_TEST_NUMBERS = {}
+        settings.PAYMENT_GATEWAY = RAZORPAY
+        settings.ALLOWED_HOSTS = list(hosts)
+        for name in ("RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "RAZORPAY_WEBHOOK_SECRET"):
+            setattr(settings, name, keys.get(name, ""))
+        return [e for e in run_checks(include_deployment_checks=True) if e.id == "payments.E003"]
+
+    @pytest.mark.parametrize("environment", ["staging", "production"])
+    def test_missing_keys_on_a_real_deployment(self, settings, environment):
+        errors = self.errors(settings, environment=environment, RAZORPAY_KEY_ID="rzp_live_x")
+        assert len(errors) == 1
+        assert "RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET" in errors[0].msg
+
+    def test_all_keys_set(self, settings):
+        keys = {"RAZORPAY_KEY_ID": "a", "RAZORPAY_KEY_SECRET": "b", "RAZORPAY_WEBHOOK_SECRET": "c"}
+        assert self.errors(settings, **keys) == []
+
+    @pytest.mark.parametrize(
+        "hosts",
+        [
+            ("api.example.com",),
+            ("example.org", "x.example.net"),
+            ("api.jivo.test",),
+            ("a.invalid",),
+        ],
+    )
+    def test_dry_run_hosts_are_skipped(self, settings, hosts):
+        assert self.errors(settings, hosts=hosts) == []
+
+    @pytest.mark.parametrize(
+        "hosts", [("api.example.com", "api.jivo.in"), ("*",), ("myexample.com",)]
+    )
+    def test_a_real_host_is_never_a_dry_run(self, settings, hosts):
+        assert len(self.errors(settings, hosts=hosts)) == 1
+
+    @pytest.mark.parametrize("environment", ["local", "test"])
+    def test_not_outside_deployed_environments(self, settings, environment):
+        assert self.errors(settings, environment=environment) == []
+
+    def test_not_for_the_fake_gateway(self, settings):
+        self.errors(settings)
+        settings.PAYMENT_GATEWAY = FAKE  # refused by payments.E001 instead
+        ids = {e.id for e in run_checks(include_deployment_checks=True)}
+        assert "payments.E003" not in ids
+        assert "payments.E001" in ids
+
+    def test_only_with_deploy_checks(self, settings):
+        self.errors(settings)
+        assert not [e for e in run_checks() if e.id == "payments.E003"]
