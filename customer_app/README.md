@@ -87,11 +87,74 @@ Then build as usual. How it is wired:
   `mappls_olf_data` and copies the `.conf` file to
   `android/app/src/<variant>/assets/mappls-conf.txt`. That path is
   gitignored too.
-- `MainActivity.kt` answers the `in.jivo.quick/maps` channel with whether
-  both are in the APK. `PlatformMapsAvailability` asks it, so a map is only
-  created when the SDK can authenticate. A map error (for example failed
-  authentication) also falls back, and the code is logged
+- `MainActivity.kt` answers `prepare` on the `in.jivo.quick/maps` channel
+  (see "Why Mappls starts lazily" below). `PlatformMapsAvailability` calls
+  it only when a screen needs a map, so a map is only created when the
+  config is in the APK and the SDK accepted it. A map error (for example
+  failed authentication) also falls back, and the code is logged
   (`Mappls map error <code>: <message>` in `flutter logs`/logcat).
+
+### Why Mappls starts lazily (launch crash, 2026-11-03)
+
+**Symptom.** The app crashed at launch on a phone (dev release build), on
+the thread `pool-N-thread-1`, with an uncaught `IllegalStateException`:
+- no config built in: `Please apply plugin"com.mappls.services.android"…`
+- config present but not registered for the package/fingerprint:
+  `You are using Invalid Configuration. Please check your Package Name /
+  App Fingerprint…`
+
+**Root cause.** Not a manifest provider (the merged manifest has none from
+Mappls). The flutter tool generates
+`android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java`,
+which registers every plugin on every engine start. mappls_gl's
+`MapplsMapsPlugin.onAttachedToEngine` creates `GlobalMethodHandler`, whose
+constructor calls `Mappls.getInstance(context)`. That runs the SDK's config
+check (`MapplsApiManager.init` → `MapplsInitialiser.initialise`) on its own
+executor thread, which throws and kills the process before any Dart code
+can fall back. A swallowing uncaught-exception handler is not a fix: Android
+still logs `FATAL EXCEPTION` to the crash buffer, and the SDK is left
+half-started.
+
+**Fix.**
+1. `android/app/build.gradle.kts`, task `stripMapplsAutoRegistration`:
+   before Kotlin/Java compilation it removes the `MapplsMapsPlugin` block
+   from the generated registrant (the flutter tool writes that file before
+   Gradle runs). It only rewrites the file when it changes, and **fails the
+   build** if `MapplsMapsPlugin` is still in it afterwards, so a template
+   change can't silently bring the crash back. Background engines use the
+   same registrant, so they never start Mappls either.
+2. `MainActivity` registers the plugin on demand. On `prepare` it checks,
+   once per process and off the main thread:
+   - the `mappls_olf_data` resource and `mappls-conf.txt` asset are in the
+     APK (if not, the SDK is never touched);
+   - the SDK's own check, `MapplsInitialiser.getInstance().initialise()`,
+     passes inside a try/catch. It is the exact call that throws in both
+     crash cases, so a bad config is caught here instead of on the SDK's
+     thread. Failures log `Mappls unavailable: <exception>` (tag
+     `JivoMaps`, never the config contents).
+
+   Only then is `MapplsMapsPlugin()` added to the engine (main thread, once
+   per engine), and `prepare` returns true. Otherwise it returns false and
+   the picker shows "Map isn't available".
+3. `compileOnly("com.mappls.sdk:mappls-core:1.0.2")` in
+   `android/app/build.gradle.kts` makes `MapplsInitialiser` visible to
+   `MainActivity`; the runtime copy still comes from mappls_gl.
+
+**Re-check after any mappls_gl (or Flutter) upgrade:**
+- `mappls-core`'s version in `android/app/build.gradle.kts` must equal the
+  one mappls_gl resolves
+  (`cd android && ./gradlew :app:dependencies --configuration devReleaseRuntimeClasspath | grep mappls-core`).
+- `GlobalMethodHandler`/`MapplsMapsPlugin` in the new plugin: if it still
+  starts the SDK on attach, keep the strip. If the strip task fails the
+  build, update its regex to the new registrant format.
+- `MapplsInitialiser.initialise(Context)` must still exist and still be the
+  call that validates the config.
+- Launch check on a device, without config (`tool/setup_mappls.sh
+  --remove`) and with it: build the dev release APK, `adb logcat -b crash
+  -c`, start the app, wait ~10 s, then `pidof in.jivo.quick.dev` must print
+  a pid and `adb logcat -b crash -d` must have no `FATAL`. Then open "Pick
+  on map": with an unregistered config it shows the fallback, and logcat
+  shows `JivoMaps: Mappls unavailable: …`.
 
 **Registration.** In the Mappls console, register every package name the
 config must work for, with the signing certificate's fingerprints:
@@ -113,13 +176,15 @@ Requirements (mappls_gl 2.0.7):
   1.9.0 and AGP 8.8.2 in its own buildscript; the app's AGP and Kotlin
   versions are used.
 - It adds the `https://maven.mappls.com/repository/mappls/` Maven repository.
-- **Keep `mappls_gl` pinned at exactly 2.0.7.** Two things depend on its
+- **Keep `mappls_gl` pinned at exactly 2.0.7.** These depend on its
   internals and must be re-checked on any upgrade:
   - The no-config guard in `android/build.gradle.kts` matches the plugin's
     `generate<Variant>MapplsRes` task names. If they change, builds without
     config fail again.
   - `MainActivity` looks for the `mappls_olf_data` resource and the
     `mappls-conf.txt` asset that the plugin generates.
+  - The lazy start above: the registrant strip, `MapplsInitialiser`, and the
+    `mappls-core` version (see "Re-check after any mappls_gl upgrade").
 - **AGP upgrade risk.** The plugin uses the legacy variant API
   (`applicationVariants`), which works only with `android.newDsl=false` in
   `android/gradle.properties` (AGP 9.1). Removing that flag, or an AGP
