@@ -32,7 +32,7 @@ class FakeHistoryBackend extends FakeApiEndpoint
         TaskHistoryEntry(
           taskId: 600 - i,
           orderNumber: 'JQ-10${501 - i}',
-          completedAt: today.subtract(Duration(hours: 3 * i)),
+          completedAt: completedAtOf(today, i),
           storeName: 'Jivo Sector 18',
           dropLocality: i.isEven ? 'Sector 21, Noida' : 'Sector 27, Noida',
           status: statuses[i % statuses.length],
@@ -46,5 +46,15 @@ class FakeHistoryBackend extends FakeApiEndpoint
         ),
     ];
     return pageOf(all, page);
+  }
+
+  /// Four tasks a day, newest first: entry [i] ended on the IST day
+  /// `today - i ~/ 4` (today: an IST date as `istToday()` returns it) at
+  /// 11:40, 10:45, 09:20 or 08:05 IST.
+  static DateTime completedAtOf(DateTime today, int i) {
+    const times = [(11, 40), (10, 45), (9, 20), (8, 5)];
+    final (hour, minute) = times[i % times.length];
+    final day = today.subtract(Duration(days: i ~/ times.length));
+    return istWallClock(day, hour, minute);
   }
 }

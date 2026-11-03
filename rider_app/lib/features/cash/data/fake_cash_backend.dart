@@ -25,13 +25,14 @@ class FakeCashBackend extends FakeApiEndpoint implements CashRepository {
   Future<CashLedgerPage> fetchLedger({int page = 1}) async {
     await recordCall('fetchLedger $page');
     final today = istToday(_clock());
+    final yesterday = today.subtract(const Duration(days: 1));
     final all = <CashEntry>[
       CashEntry(
         id: 30,
         type: CashEntryType.codCollected,
         amount: '1249.00',
         balanceAfter: limitReached ? '5249.00' : '2149.00',
-        recordedAt: today.add(const Duration(hours: 6, minutes: 10)),
+        recordedAt: istWallClock(today, 11, 40),
         orderNumber: 'JQ-10501',
       ),
       CashEntry(
@@ -39,7 +40,7 @@ class FakeCashBackend extends FakeApiEndpoint implements CashRepository {
         type: CashEntryType.codCollected,
         amount: '900.00',
         balanceAfter: limitReached ? '4000.00' : '900.00',
-        recordedAt: today.add(const Duration(hours: 4, minutes: 40)),
+        recordedAt: istWallClock(today, 10, 10),
         orderNumber: 'JQ-10498',
       ),
       CashEntry(
@@ -47,7 +48,7 @@ class FakeCashBackend extends FakeApiEndpoint implements CashRepository {
         type: CashEntryType.deposit,
         amount: '-3100.00',
         balanceAfter: '0.00',
-        recordedAt: today.subtract(const Duration(hours: 10)),
+        recordedAt: istWallClock(yesterday, 19, 30),
         note: 'Deposited at Jivo Sector 18',
       ),
       CashEntry(
@@ -55,7 +56,7 @@ class FakeCashBackend extends FakeApiEndpoint implements CashRepository {
         type: CashEntryType.adjustment,
         amount: '-50.00',
         balanceAfter: '3100.00',
-        recordedAt: today.subtract(const Duration(hours: 11)),
+        recordedAt: istWallClock(yesterday, 18, 30),
         note: 'Short deposit corrected',
       ),
       for (var i = 0; i < 11; i++)
@@ -64,7 +65,12 @@ class FakeCashBackend extends FakeApiEndpoint implements CashRepository {
           type: CashEntryType.codCollected,
           amount: '${300 + i * 10}.00',
           balanceAfter: '${3150 - i * 250}.00',
-          recordedAt: today.subtract(Duration(days: 1 + i ~/ 3, hours: 2)),
+          // Three a day from yesterday back, before that day's deposit.
+          recordedAt: istWallClock(
+            today.subtract(Duration(days: 1 + i ~/ 3)),
+            const [16, 13, 11][i % 3],
+            const [15, 40, 5][i % 3],
+          ),
           orderNumber: 'JQ-10${480 - i}',
         ),
     ];

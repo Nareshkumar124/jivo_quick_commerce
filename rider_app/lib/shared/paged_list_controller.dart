@@ -39,6 +39,9 @@ class PagedListState<T, H> {
 /// - Page-number paging shifts when new rows arrive between two pages (a
 ///   delivery adds a ledger entry), so a row can come back on the next
 ///   page. With [keyOf], rows already listed are skipped.
+/// - The header is the latest page's, on purpose: the cash summary shown
+///   is the freshest the server sent, and a page without a header keeps
+///   the one already shown.
 class PagedListNotifier<T, H> extends Notifier<PagedListState<T, H>> {
   PagedListNotifier(this._fetch, {this._keyOf});
 

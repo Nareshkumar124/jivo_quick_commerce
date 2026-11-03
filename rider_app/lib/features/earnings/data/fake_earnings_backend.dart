@@ -20,7 +20,7 @@ class FakeEarningsBackend extends FakeApiEndpoint
       'fetchEarnings ${apiDate(range.from)}..${apiDate(range.to)}',
     );
     final oneDay = range.from == range.to;
-    // IST 11:40 and 10:10 on the last day, as UTC instants.
+    // Times on the last IST day of the range.
     final day = range.to;
     return EarningsSummary(
       from: range.from,
@@ -47,7 +47,7 @@ class FakeEarningsBackend extends FakeApiEndpoint
       orders: [
         OrderEarning(
           orderNumber: 'JQ-10501',
-          completedAt: day.add(const Duration(hours: 6, minutes: 10)),
+          completedAt: istWallClock(day, 11, 40),
           total: '65.00',
           lines: const [
             EarningLine(type: EarningType.base, amount: '30.00'),
@@ -57,7 +57,7 @@ class FakeEarningsBackend extends FakeApiEndpoint
         ),
         OrderEarning(
           orderNumber: 'JQ-10498',
-          completedAt: day.add(const Duration(hours: 4, minutes: 40)),
+          completedAt: istWallClock(day, 10, 10),
           total: '40.00',
           lines: const [
             EarningLine(type: EarningType.base, amount: '30.00'),
@@ -67,7 +67,7 @@ class FakeEarningsBackend extends FakeApiEndpoint
       ],
       adjustments: [
         EarningAdjustment(
-          recordedAt: day.add(const Duration(hours: 8)),
+          recordedAt: istWallClock(day, 11),
           line: const EarningLine(
             type: EarningType.incentive,
             amount: '50.00',
@@ -75,7 +75,7 @@ class FakeEarningsBackend extends FakeApiEndpoint
           ),
         ),
         EarningAdjustment(
-          recordedAt: day.add(const Duration(hours: 3)),
+          recordedAt: istWallClock(day, 8, 30),
           line: const EarningLine(
             type: EarningType.penalty,
             amount: '-20.00',

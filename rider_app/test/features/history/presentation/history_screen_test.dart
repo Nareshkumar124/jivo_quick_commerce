@@ -16,6 +16,15 @@ void main() {
     await openFromHome(tester, h, 'home-history');
 
     expect(find.text('Order JQ-10501'), findsOneWidget);
+    // Ended 11:40 IST today: shown on the same IST day (a narrow no-break
+    // space before AM).
+    expect(
+      find.descendant(
+        of: byKey('history-600'),
+        matching: find.text('Nov 2, 2026 11:40 AM'),
+      ),
+      findsOneWidget,
+    );
     expect(textOf(tester, 'history-600-status'), 'Delivered');
     expect(find.text('Jivo Sector 18 → Sector 21, Noida'), findsWidgets);
     expect(find.text('2.0 km'), findsOneWidget);

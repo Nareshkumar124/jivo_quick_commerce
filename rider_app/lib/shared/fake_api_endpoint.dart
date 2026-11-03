@@ -47,6 +47,20 @@ abstract class FakeApiEndpoint {
   }
 }
 
+/// The UTC instant of [hour]:[minute] IST on [istDate], an Indian calendar
+/// date held as a UTC-midnight value (what `istToday()` returns). The fakes
+/// build every demo time with it, so an entry meant for a day stays on that
+/// IST day once the screen converts it back (a date value is not an
+/// instant: midnight UTC is already 05:30 IST).
+DateTime istWallClock(DateTime istDate, int hour, [int minute = 0]) =>
+    DateTime.utc(
+      istDate.year,
+      istDate.month,
+      istDate.day,
+      hour,
+      minute,
+    ).subtract(const Duration(hours: 5, minutes: 30));
+
 /// `YYYY-MM-DD`, as the API takes dates in query strings.
 String apiDate(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}-'
