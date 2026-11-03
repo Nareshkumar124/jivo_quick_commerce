@@ -4,12 +4,28 @@ import 'package:jivo_api/src/model/account_deletion.dart';
 import 'package:jivo_api/src/model/address.dart';
 import 'package:jivo_api/src/model/address_request.dart';
 import 'package:jivo_api/src/model/app_config.dart';
+import 'package:jivo_api/src/model/applied_coupon.dart';
 import 'package:jivo_api/src/model/auth_session.dart';
+import 'package:jivo_api/src/model/bill.dart';
+import 'package:jivo_api/src/model/cart.dart';
+import 'package:jivo_api/src/model/cart_item_add_request.dart';
+import 'package:jivo_api/src/model/cart_item_update_request.dart';
+import 'package:jivo_api/src/model/cart_line.dart';
+import 'package:jivo_api/src/model/cart_line_issue.dart';
+import 'package:jivo_api/src/model/cart_product.dart';
+import 'package:jivo_api/src/model/cart_thresholds.dart';
 import 'package:jivo_api/src/model/category_node.dart';
 import 'package:jivo_api/src/model/category_tile.dart';
 import 'package:jivo_api/src/model/category_tree.dart';
+import 'package:jivo_api/src/model/checkout_blocker.dart';
+import 'package:jivo_api/src/model/checkout_status.dart';
 import 'package:jivo_api/src/model/collection_detail.dart';
 import 'package:jivo_api/src/model/collection_rail.dart';
+import 'package:jivo_api/src/model/coupon_apply_request.dart';
+import 'package:jivo_api/src/model/coupon_list.dart';
+import 'package:jivo_api/src/model/coupon_offer.dart';
+import 'package:jivo_api/src/model/delivery_instructions.dart';
+import 'package:jivo_api/src/model/delivery_instructions_request.dart';
 import 'package:jivo_api/src/model/device.dart';
 import 'package:jivo_api/src/model/device_request.dart';
 import 'package:jivo_api/src/model/error_body.dart';
@@ -26,17 +42,32 @@ import 'package:jivo_api/src/model/notify_me.dart';
 import 'package:jivo_api/src/model/notify_me_request.dart';
 import 'package:jivo_api/src/model/nutrition_row.dart';
 import 'package:jivo_api/src/model/nutrition_table.dart';
+import 'package:jivo_api/src/model/order.dart';
+import 'package:jivo_api/src/model/order_address.dart';
+import 'package:jivo_api/src/model/order_cancel_request.dart';
+import 'package:jivo_api/src/model/order_create_request.dart';
+import 'package:jivo_api/src/model/order_line.dart';
+import 'package:jivo_api/src/model/order_placement.dart';
+import 'package:jivo_api/src/model/order_store.dart';
+import 'package:jivo_api/src/model/order_summary.dart';
 import 'package:jivo_api/src/model/otp_send_request.dart';
 import 'package:jivo_api/src/model/otp_sent.dart';
 import 'package:jivo_api/src/model/otp_settings.dart';
 import 'package:jivo_api/src/model/otp_verify_request.dart';
 import 'package:jivo_api/src/model/paginated_address_list.dart';
+import 'package:jivo_api/src/model/paginated_order_summary_list.dart';
 import 'package:jivo_api/src/model/paginated_product_card_list.dart';
 import 'package:jivo_api/src/model/patched_address_request.dart';
+import 'package:jivo_api/src/model/patched_cart_update_request.dart';
 import 'package:jivo_api/src/model/patched_me_request.dart';
+import 'package:jivo_api/src/model/payment_option.dart';
+import 'package:jivo_api/src/model/payment_verify_request.dart';
 import 'package:jivo_api/src/model/policy_urls.dart';
 import 'package:jivo_api/src/model/product_card.dart';
 import 'package:jivo_api/src/model/product_detail.dart';
+import 'package:jivo_api/src/model/razorpay_checkout.dart';
+import 'package:jivo_api/src/model/razorpay_prefill.dart';
+import 'package:jivo_api/src/model/razorpay_webhook_event_request.dart';
 import 'package:jivo_api/src/model/rider_location_settings.dart';
 import 'package:jivo_api/src/model/search_suggestion.dart';
 import 'package:jivo_api/src/model/search_suggestions.dart';
@@ -48,6 +79,7 @@ import 'package:jivo_api/src/model/token_refresh_request.dart';
 import 'package:jivo_api/src/model/unit_price.dart';
 import 'package:jivo_api/src/model/variant_detail.dart';
 import 'package:jivo_api/src/model/variant_summary.dart';
+import 'package:jivo_api/src/model/webhook_ack.dart';
 
 final _regList = RegExp(r'^List<(.*)>$');
 final _regSet = RegExp(r'^Set<(.*)>$');
@@ -86,20 +118,68 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'AppConfig':
       return AppConfig.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'AppEnum':
+    case 'AppliedCoupon':
+      return AppliedCoupon.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'AuthSession':
       return AuthSession.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'BannerLinkTypeEnum':
+    case 'Bill':
+      return Bill.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CancelReasonEnum':
+    case 'Cart':
+      return Cart.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CartItemAddRequest':
+      return CartItemAddRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CartItemUpdateRequest':
+      return CartItemUpdateRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CartLine':
+      return CartLine.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CartLineIssue':
+      return CartLineIssue.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CartLineIssueCodeEnum':
+    case 'CartProduct':
+      return CartProduct.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CartThresholds':
+      return CartThresholds.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'CategoryNode':
       return CategoryNode.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'CategoryTile':
       return CategoryTile.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'CategoryTree':
       return CategoryTree.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CheckoutBlocker':
+      return CheckoutBlocker.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CheckoutBlockerCodeEnum':
+    case 'CheckoutStatus':
+      return CheckoutStatus.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'CollectionDetail':
       return CollectionDetail.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'CollectionRail':
       return CollectionRail.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CouponApplyRequest':
+      return CouponApplyRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CouponDiscountTypeEnum':
+    case 'CouponIneligibleReasonEnum':
+    case 'CouponList':
+      return CouponList.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CouponOffer':
+      return CouponOffer.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'DeliveryInstructionChipEnum':
+    case 'DeliveryInstructions':
+      return DeliveryInstructions.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'DeliveryInstructionsRequest':
+      return DeliveryInstructionsRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'Device':
       return Device.fromJson(value as Map<String, dynamic>) as ReturnType;
@@ -141,6 +221,26 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'NutritionTable':
       return NutritionTable.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'Order':
+      return Order.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'OrderAddress':
+      return OrderAddress.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'OrderCancelRequest':
+      return OrderCancelRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'OrderCreateRequest':
+      return OrderCreateRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'OrderLine':
+      return OrderLine.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'OrderPlacement':
+      return OrderPlacement.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'OrderStatusEnum':
+    case 'OrderStore':
+      return OrderStore.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'OrderSummary':
+      return OrderSummary.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'OtpPurposeEnum':
     case 'OtpSendRequest':
       return OtpSendRequest.fromJson(value as Map<String, dynamic>)
@@ -155,14 +255,29 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'PaginatedAddressList':
       return PaginatedAddressList.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'PaginatedOrderSummaryList':
+      return PaginatedOrderSummaryList.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'PaginatedProductCardList':
       return PaginatedProductCardList.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'PatchedAddressRequest':
       return PatchedAddressRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'PatchedCartUpdateRequest':
+      return PatchedCartUpdateRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'PatchedMeRequest':
       return PatchedMeRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'PaymentMethodEnum':
+    case 'PaymentOption':
+      return PaymentOption.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'PaymentStatusEnum':
+    case 'PaymentUnavailableReasonEnum':
+    case 'PaymentVerifyRequest':
+      return PaymentVerifyRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'PlatformEnum':
     case 'PolicyUrls':
@@ -171,6 +286,15 @@ ReturnType deserialize<ReturnType, BaseType>(
       return ProductCard.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'ProductDetail':
       return ProductDetail.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RazorpayCheckout':
+      return RazorpayCheckout.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RazorpayPrefill':
+      return RazorpayPrefill.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RazorpayWebhookEventRequest':
+      return RazorpayWebhookEventRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'RiderLocationSettings':
       return RiderLocationSettings.fromJson(value as Map<String, dynamic>)
@@ -205,6 +329,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'VariantSummary':
       return VariantSummary.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'WebhookAck':
+      return WebhookAck.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'WebhookResultEnum':
     default:
       RegExpMatch? match;
 
