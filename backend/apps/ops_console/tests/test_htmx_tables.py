@@ -120,9 +120,20 @@ def test_table_queries_do_not_grow_with_rows(client, django_assert_max_num_queri
         client.get(URL, **HX)
 
 
+# Measured 2026-11-03 with every Phase 2 card (Super Admin: 19 queries); budget = measured + 2.
+DASHBOARD_QUERY_BUDGET = 21
+
+
 def test_dashboard_query_budget(client, django_assert_max_num_queries):
+    from apps.catalog.tests.factories import VariantFactory
+    from apps.inventory.tests.factories import stock
+    from apps.stores.tests.factories import DarkStoreFactory
+
     client.force_login(staff_in_role(roles.SUPER_ADMIN))
     for index in range(30):
         UserFactory(name=f"Row {index}")
-    with django_assert_max_num_queries(25):
+    store = DarkStoreFactory()
+    for _ in range(5):
+        stock(store, VariantFactory(), 3)
+    with django_assert_max_num_queries(DASHBOARD_QUERY_BUDGET):
         assert client.get("/ops/").status_code == 200

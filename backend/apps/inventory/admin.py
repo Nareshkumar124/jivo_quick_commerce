@@ -8,7 +8,9 @@ Rules (docs/admin-panel-architecture.md §5):
   `update_inventory_settings` (threshold, rack) and `set_price_override` (validated against the
   MRP). `save_model` never calls `obj.save()`.
 - Service errors show on the form: each form first runs the service in a rolled-back
-  transaction (`dry_run`), so the service is the one source of validation rules.
+  transaction (`dry_run`), so the service is the one source of validation rules. If the real
+  call still fails (the row or variant changed between the check and the save, e.g. a lower
+  MRP), the whole save is rolled back and the page shows the message instead of a 500.
 - Store scoping: every queryset is limited by `stores_for(user)`; custom views fetch the row from
   that queryset (another store's row is a 404).
 - `StockMovement` (the ledger) is read-only for everyone, superusers included.
@@ -53,7 +55,14 @@ from apps.inventory.services import (
     set_price_override,
     update_inventory_settings,
 )
-from apps.ops_console.admin_support import ReadOnlyHistoryAdmin, add_service_errors, dry_run
+from apps.ops_console.admin_support import (
+    MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_ROWS,
+    MSG_TOO_LARGE,
+    ReadOnlyHistoryAdmin,
+    add_service_errors,
+    dry_run,
+)
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin, visible_stores
 from apps.ops_console.selectors import ON_SALE
 
@@ -84,10 +93,10 @@ ALWAYS_READ_ONLY = (
     "updated_at",
 )
 
-# Bulk inward CSV (docs/admin-panel-architecture.md §10).
+# Bulk inward CSV (docs/admin-panel-architecture.md §10). Same limits as every admin import.
 INWARD_HEADER = ["sku", "quantity"]
-MAX_INWARD_ROWS = 2000
-MAX_INWARD_BYTES = 1_000_000
+MAX_INWARD_ROWS = MAX_UPLOAD_ROWS
+MAX_INWARD_BYTES = MAX_UPLOAD_BYTES
 
 
 def editable_fields(user) -> tuple[str, ...]:
@@ -123,6 +132,15 @@ def apply_settings(inventory_pk: int, changes: dict) -> StoreInventory:
     if errors:
         raise ValidationError(errors)
     return inventory
+
+
+class SettingsNotSaved(Exception):
+    """`save_model` could not apply settings that passed the form's dry run (the row or its
+    variant changed in between). Carries the service's ValidationError."""
+
+    def __init__(self, error: ValidationError):
+        super().__init__(error)
+        self.error = error
 
 
 class StoreInventoryForm(forms.ModelForm):
@@ -280,7 +298,26 @@ class StoreInventoryAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmi
     def save_model(self, request, obj, form, change):
         changes = form.changed_settings()
         if changes:
-            apply_settings(obj.pk, changes)  # validated in form.clean(); never obj.save()
+            try:
+                apply_settings(obj.pk, changes)  # validated in form.clean(); never obj.save()
+            except ValidationError as error:
+                # Raised out of the admin's transaction (changeform_view below), so settings
+                # already applied by apply_settings are rolled back with it.
+                raise SettingsNotSaved(error) from error
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        try:
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        except SettingsNotSaved as failure:
+            for message in failure.error.messages:
+                self.message_user(request, f"Not saved: {message}", messages.ERROR)
+            self.message_user(
+                request,
+                "The item changed while you were editing it. Nothing was saved; check the "
+                "values below and try again.",
+                messages.WARNING,
+            )
+            return HttpResponseRedirect(request.get_full_path())
 
     # ---------------------------------------------------------------- columns
 
@@ -589,7 +626,7 @@ class InwardForm(forms.Form):
             upload = cleaned.get("file")
             if upload is not None:
                 if upload.size > MAX_INWARD_BYTES:
-                    self.add_error("file", "The file is larger than 1 MB; split it.")
+                    self.add_error("file", MSG_TOO_LARGE)
                     return cleaned
                 try:
                     text = upload.read().decode("utf-8-sig")

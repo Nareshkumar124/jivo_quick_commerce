@@ -8,6 +8,7 @@ checks: the queryset is scoped first, and an object outside it simply does not e
 
 from django.contrib import admin
 from django.db.models import QuerySet
+from django.http import Http404
 
 from apps.stores.models import DarkStore
 from apps.stores.services import stores_for
@@ -25,15 +26,21 @@ def scope_to_stores(queryset: QuerySet, user, field: str = "store") -> QuerySet:
 class StoreScopedAdminMixin:
     """ModelAdmin mixin: `get_queryset` is limited to the user's stores through `store_field`.
 
-    The change, delete and history views look the object up in this queryset, so another
-    store's row answers like a missing one (Django admin: redirect to the index with a
-    "doesn't exist" message), and custom views use `get_object_or_404(self.get_queryset(...))`.
+    The change, delete and history views look the object up in this queryset, and an object
+    outside it is a 404 (IDOR rule), not Django admin's usual redirect to the index. Custom
+    views use `get_object_or_404(self.get_queryset(request), ...)` for the same answer.
     """
 
     store_field = "store"
 
     def get_queryset(self, request):
         return scope_to_stores(super().get_queryset(request), request.user, self.store_field)
+
+    def get_object(self, request, object_id, from_field=None):
+        obj = super().get_object(request, object_id, from_field)
+        if obj is None:
+            raise Http404("No such record.")
+        return obj
 
 
 class ScopedStoreFilter(admin.SimpleListFilter):

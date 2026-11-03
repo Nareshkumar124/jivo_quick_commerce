@@ -119,3 +119,21 @@ def test_logout_needs_post_with_csrf(client):
     assert f'action="{reverse("admin:logout")}"' in content
     assert "csrfmiddlewaretoken" in content
     assert "X-CSRFToken" in content  # hx-headers on <body>: every HTMX POST carries the token
+
+
+def test_csrf_failure_is_not_marked_as_a_role_refusal():
+    """ops.js tells the two 403s apart by `X-Ops-Refused`: a role refusal says "your role does
+    not allow this", anything else (a CSRF failure) says "reload and try again". Every Ops POST
+    is CSRF-protected by the middleware before the view runs."""
+    from django.test import Client
+
+    client = Client(enforce_csrf_checks=True)
+    client.force_login(staff_in_role(roles.OPS))
+    csrf = client.post(reverse("ops:dashboard-operations"), HTTP_HX_REQUEST="true")
+    assert csrf.status_code == 403
+    assert "X-Ops-Refused" not in csrf
+
+    client.force_login(staff_in_role(roles.STORE_STAFF))
+    refused = client.get(reverse("ops:dashboard-signups"), HTTP_HX_REQUEST="true")
+    assert refused.status_code == 403
+    assert refused["X-Ops-Refused"] == "1"

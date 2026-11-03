@@ -10,6 +10,13 @@ documented column by column in docs/admin-panel-architecture.md §10. Change bot
   price within the MRP, the unit pair, label attributes, slugs. Rows are saved one by one (no bulk
   mode) so the catalog cache invalidation signals and the variant price history run.
 - Images are not imported here (uploaded in the admin).
+- Files are CSV (UTF-8) or Excel (.xlsx), at most 1 MB and 2000 rows (checked by the admin's
+  `LimitedImportForm` before anything is stored or parsed).
+- Export escapes spreadsheet formulas (`apps.core.export_formats`: a text cell starting with
+  = + - @ gets a leading apostrophe); import removes exactly that apostrophe again
+  (`SpreadsheetImportMixin`), so an exported file imports back unchanged. Rows with no value at
+  all (Excel's formatted empty rows) are ignored, and an empty Excel cell reads like an empty
+  CSV cell.
 """
 
 import json
@@ -19,6 +26,7 @@ from import_export import fields, resources, widgets
 
 from apps.catalog.models import Category, Product, ProductVariant
 from apps.catalog.validators import LABEL_TEXT_KEYS
+from apps.ops_console.admin_support import SpreadsheetImportMixin
 
 HIGHLIGHT_SEPARATOR = "|"
 
@@ -100,7 +108,7 @@ CATEGORY_COLUMNS = ("slug", "name", "parent_slug", "sort_order", "is_active")
 CATEGORY_FIELDS = ("slug", "name", "parent", "sort_order", "is_active")
 
 
-class CategoryResource(resources.ModelResource):
+class CategoryResource(SpreadsheetImportMixin, resources.ModelResource):
     parent = fields.Field(
         attribute="parent",
         column_name="parent_slug",
@@ -145,7 +153,7 @@ PRODUCT_COLUMNS = (
 PRODUCT_FIELDS = tuple("category" if name == "category_slug" else name for name in PRODUCT_COLUMNS)
 
 
-class ProductResource(resources.ModelResource):
+class ProductResource(SpreadsheetImportMixin, resources.ModelResource):
     category = fields.Field(
         attribute="category",
         column_name="category_slug",
@@ -195,7 +203,9 @@ class ProductResource(resources.ModelResource):
 
 def label_attributes(current: dict | None, row) -> dict:
     """`Product.attributes` from the label columns present in `row`. An empty cell clears the
-    key; a column missing from the file keeps the current value. `nutrition` is JSON text."""
+    key (a value that is already empty text is left as it is, so re-importing an export does not
+    count as a change); a column missing from the file keeps the current value. `nutrition` is
+    JSON text."""
     attributes = dict(current or {})
     for key in LABEL_TEXT_KEYS:
         if key not in row:
@@ -203,7 +213,7 @@ def label_attributes(current: dict | None, row) -> dict:
         text = "" if row[key] is None else str(row[key]).strip()
         if text:
             attributes[key] = text
-        else:
+        elif attributes.get(key) != "":
             attributes.pop(key, None)
     if "nutrition" in row:
         text = "" if row["nutrition"] is None else str(row["nutrition"]).strip()
@@ -238,7 +248,7 @@ VARIANT_COLUMNS = (
 VARIANT_FIELDS = tuple("product" if name == "product_slug" else name for name in VARIANT_COLUMNS)
 
 
-class ProductVariantResource(resources.ModelResource):
+class ProductVariantResource(SpreadsheetImportMixin, resources.ModelResource):
     product = fields.Field(
         attribute="product",
         column_name="product_slug",

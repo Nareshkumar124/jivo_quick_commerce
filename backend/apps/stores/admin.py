@@ -5,7 +5,10 @@
   them).
 - The location pin and service area use the swappable map editor in `apps.ops_console.maps`.
   View-only roles see a read-only map instead of raw coordinates.
-- Notify-me leads: read-only list with a map, phones shown per the PII policy.
+- Pause / resume orders: `stores.services.set_accepting_orders` (records who, as an admin
+  LogEntry on the store).
+- Notify-me leads: read-only list with a map, phones shown per the PII policy. Coordinates in
+  the text columns are rounded to 3 decimals, about 100 m (DL-40); the map keeps the points.
 """
 
 from django.contrib import admin, messages
@@ -19,7 +22,7 @@ from apps.ops_console.maps import MAP_FORMFIELD_OVERRIDES, MAP_MEDIA, feature, r
 from apps.ops_console.pii import can_view_full_phone, mask_phone
 from apps.ops_console.scoping import StoreScopedAdminMixin, visible_stores
 from apps.stores.models import DarkStore, ServiceabilityRequest, StoreTiming
-from apps.stores.services import store_status
+from apps.stores.services import set_accepting_orders, store_status
 
 # Map at most this many leads (newest first under the current filters) above the list.
 LEADS_MAP_LIMIT = 500
@@ -37,18 +40,8 @@ class StoreTimingInline(TabularInline):
     )
 
 
-def set_accepting_orders(store: DarkStore, accepting: bool) -> bool:
-    """Pause or resume orders at a store; True if it changed. Saves the one field so the
-    post-save signal drops the serviceability snapshot.
-
-    TODO(backend gap): replace with a `stores.services.set_accepting_orders(store, accepting,
-    actor)` that records who paused the store (DarkStore has no history yet).
-    """
-    if store.is_accepting_orders == accepting:
-        return False
-    store.is_accepting_orders = accepting
-    store.save(update_fields=["is_accepting_orders", "updated_at"])
-    return True
+# Lead coordinates as text: 3 decimals is about 100 m (DL-40, PII).
+LEAD_COORDINATE_DECIMALS = 3
 
 
 STATUS_LABELS = {
@@ -168,7 +161,10 @@ class DarkStoreAdmin(StoreScopedAdminMixin, ModelAdmin):
         return read_only_map(features, label=f"Service area of {obj.name}")
 
     def _set_accepting(self, request, queryset, accepting: bool):
-        count = sum(set_accepting_orders(store, accepting) for store in queryset)
+        count = sum(
+            set_accepting_orders(store, accepting, actor=request.user)
+            for store in queryset.order_by("pk")
+        )
         verb = "Resumed" if accepting else "Paused"
         self.message_user(request, f"{verb} orders at {count} store(s).", messages.SUCCESS)
 
@@ -238,9 +234,10 @@ class ServiceabilityRequestAdmin(ModelAdmin):
             features.append(feature(store.location, kind="store", name=store.name))
         return read_only_map(features, height=420, label="Notify-me leads and store areas")
 
-    @display(description="Lat, lng")
+    @display(description="Lat, lng (about 100 m)")
     def coordinates(self, obj) -> str:
-        return f"{obj.location.y:.5f}, {obj.location.x:.5f}"
+        places = LEAD_COORDINATE_DECIMALS
+        return f"{obj.location.y:.{places}f}, {obj.location.x:.{places}f}"
 
     @display(description="Phone")
     def phone_display(self, obj) -> str:
