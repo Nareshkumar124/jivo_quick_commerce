@@ -17,6 +17,7 @@ Repo layout (top-level folders, chosen by the user for readability):
 
 **Environment specifics** (they differ from the docs' original plan):
 - **Database.** The DB is a **remote PostgreSQL 16** server. Its credentials are only in `backend/.env`, which is gitignored. Never print that file or copy the password anywhere. The server is shared, so tests may only create or drop databases whose names start with `test_jivo_quick_commerce`. Settings refuse any other `POSTGRES_TEST_DB`. The backend agent uses the default name. The admin agent runs with `POSTGRES_TEST_DB=test_jivo_quick_commerce_admin TEST_REDIS_DB=14`, so parallel test runs don't collide. Never run `DROP DATABASE` or `flush`. The only extension in use is `postgis`, which is already enabled; tests may let GeoDjango create it in their own test DBs.
+- **⚠ TEMPORARY (2026-11-03, DL-36):** the remote DB host is unreachable from this machine, so tests and the :8001 dev server use a **local PostGIS container** (`jivoqc-pg-local`, `127.0.0.1:5433`). Load its credentials with `set -a; . backend/.env.localdb; set +a` (gitignored) before `uv run …`. Switch back once the remote DB is reachable.
 - **PostGIS.**
   - **Server:** PostGIS 3.4.2 was installed on the DB server and enabled in `jivo_quick_commerce` on 2026-11-02 (Phase 2), at the user's request.
   - **Engine:** settings use the plain `postgresql` engine until the backend agent's Phase 2 R2 switches to `django.contrib.gis.db.backends.postgis`.
@@ -42,6 +43,7 @@ Repo layout (top-level folders, chosen by the user for readability):
   - Procedures: `docs/integration-checklist.md` and `docs/release-checklist.md`.
   - Agent reports use the §9.3 format.
 - **Maps: Mappls (MapmyIndia), not Google Maps** (DL-29). The SDK config files (`*.a.olf`, `*.a.conf`) are secrets: they live only in `~/.config/jivo-quick-commerce/mappls/`, are gitignored, and must never be committed or printed.
+- **No Android emulator** (user instruction, 2026-11-03: too heavy for this machine). Device and integration tests run on the user's phone over USB (`9TY5KF8H49Z5YDON`, Realme RMX5056) using `adb reverse tcp:8001 tcp:8001` and `--dart-define=API_BASE_URL=http://localhost:8001`. After any integration test, reinstall the normal dev build with `install -r` so the user's app keeps working.
 - **Test login:** fixed-OTP test numbers `+919000000001`, `…002` and `…003` all use OTP `123456` and send no SMS (local and test settings only; production refuses them). Seeded staff passwords come only from `SEED_DEMO_STAFF_PASSWORD` in `backend/.env`.
 
 **Known gap:** `docs/README.md` links to `docs/plan/00-roadmap.md` and `docs/plan/phase-0-…` through `phase-8-…`. All three subagents treat `docs/plan/phase-N-*.md` as their main brief. **The `docs/plan/` directory does not exist yet.** Don't invent phase files on your own. Tell the user they're missing and offer to draft them from `docs/README.md` (the phase list and file format) and `docs/10-testing-strategy.md` §5 (gate, test case format, sign-off template).

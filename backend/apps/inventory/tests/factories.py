@@ -1,4 +1,4 @@
-from apps.inventory.models import MovementType, StoreInventory
+from apps.inventory.models import MovementType, StoreInventory, stock_write
 from apps.inventory.services import adjust_stock, ensure_inventory
 
 
@@ -17,5 +17,6 @@ def stock(store, variant, quantity: int, *, reserved: int = 0) -> StoreInventory
     inventory = StoreInventory.objects.get(store=store, variant=variant)
     if reserved:
         inventory.reserved = reserved
-        inventory.save(update_fields=["reserved"])
+        with stock_write():  # the reservation services arrive in Phase 3
+            inventory.save(update_fields=["reserved"])
     return inventory

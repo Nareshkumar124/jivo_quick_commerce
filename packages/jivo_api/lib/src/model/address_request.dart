@@ -59,11 +59,11 @@ class AddressRequest {
   @JsonKey(name: r'custom_label', required: false, includeIfNull: false)
   final String? customLabel;
 
-  /// Defaults to the user's name. Send an empty string to reset it to the user's own (copied when saved).
+  /// Defaults to the user's name. Send an empty string to reset it to the user's own (copied when saved). Omit it to keep the current value; null is rejected.
   @JsonKey(name: r'receiver_name', required: false, includeIfNull: false)
   final String? receiverName;
 
-  /// Defaults to the user's phone. Send an empty string to reset it to the user's own (copied when saved).
+  /// Defaults to the user's phone. Send an empty string to reset it to the user's own (copied when saved). Omit it to keep the current value; null is rejected.
   @JsonKey(name: r'receiver_phone', required: false, includeIfNull: false)
   final String? receiverPhone;
 

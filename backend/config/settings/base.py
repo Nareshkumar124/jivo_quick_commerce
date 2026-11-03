@@ -39,8 +39,10 @@ CSRF_TRUSTED_ORIGINS: list[str] = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", defaul
 INSTALLED_APPS = [
     # `daphne` first: it makes `runserver` an ASGI server, so Channels works in local dev.
     "daphne",
-    # `unfold` must come before django.contrib.admin.
+    # `unfold` (and its contrib apps) must come before django.contrib.admin.
     "unfold",
+    "unfold.contrib.import_export",  # unfold-styled import/export screens (admin)
+    "unfold.contrib.simple_history",  # unfold-styled history screens (admin)
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -142,6 +144,27 @@ DATABASES = {
         "TEST": {"NAME": TEST_DATABASE_NAME},
     }
 }
+
+# T-218: connection reuse. Opening a connection to the remote DB costs about 99 ms and
+# occasionally times out (> 5 s), so per-request connections are slow and fragile.
+# - Web (ASGI): persistent connections (CONN_MAX_AGE) are unsafe under ASGI (Django docs), so the
+#   web process uses psycopg's pool: POSTGRES_POOL=true. Connections are opened in the background
+#   and health-checked on checkout (CONN_HEALTH_CHECKS); a broken one is replaced, not served.
+# - Celery worker / beat (sync, long-lived threads): POSTGRES_CONN_MAX_AGE=60 instead.
+# Never both: Django refuses a pool with CONN_MAX_AGE > 0. Size it for the shared server:
+# web processes x POSTGRES_POOL_MAX_SIZE + Celery concurrency must stay under its connection
+# limit. Off by default; deployed environments turn it on per process (devops, T-218).
+POSTGRES_POOL = env_bool("POSTGRES_POOL", default=False)
+if POSTGRES_POOL:
+    DATABASES["default"]["CONN_MAX_AGE"] = 0
+    DATABASES["default"]["OPTIONS"]["pool"] = {
+        "min_size": env_int("POSTGRES_POOL_MIN_SIZE", default=2),
+        "max_size": env_int("POSTGRES_POOL_MAX_SIZE", default=8),
+        # Seconds a request waits for a free connection before failing (then a 500/503).
+        "timeout": env_float("POSTGRES_POOL_TIMEOUT", default=10.0),
+        "max_idle": env_float("POSTGRES_POOL_MAX_IDLE", default=300.0),
+        "max_lifetime": env_float("POSTGRES_POOL_MAX_LIFETIME", default=1800.0),
+    }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --------------------------------------------------------------------------- auth
@@ -157,8 +180,10 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 # Staff use Django session login until Jivo Auth (D-04). User.auth_id is reserved for that.
 # 05 §5 (BUG-0006): a staff session ends 8 h after login (absolute, enforced from a login stamp
-# by apps.accounts.middleware), and admin roles also after 2 h without a request.
+# by apps.accounts.middleware, whatever SESSION_COOKIE_AGE says), and admin roles also after 2 h
+# without a request.
 SESSION_COOKIE_AGE = env_int("DJANGO_SESSION_COOKIE_AGE", default=8 * 60 * 60)
+STAFF_SESSION_MAX_AGE_SECONDS = env_int("DJANGO_STAFF_SESSION_MAX_AGE_SECONDS", default=8 * 3600)
 STAFF_SESSION_IDLE_SECONDS = env_int("DJANGO_STAFF_SESSION_IDLE_SECONDS", default=2 * 60 * 60)
 # The panel (admin, Ops Console) shows and takes times in IST for signed-in staff.
 STAFF_TIME_ZONE = "Asia/Kolkata"
@@ -444,6 +469,18 @@ ETA_RIDER_WAIT_MINUTES = env_int("ETA_RIDER_WAIT_MINUTES", default=3)
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
     "notify_me": env_str("NOTIFY_ME_RATE", default="10/hour"),
 }
+
+# --------------------------------------------------------------------------- import / export
+# The admin's import is two requests (preview, then confirm), possibly served by different web
+# processes or containers: keep the uploaded file in Redis, not in a process-local temp folder.
+# Entries expire after a day (CacheStorage.CACHE_LIFETIME).
+IMPORT_EXPORT_TMP_STORAGE_CLASS = "import_export.tmp_storages.CacheStorage"
+# CSV and Excel only (05 §2), with formula-injection escaping on export: cells starting with
+# = + - @ are written as text, never as formulas (apps.core.export_formats).
+# (import-export instantiates these classes directly, so they are imported here.)
+from apps.core.export_formats import FORMATS as IMPORT_EXPORT_FORMATS  # noqa: E402, F401
+
+IMPORT_EXPORT_ESCAPE_FORMULAE_ON_EXPORT = True
 
 # --------------------------------------------------------------------------- admin (unfold)
 from config.admin_ui import UNFOLD  # noqa: E402, F401  (owned by the admin panel track)

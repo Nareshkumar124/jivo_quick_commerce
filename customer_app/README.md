@@ -171,6 +171,22 @@ The browse test prints `BROWSE ...` lines (mode, store, products, search
 results, cart, and the `X-Store-Id` on each request) as evidence of which
 backend it ran against.
 
+On a physical phone over USB, forward the port first
+(`adb -s <serial> reverse tcp:8001 tcp:8001`, again after each install) and
+use `--dart-define=API_BASE_URL=http://localhost:8001`. Some phones can't
+attach `flutter test` (seen on a Realme RMX5056, Android 16): with DDS it
+fails with "Failed to start Dart Development Service"; with `--no-dds` it
+fails with `streamListen: invalid 'streamId' parameter:
+integration_test.VmServiceProxyGoldenFileComparator`, because only DDS
+provides that stream. The fallback is `flutter drive` with the host driver,
+whose harness doesn't use that stream (not yet verified on that phone):
+
+```sh
+flutter drive --driver=test_driver/integration_test.dart \
+  --target=integration_test/browse_flow_test.dart --flavor dev \
+  -d <serial> --no-dds --dart-define=API_BASE_URL=http://localhost:8001
+```
+
 ## iOS: what still needs Xcode
 
 These were set up on Linux, so only the Android flavors exist so far.

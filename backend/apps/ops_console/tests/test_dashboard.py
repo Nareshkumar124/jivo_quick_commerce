@@ -176,27 +176,38 @@ def test_app_config_card_shows_maintenance_and_versions(client):
     assert "1.4.0" in html
 
 
-@pytest.mark.parametrize(
-    ("role", "customers", "staff", "app_config"),
-    [
-        (roles.SUPER_ADMIN, True, True, True),
-        (roles.OPS, True, False, False),
-        (roles.SUPPORT, True, False, False),
-        (roles.STORE_MANAGER, False, False, False),
-        (roles.STORE_STAFF, False, False, False),
-        (roles.CATALOG_MANAGER, False, False, False),
-        (roles.FINANCE, False, False, False),
-    ],
-)
-def test_cards_follow_permissions(client, role, customers, staff, app_config):
+# role -> (customers, staff, app config, stores cards, catalog cards, stock cards)
+CARDS = {
+    roles.SUPER_ADMIN: (True, True, True, True, True, True),
+    roles.OPS: (True, False, False, True, True, True),
+    roles.SUPPORT: (True, False, False, False, True, False),
+    roles.STORE_MANAGER: (False, False, False, True, True, True),
+    roles.STORE_STAFF: (False, False, False, False, True, True),
+    roles.CATALOG_MANAGER: (False, False, False, False, True, True),
+    roles.FINANCE: (False, False, False, False, False, True),
+}
+
+
+@pytest.mark.parametrize("role", ROLES)
+def test_cards_follow_permissions(client, role):
+    customers, staff, app_config, stores, catalog, stock_cards = CARDS[role]
     client.force_login(staff_in_role(role))
     html = client.get(reverse("ops:dashboard")).content.decode()
     assert ('data-testid="customer-kpis"' in html) is customers
     assert ('data-testid="signups-chart"' in html) is customers
     assert ('data-testid="staff-roles"' in html) is staff
     assert ('data-testid="app-config"' in html) is app_config
-    no_cards = not (customers or staff or app_config)
-    assert ("No dashboard cards for your role yet" in html) is no_cards
+    assert ('data-testid="kpi-stores-active"' in html) is stores
+    assert ('data-testid="kpi-products"' in html) is catalog
+    assert ('data-testid="kpi-low-stock"' in html) is stock_cards
+    assert "No dashboard cards for your role yet" not in html  # every role has a card now
+
+
+def test_role_without_permissions_gets_the_empty_state(client):
+    client.force_login(StaffUserFactory())
+    html = client.get(reverse("ops:dashboard")).content.decode()
+    assert "No dashboard cards for your role yet" in html
+    assert 'data-testid="operations-kpis"' not in html
 
 
 def test_no_fake_kpis_before_their_phase(client):

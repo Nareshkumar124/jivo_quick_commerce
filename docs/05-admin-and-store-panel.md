@@ -98,6 +98,12 @@ Implemented with Django Groups + model permissions + **store scoping**. Store st
 
 Refund limits and other thresholds are settings, not hard-coded.
 
+Phase 2 store scoping (P2 R3, code review #2): `apps.stores.services.stores_for(user)` fails closed. Superusers and the global roles (Super Admin, Ops, Catalog Manager, Support, Finance: `roles.GLOBAL_ROLES`) see every store. Anyone in a store role (Store Manager, Store Staff) sees only their `StaffStoreAccess` stores, **even if they also hold a global role** (the stricter role wins; PM decision, 2026-11-03). Unknown groups never widen access; no role means no store.
+
+Customer moderation (P2 R3): the Customers admin blocks and unblocks through `apps.accounts.services.customers.block_customer(user_id, by=)` / `unblock_customer(user_id, by=)`. Block deactivates the account, revokes every refresh token and deactivates push devices. Both refuse staff and anonymised accounts, return whether anything changed, and record the actor as an admin log entry (no personal data in it; scrubbed again on anonymisation) until the full audit log (P4–P8). "Anonymise now" needs `accounts.anonymise_customer`, which only Super Admin holds (DL-35). Stores: pausing or resuming orders goes through `apps.stores.services.set_accepting_orders(store, accepting, actor=)` (atomic, actor in the admin log, caches refreshed).
+
+Import/export (P2 R3): CSV and Excel (`.xlsx`) only (`apps.core.export_formats`). On export, any text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading apostrophe, so a spreadsheet shows it as text and never runs it as a formula (CSV/formula injection); plain numbers are unchanged. The import preview is kept in Redis between the preview and confirm requests (`IMPORT_EXPORT_TMP_STORAGE_CLASS`), so it works across web processes.
+
 Phase 1 implementation: the seven roles are Django Groups (`Super Admin`, `Ops / Dispatch`, `Store Manager`, `Store Staff`, `Catalog Manager`, `Support`, `Finance`), synced idempotently after every `migrate` (`apps.accounts.roles.sync_roles`). Each phase adds the permissions for its models. Store scoping (`StaffStoreAccess`) arrives in Phase 2 with stores. In Phase 1, Super Admin manages staff users, roles and app config; Ops and Support can view customers and block/unblock them (Customers admin, a proxy model so they cannot edit staff accounts).
 
 ## 4. Reports [P7]
@@ -122,5 +128,7 @@ All reports filter by date range and store, and export to CSV/Excel.
 ## 5. Panel non-functional notes
 - Responsive down to tablet width (packing console). The admin is desktop-first.
 - Session timeout 8 hours (store staff) / 2 hours idle (admin roles). CSRF protection. Login rate limiting.
+  - Implemented in P2 R3 (BUG-0006, `apps.accounts.middleware`): **every** staff session ends 8 hours after login however active it is (`DJANGO_STAFF_SESSION_MAX_AGE_SECONDS`, stamped at login so later session saves never extend it; `DJANGO_SESSION_COOKIE_AGE` now also defaults to 8 hours). **Admin roles** also end after 2 hours without a request (`DJANGO_STAFF_SESSION_IDLE_SECONDS`). "Admin roles" = everyone except staff whose only roles are Store Manager / Store Staff: superusers, global roles, mixed roles and staff with no role all get the stricter rule. The 8-hour cap also applies to admin roles (PM decision, 2026-11-03).
+  - Signed-in staff see `/admin` and `/ops` in IST (`STAFF_TIME_ZONE`); storage stays UTC.
 - Every staff mutation on orders, stock, prices, refunds, riders and config is written to the audit log.
 - Large lists use server-side pagination and DB indexes. Exports above ~10k rows run as Celery jobs and email or download a file.

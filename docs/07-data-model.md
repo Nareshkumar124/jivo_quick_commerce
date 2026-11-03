@@ -87,7 +87,7 @@ erDiagram
 
 **StaffStoreAccess**: see 2.2 (built in Phase 2, in the `stores` app).
 
-**Customer** (proxy of User, non-staff users): exists only to give the Customers admin its own permissions (support/ops can block customers without editing staff accounts).
+**Customer** (proxy of User, non-staff users): exists only to give the Customers admin its own permissions (support/ops can block customers without editing staff accounts). Custom permission `anonymise_customer` (P2 R3, DL-35: Super Admin only). Phone, OTP and PIN code validators accept ASCII digits only (`[0-9]`, BUG-0002; migrations `accounts.0005`, `cms.0002`, `stores.0002` change validators only, no SQL).
 
 ### 2.2 Stores (`stores`)
 
@@ -99,7 +99,7 @@ erDiagram
 
 **ServiceabilityRequest**: `location` (Point), `user` (nullable), `phone` (nullable), `address_text`.
 
-**StaffStoreAccess**: `user`, `store`, unique together. Lives in the `stores` app (not `accounts`), so accounts does not depend on stores. Scope staff querysets with `apps.stores.services.stores_for(user)`: superusers and global roles see every store; Store Manager / Store Staff only theirs.
+**StaffStoreAccess**: `user`, `store`, unique together. Lives in the `stores` app (not `accounts`), so accounts does not depend on stores (migration `stores.0001_initial`). Scope staff querysets with `apps.stores.services.stores_for(user)`: superusers and the global roles see every store; anyone in a store role (Store Manager / Store Staff) only theirs, even with an extra group; unknown groups or no role: none (05 §3). Grant and revoke with `grant_store_access()` / `revoke_store_access()`.
 
 > Overlapping service areas: if a point falls inside several active stores' polygons, choose the **nearest open** store (tie-break by `priority` field on DarkStore).
 
@@ -125,11 +125,11 @@ Images (`Category.image`, `ProductImage.image`, `Banner.image`) are public media
 ### 2.4 Inventory (`inventory`)
 
 **StoreInventory**: unique (`store`, `variant`). Fields: `on_hand` (int ≥ 0), `reserved` (int ≥ 0), `low_stock_threshold`, `is_available` (manual kill switch), `price_override` (nullable), `rack_location` (nullable).
-`available = on_hand − reserved`. DB check constraints enforce `on_hand ≥ 0`, `reserved ≥ 0` and `reserved ≤ on_hand`.
+`available = on_hand − reserved`. DB check constraints enforce `on_hand ≥ 0`, `reserved ≥ 0` and `reserved ≤ on_hand`. `on_hand`/`reserved` can be written only inside `apps.inventory.models.stock_write()`, which only the inventory (and, from Phase 3, reservation) services open: `save()` and `QuerySet.update()` refuse them elsewhere (P2 R3). Quantities per adjustment, CSV line or count are at most 1,000,000. `price_override` applies only when it is above 0 and at most the variant's MRP: an MRP edit below an existing override is refused, and an override left above the MRP is ignored (the variant's `selling_price` is used) in both `effective_price()` and the catalog's SQL.
 
 **StockReservation**: `order`, `store`, `variant`, `quantity`, `status` (ACTIVE/COMMITTED/RELEASED), `expires_at` (for online-payment orders).
 
-**StockMovement** (append-only ledger; the model refuses updates and deletes): `store`, `variant`, `delta` (+/−, never 0), `type` (INWARD, SALE, RETURN, DAMAGE, AUDIT_ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT), `order` (nullable; the column is added with orders in Phase 3), `reason`, `created_by`, `on_hand_after`. `StoreInventory` rows are created at zero and opening stock is an INWARD movement, so a row's movements always sum to its `on_hand` (`apps.inventory.services`). Custom permissions: `inventory.adjust_stock`, `inventory.toggle_availability`.
+**StockMovement** (append-only ledger; the model and its querysets refuse updates and deletes): `store`, `variant`, `delta` (+/−, never 0), `type` (INWARD, SALE, RETURN, DAMAGE, AUDIT_ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT), `order` (nullable; the column is added with orders in Phase 3), `reason`, `created_by`, `on_hand_after`. `StoreInventory` rows are created at zero and opening stock is an INWARD movement, so a row's movements always sum to its `on_hand` (`apps.inventory.services`). Custom permissions: `inventory.adjust_stock`, `inventory.toggle_availability`.
 
 > Concurrency rule: reservations use `SELECT … FOR UPDATE` on `StoreInventory` rows (locked in a consistent order by variant id to avoid deadlocks) inside one transaction. Two customers can never reserve the same last unit.
 

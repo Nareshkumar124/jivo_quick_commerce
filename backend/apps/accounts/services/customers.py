@@ -49,9 +49,12 @@ def _locked_customer(user_id: int) -> User:
     return user
 
 
-def _record(by: User, user: User, message: str) -> None:
+def _require_actor(by: User | None) -> None:
     if by is None or by.pk is None:
         raise ValueError("block/unblock need the acting staff user (`by`).")
+
+
+def _record(by: User, user: User, message: str) -> None:
     LogEntry.objects.create(
         user_id=by.pk,
         content_type=ContentType.objects.get_for_model(Customer, for_concrete_model=False),
@@ -66,6 +69,7 @@ def block_customer(user_id: int, *, by: User) -> bool:
     """Deactivate the customer, revoke every refresh token and deactivate their push devices.
     Access tokens stop working at once (inactive users fail authentication). False if the
     customer was already blocked."""
+    _require_actor(by)
     with transaction.atomic():
         user = _locked_customer(user_id)
         if not user.is_active:
@@ -83,6 +87,7 @@ def block_customer(user_id: int, *, by: User) -> bool:
 def unblock_customer(user_id: int, *, by: User) -> bool:
     """Reactivate a blocked customer. They sign in again with an OTP (tokens stay revoked;
     devices re-register after login). False if the customer was not blocked."""
+    _require_actor(by)
     with transaction.atomic():
         user = _locked_customer(user_id)
         if user.is_active:
