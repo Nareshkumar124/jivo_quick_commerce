@@ -1,8 +1,10 @@
 """Force update (426 APP_UPDATE_REQUIRED) and maintenance (503 MAINTENANCE) for the app API.
 
 Applies to /api/v1/ except the splash config and token refresh (sessions survive maintenance
-and force updates). 426 is sent only when the request names its app, platform and version
-(X-App-Name, X-Platform, X-App-Version) and that version is below the configured minimum.
+and force updates) and the payment gateway's webhook (server to server: a payment event must
+never be refused during maintenance). 426 is sent only when the request names its app, platform
+and version (X-App-Name, X-Platform, X-App-Version) and that version is below the configured
+minimum.
 Runs after client_info_middleware.
 """
 
@@ -14,7 +16,13 @@ from apps.cms.services import get_app_config, parse_version
 from apps.core.errors import ErrorCode, error_payload
 
 API_PREFIX = "/api/v1/"
-EXEMPT_PATHS = frozenset({"/api/v1/config/app/", "/api/v1/auth/token/refresh/"})
+EXEMPT_PATHS = frozenset(
+    {
+        "/api/v1/config/app/",
+        "/api/v1/auth/token/refresh/",
+        "/api/v1/payments/razorpay/webhook/",
+    }
+)
 
 
 def guard_response(request) -> JsonResponse | None:

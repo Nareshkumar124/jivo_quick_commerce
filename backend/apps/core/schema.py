@@ -125,3 +125,19 @@ def paginated_responses(responses: Mapping[int, Any]) -> dict[int, Any]:
     result = app_responses(responses)
     result.setdefault(404, INVALID_PAGE)
     return result
+
+
+def ok_response(serializer, description: str, *examples: tuple[str, dict]) -> OpenApiResponse:
+    """A success response with named examples (`(name, value)` pairs)."""
+    return OpenApiResponse(
+        serializer,
+        description=description,
+        examples=[
+            OpenApiExample(name, value=value, response_only=True) for name, value in examples
+        ],
+    )
+
+
+def request_examples(*examples: tuple[str, dict]) -> list[OpenApiExample]:
+    """Named request-body examples (`(name, value)` pairs)."""
+    return [OpenApiExample(name, value=value, request_only=True) for name, value in examples]
