@@ -13,6 +13,7 @@ class LaunchConfig {
     this.maintenanceMessage,
     this.otpLength = 6,
     this.resendAfterSeconds = 30,
+    this.supportPhone,
   });
 
   final String? minSupportedVersion;
@@ -26,6 +27,9 @@ class LaunchConfig {
   final PolicyLinks policies;
   final int otpLength;
   final int resendAfterSeconds;
+
+  /// `support.phone`: "Contact support" calls it (`03 §2.10`).
+  final String? supportPhone;
 }
 
 @immutable

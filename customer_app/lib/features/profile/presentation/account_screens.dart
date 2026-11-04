@@ -65,9 +65,21 @@ class AccountScreen extends ConsumerWidget {
               onTap: () => context.push(Routes.editProfile),
             ),
             ListTile(
+              key: const Key('account-orders'),
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: Text(l10n.myOrders),
+              onTap: () => context.push(Routes.orders),
+            ),
+            ListTile(
               leading: const Icon(Icons.location_on_outlined),
               title: Text(l10n.addresses),
               onTap: () => context.push(Routes.addresses),
+            ),
+            ListTile(
+              key: const Key('account-notifications'),
+              leading: const Icon(Icons.notifications_none),
+              title: Text(l10n.notificationsTitle),
+              onTap: () => context.push(Routes.notifications),
             ),
             if (policies != null) ...[
               const Divider(),

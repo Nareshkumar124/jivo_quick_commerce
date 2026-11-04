@@ -2073,6 +2073,564 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Checking the payment status…'**
   String get checkingPayment;
+
+  /// Account row and screen title: the order list.
+  ///
+  /// In en, this message translates to:
+  /// **'My orders'**
+  String get myOrders;
+
+  /// Order list section: orders not finished yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Active orders'**
+  String get ordersActive;
+
+  /// Order list section: finished orders.
+  ///
+  /// In en, this message translates to:
+  /// **'Past orders'**
+  String get ordersPast;
+
+  /// Order list empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'You haven\'t placed an order yet. Your orders will show up here.'**
+  String get ordersEmpty;
+
+  /// Footer of a paged list when the next page failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load more orders.'**
+  String get ordersLoadMoreFailed;
+
+  /// Units in an order.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String orderItemCount(int count);
+
+  /// Order date (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Placed on {date}'**
+  String orderPlacedOn(String date);
+
+  /// 08 §1 label: PAYMENT_PENDING.
+  ///
+  /// In en, this message translates to:
+  /// **'Completing payment…'**
+  String get orderStatusPaymentPending;
+
+  /// 08 §1 label: PLACED.
+  ///
+  /// In en, this message translates to:
+  /// **'Order placed'**
+  String get orderStatusPlaced;
+
+  /// 08 §1 label: ACCEPTED.
+  ///
+  /// In en, this message translates to:
+  /// **'Order confirmed'**
+  String get orderStatusAccepted;
+
+  /// 08 §1 label: PACKING.
+  ///
+  /// In en, this message translates to:
+  /// **'Packing your order'**
+  String get orderStatusPacking;
+
+  /// 08 §1 label: PACKED.
+  ///
+  /// In en, this message translates to:
+  /// **'Packed, rider on the way to store'**
+  String get orderStatusPacked;
+
+  /// 08 §1 label: OUT_FOR_DELIVERY.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get orderStatusOutForDelivery;
+
+  /// 08 §1 label: DELIVERED.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get orderStatusDelivered;
+
+  /// 08 §1 label: CANCELLED.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get orderStatusCancelled;
+
+  /// 08 §1 label: PAYMENT_FAILED.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed'**
+  String get orderStatusPaymentFailed;
+
+  /// 08 §1 label: DELIVERY_FAILED and RETURNED.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery unsuccessful'**
+  String get orderStatusDeliveryFailed;
+
+  /// A status this app version does not know.
+  ///
+  /// In en, this message translates to:
+  /// **'Status unavailable'**
+  String get orderStatusUnknown;
+
+  /// Order detail title.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {number}'**
+  String orderTitle(String number);
+
+  /// Timeline step (03 §2.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get orderStageConfirmed;
+
+  /// Timeline step (03 §2.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Packing'**
+  String get orderStagePacking;
+
+  /// Timeline step (03 §2.10).
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get orderStageOnTheWay;
+
+  /// Timeline step (03 §2.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Placed'**
+  String get orderStagePlaced;
+
+  /// Timeline step (03 §2.10).
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get orderStageDelivered;
+
+  /// Order detail: the timeline header.
+  ///
+  /// In en, this message translates to:
+  /// **'Order status'**
+  String get orderTimelineTitle;
+
+  /// Screen reader: a timeline step that was reached.
+  ///
+  /// In en, this message translates to:
+  /// **'done'**
+  String get orderStepDone;
+
+  /// Screen reader: the current timeline step.
+  ///
+  /// In en, this message translates to:
+  /// **'current'**
+  String get orderStepCurrent;
+
+  /// Screen reader: a timeline step not reached yet.
+  ///
+  /// In en, this message translates to:
+  /// **'upcoming'**
+  String get orderStepUpcoming;
+
+  /// Order detail: the items header.
+  ///
+  /// In en, this message translates to:
+  /// **'Items'**
+  String get orderItemsTitle;
+
+  /// Order line: quantity and unit price.
+  ///
+  /// In en, this message translates to:
+  /// **'{quantity} × {price}'**
+  String orderLineQuantity(int quantity, String price);
+
+  /// Order detail: the payment header.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get orderPaymentTitle;
+
+  /// Payment method: ONLINE.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid online'**
+  String get paymentMethodOnline;
+
+  /// Payment method: COD.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery'**
+  String get paymentMethodCod;
+
+  /// payment_status PENDING.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment not completed'**
+  String get paymentStatusPending;
+
+  /// payment_status PAID.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get paymentStatusPaid;
+
+  /// payment_status FAILED.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed'**
+  String get paymentStatusFailed;
+
+  /// payment_status REFUND_PENDING.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund initiated'**
+  String get paymentStatusRefundPending;
+
+  /// payment_status REFUNDED.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get paymentStatusRefunded;
+
+  /// payment_status PARTIALLY_REFUNDED.
+  ///
+  /// In en, this message translates to:
+  /// **'Partly refunded'**
+  String get paymentStatusPartiallyRefunded;
+
+  /// payment_status COD_PENDING.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay on delivery'**
+  String get paymentStatusCodPending;
+
+  /// payment_status COD_COLLECTED.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid on delivery'**
+  String get paymentStatusCodCollected;
+
+  /// A cancelled or failed order that was never paid.
+  ///
+  /// In en, this message translates to:
+  /// **'No payment was taken for this order.'**
+  String get noPaymentTaken;
+
+  /// A cancelled cash-on-delivery order.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to pay for this order.'**
+  String get nothingToPay;
+
+  /// A pending refund (08 §6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Refund of {amount} initiated. It reaches your original payment method in 5–7 working days.'**
+  String refundInProgress(String amount);
+
+  /// A processed refund.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} refunded to your original payment method.'**
+  String refundCompleted(String amount);
+
+  /// A refund the gateway refused (ops retries it).
+  ///
+  /// In en, this message translates to:
+  /// **'Your refund of {amount} is delayed. Our team is on it; contact support if you need help.'**
+  String refundFailedNote(String amount);
+
+  /// When a refund was processed (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded on {date}'**
+  String refundedOn(String date);
+
+  /// Order detail: the address header.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery address'**
+  String get orderDeliveryTo;
+
+  /// Active order ETA (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Arriving by {time}'**
+  String orderArrivingBy(String time);
+
+  /// Order detail of a PAYMENT_PENDING order.
+  ///
+  /// In en, this message translates to:
+  /// **'This order is waiting for payment.'**
+  String get orderAwaitingPayment;
+
+  /// Opens the payment screen of a PAYMENT_PENDING order.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete payment'**
+  String get completePayment;
+
+  /// Opens the GST invoice PDF.
+  ///
+  /// In en, this message translates to:
+  /// **'Download invoice'**
+  String get downloadInvoice;
+
+  /// No app could open the invoice link.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the invoice. Install a PDF viewer or browser and try again.'**
+  String get invoiceOpenFailed;
+
+  /// Adds the order's items back to the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'Order again'**
+  String get reorder;
+
+  /// Reorder: everything was added.
+  ///
+  /// In en, this message translates to:
+  /// **'Items added to your cart.'**
+  String get reorderAllAdded;
+
+  /// Reorder: nothing could be added.
+  ///
+  /// In en, this message translates to:
+  /// **'None of these items can be ordered right now.'**
+  String get reorderNothingAdded;
+
+  /// Reorder dialog title when items are unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items were not added'**
+  String get reorderSomeUnavailableTitle;
+
+  /// Reorder: an out-of-stock item.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is out of stock'**
+  String reorderOutOfStock(String name);
+
+  /// Reorder: a discontinued item.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is no longer sold'**
+  String reorderDiscontinued(String name);
+
+  /// Reorder: fewer units than ordered were available.
+  ///
+  /// In en, this message translates to:
+  /// **'Only {count} of {name} added'**
+  String reorderReduced(int count, String name);
+
+  /// Order detail past the cancel window (08 §7).
+  ///
+  /// In en, this message translates to:
+  /// **'Need to cancel?'**
+  String get cannotCancelTitle;
+
+  /// Order detail past the cancel window (08 §7).
+  ///
+  /// In en, this message translates to:
+  /// **'Your order is already being packed, so it can no longer be cancelled in the app. Contact support for help.'**
+  String get cannotCancelBody;
+
+  /// Calls Jivo support.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact support'**
+  String get contactSupport;
+
+  /// Cancel sheet title.
+  ///
+  /// In en, this message translates to:
+  /// **'Why are you cancelling?'**
+  String get cancelSheetTitle;
+
+  /// Cancel reason ORDERED_BY_MISTAKE.
+  ///
+  /// In en, this message translates to:
+  /// **'Ordered by mistake'**
+  String get cancelReasonOrderedByMistake;
+
+  /// Cancel reason CHANGED_MIND.
+  ///
+  /// In en, this message translates to:
+  /// **'Changed my mind'**
+  String get cancelReasonChangedMind;
+
+  /// Cancel reason DELIVERY_TOO_SLOW.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery is taking too long'**
+  String get cancelReasonDeliveryTooSlow;
+
+  /// Cancel reason CHANGE_PAYMENT_METHOD.
+  ///
+  /// In en, this message translates to:
+  /// **'Want to change the payment method'**
+  String get cancelReasonChangePaymentMethod;
+
+  /// Cancel reason PAYMENT_PROBLEM.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem with the payment'**
+  String get cancelReasonPaymentProblem;
+
+  /// Cancel reason OTHER.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get cancelReasonOther;
+
+  /// Cancel sheet refund info, paid online (08 §6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'You will get a full refund of {amount} to your original payment method in 5–7 working days.'**
+  String cancelRefundOnline(String amount);
+
+  /// Cancel sheet refund info, COD (08 §6.4).
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is due for a cash-on-delivery order.'**
+  String get cancelRefundCod;
+
+  /// Cancel sheet info, order awaiting payment.
+  ///
+  /// In en, this message translates to:
+  /// **'No payment was taken for this order, so there is nothing to refund.'**
+  String get cancelRefundUnpaid;
+
+  /// Cancel sheet confirm button.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel order'**
+  String get cancelConfirmAction;
+
+  /// Cancel sheet hint before a reason is chosen.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a reason to continue.'**
+  String get cancelChooseReason;
+
+  /// The store the order comes from.
+  ///
+  /// In en, this message translates to:
+  /// **'From {store}'**
+  String orderStoreName(String store);
+
+  /// The coupon used on the order.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupon {code}'**
+  String couponUsed(String code);
+
+  /// Tracking ETA countdown.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{Arriving in 1 min} other{Arriving in {minutes} mins}}'**
+  String trackingEtaMinutes(int minutes);
+
+  /// Tracking: the ETA has passed.
+  ///
+  /// In en, this message translates to:
+  /// **'Arriving any moment'**
+  String get trackingArrivingNow;
+
+  /// Tracking before a rider is assigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigning a delivery partner…'**
+  String get trackingRiderAssigning;
+
+  /// Tracking: the rider card.
+  ///
+  /// In en, this message translates to:
+  /// **'Your delivery partner'**
+  String get trackingRiderLabel;
+
+  /// Tracking: call the rider.
+  ///
+  /// In en, this message translates to:
+  /// **'Call {name}'**
+  String trackingCallRider(String name);
+
+  /// Tracking: the delivery OTP.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery OTP'**
+  String get trackingOtpTitle;
+
+  /// Tracking: OTP guidance.
+  ///
+  /// In en, this message translates to:
+  /// **'Share this code with the rider only when you receive your order.'**
+  String get trackingOtpHint;
+
+  /// Route sketch: the store end.
+  ///
+  /// In en, this message translates to:
+  /// **'Store'**
+  String get trackingMapStore;
+
+  /// Route sketch: the customer end.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get trackingMapHome;
+
+  /// Route sketch for screen readers.
+  ///
+  /// In en, this message translates to:
+  /// **'The rider is {percent} percent of the way to you.'**
+  String trackingMapSemantics(int percent);
+
+  /// Tracking: opens the order detail.
+  ///
+  /// In en, this message translates to:
+  /// **'Order details'**
+  String get trackingViewDetails;
+
+  /// Inbox title and account row.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notificationsTitle;
+
+  /// Inbox empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications yet. Order updates and offers will show up here.'**
+  String get notificationsEmpty;
+
+  /// Screen reader: an unread notification.
+  ///
+  /// In en, this message translates to:
+  /// **'Unread'**
+  String get notificationUnread;
+
+  /// Order line: units the store marked unavailable (08 T8a).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unit was unavailable and is not charged} other{{count} units were unavailable and are not charged}}'**
+  String orderLineUnavailable(int count);
+
+  /// Order detail: the cancellation section header.
+  ///
+  /// In en, this message translates to:
+  /// **'Why this order was cancelled'**
+  String get orderCancelledTitle;
 }
 
 class _AppLocalizationsDelegate

@@ -15,8 +15,10 @@ import 'package:jivo_api/src/model/error_envelope.dart';
 import 'package:jivo_api/src/model/order.dart';
 import 'package:jivo_api/src/model/order_cancel_request.dart';
 import 'package:jivo_api/src/model/order_create_request.dart';
+import 'package:jivo_api/src/model/order_invoice.dart';
 import 'package:jivo_api/src/model/order_placement.dart';
 import 'package:jivo_api/src/model/paginated_order_summary_list.dart';
+import 'package:jivo_api/src/model/reorder_result.dart';
 
 class OrdersApi {
   final Dio _dio;
@@ -24,7 +26,7 @@ class OrdersApi {
   const OrdersApi(this._dio);
 
   /// Cancel my order
-  /// 08 §7. **Phase 3:** only an order in PAYMENT_PENDING (T5, e.g. the customer gives up on paying or wants to pay another way): the stock and the coupon hold are released; the cart is still there. **From Phase 4:** also PLACED and ACCEPTED (T11, with a refund for paid orders). Use &#x60;can_cancel&#x60; to show the button.
+  /// 08 §7: allowed in PAYMENT_PENDING, PLACED and ACCEPTED; use &#x60;can_cancel&#x60; to show the button (from PACKING on, show &#39;Contact support&#39;).  - **PAYMENT_PENDING (T5):** the customer gives up on paying or wants to pay another way: the stock and the coupon hold are released; the cart is still there. - **PLACED / ACCEPTED (T11, Phase 4):** the stock is released and the coupon can be used again. Paid online: the full amount is refunded to the original payment (&#x60;refunds[]&#x60;, &#x60;payment_status&#x60; REFUND_PENDING, then REFUNDED; 08 §6.4). COD: nothing is due.  Repeating the call on an order already cancelled returns 409.
   ///
   /// Parameters:
   /// * [id] - `Order.id`.
@@ -218,6 +220,88 @@ class OrdersApi {
     );
   }
 
+  /// Download the GST invoice
+  /// A short-lived signed link to the order&#39;s GST tax invoice (PDF), made on the first request. Only for DELIVERED orders (&#x60;can_download_invoice&#x60;). Open or download the link before &#x60;expires_at&#x60;; call again for a fresh link.  Until Jivo&#39;s GST details are configured (D-12), invoices carry placeholder GST data and a &#39;not a valid tax invoice&#39; banner.
+  ///
+  /// Parameters:
+  /// * [id] - `Order.id`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [OrderInvoice] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<OrderInvoice>> ordersInvoice({
+    required int id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/orders/{id}/invoice/'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    OrderInvoice? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OrderInvoice, OrderInvoice>(
+              rawData,
+              'OrderInvoice',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<OrderInvoice>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// My orders
   /// The caller&#39;s orders, newest first; without &#x60;status&#x60;, active orders come first. On app launch, &#x60;?status&#x3D;active&#x60; finds an order still in PAYMENT_PENDING (the app was closed during payment): show its server status and offer Retry while &#x60;can_retry_payment&#x60; is true (03 §2.9).
   ///
@@ -306,8 +390,92 @@ class OrdersApi {
     );
   }
 
+  /// Order again
+  /// Puts the order&#39;s items back in the cart, priced at the store in &#x60;X-Store-Id&#x60;, as far as they can be ordered now (03 §2.10). Each line is raised to the units of the past order, capped by what can be ordered (&#x60;orderable_quantity&#x60;); it is never added on top, so repeating the call changes nothing. Lines already in the cart with more units are left as they are. Returns the whole cart and the lines that could not be added in full (&#x60;unavailable&#x60;): show them, then open the cart.
+  ///
+  /// Parameters:
+  /// * [xStoreId] - The store id from `GET /serviceability/` (`store.id`) for the selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR` with `details: {\"X-Store-Id\": [...]}`. Unknown or deactivated store: 404 `STORE_NOT_FOUND`; drop the saved store and check serviceability again. A closed store is still browsable.
+  /// * [id] - `Order.id`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ReorderResult] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ReorderResult>> ordersReorder({
+    required int xStoreId,
+    required int id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/orders/{id}/reorder/'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{r'X-Store-Id': xStoreId, ...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ReorderResult? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ReorderResult, ReorderResult>(
+              rawData,
+              'ReorderResult',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ReorderResult>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// One of my orders
-  /// The order with its bill, items and state (added to Phase 3, PM decision): poll it after checkout while the payment is being confirmed (e.g. verify&#39;s response was lost), and for the success screen. Another user&#39;s order id is a 404. Phase 4 adds the status timeline and invoice to the same shape.
+  /// The order with its bill, items and state (added to Phase 3, PM decision): poll it after checkout while the payment is being confirmed (e.g. verify&#39;s response was lost), and for the success screen. Another user&#39;s order id is a 404.  **Phase 4** adds &#x60;timeline&#x60; (every state reached), &#x60;cancellation&#x60;, &#x60;amount_refunded&#x60;, &#x60;refunds&#x60; and &#x60;can_download_invoice&#x60;, and per line &#x60;quantity_unavailable&#x60;: when the store cannot supply some units (08 T8a) they are removed, &#x60;bill&#x60; becomes the recomputed bill (never more than before) and, for an online payment, the difference is refunded. Show the bill as it is: the app never computes money.
   ///
   /// Parameters:
   /// * [id] - `Order.id`.

@@ -4,8 +4,11 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../catalog/domain/catalog_models.dart';
 import '../../checkout/data/fake_payment_launcher.dart';
+import '../../addresses/domain/saved_address.dart';
+import '../../orders/data/order_history_repository.dart';
 import '../../orders/data/order_repository.dart';
 import '../../orders/domain/order.dart';
+import '../../orders/domain/order_history.dart';
 import '../domain/cart.dart';
 import 'cart_repository.dart';
 
@@ -84,7 +87,14 @@ const fakeGatewayKeyId = 'rzp_fake_jivo_local';
 /// demo [FakeBillRules]; screens and controllers only render what it
 /// returns, exactly as they render the real API. Online payments use the
 /// server's fake gateway scheme (`rzp_fake_jivo_local`, HMAC signatures).
-class FakeCommerceBackend implements CartRepository, OrderRepository {
+///
+/// Phase 4 adds the order history side (`OrderHistoryRepository`, the
+/// list/detail/cancel/reorder/invoice contract of `06 §2.6`) with test and
+/// demo hooks: [advanceOrder] plays the store and rider (`08` T6–T10),
+/// [settleRefunds] plays Razorpay's `refund.processed`, and
+/// [seedDemoOrders] fills the history for the dev flavor's `FAKE_API=true`.
+class FakeCommerceBackend
+    implements CartRepository, OrderRepository, OrderHistoryRepository {
   FakeCommerceBackend({
     this.rules = FakeBillRules.demo,
     this.latency = const Duration(milliseconds: 250),
@@ -366,6 +376,10 @@ class FakeCommerceBackend implements CartRepository, OrderRepository {
     required String idempotencyKey,
   }) async {
     await _respond();
+    return _place(request, idempotencyKey);
+  }
+
+  PlacedOrder _place(PlaceOrderRequest request, String idempotencyKey) {
     final repeat = _orderByKey[idempotencyKey];
     if (repeat != null) {
       if (repeat.$2 != request) {
@@ -461,7 +475,20 @@ class FakeCommerceBackend implements CartRepository, OrderRepository {
       grandTotal: bill.grandTotal,
       status: cod ? OrderStatus.placed : OrderStatus.paymentPending,
       couponCode: _couponCode,
-    );
+      lines: [
+        for (final line in cart.lines)
+          _FakeOrderLine(
+            CartLinePreview.of(line.variant, line.productName),
+            line.quantity,
+            lineMrpTotal: line.lineMrpTotal,
+            lineTotal: line.lineTotal,
+          ),
+      ],
+      bill: bill,
+      addressId: request.addressId,
+      createdAt: now,
+    )..paymentStatus = cod ? PaymentStatus.codPending : PaymentStatus.pending;
+    order.record(order.status, now);
     if (cod) {
       _redeem(order);
     } else {
@@ -491,8 +518,7 @@ class FakeCommerceBackend implements CartRepository, OrderRepository {
         proof.razorpaySignature != expected) {
       _fail(ApiErrorCode.paymentVerificationFailed);
     }
-    order.status = OrderStatus.placed;
-    _redeem(order);
+    _markPaid(order);
     return _toOrder(order);
   }
 
@@ -523,19 +549,32 @@ class FakeCommerceBackend implements CartRepository, OrderRepository {
     required CancelReason reason,
   }) async {
     await _respond();
+    return _toOrder(_cancel(orderId, reason));
+  }
+
+  /// T5 (`PAYMENT_PENDING`: stock and the coupon hold are released, the
+  /// cart stays) and T11 (`PLACED`/`ACCEPTED`: a paid ONLINE order is
+  /// refunded in full, `08 §6.4`). Later states are 409, `08 §7`.
+  _FakeOrder _cancel(int orderId, CancelReason reason) {
     final order = _order(orderId);
-    if (order.status != OrderStatus.paymentPending) {
+    if (!_customerCanCancel(order.status)) {
       _fail(
         ApiErrorCode.invalidStateTransition,
         status: 409,
         details: {'status': order.status.wireValue},
       );
     }
-    // T5: stock and the coupon hold are released; the cart stays.
+    final now = _clock().toUtc();
+    if (order.paymentStatus == PaymentStatus.paid) {
+      order
+        ..paymentStatus = PaymentStatus.refundPending
+        ..refunds.add(_FakeRefund(amount: order.grandTotal, createdAt: now));
+    }
     order
       ..status = OrderStatus.cancelled
-      ..cancelReason = reason;
-    return _toOrder(order);
+      ..cancelReason = reason
+      ..record(OrderStatus.cancelled, now);
+    return order;
   }
 
   @override
@@ -554,23 +593,360 @@ class FakeCommerceBackend implements CartRepository, OrderRepository {
   }
 
   /// The webhook confirmed a payment (T3) that the app never verified.
-  void confirmByWebhook(int orderId) {
-    final order = _orders[orderId]!;
-    order.status = OrderStatus.placed;
+  void confirmByWebhook(int orderId) => _markPaid(_orders[orderId]!);
+
+  /// T3: paid, `PLACED`.
+  void _markPaid(_FakeOrder order) {
+    order
+      ..status = OrderStatus.placed
+      ..paymentStatus = PaymentStatus.paid
+      ..record(OrderStatus.placed, _clock().toUtc());
     _redeem(order);
   }
 
   /// Why the order was cancelled (tests).
   CancelReason? cancelReasonOf(int orderId) => _orders[orderId]?.cancelReason;
 
+  // --- OrderHistoryRepository (Phase 4) ---------------------------------
+
+  /// Rows per page of [listOrders].
+  int historyPageSize = 10;
+
+  /// Variants the catalog no longer sells (reorder skips them).
+  final discontinued = <int>{};
+
+  @override
+  Future<OrderPage> listOrders({int page = 1}) async {
+    await _respond();
+    final all = _orders.values.map(_refresh).toList()
+      ..sort((a, b) {
+        final active = (_isActive(a.status) ? 0 : 1).compareTo(
+          _isActive(b.status) ? 0 : 1,
+        );
+        return active != 0 ? active : b.createdAt.compareTo(a.createdAt);
+      });
+    final start = (page - 1) * historyPageSize;
+    if (page < 1 || (start >= all.length && page > 1)) {
+      _fail(ApiErrorCode.notFound, status: 404);
+    }
+    final end = math.min(start + historyPageSize, all.length);
+    return OrderPage(
+      items: [for (final order in all.sublist(start, end)) _toListItem(order)],
+      nextPage: end < all.length ? page + 1 : null,
+    );
+  }
+
+  @override
+  Future<OrderDetail> getOrderDetail(int orderId) async {
+    await _respond();
+    return _toDetail(_order(orderId));
+  }
+
+  @override
+  Future<OrderDetail> cancel(int orderId, CancelReason reason) async {
+    await _respond();
+    return _toDetail(_cancel(orderId, reason));
+  }
+
+  @override
+  Future<ReorderResult> reorder(int orderId) async {
+    await _respond();
+    final order = _order(orderId);
+    final skipped = <ReorderSkippedItem>[];
+    for (final line in order.lines) {
+      final variant = line.preview.variant;
+      final gone = discontinued.contains(variant.id);
+      final current = _lines[variant.id]?.quantity ?? 0;
+      final room = gone ? 0 : math.max(0, _orderable(variant) - current);
+      final take = math.min(room, line.quantity);
+      if (take > 0) {
+        final existing = _lines[variant.id];
+        if (existing == null) {
+          _lines[variant.id] = _FakeLine(_nextLineId++, line.preview, take);
+        } else {
+          existing.quantity += take;
+        }
+      }
+      if (take < line.quantity) {
+        skipped.add(
+          ReorderSkippedItem(
+            variantId: variant.id,
+            productName: line.preview.productName,
+            variantName: variant.name,
+            reason: gone
+                ? ReorderSkipReason.discontinued
+                : take == 0
+                ? ReorderSkipReason.outOfStock
+                : ReorderSkipReason.quantityReduced,
+            requestedQuantity: line.quantity,
+            addedQuantity: take,
+          ),
+        );
+      }
+    }
+    return ReorderResult(unavailable: skipped, cart: _snapshot());
+  }
+
+  @override
+  Future<InvoiceLink> invoice(int orderId) async {
+    await _respond();
+    final order = _order(orderId);
+    if (!order.invoiceAvailable) _fail(ApiErrorCode.notFound, status: 404);
+    return InvoiceLink(
+      url: Uri.parse('https://invoices.example.com/${order.number}.pdf'),
+      expiresAt: _clock().toUtc().add(const Duration(minutes: 15)),
+    );
+  }
+
+  /// Plays the store and rider: moves the order to [to] (`08` T6–T10, T12,
+  /// T13), recording the history. Delivered orders get an invoice and a
+  /// COD order's cash is collected; a store cancel of a paid order is
+  /// refunded in full (`08 §6.4`).
+  void advanceOrder(int orderId, OrderStatus to, {DateTime? at}) {
+    final order = _orders[orderId]!;
+    final now = at ?? _clock().toUtc();
+    order
+      ..status = to
+      ..record(to, now);
+    if (to == OrderStatus.delivered) {
+      order.invoiceAvailable = true;
+      if (order.method == PaymentMethod.cod) {
+        order.paymentStatus = PaymentStatus.codCollected;
+      }
+    } else if (to == OrderStatus.cancelled &&
+        order.paymentStatus == PaymentStatus.paid) {
+      order
+        ..paymentStatus = PaymentStatus.refundPending
+        ..refunds.add(_FakeRefund(amount: order.grandTotal, createdAt: now));
+    }
+  }
+
+  /// Razorpay's `refund.processed` for every pending refund of the order.
+  void settleRefunds(int orderId) {
+    final order = _orders[orderId]!;
+    final now = _clock().toUtc();
+    for (final refund in order.refunds) {
+      if (refund.status == RefundStatus.pending) {
+        refund
+          ..status = RefundStatus.processed
+          ..processedAt = now;
+      }
+    }
+    order.paymentStatus = PaymentStatus.refunded;
+  }
+
+  /// Demo history for `FAKE_API=true`: a delivered COD order (one item now
+  /// out of stock), a cancelled and refunded online order, and an order the
+  /// store is packing. The tests' backends start empty.
+  void seedDemoOrders() {
+    final now = _clock().toUtc();
+    PlacedOrder place(
+      List<(CatalogVariant, String, int)> items,
+      PaymentMethod method,
+    ) {
+      for (final (variant, name, quantity) in items) {
+        _lines[variant.id] = _FakeLine(
+          _nextLineId++,
+          CartLinePreview.of(variant, name),
+          quantity,
+        );
+      }
+      final bill = _snapshot(addressId: 1).bill!;
+      return _place(
+        PlaceOrderRequest(
+          addressId: 1,
+          paymentMethod: method,
+          expectedGrandTotal: bill.grandTotal,
+        ),
+        'demo-$_nextOrderId',
+      );
+    }
+
+    void backdate(int id, Duration by) {
+      final order = _orders[id]!;
+      order.createdAt = order.createdAt.subtract(by);
+      final shifted = [
+        for (final e in order.history)
+          OrderStatusEvent(status: e.status, at: e.at.subtract(by)),
+      ];
+      order.history
+        ..clear()
+        ..addAll(shifted);
+      order.etaAt = order.etaAt?.subtract(by);
+    }
+
+    final delivered = place([
+      (_demoCanola, 'Jivo Canola Oil', 2),
+      (_demoGroundnut, 'Jivo Groundnut Oil', 1),
+    ], PaymentMethod.cod);
+    for (final (i, status) in const [
+      OrderStatus.accepted,
+      OrderStatus.packing,
+      OrderStatus.packed,
+      OrderStatus.outForDelivery,
+      OrderStatus.delivered,
+    ].indexed) {
+      advanceOrder(
+        delivered.id,
+        status,
+        at: now.add(Duration(minutes: 2 + i * 4)),
+      );
+    }
+    backdate(delivered.id, const Duration(days: 3));
+    stock[_demoGroundnut.id] = 0;
+
+    final refunded = place([
+      (_demoOlive, 'Jivo Extra Light Olive Oil', 1),
+    ], PaymentMethod.online);
+    _markPaid(_orders[refunded.id]!);
+    _cancel(refunded.id, CancelReason.changedMind);
+    settleRefunds(refunded.id);
+    backdate(refunded.id, const Duration(days: 1));
+
+    final packing = place([
+      (_demoCanola, 'Jivo Canola Oil', 1),
+      (_demoMustard, 'Jivo Kachi Ghani Mustard Oil', 1),
+    ], PaymentMethod.cod);
+    advanceOrder(packing.id, OrderStatus.accepted);
+    advanceOrder(packing.id, OrderStatus.packing);
+    // The demo orders don't use up the first-order coupon.
+    _hasOrdered = false;
+  }
+
+  static const _demoCanola = CatalogVariant(
+    id: 101,
+    name: '1 L',
+    sellingPrice: '249.00',
+    mrp: '299.00',
+    stockStatus: StockStatus.inStock,
+    orderableQuantity: 10,
+    maxQtyPerOrder: 10,
+  );
+  static const _demoOlive = CatalogVariant(
+    id: 201,
+    name: '1 L',
+    sellingPrice: '899.00',
+    mrp: '1099.00',
+    stockStatus: StockStatus.inStock,
+    orderableQuantity: 10,
+    maxQtyPerOrder: 10,
+  );
+  static const _demoMustard = CatalogVariant(
+    id: 501,
+    name: '1 L',
+    sellingPrice: '189.00',
+    mrp: '210.00',
+    stockStatus: StockStatus.inStock,
+    orderableQuantity: 10,
+    maxQtyPerOrder: 10,
+  );
+  static const _demoGroundnut = CatalogVariant(
+    id: 601,
+    name: '1 L',
+    sellingPrice: '269.00',
+    mrp: '299.00',
+    stockStatus: StockStatus.inStock,
+    orderableQuantity: 10,
+    maxQtyPerOrder: 10,
+  );
+
+  static const _storeName = 'Jivo Connaught Place';
+
+  static int _units(_FakeOrder order) =>
+      order.lines.fold(0, (sum, line) => sum + line.quantity);
+
+  OrderListItem _toListItem(_FakeOrder order) => OrderListItem(
+    id: order.id,
+    number: order.number,
+    status: order.status,
+    paymentMethod: order.method,
+    paymentStatus: order.paymentStatus,
+    storeName: _storeName,
+    itemCount: _units(order),
+    imageUrls: [
+      for (final line in order.lines.take(4)) ?line.preview.variant.imageUrl,
+    ],
+    grandTotal: order.grandTotal,
+    createdAt: order.createdAt,
+    placedAt: order.placedAt,
+    etaAt: order.status.isConfirmed ? order.etaAt : null,
+    canRetryPayment:
+        order.status == OrderStatus.paymentPending &&
+        order.method == PaymentMethod.online,
+  );
+
+  OrderDetail _toDetail(_FakeOrder order) {
+    final processed = order.refunds.where(
+      (r) => r.status == RefundStatus.processed,
+    );
+    return OrderDetail(
+      id: order.id,
+      number: order.number,
+      status: order.status,
+      paymentMethod: order.method,
+      paymentStatus: order.paymentStatus,
+      storeName: _storeName,
+      lines: [
+        for (final line in order.lines)
+          OrderLineItem(
+            variantId: line.preview.variant.id,
+            productId: line.preview.variant.id ~/ 100,
+            productName: line.preview.productName,
+            variantName: line.preview.variant.name,
+            imageUrl: line.preview.variant.imageUrl,
+            mrp: line.preview.variant.mrp,
+            sellingPrice: line.preview.variant.sellingPrice,
+            quantity: line.quantity,
+            lineMrpTotal: line.lineMrpTotal,
+            lineTotal: line.lineTotal,
+          ),
+      ],
+      itemCount: _units(order),
+      bill: order.bill,
+      couponCode: order.couponCode,
+      address: const OrderAddressSnapshot(
+        label: AddressLabel.home,
+        receiverName: 'Test Customer',
+        receiverPhone: '+919000000001',
+        text: 'Flat 4B, MG Road, Connaught Place, New Delhi, 110001',
+      ),
+      createdAt: order.createdAt,
+      placedAt: order.placedAt,
+      etaAt: order.status.isConfirmed ? order.etaAt : null,
+      paymentExpiresAt: order.status == OrderStatus.paymentPending
+          ? order.expiresAt
+          : null,
+      canCancel: _customerCanCancel(order.status),
+      canRetryPayment:
+          order.status == OrderStatus.paymentPending &&
+          order.method == PaymentMethod.online,
+      history: List.unmodifiable(order.history),
+      refunds: [
+        for (final r in order.refunds)
+          OrderRefund(
+            amount: r.amount,
+            status: r.status,
+            createdAt: r.createdAt,
+            processedAt: r.processedAt,
+          ),
+      ],
+      // The fake refunds whole orders only, so a processed refund is the
+      // order's grand total (a server value, not arithmetic).
+      amountRefunded: processed.isEmpty ? null : processed.first.amount,
+      invoiceAvailable: order.invoiceAvailable,
+    );
+  }
+
   // --- internals ----------------------------------------------------------
 
-  static bool _isActive(OrderStatus status) => switch (status) {
-    OrderStatus.delivered ||
-    OrderStatus.cancelled ||
-    OrderStatus.paymentFailed ||
-    OrderStatus.returned => false,
-    _ => true,
+  static bool _isActive(OrderStatus status) => status.isActive;
+
+  /// `08 §7`: `CUSTOMER_CANCEL_UNTIL = ACCEPTED`.
+  static bool _customerCanCancel(OrderStatus status) => switch (status) {
+    OrderStatus.paymentPending ||
+    OrderStatus.placed ||
+    OrderStatus.accepted => true,
+    _ => false,
   };
 
   _FakeOrder _order(int id) {
@@ -585,7 +961,10 @@ class FakeCommerceBackend implements CartRepository, OrderRepository {
     if (order.status == OrderStatus.paymentPending &&
         expiresAt != null &&
         !_clock().toUtc().isBefore(expiresAt)) {
-      order.status = OrderStatus.paymentFailed;
+      order
+        ..status = OrderStatus.paymentFailed
+        ..paymentStatus = PaymentStatus.failed
+        ..record(OrderStatus.paymentFailed, expiresAt);
     }
     return order;
   }
@@ -602,7 +981,7 @@ class FakeCommerceBackend implements CartRepository, OrderRepository {
       grandTotal: order.grandTotal,
       etaAt: order.status.isConfirmed ? order.etaAt : null,
       paymentExpiresAt: expiresAt,
-      canCancel: pending,
+      canCancel: _customerCanCancel(order.status),
       canRetryPayment: pending && order.method == PaymentMethod.online,
       razorpay: pending && razorpay != null
           ? RazorpayCheckout(
@@ -915,6 +1294,10 @@ class _FakeOrder {
     required this.method,
     required this.grandTotal,
     required this.status,
+    required this.lines,
+    required this.bill,
+    required this.addressId,
+    required this.createdAt,
     this.couponCode,
   });
 
@@ -923,9 +1306,48 @@ class _FakeOrder {
   final PaymentMethod method;
   final String grandTotal;
   final String? couponCode;
+  final List<_FakeOrderLine> lines;
+  final CartBill bill;
+  final int addressId;
+  DateTime createdAt;
   OrderStatus status;
+  PaymentStatus paymentStatus = PaymentStatus.pending;
+  final history = <OrderStatusEvent>[];
+  final refunds = <_FakeRefund>[];
+  bool invoiceAvailable = false;
+
+  void record(OrderStatus status, DateTime at) =>
+      history.add(OrderStatusEvent(status: status, at: at));
+
+  DateTime? get placedAt => history
+      .where((event) => event.status == OrderStatus.placed)
+      .firstOrNull
+      ?.at;
   DateTime? expiresAt;
   DateTime? etaAt;
   RazorpayCheckout? razorpay;
   CancelReason? cancelReason;
+}
+
+class _FakeOrderLine {
+  _FakeOrderLine(
+    this.preview,
+    this.quantity, {
+    required this.lineMrpTotal,
+    required this.lineTotal,
+  });
+
+  final CartLinePreview preview;
+  final int quantity;
+  final String lineMrpTotal;
+  final String lineTotal;
+}
+
+class _FakeRefund {
+  _FakeRefund({required this.amount, required this.createdAt});
+
+  final String amount;
+  final DateTime createdAt;
+  RefundStatus status = RefundStatus.pending;
+  DateTime? processedAt;
 }

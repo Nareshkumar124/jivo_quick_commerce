@@ -80,6 +80,9 @@ void main() {
       await tester.tap(find.byTooltip('Account'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('Delete account'), 100);
+      // Past the bottom tabs: the account list is longer since Phase 4.
+      await tester.drag(find.byType(ListView).last, const Offset(0, -300));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Delete account'));
       await tester.pumpAndSettle();
     }

@@ -133,6 +133,7 @@ class TestApp {
           serviceabilityRepositoryProvider.overrideWithValue(serviceability),
           cartRepositoryProvider.overrideWithValue(cartRepository ?? cart),
           orderRepositoryProvider.overrideWithValue(cart),
+          orderHistoryRepositoryProvider.overrideWithValue(cart),
           paymentLauncherProvider.overrideWithValue(payments),
           mapsAvailabilityProvider.overrideWithValue(
             FakeMapsAvailability(available: mapsAvailable),
