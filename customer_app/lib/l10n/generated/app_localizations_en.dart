@@ -1513,4 +1513,214 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get orderCancelledTitle => 'Why this order was cancelled';
+
+  @override
+  String trackingOtpSemantics(String digits) {
+    return 'Delivery OTP $digits';
+  }
+
+  @override
+  String get rateOrderTitle => 'Rate your order';
+
+  @override
+  String get rateOrderQuestion => 'How was your order?';
+
+  @override
+  String get rateTagsPositive => 'What went well?';
+
+  @override
+  String get rateTagsNegative => 'What went wrong?';
+
+  @override
+  String get rateRiderQuestion => 'Rate your delivery partner';
+
+  @override
+  String get rateRiderOptional => 'Optional';
+
+  @override
+  String get rateCommentLabel => 'Tell us more';
+
+  @override
+  String get rateCommentHint => 'Anything we should know? (optional)';
+
+  @override
+  String get rateChooseStars => 'Pick a star rating to submit.';
+
+  @override
+  String get rateSubmit => 'Submit';
+
+  @override
+  String rateStars(int stars) {
+    String _temp0 = intl.Intl.pluralLogic(
+      stars,
+      locale: localeName,
+      other: '$stars stars',
+      one: '1 star',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get rateTagOnTime => 'On time';
+
+  @override
+  String get rateTagWellPacked => 'Well packed';
+
+  @override
+  String get rateTagFresh => 'Fresh products';
+
+  @override
+  String get rateTagPoliteRider => 'Polite delivery partner';
+
+  @override
+  String get rateTagLate => 'Late delivery';
+
+  @override
+  String get rateTagDamaged => 'Damaged items';
+
+  @override
+  String get rateTagMissing => 'Missing items';
+
+  @override
+  String get rateTagRudeRider => 'Rude delivery partner';
+
+  @override
+  String get ratingThanks => 'Thanks for your feedback!';
+
+  @override
+  String ratedOrder(int stars) {
+    String _temp0 = intl.Intl.pluralLogic(
+      stars,
+      locale: localeName,
+      other: 'You rated this order $stars stars',
+      one: 'You rated this order 1 star',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get helpTitle => 'Help & support';
+
+  @override
+  String get helpWithOrder => 'Get help with an order';
+
+  @override
+  String get helpWithOrderSubtitle =>
+      'Missing, damaged or wrong items, refunds and more';
+
+  @override
+  String get helpWithThisOrder => 'Get help with this order';
+
+  @override
+  String get myTickets => 'My tickets';
+
+  @override
+  String get callSupport => 'Call support';
+
+  @override
+  String get helpComingSoon => 'Support is coming soon to the app.';
+
+  @override
+  String get faqTitle => 'Frequently asked questions';
+
+  @override
+  String get faqEmpty => 'No FAQs yet.';
+
+  @override
+  String get newTicket => 'New ticket';
+
+  @override
+  String get ticketsEmpty => 'You have no support tickets.';
+
+  @override
+  String get ticketCreated => 'Ticket created. We\'ll reply here soon.';
+
+  @override
+  String get ticketOrderLabel => 'Order';
+
+  @override
+  String get ticketChooseOrder => 'Choose an order (optional)';
+
+  @override
+  String get ticketRemoveOrder => 'Remove order';
+
+  @override
+  String get ticketIssueLabel => 'What\'s the issue?';
+
+  @override
+  String get ticketChooseIssue => 'Choose an issue type.';
+
+  @override
+  String get ticketMessageLabel => 'Describe the issue';
+
+  @override
+  String get ticketMessageHint => 'Tell us what happened';
+
+  @override
+  String ticketMessageTooShort(int min) {
+    return 'Please write at least $min characters.';
+  }
+
+  @override
+  String get ticketSubmit => 'Create ticket';
+
+  @override
+  String get ticketClosedNote =>
+      'This ticket is closed. Create a new ticket if you still need help.';
+
+  @override
+  String get ticketYou => 'You';
+
+  @override
+  String get ticketSupport => 'Jivo support';
+
+  @override
+  String get ticketReplyHint => 'Write a reply';
+
+  @override
+  String get ticketSend => 'Send';
+
+  @override
+  String get ticketMissingItems => 'Missing items';
+
+  @override
+  String get ticketDamagedItems => 'Damaged items';
+
+  @override
+  String get ticketWrongItems => 'Wrong items';
+
+  @override
+  String get ticketLateDelivery => 'Late delivery';
+
+  @override
+  String get ticketPaymentRefund => 'Payment or refund';
+
+  @override
+  String get ticketAccount => 'My account';
+
+  @override
+  String get ticketOther => 'Something else';
+
+  @override
+  String get ticketStatusOpen => 'Open';
+
+  @override
+  String get ticketStatusInProgress => 'In progress';
+
+  @override
+  String get ticketStatusResolved => 'Resolved';
+
+  @override
+  String get ticketStatusClosed => 'Closed';
+
+  @override
+  String get aboutJivo => 'About Jivo';
+
+  @override
+  String get cmsPageEmpty => 'This page has no content yet.';
+
+  @override
+  String cmsUpdatedOn(String date) {
+    return 'Last updated $date';
+  }
 }

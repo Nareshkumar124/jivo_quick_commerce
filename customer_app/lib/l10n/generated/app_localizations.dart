@@ -2631,6 +2631,378 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Why this order was cancelled'**
   String get orderCancelledTitle;
+
+  /// Screen reader: the delivery OTP read digit by digit.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery OTP {digits}'**
+  String trackingOtpSemantics(String digits);
+
+  /// Rate order screen title.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate your order'**
+  String get rateOrderTitle;
+
+  /// Rate order: the order stars question.
+  ///
+  /// In en, this message translates to:
+  /// **'How was your order?'**
+  String get rateOrderQuestion;
+
+  /// Rate order: tags for 4-5 stars.
+  ///
+  /// In en, this message translates to:
+  /// **'What went well?'**
+  String get rateTagsPositive;
+
+  /// Rate order: tags for 1-3 stars.
+  ///
+  /// In en, this message translates to:
+  /// **'What went wrong?'**
+  String get rateTagsNegative;
+
+  /// Rate order: the rider stars.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate your delivery partner'**
+  String get rateRiderQuestion;
+
+  /// Rate order: the rider rating can be skipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get rateRiderOptional;
+
+  /// Rate order: the comment field.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us more'**
+  String get rateCommentLabel;
+
+  /// Rate order: comment hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Anything we should know? (optional)'**
+  String get rateCommentHint;
+
+  /// Rate order: shown until stars are picked.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a star rating to submit.'**
+  String get rateChooseStars;
+
+  /// Rate order: submit button.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get rateSubmit;
+
+  /// A star in the rating picker.
+  ///
+  /// In en, this message translates to:
+  /// **'{stars, plural, =1{1 star} other{{stars} stars}}'**
+  String rateStars(int stars);
+
+  /// Rating tag.
+  ///
+  /// In en, this message translates to:
+  /// **'On time'**
+  String get rateTagOnTime;
+
+  /// Rating tag.
+  ///
+  /// In en, this message translates to:
+  /// **'Well packed'**
+  String get rateTagWellPacked;
+
+  /// Rating tag.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh products'**
+  String get rateTagFresh;
+
+  /// Rating tag.
+  ///
+  /// In en, this message translates to:
+  /// **'Polite delivery partner'**
+  String get rateTagPoliteRider;
+
+  /// Rating tag.
+  ///
+  /// In en, this message translates to:
+  /// **'Late delivery'**
+  String get rateTagLate;
+
+  /// Rating tag.
+  ///
+  /// In en, this message translates to:
+  /// **'Damaged items'**
+  String get rateTagDamaged;
+
+  /// Rating tag.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing items'**
+  String get rateTagMissing;
+
+  /// Rating tag.
+  ///
+  /// In en, this message translates to:
+  /// **'Rude delivery partner'**
+  String get rateTagRudeRider;
+
+  /// Snackbar after rating.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks for your feedback!'**
+  String get ratingThanks;
+
+  /// Order detail: the customer's rating.
+  ///
+  /// In en, this message translates to:
+  /// **'{stars, plural, =1{You rated this order 1 star} other{You rated this order {stars} stars}}'**
+  String ratedOrder(int stars);
+
+  /// Help screen title and account row.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & support'**
+  String get helpTitle;
+
+  /// Help: start a ticket.
+  ///
+  /// In en, this message translates to:
+  /// **'Get help with an order'**
+  String get helpWithOrder;
+
+  /// Help: start a ticket subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing, damaged or wrong items, refunds and more'**
+  String get helpWithOrderSubtitle;
+
+  /// Order detail: open a ticket for this order.
+  ///
+  /// In en, this message translates to:
+  /// **'Get help with this order'**
+  String get helpWithThisOrder;
+
+  /// Help: the customer's tickets.
+  ///
+  /// In en, this message translates to:
+  /// **'My tickets'**
+  String get myTickets;
+
+  /// Help: call the support phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Call support'**
+  String get callSupport;
+
+  /// Help when no contact option is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Support is coming soon to the app.'**
+  String get helpComingSoon;
+
+  /// Help: FAQ section.
+  ///
+  /// In en, this message translates to:
+  /// **'Frequently asked questions'**
+  String get faqTitle;
+
+  /// Help: no FAQs.
+  ///
+  /// In en, this message translates to:
+  /// **'No FAQs yet.'**
+  String get faqEmpty;
+
+  /// New ticket screen title and button.
+  ///
+  /// In en, this message translates to:
+  /// **'New ticket'**
+  String get newTicket;
+
+  /// Tickets empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'You have no support tickets.'**
+  String get ticketsEmpty;
+
+  /// Snackbar after a ticket is created.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket created. We\'ll reply here soon.'**
+  String get ticketCreated;
+
+  /// New ticket: the related order.
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get ticketOrderLabel;
+
+  /// New ticket: pick an order.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an order (optional)'**
+  String get ticketChooseOrder;
+
+  /// New ticket: unlink the order.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove order'**
+  String get ticketRemoveOrder;
+
+  /// New ticket: the issue type.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s the issue?'**
+  String get ticketIssueLabel;
+
+  /// New ticket: no issue type picked.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an issue type.'**
+  String get ticketChooseIssue;
+
+  /// New ticket: the message field.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe the issue'**
+  String get ticketMessageLabel;
+
+  /// New ticket: message hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us what happened'**
+  String get ticketMessageHint;
+
+  /// New ticket: message too short.
+  ///
+  /// In en, this message translates to:
+  /// **'Please write at least {min} characters.'**
+  String ticketMessageTooShort(int min);
+
+  /// New ticket: submit.
+  ///
+  /// In en, this message translates to:
+  /// **'Create ticket'**
+  String get ticketSubmit;
+
+  /// Ticket detail: closed ticket.
+  ///
+  /// In en, this message translates to:
+  /// **'This ticket is closed. Create a new ticket if you still need help.'**
+  String get ticketClosedNote;
+
+  /// Ticket thread: the customer's message.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get ticketYou;
+
+  /// Ticket thread: a support message.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo support'**
+  String get ticketSupport;
+
+  /// Ticket thread: reply field.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a reply'**
+  String get ticketReplyHint;
+
+  /// Ticket thread: send button.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get ticketSend;
+
+  /// Ticket issue type.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing items'**
+  String get ticketMissingItems;
+
+  /// Ticket issue type.
+  ///
+  /// In en, this message translates to:
+  /// **'Damaged items'**
+  String get ticketDamagedItems;
+
+  /// Ticket issue type.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong items'**
+  String get ticketWrongItems;
+
+  /// Ticket issue type.
+  ///
+  /// In en, this message translates to:
+  /// **'Late delivery'**
+  String get ticketLateDelivery;
+
+  /// Ticket issue type.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment or refund'**
+  String get ticketPaymentRefund;
+
+  /// Ticket issue type.
+  ///
+  /// In en, this message translates to:
+  /// **'My account'**
+  String get ticketAccount;
+
+  /// Ticket issue type.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get ticketOther;
+
+  /// Ticket status.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get ticketStatusOpen;
+
+  /// Ticket status.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get ticketStatusInProgress;
+
+  /// Ticket status.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get ticketStatusResolved;
+
+  /// Ticket status.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get ticketStatusClosed;
+
+  /// Account: the About page.
+  ///
+  /// In en, this message translates to:
+  /// **'About Jivo'**
+  String get aboutJivo;
+
+  /// CMS page without content.
+  ///
+  /// In en, this message translates to:
+  /// **'This page has no content yet.'**
+  String get cmsPageEmpty;
+
+  /// CMS page: last update date.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated {date}'**
+  String cmsUpdatedOn(String date);
 }
 
 class _AppLocalizationsDelegate

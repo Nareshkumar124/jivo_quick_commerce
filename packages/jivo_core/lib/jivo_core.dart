@@ -25,3 +25,4 @@ export 'src/session/token_refresher.dart';
 export 'src/session/token_store.dart';
 export 'src/theme/jivo_theme.dart';
 export 'src/util/app_version.dart';
+export 'src/util/money_format.dart';
