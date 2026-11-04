@@ -52,3 +52,9 @@ The smoke set was unaffected.
   - re-check the refund cases after the refund fix run
   - P3-TC-64 on the user's phone
   - re-verify BUG-0008 (residual fix in `41f02f6`)
+
+## Phase 3 refund re-check (2026-11-04, `9ed7ffc`, T-310)
+- **Smoke P0–P4:** `77 passed, 13 skipped` (12 P4 stubs awaiting R2, 1 staging-profile case). New 🔥 cases: P4-TC-44 and 45 (SQL money and stock invariants), both pass on develop.
+- **Affected area re-run:** the P3 payments suite (`13 passed`), P3-TC-47 slow (`1 passed`), the new refund-ordering cases P3-TC-65…69 (all pass).
+- **Full P0–P2 regression:** not re-run (smoke only). Run it at the phase gate on staging.
+- **Still pending:** P3-TC-64 on the user's phone; re-verify BUG-0008 (residual fix in `41f02f6`).

@@ -65,3 +65,8 @@ Exploit-level details of open security findings are in `qa/private/` (gitignored
 - **PII (P3-TC-60b):** no full QA phone number appears for Store Manager, Store Staff or Finance on the order list, the order detail (address snapshot included) or phone search.
 - **BUG-0009 verified:** malformed webhook ids → `ignored`, and the stage-2 instance log has 0 responses with status 500.
 - **SMS safety:** the QA instance ran with the console SMS backend (no Twilio).
+
+## Phase 3 refund re-check (2026-11-04, `9ed7ffc`, T-310)
+- **Duplicate financial transactions:** none. In SQL over the whole shared DB (P4-TC-44 🔥), no payment is refunded above its capture, refund ids and keys are unique, and every PROCESSED refund has a gateway id. The webhook-before-task race produces one refund (P3-TC-65/66).
+- **Webhook abuse:** signed refund events for an unrelated payment, or with another payment's receipt, are `ignored` and never matched across payments (P3-TC-67). The 503 retry path is bounded by the window (P3-TC-69), so a signed event cannot keep the gateway retrying forever.
+- **No new security bugs.**
