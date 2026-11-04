@@ -118,7 +118,7 @@ jobs:
         env:
           PYTEST_WORKERS: ${{ vars.BACKEND_PYTEST_WORKERS || 'auto' }}
         run: |
-          uv run --with "pytest-xdist==${PYTEST_XDIST_VERSION}"             pytest -n "${PYTEST_WORKERS}" --create-db
+          uv run --with "pytest-xdist==${PYTEST_XDIST_VERSION}" pytest -n "${PYTEST_WORKERS}" --create-db
 
       - name: OpenAPI schema is valid, warning-free and committed
         run: |

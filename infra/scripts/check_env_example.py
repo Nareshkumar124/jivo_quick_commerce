@@ -19,6 +19,11 @@ helper definitions), via the AST, for:
 Every such name must appear as an uncommented ``NAME=`` line in ``infra/env/backend.env.example``.
 Names in the example that no code reads are reported as a warning only (some are read by
 docker-compose interpolation, e.g. MINIO_ROOT_USER). Read-only and idempotent: changes nothing.
+
+Limits (static analysis only): names built dynamically (f-strings, concatenation, loops) or passed
+through a constant or variable (``env_str(NAME)``) are not detected, nor are ``env_*`` calls that
+pass the name as a keyword (``env_str(name="X")``); only ``env_test_*`` helpers read ``name=``.
+Keep env reads as literal first arguments so this check sees them.
 """
 
 from __future__ import annotations
