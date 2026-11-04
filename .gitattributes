@@ -1,0 +1,2 @@
+# Fixtures compared byte-for-byte in tests: keep LF on every OS (core.autocrlf on Windows).
+*.gpx text eol=lf
