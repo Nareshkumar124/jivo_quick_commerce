@@ -13,3 +13,17 @@
 | Contract ↔ generated Dart client (`packages/jivo_api`) | n/a (Flutter) | ⏭ No Flutter this run |
 | Apps ↔ API (E2E login flow) | n/a | ⏭ The apps' `integration_test` suites were not re-run; device run pending |
 | Production settings ↔ environment | `check --deploy` with production settings; production refuses `OTP_TEST_NUMBERS` | ✅ |
+
+## Phase 3 stage 1 (2026-11-04, `c2c153a`)
+| Integration | Result | Evidence |
+|---|---|---|
+| API → `compute_bill` → order snapshot (cart bill = order bill) | ✅ | P3-TC-20/21; SQL identities over all orders (P3-TC-48) |
+| Placement → inventory reservation (`select_for_update`, variant-id order) under a 5-way race | ✅ | P3-TC-43: one 201, four 409, reserved ≤ on_hand |
+| Verify ↔ webhook ↔ expiry job deciding a capture once (order-insensitive) | ✅ | P3-TC-36/38/52/53; SQL P3-TC-50 |
+| :8001 Celery beat `expire_unpaid_orders` → T4 on an order placed through :8004 (same DB) | ✅ | Order 18: PAYMENT_FAILED at window end + 45 s, history actor `system` |
+| `transaction.on_commit` → Celery `process_refund` / `order_event` (QA worker on broker DB 7, `--pool=solo`) | ✅ | 21 refunds processed, 0 errors, `amount_refunded` correct; events logged |
+| FakeRazorpayGateway signature algorithm = Razorpay's (06 worked example) | ✅ | P3-TC-32 |
+| Real Razorpay (test mode) | ⏭ | No keys on this host (D-05) |
+| Customer app ↔ API (checkout, pay, retry, cancel) | ⬜ | Device run |
+
+**Clock note:** row timestamps written by the app host run about 35 s ahead of the DB server's `now()`. This is harmless, because the expiry logic compares app-written timestamps only, but SQL checks must not mix `now()` with app timestamps.

@@ -62,3 +62,22 @@ Phase 1 sign-off
 - Approved by:          pending
 - Notes / deferrals:    P1-TC-61/62 (shared AppConfig), P1-TC-67 (admin rework), P1-TC-46 (time travel), device cases
 ```
+
+## Phase 3: Cart, coupons, orders and payments. Interim verdict (stage 1, 2026-11-04): **Not ready (gate incomplete); backend API on track**
+**Build:** `c2c153a` (`develop` with backend R2b and admin T-304 still WIP and unreviewed). This verdict is **interim** and must be re-run after the R2b and T-304 merges.
+
+| §5.2 criterion | Result |
+|---|---|
+| CI green | ⬜ Not verified by QA |
+| 100% of P0/P1 cases passed, ≥ 95% of all | ❌ 56/64 (87.5%). No P0/P1 case **failed**. The ones not passed are ⏭/⬜: TC-26, 59–63, 64 |
+| Smoke set | ✅ P0–P3 (72 + P3-TC-43) |
+| No open P0/P1 bugs | ✅ Only BUG-0009 (P3 Low) is new |
+| No unauthorised access, data corruption, duplicate financial transaction or crash in major flows | ✅ None found: IDOR, signatures, idempotency, races and SQL invariants all hold |
+
+**To reach Ready:**
+1. Merge R2b and re-run the full P3 suite plus `QA_SLOW=1` P3-TC-47.
+2. Merge T-304 and run P3-TC-59/60, plus P3-TC-61 with a QA coupon.
+3. Find a way to run P3-TC-62/63: a QA-owned DB/config or staging.
+4. Run the customer-app device case P3-TC-64.
+5. Run on staging, with CI evidence.
+6. Fix BUG-0009 (optional for the gate: P3).

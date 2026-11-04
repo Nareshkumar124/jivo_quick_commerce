@@ -34,3 +34,19 @@ Not executed on a device this run: no Flutter commands, phone or emulator allowe
 - rider login and `rider_status` routing
 
 The dev agents report 62 customer, 112 rider and 75 `jivo_core` tests plus real-API integration tests. QA has **not** verified these (no Flutter this run).
+
+## Phase 3 stage 1 (2026-11-04, `c2c153a`, executed black-box on :8004)
+| Feature (doc) | Result | Notes |
+|---|---|---|
+| Cart bill = 08 §6.2 (fees and thresholds on item_total, half-up, 2-dp strings) | ✅ | An independent oracle from DB prices; 5 cart shapes, plus coupon cases |
+| Cart set-quantity, max qty, stock flags, never reserves | ✅ | P3-TC-04…06 |
+| Tip (0–500), instructions, address serviceability, preview | ✅ | P3-TC-07/08 |
+| Coupons FLAT / PERCENT / cap / category eligible subtotal / min order / first order / stops applying / sheet | ✅ | Usage exhaustion and expiry ⏭ (QA coupon needed, T-304) |
+| COD placement (T2) and ONLINE placement (T1), snapshot, reservation, cart handling | ✅ | R2b re-run |
+| Idempotency-Key replay, reuse, parallel; PRICE_CHANGED; one unpaid order (DL-44) | ✅ | |
+| Verify (T3), webhook (T3), payment.failed, retry-payment, duplicate capture (DL-45) | ✅ | |
+| Cancel unpaid (T5); expiry (T4, :8001 beat); late capture (T3a) and auto-refund | ✅ | T4 was observed 45 s after the window ended |
+| Store closed blocks checkout | ✅ | Clock profile |
+| COD blocked user / COD disabled; gateway down 503 | ⏭ | Admin/shared config; fault injection |
+| Admin P3 screens and roles (05 §3, DL-46) | ⏭ | T-304 in progress |
+| Customer app P3 screens | ⬜ | No device this run |

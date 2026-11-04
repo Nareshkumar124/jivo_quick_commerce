@@ -7,6 +7,7 @@ for one of this order's gateway orders.
 """
 
 import logging
+import re
 
 from django.db import transaction
 from django.utils import timezone
@@ -20,6 +21,7 @@ from apps.payments.choices import WebhookResult
 from apps.payments.gateways import get_gateway
 from apps.payments.models import Payment, PaymentWebhookEvent, Refund
 from apps.payments.refunds import record_refund_status
+from apps.payments.serializers import RAZORPAY_ORDER_ID_PATTERN, RAZORPAY_PAYMENT_ID_PATTERN
 
 logger = logging.getLogger(__name__)
 
@@ -89,18 +91,29 @@ def _entity(event: dict, name: str) -> dict:
     return event["payload"][name]["entity"]
 
 
+def _gateway_id(value, pattern: str) -> str:
+    """A Razorpay id from a webhook, checked like the verify endpoint's (BUG-0009): an id that
+    does not fit the stored fields (`gateway_payment_id`, the refund key `capture:<payment id>`,
+    64 characters each) is malformed, so the event is ignored instead of failing with a 500."""
+    if not isinstance(value, str) or not re.fullmatch(pattern, value):
+        raise ValueError("not a Razorpay id")
+    return value
+
+
 def _dispatch(event: dict) -> str:
     kind = event.get("event")
     if kind == "payment.captured":
         entity = _entity(event, "payment")
-        payment = Payment.objects.filter(gateway_order_id=entity["order_id"]).first()
+        gateway_order_id = _gateway_id(entity["order_id"], RAZORPAY_ORDER_ID_PATTERN)
+        payment_id = _gateway_id(entity["id"], RAZORPAY_PAYMENT_ID_PATTERN)
+        payment = Payment.objects.filter(gateway_order_id=gateway_order_id).first()
         if payment is None:
-            logger.warning("payment.captured for unknown gateway order %s", entity["order_id"])
+            logger.warning("payment.captured for unknown gateway order %s", gateway_order_id)
             return WebhookResult.IGNORED
         orders.capture_payment(
             payment.order_id,
-            gateway_order_id=entity["order_id"],
-            payment_id=entity["id"],
+            gateway_order_id=gateway_order_id,
+            payment_id=payment_id,
             amount_paise=int(entity["amount"]),
             method=entity.get("method") or "",
             raw=entity,
@@ -109,7 +122,7 @@ def _dispatch(event: dict) -> str:
     if kind == "payment.failed":
         entity = _entity(event, "payment")
         changed = orders.mark_payment_failed(
-            entity["order_id"],
+            _gateway_id(entity["order_id"], RAZORPAY_ORDER_ID_PATTERN),
             error_code=entity.get("error_code") or "",
             error_description=entity.get("error_description") or "",
             raw=entity,

@@ -67,3 +67,68 @@ Every error response was checked for:
 ## Input validation summary
 - **Covered:** missing fields, wrong types, enums, max lengths (every address field, name, email, `fcm_token`, reason, `terms_version`), regex fields, coordinates (range, NaN/Infinity/overflow strings, booleans), numeric strings, oversized bodies, Unicode digits.
 - **Defects:** BUG-0001 (oversized body → 500) and BUG-0002 (non-ASCII numeric input). OBS-03: a boolean `lat` is coerced.
+
+
+## Phase 3 stage 1 (2026-11-04)
+**Build:** `qa/phase-2` at `c2c153a` (`git merge --no-ff develop`, clean; it contains Phase 3 backend R2b WIP and admin T-304 WIP). **Target:** QA instance `127.0.0.1:8004`, started by hand from the QA worktree on the Windows host. `instance.sh` needs Linux, so the same environment was set manually: `config.settings.local`, FakeRazorpayGateway, Redis 6380 DB 5/6/7, QA OTP numbers, shared remote DB. **Contract:** `backend/openapi/schema.yaml` @ `c2c153a`. Strict validation (`additionalProperties: false`) was applied to every P3 operation.
+
+### Commands
+```bash
+# instance (bash, from .worktrees/qa/backend)
+unset POSTGRES_HOST POSTGRES_PORT POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD
+REDIS_URL=redis://localhost:6380/5 CHANNELS_REDIS_URL=redis://localhost:6380/6 CELERY_BROKER_URL=redis://localhost:6380/7 \
+OTP_TEST_NUMBERS="+919000000101:123456,...105:123456" DJANGO_SETTINGS_MODULE=config.settings.local \
+  uv run python manage.py runserver 127.0.0.1:8004 --noreload
+cd qa
+uv run pytest tests/test_p3_cart.py tests/test_p3_coupons.py tests/test_p3_orders.py tests/test_p3_payments.py \
+  tests/test_p3_concurrency.py tests/test_p3_db.py -q -rfEsxX            # private/runs/p3-full-run2.txt
+QA_SLOW=1 uv run pytest tests/test_p3_concurrency.py -k tc47              # T4 via the :8001 beat (~16 min)
+uv run pytest -m smoke                                                    # P0-P3 smoke, private/runs/p3-smoke-run1.txt
+# clock profile (store closed): QA_FAKE_NOW=2026-11-04T23:30:00+05:30 PYTHONPATH=qa/tools/clock, then
+uv run pytest tests/test_p2_clock.py -k tc56
+# refunds: a QA Celery worker on the QA broker only (DB 7), Windows needs --pool=solo
+uv run celery -A config worker --pool=solo --without-heartbeat --without-mingle --without-gossip
+```
+
+### Results (actual pytest summaries)
+| Run | Result |
+|---|---|
+| P3 full suite, run 1 | `3 failed, 55 passed, 2 skipped, 1 xfailed in 341.33s`. All 3 failures were **429 RATE_LIMITED** on QA user A: the suite itself placed more than 30 orders/hour (the limit is correct, P3-TC-46). Fixed in the QA fixtures, which now clear the QA throttle history per test (DB 5 only). |
+| P3 full suite, run 2 (final) | `58 passed, 2 skipped, 1 xfailed in 603.13s` (skips: P3-TC-26 no data, P3-TC-47 slow; xfail: BUG-0009) |
+| P3-TC-47 slow (QA_SLOW=1) | `1 failed, 1 error in 928.25s`: the 15-min access token expired while the test was polling (a test defect). The order was failed by the :8001 beat at the window end + 45 s, verified by SQL, and the remaining steps were run by script. All expectations held. The test is fixed. |
+| Smoke set P0–P3 (except P3-TC-43, which was then running alone) | `72 passed, 1 skipped, 354 deselected in 316.38s` |
+| P3-TC-43/44/45 after the fixture fix | `3 passed` |
+| Clock profile P3-TC-56 | `1 passed` (and the P2 clock cases: `2 passed, 1 skipped`) |
+| QA worker on DB 7 | 21 `process_refund` tasks: all `processed`, 0 errors. Every REFUNDED order has `amount_refunded = grand_total`. |
+
+### Coverage per P3 operation
+| operationId | Cases | Status codes observed | Schema |
+|---|---|---|---|
+| `cart_retrieve` | TC-01…03, 08, 09, 11 | 200, 400, 401, 404 | ✅ |
+| `cart_update` | TC-07, 08 | 200, 400, 422 | ✅ |
+| `cart_clear` | TC-07 | 200 | ✅ |
+| `cart_items_add` | TC-04, 05, 06 | 200, 400, 401, 409, 422 | ✅ |
+| `cart_items_update` / `cart_items_delete` | TC-04, 10 | 200, 400, 404 | ✅ |
+| `cart_coupons_list` | TC-18, 19 | 200, 400, 401 | ✅ |
+| `cart_coupon_apply` / `cart_coupon_remove` | TC-12…17, 55 | 200, 400, 401, 422 | ✅ |
+| `orders_create` | TC-20…28, 43, 44, 46, 54, 56 | 200, 201, 400, 409, 422, 429 | ✅ |
+| `orders_list` / `orders_retrieve` | TC-20, 29, 30 | 200, 400, 401, 404 | ✅ |
+| `orders_cancel` | TC-21, 29, 31, 38, 53 | 200, 400, 404, 409 | ✅ |
+| `orders_retry_payment` | TC-29, 39, 40 | 200, 400, 404, 409 | ✅ |
+| `payments_razorpay_verify` | TC-29, 33, 34, 38, 39, 53 | 200, 400, 401, 404, 409 | ✅ |
+| `payments_razorpay_webhook` | TC-35…38, 41, 42, 52, 57, 58 | 200, 400, **500 (BUG-0009)** | ✅ (except BUG-0009) |
+
+Not observed: 503 `SERVICE_UNAVAILABLE` (gateway down, P3-TC-63 ⏭), 426/503 maintenance (shared AppConfig).
+
+### Error codes exercised (06 §6)
+`VALIDATION_ERROR`, `AUTH_REQUIRED`, `NOT_FOUND`, `STORE_NOT_FOUND`, `NOT_SERVICEABLE`, `STORE_CLOSED`, `STOCK_UNAVAILABLE`, `MAX_QTY_EXCEEDED`, `COUPON_INVALID`, `COUPON_NOT_ELIGIBLE` (MIN_ORDER_VALUE, NO_ELIGIBLE_ITEMS, FIRST_ORDER_ONLY), `COD_NOT_AVAILABLE` (ABOVE_LIMIT), `PRICE_CHANGED`, `PAYMENT_VERIFICATION_FAILED`, `INVALID_STATE_TRANSITION` ({status}, {pending_order_id}), `RATE_LIMITED`. Every one was checked against the exact envelope `{error: {code, message, details}}`. **Not yet exercised:** `MIN_ORDER_NOT_MET` as a placement error (no data), `COUPON_EXPIRED`, `COUPON_USAGE_EXCEEDED`, `SERVICE_UNAVAILABLE`.
+
+### Demo data consumed on the shared dev DB (no destructive changes)
+- QA users `+9190000001{01..05}` now own 87 orders: 0 PAYMENT_PENDING, the others CANCELLED, PAYMENT_FAILED or PLACED.
+- Phase 3 has no T11/T12, so the PLACED ones still reserve demo stock:
+  - variant 1 (Canola 1 L): 4 units (COD)
+  - variant 2 (Canola 2 L): 1 unit
+  - variant 13 (Sunflower 1 L): 16 units (paid ONLINE)
+- Store GGN-01 still has variant 1 at 40/9 (`on_hand/reserved`; the 5 reserved before the run had no reservation rows), variant 13 at 40/16, and variant 6 (the oversell race item) at 2/0, unchanged.
+- No demo coupon redemption remains HELD or APPLIED.
+- These orders can be cancelled through T11/T12 when Phase 4 ships, or by Super Admin. All QA addresses were soft-deleted and all QA carts emptied.
