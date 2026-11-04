@@ -31,8 +31,8 @@ App agents raise API gaps in their reports (`development-phase.md` §4). This fi
 | 26 | rider (T-415) | P6 | Should a document rejection reach the rider by push and in the inbox? | open |
 | 27 | rider (T-415) | P5 contract | Confirm that `support.phone` in `GET /config/app/` is the rider's "Call ops" number (the fake already uses it). | open |
 | 28 | customer (T-414) | P5 contract | **`GET /orders/{id}/track/`** returns `{status, eta_at, store{name, lat, lng}, destination{lat, lng}, rider{name, phone, photo, lat, lng, updated_at} or null, delivery_otp (only while OUT_FOR_DELIVERY)}`. | open |
-| 29 | customer (T-414) | P6 | **Inbox:** `GET /me/notifications/?page=` returns `{id, title, body, created_at, read, link (jivo://)}`; `POST /me/notifications/{id}/read/`. | open |
-| 30 | customer (T-414) | P6 | **FCM data payload:** `{type: order\|product\|collection\|category, order_id or slug}` or `{link}`. | open |
+| 29 | customer (T-414) | P6 | **Inbox:** `GET /me/notifications/?page=` returns `{id, title, body, created_at, read, link (jivo://)}`; `POST /me/notifications/{id}/read/`. | done in the P6 contract (T-611): `me_notifications_list`, `me_notifications_read`, plus `me_notifications_read_all`; adds `category` |
+| 30 | customer (T-414) | P6 | **FCM data payload:** `{type: order\|product\|collection\|category, order_id or slug}` or `{link}`. | done in the P6 contract (T-611): doc 06 §4.3 |
 | 31 | customer (T-414) | P4 | `ReorderResult.added_count` (lines added), so the app doesn't have to guess. | sent to BE P4 run |
 | 32 | customer (T-414) | P4 | Customer-facing refund status: FAILED shows as PENDING (ops retries); the customer enum stays PENDING\|PROCESSED (PM default). | sent to BE P4 run |
 | 33 | customer (T-516) | P5 contract | Extends #28: add `order_number` to `track/`; `rider.photo` must be an https URL. | sent to BE P5 |

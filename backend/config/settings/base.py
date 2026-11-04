@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "apps.cart",
     "apps.orders",
     "apps.payments",
+    "apps.realtime",  # Phase 6: WebSockets (06 §4)
     "apps.ops_console",
 ]
 
@@ -321,6 +322,15 @@ CELERY_BEAT_SCHEDULE = {
     # alert on acceptance SLA breaches missed by their countdown tasks.
     "sync-refund-status": {"task": "payments.sync_refund_status", "schedule": 30 * 60.0},
     "auto-accept-orders": {"task": "orders.auto_accept_orders", "schedule": 60.0},
+    # Phase 6 (06 §5): retention purges (03:20 and 03:25 IST).
+    "purge-old-rider-locations": {
+        "task": "realtime.purge_old_locations",
+        "schedule": crontab(hour=21, minute=55),
+    },
+    "purge-old-notifications": {
+        "task": "notifications.purge_old_notifications",
+        "schedule": crontab(hour=21, minute=50),
+    },
 }
 
 # --------------------------------------------------------------------------- email
@@ -412,6 +422,24 @@ SMS_RETRIEVER_APP_HASHES = {
 # --------------------------------------------------------------------------- account deletion
 ACCOUNT_DELETION_GRACE_DAYS = env_int("ACCOUNT_DELETION_GRACE_DAYS", default=30)  # 07 §4
 
+# --------------------------------------------------------------------------- notifications (P6)
+# Push (08 §9) behind apps.notifications.push. FCM waits for D-19: until then the default sends
+# nothing (DisabledPushBackend: notifications are recorded, push is SKIPPED). local.py logs them.
+PUSH_BACKEND = env_str("PUSH_BACKEND", default="apps.notifications.push.DisabledPushBackend")
+# TRAI DLT template id per notification event with SMS ("order.placed:1007...,order.cancelled:
+# 1007..."). An event without one sends no SMS (logged). OTP keeps SMS_OTP_DLT_TEMPLATE_ID.
+SMS_DLT_TEMPLATE_IDS: dict[str, str] = env_dict("SMS_DLT_TEMPLATE_IDS", default={})
+NOTIFICATION_RETENTION_DAYS = env_int("NOTIFICATION_RETENTION_DAYS", default=90)
+RIDER_LOCATION_RETENTION_DAYS = env_int("RIDER_LOCATION_RETENTION_DAYS", default=30)  # 07 §2.8
+
+# --------------------------------------------------------------------------- WebSockets (P6)
+# /ws/v1/ sockets close with 4408 when no auth message arrives in time (06 §4).
+WS_AUTH_TIMEOUT_SECONDS = env_float("WS_AUTH_TIMEOUT_SECONDS", default=10.0)
+# /ws/ops/live/ re-checks the staff session, role and stores this often (revoked access ends).
+WS_OPS_RECHECK_SECONDS = env_float("WS_OPS_RECHECK_SECONDS", default=300.0)
+# `order.eta` while out for delivery is recomputed from rider pings at most this often per order.
+WS_ETA_MIN_INTERVAL_SECONDS = env_int("WS_ETA_MIN_INTERVAL_SECONDS", default=30)
+
 # --------------------------------------------------------------------------- OpenAPI
 # /api/schema/ and /api/docs/ are public only where API_DOCS_PUBLIC is true (local); staff-only
 # elsewhere (02 §5). The committed contract is backend/openapi/schema.yaml.
@@ -428,6 +456,11 @@ SPECTACULAR_SETTINGS = {
         "Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`."
     ),
     "VERSION": "0.1.0",
+    # Phase 6: the WebSocket messages (06 §4) as `Ws...` components (apps.realtime.contract).
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "apps.realtime.schema.add_websocket_components",
+    ],
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVE_PERMISSIONS": ["apps.core.permissions.ApiDocsPermission"],
     # JWT first so anonymous requests get 401 (with WWW-Authenticate), not 403.
@@ -505,6 +538,13 @@ SPECTACULAR_SETTINGS = {
         {
             "name": "payments",
             "description": "Online payment confirmation and the gateway webhook (06 §2.6, 08 §4).",
+        },
+        {
+            "name": "notifications",
+            "description": (
+                "The in-app inbox (06 §2.7). Live updates use WebSockets (06 §4): their messages "
+                "are the `Ws...` schemas."
+            ),
         },
     ],
     "SWAGGER_UI_SETTINGS": {"persistAuthorization": True, "displayOperationId": True},

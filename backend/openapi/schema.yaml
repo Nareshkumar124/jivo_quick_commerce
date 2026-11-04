@@ -6807,6 +6807,320 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/me/notifications/:
+    get:
+      operationId: me_notifications_list
+      description: 'Newest first, for the app the access token was issued to (customer
+        or rider). Entries are kept for `NOTIFICATION_RETENTION_DAYS` (90). A tap
+        opens `link`. Unread entries have `read: false`; mark one with `POST .../{id}/read/`
+        or all with `POST /me/notifications/read-all/`. The push data payload of the
+        same event carries the same `link` (see the push payload in 06 §2.7).'
+      summary: My notification inbox
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (1-based). Default 1.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: 'Items per page: default 20, max 100.'
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInboxNotificationList'
+              examples:
+                Inbox:
+                  value:
+                    count: 2
+                    next: null
+                    previous: null
+                    results:
+                    - id: 5102
+                      title: Order placed
+                      body: We have received order JV-261110-001203. We will tell
+                        you when the store confirms it.
+                      category: order
+                      link: jivo://orders/1203
+                      read: false
+                      created_at: '2026-11-10T09:40:32Z'
+                    - id: 5101
+                      title: Order confirmed
+                      body: The store has confirmed order JV-261109-001188 and is
+                        packing it.
+                      category: order
+                      link: jivo://orders/1188
+                      read: true
+                      created_at: '2026-11-09T18:02:10Z'
+                Empty:
+                  value:
+                    count: 0
+                    next: null
+                    previous: null
+                    results: []
+          description: One page of inbox entries.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                PAGENOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Invalid page.
+                      details: {}
+                  summary: Page out of range
+          description: '`page` is not a page of this list: 0, past the last page,
+            or not a number. Go back to page 1.'
+  /api/v1/me/notifications/{id}/read/:
+    post:
+      operationId: me_notifications_read
+      description: 'Idempotent: an entry already read stays read (its first read time
+        is kept).'
+      summary: Mark one inbox entry read
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InboxNotification'
+              examples:
+                Read:
+                  value:
+                    id: 5102
+                    title: Order placed
+                    body: We have received order JV-261110-001203. We will tell you
+                      when the store confirms it.
+                    category: order
+                    link: jivo://orders/1203
+                    read: true
+                    created_at: '2026-11-10T09:40:32Z'
+          description: The entry.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The object does not exist or does not belong to the caller.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/me/notifications/read-all/:
+    post:
+      operationId: me_notifications_read_all
+      summary: Mark every inbox entry read
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadAllResult'
+              examples:
+                ReadAll:
+                  value:
+                    updated: 3
+                  summary: Read all
+          description: How many changed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/orders/:
     get:
       operationId: orders_list
@@ -12849,6 +13163,16 @@ components:
       - amount_to_min_order
       - free_delivery_threshold
       - min_order_value
+    CategoryEnum:
+      enum:
+      - order
+      - promo
+      - system
+      type: string
+      description: |-
+        * `order` - Order updates
+        * `promo` - Offers
+        * `system` - Account and app
     CategoryNode:
       type: object
       properties:
@@ -13503,6 +13827,43 @@ components:
       - large
       - medium
       - thumbnail
+    InboxNotification:
+      type: object
+      description: 'An inbox entry (api-requests #29).'
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          readOnly: true
+        body:
+          type: string
+          readOnly: true
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        link:
+          type: string
+          nullable: true
+          readOnly: true
+          description: 'Where a tap goes: a `jivo://` deep link (`jivo://orders/1203`,
+            `jivo://product/<slug>`, ...), or null.'
+        read:
+          type: boolean
+          readOnly: true
+          description: True once marked read.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - body
+      - category
+      - created_at
+      - id
+      - link
+      - read
+      - title
     LogoutRequest:
       type: object
       properties:
@@ -14364,6 +14725,29 @@ components:
       - next
       - previous
       - results
+    PaginatedInboxNotificationList:
+      type: object
+      description: 'Standard page (02 §5): `?page=&page_size=`, default 20, max 100.'
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/InboxNotification'
+      required:
+      - count
+      - next
+      - previous
+      - results
     PaginatedOrderSummaryList:
       type: object
       description: 'Standard page (02 §5): `?page=&page_size=`, default 20, max 100.'
@@ -14869,6 +15253,14 @@ components:
       required:
       - event
       - payload
+    ReadAllResult:
+      type: object
+      properties:
+        updated:
+          type: integer
+          description: How many entries were unread and are now read.
+      required:
+      - updated
     ReorderIssue:
       type: object
       properties:
@@ -15309,6 +15701,691 @@ components:
         * `processed` - Processed
         * `duplicate` - Already processed (same event id): nothing done
         * `ignored` - Event type not handled: nothing done
+    WsOrderStatusData:
+      type: object
+      description: The order's current status (same values as `GET /orders/{id}/`).
+      properties:
+        order_id:
+          type: integer
+        order_number:
+          type: string
+        store_id:
+          type: integer
+        status:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        payment_status:
+          $ref: '#/components/schemas/PaymentStatusEnum'
+        eta_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Promised delivery time (08 §8), UTC.
+        updated_at:
+          type: string
+          format: date-time
+          description: When the order last changed.
+      required:
+      - order_id
+      - order_number
+      - store_id
+      - status
+      - payment_status
+      - eta_at
+      - updated_at
+    WsOrderEtaData:
+      type: object
+      description: 'A recomputed ETA (08 §8): on status changes and while the rider
+        is on the way.'
+      properties:
+        order_id:
+          type: integer
+        eta_at:
+          type: string
+          format: date-time
+        eta_minutes:
+          type: integer
+          description: Minutes from `sent_at`, at least 1.
+      required:
+      - order_id
+      - eta_at
+      - eta_minutes
+    WsRiderLocationData:
+      type: object
+      description: The rider's newest position for this order (customer socket).
+      properties:
+        order_id:
+          type: integer
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        heading:
+          type: number
+          format: double
+          nullable: true
+          description: Degrees from north, or null.
+        recorded_at:
+          type: string
+          format: date-time
+          description: When the phone recorded the fix (UTC).
+      required:
+      - order_id
+      - lat
+      - lng
+      - heading
+      - recorded_at
+    WsOpsRiderLocationData:
+      type: object
+      description: A rider's newest position (ops socket, rider map).
+      properties:
+        rider_id:
+          type: integer
+        store_id:
+          type: integer
+        order_id:
+          type: integer
+          nullable: true
+          description: The order of the rider's active task, or null.
+        lat:
+          type: number
+          format: double
+        lng:
+          type: number
+          format: double
+        heading:
+          type: number
+          format: double
+          nullable: true
+        recorded_at:
+          type: string
+          format: date-time
+      required:
+      - rider_id
+      - store_id
+      - order_id
+      - lat
+      - lng
+      - heading
+      - recorded_at
+    WsOrderCreatedData:
+      type: object
+      description: A new order for the store (new-order alert with sound, live board).
+        No customer data.
+      properties:
+        order_id:
+          type: integer
+        order_number:
+          type: string
+        store_id:
+          type: integer
+        status:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        payment_method:
+          $ref: '#/components/schemas/PaymentMethodEnum'
+        item_count:
+          type: integer
+          description: Units in the order.
+        grand_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        placed_at:
+          type: string
+          format: date-time
+          nullable: true
+        eta_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - order_id
+      - order_number
+      - store_id
+      - status
+      - payment_method
+      - item_count
+      - grand_total
+      - placed_at
+      - eta_at
+    WsRiderStatusData:
+      type: object
+      description: A rider went online or offline, or started or finished a task (ops).
+      properties:
+        rider_id:
+          type: integer
+        store_id:
+          type: integer
+        is_online:
+          type: boolean
+        on_task:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - rider_id
+      - store_id
+      - is_online
+      - on_task
+      - updated_at
+    WsAlertData:
+      type: object
+      description: An ops alert (08 §9 **Alert** column).
+      properties:
+        code:
+          type: string
+          enum:
+          - ACCEPTANCE_SLA_BREACHED
+          - LATE_CAPTURE
+          - REFUND_FAILED
+          - DELIVERY_FAILED
+          - DISPATCH_UNASSIGNED
+          description: 'What happened. New codes may come: show `message` for unknown
+            ones.'
+        message:
+          type: string
+        store_id:
+          type: integer
+          nullable: true
+        order_id:
+          type: integer
+          nullable: true
+        rider_id:
+          type: integer
+          nullable: true
+        at:
+          type: string
+          format: date-time
+      required:
+      - code
+      - message
+      - store_id
+      - order_id
+      - rider_id
+      - at
+    WsOfferData:
+      type: object
+      description: Exactly the `RiderOffer` body of `GET /rider/offers/current/` (`offer`).
+        Accept with `POST /rider/offers/{id}/accept/` before `expires_at`.
+      properties:
+        id:
+          type: integer
+        task_id:
+          type: integer
+        store_name:
+          type: string
+        drop_locality:
+          type: string
+        distance_km:
+          type: string
+          format: decimal
+        payment_type:
+          type: string
+        cod_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        estimated_payout:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        item_count:
+          type: integer
+        offered_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - task_id
+      - store_name
+      - drop_locality
+      - distance_km
+      - payment_type
+      - cod_amount
+      - estimated_payout
+      - item_count
+      - offered_at
+      - expires_at
+    WsOfferWithdrawnData:
+      type: object
+      description: 'The offer is gone: close the offer screen.'
+      properties:
+        offer_id:
+          type: integer
+        task_id:
+          type: integer
+        reason:
+          type: string
+          enum:
+          - EXPIRED
+          - TAKEN
+          - ORDER_CANCELLED
+          - REASSIGNED
+      required:
+      - offer_id
+      - task_id
+      - reason
+    WsTaskUpdatedData:
+      type: object
+      description: 'The rider''s task changed: re-read `GET /rider/tasks/current/`.'
+      properties:
+        task_id:
+          type: integer
+        order_id:
+          type: integer
+        status:
+          type: string
+          description: The task status (08 §3).
+        order_status:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        change:
+          type: string
+          enum:
+          - ORDER_PACKED
+          - ORDER_CANCELLED
+          - AMOUNT_CHANGED
+          - REASSIGNED
+          - STATUS_CHANGED
+      required:
+      - task_id
+      - order_id
+      - status
+      - order_status
+      - change
+    WsAuthOkData:
+      type: object
+      description: Authenticated. Before `expires_at` send a new auth message with
+        a fresh access token, or the socket closes with 4401.
+      properties:
+        user_id:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - user_id
+      - expires_at
+    WsErrorData:
+      type: object
+      description: A non-fatal error about a client message (the socket stays open).
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required:
+      - code
+      - message
+    WsOrderStatusMessage:
+      type: object
+      description: '`/ws/v1/orders/{order_id}/` (also sent once right after `auth.ok`)
+        and `/ws/ops/live/`.'
+      properties:
+        type:
+          type: string
+          description: Always "order.status".
+        data:
+          $ref: '#/components/schemas/WsOrderStatusData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: order.status
+        data:
+          order_id: 1203
+          order_number: JV-261110-001203
+          store_id: 1
+          status: ACCEPTED
+          payment_status: PAID
+          eta_at: '2026-11-10T09:58:00Z'
+          updated_at: '2026-11-10T09:41:04.880000Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsOrderEtaMessage:
+      type: object
+      description: '`/ws/v1/orders/{order_id}/`.'
+      properties:
+        type:
+          type: string
+          description: Always "order.eta".
+        data:
+          $ref: '#/components/schemas/WsOrderEtaData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: order.eta
+        data:
+          order_id: 1203
+          eta_at: '2026-11-10T09:56:00Z'
+          eta_minutes: 9
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsRiderLocationMessage:
+      type: object
+      description: '`/ws/v1/orders/{order_id}/`: while a rider is assigned.'
+      properties:
+        type:
+          type: string
+          description: Always "rider.location".
+        data:
+          $ref: '#/components/schemas/WsRiderLocationData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: rider.location
+        data:
+          order_id: 1203
+          lat: 28.4741
+          lng: 77.0489
+          heading: 72.5
+          recorded_at: '2026-11-10T09:47:12Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsOpsRiderLocationMessage:
+      type: object
+      description: '`/ws/ops/live/`: the rider map.'
+      properties:
+        type:
+          type: string
+          description: Always "rider.location".
+        data:
+          $ref: '#/components/schemas/WsOpsRiderLocationData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: rider.location
+        data:
+          rider_id: 41
+          store_id: 1
+          order_id: 1203
+          lat: 28.4741
+          lng: 77.0489
+          heading: 72.5
+          recorded_at: '2026-11-10T09:47:12Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsOrderCreatedMessage:
+      type: object
+      description: '`/ws/ops/live/`: an order reached PLACED.'
+      properties:
+        type:
+          type: string
+          description: Always "order.created".
+        data:
+          $ref: '#/components/schemas/WsOrderCreatedData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: order.created
+        data:
+          order_id: 1203
+          order_number: JV-261110-001203
+          store_id: 1
+          status: PLACED
+          payment_method: COD
+          item_count: 3
+          grand_total: '498.00'
+          placed_at: '2026-11-10T09:40:31Z'
+          eta_at: '2026-11-10T09:58:00Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsRiderStatusMessage:
+      type: object
+      description: '`/ws/ops/live/`.'
+      properties:
+        type:
+          type: string
+          description: Always "rider.status".
+        data:
+          $ref: '#/components/schemas/WsRiderStatusData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: rider.status
+        data:
+          rider_id: 41
+          store_id: 1
+          is_online: true
+          on_task: false
+          updated_at: '2026-11-10T09:30:00Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsAlertMessage:
+      type: object
+      description: '`/ws/ops/live/`.'
+      properties:
+        type:
+          type: string
+          description: Always "alert".
+        data:
+          $ref: '#/components/schemas/WsAlertData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: alert
+        data:
+          code: ACCEPTANCE_SLA_BREACHED
+          message: Order JV-261110-001203 has not been accepted within 60 seconds.
+          store_id: 1
+          order_id: 1203
+          rider_id: null
+          at: '2026-11-10T09:41:31Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsOfferNewMessage:
+      type: object
+      description: '`/ws/v1/rider/`.'
+      properties:
+        type:
+          type: string
+          description: Always "offer.new".
+        data:
+          $ref: '#/components/schemas/WsOfferData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: offer.new
+        data:
+          id: 9001
+          task_id: 7001
+          store_name: Jivo Sector 14
+          drop_locality: Sector 21, Gurugram
+          distance_km: '2.40'
+          payment_type: COD
+          cod_amount: '498.00'
+          estimated_payout: '42.00'
+          item_count: 3
+          offered_at: '2026-11-10T09:30:00Z'
+          expires_at: '2026-11-10T09:30:30Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsOfferWithdrawnMessage:
+      type: object
+      description: '`/ws/v1/rider/`.'
+      properties:
+        type:
+          type: string
+          description: Always "offer.withdrawn".
+        data:
+          $ref: '#/components/schemas/WsOfferWithdrawnData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: offer.withdrawn
+        data:
+          offer_id: 9001
+          task_id: 7001
+          reason: ORDER_CANCELLED
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsTaskUpdatedMessage:
+      type: object
+      description: '`/ws/v1/rider/`.'
+      properties:
+        type:
+          type: string
+          description: Always "task.updated".
+        data:
+          $ref: '#/components/schemas/WsTaskUpdatedData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: task.updated
+        data:
+          task_id: 7001
+          order_id: 1203
+          status: ASSIGNED
+          order_status: PACKED
+          change: ORDER_PACKED
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsAuthOkMessage:
+      type: object
+      description: 'Every socket: the answer to a valid auth (first message or subprotocol).'
+      properties:
+        type:
+          type: string
+          description: Always "auth.ok".
+        data:
+          $ref: '#/components/schemas/WsAuthOkData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: auth.ok
+        data:
+          user_id: 812
+          expires_at: '2026-11-10T09:55:00Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsPongMessage:
+      type: object
+      description: 'Every socket: the answer to `{"type": "ping"}`.'
+      properties:
+        type:
+          type: string
+          description: Always "pong".
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - sent_at
+      example:
+        type: pong
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsErrorMessage:
+      type: object
+      description: Every socket.
+      properties:
+        type:
+          type: string
+          description: Always "error".
+        data:
+          $ref: '#/components/schemas/WsErrorData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: error
+        data:
+          code: VALIDATION_ERROR
+          message: Unknown message type.
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsAuthRequest:
+      type: object
+      description: Client -> server, the first message on `/ws/v1/` sockets (or offer
+        the subprotocols `["jivo.v1", "jivo.auth.<access JWT>"]` instead). Never put
+        the token in the URL. Send it again with a fresh token to extend the socket.
+      properties:
+        type:
+          type: string
+          description: '"auth"'
+        token:
+          type: string
+      required:
+      - type
+      - token
+      example:
+        type: auth
+        token: <access JWT>
+    WsPingRequest:
+      type: object
+      description: 'Client -> server keep-alive, answered with `{"type": "pong"}`.'
+      properties:
+        type:
+          type: string
+          description: '"ping"'
+      required:
+      - type
+      example:
+        type: ping
   securitySchemes:
     jwtAuth:
       type: http
@@ -15337,3 +16414,6 @@ tags:
   description: Place orders, list them, retry a payment, cancel (06 §2.6, 08).
 - name: payments
   description: Online payment confirmation and the gateway webhook (06 §2.6, 08 §4).
+- name: notifications
+  description: 'The in-app inbox (06 §2.7). Live updates use WebSockets (06 §4): their
+    messages are the `Ws...` schemas.'
