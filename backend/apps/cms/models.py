@@ -1,4 +1,4 @@
-from django.core.validators import RegexValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 
 from apps.accounts.choices import AppName, Platform
@@ -31,6 +31,14 @@ class AppConfig(TimeStampedModel):
         max_length=32,
         default="2026-11-01",
         help_text="Current Terms & Privacy version. Apps send it on login (DPDP consent).",
+    )
+    payment_window_minutes = models.PositiveSmallIntegerField(
+        default=15,
+        validators=[MinValueValidator(5), MaxValueValidator(60)],
+        help_text=(
+            "Minutes an online order waits for payment before it fails and its stock is "
+            "released (01 §5, 08 T4). Applies to orders placed after a change."
+        ),
     )
     rider_location_active_interval_seconds = models.PositiveSmallIntegerField(default=10)
     rider_location_idle_interval_seconds = models.PositiveSmallIntegerField(default=30)

@@ -23,7 +23,7 @@ class ProductImage extends StatelessWidget {
     final placeholder = _Placeholder(icon: icon);
     final source = url;
     if (source == null || source.isEmpty) return placeholder;
-    // TODO(perf): cached_network_image (disk cache across launches); the
+    // Planned performance work: cached_network_image (disk cache across launches); the
     // catalog API serves image URLs since Phase 2.
     return Image.network(
       source,

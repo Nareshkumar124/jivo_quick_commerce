@@ -40,6 +40,15 @@ Owner: `admin-panel-dev`. Spec: `05-admin-and-store-panel.md`. This page records
 | `/admin/inventory/storeinventory/<id>/adjust/` | Adjust one row (inward / damage / audit count) | `inventory.adjust_stock` + the row's store (`can_adjust_stock`) |
 | `/admin/inventory/storeinventory/inward/` | Bulk stock inward (CSV upload or pasted rows, preview first) | `inventory.adjust_stock`; stores limited to the user's |
 | `/admin/inventory/stockmovement/` | Stock ledger (read-only for everyone) | `inventory.view_stockmovement`, scoped |
+| `/admin/stores/pricingconfig/` | Pricing config per store (P3): ₹ inputs, defaults note for stores without a row, history (view-only), no delete | `stores.view_pricingconfig` (Super Admin, Finance), scoped; edit and add: `stores.change/add_pricingconfig` (Super Admin) |
+| `/admin/promotions/coupon/` | Coupons (P3): CRUD, state filter (live / scheduled / expired / switched off), usage summary, history (view-only); delete only while never used | `promotions.view_coupon` (Super Admin, Catalog Manager, Support, Finance); add / change / delete: Super Admin, Catalog Manager |
+| `/admin/promotions/couponredemption/?coupon=<id>` | Redemptions (read-only for everyone); customer per the PII policy | `promotions.view_couponredemption`, scoped through the order |
+| `/admin/orders/order/` | Orders (P3: read-only for everyone): list, detail with the stored bill, address snapshot, items, payments, refunds and status history | `orders.view_order` (Super Admin, Ops, Store Manager, Store Staff, Support, Finance), scoped |
+| `/admin/payments/payment/`, `/admin/payments/refund/` | Payment attempts and refunds (read-only); gateway data as an allow-listed summary | `payments.view_payment` / `view_refund` (Super Admin, Support, Finance), scoped through the order |
+| `/admin/payments/paymentwebhookevent/` | Signed gateway events (read-only); payload as an allow-listed summary | `payments.view_paymentwebhookevent` (Super Admin, Finance) |
+| `/admin/accounts/customer/` actions "Block / Allow cash on delivery" | `User.cod_blocked` (DL-43) | `accounts.change_customer` + full PII (Super Admin, Ops, Support) |
+
+Money on every screen is formatted by `ops_console.money.inr()` (two decimals, Indian grouping, "₹1,299.00"); it never adds anything up. Money inputs use `RupeeInput` (a "₹" prefix).
 
 Planned additions: `/ops/orders/live/` (P4), `/ops/store/<store>/` (P4), `/ops/riders/map/` (P5), `/ops/cash/` (P5), `/ws/ops/live/` (P6).
 
@@ -115,6 +124,14 @@ backend/
 - **Anonymise now** (irreversible): needs `accounts.anonymise_customer`, held only by Super Admin (DL-35, DL-39; superusers hold every permission). The action is hidden from everyone else and checked again inside it.
 - **Block / unblock** need `accounts.change_customer` (Super Admin, Ops, Support) and call `accounts.services.customers.block_customer` / `unblock_customer` once per selected customer. Their refusals (staff, anonymised or unknown accounts) are shown as warnings, grouped by reason.
 - **Notify-me leads** (Super Admin, Ops): the text columns round coordinates to 3 decimals, about 100 m (DL-40). The leads map keeps the points for expansion planning.
+- **Orders and money screens (Phase 3).**
+  - Orders, payments, refunds and coupon redemptions are scoped with `StoreScopedAdminMixin` (`store_field = "store"` or `"order__store"`); another store's order is a 404 on the change and history pages and never listed. No store role holds a payment permission today; the scoping is fail-closed defence.
+  - Every Phase 3 order and money screen is read-only for everyone, superusers included (`has_add/change/delete_permission` return False, no actions). Order actions arrive in Phase 4 through `orders.services.transition()` and the refund services.
+  - Payment and refund inlines on an order appear only with `payments.view_payment` / `view_refund` (Django checks the inline model's permission).
+- **PII on order screens** (`ops_console.pii`): roles with `accounts.view_customer` (Super Admin, Ops, Support) see the customer and the delivery address in full and may search orders by customer or receiver phone. Everyone else (Store Manager, Store Staff, Finance; Catalog Manager on redemptions) sees the name and a masked phone, the address locality only (area, city, state, pincode: no house, street, landmark or pin), no free text the customer wrote (delivery note, cancel note, timeline note; staff and system notes stay visible), and searches by order number or coupon code only, so a masked phone cannot be recovered by searching digit by digit. `str(user)` is never rendered: people are shown with `customer_label` / `person_label`, and display methods never reuse a model field's name (Django would render the field instead).
+- **Gateway data.** `Payment.raw` and `PaymentWebhookEvent.payload` (the customer's contact, email, VPA and card details) are never rendered, even for superusers. The pages show only the allow-listed scalar keys of each entity (`pii.GATEWAY_SAFE_KEYS`: ids, states, method, amounts in paise, error codes).
+- **Pricing config** is a standalone admin (Finance has `view_pricingconfig` but not `view_darkstore`). View-only roles see the amounts in rupees.
+- **Coupons.** Panel rules on top of `Coupon.clean()`: a percent coupon needs a cap, a flat coupon has none, codes are unique ignoring case and have no spaces. The redemption link uses a plain `?coupon=<id>` filter (Django's related-only filter is dropped, and its parameter silently ignored, while only one coupon has been used).
 - **PII masking.** `pii.display_phone(user, phone)` and `{{ phone|phone_for:request.user }}` show the full number only with `accounts.view_customer`. Everyone else sees `+91 XXXXXX2233`. Masking first applies on order screens (P4). Order screens must also avoid rendering `str(user)`, which is the phone.
 - **Hiding a link is not a permission.** The sidebars hide refused links, but every view and ModelAdmin checks again.
 - **Tests.** Each screen has a role-matrix test covering the 7 roles, a superuser flag, a non-staff user and an anonymous visitor (`apps/ops_console/tests/helpers.py`). From P2, each screen also needs an other-store test.
@@ -125,8 +142,10 @@ backend/
 - Ops POSTs are HTMX requests with the CSRF token in `hx-headers` on `<body>`. Irreversible actions need a confirmation: `hx-confirm`, or an intermediate admin page like "Anonymise now".
 - The panel only displays money and never computes it. Amounts come from records produced by `cart.services.compute_bill()` and the payment services.
 - Every staff mutation on orders, stock, prices, refunds, riders and config goes through the backend's audit mechanism (`AuditLog`, P4–P8; django-simple-history where the backend enabled it).
-  - **With history:** `ProductVariant` (prices), `StoreInventory` (availability, threshold, store price) and `PricingConfig`. Stock itself is audited by the `StockMovement` ledger (who, when, why).
+  - **With history:** `ProductVariant` (prices), `StoreInventory` (availability, threshold, store price), `PricingConfig` and `Coupon` (field changes; its stores and categories are not in the history rows, only in the admin `LogEntry`). Stock itself is audited by the `StockMovement` ledger (who, when, why).
   - **Recorded by the services as an admin `LogEntry`** (until `AuditLog`): customer block and unblock (`object_repr` is "Customer <id>", never the phone) and store pause / resume (`set_accepting_orders`).
+  - **Cash on delivery block (DL-43), interim:** `accounts.admin.set_cod_blocked(user_id, blocked, *, by)` mirrors `block_customer` (row lock, staff / anonymised refused, LogEntry "Customer <id>" with the actor) until the backend ships `accounts.services.customers.set_cod_blocked` with the same signature (reported gap); then the admin imports it instead.
+  - **App configuration** `payment_window_minutes` (DL-43) is edited on the App configuration page (Super Admin); like the rest of `AppConfig` it has no history yet (gap above).
   - **Without history (gap, reported):** `DarkStore` field edits (GSTIN, invoice prefix, areas), `StoreTiming`, `Product` (GST, HSN), `Category`, `Collection`, `Banner`, `StaffStoreAccess`, and the Phase 1 mutations (anonymise, `AppConfig`, `AppVersionPolicy`, staff role membership). Until then Django's `LogEntry` (admin history) is the only trail.
 - **Inventory (Phase 2).** The admin never writes stock fields:
   - `on_hand` and `reserved` are read-only in every admin, inline and form; there is no import resource for `StoreInventory`; `StockMovement` has no add, change, delete or actions, even for superusers (guard test: `apps/inventory/tests/test_admin.py`).
@@ -204,7 +223,7 @@ Phase 2 cards (`selectors.operations_stats`; every count limited to `stores_for(
 | Active products / Active SKUs | Active products; active variants of active products (catalog is central, not scoped) | `catalog.view_product` |
 | Low-stock SKUs / Out of stock | Store × variant rows **on sale** (switched on, active store, active variant and product) whose available (on hand − reserved) is below the row's threshold, as the inventory service alerts; out of stock = on sale with nothing available. Each card links to the inventory list with the same filters (`?stock=low&on_sale=1`). | `inventory.view_storeinventory` |
 
-Order, GMV and rider cards are **absent** until their phases. The panel never shows placeholder numbers.
+Order, GMV and rider cards are **absent** until their phases. The panel never shows placeholder numbers. Phase 3 adds no dashboard card: 05 §1 puts the order KPIs in P7 and the live order board in P4.
 
 ## 10. Catalog import/export format (CSV)
 

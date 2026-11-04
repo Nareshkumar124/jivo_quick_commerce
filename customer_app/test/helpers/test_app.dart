@@ -9,7 +9,10 @@ import 'package:customer_app/features/addresses/data/device_location.dart';
 import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/data/fake_token_refresher.dart';
 import 'package:customer_app/features/cart/data/cart_repository.dart';
+import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
+import 'package:customer_app/features/checkout/data/fake_payment_launcher.dart';
+import 'package:customer_app/features/checkout/data/payment_launcher.dart';
 import 'package:customer_app/features/home/presentation/banner_carousel.dart';
 import 'package:customer_app/features/launch/data/config_repository.dart';
 import 'package:customer_app/features/location/data/delivery_location_store.dart';
@@ -48,7 +51,10 @@ class TestApp {
     this.mapsAvailable = false,
     this.extraOverrides = const [],
     String? autofillCode,
-  }) : autofill = FakeOtpAutofill(autofillCode);
+    FakeCommerceBackend? commerce,
+    this.cartRepository,
+  }) : autofill = FakeOtpAutofill(autofillCode),
+       cart = commerce ?? FakeCommerceBackend(latency: Duration.zero);
 
   final AuthTokens? tokens;
   final bool onboardingSeen;
@@ -68,7 +74,19 @@ class TestApp {
   final location = FakeDeviceLocation();
   final catalog = FakeCatalogRepository(latency: Duration.zero);
   final serviceability = FakeServiceabilityRepository(latency: Duration.zero);
-  final cart = InMemoryCartRepository();
+
+  /// The fake server cart and orders (one instance, like the server).
+  final FakeCommerceBackend cart;
+
+  /// Replaces [cart] as the cart repository only (orders stay on [cart]).
+  final CartRepository? cartRepository;
+
+  /// How the fake payment sheet answers (no sheet in widget tests).
+  FakePaymentChoice Function(PaymentRequest request) onPay = (_) =>
+      FakePaymentChoice.succeed;
+  late final payments = FakePaymentLauncher(
+    choose: (request) async => onPay(request),
+  );
   final geocoder = FakeReverseGeocoder();
   final FakeOtpAutofill autofill;
   final urls = FakeUrlOpener();
@@ -113,7 +131,9 @@ class TestApp {
           connectivityStreamProvider.overrideWithValue(connectivity.stream),
           catalogRepositoryProvider.overrideWithValue(catalog),
           serviceabilityRepositoryProvider.overrideWithValue(serviceability),
-          cartRepositoryProvider.overrideWithValue(cart),
+          cartRepositoryProvider.overrideWithValue(cartRepository ?? cart),
+          orderRepositoryProvider.overrideWithValue(cart),
+          paymentLauncherProvider.overrideWithValue(payments),
           mapsAvailabilityProvider.overrideWithValue(
             FakeMapsAvailability(available: mapsAvailable),
           ),

@@ -1,5 +1,5 @@
 """seed_demo step (idempotent): the demo dark store GGN-01 in Gurugram with a real service area,
-opening hours 07:00-23:00 IST every day, pricing config (zeros until D-09) and store access for
+opening hours 07:00-23:00 IST every day, the D-09 pricing config (Phase 3) and store access for
 the seeded Store Manager and Store Staff."""
 
 from datetime import time
@@ -53,6 +53,7 @@ def seed_stores(stdout, options) -> None:
         StoreTiming.objects.update_or_create(
             store=store, weekday=weekday, defaults={"opens_at": time(7), "closes_at": time(23)}
         )
+    # New rows get the D-09 model defaults; values edited in the admin survive re-seeding.
     PricingConfig.objects.get_or_create(store=store)
     for email in SCOPED_STAFF:
         user = User.objects.filter(email=email).first()

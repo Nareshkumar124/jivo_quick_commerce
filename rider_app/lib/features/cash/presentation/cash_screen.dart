@@ -5,9 +5,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/format/ist_format.dart';
 import '../../../shared/paged_list_controller.dart';
 import '../../../shared/widgets/paged_list_view.dart';
-import '../../earnings/presentation/records_providers.dart';
 import '../../task/domain/task_rules.dart';
 import '../domain/cash_ledger.dart';
+import 'cash_providers.dart';
 
 /// Cash in hand and the ledger (04 §2.7, screen 16): COD collected per
 /// order, deposits recorded by the store manager, adjustments, by date.
@@ -26,13 +26,13 @@ class CashScreen extends ConsumerWidget {
 
     // Day headers are inserted between entries: grouping is display only,
     // no amounts are added up.
-    final rows = <Object>[];
-    for (final (day, entries) in groupByIstDay(state.items)) {
-      rows
-        ..add(day)
-        ..addAll(entries);
-    }
-    final display = PagedListState<Object, CashSummary>(
+    final rows = <_CashRow>[
+      for (final (day, entries) in groupByIstDay(state.items)) ...[
+        _DayRow(day),
+        for (final entry in entries) _EntryRow(entry),
+      ],
+    ];
+    final display = PagedListState<_CashRow, CashSummary>(
       items: rows,
       header: state.header,
       nextPage: state.nextPage,
@@ -43,7 +43,7 @@ class CashScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.cashTitle)),
-      body: PagedListView<Object, CashSummary>(
+      body: PagedListView<_CashRow, CashSummary>(
         state: display,
         onRefresh: notifier.refresh,
         onLoadMore: notifier.loadMore,
@@ -94,7 +94,7 @@ class CashScreen extends ConsumerWidget {
           ],
         ],
         itemBuilder: (context, row) => switch (row) {
-          final DateTime day => Padding(
+          _DayRow(:final day) => Padding(
             padding: const EdgeInsets.fromLTRB(4, 16, 4, 4),
             child: Text(
               istDate(context, day),
@@ -102,12 +102,29 @@ class CashScreen extends ConsumerWidget {
               style: theme.textTheme.titleMedium,
             ),
           ),
-          final CashEntry entry => _EntryTile(entry: entry),
-          _ => const SizedBox.shrink(),
+          _EntryRow(:final entry) => _EntryTile(entry: entry),
         },
       ),
     );
   }
+}
+
+/// One line of the ledger list: a day header or an entry.
+sealed class _CashRow {
+  const _CashRow();
+}
+
+class _DayRow extends _CashRow {
+  const _DayRow(this.day);
+
+  /// The IST date (UTC-midnight value).
+  final DateTime day;
+}
+
+class _EntryRow extends _CashRow {
+  const _EntryRow(this.entry);
+
+  final CashEntry entry;
 }
 
 class _EntryTile extends StatelessWidget {
@@ -122,7 +139,10 @@ class _EntryTile extends StatelessWidget {
     final (icon, title) = switch (entry.type) {
       CashEntryType.codCollected => (
         Icons.payments,
-        l10n.cashCodCollected(entry.orderNumber ?? ''),
+        switch (entry.orderNumber) {
+          final order? => l10n.cashCodCollected(order),
+          null => l10n.cashCodCollectedNoOrder,
+        },
       ),
       CashEntryType.deposit => (Icons.account_balance, l10n.cashDeposit),
       CashEntryType.adjustment => (Icons.tune, l10n.cashAdjustment),

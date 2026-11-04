@@ -1,8 +1,9 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rider_app/features/offers/presentation/offer_screen.dart';
 import 'package:rider_app/features/task/data/fake_task_backend.dart';
 import 'package:rider_app/features/task/domain/rider_task.dart';
+import 'package:rider_app/features/task/domain/task_rules.dart';
 
 import 'gpx_route.dart';
 import 'rider_app_harness.dart';
@@ -13,13 +14,17 @@ Finder _key(String key) => find.byKey(Key(key));
 /// route: offer → accept → arrived at store (refused while too far, then
 /// accepted at the store) → pickup with the bag code → arrived at customer
 /// (refused short of the drop, then accepted) → delivery OTP → delivered.
+/// With [cod], the order is cash on delivery: after the OTP the rider sees
+/// the server's amount and must confirm "collected exactly ₹X" before
+/// `deliver` is sent (rider rule 6).
 ///
 /// Shared by the widget test (runs in CI) and the integration test (runs on
-/// an emulator), so the harness is proven before any device is used.
+/// the USB phone), so the harness is proven before any device is used.
 Future<void> driveAcceptToDeliver(
   WidgetTester tester,
   RiderTestHarness h, {
   List<GeoPoint>? route,
+  bool cod = false,
 }) async {
   final points = route ?? parseGpx(sector18ToSector21Gpx);
   void moveTo(int index) => h.locationReader.fix = points[index];
@@ -33,7 +38,7 @@ Future<void> driveAcceptToDeliver(
 
   // Dispatch offers an order; the full-screen offer ticks every second, so
   // pump for a while instead of settling.
-  h.tasks.simulateOffer();
+  h.tasks.simulateOffer(cod: cod);
   await pumpFor(tester, const Duration(milliseconds: 500));
   expect(find.byType(OfferScreen), findsOneWidget);
   await tester.tap(_key('offer-accept'));
@@ -64,7 +69,20 @@ Future<void> driveAcceptToDeliver(
 
   await tester.enterText(_key('delivery-otp'), FakeTaskBackend.deliveryOtp);
   await tester.pump();
-  await tap('task-deliver');
+  if (cod) {
+    await tap('otp-continue');
+    // The amount due comes from the server; nothing is sent until the
+    // rider confirms the exact cash.
+    expect(
+      tester.widget<Text>(_key('cod-amount')).data,
+      formatRupees(FakeTaskBackend.codAmount),
+    );
+    await tap('cod-cash');
+    expect(h.tasks.calls, isNot(contains(startsWith('deliver'))));
+    await tap('cod-cash-confirm');
+  } else {
+    await tap('task-deliver');
+  }
   expect(find.text('Delivered!'), findsOneWidget);
 
   await tap('task-done');

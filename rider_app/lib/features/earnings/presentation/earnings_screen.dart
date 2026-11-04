@@ -10,7 +10,7 @@ import '../../../shared/format/ist_format.dart';
 import '../../onboarding/domain/validators.dart';
 import '../../task/domain/task_rules.dart';
 import '../domain/earnings.dart';
-import 'records_providers.dart';
+import 'earnings_providers.dart';
 
 /// Earnings (04 §2.8, screen 15): today, this week or chosen dates. Every
 /// amount, including all totals, is shown exactly as the server sends it.
@@ -22,7 +22,8 @@ class EarningsScreen extends ConsumerWidget {
     final current = ref.read(earningsSelectionProvider).range;
     final picked = await showDateRangePicker(
       context: context,
-      firstDate: DateTime(today.year - 1),
+      // Up to a year back (the API's limit is an open question).
+      firstDate: DateTime(today.year - 1, today.month, today.day),
       lastDate: DateTime(today.year, today.month, today.day),
       initialDateRange: DateTimeRange(
         start: DateTime(
