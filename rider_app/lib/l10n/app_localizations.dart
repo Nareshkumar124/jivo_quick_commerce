@@ -2629,6 +2629,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No ratings yet'**
   String get profileNoRating;
+
+  /// No description provided for @documentsProfileIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Your KYC documents and their review status. Approved documents can\'t be changed. Upload again any document marked Rejected.'**
+  String get documentsProfileIntro;
+
+  /// No description provided for @documentsNeedAttention.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 document needs a new upload.} other{{count} documents need a new upload.}}'**
+  String documentsNeedAttention(int count);
+
+  /// No description provided for @profileDocumentsAttention.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 needs a new upload} other{{count} need a new upload}}'**
+  String profileDocumentsAttention(int count);
+
+  /// No description provided for @profileDocumentsAllGood.
+  ///
+  /// In en, this message translates to:
+  /// **'All approved'**
+  String get profileDocumentsAllGood;
+
+  /// No description provided for @profileDocumentsInReview.
+  ///
+  /// In en, this message translates to:
+  /// **'In review'**
+  String get profileDocumentsInReview;
+
+  /// No description provided for @profileSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get profileSupport;
+
+  /// No description provided for @profileSupportBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Problems with an order, a payout or the app? Call Jivo rider support.'**
+  String get profileSupportBody;
+
+  /// No description provided for @devRejectDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Ops: reject the driving licence (dev)'**
+  String get devRejectDocument;
 }
 
 class _AppLocalizationsDelegate
