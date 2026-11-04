@@ -68,10 +68,17 @@ class NotificationTapRouter {
     if (location == null) return;
     if (_inApp) {
       unawaited(router.push(location));
-    } else {
+    } else if (session.status != SessionStatus.signedOut) {
+      // Still starting up (splash, complete-profile): open it once in.
       _pending = location;
     }
+    // Signed out: dropped. Held, it would open for whoever signs in next,
+    // possibly another user (code review of 2e2560a).
   }
+
+  /// Opens a held tap if the user is in the app now (tests).
+  @visibleForTesting
+  void flushForTest() => _flush();
 
   void _flush() {
     final location = _pending;

@@ -3,13 +3,17 @@ import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/notifications/data/device_repository.dart';
 import 'package:customer_app/features/notifications/data/push_messaging.dart';
+import 'package:customer_app/app/launch_state.dart';
+import 'package:customer_app/features/notifications/presentation/notification_tap_router.dart';
 import 'package:customer_app/features/notifications/presentation/push_registration.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
 import 'package:customer_app/features/tracking/data/track_repository.dart';
 import 'package:customer_app/features/tracking/presentation/tracking_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
+import 'package:mocktail/mocktail.dart';
 
 import '../../helpers/fake_http.dart';
 import '../../helpers/test_app.dart';
@@ -187,6 +191,69 @@ void main() {
     });
   });
 
+  group('NotificationTapRouter', () {
+    test('a tap while signed out is dropped, not opened for the next user',
+        () async {
+      final session = SessionManager(
+        store: InMemoryTokenStore(),
+        refresher: _NoRefresh(),
+      );
+      await session.restore();
+      final launch = LaunchState(onboardingSeen: true)..markReady();
+      final router = _MockRouter();
+      when(() => router.push<Object?>(any())).thenAnswer((_) async => null);
+      final push = FakePushMessaging(token: 't');
+      final tapRouter = NotificationTapRouter(
+        messaging: push,
+        router: router,
+        session: session,
+        launch: launch,
+        trackingAvailable: () => true,
+      )..start();
+      addTearDown(tapRouter.dispose);
+      addTearDown(push.close);
+
+      tapRouter.handle({'type': 'order', 'order_id': 5});
+      expect(tapRouter.pending, isNull);
+
+      await session.signIn(signedInTokens);
+      await Future<void>.delayed(Duration.zero);
+      verifyNever(() => router.push<Object?>(any()));
+      verifyNever(() => router.go(any()));
+
+      // Signed in now: a tap opens right away.
+      tapRouter.handle({'type': 'order', 'order_id': 5});
+      verify(() => router.push<Object?>('/orders/5/track')).called(1);
+    });
+
+    test('a tap during start-up is held, then opened once in the app',
+        () async {
+      final session = SessionManager(
+        store: InMemoryTokenStore(),
+        refresher: _NoRefresh(),
+      );
+      await session.restore();
+      await session.signIn(signedInTokens);
+      final launch = LaunchState(onboardingSeen: true);
+      final router = _MockRouter();
+      when(() => router.push<Object?>(any())).thenAnswer((_) async => null);
+      final tapRouter = NotificationTapRouter(
+        messaging: const NoopPushMessaging(),
+        router: router,
+        session: session,
+        launch: launch,
+        trackingAvailable: () => false,
+      );
+      tapRouter.handle({'type': 'product', 'slug': 'jivo-ghee'});
+      expect(tapRouter.pending, '/product/jivo-ghee');
+      launch.addListener(tapRouter.flushForTest);
+      launch.markReady();
+      verify(() => router.go('/home')).called(1);
+      verify(() => router.push<Object?>('/product/jivo-ghee')).called(1);
+      expect(tapRouter.pending, isNull);
+    });
+  });
+
   group('notification taps', () {
     late FakeCommerceBackend backend;
     setUp(() {
@@ -253,3 +320,5 @@ class _NoRefresh implements TokenRefresher {
   Future<AuthTokens> refresh(String refreshToken) async =>
       throw const ApiError(code: ApiErrorCode.tokenInvalid);
 }
+
+class _MockRouter extends Mock implements GoRouter {}
