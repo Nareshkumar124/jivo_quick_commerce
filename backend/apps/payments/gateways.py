@@ -72,7 +72,9 @@ class PaymentGatewayRejected(PaymentGatewayError):
     @property
     def already_done(self) -> bool:
         """The refund was made before (a repeated receipt) or the payment is fully refunded:
-        look the refund up instead of failing (code review M1)."""
+        look the refund up instead of failing. A fallback only: the task's lookup before the POST
+        is the guard, and Razorpay refusing a repeated refund receipt is assumed from its docs
+        (confirm in Razorpay test mode)."""
         text = self.description.lower()
         return "duplicate receipt" in text or "refunded already" in text
 
@@ -109,8 +111,9 @@ class GatewayRefund:
 
 
 def refund_receipt(key: str) -> str:
-    """The refund `receipt`, which Razorpay treats as the refund's idempotency key (a repeat is
-    refused with "Duplicate receipt found"). At most 40 characters."""
+    """The refund `receipt` (at most 40 characters): how `process_refund` recognises its own
+    refund among the payment's refunds at the gateway. Razorpay's docs also say a repeated
+    refund receipt is refused ("Duplicate receipt"); assumed, confirm in Razorpay test mode."""
     return key if len(key) <= 40 else "rk_" + hashlib.sha256(key.encode()).hexdigest()[:37]
 
 
@@ -160,8 +163,8 @@ class PaymentGateway(ABC):
     def refund(
         self, *, payment_id: str, amount_paise: int, notes: dict, receipt: str
     ) -> GatewayRefund:
-        """Refund to the original payment (08 §4 rule 4; T3a late captures). `receipt` is the
-        refund's idempotency key at the gateway (`refund_receipt()`)."""
+        """Refund to the original payment (08 §4 rule 4; T3a late captures). `receipt` identifies
+        the refund at the gateway (`refund_receipt()`)."""
 
     @abstractmethod
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:

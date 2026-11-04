@@ -197,17 +197,25 @@ class TestWebhook:
     @pytest.mark.parametrize(
         ("payment_id", "order_id"),
         [
-            ("pay_" + "A" * 61, None),  # over Payment.gateway_payment_id (64)
-            ("pay_" + "B" * 53, None),  # fits the payment, not the refund key (56)
-            ("pay_Short", None),  # not a Razorpay id
-            ("pay_WebhookPay0001", "order_" + "C" * 59),  # over gateway_order_id (64)
+            ("pay_" + "A" * 61, None),  # 65 chars: would overflow gateway_payment_id (64)
+            (
+                "pay_" + "B" * 53,
+                None,
+            ),  # 57: too long for the refund key `capture:<id>`
+            ("pay_Short", None),  # too short for a Razorpay id
+            (
+                "pay_WebhookPay0001",
+                "order_" + "C" * 59,
+            ),  # 65: too long for gateway_order_id
         ],
     )
     def test_bug_0009_oversized_ids_are_ignored_not_a_500(
         self, checkout, pending, api_client, payment_id, order_id
     ):
-        """BUG-0009: a signed event whose ids do not fit the stored fields (including the derived
-        refund key `capture:<payment id>`) is stored as malformed and answered `ignored`."""
+        """BUG-0009: every id is checked against the verify endpoint's Razorpay id patterns
+        (`pay_`/`order_` + 10-40 characters, so at most 46 and always within the stored fields and
+        the refund key). One that does not match is stored as malformed and answered `ignored`,
+        never a 500."""
         order = Order.objects.get()
         services.cancel_order(order.user, order.pk, reason="OTHER")  # a capture now needs a refund
         event = captured_event(order_id or pending["razorpay"]["order_id"], payment_id)

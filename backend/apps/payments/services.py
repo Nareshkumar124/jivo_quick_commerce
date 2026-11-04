@@ -18,8 +18,8 @@ from apps.core.exceptions import ApiError
 from apps.orders import services as orders
 from apps.orders.choices import ActorType, OrderStatus
 from apps.payments.choices import WebhookResult
-from apps.payments.gateways import get_gateway
-from apps.payments.models import Payment, PaymentWebhookEvent, Refund
+from apps.payments.gateways import get_gateway, refund_receipt
+from apps.payments.models import Payment, PaymentWebhookEvent, Refund, RefundStatus
 from apps.payments.refunds import record_refund_status
 from apps.payments.serializers import RAZORPAY_ORDER_ID_PATTERN, RAZORPAY_PAYMENT_ID_PATTERN
 
@@ -87,6 +87,11 @@ def handle_webhook(event_id: str, event: dict) -> str:
         return result
 
 
+class WebhookRetryLater(Exception):
+    """The event cannot be applied yet and must not be stored as processed: the view answers
+    503 so the gateway retries it (code review R2b-fix Major 1)."""
+
+
 def _entity(event: dict, name: str) -> dict:
     return event["payload"][name]["entity"]
 
@@ -130,9 +135,39 @@ def _dispatch(event: dict) -> str:
         return WebhookResult.PROCESSED if changed else WebhookResult.IGNORED
     if kind in ("refund.processed", "refund.failed"):
         entity = _entity(event, "refund")
-        refund = Refund.objects.filter(gateway_refund_id=entity["id"]).first()
+        gateway_refund_id = str(entity["id"])
+        refund = Refund.objects.filter(gateway_refund_id=gateway_refund_id).first()
+        if refund is None:
+            refund = _refund_by_receipt(entity)
         if refund is None:
             return WebhookResult.IGNORED
-        record_refund_status(refund, kind.split(".", 1)[1])
+        record_refund_status(refund, kind.split(".", 1)[1], gateway_refund_id)
         return WebhookResult.PROCESSED
     return WebhookResult.IGNORED
+
+
+def _refund_by_receipt(entity: dict) -> Refund | None:
+    """A `refund.*` event for a refund whose gateway id is not stored yet: `process_refund` may
+    still be in its gateway call (code review R2b-fix Major 1). Matched by the payment and the
+    refund `receipt` (= `refund_receipt(idempotency_key)`), never by amount. If nothing matches
+    while a refund of that payment is still PENDING without a gateway id, the event is answered
+    503 (`WebhookRetryLater`), not stored, so the gateway's retry finds the id recorded."""
+    payment_id = entity.get("payment_id")
+    if not isinstance(payment_id, str) or not re.fullmatch(RAZORPAY_PAYMENT_ID_PATTERN, payment_id):
+        return None
+    candidates = list(Refund.objects.filter(payment__gateway_payment_id=payment_id))
+    receipt = entity.get("receipt") or ""
+    for refund in candidates:
+        if receipt and refund_receipt(refund.idempotency_key) == receipt:
+            if refund.gateway_refund_id and refund.gateway_refund_id != str(entity["id"]):
+                logger.warning(
+                    "Refund event %s has the receipt of refund %s (gateway id %s): ignored",
+                    entity["id"],
+                    refund.pk,
+                    refund.gateway_refund_id,
+                )
+                return None
+            return refund
+    if any(r.status == RefundStatus.PENDING and not r.gateway_refund_id for r in candidates):
+        raise WebhookRetryLater(f"refund {entity['id']} not recorded yet")
+    return None

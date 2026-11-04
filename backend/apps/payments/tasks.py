@@ -27,12 +27,19 @@ logger = logging.getLogger(__name__)
     max_retries=8,
 )
 def process_refund(refund_id: int) -> str:
-    """06 §5 `process_refund` (Phase 3: automatic T3a refunds). Safe to redeliver (code review
-    M1): under the order and refund row locks it re-checks that the refund is still PENDING
-    without a gateway id, then calls the gateway once with `receipt` = the refund key.
-    - Timeout / 5xx (`GatewayUnavailable`): nothing is recorded, the task retries with the same
-      receipt; if the first call did refund, the gateway answers "Duplicate receipt" and the
-      existing refund is looked up and recorded.
+    """06 §5 `process_refund` (Phase 3: automatic T3a refunds). Safe to redeliver and retry (code
+    review M1 and its fix review, Major 2). Under the order and refund row locks it re-checks
+    that the refund is still PENDING without a gateway id, then:
+    1. looks the payment's refunds up at the gateway (`fetch_payment_refunds`) and adopts one
+       whose `receipt` is this refund's key: the primary guard, so an earlier attempt whose
+       answer was lost (timeout, worker crash) is never repeated. Done on every run, not only on
+       Celery retries, because a redelivered task after a crash starts at retry 0;
+    2. otherwise POSTs the refund with that `receipt`.
+    - Timeout / 5xx (`GatewayUnavailable`, on either call): nothing is recorded; the task
+      retries and step 1 finds a refund the lost call made.
+    - "Duplicate receipt" / "fully refunded already" 4xx: Razorpay's docs say a repeated refund
+      receipt is refused (assumed; confirm in Razorpay test mode), so this is a fallback: the
+      refunds are looked up again (`_made_before`).
     - Other 4xx: not retried; the refund is FAILED and ops are alerted (`payment.refund_failed`).
     """
     from apps.orders.models import Order
@@ -48,39 +55,53 @@ def process_refund(refund_id: int) -> str:
         if refund.gateway_refund_id:
             return "waiting"
         gateway, receipt = get_gateway(), refund_receipt(refund.idempotency_key)
-        try:
-            result = gateway.refund(
-                payment_id=refund.payment.gateway_payment_id,
-                amount_paise=to_paise(refund.amount),
-                notes={"order_id": str(refund.order_id), "reason": refund.reason},
-                receipt=receipt,
-            )
-        except PaymentGatewayRejected as exc:
-            result = _made_before(gateway, refund, receipt) if exc.already_done else None
-            if result is None:
-                logger.error("Refund %s refused by the gateway: %s", refund.pk, exc)
-                record_refund_status(refund, "failed")
-                return "rejected"
+        result = _same_receipt(_gateway_refunds(gateway, refund), receipt)
+        if result is None:
+            try:
+                result = gateway.refund(
+                    payment_id=refund.payment.gateway_payment_id,
+                    amount_paise=to_paise(refund.amount),
+                    notes={"order_id": str(refund.order_id), "reason": refund.reason},
+                    receipt=receipt,
+                )
+            except PaymentGatewayRejected as exc:
+                result = _made_before(gateway, refund, receipt) if exc.already_done else None
+                if result is None:
+                    logger.error("Refund %s refused by the gateway: %s", refund.pk, exc)
+                    record_refund_status(refund, "failed")
+                    return "rejected"
         record_refund_status(refund, result.status, result.id)
         logger.info("Refund %s for order %s: gateway %s", refund.pk, refund.order_id, result.status)
         return result.status
 
 
-def _made_before(gateway, refund: Refund, receipt: str) -> GatewayRefund | None:
-    """The refund the gateway already made for this receipt (an earlier attempt whose answer was
-    lost), else, for a fully refunded payment, a refund of the same amount."""
+def _gateway_refunds(gateway, refund: Refund) -> list[GatewayRefund]:
+    """The payment's refunds at the gateway; [] if it refuses the lookup (4xx). A timeout or 5xx
+    propagates, so the task retries rather than risk a second refund."""
     try:
-        found = gateway.fetch_payment_refunds(refund.payment.gateway_payment_id)
+        return gateway.fetch_payment_refunds(refund.payment.gateway_payment_id)
     except PaymentGatewayRejected:
+        return []
+
+
+def _same_receipt(found: list[GatewayRefund], receipt: str) -> GatewayRefund | None:
+    return next((item for item in found if item.receipt == receipt), None)
+
+
+def _made_before(gateway, refund: Refund, receipt: str) -> GatewayRefund | None:
+    """After a "duplicate receipt" / "fully refunded already" refusal: the refund the gateway made
+    for this receipt, else, only when this is the payment's sole Refund, one of the same amount
+    (e.g. made from the Dashboard). With other Refund rows on the payment a same-amount refund
+    could be theirs, so nothing is adopted and the refund fails for ops (R2b-fix Minor 5)."""
+    found = _gateway_refunds(gateway, refund)
+    if (match := _same_receipt(found, receipt)) is not None:
+        return match
+    if Refund.objects.filter(payment_id=refund.payment_id).exclude(pk=refund.pk).exists():
+        logger.warning(
+            "Refund %s: payment %s has other refunds; no same-amount refund adopted",
+            refund.pk,
+            refund.payment.gateway_payment_id,
+        )
         return None
-    same_receipt = [item for item in found if item.receipt == receipt]
-    if same_receipt:
-        return same_receipt[0]
     amount = to_paise(refund.amount)
-    taken = set(
-        Refund.objects.exclude(pk=refund.pk)
-        .exclude(gateway_refund_id="")
-        .values_list("gateway_refund_id", flat=True)
-    )
-    same_amount = [i for i in found if i.amount_paise == amount and i.id not in taken]
-    return same_amount[0] if same_amount else None
+    return next((item for item in found if item.amount_paise == amount), None)
