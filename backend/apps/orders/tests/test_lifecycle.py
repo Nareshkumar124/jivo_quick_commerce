@@ -194,6 +194,31 @@ class TestWebhook:
         assert Payment.objects.get().status == "CAPTURED"
         assert Order.objects.get().status == "PLACED"
 
+    @pytest.mark.parametrize(
+        ("payment_id", "order_id"),
+        [
+            ("pay_" + "A" * 61, None),  # over Payment.gateway_payment_id (64)
+            ("pay_" + "B" * 53, None),  # fits the payment, not the refund key (56)
+            ("pay_Short", None),  # not a Razorpay id
+            ("pay_WebhookPay0001", "order_" + "C" * 59),  # over gateway_order_id (64)
+        ],
+    )
+    def test_bug_0009_oversized_ids_are_ignored_not_a_500(
+        self, checkout, pending, api_client, payment_id, order_id
+    ):
+        """BUG-0009: a signed event whose ids do not fit the stored fields (including the derived
+        refund key `capture:<payment id>`) is stored as malformed and answered `ignored`."""
+        order = Order.objects.get()
+        services.cancel_order(order.user, order.pk, reason="OTHER")  # a capture now needs a refund
+        event = captured_event(order_id or pending["razorpay"]["order_id"], payment_id)
+        response = webhook(api_client, event, "evt_bug_0009")
+        assert (response.status_code, response.json()) == (200, {"status": "ignored"})
+        stored = PaymentWebhookEvent.objects.get(event_id="evt_bug_0009")
+        assert stored.error == "malformed: ValueError"
+        assert Refund.objects.count() == 0
+        failed = captured_event("order_" + "D" * 59, kind="payment.failed")
+        assert webhook(api_client, failed, "evt_bug_0009b").json() == {"status": "ignored"}
+
     def test_payment_failed_keeps_the_window_open(self, checkout, pending, api_client):
         event = captured_event(pending["razorpay"]["order_id"], kind="payment.failed")
         assert webhook(api_client, event, "evt_0003").json() == {"status": "processed"}

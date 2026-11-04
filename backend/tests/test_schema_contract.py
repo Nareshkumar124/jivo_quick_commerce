@@ -21,7 +21,7 @@ def generated() -> dict:
 
 
 def test_committed_schema_is_up_to_date(generated):
-    committed = yaml.safe_load(SCHEMA_FILE.read_text())
+    committed = yaml.safe_load(SCHEMA_FILE.read_text(encoding="utf-8"))
     assert committed == generated, "openapi/schema.yaml is stale: re-export it (see module doc)."
 
 

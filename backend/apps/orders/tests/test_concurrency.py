@@ -297,3 +297,41 @@ def test_capture_and_cancel(shop):
             (f"capture:{payment_id}", "late_capture")
         ]
         assert reserved(shop) == 0
+
+
+def test_refund_task_delivered_twice(shop, monkeypatch):
+    """Code review M1: two workers run `process_refund` for one refund at once (a redelivery);
+    the refund row lock lets exactly one call the gateway."""
+    import time
+
+    from apps.payments.gateways import FakeRazorpayGateway
+    from apps.payments.models import Refund
+    from apps.payments.tasks import process_refund
+
+    user, order, gateway_order_id = pending_order(shop)
+    services.cancel_order(user, order.pk, reason="OTHER")
+    payment_id = "pay_RaceRefund001"
+    with monkeypatch.context() as queued:  # tests run Celery eagerly: keep the task queued
+        queued.setattr(process_refund, "delay", lambda refund_id: None)
+        outcome = services.capture_payment(
+            order.pk, gateway_order_id=gateway_order_id, payment_id=payment_id, amount_paise=55800
+        ).outcome
+    assert outcome == "late_capture"
+    refund = Refund.objects.get()
+    assert (refund.status, refund.gateway_refund_id) == ("PENDING", "")
+
+    calls: list[str] = []
+    original = FakeRazorpayGateway.refund
+
+    def slow_refund(self, **kwargs):
+        calls.append(kwargs["receipt"])
+        time.sleep(0.3)  # hold the lock while the other worker arrives
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(FakeRazorpayGateway, "refund", slow_refund)
+    results = race(*(lambda: process_refund.run(refund.pk) for _ in range(2)))
+    assert sorted(results) == ["processed", "skipped"], results
+    assert calls == [f"capture:{payment_id}"]
+    refund.refresh_from_db()
+    assert refund.status == "PROCESSED"
+    assert Refund.objects.count() == 1
