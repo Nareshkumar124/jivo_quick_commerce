@@ -4,7 +4,8 @@
  * - Confirm dialog: Alpine store "confirm", replaces window.confirm for hx-confirm, and handles
  *   <form data-ops-confirm="...">.
  * - HTMX errors: 401 -> login (the server also sends HX-Redirect), 403 -> "refused" toast,
- *   other 4xx/5xx and network errors -> error toast. Responses are not swapped on error.
+ *   a response with X-Ops-Message (order buttons: 400/409/501) -> that message, other 4xx/5xx
+ *   and network errors -> error toast. Responses are not swapped on error.
  * - Charts: <canvas data-ops-chart="<json_script id>"> with a small spec (type, labels, datasets).
  */
 (function () {
@@ -102,9 +103,25 @@
 		});
 	});
 
+	// Order buttons (order_views.py): 400 / 409 / 501 carry the service's message.
+	function serverMessage(xhr) {
+		const raw = xhr.getResponseHeader("X-Ops-Message");
+		if (!raw) return "";
+		try {
+			return decodeURIComponent(raw);
+		} catch (error) {
+			return raw;
+		}
+	}
+
 	document.addEventListener("htmx:responseError", function (event) {
 		const xhr = event.detail.xhr;
 		const status = xhr.status;
+		const message = serverMessage(xhr);
+		if (message) {
+			toast(message, status === 501 ? "info" : "danger");
+			return;
+		}
 		if (status === 401) {
 			if (!xhr.getResponseHeader("HX-Redirect")) window.location.assign(loginUrl());
 			return;

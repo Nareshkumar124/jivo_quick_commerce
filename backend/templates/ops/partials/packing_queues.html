@@ -1,0 +1,112 @@
+{% load ops %}
+{# Packing queues of one store (05 §1.3). Context: store, console (packing.Console), caps, actions, poll_seconds. Polls itself; pauses while staff type in it or a dialog is open. data-new-orders feeds the new-order alert (orders.js). Buttons whose backend service is not on this branch yet are shown disabled. #}
+<div id="packing-queues" hx-get="{% url 'ops:packing-queues' store.code %}" hx-swap="outerHTML"
+     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('packing-queues')], ops:refresh from:body"
+     data-new-orders="{{ console.new_order_ids }}" data-store="{{ store.code }}" data-store-name="{{ store.name }}"
+     data-testid="packing-queues">
+    <p class="mb-3 text-xs text-font-subtle-light dark:text-font-subtle-dark">Updated {{ console.generated_at|date:"H:i:s" }} IST; refreshes every {{ poll_seconds }} s.</p>
+    <div class="ops-packing">
+        {% for queue in console.queues %}
+            <section class="ops-packing__queue" aria-labelledby="queue-{{ queue.code }}" data-testid="queue-{{ queue.code }}">
+                <header class="flex items-center gap-2 mb-2">
+                    <h2 id="queue-{{ queue.code }}" class="font-semibold text-font-important-light dark:text-font-important-dark">{{ queue.title }}</h2>
+                    <span class="ml-auto font-semibold" data-testid="count-{{ queue.code }}">{{ queue.count }}</span>
+                </header>
+                <div class="flex flex-col gap-3">
+                    {% for ticket in queue.tickets %}
+                        {% with order=ticket.order timer=ticket.timer %}
+                            <article class="ops-ticket bg-white border border-base-200 rounded-default p-3 shadow-xs dark:bg-base-900 dark:border-base-800"
+                                     data-tone="{{ timer.tone }}" data-sla-start="{{ timer.start|iso }}"
+                                     data-sla-deadline="{{ timer.deadline|iso }}" data-sla-warn="{{ timer.warn_at|iso }}"
+                                     {% if order.status == "PACKING" %}x-data="pickList({{ order.pk }})"{% endif %}
+                                     data-testid="ticket-{{ order.order_number }}">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-semibold text-[15px] text-font-important-light dark:text-font-important-dark">{{ order.order_number }}</span>
+                                    {% if order.pickup_code and order.status != "PLACED" %}
+                                        <span class="ops-pickup-code" title="Pickup code (the rider scans or types it)">{{ order.pickup_code }}</span>
+                                    {% endif %}
+                                    <span class="flex items-center gap-1 ml-auto ops-order-card__timer" title="{{ timer.label }}{% if timer.deadline %}: {{ timer.deadline|date:'H:i' }} IST{% endif %}">
+                                        <span class="material-symbols-outlined md-18" aria-hidden="true">timer</span>
+                                        {% if order.status == "PLACED" and timer.deadline %}<span data-left>{{ timer.deadline|date:"H:i" }}</span>{% else %}<span data-age>{{ timer.start|minutes_since:console.generated_at }}m</span>{% endif %}
+                                    </span>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                                    <span>{{ ticket.units }} item{{ ticket.units|pluralize }}</span>
+                                    <span>{% if order.payment_method == "COD" %}Cash on delivery{% else %}Paid online{% endif %}</span>
+                                </div>
+
+                                {% if ticket.lines %}
+                                    <table class="mt-2 w-full ops-picklist">
+                                        <thead class="sr-only"><tr><th scope="col">Picked</th><th scope="col">Item</th><th scope="col">Qty</th><th scope="col">Rack</th></tr></thead>
+                                        <tbody>
+                                            {% for line in ticket.lines %}
+                                                <tr class="border-t border-base-200 dark:border-base-800" data-testid="line-{{ line.sku }}">
+                                                    <td class="py-1 pr-2 align-top w-8">
+                                                        {% if order.status == "PACKING" and line.quantity > line.quantity_unavailable %}
+                                                            <input type="checkbox" class="ops-check" aria-label="Picked {{ line.product_name }}"
+                                                                   x-bind:checked="isChecked('{{ line.pk }}')"
+                                                                   x-on:change="toggle('{{ line.pk }}', $event.target.checked)">
+                                                        {% endif %}
+                                                    </td>
+                                                    <td class="py-1 pr-2 align-top">
+                                                        <span class="font-medium">{{ line.product_name }}</span>
+                                                        <span class="text-xs text-font-subtle-light dark:text-font-subtle-dark">{{ line.variant_name }} · {{ line.sku }}</span>
+                                                        {% if line.quantity_unavailable %}<span class="block text-xs ops-tone-warning">{{ line.quantity_unavailable }} unavailable</span>{% endif %}
+                                                    </td>
+                                                    <td class="py-1 pr-2 align-top text-right font-semibold whitespace-nowrap">× {{ line.quantity }}</td>
+                                                    <td class="py-1 align-top text-xs whitespace-nowrap">{{ line.rack|default:"" }}</td>
+                                                </tr>
+                                                {% if ticket.adjustable and actions.mark_unavailable %}
+                                                    <tr>
+                                                        <td></td>
+                                                        <td colspan="3" class="pb-2">
+                                                            <form class="flex items-center gap-2 text-xs" hx-post="{% url 'ops:packing-unavailable' store.code order.pk %}" hx-swap="none"
+                                                                  hx-confirm="The bill is recalculated: a prepaid order is refunded the difference, a COD order pays less, and the customer is told. If nothing is left, the order is cancelled."
+                                                                  data-confirm-title="Mark units unavailable?" data-confirm-label="Update order" data-confirm-tone="danger">
+                                                                <input type="hidden" name="item" value="{{ line.pk }}">
+                                                                <label for="unavail-{{ line.pk }}">Unavailable</label>
+                                                                <input id="unavail-{{ line.pk }}" type="number" name="quantity_unavailable" min="0" max="{{ line.quantity }}" value="{{ line.quantity_unavailable }}"
+                                                                       class="border border-base-200 rounded-default px-2 py-1 w-16 bg-white dark:bg-base-900 dark:border-base-700">
+                                                                <button type="submit" class="ops-link-button">Update</button>
+                                                            </form>
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                {% endif %}
+
+                                <div class="flex flex-wrap items-center gap-2 mt-3">
+                                    {% if order.status == "PLACED" %}
+                                        <button type="button" class="ops-button" {% if actions.accept %}hx-post="{% url 'ops:packing-step' store.code order.pk 'accept' %}" hx-swap="none"{% else %}disabled title="Waiting for the order service (Phase 4)"{% endif %} data-testid="accept-{{ order.order_number }}">Accept</button>
+                                    {% elif order.status == "ACCEPTED" %}
+                                        <button type="button" class="ops-button" {% if actions.start_packing %}hx-post="{% url 'ops:packing-step' store.code order.pk 'start-packing' %}" hx-swap="none"{% else %}disabled title="Waiting for the order service (Phase 4)"{% endif %} data-testid="start-{{ order.order_number }}">Start packing</button>
+                                    {% elif order.status == "PACKING" %}
+                                        <button type="button" class="ops-button" {% if actions.mark_packed %}hx-post="{% url 'ops:packing-step' store.code order.pk 'mark-packed' %}" hx-swap="none" x-bind:disabled="!complete({{ ticket.pick_ids }})" title="Tick every item first"{% else %}disabled title="Waiting for the order service (Phase 4)"{% endif %} data-testid="packed-{{ order.order_number }}">Mark packed</button>
+                                    {% elif order.status == "PACKED" %}
+                                        <span class="text-xs text-font-subtle-light dark:text-font-subtle-dark">Hand over when the rider shows this code or scans the bag label.</span>
+                                    {% endif %}
+                                    {% if ticket.printable %}
+                                        <a class="ops-button ops-button--secondary" href="{% url 'ops:packing-slip' store.code order.pk %}" target="_blank" rel="noopener">
+                                            <span class="material-symbols-outlined md-18" aria-hidden="true">print</span>Print slip
+                                        </a>
+                                    {% endif %}
+                                    {% if caps.cancel_order and actions.cancel and ticket.cancellable %}
+                                        <button type="button" class="ops-link-button ops-tone-danger ml-auto" x-data data-testid="cancel-{{ order.order_number }}"
+                                                x-on:click="$store.cancelOrder.ask('{% url 'ops:packing-cancel' store.code order.pk %}', '{{ order.order_number }}')">Cancel order</button>
+                                    {% endif %}
+                                </div>
+                            </article>
+                        {% endwith %}
+                    {% empty %}
+                        <p class="py-6 text-center text-xs text-font-subtle-light dark:text-font-subtle-dark">Nothing here</p>
+                    {% endfor %}
+                    {% if queue.hidden %}
+                        <p class="text-xs text-font-subtle-light dark:text-font-subtle-dark">+ {{ queue.hidden }} more, oldest first.</p>
+                    {% endif %}
+                </div>
+            </section>
+        {% endfor %}
+    </div>
+</div>

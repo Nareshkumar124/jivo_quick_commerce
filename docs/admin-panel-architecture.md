@@ -50,7 +50,19 @@ Owner: `admin-panel-dev`. Spec: `05-admin-and-store-panel.md`. This page records
 
 Money on every screen is formatted by `ops_console.money.inr()` (two decimals, Indian grouping, "₹1,299.00"); it never adds anything up. Money inputs use `RupeeInput` (a "₹" prefix).
 
-Planned additions: `/ops/orders/live/` (P4), `/ops/store/<store>/` (P4), `/ops/riders/map/` (P5), `/ops/cash/` (P5), `/ws/ops/live/` (P6).
+| `/ops/orders/live/` (+ `columns/` HTMX partial, polled every `OPS_POLL_SECONDS`, default 10 s) | Live order board (P4): Placed → Accepted → Packing → Packed → Out for delivery, exceptions lane (payment pending, delivery failed); filters store / payment / SLA breached; cards carry no customer data | capability `live_board` = `orders.view_order` + `orders.cancel_order` (Super Admin, Ops, Store Manager own, Support), scoped |
+| `/ops/orders/<id>/cancel/` (POST) | Cancel with a reason (T12) through `order_actions.cancel` | capability `cancel_order` = `orders.cancel_order` (Super Admin, Ops, Store Manager own, Support), scoped (other store: 404) |
+| `/ops/store/` | Packing console store picker (one store: redirect) | capability `packing` = `orders.process_order` (Super Admin, Ops, Store Manager own, Store Staff own) |
+| `/ops/store/<code>/` (+ `queues/` partial) | Packing console (P4, 05 §1.3 minus returns): New / Accepted / Packing / Packed queues, acceptance countdown, pick list with rack location and ticks, new-order sound + browser notification, low-stock link | capability `packing`, store looked up inside `stores_for` (other store: 404) |
+| `/ops/store/<code>/orders/<id>/{accept,start-packing,mark-packed}/`, `unavailable/`, `cancel/` (POST) | T6, T7, T8, T8a, T12 through `order_actions` | `packing` (cancel: `cancel_order`); order inside the store (else 404) |
+| `/ops/store/<code>/accepting/` (POST) | Pause / resume orders (`stores.services.set_accepting_orders`) | capability `toggle_store`: `stores.change_darkstore` or store view + `inventory.adjust_stock` (Super Admin, Store Manager own; no dedicated permission yet) |
+| `/ops/store/<code>/orders/<id>/slip/` | Printable slip + bag label: order number, pickup code, QR of the code, item count; no customer data | `packing`; PACKING / PACKED orders of the store only |
+| `/admin/core/auditlog/` | Audit log (P4): `core.AuditLog` read-only; actor as staff name (a non-staff actor as "Customer <id>"), never the IP; search by record id | `core.view_auditlog` (Super Admin, Finance) |
+| `/admin/admin/logentry/` | Admin history: `LogEntry` read-only; for roles without full PII, people and staff-access records shown as "<type> <id>" and structured change messages without related objects' names; search by record id only | capability `audit_log` = `core.view_auditlog` |
+| `/admin/payments/refund/` action "Retry failed refund" | T-401c: `payments.order_refunds.retry_refund(refund_id, by=)` via `order_actions`, once per refund; the service decides (failed or stuck pending, never twice, audit) | capability `retry_refund` = `payments.issue_refund` (Super Admin, Finance, Support up to its limit) |
+| `/admin/accounts/customer/<id>/` | P4 adds recent orders (scoped, linked) and refunds (`payments.view_refund` roles); "See all orders" = `/admin/orders/order/?customer=<id>` | as the Customers admin |
+
+Planned additions: `/ops/riders/map/` (P5), `/ops/cash/` (P5), `/ws/ops/live/` (P6).
 
 **Navigation.** One registry, `apps/ops_console/navigation.py` (`MODULES`), feeds both the unfold sidebar (`config/admin_ui.py`) and the Ops sidebar. Each item names its permissions, and a section with no allowed item is hidden. Adding a module therefore means adding one `NavItem`.
 
@@ -70,6 +82,11 @@ backend/
     selectors.py   read-only queries (never write, not even get_or_create)
     dashboard.py   dashboard blocks (chart spec, tables)
     tables.py      DataTable: search, filters, pagination from GET params
+    capabilities.py  05 §3 order/refund/audit capabilities (interim permission combinations)
+    order_actions.py the ONE adapter to the backend services that change orders, refunds, stores
+    board.py, packing.py, sla.py   live board / packing console reads and SLA timers
+    order_views.py, forms.py       Phase 4 Ops views (thin) and their input forms
+    admin.py       audit log viewer (LogEntry, read-only)
     pii.py         masking policy (§4)
     status.py      status badges: label + tone per state (08 §1, §3, §4; customer statuses)
     dates.py       DISPLAY_TZ = Asia/Kolkata helpers
@@ -133,6 +150,7 @@ backend/
 - **Pricing config** is a standalone admin (Finance has `view_pricingconfig` but not `view_darkstore`). View-only roles see the amounts in rupees.
 - **Coupons.** Panel rules on top of `Coupon.clean()`: a percent coupon needs a cap, a flat coupon has none, codes are unique ignoring case and have no spaces. The redemption link uses a plain `?coupon=<id>` filter (Django's related-only filter is dropped, and its parameter silently ignored, while only one coupon has been used).
 - **PII masking.** `pii.display_phone(user, phone)` and `{{ phone|phone_for:request.user }}` show the full number only with `accounts.view_customer`. Everyone else sees `+91 XXXXXX2233`. Masking first applies on order screens (P4). Order screens must also avoid rendering `str(user)`, which is the phone.
+- **Phase 4 capabilities** (`ops_console/capabilities.py`) map the 05 §3 rows onto the backend's Phase 4 permissions (`apps.accounts.roles`): `orders.process_order` (packing), `orders.cancel_order` (cancel; with `orders.view_order` also the live board), `payments.issue_refund` (refund retry), `core.view_auditlog` (audit), and for the store switch `stores.change_darkstore` or store view + `inventory.adjust_stock` (Super Admin, Store Manager). Until those roles are on the branch, interim combinations of the Phase 3 grants select the same roles. `ops_view(capability=...)`, `NavItem(capability=...)` and the admin checks all go through `capabilities.allowed()`; the role sets are pinned in `tests/helpers.py`.
 - **Hiding a link is not a permission.** The sidebars hide refused links, but every view and ModelAdmin checks again.
 - **Tests.** Each screen has a role-matrix test covering the 7 roles, a superuser flag, a non-staff user and an anonymous visitor (`apps/ops_console/tests/helpers.py`). From P2, each screen also needs an other-store test.
 
@@ -140,11 +158,12 @@ backend/
 
 - Admin actions and Ops buttons are **thin wrappers around backend services**: `orders.services.transition()`, `inventory.services.adjust(...)`, dispatch, refunds, and so on. The panel never calls `.save()` to change an order, task, payment, stock or rider status. If a service is missing, the screen waits and the gap is reported.
 - Ops POSTs are HTMX requests with the CSRF token in `hx-headers` on `<body>`. Irreversible actions need a confirmation: `hx-confirm`, or an intermediate admin page like "Anonymise now".
+- **One adapter for state changes (Phase 4):** `ops_console/order_actions.py` is the only module the order screens, the refund retry and the COD block call: `orders.store_ops` (`accept_order`, `start_packing`, `mark_item_unavailable` one call per line, `mark_packed`, `cancel_by_staff` with `StaffCancelReason`), `payments.order_refunds.retry_refund`, `stores.services.set_accepting_orders`, `accounts.services.customers.set_cod_blocked`, all with `by=` (the store switch: `actor=`). A contract test compares their signatures. A service missing on the branch makes `available()` False (button hidden or disabled) and a crafted POST gets `ActionUnavailable` (HTTP 501). Refusals become `ActionRefused` with the service's message in `X-Ops-Message`: `PermissionDenied` 403, "not found" 404, validation 400, `ApiError` (wrong state) 409. Successful buttons answer 204 + `HX-Trigger: {"ops:toast", "ops:refresh"}` so the polled region reloads at once.
 - The panel only displays money and never computes it. Amounts come from records produced by `cart.services.compute_bill()` and the payment services.
 - Every staff mutation on orders, stock, prices, refunds, riders and config goes through the backend's audit mechanism (`AuditLog`, P4–P8; django-simple-history where the backend enabled it).
   - **With history:** `ProductVariant` (prices), `StoreInventory` (availability, threshold, store price), `PricingConfig` and `Coupon` (field changes; its stores and categories are not in the history rows, only in the admin `LogEntry`). Stock itself is audited by the `StockMovement` ledger (who, when, why).
   - **Recorded by the services as an admin `LogEntry`** (until `AuditLog`): customer block and unblock (`object_repr` is "Customer <id>", never the phone) and store pause / resume (`set_accepting_orders`).
-  - **Cash on delivery block (DL-43), interim:** `accounts.admin.set_cod_blocked(user_id, blocked, *, by)` mirrors `block_customer` (row lock, staff / anonymised refused, LogEntry "Customer <id>" with the actor) until the backend ships `accounts.services.customers.set_cod_blocked` with the same signature (reported gap); then the admin imports it instead.
+  - **Cash on delivery block (DL-43):** `accounts.services.customers.set_cod_blocked(user_id, blocked, *, by)` (T-405c; the admin's interim copy is gone), called through `order_actions`.
   - **App configuration** `payment_window_minutes` (DL-43) is edited on the App configuration page (Super Admin); like the rest of `AppConfig` it has no history yet (gap above).
   - **Without history (gap, reported):** `DarkStore` field edits (GSTIN, invoice prefix, areas), `StoreTiming`, `Product` (GST, HSN), `Category`, `Collection`, `Banner`, `StaffStoreAccess`, and the Phase 1 mutations (anonymise, `AppConfig`, `AppVersionPolicy`, staff role membership). Until then Django's `LogEntry` (admin history) is the only trail.
 - **Inventory (Phase 2).** The admin never writes stock fields:
@@ -163,6 +182,8 @@ backend/
 | `static/ops/vendor/ol-7.2.2.min.js` | OpenLayers 7.2.2 (the version Django 5.2's `OSMWidget` pins) | `cdn.jsdelivr.net/npm/ol@7.2.2/dist/ol.js`, minus the trailing `//# sourceMappingURL=ol.js.map` line (no map is shipped) | `eab867af2bf8fe7fae86c21159448d9676eb1bca1e11a10434a9884b86950aa7` (upstream: `12d3babf6b47adc2bc4b6acd1fb3279752fa66c219d7856f12788a92c49a642e`) |
 | `static/ops/vendor/ol-7.2.2.css` | OpenLayers 7.2.2 | `cdn.jsdelivr.net/npm/ol@7.2.2/ol.css` (unchanged) | `065779b56c76f9ba2966e30f29c721b197c1eda4be93e73c4c16cd5138fec1c9` |
 
+| `static/ops/vendor/qrcode-generator-1.4.4.js` | qrcode-generator 1.4.4 (Kazuhiko Arase, MIT) | `cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js` (unchanged) | `18ae399f81182bc9de916e9c77b195df20cc58d6f2d55a62b085a299f1bf1780` |
+
 - **Versions match unfold's**, so `/admin` and `/ops` behave the same. Upgrade deliberately: new filename, update this table, run the tests.
 - **Load order.** `base.html` loads the scripts deferred in this order: htmx, Chart.js, `ops.js`, then Alpine. `ops.js` registers its Alpine stores on `alpine:init`.
 - **Alpine plugins.** None are loaded, so `x-trap`, `x-persist` and similar are not available. Vendor a plugin before using it.
@@ -180,6 +201,8 @@ backend/
 | Success messages | `HX-Trigger: {"ops:toast": {"message", "tone"}}` or Django `messages` | Toast |
 
 **Other client settings.** Ops responses are `never_cache`. The htmx history cache is turned off (`historyCacheSize = 0`) so PII never lands in `localStorage`. Views render in IST (`timezone.override`), while stored times stay UTC. The backend's staff time-zone middleware (`apps.core.middleware.staff_timezone_middleware`) also renders `/admin` in IST, and admin forms take times in IST.
+
+**Polling (Phase 4).** The live board and the packing queues poll with `hx-trigger="every Ns[opsPollAllowed('<id>')], ops:refresh from:body"`: a poll is skipped while a dialog is open or the user is typing inside the region. SLA timers tick every second in `ops/js/orders.js` from `data-sla-start / -warn / -deadline` (UTC ISO); the server renders the same tone first (`ops_console/sla.py`: PLACED against `ORDER_ACCEPTANCE_SLA_SECONDS`, default 120 s per 05 §1.1; accepted orders against `eta_at`; amber in the last `OPS_SLA_WARNING_FRACTION`, default 0.25). Pick-list ticks live in `sessionStorage` (a packing aid; the server checks the T8 guard); the sound choice in `localStorage`. Page scripts that register Alpine components go in the `page_scripts` block of `ops/base.html`, which loads before Alpine.
 
 **Sessions** (backend, `apps/accounts/middleware.py`, 05 §5): every staff session ends 8 h after login; admin roles (everyone except staff whose only roles are Store Manager / Store Staff) also after 2 h without a request. Expired sessions are signed out before the view runs, so `/ops` HTMX requests get the 401 + `HX-Redirect` above.
 
