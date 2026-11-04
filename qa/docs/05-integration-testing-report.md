@@ -27,3 +27,14 @@
 | Customer app ↔ API (checkout, pay, retry, cancel) | ⬜ | Device run |
 
 **Clock note:** row timestamps written by the app host run about 35 s ahead of the DB server's `now()`. This is harmless, because the expiry logic compares app-written timestamps only, but SQL checks must not mix `now()` with app timestamps.
+
+## Phase 3 refund re-check (2026-11-04, `9ed7ffc`, T-310)
+- **Webhook and Celery task ordering** (the integration this fix targets): P3-TC-65…69, run with a QA worker that the tests start themselves (DB 7), so the "webhook before the task records the id" race is reproduced deterministically:
+  - no receipt: 503, then processed on retry
+  - with a receipt: processed at once, and the task skips
+  - another payment: ignored
+  - `refund.failed`: stays FAILED
+  - past the window: ignored
+
+  All ✅.
+- The :8001 beat (`expire_unpaid_orders`) and the QA instance share the DB: P3-TC-47 ✅ (`948.52s`).

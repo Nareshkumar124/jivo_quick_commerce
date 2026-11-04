@@ -1,6 +1,6 @@
 ---
 name: catalog-data
-description: Catalog and content data agent for Jivo Quick Commerce. Use to turn Jivo's product sheets, SAP CSV exports and photos into validated, import-ready catalog data for categories, products, variants, prices, GST/HSN, FSSAI and label info, images, collections, banners and store stock. It writes validation reports and image manifests. Owns only data/. Give it the incoming files (e.g. "prepare the catalog from data/incoming/jivo_products.xlsx").
+description: "Catalog and content data agent for Jivo Quick Commerce. Use to turn Jivo's product sheets, SAP CSV exports and photos into validated, import-ready catalog data for categories, products, variants, prices, GST/HSN, FSSAI and label info, images, collections, banners and store stock. It writes validation reports and image manifests. Owns only data/. Give it the incoming files (e.g. \"prepare the catalog from data/incoming/jivo_products.xlsx\")."
 model: sonnet
 ---
 

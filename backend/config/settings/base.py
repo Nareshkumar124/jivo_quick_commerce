@@ -317,6 +317,10 @@ CELERY_BEAT_SCHEDULE = {
     },
     # Phase 3 (06 §5): fail online orders whose payment window ended (after asking the gateway).
     "expire-unpaid-orders": {"task": "orders.expire_unpaid_orders", "schedule": 60.0},
+    # Phase 4 (06 §5): settle refunds still pending; accept orders of auto-accept stores and
+    # alert on acceptance SLA breaches missed by their countdown tasks.
+    "sync-refund-status": {"task": "payments.sync_refund_status", "schedule": 30 * 60.0},
+    "auto-accept-orders": {"task": "orders.auto_accept_orders", "schedule": 60.0},
 }
 
 # --------------------------------------------------------------------------- email
@@ -463,6 +467,12 @@ SPECTACULAR_SETTINGS = {
         "OrderListStatusEnum": "apps.orders.choices.OrderListStatus",
         "CancelReasonEnum": "apps.orders.choices.CancelReason",
         "WebhookResultEnum": "apps.payments.choices.WebhookResult",
+        # Phase 4: order processing
+        "OrderCancelReasonEnum": "apps.orders.choices.OrderCancelReason",
+        "CancelledByEnum": "apps.orders.choices.ActorType",
+        "OrderRefundReasonEnum": "apps.orders.choices.OrderRefundReason",
+        "OrderRefundStatusEnum": "apps.orders.choices.OrderRefundStatus",
+        "ReorderIssueReasonEnum": "apps.orders.choices.ReorderIssueReason",
     },
     "TAGS": [
         {"name": "health", "description": "Liveness and readiness probes. No authentication."},
@@ -537,6 +547,12 @@ RAZORPAY_KEY_SECRET = env_str("RAZORPAY_KEY_SECRET", default="")
 RAZORPAY_WEBHOOK_SECRET = env_str("RAZORPAY_WEBHOOK_SECRET", default="")
 # Seconds to wait for a Razorpay API call (create order, list payments, refund).
 RAZORPAY_TIMEOUT_SECONDS = env_float("RAZORPAY_TIMEOUT_SECONDS", default=10.0)
+# A `refund.*` webhook whose refund is not recorded yet answers 503 (so Razorpay retries) only
+# while a PENDING refund of that payment without a gateway id is younger than this. Default 2 h:
+# a little over `payments.process_refund`'s longest life, 5490 s of backoff (30 s doubling to the
+# 1800 s cap, 8 retries) + 9 attempts x 2 calls x RAZORPAY_TIMEOUT_SECONDS (180 s) = ~95 min.
+# Older ones (a Dashboard refund, a task that gave up) are logged and the event is ignored.
+REFUND_WEBHOOK_RETRY_WINDOW_SECONDS = env_int("REFUND_WEBHOOK_RETRY_WINDOW_SECONDS", default=7200)
 
 # --------------------------------------------------------------------------- import / export
 # The admin's import is two requests (preview, then confirm), possibly served by different web
@@ -549,6 +565,41 @@ IMPORT_EXPORT_TMP_STORAGE_CLASS = "import_export.tmp_storages.CacheStorage"
 from apps.core.export_formats import FORMATS as IMPORT_EXPORT_FORMATS  # noqa: E402, F401
 
 IMPORT_EXPORT_ESCAPE_FORMULAE_ON_EXPORT = True
+
+# --------------------------------------------------------------------------- payments (P3-TC-63)
+# Local development only (P3-TC-63): the fake gateway answers every call as if Razorpay were
+# down (GatewayUnavailable). Ignored by the real gateway; refused in staging/production
+# (payments.E004).
+FAKE_GATEWAY_DOWN = env_bool("FAKE_GATEWAY_DOWN", default=False)
+
+# --------------------------------------------------------------------------- order processing (P4)
+# 08 §7: the last state in which the customer may cancel in the app (PLACED or ACCEPTED).
+CUSTOMER_CANCEL_UNTIL = env_str("CUSTOMER_CANCEL_UNTIL", default="ACCEPTED")
+# 08 §9 / 05 §1.3: ops are alerted when a store has not accepted an order within this.
+STORE_ACCEPTANCE_SLA_SECONDS = env_int("STORE_ACCEPTANCE_SLA_SECONDS", default=60)
+# Stores with auto-accept: orders are accepted this long after PLACED (0 = at once).
+AUTO_ACCEPT_DELAY_SECONDS = env_int("AUTO_ACCEPT_DELAY_SECONDS", default=0)
+# 08 §2.1: dispatch starts at ACCEPTED (default) or PLACED (dispatch itself is Phase 5).
+DISPATCH_TRIGGER = env_str("DISPATCH_TRIGGER", default="ACCEPTED")
+# 08 §6.4 (D-10 defaults, not decided): a failed delivery caused by the customer keeps the
+# delivery fee.
+REFUND_KEEP_DELIVERY_FEE_ON_CUSTOMER_FAULT = env_bool(
+    "REFUND_KEEP_DELIVERY_FEE_ON_CUSTOMER_FAULT", default=True
+)
+# 05 §3: Support may refund up to this per refund (Super Admin and Finance: no limit).
+SUPPORT_REFUND_LIMIT = Decimal(env_str("SUPPORT_REFUND_LIMIT", default="500.00"))
+# A PENDING refund with no gateway answer after this long is sent again (sync, ops retry).
+REFUND_STUCK_MINUTES = env_int("REFUND_STUCK_MINUTES", default=10)
+# Invoices (D-12 not decided): PLACEHOLDER seller GST data. Never real-looking values; an
+# invoice made with any placeholder is marked "not a valid tax invoice".
+INVOICE_SELLER_NAME = env_str("INVOICE_SELLER_NAME", default="Jivo Wellness (placeholder)")
+INVOICE_PLACEHOLDER_GSTIN = "GSTIN-NOT-SET"
+INVOICE_PLACEHOLDER_HSN = "HSN-TBD"
+INVOICE_FEE_SAC = env_str("INVOICE_FEE_SAC", default="SAC-TBD")
+# GST rate on fees (delivery, small cart, handling); placeholder until D-12.
+INVOICE_FEE_GST_RATE = Decimal(env_str("INVOICE_FEE_GST_RATE", default="18.00"))
+# Signed invoice links expire after this (the private bucket).
+INVOICE_URL_EXPIRY_SECONDS = env_int("INVOICE_URL_EXPIRY_SECONDS", default=600)
 
 # --------------------------------------------------------------------------- admin (unfold)
 from config.admin_ui import UNFOLD  # noqa: E402, F401  (owned by the admin panel track)

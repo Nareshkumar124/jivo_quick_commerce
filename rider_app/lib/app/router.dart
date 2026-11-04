@@ -202,7 +202,23 @@ final routerProvider = Provider<GoRouter>((ref) {
             GoRoute(
               path: 'documents',
               name: 'profile_documents',
-              builder: (_, _) => const DocumentsScreen(readOnly: true),
+              builder: (_, _) => const DocumentsScreen(fromProfile: true),
+              routes: [
+                GoRoute(
+                  path: ':type',
+                  name: 'profile_document_capture',
+                  redirect: (_, state) => _documentType(state) == null
+                      ? Routes.profileDocuments
+                      : null,
+                  builder: (_, state) => DocumentCaptureScreen(
+                    type: _documentType(state)!,
+                    fromProfile: true,
+                    recovered: state.extra is PickedImage
+                        ? state.extra! as PickedImage
+                        : null,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

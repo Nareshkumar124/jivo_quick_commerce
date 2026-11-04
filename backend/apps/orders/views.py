@@ -13,6 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.cart import services as cart_services
 from apps.core.errors import ErrorCode
 from apps.core.idempotency import (
     IDEMPOTENCY_KEY_INVALID,
@@ -41,10 +42,12 @@ from apps.orders.choices import ACTIVE_STATUSES, TERMINAL_STATUSES, OrderListSta
 from apps.orders.serializers import (
     OrderCancelSerializer,
     OrderCreateSerializer,
+    OrderInvoiceSerializer,
     OrderListQuerySerializer,
     OrderPlacementSerializer,
     OrderSerializer,
     PaginatedOrderSummaryListSerializer,
+    ReorderResultSerializer,
 )
 from apps.stores.context import get_store
 from apps.stores.schema import STORE_ID_PARAMETER, store_responses
@@ -282,8 +285,13 @@ class OrderDetailView(APIView):
         description=(
             "The order with its bill, items and state (added to Phase 3, PM decision): poll it "
             "after checkout while the payment is being confirmed (e.g. verify's response was "
-            "lost), and for the success screen. Another user's order id is a 404. Phase 4 adds "
-            "the status timeline and invoice to the same shape."
+            "lost), and for the success screen. Another user's order id is a 404.\n\n"
+            "**Phase 4** adds `timeline` (every state reached), `cancellation`, "
+            "`amount_refunded`, `refunds` and `can_download_invoice`, and per line "
+            "`quantity_unavailable`: when the store cannot supply some units (08 T8a) they are "
+            "removed, `bill` becomes the recomputed bill (never more than before) and, for an "
+            "online payment, the difference is refunded. Show the bill as it is: the app never "
+            "computes money."
         ),
         parameters=[ORDER_ID],
         responses=app_responses(
@@ -295,6 +303,11 @@ class OrderDetailView(APIView):
                     ("Paid online", ex.ORDER_ONLINE_PLACED),
                     ("Cash on delivery", ex.ORDER_COD_PLACED),
                     ("Cancelled before paying", ex.ORDER_PAYMENT_CANCELLED),
+                    ("Accepted by the store", ex.ORDER_ACCEPTED),
+                    ("Packing, an item unavailable (refund pending)", ex.ORDER_ITEM_UNAVAILABLE),
+                    ("Cancelled by the customer, refunded", ex.ORDER_CANCELLED_REFUNDED),
+                    ("Cancelled by the store (COD)", ex.ORDER_CANCELLED_BY_STORE),
+                    ("Delivered, invoice available", ex.ORDER_DELIVERED),
                 ),
                 401: UNAUTHORIZED,
                 404: ORDER_NOT_FOUND,
@@ -369,21 +382,30 @@ class OrderCancelView(APIView):
         tags=TAGS,
         summary="Cancel my order",
         description=(
-            "08 §7. **Phase 3:** only an order in PAYMENT_PENDING (T5, e.g. the customer gives "
-            "up on paying or wants to pay another way): the stock and the coupon hold are "
-            "released; the cart is still there. **From Phase 4:** also PLACED and ACCEPTED "
-            "(T11, with a refund for paid orders). Use `can_cancel` to show the button."
+            "08 §7: allowed in PAYMENT_PENDING, PLACED and ACCEPTED; use `can_cancel` to show "
+            "the button (from PACKING on, show 'Contact support').\n\n"
+            "- **PAYMENT_PENDING (T5):** the customer gives up on paying or wants to pay another "
+            "way: the stock and the coupon hold are released; the cart is still there.\n"
+            "- **PLACED / ACCEPTED (T11, Phase 4):** the stock is released and the coupon can be "
+            "used again. Paid online: the full amount is refunded to the original payment "
+            "(`refunds[]`, `payment_status` REFUND_PENDING, then REFUNDED; 08 §6.4). COD: "
+            "nothing is due.\n\n"
+            "Repeating the call on an order already cancelled returns 409."
         ),
         parameters=[ORDER_ID],
         request=OrderCancelSerializer,
         examples=request_examples(
             ("Pay another way", ex.ORDER_CANCEL_REQUEST),
+            ("Changed my mind", ex.ORDER_CANCEL_CHANGED_MIND_REQUEST),
             ("Other, with a note", ex.ORDER_CANCEL_OTHER_REQUEST),
         ),
         responses=app_responses(
             {
                 200: ok_response(
-                    OrderSerializer, "Cancelled.", ("Cancelled", ex.ORDER_PAYMENT_CANCELLED)
+                    OrderSerializer,
+                    "Cancelled.",
+                    ("Cancelled before paying (T5)", ex.ORDER_PAYMENT_CANCELLED),
+                    ("Cancelled after paying: refunded (T11)", ex.ORDER_CANCELLED_REFUNDED),
                 ),
                 400: error_response(
                     "Invalid reason or note.",
@@ -411,3 +433,95 @@ class OrderCancelView(APIView):
         data = serializer.validated_data
         services.cancel_order(request.user, id, reason=data["reason"], note=data.get("note", ""))
         return Response(presenters.order_body(services.get_own_order(request.user, id)))
+
+
+INVOICE_NOT_READY = error_example(
+    ErrorCode.INVALID_STATE_TRANSITION,
+    "The invoice is available once the order is delivered.",
+    {"status": "PACKING"},
+    name="INVOICE_NOT_READY",
+)
+INVOICE_UNAVAILABLE = error_example(
+    ErrorCode.SERVICE_UNAVAILABLE,
+    "The invoice cannot be created right now. Try again in a few minutes.",
+    name="INVOICE_RENDERING_UNAVAILABLE",
+)
+
+
+class OrderInvoiceView(APIView):
+    @extend_schema(
+        operation_id="orders_invoice",
+        tags=TAGS,
+        summary="Download the GST invoice",
+        description=(
+            "A short-lived signed link to the order's GST tax invoice (PDF), made on the first "
+            "request. Only for DELIVERED orders (`can_download_invoice`). Open or download the "
+            "link before `expires_at`; call again for a fresh link.\n\n"
+            "Until Jivo's GST details are configured (D-12), invoices carry placeholder GST data "
+            "and a 'not a valid tax invoice' banner."
+        ),
+        parameters=[ORDER_ID],
+        responses=app_responses(
+            {
+                200: ok_response(
+                    OrderInvoiceSerializer, "The invoice link.", ("Invoice", ex.INVOICE)
+                ),
+                401: UNAUTHORIZED,
+                404: ORDER_NOT_FOUND,
+                409: error_response(
+                    "`INVALID_STATE_TRANSITION`: the order is not delivered (`details.status`).",
+                    INVOICE_NOT_READY,
+                ),
+                503: error_response(
+                    "Maintenance mode, or the PDF cannot be made right now (retry later).",
+                    *MAINTENANCE.examples,
+                    INVOICE_UNAVAILABLE,
+                ),
+            }
+        ),
+    )
+    def get(self, request: Request, id: int) -> Response:
+        return Response(services.invoice_link(request.user, id))
+
+
+class OrderReorderView(APIView):
+    @extend_schema(
+        operation_id="orders_reorder",
+        tags=TAGS,
+        summary="Order again",
+        description=(
+            "Puts the order's items back in the cart, priced at the store in `X-Store-Id`, as "
+            "far as they can be ordered now (03 §2.10). Each line is raised to the units of the "
+            "past order, capped by what can be ordered (`orderable_quantity`); it is never "
+            "added on top, so repeating the call changes nothing. Lines already in the cart "
+            "with more units are left as they are. Returns the whole cart and the lines that "
+            "could not be added in full (`unavailable`): show them, then open the cart."
+        ),
+        parameters=[ORDER_ID, STORE_ID_PARAMETER],
+        request=None,
+        responses=store_responses(
+            {
+                200: ok_response(
+                    ReorderResultSerializer,
+                    "The cart after adding the items.",
+                    ("Everything added", ex.REORDER_ALL_ADDED),
+                    ("Some items unavailable", ex.REORDER_SOME_UNAVAILABLE),
+                ),
+                401: UNAUTHORIZED,
+            },
+            not_found=(
+                error_example(ErrorCode.NOT_FOUND, "Order not found.", name="ORDER_NOT_FOUND"),
+            ),
+        ),
+    )
+    def post(self, request: Request, id: int) -> Response:
+        store = get_store(request)
+        unavailable, added_count = services.reorder(request.user, store, id)
+        cart = cart_services.read_cart(request.user, store)
+        return Response(
+            {
+                "cart": cart_services.cart_body(cart, store, request.user),
+                "added_count": added_count,
+                "unavailable": unavailable,
+            }
+        )

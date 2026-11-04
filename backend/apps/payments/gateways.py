@@ -72,7 +72,9 @@ class PaymentGatewayRejected(PaymentGatewayError):
     @property
     def already_done(self) -> bool:
         """The refund was made before (a repeated receipt) or the payment is fully refunded:
-        look the refund up instead of failing (code review M1)."""
+        look the refund up instead of failing. A fallback only: the task's lookup before the POST
+        is the guard, and Razorpay refusing a repeated refund receipt is assumed from its docs
+        (confirm in Razorpay test mode)."""
         text = self.description.lower()
         return "duplicate receipt" in text or "refunded already" in text
 
@@ -109,8 +111,9 @@ class GatewayRefund:
 
 
 def refund_receipt(key: str) -> str:
-    """The refund `receipt`, which Razorpay treats as the refund's idempotency key (a repeat is
-    refused with "Duplicate receipt found"). At most 40 characters."""
+    """The refund `receipt` (at most 40 characters): how `process_refund` recognises its own
+    refund among the payment's refunds at the gateway. Razorpay's docs also say a repeated
+    refund receipt is refused ("Duplicate receipt"); assumed, confirm in Razorpay test mode."""
     return key if len(key) <= 40 else "rk_" + hashlib.sha256(key.encode()).hexdigest()[:37]
 
 
@@ -160,8 +163,8 @@ class PaymentGateway(ABC):
     def refund(
         self, *, payment_id: str, amount_paise: int, notes: dict, receipt: str
     ) -> GatewayRefund:
-        """Refund to the original payment (08 §4 rule 4; T3a late captures). `receipt` is the
-        refund's idempotency key at the gateway (`refund_receipt()`)."""
+        """Refund to the original payment (08 §4 rule 4; T3a late captures). `receipt` identifies
+        the refund at the gateway (`refund_receipt()`)."""
 
     @abstractmethod
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
@@ -274,7 +277,8 @@ class RazorpayGateway(PaymentGateway):
         return _gateway_refund(data, payment_id)
 
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
-        data = self._call("GET", f"/payments/{urllib.parse.quote(payment_id)}/refunds")
+        # Razorpay pages 10 by default; 100 is its maximum per request.
+        data = self._call("GET", f"/payments/{urllib.parse.quote(payment_id)}/refunds?count=100")
         return [_gateway_refund(item, payment_id) for item in data.get("items", [])]
 
 
@@ -328,7 +332,21 @@ class FakeRazorpayGateway(PaymentGateway):
     def _webhook_secret(self) -> str:
         return FAKE_WEBHOOK_SECRET
 
+    @staticmethod
+    def _check_up() -> None:
+        """`FAKE_GATEWAY_DOWN` (local development only, P3-TC-63): every gateway call fails as
+        if Razorpay could not be reached, so the "payment unavailable" paths can be tried."""
+        if getattr(settings, "FAKE_GATEWAY_DOWN", False):
+            raise GatewayUnavailable("Fake gateway is down (FAKE_GATEWAY_DOWN).")
+
+    def verify_payment_signature(self, *, order_id: str, payment_id: str, signature: str) -> bool:
+        self._check_up()
+        return super().verify_payment_signature(
+            order_id=order_id, payment_id=payment_id, signature=signature
+        )
+
     def create_order(self, *, amount_paise: int, receipt: str, notes: dict) -> GatewayOrder:
+        self._check_up()
         return GatewayOrder(
             id=_fake_id("order_"), amount_paise=amount_paise, currency="INR", receipt=receipt
         )
@@ -337,6 +355,8 @@ class FakeRazorpayGateway(PaymentGateway):
         """The fake has no payment service: it reports the captures the server itself learnt
         (through verify or a signed webhook). A dev payment never verified is never captured."""
         from apps.payments.models import Payment, PaymentAttemptStatus
+
+        self._check_up()
 
         return [
             GatewayPayment(
@@ -356,6 +376,7 @@ class FakeRazorpayGateway(PaymentGateway):
     ) -> GatewayRefund:
         """Processed at once. Idempotent on `receipt` like Razorpay: the same receipt always
         gives the same refund id."""
+        self._check_up()
         digest = hashlib.sha256(f"{payment_id}|{receipt}".encode()).hexdigest()[:14]
         return GatewayRefund(
             id=f"rfnd_{digest}",
@@ -368,6 +389,8 @@ class FakeRazorpayGateway(PaymentGateway):
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
         """The refunds the server recorded for this payment (the fake keeps no state)."""
         from apps.payments.models import Refund
+
+        self._check_up()
 
         return [
             GatewayRefund(

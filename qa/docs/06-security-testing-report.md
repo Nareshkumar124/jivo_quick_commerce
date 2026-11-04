@@ -59,3 +59,14 @@ Exploit-level details of open security findings are in `qa/private/` (gitignored
 | PII in logs (all P3 instance logs) | ✅ 0 unmasked `+91` numbers, 0 JWTs. Every 500 in the logs is a BUG-0009 probe. |
 | Fake gateway refused outside local/test (payments.E001) | ⏭ Covered by the backend suite; re-check with staging settings after R2b |
 | Admin P3 role matrix (DL-46) | ⏭ T-304 |
+
+## Phase 3 stage 2 (2026-11-04, `f84482f`)
+- **Admin role matrix (P3-TC-59):** 49/49 page checks are server-side 403/200 as expected. A view-only role's change POST is 403. The order add, change and delete paths are closed for every role, including Super Admin (state changes only through the order services).
+- **PII (P3-TC-60b):** no full QA phone number appears for Store Manager, Store Staff or Finance on the order list, the order detail (address snapshot included) or phone search.
+- **BUG-0009 verified:** malformed webhook ids → `ignored`, and the stage-2 instance log has 0 responses with status 500.
+- **SMS safety:** the QA instance ran with the console SMS backend (no Twilio).
+
+## Phase 3 refund re-check (2026-11-04, `9ed7ffc`, T-310)
+- **Duplicate financial transactions:** none. In SQL over the whole shared DB (P4-TC-44 🔥), no payment is refunded above its capture, refund ids and keys are unique, and every PROCESSED refund has a gateway id. The webhook-before-task race produces one refund (P3-TC-65/66).
+- **Webhook abuse:** signed refund events for an unrelated payment, or with another payment's receipt, are `ignored` and never matched across payments (P3-TC-67). The 503 retry path is bounded by the window (P3-TC-69), so a signed event cannot keep the gateway retrying forever.
+- **No new security bugs.**

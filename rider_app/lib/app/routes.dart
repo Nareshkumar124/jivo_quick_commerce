@@ -47,6 +47,11 @@ abstract final class Routes {
   static const profile = '/profile';
   static const profileDocuments = '/profile/documents';
 
+  /// An ACTIVE rider re-uploads one rejected (or missing) document, e.g.
+  /// `/profile/documents/dl` (04 §2.9).
+  static String profileDocumentCapture(String wireValue) =>
+      '$profileDocuments/${wireValue.toLowerCase()}';
+
   static bool isAccountRoute(String location) => [
     earnings,
     payouts,

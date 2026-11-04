@@ -59,6 +59,10 @@ RUN DJANGO_SETTINGS_MODULE=config.settings.local \
 USER jivo
 ENV DJANGO_SETTINGS_MODULE=config.settings.production
 EXPOSE 8000
-# Worker: celery -A config worker -l INFO · Beat: celery -A config beat -l INFO
+# Same image, other commands (docs/deployment.md "Processes"):
+#   worker: celery -A config worker -l INFO          (POSTGRES_CONN_MAX_AGE=60)
+#   beat:   celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+#           exactly one replica per environment
+# Web: set POSTGRES_POOL=true (T-218).
 CMD ["gunicorn", "config.asgi:application", "--worker-class", "uvicorn_worker.UvicornWorker", \
      "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-"]

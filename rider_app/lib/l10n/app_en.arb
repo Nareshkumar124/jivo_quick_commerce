@@ -849,5 +849,27 @@
       }
     }
   },
-  "profileNoRating": "No ratings yet"
+  "profileNoRating": "No ratings yet",
+  "documentsProfileIntro": "Your KYC documents and their review status. Approved documents can't be changed. Upload again any document marked Rejected.",
+  "documentsNeedAttention": "{count, plural, =1{1 document needs a new upload.} other{{count} documents need a new upload.}}",
+  "@documentsNeedAttention": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileDocumentsAttention": "{count, plural, =1{1 needs a new upload} other{{count} need a new upload}}",
+  "@profileDocumentsAttention": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileDocumentsAllGood": "All approved",
+  "profileDocumentsInReview": "In review",
+  "profileSupport": "Support",
+  "profileSupportBody": "Problems with an order, a payout or the app? Call Jivo rider support.",
+  "devRejectDocument": "Ops: reject the driving licence (dev)"
 }

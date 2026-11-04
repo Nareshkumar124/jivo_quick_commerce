@@ -25,6 +25,8 @@ abstract class _$OrderLineCWProxy {
 
   OrderLine quantity(int quantity);
 
+  OrderLine quantityUnavailable(int quantityUnavailable);
+
   OrderLine lineMrpTotal(String lineMrpTotal);
 
   OrderLine lineTotal(String lineTotal);
@@ -45,6 +47,7 @@ abstract class _$OrderLineCWProxy {
     String mrp,
     String sellingPrice,
     int quantity,
+    int quantityUnavailable,
     String lineMrpTotal,
     String lineTotal,
   });
@@ -85,6 +88,10 @@ class _$OrderLineCWProxyImpl implements _$OrderLineCWProxy {
   OrderLine quantity(int quantity) => this(quantity: quantity);
 
   @override
+  OrderLine quantityUnavailable(int quantityUnavailable) =>
+      this(quantityUnavailable: quantityUnavailable);
+
+  @override
   OrderLine lineMrpTotal(String lineMrpTotal) =>
       this(lineMrpTotal: lineMrpTotal);
 
@@ -108,6 +115,7 @@ class _$OrderLineCWProxyImpl implements _$OrderLineCWProxy {
     Object? mrp = const $CopyWithPlaceholder(),
     Object? sellingPrice = const $CopyWithPlaceholder(),
     Object? quantity = const $CopyWithPlaceholder(),
+    Object? quantityUnavailable = const $CopyWithPlaceholder(),
     Object? lineMrpTotal = const $CopyWithPlaceholder(),
     Object? lineTotal = const $CopyWithPlaceholder(),
   }) {
@@ -148,6 +156,10 @@ class _$OrderLineCWProxyImpl implements _$OrderLineCWProxy {
           ? _value.quantity
           // ignore: cast_nullable_to_non_nullable
           : quantity as int,
+      quantityUnavailable: quantityUnavailable == const $CopyWithPlaceholder()
+          ? _value.quantityUnavailable
+          // ignore: cast_nullable_to_non_nullable
+          : quantityUnavailable as int,
       lineMrpTotal: lineMrpTotal == const $CopyWithPlaceholder()
           ? _value.lineMrpTotal
           // ignore: cast_nullable_to_non_nullable
@@ -186,6 +198,7 @@ OrderLine _$OrderLineFromJson(Map<String, dynamic> json) => $checkedCreate(
         'mrp',
         'selling_price',
         'quantity',
+        'quantity_unavailable',
         'line_mrp_total',
         'line_total',
       ],
@@ -203,6 +216,10 @@ OrderLine _$OrderLineFromJson(Map<String, dynamic> json) => $checkedCreate(
       mrp: $checkedConvert('mrp', (v) => v as String),
       sellingPrice: $checkedConvert('selling_price', (v) => v as String),
       quantity: $checkedConvert('quantity', (v) => (v as num).toInt()),
+      quantityUnavailable: $checkedConvert(
+        'quantity_unavailable',
+        (v) => (v as num).toInt(),
+      ),
       lineMrpTotal: $checkedConvert('line_mrp_total', (v) => v as String),
       lineTotal: $checkedConvert('line_total', (v) => v as String),
     );
@@ -214,6 +231,7 @@ OrderLine _$OrderLineFromJson(Map<String, dynamic> json) => $checkedCreate(
     'productName': 'product_name',
     'variantName': 'variant_name',
     'sellingPrice': 'selling_price',
+    'quantityUnavailable': 'quantity_unavailable',
     'lineMrpTotal': 'line_mrp_total',
     'lineTotal': 'line_total',
   },
@@ -229,6 +247,7 @@ Map<String, dynamic> _$OrderLineToJson(OrderLine instance) => <String, dynamic>{
   'mrp': instance.mrp,
   'selling_price': instance.sellingPrice,
   'quantity': instance.quantity,
+  'quantity_unavailable': instance.quantityUnavailable,
   'line_mrp_total': instance.lineMrpTotal,
   'line_total': instance.lineTotal,
 };

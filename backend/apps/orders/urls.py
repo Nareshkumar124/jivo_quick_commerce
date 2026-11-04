@@ -11,4 +11,6 @@ urlpatterns = [
         name="order-retry-payment",
     ),
     path("orders/<int:id>/cancel/", views.OrderCancelView.as_view(), name="order-cancel"),
+    path("orders/<int:id>/reorder/", views.OrderReorderView.as_view(), name="order-reorder"),
+    path("orders/<int:id>/invoice/", views.OrderInvoiceView.as_view(), name="order-invoice"),
 ]

@@ -50,3 +50,17 @@ The dev agents report 62 customer, 112 rider and 75 `jivo_core` tests plus real-
 | COD blocked user / COD disabled; gateway down 503 | ⏭ | Admin/shared config; fault injection |
 | Admin P3 screens and roles (05 §3, DL-46) | ⏭ | T-304 in progress |
 | Customer app P3 screens | ⬜ | No device this run |
+
+## Phase 3 stage 2 (2026-11-04, `f84482f`)
+| Feature | Result |
+|---|---|
+| Admin P3 role matrix (coupons, redemptions, orders, payments, refunds, webhook events; 7 roles) | ✅ |
+| Order/payment admin screens read-only; PII masked for roles without PII | ✅ |
+| Coupon creation in admin; validity (expired / not started / inactive); usage limits incl. holds; last-use race | ✅ |
+| COD blocked customer (admin action) | ✅. Store COD disabled ⏭ (PM: demo store in use) |
+| Webhook malformed ids (BUG-0009) | ✅ fixed |
+| Customer app P3 | ⬜ the user's phone test |
+
+## Phase 3 refund re-check (2026-11-04, `9ed7ffc`, T-310)
+- Refund behaviour after the T-303 fixes, black-box on :8004: T3a late capture, wrong-amount capture and duplicate capture (DL-45) each make exactly one refund that settles to PROCESSED; the T4 expiry plus late capture (P3-TC-47) settles to REFUNDED. Results: P3-TC-37/38/39/47/58 ✅. Details and commands are in 03.
+- Phase 4 functional cases P4-TC-01…60 are written (02, plan in 01 §8). They are not executed yet: they are awaiting the P4 R2 merge.
