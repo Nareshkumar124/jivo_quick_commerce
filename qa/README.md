@@ -53,6 +53,9 @@ qa/tools/instance.sh stop
 - `QA_SCHEMA` (the OpenAPI file to validate against; default: the exported commit's `backend/openapi/schema.yaml`)
 - `QA_KEEP_COUNTERS=1` (don't clear rate-limit counters at session start)
 - `QA_FORCE_ALL=1` (run local-profile tests on another profile)
+- `QA_SLOW=1` (run the slow cases, e.g. P3-TC-47, which waits about 16 min for the :8001 beat to expire an unpaid order)
+
+**Phase 3** (`tests/test_p3_*.py`) uses the FakeRazorpayGateway's published dev-only secrets (06 §2.6) and, read-only, the demo catalogue and coupons. COD orders and paid ONLINE orders stay PLACED in Phase 3, so they keep a little demo stock reserved; see `docs/03` ("Demo data consumed"). Refunds settle only when a Celery worker consumes the QA broker (Redis DB 7): `uv run celery -A config worker --pool=solo` with the QA Redis URLs.
 
 Guard tests for **open security bugs** live in the gitignored `qa/private/tests/` (run them with `uv run pytest private/tests`). They move back into `tests/` once the bug is fixed.
 

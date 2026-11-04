@@ -32,5 +32,6 @@ markers = [
     "profile_db_down: needs the instance started with the db-down profile (500 trigger)",
     "any_profile: runs on every instance profile",
     "db: read-only SQL checks against the shared database",
+    "slow: long-running (minutes); runs only with QA_SLOW=1 (e.g. the P3 15-minute payment-window expiry)",
     "fuzz: schemathesis property-based fuzzing (low example counts)",
 ]

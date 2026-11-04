@@ -35,3 +35,11 @@ The smoke set was unaffected.
 ## Next regression run
 - **Phase 2 gate:** re-run the full `qa/tests` suite (P0/P1 regression), the smoke set on staging, and the fix verification for BUG-0001…0007.
 - The suite is re-runnable: `qa/tools/instance.sh start local <commit>`, then `uv run pytest`. Counters are cleared automatically in QA Redis DB 5 only.
+
+## Phase 3 stage 1 (2026-11-04, `c2c153a`)
+- **Smoke P0–P3:** `72 passed, 1 skipped` (the skip is P0-TC-04, staging profile only). P3-TC-43 was run separately: ✅.
+- **New P3 🔥 cases:** P3-TC-01, 02, 09, 10, 12, 20, 21, 22, 24, 27, 29, 33, 34, 35, 36, 38, 43, 44, 48, 49, 50.
+- **New known-bug guard:** BUG-0009, `test_p3_tc57` (`xfail(strict=True)`).
+- **Full P0–P2 regression:** not re-run in this stage; only the smoke set was. Run the whole suite after the R2b/T-304 merges.
+- **Re-run after the R2b merge:** the full P3 suite, `QA_SLOW=1` P3-TC-47, the BUG-0009 fix check, and a P3 perf baseline.
+- **Re-run after the T-304 merge:** P3-TC-59/60, plus P3-TC-61 using a QA-owned coupon created in admin.

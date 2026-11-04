@@ -66,3 +66,18 @@
 - **Run 1 (2026-11-02):** P0/P1 backend black-box, security, DB and performance; mobile static review; reports.
 - **Run 2:** admin role matrix (P1-TC-67) after the admin rework; Phase 2 contract and behaviour; fix verification of BUG-0001…0006.
 - **Device run:** P1-TC-80…92 on the 10 §4 matrix when the PM allows the emulator or devices.
+
+## 7. Phase 3 (cart, coupons, orders, payments): stage 1, 2026-11-04
+**Build under test:** `qa/phase-2` at `c2c153a`, which is `develop` (Phase 3 backend R2b WIP and admin T-304 WIP, both unreviewed) merged in. It runs from the QA worktree on a Windows host: no Docker, no `instance.sh` (it needs Linux `ss`/`git archive` to `/tmp`). The instance was started by hand with the role-definition environment: Redis 6380 DB 5–7, QA OTP numbers, `config.settings.local`, so the gateway is `FakeRazorpayGateway`, on `127.0.0.1:8004`, against the shared remote dev DB.
+
+| In scope (stage 1) | Out of scope / deferred, with the reason |
+|---|---|
+| Cart API: bill vs an **independent 08 §6.2 oracle** (DB prices + `PricingConfig`), set-quantity semantics, MAX_QTY / STOCK guards, tip/instructions, address rules, X-Store-Id, IDOR | Admin Phase 3 screens and the 05 §3 P3 role rows (DL-46): T-304 still in progress. Re-run after the T-304 merge. |
+| Coupons: FLAT / PERCENT / max_discount / category eligible-subtotal cap, min order, first-order-only, stops-applying, sheet ordering | Coupon usage exhaustion (per-user/total limits reached) and expired/not-started coupons: they need a QA-owned coupon, created via admin (T-304), because the demo coupons must not be used up |
+| Placement T1/T2: COD + ONLINE, snapshot, reservation, Idempotency-Key replay/reuse/parallel, PRICE_CHANGED, guards, one unpaid order, COD limit | `COD_NOT_AVAILABLE` NOT_ALLOWED / COD_DISABLED: they need `User.cod_blocked` or a store setting (admin / shared config) |
+| Payments: verify (signature, foreign gateway order, repeat), webhook (raw-body HMAC, event-id idempotency incl. parallel, order-insensitivity, wrong amount, payment.failed, malformed), retry-payment, T3a late capture, duplicate capture, refund settlement (QA Celery worker on DB 7) | `SERVICE_UNAVAILABLE` (gateway down): needs a failing gateway (not configurable without code) |
+| T5 cancel; T4 expiry via the :8001 beat (slow, `QA_SLOW=1`); stock oversell race; verify/cancel race | Real Razorpay (test mode) keys: none on this host (D-05 / DevOps) |
+| STORE_CLOSED (clock profile, read-only): prepared, see 03 | Customer-app Phase 3 screens on device: no device or emulator this run |
+| Read-only DB invariants: money, stock, financial duplicates, history, coupon counts | Load tests: Phase 8 |
+
+**Data hygiene on the shared DB:** COD orders and paid ONLINE orders stay `PLACED`, because Phase 3 has no T11/T12, so each keeps 1–2 units of a high-stock demo variant reserved. The list is in 03 §"Demo data consumed". Every ONLINE test order is cancelled (T5), which releases its stock and coupon hold. No demo coupon was redeemed: the only coupon placements were ONLINE orders that were cancelled or expired, so their holds were released.

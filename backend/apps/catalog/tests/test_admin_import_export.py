@@ -380,7 +380,12 @@ class TestAcceptedUploads:
 
 
 def template_origins(response) -> set[str]:
-    return {template.origin.name for template in response.templates if template.origin}
+    # Forward slashes, so the path checks below also hold on Windows hosts.
+    return {
+        str(template.origin.name).replace("\\", "/")
+        for template in response.templates
+        if template.origin
+    }
 
 
 def test_import_export_screens_use_unfold_templates(catalog_manager):
