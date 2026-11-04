@@ -132,3 +132,27 @@ Not observed: 503 `SERVICE_UNAVAILABLE` (gateway down, P3-TC-63 ⏭), 426/503 ma
 - Store GGN-01 still has variant 1 at 40/9 (`on_hand/reserved`; the 5 reserved before the run had no reservation rows), variant 13 at 40/16, and variant 6 (the oversell race item) at 2/0, unchanged.
 - No demo coupon redemption remains HELD or APPLIED.
 - These orders can be cancelled through T11/T12 when Phase 4 ships, or by Super Admin. All QA addresses were soft-deleted and all QA carts emptied.
+
+## Phase 3 stage 2 (2026-11-04)
+**Build:** `qa/phase-2` at `f84482f`, i.e. `develop` `a2b0762` merged in (clean merge). It contains the R2b review fixes (`41f02f6`: BUG-0009, OBS-P3-01, the `process_refund` locking), admin T-304 and Twilio SMS (T-308). The instance was started as in stage 1, plus **`SMS_BACKEND=apps.notifications.sms.ConsoleSmsBackend`**, so no real SMS can be sent: the instance log has 0 Twilio lines.
+
+| Run | Result (actual pytest summary) |
+|---|---|
+| P3 full suite (stage-1 files) | `1 failed, 58 passed, 2 skipped in 598.75s`. The single failure is **XPASS(strict) of BUG-0009**, which is the cue that the fix landed; it was verified and the marker removed. Re-run: `1 passed`. |
+| Admin + coupons + COD (`test_p3_admin.py`, new) and P3-TC-57 | `9 passed in 133.40s` (the first attempt had 1 test-logic error in P3-TC-61b: with both limits reached the server reports `total`; the test was reordered to check `per_user` first) |
+| P3-TC-43 oversell race | `1 passed` |
+| `QA_SLOW=1` P3-TC-47 (T4 via the :8001 beat + late capture) | `1 passed in 969.11s` |
+| Smoke P0–P3 (now including P3-TC-59) | `73 passed, 1 skipped in 319.59s` |
+| DB invariants (P3-TC-48…51), after the QA worker settled refunds | `4 passed` |
+| QA Celery worker on broker DB 7 | 28/28 refunds `PROCESSED`; every REFUNDED order has `amount_refunded = grand_total` |
+
+**Refund cases** (P3-TC-37/38/39/47/58 and worker settlement): they pass on this build. Per the PM, mark them **"re-check after the refund fix run"** (webhook race and idempotency lookup).
+
+**Test-isolation note:** running `-m smoke` while `QA_SLOW` P3-TC-47 runs breaks P3-TC-47, because P1 smoke cases use QA user D too. Run the slow case alone.
+
+**QA data added on the shared DB:**
+- 47 more QA orders, 134 in total, none unpaid.
+- PLACED QA orders reserve: variant 1 ×6, variant 2 ×1, variant 13 ×24.
+- 7 hidden QA coupons `QAP3*`, all switched off.
+- QA user E's `cod_blocked` was set and reset (0 users blocked now).
+- The demo store's COD setting was never touched.

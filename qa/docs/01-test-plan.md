@@ -81,3 +81,5 @@
 | Read-only DB invariants: money, stock, financial duplicates, history, coupon counts | Load tests: Phase 8 |
 
 **Data hygiene on the shared DB:** COD orders and paid ONLINE orders stay `PLACED`, because Phase 3 has no T11/T12, so each keeps 1–2 units of a high-stock demo variant reserved. The list is in 03 §"Demo data consumed". Every ONLINE test order is cancelled (T5), which releases its stock and coupon hold. No demo coupon was redeemed: the only coupon placements were ONLINE orders that were cancelled or expired, so their holds were released.
+
+**Stage 2 (2026-11-04, `f84482f`):** the admin cases (T-304), the QA-owned coupons (hidden `QAP3*`, made in admin as Super Admin) and the `cod_blocked` case (QA user E) moved into scope. Store COD-disabled stays out of scope, because the demo store is used for the user's phone COD test (PM). The instance runs with `SMS_BACKEND=apps.notifications.sms.ConsoleSmsBackend` because the dev settings now use Twilio (T-308).

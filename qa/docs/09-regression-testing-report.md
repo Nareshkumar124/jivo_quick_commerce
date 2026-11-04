@@ -43,3 +43,12 @@ The smoke set was unaffected.
 - **Full P0–P2 regression:** not re-run in this stage; only the smoke set was. Run the whole suite after the R2b/T-304 merges.
 - **Re-run after the R2b merge:** the full P3 suite, `QA_SLOW=1` P3-TC-47, the BUG-0009 fix check, and a P3 perf baseline.
 - **Re-run after the T-304 merge:** P3-TC-59/60, plus P3-TC-61 using a QA-owned coupon created in admin.
+
+## Phase 3 stage 2 (2026-11-04, `f84482f`)
+- **Smoke P0–P3:** `73 passed, 1 skipped`, plus P3-TC-43 `1 passed`. P3-TC-59 joined the 🔥 set.
+- **Fixes verified:** BUG-0009; its guard is now a normal assertion.
+- **Full P0–P2 regression:** not re-run (smoke only). Run it at the phase gate on staging.
+- **Pending:**
+  - re-check the refund cases after the refund fix run
+  - P3-TC-64 on the user's phone
+  - re-verify BUG-0008 (residual fix in `41f02f6`)

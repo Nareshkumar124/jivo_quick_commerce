@@ -258,7 +258,6 @@ def test_p3_tc42_webhook_unknown_and_malformed(api):
     assert r.status_code == 400, describe(r)
 
 
-@pytest.mark.xfail(strict=True, reason="BUG-0009: over-long entity ids in a signed webhook give 500")
 def test_p3_tc57_webhook_overlong_ids(api, pending):
     """P3-TC-57 A signed payment.captured whose payment id is longer than the stored column
     (or long enough that the refund key overflows) is a malformed payload: 200 `ignored`
@@ -268,6 +267,8 @@ def test_p3_tc57_webhook_overlong_ids(api, pending):
     r2 = send_webhook(api, captured_event(rzp["order_id"], "pay_" + "B" * 54, paise(order) - 100))
     assert shop.order(order["id"]).json()["status"] == "PAYMENT_PENDING"
     assert (r1.status_code, r2.status_code) == (200, 200), (describe(r1), describe(r2))
+    assert r1.json() == r2.json() == {"status": "ignored"}  # BUG-0009 fixed (41f02f6)
+    assert [p for p in payments(order["id"]) if p[2] == "CAPTURED"] == [] and refunds(order["id"]) == []
 
 
 def test_p3_tc58_refund_webhook_idempotent(api):
