@@ -184,15 +184,15 @@ class TestNotifyMe:
         lead = ServiceabilityRequest.objects.get()
         assert lead.user == user
 
-    def test_anonymous_phone_dedupe_and_no_phone(self, api_client):
+    def test_anonymous_requests_are_never_merged(self, api_client):
+        """BUG-0008 residual (R2b review): with or without a phone, each anonymous request is its
+        own lead."""
         body = {**accounts_ex_point(), "phone": "+919876543210"}
-        assert (
-            api_client.post(self.URL, body, format="json").json()["id"]
-            == (api_client.post(self.URL, body, format="json").json()["id"])
-        )
+        first = api_client.post(self.URL, body, format="json").json()["id"]
+        assert api_client.post(self.URL, body, format="json").json()["id"] != first
         api_client.post(self.URL, accounts_ex_point(), format="json")
         api_client.post(self.URL, accounts_ex_point(), format="json")
-        assert ServiceabilityRequest.objects.count() == 3  # anonymous without phone: not merged
+        assert ServiceabilityRequest.objects.count() == 4
 
     def test_bug_0008_two_anonymous_callers_get_only_their_own_data(self, api_client):
         """BUG-0008 (P2-TC-18): an anonymous caller who types someone else's phone near their
@@ -208,17 +208,18 @@ class TestNotifyMe:
         assert second["id"] != first["id"]  # never merged into a lead with other details
         assert ServiceabilityRequest.objects.count() == 2
 
-    def test_bug_0008_a_double_tap_is_merged_and_echoes_the_callers_values(self, api_client):
+    def test_bug_0008_anonymous_repeat_never_returns_an_earlier_lead(self, api_client):
+        """BUG-0008 residual (R2b review): even an identical anonymous repeat gets a lead of its
+        own, so neither `id` nor `created_at` reveals an earlier submission."""
         body = {"lat": 28.6692, "lng": 77.4538, "phone": "+919876543210", "address_text": " A1 "}
         first = api_client.post(self.URL, body, format="json").json()
-        nearby = {**body, "lat": 28.6693}
-        again = api_client.post(self.URL, nearby, format="json").json()
-        assert again["id"] == first["id"]
+        again = api_client.post(self.URL, {**body, "lat": 28.6693}, format="json").json()
+        assert again["id"] != first["id"]
+        assert again["created_at"] != first["created_at"]
         assert (again["lat"], again["address_text"]) == (28.6693, "A1")  # the caller's values
-        # BUG-0008 residual (R2b review): not the earlier lead's time either.
-        stored = ServiceabilityRequest.objects.get().created_at
-        assert again["created_at"] != stored.isoformat().replace("+00:00", "Z")
-        assert ServiceabilityRequest.objects.count() == 1
+        stored = ServiceabilityRequest.objects.get(pk=again["id"])
+        assert (stored.phone, stored.address_text) == ("+919876543210", "A1")
+        assert ServiceabilityRequest.objects.count() == 2
 
     def test_throttled(self, api_client):
         from apps.stores.views import NotifyMeThrottle
