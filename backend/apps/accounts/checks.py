@@ -52,3 +52,33 @@ def check_sms_backend(app_configs, **kwargs):
             id="accounts.E003",
         )
     ]
+
+
+@register()
+def check_twilio_settings(app_configs, **kwargs):
+    """D-02: the Twilio backend needs its credentials and a sender (a Messaging Service SID or
+    a From number). Checked in every environment, so a misconfiguration fails at startup rather
+    than on the first OTP."""
+    from apps.notifications.sms import TWILIO_BACKEND
+
+    if settings.SMS_BACKEND != TWILIO_BACKEND:
+        return []
+    missing = [
+        name
+        for name in ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN")
+        if not getattr(settings, name, "")
+    ]
+    if not (
+        getattr(settings, "TWILIO_MESSAGING_SERVICE_SID", "")
+        or getattr(settings, "TWILIO_FROM_NUMBER", "")
+    ):
+        missing.append("TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER")
+    if not missing:
+        return []
+    return [
+        Error(
+            f"SMS_BACKEND is TwilioSmsBackend but {', '.join(missing)} is not set.",
+            hint="Set the TWILIO_* variables in the environment (backend/.env locally).",
+            id="accounts.E004",
+        )
+    ]

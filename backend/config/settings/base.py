@@ -387,6 +387,12 @@ SMS_BACKEND = env_str("SMS_BACKEND", default="apps.notifications.sms.ConsoleSmsB
 SMS_CONSOLE_BACKEND_ALLOWED = False  # staging only, see deployed.py
 SMS_SENDER_ID = env_str("SMS_SENDER_ID", default="")
 SMS_OTP_DLT_TEMPLATE_ID = env_str("SMS_OTP_DLT_TEMPLATE_ID", default="")
+# Twilio (SMS_BACKEND=apps.notifications.sms.TwilioSmsBackend). Credentials only from env. Sends
+# from the Messaging Service when set, else from the number (system check accounts.E004).
+TWILIO_ACCOUNT_SID = env_str("TWILIO_ACCOUNT_SID", default="")
+TWILIO_AUTH_TOKEN = env_str("TWILIO_AUTH_TOKEN", default="")
+TWILIO_FROM_NUMBER = env_str("TWILIO_FROM_NUMBER", default="")
+TWILIO_MESSAGING_SERVICE_SID = env_str("TWILIO_MESSAGING_SERVICE_SID", default="")
 # Must match the DLT-registered template text exactly. {app_hash} is the Android SMS Retriever
 # hash of the app that asked (blank if unset).
 SMS_OTP_TEMPLATE = env_str(
