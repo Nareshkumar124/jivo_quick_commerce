@@ -21,12 +21,14 @@ void main() {
   int idOf(OrderStatus status) =>
       backend.orders.firstWhere((o) => o.status == status).id;
 
-  TestApp app({bool tracking = false}) => TestApp(
+  TestApp app({bool tracking = false, int trackStep = 0}) => TestApp(
     tokens: signedInTokens,
     commerce: backend,
     extraOverrides: [
       trackingAvailableProvider.overrideWithValue(tracking),
-      trackRepositoryProvider.overrideWithValue(FakeTrackRepository()),
+      trackRepositoryProvider.overrideWithValue(
+        FakeTrackRepository(startStep: trackStep),
+      ),
       trackPollIntervalProvider.overrideWithValue(Duration.zero),
     ],
   );
@@ -257,6 +259,33 @@ void main() {
     await tester.tap(find.byKey(const Key('track-order')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('tracking')), findsOneWidget);
+  });
+
+  testWidgets('out for delivery: the detail shows the delivery OTP and the '
+      'rider with a call button (P5)', (tester) async {
+    final a = app(tracking: true, trackStep: 2);
+    await openOrders(tester, a);
+    await openOrder(tester, idOf(OrderStatus.packing));
+
+    expect(find.byKey(const Key('delivery-otp')), findsOneWidget);
+    expect(find.byKey(const Key('delivery-otp-code')), findsOneWidget);
+    expect(find.text('4821'), findsOneWidget);
+    final semantics = tester.ensureSemantics();
+    await tester.pump();
+    expect(find.bySemanticsLabel(RegExp('Delivery OTP 4 8 2 1')), findsOneWidget);
+    semantics.dispose();
+    expect(find.byKey(const Key('rider-card')), findsOneWidget);
+    expect(find.text('Ravi Kumar'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('call-rider')));
+    await tester.pumpAndSettle();
+    expect(a.urls.opened.single, Uri(scheme: 'tel', path: '+919000000099'));
+  });
+
+  testWidgets('confirmed, no rider yet: no OTP or rider card', (tester) async {
+    await openOrders(tester, app(tracking: true));
+    await openOrder(tester, idOf(OrderStatus.packing));
+    expect(find.byKey(const Key('delivery-otp')), findsNothing);
+    expect(find.byKey(const Key('rider-card')), findsNothing);
   });
 
   testWidgets('without tracking the detail has no track button', (

@@ -196,7 +196,7 @@ class _RotatingLogout extends FakeAuthRepository {
   final List<String> revoked = [];
 
   @override
-  Future<void> logout(String refreshToken) async {
+  Future<void> logout(String refreshToken, {String? fcmToken}) async {
     if (revoked.isEmpty) {
       await session.signIn(const AuthTokens(access: 'a2', refresh: 'r2'));
     }
@@ -206,6 +206,6 @@ class _RotatingLogout extends FakeAuthRepository {
 
 class _FailingLogout extends FakeAuthRepository {
   @override
-  Future<void> logout(String refreshToken) async =>
+  Future<void> logout(String refreshToken, {String? fcmToken}) async =>
       throw const ApiError(code: ApiErrorCode.network);
 }

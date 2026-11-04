@@ -1,6 +1,7 @@
 import 'package:customer_app/app/bootstrap.dart';
 import 'package:customer_app/shared/formatting/formatters.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jivo_core/jivo_core.dart' show formatRupeeAmount;
 
 void main() {
   setUpAll(initializeFormatting);
@@ -67,5 +68,13 @@ void main() {
     expect(isSameAmount('20.00', '20.01'), isFalse);
     expect(isSameAmount('020.00', '20.00'), isTrue);
     expect(isSameAmount('abc', '20.00'), isFalse);
+  });
+
+  test('formatRupeesOrNull: jivo_core formatting, null when unusable', () {
+    expect(formatRupeesOrNull('124999.00'), '₹1,24,999');
+    expect(formatRupeesOrNull('249.50'), '₹249.50');
+    expect(formatRupeesOrNull(null), isNull);
+    expect(formatRupeesOrNull('12.345'), isNull);
+    expect(formatRupees('124999.00'), formatRupeeAmount('124999.00'));
   });
 }

@@ -124,6 +124,20 @@ class OrderDetailController extends AsyncNotifier<OrderDetail> {
 
   /// The server's newer copy of the order (e.g. the cancel response).
   void replace(OrderDetail order) => state = AsyncData(order);
+
+  /// Re-fetches in the background, keeping the shown order (no skeleton);
+  /// used when live tracking reports a new status. A failure keeps the
+  /// current copy.
+  Future<void> refreshQuietly() async {
+    try {
+      final order = await ref
+          .read(orderHistoryRepositoryProvider)
+          .getOrderDetail(orderId);
+      if (ref.mounted) state = AsyncData(order);
+    } catch (_) {
+      // The next status change or pull to refresh tries again.
+    }
+  }
 }
 
 final orderDetailProvider = AsyncNotifierProvider.autoDispose
