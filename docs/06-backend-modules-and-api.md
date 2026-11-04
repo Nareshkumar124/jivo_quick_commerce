@@ -243,7 +243,7 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 
 | Job | Trigger | What it does | Phase |
 |-----|---------|--------------|-------|
-| `send_otp_sms` | OTP request | Send the OTP via the SMS gateway (DLT template) | P1 |
+| `send_otp_sms` | OTP request | Send the OTP via the SMS gateway (DLT template). Gateway = `SMS_BACKEND`: console (local), locmem (tests), `TwilioSmsBackend` (Twilio Programmable Messaging, settings `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID` or `TWILIO_FROM_NUMBER`; check `accounts.E004`). Retried (3x, backoff): failures before the request is sent (DNS, connection refused, connect timeout), 429 and 5xx. Not retried: a read timeout or dropped connection after sending (outcome unknown; Twilio has no idempotency key, so a retry could send a duplicate OTP; logged as "outcome unknown, not retried", the user can request a new OTP), other 4xx (invalid or, on a trial account, unverified number: Twilio 21608) and 3xx (redirects are never followed). Logs carry only the masked number, HTTP status, Twilio error code and message SID. Fixed-OTP test numbers (D-15) never queue this job. | P1 |
 | `expire_unpaid_orders` | Beat, every 1 min | PAYMENT_PENDING older than the window: check Razorpay status, then PLACED or PAYMENT_FAILED + release stock | P3 |
 | `generate_invoice` | Order DELIVERED (and on demand) | Render the GST invoice PDF and store it | P4 |
 | `process_refund` | Cancel / partial unavailability / failed delivery | Call the Razorpay refund API. Retry with backoff. Phase 3 (R2b): the automatic full refund of a late or duplicate capture (08 T3a, DL-45), one gateway call per `Refund`. | P3/P4 |
