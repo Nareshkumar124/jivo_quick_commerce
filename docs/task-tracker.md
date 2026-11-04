@@ -32,15 +32,24 @@ Last updated: 2026-11-04 (P4 backend and customer merged, migrations applied; Ph
 | T-103 | P1 customer app: login, profile, addresses, delete account | CUS | P0 | `customer_app` P1 screens | 62 tests and the real-API itest green; QA functional check | Testing |
 | T-104 | P1 rider app: login, routing by status | RID | P0 | `rider_app` P1 screens | 112 tests and the real-API itest green; QA functional check | Testing |
 
+## Phase 6: Real-time & notifications (started in part 2026-11-04, DL-55)
+| ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
+|----|------|-------|-----|-----------|--------------|---------------------|--------|
+| T-611 | WS contract examples (`06 §4`) + inbox API; `realtime` app (order/ops consumers, first-message JWT, `broadcast_ws`); `notifications` (`08 §9` templates, `send_push` no-op until D-19, `send_sms`, retries); purge jobs | BE | P0 | – | Apps, migrations, tests | `WebsocketCommunicator` tests; IDOR/scoping | In Progress (`backend/phase-6`, `.worktrees/backend6`) |
+| T-612 | Rider location fan-out, ETA (`08 §8`), rider socket `offer.*`/`task.updated` | BE | P0 | T-611, P5 5.3 | – | Offer latency < 3 s | Not Started |
+| T-613 | Customer: tracking over WS with polling fallback, inbox bind, FCM adapter (D-19) | CUS | P0 | T-611 | – | Tests green | Not Started |
+| T-614 | Rider: `/ws/v1/rider/` with polling and FCM fallback, inbox | RID | P0 | T-612 | – | – | Not Started |
+| T-711 | ⏩ P7 lookahead: support tickets, FAQs, CMS pages API | BE | P1 | – | `cms` and `support` apps | IDOR tests | In Progress (`backend/p7-support`) |
+
 ## Phase 5: Rider & delivery (started 2026-11-04, DL-54)
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
 |----|------|-------|-----|-----------|--------------|---------------------|--------|
-| T-511 | Final P5 rider contract (`06 §3`) + `GET /orders/{id}/track/`; answers to api-requests #2–#28 | BE | P0 | – | Serializers, routes, examples, schema | Additive; schema re-exported | In Progress (`backend/phase-5`, `.worktrees/backend5`) |
+| T-511 | Final P5 rider contract (`06 §3`) + `GET /orders/{id}/track/`; answers to api-requests #2–#28 | BE | P0 | – | Serializers, routes, examples, schema | Additive; schema re-exported | Testing (contract exported; jivo_api generated into the rider and customer worktrees; full run, then review) |
 | T-512 | Slice 5.1: registration, KYC (private bucket, masked/encrypted numbers), bank, admin approval services | BE | P0 | T-511 | Models, services, migrations, tests | D-14 defaults; DPDP | In Progress |
 | T-513 | Slice 5.2: shifts, location ingestion, heartbeat auto-offline, `simulate_rider` | BE | P0 | T-512 | Services, tasks | – | Not Started |
 | T-514 | Slices 5.3/5.4: dispatch, offers, T9–T14, delivery OTP, cash ledger, earnings (D-16 defaults), payouts; invoices on DELIVERED | BE | P0 | T-513 | – | `08` exactly | Not Started |
 | T-515 | Rider P5: foreground location service, background-location disclosure, FCM plumbing; bind slices 5.1–5.4 | RID | P0 | T-511 | – | Tests green | In Progress (`rider/phase-5`) |
-| T-516 | Customer P5: FCM token, rider + delivery OTP via `track/`; ⏩ P7 rating/help/CMS on fakes | CUS | P0 | T-511 | – | Tests green | In Progress (`customer/phase-5`) |
+| T-516 | Customer P5: FCM token, rider + delivery OTP via `track/`; ⏩ P7 rating/help/CMS on fakes | CUS | P0 | T-511 | – | Tests green | Testing (run 1 merged `efd4a1f`; tracking bound to track/ `1da5991`, merges with the P5 backend) |
 | T-517 | Admin P5: riders, KYC review, rider map, cash deposits, returns | ADM | P0 | T-512 | – | Role matrix | Not Started (after admin P4 merge and slice 5.1) |
 | T-518 | QA P5 + rider mini-UAT | QA | P0 | T-514 | – | P5 verdict | Not Started |
 
