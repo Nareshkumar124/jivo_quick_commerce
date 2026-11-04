@@ -1,8 +1,23 @@
 import '../../app/redirect.dart';
 
+/// The App Links hosts this build trusts for `https` deep links, from
+/// `--dart-define=APP_LINK_HOSTS=host1,host2`. Empty by default (the
+/// domain isn't decided yet), so every `https` link is rejected and only
+/// `jivo://` links work.
+final Set<String> appLinkHosts = parseAppLinkHosts(
+  const String.fromEnvironment('APP_LINK_HOSTS'),
+);
+
+/// `"a.in, B.in,"` → `{a.in, b.in}`.
+Set<String> parseAppLinkHosts(String value) => {
+  for (final host in value.split(','))
+    if (host.trim().isNotEmpty) host.trim().toLowerCase(),
+};
+
 /// Where a deep link opens (`03 §2.12`: notification taps open order
 /// tracking, a product or a collection). Accepts `jivo://<path>` and
-/// `https://<any host>/<path>` with these paths:
+/// `https://<host>/<path>` for a host in [allowedHosts] (default
+/// [appLinkHosts]), with these paths:
 ///
 /// - `orders/<id>`: the order's tracking, or its detail when tracking isn't
 ///   available in this build ([trackingAvailable])
@@ -11,8 +26,22 @@ import '../../app/redirect.dart';
 /// - `orders`, `notifications`, `cart`, `home`
 ///
 /// Returns null for anything else (the caller stays where it is).
-String? deepLinkLocation(Uri uri, {bool trackingAvailable = false}) {
-  if (uri.scheme != 'jivo' && uri.scheme != 'https') return null;
+String? deepLinkLocation(
+  Uri uri, {
+  bool trackingAvailable = false,
+  Set<String>? allowedHosts,
+}) {
+  switch (uri.scheme) {
+    case 'jivo':
+      break;
+    case 'https':
+      final hosts = allowedHosts ?? appLinkHosts;
+      if (uri.host.isEmpty || !hosts.contains(uri.host.toLowerCase())) {
+        return null;
+      }
+    default:
+      return null;
+  }
   // `jivo://orders/12`: "orders" is the host; `https://jivo.in/orders/12`:
   // it is the first path segment.
   final segments = [
@@ -55,19 +84,25 @@ String? deepLinkLocation(Uri uri, {bool trackingAvailable = false}) {
 String? notificationLocation(
   Map<String, Object?> data, {
   bool trackingAvailable = false,
+  Set<String>? allowedHosts,
 }) {
   final link = data['link'];
   if (link is String) {
     final uri = Uri.tryParse(link);
     if (uri != null) {
-      return deepLinkLocation(uri, trackingAvailable: trackingAvailable);
+      return deepLinkLocation(
+        uri,
+        trackingAvailable: trackingAvailable,
+        allowedHosts: allowedHosts,
+      );
     }
   }
   final type = data['type'];
   final orderId = data['order_id'];
   final slug = data['slug'];
   final path = switch (type) {
-    'order' when orderId != null => 'orders/$orderId',
+    'order' when orderId != null && _id('$orderId') != null =>
+      'orders/$orderId',
     'product' ||
     'collection' ||
     'category' when slug is String => '$type/$slug',
@@ -81,7 +116,8 @@ String? notificationLocation(
         );
 }
 
-int? _id(String value) {
-  final id = int.tryParse(value);
-  return id == null || id <= 0 ? null : id;
-}
+/// A positive id in plain digits only (no sign, spaces or encoded
+/// separators).
+final _idPattern = RegExp(r'^[1-9][0-9]{0,17}$');
+
+int? _id(String value) => _idPattern.hasMatch(value) ? int.parse(value) : null;

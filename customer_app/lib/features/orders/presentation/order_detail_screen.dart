@@ -246,17 +246,18 @@ class _OrderBody extends ConsumerWidget {
 
   Future<void> _openInvoice(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context);
+    bool? opened;
     try {
-      final opened = await ref
+      opened = await ref
           .read(orderActionsProvider(order.id).notifier)
           .openInvoice();
-      if (opened == false && context.mounted) {
-        showMessage(context, l10n.invoiceOpenFailed);
-      }
-    } catch (error) {
-      if (context.mounted) {
-        showMessage(context, describeErrorWithDetails(context, error));
-      }
+    } catch (_) {
+      opened = false;
+    }
+    // Any failure (server refusal, unsafe or broken link, no PDF app) gets
+    // the same message; null means another action was already running.
+    if (opened == false && context.mounted) {
+      showMessage(context, l10n.invoiceOpenFailed);
     }
   }
 

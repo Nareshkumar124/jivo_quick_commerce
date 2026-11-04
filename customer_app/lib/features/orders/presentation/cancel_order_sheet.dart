@@ -40,7 +40,11 @@ List<CancelReason> cancelReasonsFor(OrderStatus status) =>
         CancelReason.other,
       ];
 
-/// The refund line for cancelling [order] (`08 §6.4` defaults, D-10):
+/// The refund line for cancelling [order] (`08 §6.4` defaults, D-10).
+///
+/// PM default (P4 review): derived here from `payment_method` and
+/// `payment_status` until the server offers a refund preview for a cancel;
+/// revisit when D-10 is decided or such a preview lands. The rule:
 /// paid online → full refund to the source in 5–7 working days; cash on
 /// delivery → nothing due; not paid yet → nothing to refund. The amount is
 /// the server's `grand_total`.

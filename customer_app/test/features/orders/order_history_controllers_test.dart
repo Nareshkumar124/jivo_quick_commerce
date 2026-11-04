@@ -2,6 +2,7 @@ import 'package:customer_app/app/providers.dart';
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/cart/presentation/cart_controller.dart';
+import 'package:customer_app/features/orders/data/order_history_repository.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
 import 'package:customer_app/features/orders/domain/order_history.dart';
 import 'package:customer_app/features/orders/presentation/order_history_controllers.dart';
@@ -137,4 +138,75 @@ void main() {
     urls.result = false;
     expect(await notifier.openInvoice(), isFalse);
   });
+
+  test('only https invoice links with a host are opened', () async {
+    final id = idOf(OrderStatus.delivered);
+    for (final bad in [
+      'http://invoices.example.com/a.pdf',
+      'file:///sdcard/a.pdf',
+      'https:///a.pdf',
+      'javascript:alert(1)',
+    ]) {
+      final repo = _InvoiceOverride(backend, () => Uri.parse(bad));
+      final c = ProviderContainer(
+        overrides: [
+          orderHistoryRepositoryProvider.overrideWithValue(repo),
+          urlOpenerProvider.overrideWithValue(urls),
+        ],
+      );
+      addTearDown(c.dispose);
+      final sub = c.listen(orderActionsProvider(id), (_, _) {});
+      addTearDown(sub.close);
+      expect(
+        await c.read(orderActionsProvider(id).notifier).openInvoice(),
+        isFalse,
+        reason: bad,
+      );
+    }
+    expect(urls.opened, isEmpty);
+  });
+
+  test('an invoice URL that does not parse is not opened', () async {
+    final id = idOf(OrderStatus.delivered);
+    final repo = _InvoiceOverride(backend, () => Uri.parse('https://[bad'));
+    final c = ProviderContainer(
+      overrides: [
+        orderHistoryRepositoryProvider.overrideWithValue(repo),
+        urlOpenerProvider.overrideWithValue(urls),
+      ],
+    );
+    addTearDown(c.dispose);
+    final sub = c.listen(orderActionsProvider(id), (_, _) {});
+    addTearDown(sub.close);
+    expect(
+      await c.read(orderActionsProvider(id).notifier).openInvoice(),
+      isFalse,
+    );
+    expect(urls.opened, isEmpty);
+  });
+}
+
+/// The fake server, with an invoice link chosen by the test.
+class _InvoiceOverride implements OrderHistoryRepository {
+  _InvoiceOverride(this._inner, this._url);
+
+  final FakeCommerceBackend _inner;
+  final Uri Function() _url;
+
+  @override
+  Future<InvoiceLink> invoice(int orderId) async => InvoiceLink(url: _url());
+
+  @override
+  Future<OrderDetail> cancel(int orderId, CancelReason reason) =>
+      _inner.cancel(orderId, reason);
+
+  @override
+  Future<OrderDetail> getOrderDetail(int orderId) =>
+      _inner.getOrderDetail(orderId);
+
+  @override
+  Future<OrderPage> listOrders({int page = 1}) => _inner.listOrders(page: page);
+
+  @override
+  Future<ReorderResult> reorder(int orderId) => _inner.reorder(orderId);
 }

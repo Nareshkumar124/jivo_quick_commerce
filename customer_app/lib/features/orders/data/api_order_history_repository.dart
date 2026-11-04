@@ -87,6 +87,7 @@ class ApiOrderHistoryRepository implements OrderHistoryRepository {
   });
 
   /// 409 unless the order is DELIVERED; 503 when the PDF can't be made.
+  /// A `url` that doesn't parse throws [FormatException].
   @override
   Future<InvoiceLink> invoice(int orderId) => _guard(() async {
     final invoice = (await _orders.ordersInvoice(id: orderId)).data!;

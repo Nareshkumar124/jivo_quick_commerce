@@ -2,8 +2,12 @@ import 'package:customer_app/shared/links/deep_links.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  String? loc(String link, {bool tracking = false}) =>
-      deepLinkLocation(Uri.parse(link), trackingAvailable: tracking);
+  const hosts = {'jivo.in'};
+  String? loc(String link, {bool tracking = false}) => deepLinkLocation(
+    Uri.parse(link),
+    trackingAvailable: tracking,
+    allowedHosts: hosts,
+  );
 
   test('orders open tracking when available, else the detail', () {
     expect(loc('jivo://orders/12'), '/orders/12');
@@ -48,5 +52,42 @@ void main() {
     );
     expect(notificationLocation({'type': 'promo'}), isNull);
     expect(notificationLocation({'type': 'collection'}), isNull);
+  });
+
+  test('https only for allowed App Links hosts', () {
+    expect(loc('https://evil.example/orders/12'), isNull);
+    expect(loc('https://JIVO.in/orders/12'), '/orders/12');
+    // The build default is empty until APP_LINK_HOSTS is configured.
+    expect(appLinkHosts, isEmpty);
+    expect(deepLinkLocation(Uri.parse('https://jivo.in/orders/12')), isNull);
+    expect(deepLinkLocation(Uri.parse('jivo://orders/12')), '/orders/12');
+    expect(parseAppLinkHosts(' jivo.in, Shop.Jivo.in ,,'), {
+      'jivo.in',
+      'shop.jivo.in',
+    });
+    expect(parseAppLinkHosts(''), isEmpty);
+  });
+
+  test('ids are plain positive digits only', () {
+    expect(loc('jivo://orders/+5'), isNull);
+    expect(loc('jivo://orders/5%2Fdetail'), isNull);
+    expect(loc('jivo://orders/%35'), '/orders/5');
+    expect(loc('jivo://orders/05'), isNull);
+    expect(loc('jivo://orders/1234567890123456789'), isNull);
+    expect(
+      notificationLocation({'type': 'order', 'order_id': '5/detail'}),
+      isNull,
+    );
+    expect(notificationLocation({'type': 'order', 'order_id': '+5'}), isNull);
+    expect(
+      notificationLocation({'type': 'order', 'order_id': '5'}),
+      '/orders/5',
+    );
+    expect(
+      notificationLocation({
+        'link': 'https://evil.example/orders/5',
+      }, allowedHosts: hosts),
+      isNull,
+    );
   });
 }

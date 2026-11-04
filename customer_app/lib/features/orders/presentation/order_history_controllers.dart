@@ -181,13 +181,23 @@ class OrderActionsController extends Notifier<OrderAction?> {
 
   /// Fetches the invoice link and opens the PDF outside the app. False
   /// when no app could open it.
+  ///
+  /// Only an `https` link with a host is opened; anything else (or a link
+  /// that doesn't parse) is reported as false, never launched.
   Future<bool?> openInvoice() => _run(OrderAction.invoice, () async {
-    final link = await ref
-        .read(orderHistoryRepositoryProvider)
-        .invoice(orderId);
+    final InvoiceLink link;
+    try {
+      link = await ref.read(orderHistoryRepositoryProvider).invoice(orderId);
+    } on FormatException {
+      return false;
+    }
+    if (!isSafeInvoiceUrl(link.url)) return false;
     return ref.read(urlOpenerProvider).open(link.url);
   });
 }
+
+/// The invoice link may be opened: `https` with a host.
+bool isSafeInvoiceUrl(Uri url) => url.scheme == 'https' && url.host.isNotEmpty;
 
 final orderActionsProvider = NotifierProvider.autoDispose
     .family<OrderActionsController, OrderAction?, int>(

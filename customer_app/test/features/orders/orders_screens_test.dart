@@ -125,6 +125,34 @@ void main() {
     expect((await backend.load()).quantityOf(101), 2);
   });
 
+  testWidgets('a non-https invoice link shows "could not open"', (
+    tester,
+  ) async {
+    final a = app();
+    final id = idOf(OrderStatus.delivered);
+    await openOrders(tester, a);
+    await openOrder(tester, id);
+    backend.invoiceUrlOverride = Uri.parse('http://invoices.example.com/x.pdf');
+    await scrollTo(tester, find.byKey(const Key('download-invoice')));
+    await tester.tap(find.byKey(const Key('download-invoice')));
+    await tester.pumpAndSettle();
+    expect(a.urls.opened, isEmpty);
+    expect(find.textContaining("Couldn't open the invoice"), findsOneWidget);
+  });
+
+  testWidgets('a refused invoice request shows "could not open"', (
+    tester,
+  ) async {
+    final a = app();
+    await openOrders(tester, a);
+    await openOrder(tester, idOf(OrderStatus.delivered));
+    backend.failNext = const ApiError(code: ApiErrorCode.serviceUnavailable);
+    await scrollTo(tester, find.byKey(const Key('download-invoice')));
+    await tester.tap(find.byKey(const Key('download-invoice')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining("Couldn't open the invoice"), findsOneWidget);
+  });
+
   testWidgets('refunded order shows the refund', (tester) async {
     await openOrders(tester, app());
     await openOrder(tester, idOf(OrderStatus.cancelled));

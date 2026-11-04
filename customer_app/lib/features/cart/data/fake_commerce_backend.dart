@@ -612,6 +612,9 @@ class FakeCommerceBackend
   /// Rows per page of [listOrders].
   int historyPageSize = 10;
 
+  /// Replaces the invoice link (tests of unsafe links).
+  Uri? invoiceUrlOverride;
+
   /// Variants the catalog no longer sells (reorder skips them).
   final discontinued = <int>{};
 
@@ -693,7 +696,9 @@ class FakeCommerceBackend
     final order = _order(orderId);
     if (!order.invoiceAvailable) _fail(ApiErrorCode.notFound, status: 404);
     return InvoiceLink(
-      url: Uri.parse('https://invoices.example.com/${order.number}.pdf'),
+      url:
+          invoiceUrlOverride ??
+          Uri.parse('https://invoices.example.com/${order.number}.pdf'),
       expiresAt: _clock().toUtc().add(const Duration(minutes: 15)),
     );
   }
