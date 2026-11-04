@@ -58,3 +58,6 @@ The smoke set was unaffected.
 - **Affected area re-run:** the P3 payments suite (`13 passed`), P3-TC-47 slow (`1 passed`), the new refund-ordering cases P3-TC-65…69 (all pass).
 - **Full P0–P2 regression:** not re-run (smoke only). Run it at the phase gate on staging.
 - **Still pending:** P3-TC-64 on the user's phone; re-verify BUG-0008 (residual fix in `41f02f6`).
+
+## Phase 4 stage 1 (2026-11-04, `1b3552d`)
+`uv run pytest -m smoke` (P0–P4 🔥): `1 failed, 89 passed, 2 skipped, 406 deselected in 876.95s` (skips: P0 staging profile, P4-TC-30 second store). The failure, P3-TC-50, was a **stale QA oracle**: it counted any payment with more than one refund as a double refund, which P4 makes legitimate (T8a difference + cancel of the rest, manual partials, FAILED + retry). All 12 such payments were inspected: their standing refunds sum exactly to the payment amount. The oracle now checks Σ standing refunds ≤ amount and no two P3 capture refunds per payment; the case is kept. After the update: `8 passed` (P3 + P4 SQL). Smoke run 1 was cut off by the pause and is not counted.
