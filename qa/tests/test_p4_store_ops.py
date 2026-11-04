@@ -441,13 +441,12 @@ def test_p4_tc34_retry_only_failed(shop_a):
 # --------------------------------------------------------------------------- not yet runnable
 
 
-@pytest.mark.skip(reason="needs a second store (QA-owned) or staging: the shared DB has only GGN-01")
-@pytest.mark.smoke
+@pytest.mark.skip(reason="runs on QA-02 in test_p4_console.py::test_p4_tc30_store_scoping (stage 2)")
 def test_p4_tc30_store_scoping():
     """P4-TC-30 🔥 Store Staff / Manager of GGN-01 act on another store's order: not found."""
 
 
-@pytest.mark.skip(reason="needs a QA-owned store with auto_accept_orders (never change GGN-01)")
+@pytest.mark.skip(reason="runs on QA-02 in test_p4_console.py::test_p4_tc36_auto_accept_qa02 (stage 2)")
 def test_p4_tc36_auto_accept():
     """P4-TC-36 auto-accept after AUTO_ACCEPT_DELAY_SECONDS, history actor_type system."""
 

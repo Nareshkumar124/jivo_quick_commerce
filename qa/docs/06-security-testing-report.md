@@ -77,3 +77,11 @@ Exploit-level details of open security findings are in `qa/private/` (gitignored
 - **Audit (TC-41):** one row per action with the acting staff user; `changes` holds no phone, address or free-text note (note length only) ✅.
 - **Customer reasons:** staff reasons, empty/null/number and a 251-character note → 400 ✅.
 - No new security bug; nothing written to `qa/private/` for P4.
+
+## Phase 4 stage 2 (2026-11-04, `f744508`)
+- **05 §3 pages × 7 roles** match the matrix exactly: live board (Super, Ops, SM, Support), packing console (Super, Ops, SM own, SS own), audit log (Super, Finance), refunds (Super, Support, Finance) ✅.
+- **Server-side POSTs:** accept by Catalog/Support/Finance 403; cancel by Store Staff 403 (console and board); accepting switch by Store Staff 403 with GGN-01 unchanged; Support may cancel (cancelled_by ops) ✅.
+- **Store scoping (TC-30, QA-02):** GGN-01's Store Manager/Staff get 404 for QA-02's console, queues, every step, "Can't supply", board cancel and the order's admin page; the order never appears on their board or queue; Ops sees it with the store filter ✅.
+- **CSRF (TC-42):** POST without the token 403 and nothing changes; GET on action URLs 405 ✅.
+- **PII (TC-43):** full phone for Super/Ops/Support on the customer page; SM/SS cannot open Customers and see no phone on the order detail; no phone on the board, queues or slip ✅.
+- **Audit log:** read-only (no add, no save, no delete) ✅.

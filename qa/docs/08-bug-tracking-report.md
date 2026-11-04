@@ -46,3 +46,13 @@ Verified fixes: none yet (first run).
 | OBS-P4-02 | Late-capture (P3) orders have `amount_paid` 0 and `amount_refunded` = the late capture (e.g. ₹190), so `amount_refunded > amount_paid` on 26 old orders. | Consistent with DL-45 (a late capture is not a sale). Finance should read refunds from `Refund` rows; QA's P4-TC-44 bound is now `max(grand_total, amount_paid)`. Suggest that 07 says so. |
 | OBS-P4-03 | The :8001 beat (`sweep_placed_orders`, `sync_refund_status`) also acts on QA orders on the shared DB. | Environment only; all such actions are idempotent. |
 | OBS-P4-04 | T8a recomputes fees from the store's **current** `PricingConfig` (capped at the order's fees). | It never raises the amount (cap); if the config is lowered the customer benefits. Confirm intent with D-10. |
+
+## Phase 4 stage 2 (2026-11-04, `f744508`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0010](../bugs/BUG-0010.md) | The panel has no manual refund (full / partial) for Super Admin, Support and Finance | admin panel: Orders / Refunds | P2 Major (Medium) | P1 | admin-panel-dev | Open | P4-TC-32, 33, 40 |
+| [BUG-0011](../bugs/BUG-0011.md) | Orders admin has no CSV export | admin panel: Orders | P3 Minor (Low) | P3 | admin-panel-dev | Open | P4-TC-40 |
+
+**OBS-P4-01: resolved** (one-time token on the refund-retry form): the identical retry form posted twice makes one retry (TC-34c). The same protection must be on the manual refund form when BUG-0010 is built.
+
+**Open by severity:** P0 0 · P1 0 · P2 1 (BUG-0010) · P3 3 (BUG-0006, BUG-0008, BUG-0011).
