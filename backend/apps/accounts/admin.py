@@ -3,12 +3,16 @@ Support). Permissions follow 05 §3 through the Groups synced by `apps.accounts.
 
 from django.contrib import admin, messages
 from django.contrib.admin import helpers
+from django.contrib.admin.models import CHANGE, LogEntry
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Count, Q
 from django.template.response import TemplateResponse
+from django.utils import timezone
 from django.utils.html import format_html_join
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action, display
@@ -18,7 +22,13 @@ from apps.accounts import roles
 from apps.accounts.forms import UserChangeForm, UserCreationForm
 from apps.accounts.models import Address, Customer, Device, User
 from apps.accounts.services.auth import anonymise_user
-from apps.accounts.services.customers import block_customer, unblock_customer
+from apps.accounts.services.customers import (
+    MSG_NOT_FOUND,
+    MSG_STAFF,
+    block_customer,
+    customer_log_repr,
+    unblock_customer,
+)
 from apps.ops_console import status
 from apps.ops_console.pii import can_view_full_phone
 from apps.ops_console.selectors import CUSTOMER_STATUS_FILTERS
@@ -289,6 +299,46 @@ def can_anonymise(user) -> bool:
     return bool(user.is_active and user.is_staff and user.has_perm(ANONYMISE_CUSTOMER))
 
 
+# --------------------------------------------------------------------------- COD block (DL-43)
+
+LOG_COD_BLOCKED = "Cash on delivery blocked: COD is not offered at checkout."
+LOG_COD_ALLOWED = "Cash on delivery allowed again."
+MSG_COD_ANONYMISED = "This account has been anonymised; its COD setting cannot change."
+
+
+def set_cod_blocked(user_id: int, blocked: bool, *, by) -> bool:
+    """INTERIM, until the backend ships `accounts.services.customers.set_cod_blocked` (reported
+    gap, same signature): set `User.cod_blocked` (08 T2: COD is not offered to the customer).
+
+    Mirrors `block_customer`: one transaction with the row locked, staff / anonymised / unknown
+    accounts refused with a `ValidationError`, True only when the flag changed, and the actor
+    recorded as an admin `LogEntry` on the Customer whose `object_repr` holds no personal data
+    ("Customer 42"; `anonymise_user()` scrubs these entries too). No side effects: carts and
+    orders already placed are not touched; the next cart read hides COD."""
+    if by is None or by.pk is None:
+        raise ValueError("set_cod_blocked needs the acting staff user (`by`).")
+    with transaction.atomic():
+        user = User.objects.select_for_update().filter(pk=user_id).first()
+        if user is None:
+            raise ValidationError(MSG_NOT_FOUND, code="not_found")
+        if user.is_staff or user.is_superuser:
+            raise ValidationError(MSG_STAFF, code="staff")
+        if user.anonymised_at is not None:
+            raise ValidationError(MSG_COD_ANONYMISED, code="anonymised")
+        if user.cod_blocked == blocked:
+            return False
+        User.objects.filter(pk=user.pk).update(cod_blocked=blocked, updated_at=timezone.now())
+        LogEntry.objects.create(
+            user_id=by.pk,
+            content_type=ContentType.objects.get_for_model(Customer, for_concrete_model=False),
+            object_id=str(user.pk),
+            object_repr=customer_log_repr(user.pk),
+            action_flag=CHANGE,
+            change_message=LOG_COD_BLOCKED if blocked else LOG_COD_ALLOWED,
+        )
+    return True
+
+
 @admin.register(Customer)
 class CustomerAdmin(ModelAdmin):
     """05 §2 Customers: list/search by phone or name, addresses, block/unblock, anonymise on
@@ -303,6 +353,7 @@ class CustomerAdmin(ModelAdmin):
         "phone",
         "email",
         "status_badge",
+        "cod_badge",
         "address_count",
         "created_at",
         "last_login",
@@ -310,6 +361,7 @@ class CustomerAdmin(ModelAdmin):
     list_display_links = ("id", "name")
     list_filter = (
         CustomerStatusFilter,
+        ("cod_blocked", admin.BooleanFieldListFilter),
         ("created_at", admin.DateFieldListFilter),
         "marketing_opt_in",
     )
@@ -319,9 +371,19 @@ class CustomerAdmin(ModelAdmin):
     list_per_page = 50
     show_full_result_count = False  # one COUNT less on big lists
     inlines = [AddressInline, DeviceInline]
-    actions = ["block", "unblock", "anonymise_now"]
+    actions = ["block", "unblock", "block_cod", "allow_cod", "anonymise_now"]
     fieldsets = (
         ("Customer", {"fields": ("name", "phone", "email", "status_badge")}),
+        (
+            "Cash on delivery",
+            {
+                "fields": ("cod_badge", "cod_history"),
+                "description": (
+                    "Blocked customers are not offered cash on delivery at checkout; orders "
+                    "already placed are not changed. Use the list actions to block or allow."
+                ),
+            },
+        ),
         (
             "Account",
             {
@@ -361,6 +423,32 @@ class CustomerAdmin(ModelAdmin):
     @display(description="Status", label=_STATUS_LABELS)
     def status_badge(self, obj) -> str:
         return status.BADGES[status.CUSTOMER][status.customer_status(obj)].label
+
+    @display(
+        description="Cash on delivery",
+        ordering="cod_blocked",
+        label=status.label_tones(status.COD),
+    )
+    def cod_badge(self, obj) -> str:
+        return status.BADGES[status.COD]["blocked" if obj.cod_blocked else "allowed"].label
+
+    @display(description="Last COD change")
+    def cod_history(self, obj) -> str:
+        entry = (
+            LogEntry.objects.filter(
+                content_type=ContentType.objects.get_for_model(Customer, for_concrete_model=False),
+                object_id=str(obj.pk),
+                change_message__in=(LOG_COD_BLOCKED, LOG_COD_ALLOWED),
+            )
+            .select_related("user")
+            .order_by("-action_time", "-id")
+            .first()
+        )
+        if entry is None:
+            return "Never changed"
+        actor = entry.user.name or entry.user.email or f"User {entry.user_id}"
+        when = timezone.localtime(entry.action_time).strftime("%d %b %Y %H:%M")
+        return f"{entry.change_message} By {actor}, {when} IST."
 
     @display(description="Addresses", ordering="live_addresses")
     def address_count(self, obj) -> int:
@@ -404,6 +492,36 @@ class CustomerAdmin(ModelAdmin):
         self._moderate(
             request, queryset, unblock_customer, done="Unblocked", already="were not blocked"
         )
+
+    def _set_cod(self, request, queryset, blocked: bool) -> None:
+        changed = unchanged = 0
+        refused: dict[str, int] = {}
+        for pk in queryset.order_by("pk").values_list("pk", flat=True):
+            try:
+                if set_cod_blocked(pk, blocked, by=request.user):
+                    changed += 1
+                else:
+                    unchanged += 1
+            except ValidationError as error:
+                for message in error.messages:
+                    refused[message] = refused.get(message, 0) + 1
+        verb = "Blocked cash on delivery for" if blocked else "Allowed cash on delivery for"
+        self.message_user(request, f"{verb} {changed} customer(s).", messages.SUCCESS)
+        if unchanged:
+            state = "blocked" if blocked else "allowed"
+            self.message_user(
+                request, f"{unchanged} customer(s) already had COD {state}.", messages.INFO
+            )
+        for message, count in refused.items():
+            self.message_user(request, f"Skipped {count} customer(s): {message}", messages.WARNING)
+
+    @action(description="Block cash on delivery", permissions=["change"])
+    def block_cod(self, request, queryset):
+        self._set_cod(request, queryset, True)
+
+    @action(description="Allow cash on delivery again", permissions=["change"])
+    def allow_cod(self, request, queryset):
+        self._set_cod(request, queryset, False)
 
     def has_anonymise_permission(self, request) -> bool:
         return can_anonymise(request.user) and self.has_change_permission(request)
