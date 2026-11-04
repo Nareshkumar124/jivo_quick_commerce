@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 @shared_task(name="orders.order_event")
 def order_event(event: str, order_id: int) -> str:
     """Domain event handler (`apps.orders.events`). Phase 3 records it; later phases notify."""
-    if event == "payment.late_capture":
-        logger.error("Ops alert: %s on order %s (automatic full refund requested)", event, order_id)
+    if event in ("payment.late_capture", "payment.refund_failed"):
+        logger.error("Ops alert: %s on order %s", event, order_id)
     else:
         logger.info("Order event %s: order %s", event, order_id)
     return event

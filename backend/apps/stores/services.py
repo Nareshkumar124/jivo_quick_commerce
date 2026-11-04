@@ -391,7 +391,9 @@ def notify_me_body(
     lead: ServiceabilityRequest, *, lat: float, lng: float, phone: str | None, address_text: str
 ) -> dict:
     """The notify-me response. A signed-in caller sees their own lead; an anonymous caller gets
-    their own submitted values back (BUG-0008: never fields stored by an earlier request)."""
+    their own submitted values back and `created_at` = the time of this request (BUG-0008: no
+    stored field of an earlier request; the lead `id` is kept because the contract publishes it
+    as a required integer, so a merged repeat returns the id of the identical submission)."""
     if lead.user_id is not None:
         return {
             "id": lead.pk,
@@ -407,7 +409,7 @@ def notify_me_body(
         "lng": lng,
         "phone": phone,
         "address_text": address_text.strip(),
-        "created_at": lead.created_at,
+        "created_at": timezone.now(),
     }
 
 
