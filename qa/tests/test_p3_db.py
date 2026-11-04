@@ -63,8 +63,15 @@ def test_p3_tc50_no_duplicate_financial_transactions():
         "select count(*) from (select p.order_id from payments_payment p left join payments_refund r on r.payment_id = p.id "
         "where p.status = 'CAPTURED' and r.id is null group by 1 having count(*) > 1) d"
     )[0][0]
+    # Phase 4 (T-402c): one payment may carry several order refunds (T8a difference + cancel
+    # rest, manual partials, FAILED + retry). A double refund is now: the standing (non-FAILED)
+    # refunds of a payment exceed its amount, or two Phase 3 capture refunds of one payment.
     double_refund = db_query(
-        "select count(*) from (select payment_id from payments_refund group by 1 having count(*) > 1) d"
+        "select count(*) from (select p.id from payments_payment p join payments_refund r on r.payment_id=p.id "
+        "where r.status <> 'FAILED' group by p.id, p.amount having sum(r.amount) > p.amount) d"
+    )[0][0] + db_query(
+        "select count(*) from (select payment_id from payments_refund where idempotency_key like 'capture:%%' "
+        "group by 1 having count(*) > 1) d"
     )[0][0]
     dup_evt = db_query(
         "select count(*) from (select event_id from payments_paymentwebhookevent group by 1 having count(*) > 1) d"

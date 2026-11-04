@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "apps.orders",
     "apps.payments",
     "apps.delivery",
+    "apps.support",
     "apps.ops_console",
 ]
 
@@ -672,6 +673,25 @@ DELIVERY_OTP_LENGTH = 4  # 04 §2.6 (the contract publishes it as `delivery_otp.
 DELIVERY_OTP_MAX_ATTEMPTS = env_int("DELIVERY_OTP_MAX_ATTEMPTS", default=5)
 # `GET /rider/tasks/current/` returns the rider's last ended task as `recent_task` this long.
 RIDER_RECENT_TASK_SECONDS = env_int("RIDER_RECENT_TASK_SECONDS", default=600)
+# --------------------------------------------------------------------------- support (P7)
+# Per user, fail open (apps.core.throttling). A customer raises a few tickets at most; these
+# only stop scripted abuse of the support inbox.
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
+    {
+        "support_tickets_create": env_str("SUPPORT_TICKETS_CREATE_RATE", default="10/hour"),
+        "support_messages": env_str("SUPPORT_MESSAGES_RATE", default="60/hour"),
+    }
+)
+SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"].update(
+    {
+        "TicketCategoryEnum": "apps.support.choices.TicketCategory",
+        "TicketStatusEnum": "apps.support.choices.TicketStatus",
+    }
+)
+SPECTACULAR_SETTINGS["TAGS"] += [
+    {"name": "cms", "description": "Static pages and FAQs (06 §2.7). No authentication."},
+    {"name": "support", "description": "The caller's support tickets and replies (06 §2.7)."},
+]
 
 # --------------------------------------------------------------------------- admin (unfold)
 from config.admin_ui import UNFOLD  # noqa: E402, F401  (owned by the admin panel track)

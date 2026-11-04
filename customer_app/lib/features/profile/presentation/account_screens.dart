@@ -7,10 +7,12 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/launch_state.dart';
 import '../../../app/providers.dart';
 import '../../../app/redirect.dart';
+import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../auth/presentation/auth_flow.dart';
+import '../../cms/data/cms_repository.dart';
 import 'profile_controllers.dart';
 import 'profile_form.dart';
 
@@ -46,6 +48,7 @@ class AccountScreen extends ConsumerWidget {
     final policies = ref.watch(launchStateProvider).config?.policies;
     final version = ref.watch(clientInfoProvider).appVersion;
     final opener = ref.read(urlOpenerProvider);
+    final inAppPages = ref.watch(cmsAvailableProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.accountTitle)),
@@ -81,7 +84,33 @@ class AccountScreen extends ConsumerWidget {
               title: Text(l10n.notificationsTitle),
               onTap: () => context.push(Routes.notifications),
             ),
-            if (policies != null) ...[
+            ListTile(
+              key: const Key('account-help'),
+              leading: const Icon(Icons.help_outline),
+              title: Text(l10n.helpTitle),
+              onTap: () => context.push(Routes.help),
+            ),
+            if (inAppPages) ...[
+              const Divider(),
+              ListTile(
+                title: Text(
+                  l10n.legal,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              for (final (label, slug) in [
+                (l10n.aboutJivo, CmsSlugs.about),
+                (l10n.termsOfService, CmsSlugs.terms),
+                (l10n.privacyPolicy, CmsSlugs.privacy),
+                (l10n.refundPolicy, CmsSlugs.refund),
+              ])
+                ListTile(
+                  key: Key('legal-$slug'),
+                  title: Text(label),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(Routes.page(slug)),
+                ),
+            ] else if (policies != null) ...[
               const Divider(),
               ListTile(
                 title: Text(

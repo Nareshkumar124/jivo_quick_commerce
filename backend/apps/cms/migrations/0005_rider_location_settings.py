@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('cms', '0003_appconfig_payment_window_minutes'),
+        ('cms', '0004_page_faq'),
     ]
 
     operations = [

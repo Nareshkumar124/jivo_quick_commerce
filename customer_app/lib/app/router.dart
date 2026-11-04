@@ -17,6 +17,7 @@ import '../features/cart/presentation/cart_screen.dart';
 import '../features/checkout/presentation/checkout_screen.dart';
 import '../features/checkout/presentation/order_success_screen.dart';
 import '../features/checkout/presentation/payment_failed_screen.dart';
+import '../features/cms/presentation/cms_page_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/launch/presentation/app_control_screens.dart';
 import '../features/launch/presentation/onboarding_screen.dart';
@@ -31,7 +32,10 @@ import '../features/orders/presentation/order_again_screen.dart';
 import '../features/orders/presentation/order_detail_screen.dart';
 import '../features/orders/presentation/orders_screen.dart';
 import '../features/profile/presentation/account_screens.dart';
+import '../features/rating/presentation/rate_order_screen.dart';
 import '../features/search/presentation/search_screen.dart';
+import '../features/support/presentation/help_screen.dart';
+import '../features/support/presentation/ticket_screens.dart';
 import '../features/tracking/presentation/tracking_screen.dart';
 import 'app_shell.dart';
 import 'launch_state.dart';
@@ -174,7 +178,36 @@ final routerProvider = Provider<GoRouter>((ref) {
           orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
         ),
       ),
+      route(
+        '/orders/:id/rate',
+        'rate_order',
+        (state) => RateOrderScreen(
+          orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+          initialStars: int.tryParse(state.uri.queryParameters['stars'] ?? ''),
+        ),
+      ),
       route(Routes.orders, 'orders', (_) => const OrdersScreen()),
+      route(Routes.help, 'help', (_) => const HelpScreen()),
+      route(Routes.tickets, 'tickets', (_) => const TicketListScreen()),
+      route(
+        '/account/help/new',
+        'ticket_new',
+        (state) => NewTicketScreen(
+          orderId: int.tryParse(state.uri.queryParameters['order'] ?? ''),
+        ),
+      ),
+      route(
+        '/account/help/tickets/:id',
+        'ticket_detail',
+        (state) => TicketDetailScreen(
+          ticketId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      route(
+        '/pages/:slug',
+        'cms_page',
+        (state) => CmsPageScreen(slug: state.pathParameters['slug']!),
+      ),
       route(Routes.notifications, 'notifications', (_) => const InboxScreen()),
       route(
         '/orders/:id/success',

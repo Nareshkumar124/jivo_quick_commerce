@@ -29,6 +29,9 @@ SEED_STEPS: list[str] = [
     "apps.orders.seed.seed_orders",
     # Phase 5: an ACTIVE test rider (+919000000002) and a PENDING_KYC applicant at GGN-01
     "apps.delivery.seed.seed_riders",
+    # Phase 7: placeholder CMS pages and FAQs, a demo support ticket
+    "apps.cms.seed.seed_pages_and_faqs",
+    "apps.support.seed.seed_tickets",
 ]
 
 

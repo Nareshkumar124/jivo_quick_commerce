@@ -70,3 +70,10 @@ Exploit-level details of open security findings are in `qa/private/` (gitignored
 - **Duplicate financial transactions:** none. In SQL over the whole shared DB (P4-TC-44 🔥), no payment is refunded above its capture, refund ids and keys are unique, and every PROCESSED refund has a gateway id. The webhook-before-task race produces one refund (P3-TC-65/66).
 - **Webhook abuse:** signed refund events for an unrelated payment, or with another payment's receipt, are `ignored` and never matched across payments (P3-TC-67). The 503 retry path is bounded by the window (P3-TC-69), so a signed event cannot keep the gateway retrying forever.
 - **No new security bugs.**
+
+## Phase 4 stage 1 (2026-11-04, `1b3552d`)
+- **IDOR:** cancel (PAYMENT_PENDING and PLACED), reorder and invoice of another user's order → 404; A's order and reservation unchanged (TC-07, TC-14) ✅. No token → 401 ✅.
+- **Role matrix (05 §3), service level:** process denied to Catalog/Support/Finance; cancel denied to Store Staff/Catalog/Finance; manual refund denied to Ops/Store Manager/Store Staff/Catalog; Support refund limit enforced server-side ✅. Console pages, CSRF (TC-42) and cross-store scoping (TC-30: only GGN-01 exists) ⏭.
+- **Audit (TC-41):** one row per action with the acting staff user; `changes` holds no phone, address or free-text note (note length only) ✅.
+- **Customer reasons:** staff reasons, empty/null/number and a 251-character note → 400 ✅.
+- No new security bug; nothing written to `qa/private/` for P4.

@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.accounts.choices import AppName
+
 
 class SupportContactsSerializer(serializers.Serializer):
     phone = serializers.CharField(help_text="Support phone, E.164.")
@@ -70,4 +72,35 @@ class AppConfigSerializer(serializers.Serializer):
     feature_flags = serializers.DictField(
         child=serializers.BooleanField(),
         help_text="Named on/off switches. Keys are added per phase; ignore unknown keys.",
+    )
+
+
+# --------------------------------------------------------------------------- P7: pages and FAQs
+
+
+class PageSerializer(serializers.Serializer):
+    slug = serializers.CharField(help_text="about, terms, privacy or refund-policy.")
+    title = serializers.CharField()
+    html = serializers.CharField(
+        help_text=(
+            "Sanitised HTML: h1-h6, p, br, ul/ol/li, blockquote, strong/em/b/i and <a href> with "
+            "https:, mailto: or tel: only. No attributes other than href, no scripts, styles, "
+            "images or relative links. Still render it with the app's own safe HTML parser."
+        )
+    )
+    updated_at = serializers.DateTimeField(help_text="Last edit (UTC).")
+
+
+class FaqSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    category = serializers.CharField(
+        help_text="Group heading. Entries of one category are consecutive in the list."
+    )
+    question = serializers.CharField()
+    answer = serializers.CharField(help_text="Plain text; show as text, never as HTML.")
+
+
+class FaqQuerySerializer(serializers.Serializer):
+    app = serializers.ChoiceField(
+        choices=AppName.choices, help_text="Which app's help screen: customer or rider."
     )

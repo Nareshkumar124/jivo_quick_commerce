@@ -139,3 +139,6 @@
 | UAT-P4-13 | All | Short questionnaire: what was confusing, what is missing, would you use it on a shift | Feedback logged; the PM triages each item as bug, change request or training |
 
 **Mini-UAT exit:** UAT-P4-01…12 pass, or each failure is filed (bug or change request) and accepted by the PM.
+
+### 8.6 Stage 1 execution note (2026-11-04, `1b3552d`)
+Executed everything that does not need the Ops Console. Store actions were driven through the backend services (`qa/tools/store_ops_driver.py`) because admin P4 is not merged; the stage-2 run repeats the console-facing cases through the real pages. Profiles used: `local`, `gwdown`, `cancelplaced` (environment only). On Windows the instance is controlled by `qa/private/qa_instance.sh` (it kills only the PID on 8004).

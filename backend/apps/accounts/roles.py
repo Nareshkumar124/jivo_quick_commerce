@@ -35,6 +35,7 @@ SUPER_ADMIN_APPS = (
     "payments",
     "delivery",
     "core",  # audit log: view only (see _permissions_for)
+    "support",
 )
 
 CUSTOMER_CARE = ["accounts.view_customer", "accounts.change_customer"]
@@ -87,6 +88,15 @@ AUDIT_VIEW = "core.view_auditlog"
 # changes go through apps.delivery.services.kyc, which re-checks these and the store scope.
 RIDER_VIEW = ["delivery.view_rider", "delivery.view_riderdocument", "delivery.view_ridershift"]
 RIDER_REVIEW = ["delivery.review_rider", "delivery.view_kyc_document_file"]
+# Phase 7 (05 §3 "Support tickets": Super Admin, Ops, Support). Ticket changes go through
+# apps.support.services, which re-check `support.handle_ticket`. FAQs are part of the Support
+# module (05 §2), so Support also edits them (PM default); pages stay Super Admin (CMS).
+SUPPORT_TICKETS = [
+    "support.view_supportticket",
+    "support.view_ticketmessage",
+    "support.handle_ticket",
+]
+FAQ_MANAGE = [f"cms.{action}_faq" for action in ("add", "change", "delete", "view")]
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     SUPER_ADMIN: [],  # all permissions of SUPER_ADMIN_APPS (see _permissions_for)
@@ -102,6 +112,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         ORDER_CANCEL,
         *RIDER_VIEW,
         *RIDER_REVIEW,
+        *SUPPORT_TICKETS,
     ],
     STORE_MANAGER: [
         *STORE_VIEW,
@@ -124,6 +135,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         *PAYMENT_VIEW,
         ORDER_CANCEL,
         REFUND_ISSUE,
+        *SUPPORT_TICKETS,
+        *FAQ_MANAGE,
     ],
     FINANCE: [
         *INVENTORY_VIEW,
