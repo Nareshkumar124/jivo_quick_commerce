@@ -139,7 +139,9 @@ class TestRazorpayGateway:
         )
         found = RazorpayGateway().fetch_payment_refunds("pay_A")
         assert [(r.id, r.receipt, r.amount_paise) for r in found] == [("rfnd_B", "k", 100)]
-        assert recorded[0]["url"] == "https://api.razorpay.com/v1/payments/pay_A/refunds"
+        # Fix review Minor: Razorpay pages 10 refunds by default; ask for its maximum, 100.
+        assert recorded[0]["method"] == "GET"
+        assert recorded[0]["url"] == "https://api.razorpay.com/v1/payments/pay_A/refunds?count=100"
 
     def test_4xx_is_a_rejection_with_the_gateway_description(self, calls):
         body = io.BytesIO(
@@ -366,3 +368,260 @@ class TestRefundTask:
         assert (retry.status, retry.initiated_by) == ("PROCESSED", payment.order.user)
         with pytest.raises(ValueError, match="Only a failed refund"):
             retry_failed_refund(retry)
+
+    # ------------------------------------------------------------------ fix review (R2b-fix)
+
+    def test_lookup_first_adopts_an_earlier_refund_without_posting(self, payment, monkeypatch):
+        """Major 2: the lookup before the POST is the guard; no reliance on the gateway refusing
+        a repeated receipt."""
+        refund_row = self.make_refund(payment)
+        receipt = refund_receipt(refund_row.idempotency_key)
+
+        def must_not_post(self, **kwargs):
+            raise AssertionError("refund POSTed although the gateway already had it")
+
+        monkeypatch.setattr(FakeRazorpayGateway, "refund", must_not_post)
+        monkeypatch.setattr(
+            FakeRazorpayGateway,
+            "fetch_payment_refunds",
+            lambda self, pid: [
+                GatewayRefund("rfnd_Other0000001", pid, 100, "processed", "someone-else"),
+                GatewayRefund("rfnd_Earlier00001", pid, 1, "pending", receipt),
+            ],
+        )
+        assert process_refund(refund_row.pk) == "pending"
+        refund_row.refresh_from_db()
+        assert (refund_row.status, refund_row.gateway_refund_id) == ("PENDING", "rfnd_Earlier00001")
+        assert process_refund(refund_row.pk) == "waiting"  # redelivered: nothing more to do
+
+    def test_lookup_unavailable_retries_without_posting(self, payment, monkeypatch):
+        posted = []
+        monkeypatch.setattr(FakeRazorpayGateway, "refund", lambda self, **kw: posted.append(kw))
+
+        def down(self, pid):
+            raise GatewayUnavailable("timeout")
+
+        monkeypatch.setattr(FakeRazorpayGateway, "fetch_payment_refunds", down)
+        refund_row = self.make_refund(payment)
+        with pytest.raises(GatewayUnavailable):
+            process_refund.run(refund_row.pk)
+        assert posted == []
+        refund_row.refresh_from_db()
+        assert (refund_row.status, refund_row.gateway_refund_id) == ("PENDING", "")
+
+    def test_duplicate_receipt_text_is_only_a_fallback(self, payment, monkeypatch):
+        """The lookup misses (not visible yet), the POST is refused as a duplicate receipt, and
+        the second lookup finds it."""
+        refund_row = self.make_refund(payment)
+        receipt = refund_receipt(refund_row.idempotency_key)
+        lookups = []
+
+        def lookup(self, pid):
+            lookups.append(pid)
+            if len(lookups) == 1:
+                return []
+            return [GatewayRefund("rfnd_Visible00001", pid, 1, "processed", receipt)]
+
+        def refund(self, **kwargs):
+            raise PaymentGatewayRejected("HTTP 400", description="Duplicate receipt found")
+
+        monkeypatch.setattr(FakeRazorpayGateway, "fetch_payment_refunds", lookup)
+        monkeypatch.setattr(FakeRazorpayGateway, "refund", refund)
+        assert process_refund(refund_row.pk) == "processed"
+        refund_row.refresh_from_db()
+        assert refund_row.gateway_refund_id == "rfnd_Visible00001"
+        assert len(lookups) == 2
+
+    def test_same_amount_not_adopted_when_the_payment_has_other_refunds(
+        self, payment, monkeypatch, caplog
+    ):
+        """Minor 5: a same-amount refund at the gateway may belong to another Refund row."""
+        Refund.objects.create(
+            payment=payment, order=payment.order, amount=payment.amount, reason=DUPLICATE_CAPTURE,
+            idempotency_key="other-refund", gateway_refund_id="rfnd_TheOther0001",
+        )  # fmt: skip
+        refund_row = self.make_refund(payment)
+
+        def refund(self, **kwargs):
+            raise PaymentGatewayRejected("HTTP 400", description="fully refunded already")
+
+        monkeypatch.setattr(FakeRazorpayGateway, "refund", refund)
+        monkeypatch.setattr(
+            FakeRazorpayGateway,
+            "fetch_payment_refunds",
+            lambda self, pid: [
+                GatewayRefund("rfnd_Dashboard0002", pid, to_paise(payment.amount), "processed", "")
+            ],
+        )
+        assert process_refund(refund_row.pk) == "rejected"
+        refund_row.refresh_from_db()
+        assert (refund_row.status, refund_row.gateway_refund_id) == ("FAILED", "")
+        assert "has other refunds" in caplog.text
+
+    def test_failed_is_final_and_alerts_once(
+        self, payment, caplog, django_capture_on_commit_callbacks
+    ):
+        """Minor 4: never FAILED -> PENDING; the alert fires only on the change to FAILED."""
+        from apps.payments.refunds import record_refund_status
+
+        refund_row = self.make_refund(payment)
+        with django_capture_on_commit_callbacks(execute=True):
+            record_refund_status(refund_row, "failed")
+            record_refund_status(refund_row, "failed")
+            assert record_refund_status(refund_row, "pending") is False
+        refund_row.refresh_from_db()
+        assert refund_row.status == "FAILED"
+        assert caplog.text.count("Ops alert: payment.refund_failed") == 1
+        assert record_refund_status(refund_row, "processed") is True  # the money did arrive
+
+    def test_retrying_a_retry_numbers_from_the_original_key(self, payment):
+        """Minor 6: keys never grow (`k:retry-1:retry-1`)."""
+        from apps.payments.refunds import retry_failed_refund
+
+        failed = self.make_refund(payment, key="capture:pay_Refund0000001")
+        Refund.objects.filter(pk=failed.pk).update(status="FAILED")
+        failed.refresh_from_db()
+        first = retry_failed_refund(failed)
+        Refund.objects.filter(pk=first.pk).update(status="FAILED")
+        first.refresh_from_db()
+        second = retry_failed_refund(first)
+        assert (first.idempotency_key, second.idempotency_key) == (
+            "capture:pay_Refund0000001:retry-1",
+            "capture:pay_Refund0000001:retry-2",
+        )
+
+
+@pytest.mark.django_db
+class TestRefundWebhook:
+    """Fix review Major 1: a `refund.*` event that arrives before `process_refund` has stored the
+    gateway refund id is matched by payment + receipt, or retried (503), never lost."""
+
+    URL = "/api/v1/payments/razorpay/webhook/"
+
+    @pytest.fixture
+    def refund_row(self):
+        order = OrderFactory(
+            status="CANCELLED", payment_method="ONLINE", payment_status="REFUND_PENDING",
+            placed_at=None,
+        )  # fmt: skip
+        payment = Payment.objects.create(
+            order=order, gateway="RAZORPAY", gateway_order_id="order_RefundHook01",
+            gateway_payment_id="pay_RefundHook0001", amount=order.grand_total, status="CAPTURED",
+        )  # fmt: skip
+        return Refund.objects.create(
+            payment=payment, order=order, amount=payment.amount, reason=LATE_CAPTURE,
+            idempotency_key="capture:pay_RefundHook0001",
+        )  # fmt: skip
+
+    def post(self, client, event_id, *, refund_id, receipt, payment_id="pay_RefundHook0001"):
+        from apps.payments.gateways import FAKE_WEBHOOK_SECRET, razorpay_webhook_signature
+
+        event = {
+            "entity": "event",
+            "event": "refund.processed",
+            "payload": {
+                "refund": {
+                    "entity": {
+                        "id": refund_id,
+                        "payment_id": payment_id,
+                        "amount": 100,
+                        "receipt": receipt,
+                        "status": "processed",
+                    }
+                }
+            },
+        }
+        raw = json.dumps(event).encode()
+        return client.generic(
+            "POST", self.URL, raw, content_type="application/json",
+            headers={
+                "X-Razorpay-Signature": razorpay_webhook_signature(FAKE_WEBHOOK_SECRET, raw),
+                "X-Razorpay-Event-Id": event_id,
+            },
+        )  # fmt: skip
+
+    def test_matched_by_receipt_records_the_id(self, api_client, refund_row):
+        response = self.post(
+            api_client, "evt_rf_1", refund_id="rfnd_HookFirst0001",
+            receipt=refund_receipt(refund_row.idempotency_key),
+        )  # fmt: skip
+        assert response.json() == {"status": "processed"}
+        refund_row.refresh_from_db()
+        assert (refund_row.status, refund_row.gateway_refund_id) == (
+            "PROCESSED",
+            "rfnd_HookFirst0001",
+        )
+        refund_row.order.refresh_from_db()
+        assert refund_row.order.payment_status == "REFUNDED"
+
+    def test_unmatched_while_a_refund_is_pending_asks_for_a_retry(self, api_client, refund_row):
+        from apps.payments.models import PaymentWebhookEvent
+
+        response = self.post(api_client, "evt_rf_2", refund_id="rfnd_HookEarly0001", receipt="")
+        assert response.status_code == 503
+        assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
+        assert not PaymentWebhookEvent.objects.filter(event_id="evt_rf_2").exists()
+        # process_refund commits the id; Razorpay's retry of the same event now applies.
+        Refund.objects.filter(pk=refund_row.pk).update(gateway_refund_id="rfnd_HookEarly0001")
+        retry = self.post(api_client, "evt_rf_2", refund_id="rfnd_HookEarly0001", receipt="")
+        assert retry.json() == {"status": "processed"}
+        refund_row.refresh_from_db()
+        assert refund_row.status == "PROCESSED"
+
+    def test_unknown_refund_with_nothing_pending_is_ignored(self, api_client, refund_row):
+        Refund.objects.filter(pk=refund_row.pk).update(
+            status="PROCESSED", gateway_refund_id="rfnd_Settled00001"
+        )
+        first = self.post(api_client, "evt_rf_3", refund_id="rfnd_Unknown00001", receipt="x")
+        assert first.json() == {"status": "ignored"}
+        other = self.post(
+            api_client, "evt_rf_4", refund_id="rfnd_Unknown00002", receipt="",
+            payment_id="pay_NotOurs000001",
+        )  # fmt: skip
+        assert other.json() == {"status": "ignored"}
+
+    def test_a_receipt_already_bound_to_another_id_is_ignored(self, api_client, refund_row):
+        Refund.objects.filter(pk=refund_row.pk).update(gateway_refund_id="rfnd_Bound000001")
+        response = self.post(
+            api_client, "evt_rf_5", refund_id="rfnd_Imposter0001",
+            receipt=refund_receipt(refund_row.idempotency_key),
+        )  # fmt: skip
+        assert response.json() == {"status": "ignored"}
+        refund_row.refresh_from_db()
+        assert (refund_row.status, refund_row.gateway_refund_id) == ("PENDING", "rfnd_Bound000001")
+
+    def test_a_pending_refund_past_the_retry_window_never_gets_a_503(
+        self, api_client, refund_row, settings, caplog
+    ):
+        """Fix review Major: a refund left PENDING without an id (a Dashboard refund, a task that
+        gave up) must not make the webhook answer 503 for ever."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.payments.models import PaymentWebhookEvent
+
+        settings.REFUND_WEBHOOK_RETRY_WINDOW_SECONDS = 7200
+        Refund.objects.filter(pk=refund_row.pk).update(
+            created_at=timezone.now() - timedelta(seconds=7201)
+        )
+        response = self.post(api_client, "evt_rf_6", refund_id="rfnd_Dashboard0003", receipt="")
+        assert (response.status_code, response.json()) == (200, {"status": "ignored"})
+        assert PaymentWebhookEvent.objects.get(event_id="evt_rf_6").processed_at is not None
+        assert "pending past the retry window" in caplog.text
+        refund_row.refresh_from_db()
+        assert (refund_row.status, refund_row.gateway_refund_id) == ("PENDING", "")
+
+    def test_an_event_for_another_payment_never_gets_a_503(self, api_client, refund_row):
+        """A refund of payment A pending inside the window says nothing about payment B."""
+        Payment.objects.create(
+            order=refund_row.order, gateway="RAZORPAY", gateway_order_id="order_RefundHook02",
+            gateway_payment_id="pay_RefundHook0002", amount=refund_row.amount, status="CAPTURED",
+        )  # fmt: skip
+        response = self.post(
+            api_client, "evt_rf_7", refund_id="rfnd_OtherPay0001", receipt="",
+            payment_id="pay_RefundHook0002",
+        )  # fmt: skip
+        assert (response.status_code, response.json()) == (200, {"status": "ignored"})
+        refund_row.refresh_from_db()
+        assert (refund_row.status, refund_row.gateway_refund_id) == ("PENDING", "")

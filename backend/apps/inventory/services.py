@@ -400,3 +400,35 @@ def clear_reservation_expiry(order) -> int:
     return StockReservation.objects.filter(order=order, status=ReservationStatus.ACTIVE).update(
         expires_at=None
     )
+
+
+def release_units(order, variant_id: int, quantity: int) -> int:
+    """08 §6.1 / T8a: `quantity` units of one line were found unavailable before packing ended.
+    Gives them back (`reserved -= quantity`) and shrinks the line's ACTIVE reservation (RELEASED
+    when nothing is left). Locks the reservation, then the stock row. Returns the units
+    released (never more than still reserved for the line)."""
+    from apps.inventory.models import ReservationStatus, StockReservation
+
+    if quantity <= 0:
+        return 0
+    with transaction.atomic():
+        reservation = (
+            StockReservation.objects.select_for_update()
+            .filter(order=order, variant_id=variant_id, status=ReservationStatus.ACTIVE)
+            .first()
+        )
+        if reservation is None:
+            return 0
+        units = min(quantity, reservation.quantity)
+        row = StoreInventory.objects.select_for_update().get(
+            store_id=reservation.store_id, variant_id=variant_id
+        )
+        with stock_write():
+            row.reserved = max(row.reserved - units, 0)
+            row.save(update_fields=["reserved", "updated_at"])
+        reservation.quantity -= units
+        if reservation.quantity == 0:
+            reservation.quantity = units  # keep the row's history; the status says it ended
+            reservation.status = ReservationStatus.RELEASED
+        reservation.save(update_fields=["quantity", "status", "updated_at"])
+        return units

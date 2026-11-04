@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.gis.db import models as gis_models
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 from simple_history.models import HistoricalRecords
@@ -149,6 +150,18 @@ PRICING_MONEY_FIELDS = (
 )
 
 
+# T-406c: upper bounds of `PricingConfig.clean()` (generous; they stop typos, not policy).
+PRICING_UPPER_BOUNDS = {
+    "min_order_value": Decimal("5000.00"),
+    "delivery_fee": Decimal("500.00"),
+    "free_delivery_threshold": Decimal("10000.00"),
+    "small_cart_fee": Decimal("500.00"),
+    "small_cart_threshold": Decimal("10000.00"),
+    "handling_fee": Decimal("500.00"),
+    "cod_max_order_value": Decimal("50000.00"),
+}
+
+
 class PricingConfig(TimeStampedModel):
     """Per-store bill rules (08 §6.2), read by `cart.services.compute_bill()`. Defaults are the
     D-09 values (Phase 3, PM default); a store without a row is billed with them too.
@@ -181,6 +194,36 @@ class PricingConfig(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"Pricing for {self.store.code}"
+
+    def clean(self) -> None:
+        """Sanity bounds and cross-field checks (T-406c): catch a typo (₹2500 for ₹25) before it
+        reaches every bill. Bounds are generous; the admin form shows the messages per field."""
+        errors = {}
+        for field, upper in PRICING_UPPER_BOUNDS.items():
+            value = getattr(self, field)
+            if value is not None and value > upper:
+                errors[field] = f"Must be at most ₹{upper:,.0f}. Check for a typo."
+        if (
+            self.cod_enabled
+            and self.cod_max_order_value is not None
+            and self.min_order_value is not None
+            and self.cod_max_order_value < self.min_order_value
+        ):
+            errors.setdefault(
+                "cod_max_order_value",
+                "Must be at least the minimum order value, or no order could use COD.",
+            )
+        if (
+            self.small_cart_fee
+            and self.small_cart_threshold is not None
+            and self.small_cart_threshold <= 0
+        ):
+            errors.setdefault(
+                "small_cart_threshold",
+                "Set a threshold above zero, or the small-cart fee never applies.",
+            )
+        if errors:
+            raise ValidationError(errors)
 
 
 class ServiceabilityRequest(TimeStampedModel):

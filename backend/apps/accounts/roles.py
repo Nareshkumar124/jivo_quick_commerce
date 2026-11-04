@@ -33,6 +33,7 @@ SUPER_ADMIN_APPS = (
     "cart",
     "orders",
     "payments",
+    "core",  # audit log: view only (see _permissions_for)
 )
 
 CUSTOMER_CARE = ["accounts.view_customer", "accounts.change_customer"]
@@ -68,8 +69,19 @@ COUPON_MANAGE = [
     *[f"promotions.{action}_coupon" for action in ("add", "change", "delete", "view")],
     "promotions.view_couponredemption",
 ]
-ORDER_VIEW = ["orders.view_order", "orders.view_orderitem", "orders.view_orderstatushistory"]
+ORDER_VIEW = [
+    "orders.view_order",
+    "orders.view_orderitem",
+    "orders.view_orderstatushistory",
+    "orders.view_invoice",
+]
 PAYMENT_VIEW = ["payments.view_payment", "payments.view_refund"]
+# Phase 4 (05 §3): state changes through apps.orders.store_ops, which re-check these permissions
+# and the store scope (stores_for). Refund limits are settings (SUPPORT_REFUND_LIMIT).
+ORDER_PROCESS = "orders.process_order"  # packing console: accept, pack, items unavailable
+ORDER_CANCEL = "orders.cancel_order"  # 08 T12 (store manager: own stores, before pickup)
+REFUND_ISSUE = "payments.issue_refund"  # manual refund / retry (Support up to the limit)
+AUDIT_VIEW = "core.view_auditlog"
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     SUPER_ADMIN: [],  # all permissions of SUPER_ADMIN_APPS (see _permissions_for)
@@ -81,12 +93,30 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         *INVENTORY_VIEW,
         "stores.view_serviceabilityrequest",
         *ORDER_VIEW,
+        ORDER_PROCESS,
+        ORDER_CANCEL,
     ],
-    STORE_MANAGER: [*STORE_VIEW, *CATALOG_VIEW, *INVENTORY_VIEW, *INVENTORY_ADJUST, *ORDER_VIEW],
-    STORE_STAFF: [*CATALOG_VIEW, *INVENTORY_VIEW, *ORDER_VIEW],
+    STORE_MANAGER: [
+        *STORE_VIEW,
+        *CATALOG_VIEW,
+        *INVENTORY_VIEW,
+        *INVENTORY_ADJUST,
+        *ORDER_VIEW,
+        ORDER_PROCESS,
+        ORDER_CANCEL,
+    ],
+    STORE_STAFF: [*CATALOG_VIEW, *INVENTORY_VIEW, *ORDER_VIEW, ORDER_PROCESS],
     CATALOG_MANAGER: [*CATALOG_MANAGE, *INVENTORY_VIEW, *COUPON_MANAGE],
     # 05 §3: Customers (PII) ✔; coupons view; order board view; refunds (payments view).
-    SUPPORT: [*CUSTOMER_CARE, *CATALOG_VIEW, *COUPON_VIEW, *ORDER_VIEW, *PAYMENT_VIEW],
+    SUPPORT: [
+        *CUSTOMER_CARE,
+        *CATALOG_VIEW,
+        *COUPON_VIEW,
+        *ORDER_VIEW,
+        *PAYMENT_VIEW,
+        ORDER_CANCEL,
+        REFUND_ISSUE,
+    ],
     FINANCE: [
         *INVENTORY_VIEW,
         "stores.view_pricingconfig",
@@ -94,6 +124,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         *ORDER_VIEW,
         *PAYMENT_VIEW,
         "payments.view_paymentwebhookevent",
+        REFUND_ISSUE,
+        AUDIT_VIEW,
     ],
 }
 # Roles limited to the stores in StaffStoreAccess.
@@ -116,7 +148,12 @@ def is_store_staff_only(user) -> bool:
 
 def _permissions_for(role: str) -> list[Permission]:
     if role == SUPER_ADMIN:
-        return list(Permission.objects.filter(content_type__app_label__in=SUPER_ADMIN_APPS))
+        # The audit log is read-only for everyone (05 §2): Super Admin gets only its view
+        # permission, never add/change/delete (P4 review Minor 4).
+        perms = Permission.objects.filter(content_type__app_label__in=SUPER_ADMIN_APPS)
+        perms = perms.exclude(content_type__app_label="core", content_type__model="auditlog")
+        audit = Permission.objects.filter(content_type__app_label="core", codename="view_auditlog")
+        return [*perms, *audit]
     perms = []
     for dotted in ROLE_PERMISSIONS[role]:
         app_label, codename = dotted.split(".", 1)

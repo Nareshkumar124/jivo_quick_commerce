@@ -45,6 +45,7 @@ dev = [
     "freezegun==1.5.5",
     "ruff==0.17.3",
     "pip-audit==2.10.1",
+    "pytest-xdist==3.8.0",                  # T-408c: parallel runs (`pytest -n 4`)
 ]
 
 [tool.uv]

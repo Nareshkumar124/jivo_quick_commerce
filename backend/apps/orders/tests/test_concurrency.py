@@ -265,8 +265,9 @@ def test_expiry_and_expiry(shop):
 
 
 def test_capture_and_cancel(shop):
-    """Either the capture wins (PLACED, the cancel is refused) or the cancel wins (CANCELLED, the
-    late capture is refunded once); never both, never neither."""
+    """Either the capture wins (PLACED, then the cancel is a T11 cancellation of a paid order,
+    refunded in full; Phase 4) or the cancel wins (T5 CANCELLED, the late capture is refunded
+    once). Both ways: cancelled, refunded exactly once, stock released."""
     from apps.payments.models import Refund
 
     user, order, gateway_order_id = pending_order(shop)
@@ -282,26 +283,23 @@ def test_capture_and_cancel(shop):
 
     results = race(capture, cancel)
     order.refresh_from_db()
-    if order.status == "PLACED":
-        assert results[0] == "placed"
-        assert isinstance(results[1], ApiError)
-        assert results[1].error_code == "INVALID_STATE_TRANSITION"
-        assert transitions(order) == ["PAYMENT_PENDING", "PLACED"]
-        assert Refund.objects.count() == 0
-        assert reserved(shop) == 2
+    assert order.status == "CANCELLED"
+    assert results[1] == "CANCELLED"
+    assert reserved(shop) == 0
+    refunds = list(Refund.objects.values_list("idempotency_key", "reason", "amount"))
+    if results[0] == "placed":
+        assert transitions(order) == ["PAYMENT_PENDING", "PLACED", "CANCELLED"]
+        assert refunds == [(f"cancel:{order.pk}", "customer_cancel", Decimal("558.00"))]
     else:
-        assert order.status == "CANCELLED"
-        assert results == ["late_capture", "CANCELLED"]
+        assert results[0] == "late_capture"
         assert transitions(order) == ["PAYMENT_PENDING", "CANCELLED"]
-        assert list(Refund.objects.values_list("idempotency_key", "reason")) == [
-            (f"capture:{payment_id}", "late_capture")
-        ]
-        assert reserved(shop) == 0
+        assert refunds == [(f"capture:{payment_id}", "late_capture", Decimal("558.00"))]
 
 
 def test_refund_task_delivered_twice(shop, monkeypatch):
     """Code review M1: two workers run `process_refund` for one refund at once (a redelivery);
-    the refund row lock lets exactly one call the gateway."""
+    exactly one calls the gateway. Since P4 (T-403c) that is the per-refund advisory lock, not
+    a row lock held across the call."""
     import time
 
     from apps.payments.gateways import FakeRazorpayGateway
@@ -325,7 +323,7 @@ def test_refund_task_delivered_twice(shop, monkeypatch):
 
     def slow_refund(self, **kwargs):
         calls.append(kwargs["receipt"])
-        time.sleep(0.3)  # hold the lock while the other worker arrives
+        time.sleep(0.3)  # still sending while the other worker arrives
         return original(self, **kwargs)
 
     monkeypatch.setattr(FakeRazorpayGateway, "refund", slow_refund)
@@ -335,3 +333,58 @@ def test_refund_task_delivered_twice(shop, monkeypatch):
     refund.refresh_from_db()
     assert refund.status == "PROCESSED"
     assert Refund.objects.count() == 1
+
+
+def test_refund_gateway_call_holds_no_row_lock(shop, monkeypatch):
+    """T-403c (P4 review Major 1): while `process_refund` waits on the gateway, the order and
+    refund rows are not locked: another transaction can lock both at once (NOWAIT)."""
+    import threading
+
+    from django.db import connection
+
+    from apps.orders.models import Order
+    from apps.payments.gateways import FakeRazorpayGateway
+    from apps.payments.models import Refund
+    from apps.payments.tasks import process_refund
+
+    user, order, gateway_order_id = pending_order(shop)
+    services.cancel_order(user, order.pk, reason="OTHER")
+    with monkeypatch.context() as queued:
+        queued.setattr(process_refund, "delay", lambda refund_id: None)
+        services.capture_payment(
+            order.pk,
+            gateway_order_id=gateway_order_id,
+            payment_id="pay_NoLockRefund01",
+            amount_paise=55800,
+        )
+    refund = Refund.objects.get()
+    in_call, release = threading.Event(), threading.Event()
+    original = FakeRazorpayGateway.refund
+
+    def waiting_refund(self, **kwargs):
+        in_call.set()
+        release.wait(10)
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(FakeRazorpayGateway, "refund", waiting_refund)
+    outcome = {}
+
+    def worker():
+        try:
+            outcome["result"] = process_refund.run(refund.pk)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    try:
+        assert in_call.wait(10)
+        with transaction.atomic():
+            Order.objects.select_for_update(nowait=True).get(pk=order.pk)
+            Refund.objects.select_for_update(nowait=True).get(pk=refund.pk)
+    finally:
+        release.set()
+        thread.join(10)
+    assert outcome["result"] == "processed"
+    refund.refresh_from_db()
+    assert refund.status == "PROCESSED"
