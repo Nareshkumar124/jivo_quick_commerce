@@ -37,6 +37,7 @@ def test_super_admin_turns_maintenance_on(client):
         "privacy_url": config.privacy_url,
         "refund_url": config.refund_url,
         "terms_version": config.terms_version,
+        "payment_window_minutes": config.payment_window_minutes,
         "rider_location_active_interval_seconds": 10,
         "rider_location_idle_interval_seconds": 30,
         "feature_flags": "{}",
@@ -61,3 +62,26 @@ def test_other_roles_cannot_change_app_config(client, role):
     assert client.post(url, {"maintenance": "on"}).status_code == 403
     config.refresh_from_db()
     assert config.maintenance is False
+
+
+@pytest.mark.parametrize(("minutes", "saved"), [("20", True), ("4", False), ("61", False)])
+def test_super_admin_sets_the_payment_window(client, minutes, saved):
+    """DL-43: the online payment window (5-60 minutes) is app configuration (Super Admin)."""
+    from apps.ops_console.tests.helpers import admin_form_data
+
+    config = AppConfig.load()
+    client.force_login(staff_in_role(roles.SUPER_ADMIN))
+    url = reverse("admin:cms_appconfig_change", args=[config.pk])
+    page = client.get(url)
+    assert "How long an online order waits for payment" in page.content.decode()
+    data = admin_form_data(page)
+    data["payment_window_minutes"] = minutes
+    response = client.post(url, data)
+    config.refresh_from_db()
+    if saved:
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        assert config.payment_window_minutes == 20
+    else:
+        assert response.status_code == 200
+        assert "payment_window_minutes" in response.context["adminform"].form.errors
+        assert config.payment_window_minutes == 15

@@ -1,8 +1,10 @@
 """Status badges: one label and colour (tone) per state, used by every panel screen.
 
 Order, delivery-task and payment states are the codes of 08 §1, §3 and §4. Their models arrive
-in Phases 3 to 5; when they land, their `choices` must cover exactly these codes (a test then
-pins it). Unknown codes render as a neutral badge with the raw code, never as an error.
+in Phases 3 to 5; when they land, their `choices` must cover exactly these codes (a test pins
+the Phase 3 ones: `Order.status`, `Order.payment_status`, `Payment.status`, `Refund.status`,
+`CouponRedemption.status`). Unknown codes render as a neutral badge with the raw code, never as
+an error. Labels are unique within a kind: unfold's `@display(label=...)` maps label -> tone.
 """
 
 from dataclasses import dataclass
@@ -25,6 +27,11 @@ CUSTOMER = "customer"
 ORDER = "order"
 TASK = "task"
 PAYMENT = "payment"
+ORDER_PAYMENT = "order_payment"  # Order.payment_status (07 §2.6)
+REFUND = "refund"
+REDEMPTION = "redemption"  # CouponRedemption.status (07 §2.5)
+COUPON = "coupon"  # derived: coupon_state()
+COD = "cod"  # User.cod_blocked
 
 BADGES: dict[str, dict[str, Badge]] = {
     CUSTOMER: {
@@ -69,6 +76,40 @@ BADGES: dict[str, dict[str, Badge]] = {
         "CAPTURED": Badge("Captured", SUCCESS),
         "FAILED": Badge("Failed", DANGER),
     },
+    # 07 §2.6 Order.payment_status (staff wording; the apps use their own texts)
+    ORDER_PAYMENT: {
+        "PENDING": Badge("Awaiting payment", WARNING),
+        "PAID": Badge("Paid", SUCCESS),
+        "FAILED": Badge("Not paid", DANGER),
+        "REFUND_PENDING": Badge("Refund pending", WARNING),
+        "REFUNDED": Badge("Refunded", NEUTRAL),
+        "PARTIALLY_REFUNDED": Badge("Partly refunded", INFO),
+        "COD_PENDING": Badge("COD due", INFO),
+        "COD_COLLECTED": Badge("COD collected", SUCCESS),
+    },
+    # 07 §2.7 Refund.status
+    REFUND: {
+        "PENDING": Badge("Pending", WARNING),
+        "PROCESSED": Badge("Processed", SUCCESS),
+        "FAILED": Badge("Failed", DANGER),
+    },
+    # 07 §2.5 CouponRedemption.status
+    REDEMPTION: {
+        "HELD": Badge("Held", WARNING),
+        "APPLIED": Badge("Applied", SUCCESS),
+        "RELEASED": Badge("Released", NEUTRAL),
+        "REVERSED": Badge("Reversed", NEUTRAL),
+    },
+    COUPON: {
+        "live": Badge("Live", SUCCESS),
+        "scheduled": Badge("Scheduled", INFO),
+        "expired": Badge("Expired", NEUTRAL),
+        "inactive": Badge("Switched off", NEUTRAL),
+    },
+    COD: {
+        "allowed": Badge("COD allowed", SUCCESS),
+        "blocked": Badge("COD blocked", DANGER),
+    },
 }
 
 
@@ -76,6 +117,26 @@ def badge_for(kind: str, code: str | None) -> Badge:
     if not code:
         return Badge("-", NEUTRAL)
     return BADGES.get(kind, {}).get(code) or Badge(str(code), NEUTRAL)
+
+
+def label_tones(kind: str) -> dict[str, str]:
+    """For unfold's `@display(label=...)`: badge label -> tone. The display method returns
+    `badge_for(kind, code).label`."""
+    return {badge.label: badge.tone for badge in BADGES[kind].values()}
+
+
+def coupon_state(coupon, now) -> str:
+    """Precedence: switched off > expired > scheduled > live. Uses the coupon rules of
+    `apps.promotions.services` (is_live / is_expired), so the panel and the app agree."""
+    from apps.promotions.services import is_expired, is_live
+
+    if not coupon.is_active:
+        return "inactive"
+    if is_expired(coupon, now):
+        return "expired"
+    if not is_live(coupon, now):
+        return "scheduled"
+    return "live"
 
 
 def customer_status(user) -> str:

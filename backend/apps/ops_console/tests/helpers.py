@@ -68,6 +68,19 @@ INVENTORY_ADJUST_ROLES = frozenset({*_SA, roles.STORE_MANAGER})
 LEADS_ROLES = frozenset({*_SA, roles.OPS})
 STORE_SCOPED = frozenset({roles.STORE_MANAGER, roles.STORE_STAFF})
 
+# Phase 3 (05 §3 Pricing config, Coupons, Refund, order board / packing rows; DL-46 PM default).
+PRICING_VIEW_ROLES = frozenset({*_SA, roles.FINANCE})
+PRICING_EDIT_ROLES = frozenset(_SA)
+COUPON_VIEW_ROLES = frozenset({*_SA, roles.CATALOG_MANAGER, roles.SUPPORT, roles.FINANCE})
+COUPON_EDIT_ROLES = frozenset({*_SA, roles.CATALOG_MANAGER})
+ORDER_VIEW_ROLES = frozenset(
+    {*_SA, roles.OPS, roles.STORE_MANAGER, roles.STORE_STAFF, roles.SUPPORT, roles.FINANCE}
+)
+PAYMENT_VIEW_ROLES = frozenset({*_SA, roles.SUPPORT, roles.FINANCE})
+WEBHOOK_ROLES = frozenset({*_SA, roles.FINANCE})
+# Roles that see customers in full (`accounts.view_customer`); everyone else gets masked PII.
+FULL_PII_ROLES = CUSTOMER_ROLES
+
 
 def expected_status(principal, allowed, allowed_status: int = 200) -> int:
     """Admin and Ops: allowed -> `allowed_status`; not staff or signed out -> 302 to the login;
