@@ -139,7 +139,9 @@ class TestRazorpayGateway:
         )
         found = RazorpayGateway().fetch_payment_refunds("pay_A")
         assert [(r.id, r.receipt, r.amount_paise) for r in found] == [("rfnd_B", "k", 100)]
-        assert recorded[0]["url"] == "https://api.razorpay.com/v1/payments/pay_A/refunds"
+        # Fix review Minor: Razorpay pages 10 refunds by default; ask for its maximum, 100.
+        assert recorded[0]["method"] == "GET"
+        assert recorded[0]["url"] == "https://api.razorpay.com/v1/payments/pay_A/refunds?count=100"
 
     def test_4xx_is_a_rejection_with_the_gateway_description(self, calls):
         body = io.BytesIO(
@@ -587,3 +589,39 @@ class TestRefundWebhook:
         assert response.json() == {"status": "ignored"}
         refund_row.refresh_from_db()
         assert (refund_row.status, refund_row.gateway_refund_id) == ("PENDING", "rfnd_Bound000001")
+
+    def test_a_pending_refund_past_the_retry_window_never_gets_a_503(
+        self, api_client, refund_row, settings, caplog
+    ):
+        """Fix review Major: a refund left PENDING without an id (a Dashboard refund, a task that
+        gave up) must not make the webhook answer 503 for ever."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.payments.models import PaymentWebhookEvent
+
+        settings.REFUND_WEBHOOK_RETRY_WINDOW_SECONDS = 7200
+        Refund.objects.filter(pk=refund_row.pk).update(
+            created_at=timezone.now() - timedelta(seconds=7201)
+        )
+        response = self.post(api_client, "evt_rf_6", refund_id="rfnd_Dashboard0003", receipt="")
+        assert (response.status_code, response.json()) == (200, {"status": "ignored"})
+        assert PaymentWebhookEvent.objects.get(event_id="evt_rf_6").processed_at is not None
+        assert "pending past the retry window" in caplog.text
+        refund_row.refresh_from_db()
+        assert (refund_row.status, refund_row.gateway_refund_id) == ("PENDING", "")
+
+    def test_an_event_for_another_payment_never_gets_a_503(self, api_client, refund_row):
+        """A refund of payment A pending inside the window says nothing about payment B."""
+        Payment.objects.create(
+            order=refund_row.order, gateway="RAZORPAY", gateway_order_id="order_RefundHook02",
+            gateway_payment_id="pay_RefundHook0002", amount=refund_row.amount, status="CAPTURED",
+        )  # fmt: skip
+        response = self.post(
+            api_client, "evt_rf_7", refund_id="rfnd_OtherPay0001", receipt="",
+            payment_id="pay_RefundHook0002",
+        )  # fmt: skip
+        assert (response.status_code, response.json()) == (200, {"status": "ignored"})
+        refund_row.refresh_from_db()
+        assert (refund_row.status, refund_row.gateway_refund_id) == ("PENDING", "")

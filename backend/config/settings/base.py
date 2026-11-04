@@ -537,6 +537,12 @@ RAZORPAY_KEY_SECRET = env_str("RAZORPAY_KEY_SECRET", default="")
 RAZORPAY_WEBHOOK_SECRET = env_str("RAZORPAY_WEBHOOK_SECRET", default="")
 # Seconds to wait for a Razorpay API call (create order, list payments, refund).
 RAZORPAY_TIMEOUT_SECONDS = env_float("RAZORPAY_TIMEOUT_SECONDS", default=10.0)
+# A `refund.*` webhook whose refund is not recorded yet answers 503 (so Razorpay retries) only
+# while a PENDING refund of that payment without a gateway id is younger than this. Default 2 h:
+# a little over `payments.process_refund`'s longest life, 5490 s of backoff (30 s doubling to the
+# 1800 s cap, 8 retries) + 9 attempts x 2 calls x RAZORPAY_TIMEOUT_SECONDS (180 s) = ~95 min.
+# Older ones (a Dashboard refund, a task that gave up) are logged and the event is ignored.
+REFUND_WEBHOOK_RETRY_WINDOW_SECONDS = env_int("REFUND_WEBHOOK_RETRY_WINDOW_SECONDS", default=7200)
 
 # --------------------------------------------------------------------------- import / export
 # The admin's import is two requests (preview, then confirm), possibly served by different web
