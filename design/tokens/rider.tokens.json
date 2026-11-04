@@ -1,0 +1,85 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$description": "Rider app high-contrast (sunlight) tokens. Source: design/audits/2026-11-04-rider-delivery.md. Target: >= 7:1 for primary information outdoors. Flutter: expose as a ThemeExtension (e.g. RiderColors) built in rider_app/lib/app/theme.dart; dimensions are logical pixels (dp), font sizes are sp. Brand hues are placeholders: TODO(D-06). rider.color.online.bg equals JivoBrandColors.success and rider.color.cod.border equals JivoBrandColors.warning, so they follow the brand kit when it lands.",
+  "rider": {
+    "color": {
+      "surface": { "$type": "color", "$value": "#FFFFFF" },
+      "text": {
+        "primary": { "$type": "color", "$value": "#1A1C19", "$description": "All body and title text." },
+        "secondary": { "$type": "color", "$value": "#44483E", "$description": "Helper text. Nothing lighter is allowed on task, cash or earnings screens." }
+      },
+      "online": {
+        "bg": { "$type": "color", "$value": "#1B5E20", "$description": "Go online button, 'Ready for pickup' banner, offer ring (first 20 s). TODO(D-06): = JivoBrandColors.success." },
+        "fg": { "$type": "color", "$value": "#FFFFFF" }
+      },
+      "cod": {
+        "bg": { "$type": "color", "$value": "#FFF4D6", "$description": "COD banner, COD amount block, offline banner, 'Amount changed' notice." },
+        "border": { "$type": "color", "$value": "#8A5300", "$description": "2 dp border of COD containers. TODO(D-06): = JivoBrandColors.warning." },
+        "text": { "$type": "color", "$value": "#1A1C19" }
+      },
+      "danger": { "$type": "color", "$value": "#BA1A1A", "$description": "Errors, last 10 s of the offer countdown, wrong OTP." },
+      "onDanger": { "$type": "color", "$value": "#FFFFFF" },
+      "neutral": {
+        "container": { "$type": "color", "$value": "#ECEFE7", "$description": "'Store is packing' banner, offline status card, today tiles." }
+      }
+    },
+    "border": {
+      "outlinedButton": { "$type": "border", "$value": { "color": "#1A1C19", "width": "2px", "style": "solid" }, "$description": "All OutlinedButtons, including 'Go offline'." },
+      "codContainer": { "$type": "border", "$value": { "color": "#8A5300", "width": "2px", "style": "solid" } }
+    },
+    "size": {
+      "onlineControl": { "$type": "dimension", "$value": "72px", "$description": "Home online/offline button height (bottom-pinned)." },
+      "primaryAction": { "$type": "dimension", "$value": "56px", "$description": "Every rider primary action (PrimaryActionBar), secondary outlined actions, guard actions, Continue." },
+      "offerAccept": { "$type": "dimension", "$value": "64px" },
+      "minTarget": { "$type": "dimension", "$value": "48px", "$description": "Text buttons, chips, icon buttons." },
+      "listRowMin": { "$type": "dimension", "$value": "64px", "$description": "Permissions gate rows, home records rows." },
+      "gap": { "$type": "dimension", "$value": "8px" },
+      "gapAcceptReject": { "$type": "dimension", "$value": "16px" },
+      "gapDestructive": { "$type": "dimension", "$value": "24px", "$description": "Between a primary action and 'Can't deliver…'." },
+      "gutter": { "$type": "dimension", "$value": "16px" },
+      "offerRing": { "$type": "dimension", "$value": "120px", "$description": "Grows to max(120, 72 x textScale)." },
+      "scanViewfinder": { "$type": "dimension", "$value": "240px" }
+    },
+    "font": {
+      "bodySmall": { "$type": "dimension", "$value": "14px", "$description": "Minimum anywhere on task, cash, earnings, home. Never 12 sp." },
+      "bodyMedium": { "$type": "dimension", "$value": "16px" },
+      "bodyLarge": { "$type": "dimension", "$value": "18px" },
+      "titleMedium": { "$type": "typography", "$value": { "fontSize": "18px", "fontWeight": 600 } },
+      "actionLabel": { "$type": "typography", "$value": { "fontSize": "18px", "fontWeight": 600 }, "$description": "Already in buildRiderTheme." },
+      "onlineControlLabel": { "$type": "typography", "$value": { "fontSize": "22px", "fontWeight": 700 } },
+      "tileLabel": { "$type": "typography", "$value": { "fontSize": "14px", "fontWeight": 500 } },
+      "tileValue": { "$type": "typography", "$value": { "fontSize": "24px", "fontWeight": 700 }, "$extensions": { "fontFeatures": "tabular-figures" } },
+      "offerPayment": { "$type": "typography", "$value": { "fontSize": "22px", "fontWeight": 700 } },
+      "codAmount": { "$type": "typography", "$value": { "fontSize": "48px", "fontWeight": 800 }, "$extensions": { "fontFeatures": "tabular-figures" } },
+      "ledgerAmount": { "$type": "typography", "$value": { "fontSize": "18px", "fontWeight": 700 } },
+      "earningsTotal": { "$type": "typography", "$value": { "fontSize": "32px", "fontWeight": 700 } },
+      "waitTimer": { "$type": "typography", "$value": { "fontSize": "22px", "fontWeight": 700 } },
+      "addressDetail": { "$type": "dimension", "$value": "18px", "$description": "Landmark and instructions." }
+    },
+    "motion": {
+      "offerUrgentFrom": { "$type": "duration", "$value": "10000ms", "$description": "Remaining time when the ring turns rider.color.danger, the number gets 's' and haptics start." },
+      "offerExpiringFrom": { "$type": "duration", "$value": "5000ms", "$description": "Remaining time when the 'Expiring' label shows." },
+      "upiPoll": { "$type": "duration", "$value": "5000ms" }
+    }
+  },
+  "contrast": {
+    "$description": "WCAG 2.x ratios, computed exactly from the hex values. 'outdoor' marks pairs that meet the 7:1 sunlight target.",
+    "pairs": [
+      { "fg": "rider.color.text.primary", "bg": "rider.color.surface", "fgHex": "#1A1C19", "bgHex": "#FFFFFF", "ratio": 17.16, "level": "AA text", "outdoor": true },
+      { "fg": "rider.color.text.secondary", "bg": "rider.color.surface", "fgHex": "#44483E", "bgHex": "#FFFFFF", "ratio": 9.37, "level": "AA text", "outdoor": true },
+      { "fg": "rider.color.online.fg", "bg": "rider.color.online.bg", "fgHex": "#FFFFFF", "bgHex": "#1B5E20", "ratio": 7.87, "level": "AA text", "outdoor": true },
+      { "fg": "rider.color.online.bg", "bg": "rider.color.surface", "fgHex": "#1B5E20", "bgHex": "#FFFFFF", "ratio": 7.87, "level": "AA text; ring (non-text)", "outdoor": true },
+      { "fg": "rider.color.cod.text", "bg": "rider.color.cod.bg", "fgHex": "#1A1C19", "bgHex": "#FFF4D6", "ratio": 15.66, "level": "AA text", "outdoor": true },
+      { "fg": "rider.color.text.secondary", "bg": "rider.color.cod.bg", "fgHex": "#44483E", "bgHex": "#FFF4D6", "ratio": 8.55, "level": "AA text", "outdoor": true },
+      { "fg": "rider.color.cod.border", "bg": "rider.color.cod.bg", "fgHex": "#8A5300", "bgHex": "#FFF4D6", "ratio": 5.78, "level": "non-text (border)", "outdoor": false },
+      { "fg": "rider.color.cod.border", "bg": "rider.color.surface", "fgHex": "#8A5300", "bgHex": "#FFFFFF", "ratio": 6.33, "level": "non-text (border)", "outdoor": false },
+      { "fg": "rider.color.danger", "bg": "rider.color.surface", "fgHex": "#BA1A1A", "bgHex": "#FFFFFF", "ratio": 6.46, "level": "AA text", "outdoor": false },
+      { "fg": "rider.color.danger", "bg": "rider.color.cod.bg", "fgHex": "#BA1A1A", "bgHex": "#FFF4D6", "ratio": 5.9, "level": "AA text", "outdoor": false },
+      { "fg": "rider.color.onDanger", "bg": "rider.color.danger", "fgHex": "#FFFFFF", "bgHex": "#BA1A1A", "ratio": 6.46, "level": "AA text", "outdoor": false },
+      { "fg": "rider.color.text.primary", "bg": "rider.color.neutral.container", "fgHex": "#1A1C19", "bgHex": "#ECEFE7", "ratio": 14.76, "level": "AA text", "outdoor": true },
+      { "fg": "rider.color.text.secondary", "bg": "rider.color.neutral.container", "fgHex": "#44483E", "bgHex": "#ECEFE7", "ratio": 8.06, "level": "AA text", "outdoor": true },
+      { "fg": "rider.border.outlinedButton", "bg": "rider.color.surface", "fgHex": "#1A1C19", "bgHex": "#FFFFFF", "ratio": 17.16, "level": "non-text (border)", "outdoor": true }
+    ],
+    "notes": "rider.color.danger (6.46:1) is below the outdoor target; it is always paired with an icon and text, and used at >= 18 sp / 600 where it carries the message. Danger is never the only cue."
+  }
+}

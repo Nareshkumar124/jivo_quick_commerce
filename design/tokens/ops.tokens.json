@@ -1,0 +1,112 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$description": "Ops Console tokens (packing console, live board, slip). Source: design/audits/2026-11-04-packing-console.md. Colours alias the unfold Tailwind v4 variables that templates/ops/base.html already loads; 'srgb' is the sRGB approximation of unfold's oklch value, used only for the contrast records. Brand primary is unfold's default purple until D-06. CSS custom property = the token path with dots replaced by dashes, prefixed '--' (e.g. ops.tone.warning.text -> --ops-tone-warning-text).",
+  "ops": {
+    "color": {
+      "surface": { "$type": "color", "$value": "#ffffff", "$extensions": { "css": "#fff" } },
+      "surfaceColumn": { "$type": "color", "$value": "#f9fafb", "$extensions": { "css": "var(--color-base-50)", "srgb": "#f9fafb" } },
+      "text": {
+        "primary": { "$type": "color", "$value": "#111827", "$extensions": { "css": "var(--color-base-900)" } },
+        "secondary": { "$type": "color", "$value": "#4a5565", "$description": "SKU, helper text, 'N of M ticked'.", "$extensions": { "css": "var(--color-base-600)", "srgb": "#4a5565" } },
+        "subtle": { "$type": "color", "$value": "#6a7282", "$description": "Timestamps only. Never for required information.", "$extensions": { "css": "var(--color-base-500)", "srgb": "#6a7282" } }
+      },
+      "primary": { "$type": "color", "$value": "#9810fa", "$description": "TODO(D-06): unfold default until the brand kit.", "$extensions": { "css": "var(--color-primary-600)", "srgb": "#9810fa" } },
+      "onPrimary": { "$type": "color", "$value": "#ffffff" }
+    },
+    "tone": {
+      "success": {
+        "text": { "$type": "color", "$value": "#008236", "$extensions": { "css": "var(--color-green-700)", "srgb": "#008236" } }
+      },
+      "warning": {
+        "text": { "$type": "color", "$value": "#ca3500", "$extensions": { "css": "var(--color-orange-700)", "srgb": "#ca3500" } },
+        "border": { "$type": "color", "$value": "#ca3500", "$extensions": { "css": "var(--color-orange-700)", "srgb": "#ca3500" } },
+        "badgeFg": { "$type": "color", "$value": "#9f2d00", "$description": "DUE SOON badge, stale-data bar text.", "$extensions": { "css": "var(--color-orange-800)", "srgb": "#9f2d00" } },
+        "badgeBg": { "$type": "color", "$value": "#fff7ed", "$extensions": { "css": "var(--color-orange-50)", "srgb": "#fff7ed" } }
+      },
+      "danger": {
+        "text": { "$type": "color", "$value": "#c10007", "$extensions": { "css": "var(--color-red-700)", "srgb": "#c10007" } },
+        "border": { "$type": "color", "$value": "#c10007", "$extensions": { "css": "var(--color-red-700)", "srgb": "#c10007" } },
+        "badgeBg": { "$type": "color", "$value": "#c10007", "$description": "LATE badge, paused-store bar, danger buttons.", "$extensions": { "css": "var(--color-red-700)", "srgb": "#c10007" } },
+        "badgeFg": { "$type": "color", "$value": "#ffffff" }
+      }
+    },
+    "alert": {
+      "new": {
+        "bg": { "$type": "color", "$value": "#9810fa", "$description": "New-order banner while the New queue is not empty (before the warning time). TODO(D-06).", "$extensions": { "css": "var(--color-primary-600)" } },
+        "fg": { "$type": "color", "$value": "#ffffff" }
+      }
+    },
+    "target": {
+      "step": { "$type": "dimension", "$value": "56px", "$description": "Accept / Start packing / Mark packed; 'Can't supply' quantity chips." },
+      "min": { "$type": "dimension", "$value": "48px", "$description": "Every other control on the packing console and live board." },
+      "toastClose": { "$type": "dimension", "$value": "40px" },
+      "queueCountPill": { "$type": "dimension", "$value": "28px", "$description": "Height of the queue count pill (not a touch target)." },
+      "pickRowMin": { "$type": "dimension", "$value": "56px", "$description": "Whole pick-list row is the tick target." },
+      "checkbox": { "$type": "dimension", "$value": "28px" },
+      "gap": { "$type": "dimension", "$value": "8px", "$description": "Minimum space between adjacent targets." },
+      "gapDestructive": { "$type": "dimension", "$value": "24px", "$description": "Between a step button and any destructive control." }
+    },
+    "border": {
+      "ticket": { "$type": "dimension", "$value": "6px", "$description": "Left tone border on tickets and board cards." },
+      "focus": { "$type": "border", "$value": { "color": "#9810fa", "width": "3px", "style": "solid" }, "$extensions": { "css": "3px solid var(--color-primary-600)", "offset": "2px" } }
+    },
+    "font": {
+      "orderNumber": { "$type": "typography", "$value": { "fontSize": "18px", "fontWeight": 700, "lineHeight": "24px" }, "$extensions": { "fontVariantNumeric": "tabular-nums" } },
+      "pickupCode": { "$type": "typography", "$value": { "fontFamily": "ui-monospace, SFMono-Regular, Menlo, monospace", "fontSize": "20px", "fontWeight": 800, "letterSpacing": "0.15em" } },
+      "product": { "$type": "typography", "$value": { "fontSize": "18px", "fontWeight": 600, "lineHeight": "24px" }, "$description": "Clamp to 2 lines; full name in aria-label." },
+      "variant": { "$type": "typography", "$value": { "fontSize": "15px", "fontWeight": 500, "lineHeight": "20px" }, "$description": "Never truncated." },
+      "qty": { "$type": "typography", "$value": { "fontSize": "24px", "fontWeight": 700, "lineHeight": "28px" }, "$extensions": { "minBoxWidth": "40px" } },
+      "rack": { "$type": "typography", "$value": { "fontFamily": "ui-monospace, SFMono-Regular, Menlo, monospace", "fontSize": "16px", "fontWeight": 700 } },
+      "sku": { "$type": "typography", "$value": { "fontSize": "13px", "fontWeight": 400 } },
+      "stepButton": { "$type": "typography", "$value": { "fontSize": "18px", "fontWeight": 600 } },
+      "boardCardBody": { "$type": "dimension", "$value": "14px" },
+      "boardSummary": { "$type": "dimension", "$value": "16px" }
+    },
+    "print": {
+      "label": {
+        "page": { "$type": "other", "$value": "100mm 150mm", "$extensions": { "margin": "4mm", "alternatives": ["75mm 50mm", "80mm auto (roll, margin 2mm)"] } },
+        "storeCode": { "$type": "dimension", "$value": "10pt" },
+        "orderNumber": { "$type": "dimension", "$value": "16pt", "$extensions": { "fontWeight": 700 } },
+        "pickupCode": { "$type": "dimension", "$value": "48pt", "$extensions": { "fontWeight": 800, "letterSpacing": "0.2em", "fontFamily": "monospace" } },
+        "qrSize": { "$type": "dimension", "$value": "35mm", "$extensions": { "quietZoneModules": 4 } },
+        "itemCount": { "$type": "dimension", "$value": "14pt", "$extensions": { "fontWeight": 700 } },
+        "payment": { "$type": "dimension", "$value": "12pt" }
+      },
+      "slip": {
+        "body": { "$type": "dimension", "$value": "11pt" },
+        "packColumn": { "$type": "dimension", "$value": "14pt", "$extensions": { "fontWeight": 700 } }
+      },
+      "ink": { "$type": "color", "$value": "#000000", "$description": "Pure black on white only; no greys (thermal printers dither)." }
+    },
+    "motion": {
+      "alertRepeat": { "$type": "duration", "$value": "15000ms", "$description": "New-order alert repeat while the New queue is not empty." },
+      "alertRepeatUrgent": { "$type": "duration", "$value": "5000ms", "$description": "From the SLA warning time." },
+      "staleAfter": { "$type": "duration", "$value": "25000ms", "$description": "Show the 'Not updating' bar." },
+      "pollPauseCap": { "$type": "duration", "$value": "30000ms", "$description": "Longest polling pause while typing." },
+      "scanHighlight": { "$type": "duration", "$value": "3000ms" }
+    }
+  },
+  "contrast": {
+    "$description": "WCAG 2.x ratios for every text/background (and non-text) pair these tokens are used in. 'level' is the strictest WCAG AA use allowed for the pair. Ops colours: computed from the sRGB approximations above.",
+    "pairs": [
+      { "fg": "ops.color.text.primary", "bg": "ops.color.surface", "fgHex": "#111827", "bgHex": "#ffffff", "ratio": 17.74, "level": "AA text" },
+      { "fg": "ops.color.text.secondary", "bg": "ops.color.surface", "fgHex": "#4a5565", "bgHex": "#ffffff", "ratio": 7.56, "level": "AA text" },
+      { "fg": "ops.color.text.subtle", "bg": "ops.color.surface", "fgHex": "#6a7282", "bgHex": "#ffffff", "ratio": 4.84, "level": "AA text" },
+      { "fg": "ops.color.text.subtle", "bg": "ops.color.surfaceColumn", "fgHex": "#6a7282", "bgHex": "#f9fafb", "ratio": 4.63, "level": "AA text" },
+      { "fg": "ops.color.onPrimary", "bg": "ops.color.primary", "fgHex": "#ffffff", "bgHex": "#9810fa", "ratio": 5.54, "level": "AA text" },
+      { "fg": "ops.color.primary", "bg": "ops.color.surface", "fgHex": "#9810fa", "bgHex": "#ffffff", "ratio": 5.54, "level": "AA text; focus ring (non-text)" },
+      { "fg": "ops.tone.success.text", "bg": "ops.color.surface", "fgHex": "#008236", "bgHex": "#ffffff", "ratio": 4.95, "level": "AA text" },
+      { "fg": "ops.tone.warning.text", "bg": "ops.color.surface", "fgHex": "#ca3500", "bgHex": "#ffffff", "ratio": 5.22, "level": "AA text; border (non-text)" },
+      { "fg": "ops.tone.warning.text", "bg": "ops.color.surfaceColumn", "fgHex": "#ca3500", "bgHex": "#f9fafb", "ratio": 5.0, "level": "AA text" },
+      { "fg": "ops.tone.warning.badgeFg", "bg": "ops.tone.warning.badgeBg", "fgHex": "#9f2d00", "bgHex": "#fff7ed", "ratio": 6.94, "level": "AA text" },
+      { "fg": "ops.tone.danger.text", "bg": "ops.color.surface", "fgHex": "#c10007", "bgHex": "#ffffff", "ratio": 6.42, "level": "AA text; border (non-text)" },
+      { "fg": "ops.tone.danger.badgeFg", "bg": "ops.tone.danger.badgeBg", "fgHex": "#ffffff", "bgHex": "#c10007", "ratio": 6.42, "level": "AA text" },
+      { "fg": "ops.print.ink", "bg": "ops.color.surface", "fgHex": "#000000", "bgHex": "#ffffff", "ratio": 21.0, "level": "AA text" }
+    ],
+    "rejected": [
+      { "pair": "orange-600 #f54a00 on white", "ratio": 3.58, "reason": "Fails AA text; replaced by ops.tone.warning.text." },
+      { "pair": "orange-500 #ff6900 border on white", "ratio": 2.89, "reason": "Fails 3:1 non-text; replaced by ops.tone.warning.border." },
+      { "pair": "green-600 #00a63e on white", "ratio": 3.22, "reason": "Fails AA text; replaced by ops.tone.success.text." }
+    ]
+  }
+}
