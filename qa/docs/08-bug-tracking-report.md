@@ -36,3 +36,13 @@ Verified fixes: none yet (first run).
 | OBS-P3-03 | An `X-Razorpay-Event-Id` longer than 64 characters gets 400 "This header is required.", which is a misleading message (the header was sent). | P4 copy. The contract behaviour (400, nothing stored) is fine. |
 | OBS-P3-04 | Refunds stay `REFUND_PENDING` until a Celery worker consumes the broker. The QA instance has no worker by default; a QA worker on DB 7 settled every queued refund to `REFUNDED` correctly. | Environment only. Recorded so that REFUND_PENDING on the QA instance is not mistaken for a defect. |
 | OBS-P3-05 (2026-11-04, `9ed7ffc`) | Order 18 (a stage-1 QA order, PAYMENT_FAILED) had two separate late captures of ₹508. Each was refunded in full: two PROCESSED `late_capture` refunds, ₹1,016 in total. `amount_refunded` shows ₹508, because `record_refund_status` caps it at `grand_total` (`min(...)`). The money is correct: each charge was refunded once. Only the order-level total understates what went back. | By design today (one charge per order assumed). Raised for P4: with `amount_paid` arriving (backend R2, migration 0003), `amount_refunded` should be bounded by what was paid against the order, and Finance should reconcile from `Refund` rows. P4-TC-44/47 check it. |
+
+## Phase 4 stage 1 (2026-11-04, `1b3552d`)
+**No new bugs.** Every failure in the run was a QA test defect (fixed; listed in 03). Known open items not re-filed: OBS-P3-05, T-403c.
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| OBS-P4-01 | `manual_refund` keys each refund `manual:<order>:<n+1>`, so two submits make two refunds (each still capped by what is refundable). | No over-refund is possible, but a double click could refund twice. Check the console form's double-submit protection when admin P4 merges (TC-27/33). |
+| OBS-P4-02 | Late-capture (P3) orders have `amount_paid` 0 and `amount_refunded` = the late capture (e.g. ₹190), so `amount_refunded > amount_paid` on 26 old orders. | Consistent with DL-45 (a late capture is not a sale). Finance should read refunds from `Refund` rows; QA's P4-TC-44 bound is now `max(grand_total, amount_paid)`. Suggest that 07 says so. |
+| OBS-P4-03 | The :8001 beat (`sweep_placed_orders`, `sync_refund_status`) also acts on QA orders on the shared DB. | Environment only; all such actions are idempotent. |
+| OBS-P4-04 | T8a recomputes fees from the store's **current** `PricingConfig` (capped at the order's fees). | It never raises the amount (cap); if the config is lowered the customer benefits. Confirm intent with D-10. |

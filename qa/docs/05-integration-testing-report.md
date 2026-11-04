@@ -38,3 +38,14 @@
 
   All ✅.
 - The :8001 beat (`expire_unpaid_orders`) and the QA instance share the DB: P3-TC-47 ✅ (`948.52s`).
+
+## Phase 4 stage 1 (2026-11-04, `1b3552d`)
+| Integration | Result | Evidence |
+|---|---|---|
+| Store service (driver) → shared DB → :8004 customer API (timeline, bill, refunds) | ✅ | TC-19/20/22 |
+| Order refund → `process_refund` on the QA broker → fake gateway → `settle()` → customer `payment_status` | ✅ | 31 cleanup refunds + every P4 refund PROCESSED |
+| `refund.failed` webhook (receipt match) → FAILED → ops retry → worker | ✅ | TC-34 |
+| `sync_refund_status` + redelivered tasks → one gateway refund (advisory lock + receipt lookup) | ✅ | TC-35 |
+| Domain events after commit → QA worker (`Order event order.accepted/cancelled: order <id>`, once each) | ✅ | TC-48 |
+| Acceptance SLA alert once per order (Redis key) | ✅ | TC-37 (the :8001 beat sweep may alert first through its own Redis; accepted as `already`) |
+| Ops Console → services | ⏭ | admin P4 not merged |

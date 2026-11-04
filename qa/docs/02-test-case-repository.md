@@ -291,56 +291,56 @@ Data notes: the shared dev DB has a single store (GGN-01), so the cross-store sc
 ### Customer order API
 | ID | Area | Pri | Steps | Expected | Status |
 |---|---|---|---|---|---|
-| P4-TC-01 🔥 | BE | P0 | Order detail of an ONLINE order, then after verify (strict P4 schema on `orders_retrieve`, `orders_create`, `payments_razorpay_verify`, `orders_cancel`) | `timeline` oldest first with the 08 §1 labels; `cancellation` null; `refunds` []; `amount_refunded` "0.00"; `can_download_invoice` false; every `quantity_unavailable` 0; decimals as 2-dp strings | ⬜ R2 |
-| P4-TC-02 🔥 | BE | P0 | Customer cancels a COD order in PLACED (T11) | 200 CANCELLED; `cancellation {reason, message, cancelled_by: customer, cancelled_at}`; reservation released; coupon redemption reversed; no Refund row; `can_cancel` false; timeline ends CANCELLED | ⬜ R2 |
-| P4-TC-03 🔥 | BE | P0 | Customer cancels a paid ONLINE order in PLACED (T11) | One full refund (ORDER_CANCELLED) to the original payment; `payment_status` REFUND_PENDING → REFUNDED (QA worker); `amount_refunded` = `grand_total`; stock released; repeat cancel 409, no 2nd refund | ⬜ R2 |
-| P4-TC-04 | BE | P0 | Store accepts, then the customer cancels in ACCEPTED (paid ONLINE and COD) | 200 CANCELLED; full refund (ONLINE) / nothing due (COD); `cancelled_by` customer | ⬜ R2 |
-| P4-TC-05 🔥 | BE | P0 | Customer cancels in PACKING and in PACKED | 409 `INVALID_STATE_TRANSITION` `{status}`; `can_cancel` false; nothing released or refunded (08 §7, "Contact support") | ⬜ R2 |
-| P4-TC-06 | BE | P0 | The same paid order cancelled 5× in parallel | Exactly one 200, four 409; one Refund row; reservation released once | ⬜ R2 |
-| P4-TC-07 🔥 | BE | P0 | User B cancels user A's order: (a) PAYMENT_PENDING, (b) PLACED | 404 both; A's order and reservation unchanged (IDOR) | (a) ✅ develop `9ed7ffc` · (b) ⬜ R2 |
-| P4-TC-08 | BE | P1 | Customer cancel with staff reasons (ITEMS_UNAVAILABLE, SUSPECTED_FRAUD, NO_RIDER, OTHER_STAFF, CUSTOMER_REQUEST), empty / null / number, note of 251 characters | 400 `VALIDATION_ERROR`; order unchanged | ✅ develop `9ed7ffc` (re-run after R2) |
-| P4-TC-09 | BE | P0 | Customer cancel and staff "Start packing" at the same instant (3 rounds) | Either CANCELLED (+ refund, start packing refused) or PACKING (cancel 409, no refund); never both, never two refunds | ⬜ R2 |
-| P4-TC-10 | BE | P2 | Instance with `CUSTOMER_CANCEL_UNTIL=PLACED`: cancel in ACCEPTED | 409; `can_cancel` false in ACCEPTED | ⬜ R2 (QA profile) |
-| P4-TC-11 🔥 | BE | P0 | Reorder a past order twice | 200 `ReorderResult`; each line raised to the ordered units (never on top); `added_count` = lines in the cart; repeat changes nothing; no stock reserved; coupon and tip untouched | ⬜ R2 |
-| P4-TC-12 | BE | P1 | Reorder an order whose variants are now out of stock / partly in stock / not sold at the store | `unavailable[]` with OUT_OF_STOCK / LIMITED_STOCK (+ `added_quantity`) / NOT_AVAILABLE; the rest added | ⬜ R2 (needs a stock change on a QA-owned store) |
-| P4-TC-13 | BE | P1 | Reorder when the cart already holds more units of a line | That line left as it is; other lines raised | ⬜ R2 |
-| P4-TC-14 🔥 | BE | P0 | (a) list/detail/cancel without a token; (b) reorder and invoice of another user's order; reorder without / with an unknown `X-Store-Id`; without a token | (a) 401 `AUTH_REQUIRED`; (b) 404 `NOT_FOUND`; 400; 404 `STORE_NOT_FOUND`; 401 | (a) ✅ develop · (b) ⬜ R2 |
-| P4-TC-15 | BE | P0 | Invoice of a PLACED / CANCELLED order | 409 `INVALID_STATE_TRANSITION` `{status}`; `can_download_invoice` false | ⬜ R2 |
-| P4-TC-16 | BE | P1 | Invoice of a DELIVERED order, twice | 200 `{invoice_number, issued_at, url, expires_at}`; same number on repeat; series per store and financial year; the PDF opens; GST lines sum to the bill; placeholder banner "not a valid tax invoice" (D-12) | ⏭ needs a DELIVERED order (P5) |
+| P4-TC-01 🔥 | BE | P0 | Order detail of an ONLINE order, then after verify (strict P4 schema on `orders_retrieve`, `orders_create`, `payments_razorpay_verify`, `orders_cancel`) | `timeline` oldest first with the 08 §1 labels; `cancellation` null; `refunds` []; `amount_refunded` "0.00"; `can_download_invoice` false; every `quantity_unavailable` 0; decimals as 2-dp strings | ✅ `1b3552d` |
+| P4-TC-02 🔥 | BE | P0 | Customer cancels a COD order in PLACED (T11) | 200 CANCELLED; `cancellation {reason, message, cancelled_by: customer, cancelled_at}`; reservation released; coupon redemption reversed; no Refund row; `can_cancel` false; timeline ends CANCELLED | ✅ `1b3552d` |
+| P4-TC-03 🔥 | BE | P0 | Customer cancels a paid ONLINE order in PLACED (T11) | One full refund (ORDER_CANCELLED) to the original payment; `payment_status` REFUND_PENDING → REFUNDED (QA worker); `amount_refunded` = `grand_total`; stock released; repeat cancel 409, no 2nd refund | ✅ `1b3552d` |
+| P4-TC-04 | BE | P0 | Store accepts, then the customer cancels in ACCEPTED (paid ONLINE and COD) | 200 CANCELLED; full refund (ONLINE) / nothing due (COD); `cancelled_by` customer | ✅ `1b3552d` (ONLINE + COD; T6 via service) |
+| P4-TC-05 🔥 | BE | P0 | Customer cancels in PACKING and in PACKED | 409 `INVALID_STATE_TRANSITION` `{status}`; `can_cancel` false; nothing released or refunded (08 §7, "Contact support") | ✅ `1b3552d` (PACKING + PACKED) |
+| P4-TC-06 | BE | P0 | The same paid order cancelled 5× in parallel | Exactly one 200, four 409; one Refund row; reservation released once | ✅ `1b3552d` (1×200, 4×409, 1 refund) |
+| P4-TC-07 🔥 | BE | P0 | User B cancels user A's order: (a) PAYMENT_PENDING, (b) PLACED | 404 both; A's order and reservation unchanged (IDOR) | ✅ `1b3552d` (a + b) |
+| P4-TC-08 | BE | P1 | Customer cancel with staff reasons (ITEMS_UNAVAILABLE, SUSPECTED_FRAUD, NO_RIDER, OTHER_STAFF, CUSTOMER_REQUEST), empty / null / number, note of 251 characters | 400 `VALIDATION_ERROR`; order unchanged | ✅ `1b3552d` |
+| P4-TC-09 | BE | P0 | Customer cancel and staff "Start packing" at the same instant (3 rounds) | Either CANCELLED (+ refund, start packing refused) or PACKING (cancel 409, no refund); never both, never two refunds | ✅ `1b3552d` (3 rounds: cancelled, packing, packing; T7 via service) |
+| P4-TC-10 | BE | P2 | Instance with `CUSTOMER_CANCEL_UNTIL=PLACED`: cancel in ACCEPTED | 409; `can_cancel` false in ACCEPTED | ✅ `1b3552d` (`cancelplaced` profile) |
+| P4-TC-11 🔥 | BE | P0 | Reorder a past order twice | 200 `ReorderResult`; each line raised to the ordered units (never on top); `added_count` = lines in the cart; repeat changes nothing; no stock reserved; coupon and tip untouched | ✅ `1b3552d` |
+| P4-TC-12 | BE | P1 | Reorder an order whose variants are now out of stock / partly in stock / not sold at the store | `unavailable[]` with OUT_OF_STOCK / LIMITED_STOCK (+ `added_quantity`) / NOT_AVAILABLE; the rest added | ◐ OUT_OF_STOCK / LIMITED_STOCK: TC-12b (`1b3552d`); NOT_AVAILABLE ⏭ needs a delisted variant (QA-owned store / staging) |
+| P4-TC-13 | BE | P1 | Reorder when the cart already holds more units of a line | That line left as it is; other lines raised | ✅ `1b3552d` |
+| P4-TC-14 🔥 | BE | P0 | (a) list/detail/cancel without a token; (b) reorder and invoice of another user's order; reorder without / with an unknown `X-Store-Id`; without a token | (a) 401 `AUTH_REQUIRED`; (b) 404 `NOT_FOUND`; 400; 404 `STORE_NOT_FOUND`; 401 | ✅ `1b3552d` (a + b) |
+| P4-TC-15 | BE | P0 | Invoice of a PLACED / CANCELLED order | 409 `INVALID_STATE_TRANSITION` `{status}`; `can_download_invoice` false | ✅ `1b3552d` |
+| P4-TC-16 | BE | P1 | Invoice of a DELIVERED order, twice | 200 `{invoice_number, issued_at, url, expires_at}`; same number on repeat; series per store and financial year; the PDF opens; GST lines sum to the bill; placeholder banner "not a valid tax invoice" (D-12) | ⏭ needs a QA DELIVERED order (P5); the 503 on this host (no WeasyPrint libs) cannot be reached before DELIVERED |
 | P4-TC-17 | BE | P1 | Signed invoice URL: after `expires_at`, with a changed signature, with another order's path; check the URL for PII | Refused (403/404); no phone, name or address in the URL | ⏭ needs a DELIVERED order (P5) |
-| P4-TC-18 | BE | P1 | Order list after cancel / accept | CANCELLED in `past`; ACCEPTED / PACKING in `active`; strict schema | ⬜ R2 |
-| P4-TC-19 🔥 | ADM | P0 | Store Staff accepts a PLACED order (T6) | ACCEPTED; history actor + `actor_type` store; audit row; customer timeline "Order confirmed"; accepting again refused, no 2nd history row | ⬜ R2 |
-| P4-TC-20 🔥 | ADM | P0 | Start packing (T7), Mark packed (T8) | PACKING, then PACKED; 4-character pickup code on the slip; pick list with every line | ⬜ R2 |
-| P4-TC-21 | ADM | P0 | Out-of-order actions: pack from PLACED/ACCEPTED, start packing from PLACED, accept PACKING, anything on CANCELLED / PAYMENT_PENDING | Refused with a readable message; no state or history change | ⬜ R2 |
-| P4-TC-22 🔥 | ADM | P0 | T8a: paid ONLINE order in PACKING, mark 1 of 2 units of a line unavailable | Bill = oracle (§6.3); one refund (ITEMS_UNAVAILABLE) of old − new `grand_total`; reserved −1; `quantity_unavailable` 1; `line_total`/`item_count` count units coming; customer notified | ⬜ R2 |
-| P4-TC-23 | ADM | P0 | T8a on a COD order | Amount due reduced; no Refund; `payment_status` COD_PENDING; reserved −1 | ⬜ R2 |
-| P4-TC-24 | ADM | P0 | T8a with every unit unavailable | CANCELLED (ITEMS_UNAVAILABLE, `cancelled_by` store); ONLINE refunds total = amount paid, never more; reservation released | ⬜ R2 |
-| P4-TC-25 | ADM | P0 | T8a that drops `item_total` below the free-delivery and small-cart thresholds | `delivery_fee`/`small_cart_fee` not raised; new `grand_total` ≤ old; refund ≥ 0 | ⬜ R2 |
-| P4-TC-26 | ADM | P1 | T8a on an order with a FLAT coupon whose minimum is no longer met | Discount kept, capped at the new `item_total`; redemption stays REDEEMED | ⬜ R2 |
-| P4-TC-27 | ADM | P0 | Item unavailable on PACKED; qty > line qty, 0, negative; an item of another order; the same adjustment submitted twice | Refused, nothing changed; the double submit refunds once | ⬜ R2 |
-| P4-TC-28 | ADM | P0 | Store Manager / Ops / Support cancel (T12) in PLACED, ACCEPTED, PACKING, PACKED | CANCELLED; `cancelled_by` store / ops; full refund when paid; reservation released with no StockMovement and no `on_hand` change; audit row | ⬜ R2 |
-| P4-TC-29 | ADM | P1 | Staff cancel without a reason / with a customer-only reason | Refused | ⬜ R2 |
-| P4-TC-30 🔥 | ADM | P0 | Store Staff / Manager of GGN-01: another store's console URL; accept / cancel / unavailable on another store's order id | 404 (or 403); nothing changes; other stores' orders never listed | ⬜ R2 + a second store (QA-owned or staging) |
-| P4-TC-31 🔥 | ADM | P0 | 05 §3 P4 rows × 7 roles: live board, packing console, cancel, refund, audit log (pages and POST actions) | Exactly per the matrix, enforced server-side | ⬜ R2 |
-| P4-TC-32 | ADM | P0 | Support refunds 500.00 and 500.01; Finance any amount; refund above refundable; two concurrent manual refunds | 500.00 ok, 500.01 refused (`SUPPORT_REFUND_LIMIT`); cap enforced; never above refundable | ⬜ R2 |
-| P4-TC-33 | ADM | P0 | Manual partial then full refund (GOODWILL); double submit | PARTIALLY_REFUNDED → REFUNDED; `amount_refunded` = Σ processed; one refund per submit | ⬜ R2 |
-| P4-TC-34 | ADM | P1 | Retry a FAILED refund from the ops screen; try to retry a PENDING / PROCESSED one | New refund `<key>:retry-1`; only FAILED retryable; customer sees PENDING (never FAILED) | ⬜ R2 |
-| P4-TC-35 | BE | P1 | Refund PENDING without a gateway answer for > `REFUND_STUCK_MINUTES`; `sync_refund_status` runs | Re-sent once; the gateway lookup prevents a second refund | ⬜ R2 |
-| P4-TC-36 | BE | P1 | Store with auto-accept: new PLACED order | ACCEPTED after `AUTO_ACCEPT_DELAY_SECONDS` (+ beat); history `actor_type` system | ⬜ R2 + QA-owned store |
-| P4-TC-37 | BE | P1 | Order not accepted within `STORE_ACCEPTANCE_SLA_SECONDS` (60 s); one accepted in time | Ops alert raised once (not on the next sweep); none for the accepted one | ⬜ R2 |
-| P4-TC-38 | ADM | P1 | Live board `/ops/orders/live/` | Columns Placed → Out for delivery + exceptions lane; card fields and age timer (amber/red vs SLA); filters store / payment / SLA breach; 10 s HTMX poll returns the partial; no full phone | ⬜ R2 |
-| P4-TC-39 | ADM | P1 | Packing console `/ops/store/<store>/` | New-orders queue with SLA countdown and sound; pick list; slip with order number, 4-char code, QR, item count; accepting-orders switch (Store Manager only) | ⬜ R2 |
-| P4-TC-40 | ADM | P1 | Orders admin: filters, detail, actions, CSV export | Timeline, payments, refunds; cancel/refund only with permission; CSV formula-injection escaped | ⬜ R2 |
-| P4-TC-41 🔥 | ADM | P0 | Each staff action (accept, start packing, pack, unavailable, cancel, refund), then the audit log | One row per action with actor, action, object, changes; no customer PII; read-only; only Super Admin and Finance can open it | ⬜ R2 |
-| P4-TC-42 | ADM | P0 | Console POST without a CSRF token; GET on action URLs | 403, nothing changes; GET never changes state | ⬜ R2 |
-| P4-TC-43 | ADM | P1 | Customer detail (Customers admin, P4) per role | Orders listed; phone masked for Store Manager/Staff; full for Super Admin/Ops/Support | ⬜ R2 |
-| P4-TC-44 🔥 | BE | P0 | SQL: refunds per payment ≤ captured; `amount_refunded` ∈ [0, `grand_total`]; no duplicate refund id / key; PROCESSED has a gateway id; refunds only on CAPTURED payments of the same order | 0 violations | ✅ develop `9ed7ffc` (re-run after R2) |
-| P4-TC-45 🔥 | BE | P0 | SQL: no ACTIVE reservation on CANCELLED/PAYMENT_FAILED orders; 0 ≤ reserved ≤ on_hand | 0 violations | ✅ develop `9ed7ffc` (re-run after R2) |
-| P4-TC-46 | BE | P1 | SQL: T6/T7/T8/T11/T12 history rows with actor types; the API timeline equals the history | 0 violations | ⬜ R2 |
-| P4-TC-47 | BE | P0 | SQL: bill identity after T8a; `item_total` = Σ (qty − unavailable) × price; `amount_refunded` ≤ `amount_paid`; ITEMS_UNAVAILABLE refund = old − new | 0 violations | ⬜ R2 |
-| P4-TC-48 | BE | P2 | Domain events per transition (08 §9): T6, T8a, T11, T12, refund processed | Emitted once each, after commit (console SMS / log) | ⬜ R2 |
-| P4-TC-49 | BE | P1 | (ex P3-TC-26, DL-50) Cart of one ₹45 sachet `JV-WG-PW-10S`; place COD and ONLINE | Cart blocker; 422 `MIN_ORDER_NOT_MET` {min_order_value, item_total, amount_to_min_order}; nothing created | ⬜ R2 + `seed_demo` (PM) |
-| P4-TC-50 | BE | P1 | (ex P3-TC-63, DL-50) Instance with `FAKE_GATEWAY_DOWN=1`: ONLINE placement, retry, verify; COD placement | 503 `SERVICE_UNAVAILABLE`, nothing created; verify 503, order still pending; COD 201 | ⬜ R2 (QA `gwdown` profile) |
+| P4-TC-18 | BE | P1 | Order list after cancel / accept | CANCELLED in `past`; ACCEPTED / PACKING in `active`; strict schema | ✅ `1b3552d` |
+| P4-TC-19 🔥 | ADM | P0 | Store Staff accepts a PLACED order (T6) | ACCEPTED; history actor + `actor_type` store; audit row; customer timeline "Order confirmed"; accepting again refused, no 2nd history row | ✅ `1b3552d` service level (console ⬜) |
+| P4-TC-20 🔥 | ADM | P0 | Start packing (T7), Mark packed (T8) | PACKING, then PACKED; 4-character pickup code on the slip; pick list with every line | ✅ `1b3552d` service level (slip/QR ⬜ console) |
+| P4-TC-21 | ADM | P0 | Out-of-order actions: pack from PLACED/ACCEPTED, start packing from PLACED, accept PACKING, anything on CANCELLED / PAYMENT_PENDING | Refused with a readable message; no state or history change | ✅ `1b3552d` service level |
+| P4-TC-22 🔥 | ADM | P0 | T8a: paid ONLINE order in PACKING, mark 1 of 2 units of a line unavailable | Bill = oracle (§6.3); one refund (ITEMS_UNAVAILABLE) of old − new `grand_total`; reserved −1; `quantity_unavailable` 1; `line_total`/`item_count` count units coming; customer notified | ✅ `1b3552d` (oracle match; service level) |
+| P4-TC-23 | ADM | P0 | T8a on a COD order | Amount due reduced; no Refund; `payment_status` COD_PENDING; reserved −1 | ✅ `1b3552d` |
+| P4-TC-24 | ADM | P0 | T8a with every unit unavailable | CANCELLED (ITEMS_UNAVAILABLE, `cancelled_by` store); ONLINE refunds total = amount paid, never more; reservation released | ✅ `1b3552d` |
+| P4-TC-25 | ADM | P0 | T8a that drops `item_total` below the free-delivery and small-cart thresholds | `delivery_fee`/`small_cart_fee` not raised; new `grand_total` ≤ old; refund ≥ 0 | ✅ `1b3552d` (with the ₹45 sachet) |
+| P4-TC-26 | ADM | P1 | T8a on an order with a FLAT coupon whose minimum is no longer met | Discount kept, capped at the new `item_total`; redemption stays REDEEMED | ✅ `1b3552d` (redemption APPLIED → REVERSED; doc term corrected) |
+| P4-TC-27 | ADM | P0 | Item unavailable on PACKED; qty > line qty, 0, negative; an item of another order; the same adjustment submitted twice | Refused, nothing changed; the double submit refunds once | ✅ `1b3552d` service level (console double-submit ⬜) |
+| P4-TC-28 | ADM | P0 | Store Manager / Ops / Support cancel (T12) in PLACED, ACCEPTED, PACKING, PACKED | CANCELLED; `cancelled_by` store / ops; full refund when paid; reservation released with no StockMovement and no `on_hand` change; audit row | ✅ `1b3552d` (4 states; Ops on COD) |
+| P4-TC-29 | ADM | P1 | Staff cancel without a reason / with a customer-only reason | Refused | ✅ `1b3552d` |
+| P4-TC-30 🔥 | ADM | P0 | Store Staff / Manager of GGN-01: another store's console URL; accept / cancel / unavailable on another store's order id | 404 (or 403); nothing changes; other stores' orders never listed | ⏭ needs a second store (QA-owned) or staging |
+| P4-TC-31 🔥 | ADM | P0 | 05 §3 P4 rows × 7 roles: live board, packing console, cancel, refund, audit log (pages and POST actions) | Exactly per the matrix, enforced server-side | ◐ service level ✅ `1b3552d`; console pages ⬜ (admin P4 not merged) |
+| P4-TC-32 | ADM | P0 | Support refunds 500.00 and 500.01; Finance any amount; refund above refundable; two concurrent manual refunds | 500.00 ok, 500.01 refused (`SUPPORT_REFUND_LIMIT`); cap enforced; never above refundable | ◐ ✅ `1b3552d` limit, Finance, cap; two concurrent manual refunds ⬜ (console) |
+| P4-TC-33 | ADM | P0 | Manual partial then full refund (GOODWILL); double submit | PARTIALLY_REFUNDED → REFUNDED; `amount_refunded` = Σ processed; one refund per submit | ◐ ✅ `1b3552d` partial → full; double submit ⬜ (console, see OBS-P4-01) |
+| P4-TC-34 | ADM | P1 | Retry a FAILED refund from the ops screen; try to retry a PENDING / PROCESSED one | New refund `<key>:retry-1`; only FAILED retryable; customer sees PENDING (never FAILED) | ✅ `1b3552d` (refund.failed webhook → FAILED shown PENDING → retry-1 → PROCESSED; 2nd retry refused) |
+| P4-TC-35 | BE | P1 | Refund PENDING without a gateway answer for > `REFUND_STUCK_MINUTES`; `sync_refund_status` runs | Re-sent once; the gateway lookup prevents a second refund | ✅ `1b3552d` (2 resends + original task → 1 gateway refund) |
+| P4-TC-36 | BE | P1 | Store with auto-accept: new PLACED order | ACCEPTED after `AUTO_ACCEPT_DELAY_SECONDS` (+ beat); history `actor_type` system | ⏭ needs a QA-owned store with auto-accept |
+| P4-TC-37 | BE | P1 | Order not accepted within `STORE_ACCEPTANCE_SLA_SECONDS` (60 s); one accepted in time | Ops alert raised once (not on the next sweep); none for the accepted one | ✅ `1b3552d` (alerted/already/skipped; service level) |
+| P4-TC-38 | ADM | P1 | Live board `/ops/orders/live/` | Columns Placed → Out for delivery + exceptions lane; card fields and age timer (amber/red vs SLA); filters store / payment / SLA breach; 10 s HTMX poll returns the partial; no full phone | ⏭ console (admin P4 not merged) |
+| P4-TC-39 | ADM | P1 | Packing console `/ops/store/<store>/` | New-orders queue with SLA countdown and sound; pick list; slip with order number, 4-char code, QR, item count; accepting-orders switch (Store Manager only) | ⏭ console (admin P4 not merged) |
+| P4-TC-40 | ADM | P1 | Orders admin: filters, detail, actions, CSV export | Timeline, payments, refunds; cancel/refund only with permission; CSV formula-injection escaped | ⏭ console (admin P4 not merged) |
+| P4-TC-41 🔥 | ADM | P0 | Each staff action (accept, start packing, pack, unavailable, cancel, refund), then the audit log | One row per action with actor, action, object, changes; no customer PII; read-only; only Super Admin and Finance can open it | ◐ service level ✅ `1b3552d` (6 actions, actor, no PII); audit page ⬜ console |
+| P4-TC-42 | ADM | P0 | Console POST without a CSRF token; GET on action URLs | 403, nothing changes; GET never changes state | ⏭ console (admin P4 not merged) |
+| P4-TC-43 | ADM | P1 | Customer detail (Customers admin, P4) per role | Orders listed; phone masked for Store Manager/Staff; full for Super Admin/Ops/Support | ⏭ console (admin P4 not merged) |
+| P4-TC-44 🔥 | BE | P0 | SQL: refunds per payment ≤ captured; `amount_refunded` ∈ [0, `grand_total`]; no duplicate refund id / key; PROCESSED has a gateway id; refunds only on CAPTURED payments of the same order | 0 violations | ✅ `1b3552d` (bound updated to max(grand_total, amount_paid) for T8a) |
+| P4-TC-45 🔥 | BE | P0 | SQL: no ACTIVE reservation on CANCELLED/PAYMENT_FAILED orders; 0 ≤ reserved ≤ on_hand | 0 violations | ✅ `1b3552d` |
+| P4-TC-46 | BE | P1 | SQL: T6/T7/T8/T11/T12 history rows with actor types; the API timeline equals the history | 0 violations | ✅ `1b3552d` |
+| P4-TC-47 | BE | P0 | SQL: bill identity after T8a; `item_total` = Σ (qty − unavailable) × price; `amount_refunded` ≤ `amount_paid`; ITEMS_UNAVAILABLE refund = old − new | 0 violations | ✅ `1b3552d` (incl. amount_paid backfill) |
+| P4-TC-48 | BE | P2 | Domain events per transition (08 §9): T6, T8a, T11, T12, refund processed | Emitted once each, after commit (console SMS / log) | ✅ `1b3552d` (worker log: one accepted + one cancelled event, after commit) |
+| P4-TC-49 | BE | P1 | (ex P3-TC-26, DL-50) Cart of one ₹45 sachet `JV-WG-PW-10S`; place COD and ONLINE | Cart blocker; 422 `MIN_ORDER_NOT_MET` {min_order_value, item_total, amount_to_min_order}; nothing created | ✅ `1b3552d` (seed_demo by PM) |
+| P4-TC-50 | BE | P1 | (ex P3-TC-63, DL-50) Instance with `FAKE_GATEWAY_DOWN=1`: ONLINE placement, retry, verify; COD placement | 503 `SERVICE_UNAVAILABLE`, nothing created; verify 503, order still pending; COD 201 | ✅ `1b3552d` (`gwdown` profile: place, retry, verify 503; COD 201) |
 
 ### Customer app (device; the user's phone or the PM's device run)
 | ID | Area | Pri | Steps | Expected | Status |
@@ -357,8 +357,8 @@ Data notes: the shared dev DB has a single store (GGN-01), so the cross-store sc
 | ID | Area | Pri | Steps | Expected | Status |
 |---|---|---|---|---|---|
 | P4-TC-58 🔥 | E2E | P0 | COD order on the phone → accept on the packing console → start packing → one unit unavailable → pack | Customer sees "Order confirmed", "Packing", the reduced amount due and the struck-through unit; cancel is gone from PACKING | ⬜ R2 + device |
-| P4-TC-59 | E2E | P0 | Paid ONLINE order → customer cancels → a late `payment.captured` for the same capture → worker settles | One refund only; REFUNDED in the app; `amount_refunded` = `grand_total` | ⬜ R2 (API part automated) |
-| P4-TC-60 | BE | P2 | Live board and packing console poll endpoints: query count and p95 with 20 open orders | Fixed query count; p95 recorded (remote-DB latency noted) | ⬜ R2 |
+| P4-TC-59 | E2E | P0 | Paid ONLINE order → customer cancels → a late `payment.captured` for the same capture → worker settles | One refund only; REFUNDED in the app; `amount_refunded` = `grand_total` | ✅ `1b3552d` (API part) |
+| P4-TC-60 | BE | P2 | Live board and packing console poll endpoints: query count and p95 with 20 open orders | Fixed query count; p95 recorded (remote-DB latency noted) | ⏭ console (admin P4 not merged) |
 
 ### Totals (Phase 4, plan)
 | | Cases | ✅ | ❌ | ⏭ | ⬜ |
@@ -381,3 +381,10 @@ Notes:
   - ⏭ P1-TC-61, 62, 67 and 46
   - ⬜ all device cases
 - Automated cases are in `qa/tests/`. The raw outputs are in `qa/private/runs/`, which is gitignored.
+
+### Totals (Phase 4 stage 1, 2026-11-04, `1b3552d`)
+| | Cases | ✅ | ◐ partial | ❌ | ⏭ | ⬜ |
+|---|---|---|---|---|---|---|
+| Phase 4 | 60 | 37 | 5 (TC-12, 31, 32, 33, 41) | 0 | 12 (TC-16, 17, 30, 36, 38, 39, 40, 42, 43, 55, 57, 60) | 5 (TC-51–54, 56: device) + TC-58 (device + console) |
+
+Service-level passes of console cases (TC-19–21, 27, 31, 41) are re-run through the console when admin P4 merges. TC-26's expected status was a QA wording error ("REDEEMED"; the model's state is APPLIED, then REVERSED on cancel): test corrected, not a bug.

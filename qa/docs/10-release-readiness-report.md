@@ -112,3 +112,14 @@ Condition 1 of stage 2 (the refund re-check) is **met**. The refund fixes in dev
 1. P3-TC-64 on the user's phone (PM).
 2. CI evidence and a staging run (D-05) for the formal gate.
 3. Optional: re-verify BUG-0008 (P3).
+
+## Phase 4: Order processing and store ops. Interim verdict (stage 1, 2026-11-04, `1b3552d`): **Not ready (gate incomplete); backend P4 on track**
+| §5.2 criterion | Result |
+|---|---|
+| CI green | ⬜ Not verified by QA |
+| 100% of P0/P1 cases passed, ≥ 95% of all | ❌ 37/60 fully passed (62%). **No case failed.** The cases not passed are console cases (admin P4 not merged), device cases, cases needing a second or auto-accept store, and DELIVERED-only invoice cases |
+| Smoke set | ✅ P0–P4: 89 passed; P3-TC-50 green after the oracle update (no product defect) |
+| No open P0/P1 bugs | ✅ (no new bugs; open: BUG-0006 and BUG-0008, both P3) |
+| No unauthorised access, data corruption, duplicate financial transaction or crash | ✅ IDOR 404s; roles enforced in the services; T8a = oracle; refunds never above what was paid; FAILED/retry/sync never double-refund; reservations released, no stock movement before pickup |
+
+**To reach Ready:** (1) merge admin P4 and run TC-31/38–43/60 plus the console versions of TC-19–21, 27, 32, 33 and 41; (2) a QA-owned second store (or staging) for TC-30/36 and the NOT_AVAILABLE part of TC-12; (3) a device run for TC-51–54, 56 and 58; (4) the mini-UAT (01 §8.5); (5) the invoice cases TC-16/17/57 in P5 (DELIVERED); (6) CI evidence and staging.
