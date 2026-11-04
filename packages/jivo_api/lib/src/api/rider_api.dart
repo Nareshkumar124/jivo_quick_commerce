@@ -3,6 +3,8 @@
 // AUTO-GENERATED FILE, DO NOT MODIFY!
 //
 
+import 'package:jivo_api/src/date_only.dart';
+
 import 'dart:async';
 
 // ignore: unused_import
@@ -361,8 +363,8 @@ class RiderApi {
     );
 
     final _queryParameters = <String, dynamic>{
-      if (from != null) r'from': from,
-      if (to != null) r'to': to,
+      if (from != null) r'from': jivoDateToQuery(from),
+      if (to != null) r'to': jivoDateToQuery(to),
     };
 
     final _response = await _dio.request<Object>(
@@ -1990,9 +1992,9 @@ class RiderApi {
 
     final _queryParameters = <String, dynamic>{
       if (beforeId != null) r'before_id': beforeId,
-      if (from != null) r'from': from,
+      if (from != null) r'from': jivoDateToQuery(from),
       if (pageSize != null) r'page_size': pageSize,
-      if (to != null) r'to': to,
+      if (to != null) r'to': jivoDateToQuery(to),
     };
 
     final _response = await _dio.request<Object>(

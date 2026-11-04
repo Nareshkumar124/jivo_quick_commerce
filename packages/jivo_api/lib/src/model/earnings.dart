@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/date_only.dart';
 import 'package:jivo_api/src/model/earnings_order.dart';
 import 'package:jivo_api/src/model/earning_totals.dart';
 import 'package:jivo_api/src/model/earnings_adjustment.dart';
@@ -40,11 +41,21 @@ class Earnings {
   });
 
   /// IST calendar date, YYYY-MM-DD.
-  @JsonKey(name: r'from', required: true, includeIfNull: false)
+  @JsonKey(
+    name: r'from',
+    toJson: jivoDateToJson,
+    required: true,
+    includeIfNull: false,
+  )
   final DateTime from;
 
   /// IST calendar date, YYYY-MM-DD. Inclusive.
-  @JsonKey(name: r'to', required: true, includeIfNull: false)
+  @JsonKey(
+    name: r'to',
+    toJson: jivoDateToJson,
+    required: true,
+    includeIfNull: false,
+  )
   final DateTime to;
 
   /// All earnings in the range.

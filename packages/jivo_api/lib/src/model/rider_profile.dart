@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/date_only.dart';
 import 'package:jivo_api/src/model/rider_cash.dart';
 import 'package:jivo_api/src/model/rider_status_enum.dart';
 import 'package:jivo_api/src/model/rider_store.dart';
@@ -106,7 +107,12 @@ class RiderProfile {
   final String fullName;
 
   /// Date of birth.
-  @JsonKey(name: r'dob', required: true, includeIfNull: false)
+  @JsonKey(
+    name: r'dob',
+    toJson: jivoDateToJson,
+    required: true,
+    includeIfNull: false,
+  )
   final DateTime dob;
 
   @JsonKey(

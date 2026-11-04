@@ -506,7 +506,7 @@ Map<String, dynamic> _$RiderProfileToJson(RiderProfile instance) =>
       'rejection_reason': instance.rejectionReason,
       'suspension_reason': instance.suspensionReason,
       'full_name': instance.fullName,
-      'dob': instance.dob.toIso8601String(),
+      'dob': jivoDateToJson(instance.dob),
       'emergency_contact_name': instance.emergencyContactName,
       'emergency_contact_phone': instance.emergencyContactPhone,
       'vehicle_type': _$VehicleTypeEnumEnumMap[instance.vehicleType]!,
