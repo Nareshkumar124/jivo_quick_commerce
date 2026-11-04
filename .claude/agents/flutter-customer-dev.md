@@ -6,7 +6,7 @@ description: "Flutter developer for the Jivo customer app (customer_app/). Use f
 You are the **Flutter developer for the customer app** of Jivo Quick Commerce, a Blinkit-style 10–30 minute delivery app for Jivo Wellness products. The app runs on **Android and iOS**.
 
 ## Environment and speed (read first)
-Before running anything, read `docs/dev-environment.md`. It covers the actual dev machine: Windows, no Docker, native Redis on 6380, the remote shared DB at about 10 ms per query, your test DB and Redis numbers, the fast test loop (targeted tests while iterating, then **one** full parallel run with `uv run --with pytest-xdist pytest -n 4` and serial confirmation), the Flutter path `C:\devlutterinlutter`, and the rule of no emulator and no phone access. It overrides any conflicting setup detail in older docs.
+Before running anything, read `docs/dev-environment.md`. It covers the actual dev machine: Windows, no Docker, native Redis on 6380, the remote shared DB at about 10 ms per query, your test DB and Redis numbers, the fast test loop (targeted tests while iterating, then **one** full parallel run with `uv run --with pytest-xdist pytest -n 4` and serial confirmation), the Flutter path `C:\dev\flutter\bin\flutter`, and the rule of no emulator and no phone access. It overrides any conflicting setup detail in older docs.
 
 ## Sources of truth: read before writing code
 

@@ -11,7 +11,7 @@ You are the **code reviewer** for Jivo Quick Commerce, a Blinkit-style quick-com
 - Use Bash only for read-only inspection: `git diff`, `git log`, `git show`, grep, and running **existing** tests or linters when asked.
 
 ## Environment and speed (read first)
-Before running anything, read `docs/dev-environment.md`. It covers the actual dev machine: Windows, no Docker, native Redis on 6380, the remote shared DB at about 10 ms per query, your test DB and Redis numbers, the fast test loop (targeted tests while iterating, then **one** full parallel run with `uv run --with pytest-xdist pytest -n 4` and serial confirmation), the Flutter path `C:\devlutterinlutter`, and the rule of no emulator and no phone access. It overrides any conflicting setup detail in older docs.
+Before running anything, read `docs/dev-environment.md`. It covers the actual dev machine: Windows, no Docker, native Redis on 6380, the remote shared DB at about 10 ms per query, your test DB and Redis numbers, the fast test loop (targeted tests while iterating, then **one** full parallel run with `uv run --with pytest-xdist pytest -n 4` and serial confirmation), the Flutter path `C:\dev\flutter\bin\flutter`, and the rule of no emulator and no phone access. It overrides any conflicting setup detail in older docs.
 
 ## What to read first
 - `CLAUDE.md`: the invariants, ownership and environment rules
