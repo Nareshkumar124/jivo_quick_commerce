@@ -26,9 +26,13 @@ import '../features/location/data/maps_availability.dart';
 import '../features/location/data/reverse_geocoder.dart';
 import '../features/location/data/serviceability_repository.dart';
 import '../features/location/presentation/delivery_controller.dart';
+import '../features/notifications/data/notification_repository.dart';
+import '../features/orders/data/api_order_history_repository.dart';
 import '../features/orders/data/api_order_repository.dart';
+import '../features/orders/data/order_history_repository.dart';
 import '../features/orders/data/order_repository.dart';
 import '../features/profile/data/profile_repository.dart';
+import '../features/tracking/data/track_repository.dart';
 import 'providers.dart';
 
 /// Repositories: the API implementation, or a fake with `FAKE_API=true` in
@@ -101,7 +105,7 @@ final cartAvailableProvider = Provider<bool>(
 /// repositories, so placing an order clears the cart. Never built for
 /// staging or prod.
 final fakeCommerceBackendProvider = Provider<FakeCommerceBackend>(
-  (ref) => FakeCommerceBackend(),
+  (ref) => FakeCommerceBackend()..seedDemoOrders(),
 );
 
 /// The server cart (`06 §2.5`): the API in the dev flavor, the fake with
@@ -128,6 +132,37 @@ final orderRepositoryProvider = Provider<OrderRepository>((ref) {
     () => ref.read(currentStoreIdProvider),
   );
 });
+
+/// "My orders", order detail, cancel, reorder and invoice (`06 §2.6`),
+/// wired like [orderRepositoryProvider].
+final orderHistoryRepositoryProvider = Provider<OrderHistoryRepository>((ref) {
+  if (!ref.watch(cartAvailableProvider)) {
+    return const UnavailableOrderHistoryRepository();
+  }
+  if (_fake(ref)) return ref.watch(fakeCommerceBackendProvider);
+  return ApiOrderHistoryRepository(
+    ref.watch(jivoApiProvider),
+    () => ref.read(currentStoreIdProvider),
+  );
+});
+
+/// Whether this build can show live tracking. TODO(api): true only on
+/// fakes until `GET /orders/{id}/track/` (Phase 5) is bound.
+final trackingAvailableProvider = Provider<bool>((ref) => _fake(ref));
+
+/// Live tracking data (Phase 6 lookahead on fakes).
+final trackRepositoryProvider = Provider<TrackRepository>(
+  (ref) =>
+      _fake(ref) ? FakeTrackRepository() : const UnavailableTrackRepository(),
+);
+
+/// The notification inbox (Phase 6 lookahead on fakes). TODO(api): bind the
+/// inbox endpoints when the Phase 6 contract lands.
+final notificationRepositoryProvider = Provider<NotificationRepository>(
+  (ref) => _fake(ref)
+      ? FakeNotificationRepository()
+      : const UnavailableNotificationRepository(),
+);
 
 /// The root navigator, for sheets opened outside a widget (the dev fake
 /// payment sheet).

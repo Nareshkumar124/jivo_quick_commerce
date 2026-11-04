@@ -1170,4 +1170,347 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkingPayment => 'Checking the payment status…';
+
+  @override
+  String get myOrders => 'My orders';
+
+  @override
+  String get ordersActive => 'Active orders';
+
+  @override
+  String get ordersPast => 'Past orders';
+
+  @override
+  String get ordersEmpty =>
+      'You haven\'t placed an order yet. Your orders will show up here.';
+
+  @override
+  String get ordersLoadMoreFailed => 'Couldn\'t load more orders.';
+
+  @override
+  String orderItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String orderPlacedOn(String date) {
+    return 'Placed on $date';
+  }
+
+  @override
+  String get orderStatusPaymentPending => 'Completing payment…';
+
+  @override
+  String get orderStatusPlaced => 'Order placed';
+
+  @override
+  String get orderStatusAccepted => 'Order confirmed';
+
+  @override
+  String get orderStatusPacking => 'Packing your order';
+
+  @override
+  String get orderStatusPacked => 'Packed, rider on the way to store';
+
+  @override
+  String get orderStatusOutForDelivery => 'On the way';
+
+  @override
+  String get orderStatusDelivered => 'Delivered';
+
+  @override
+  String get orderStatusCancelled => 'Cancelled';
+
+  @override
+  String get orderStatusPaymentFailed => 'Payment failed';
+
+  @override
+  String get orderStatusDeliveryFailed => 'Delivery unsuccessful';
+
+  @override
+  String get orderStatusUnknown => 'Status unavailable';
+
+  @override
+  String orderTitle(String number) {
+    return 'Order $number';
+  }
+
+  @override
+  String get orderStageConfirmed => 'Confirmed';
+
+  @override
+  String get orderStagePacking => 'Packing';
+
+  @override
+  String get orderStageOnTheWay => 'On the way';
+
+  @override
+  String get orderStagePlaced => 'Placed';
+
+  @override
+  String get orderStageDelivered => 'Delivered';
+
+  @override
+  String get orderTimelineTitle => 'Order status';
+
+  @override
+  String get orderStepDone => 'done';
+
+  @override
+  String get orderStepCurrent => 'current';
+
+  @override
+  String get orderStepUpcoming => 'upcoming';
+
+  @override
+  String get orderItemsTitle => 'Items';
+
+  @override
+  String orderLineQuantity(int quantity, String price) {
+    return '$quantity × $price';
+  }
+
+  @override
+  String get orderPaymentTitle => 'Payment';
+
+  @override
+  String get paymentMethodOnline => 'Paid online';
+
+  @override
+  String get paymentMethodCod => 'Cash on delivery';
+
+  @override
+  String get paymentStatusPending => 'Payment not completed';
+
+  @override
+  String get paymentStatusPaid => 'Paid';
+
+  @override
+  String get paymentStatusFailed => 'Payment failed';
+
+  @override
+  String get paymentStatusRefundPending => 'Refund initiated';
+
+  @override
+  String get paymentStatusRefunded => 'Refunded';
+
+  @override
+  String get paymentStatusPartiallyRefunded => 'Partly refunded';
+
+  @override
+  String get paymentStatusCodPending => 'Pay on delivery';
+
+  @override
+  String get paymentStatusCodCollected => 'Paid on delivery';
+
+  @override
+  String get noPaymentTaken => 'No payment was taken for this order.';
+
+  @override
+  String get nothingToPay => 'Nothing to pay for this order.';
+
+  @override
+  String refundInProgress(String amount) {
+    return 'Refund of $amount initiated. It reaches your original payment method in 5–7 working days.';
+  }
+
+  @override
+  String refundCompleted(String amount) {
+    return '$amount refunded to your original payment method.';
+  }
+
+  @override
+  String refundFailedNote(String amount) {
+    return 'Your refund of $amount is delayed. Our team is on it; contact support if you need help.';
+  }
+
+  @override
+  String refundedOn(String date) {
+    return 'Refunded on $date';
+  }
+
+  @override
+  String get orderDeliveryTo => 'Delivery address';
+
+  @override
+  String orderArrivingBy(String time) {
+    return 'Arriving by $time';
+  }
+
+  @override
+  String get orderAwaitingPayment => 'This order is waiting for payment.';
+
+  @override
+  String get completePayment => 'Complete payment';
+
+  @override
+  String get downloadInvoice => 'Download invoice';
+
+  @override
+  String get invoiceOpenFailed =>
+      'Couldn\'t open the invoice. Install a PDF viewer or browser and try again.';
+
+  @override
+  String get reorder => 'Order again';
+
+  @override
+  String get reorderAllAdded => 'Items added to your cart.';
+
+  @override
+  String get reorderNothingAdded =>
+      'None of these items can be ordered right now.';
+
+  @override
+  String get reorderSomeUnavailableTitle => 'Some items were not added';
+
+  @override
+  String reorderOutOfStock(String name) {
+    return '$name is out of stock';
+  }
+
+  @override
+  String reorderDiscontinued(String name) {
+    return '$name is no longer sold';
+  }
+
+  @override
+  String reorderReduced(int count, String name) {
+    return 'Only $count of $name added';
+  }
+
+  @override
+  String get cannotCancelTitle => 'Need to cancel?';
+
+  @override
+  String get cannotCancelBody =>
+      'Your order is already being packed, so it can no longer be cancelled in the app. Contact support for help.';
+
+  @override
+  String get contactSupport => 'Contact support';
+
+  @override
+  String get cancelSheetTitle => 'Why are you cancelling?';
+
+  @override
+  String get cancelReasonOrderedByMistake => 'Ordered by mistake';
+
+  @override
+  String get cancelReasonChangedMind => 'Changed my mind';
+
+  @override
+  String get cancelReasonDeliveryTooSlow => 'Delivery is taking too long';
+
+  @override
+  String get cancelReasonChangePaymentMethod =>
+      'Want to change the payment method';
+
+  @override
+  String get cancelReasonPaymentProblem => 'Problem with the payment';
+
+  @override
+  String get cancelReasonOther => 'Other';
+
+  @override
+  String cancelRefundOnline(String amount) {
+    return 'You will get a full refund of $amount to your original payment method in 5–7 working days.';
+  }
+
+  @override
+  String get cancelRefundCod => 'Nothing is due for a cash-on-delivery order.';
+
+  @override
+  String get cancelRefundUnpaid =>
+      'No payment was taken for this order, so there is nothing to refund.';
+
+  @override
+  String get cancelConfirmAction => 'Cancel order';
+
+  @override
+  String get cancelChooseReason => 'Choose a reason to continue.';
+
+  @override
+  String orderStoreName(String store) {
+    return 'From $store';
+  }
+
+  @override
+  String couponUsed(String code) {
+    return 'Coupon $code';
+  }
+
+  @override
+  String trackingEtaMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Arriving in $minutes mins',
+      one: 'Arriving in 1 min',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trackingArrivingNow => 'Arriving any moment';
+
+  @override
+  String get trackingRiderAssigning => 'Assigning a delivery partner…';
+
+  @override
+  String get trackingRiderLabel => 'Your delivery partner';
+
+  @override
+  String trackingCallRider(String name) {
+    return 'Call $name';
+  }
+
+  @override
+  String get trackingOtpTitle => 'Delivery OTP';
+
+  @override
+  String get trackingOtpHint =>
+      'Share this code with the rider only when you receive your order.';
+
+  @override
+  String get trackingMapStore => 'Store';
+
+  @override
+  String get trackingMapHome => 'You';
+
+  @override
+  String trackingMapSemantics(int percent) {
+    return 'The rider is $percent percent of the way to you.';
+  }
+
+  @override
+  String get trackingViewDetails => 'Order details';
+
+  @override
+  String get notificationsTitle => 'Notifications';
+
+  @override
+  String get notificationsEmpty =>
+      'No notifications yet. Order updates and offers will show up here.';
+
+  @override
+  String get notificationUnread => 'Unread';
+
+  @override
+  String orderLineUnavailable(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count units were unavailable and are not charged',
+      one: '1 unit was unavailable and is not charged',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get orderCancelledTitle => 'Why this order was cancelled';
 }

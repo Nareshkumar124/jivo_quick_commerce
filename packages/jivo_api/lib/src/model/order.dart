@@ -6,10 +6,13 @@
 // ignore_for_file: unused_element
 import 'package:jivo_api/src/model/order_address.dart';
 import 'package:jivo_api/src/model/payment_method_enum.dart';
+import 'package:jivo_api/src/model/order_cancellation.dart';
 import 'package:jivo_api/src/model/order_line.dart';
 import 'package:jivo_api/src/model/payment_status_enum.dart';
 import 'package:jivo_api/src/model/delivery_instructions.dart';
+import 'package:jivo_api/src/model/order_refund.dart';
 import 'package:jivo_api/src/model/order_status_enum.dart';
+import 'package:jivo_api/src/model/order_timeline_entry.dart';
 import 'package:jivo_api/src/model/bill.dart';
 import 'package:jivo_api/src/model/order_store.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -62,6 +65,16 @@ class Order {
     required this.canCancel,
 
     required this.canRetryPayment,
+
+    required this.timeline,
+
+    required this.cancellation,
+
+    required this.amountRefunded,
+
+    required this.refunds,
+
+    required this.canDownloadInvoice,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -135,13 +148,33 @@ class Order {
   @JsonKey(name: r'eta_at', required: true, includeIfNull: true)
   final DateTime? etaAt;
 
-  /// True when `POST /orders/{id}/cancel/` is allowed now (08 §7). Phase 3: only in PAYMENT_PENDING; from Phase 4 also PLACED and ACCEPTED.
+  /// True when `POST /orders/{id}/cancel/` is allowed now (08 §7): PAYMENT_PENDING, PLACED or ACCEPTED (from PACKING on, show 'Contact support').
   @JsonKey(name: r'can_cancel', required: true, includeIfNull: false)
   final bool canCancel;
 
   /// True when `POST /orders/{id}/retry-payment/` is allowed now: an ONLINE order in PAYMENT_PENDING before `payment_expires_at`.
   @JsonKey(name: r'can_retry_payment', required: true, includeIfNull: false)
   final bool canRetryPayment;
+
+  /// Every state reached, oldest first (Phase 4).
+  @JsonKey(name: r'timeline', required: true, includeIfNull: false)
+  final List<OrderTimelineEntry> timeline;
+
+  /// Set when the order is CANCELLED; null otherwise (Phase 4).
+  @JsonKey(name: r'cancellation', required: true, includeIfNull: true)
+  final OrderCancellation? cancellation;
+
+  /// Refunded so far (processed refunds), Phase 4. `bill` is always the current bill: after items were found unavailable it is the reduced one.
+  @JsonKey(name: r'amount_refunded', required: true, includeIfNull: false)
+  final String amountRefunded;
+
+  /// Refunds of this order, oldest first; [] when none (Phase 4).
+  @JsonKey(name: r'refunds', required: true, includeIfNull: false)
+  final List<OrderRefund> refunds;
+
+  /// True when `GET /orders/{id}/invoice/` has an invoice: DELIVERED orders (Phase 4).
+  @JsonKey(name: r'can_download_invoice', required: true, includeIfNull: false)
+  final bool canDownloadInvoice;
 
   @override
   bool operator ==(Object other) =>
@@ -164,7 +197,12 @@ class Order {
           other.paymentExpiresAt == paymentExpiresAt &&
           other.etaAt == etaAt &&
           other.canCancel == canCancel &&
-          other.canRetryPayment == canRetryPayment;
+          other.canRetryPayment == canRetryPayment &&
+          other.timeline == timeline &&
+          other.cancellation == cancellation &&
+          other.amountRefunded == amountRefunded &&
+          other.refunds == refunds &&
+          other.canDownloadInvoice == canDownloadInvoice;
 
   @override
   int get hashCode =>
@@ -185,7 +223,12 @@ class Order {
       (paymentExpiresAt == null ? 0 : paymentExpiresAt.hashCode) +
       (etaAt == null ? 0 : etaAt.hashCode) +
       canCancel.hashCode +
-      canRetryPayment.hashCode;
+      canRetryPayment.hashCode +
+      timeline.hashCode +
+      (cancellation == null ? 0 : cancellation.hashCode) +
+      amountRefunded.hashCode +
+      refunds.hashCode +
+      canDownloadInvoice.hashCode;
 
   factory Order.fromJson(Map<String, dynamic> json) => _$OrderFromJson(json);
 

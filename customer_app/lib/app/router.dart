@@ -26,9 +26,13 @@ import '../features/location/presentation/location_screen.dart';
 import '../features/location/presentation/map_picker_screen.dart';
 import '../features/location/presentation/not_serviceable_screen.dart';
 import '../features/orders/domain/order.dart';
+import '../features/notifications/presentation/inbox_screen.dart';
 import '../features/orders/presentation/order_again_screen.dart';
+import '../features/orders/presentation/order_detail_screen.dart';
+import '../features/orders/presentation/orders_screen.dart';
 import '../features/profile/presentation/account_screens.dart';
 import '../features/search/presentation/search_screen.dart';
+import '../features/tracking/presentation/tracking_screen.dart';
 import 'app_shell.dart';
 import 'launch_state.dart';
 import 'providers.dart';
@@ -156,6 +160,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         'collection',
         (state) => CollectionScreen(slug: state.pathParameters['slug']!),
       ),
+      route(
+        '/orders/:id',
+        'order_detail',
+        (state) => OrderDetailScreen(
+          orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      route(
+        '/orders/:id/track',
+        'order_tracking',
+        (state) => TrackingScreen(
+          orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      route(Routes.orders, 'orders', (_) => const OrdersScreen()),
+      route(Routes.notifications, 'notifications', (_) => const InboxScreen()),
       route(
         '/orders/:id/success',
         'order_success',

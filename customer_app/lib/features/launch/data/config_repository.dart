@@ -35,6 +35,9 @@ class ApiConfigRepository implements ConfigRepository {
         ),
         otpLength: config.otp.length,
         resendAfterSeconds: config.otp.resendAfterSeconds,
+        supportPhone: config.support.phone.trim().isEmpty
+            ? null
+            : config.support.phone.trim(),
       );
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -61,6 +64,7 @@ class FakeConfigRepository implements ConfigRepository {
     ),
     minSupportedVersion: '1.0.0',
     latestVersion: '1.0.0',
+    supportPhone: '+911800000000',
   );
 
   @override
