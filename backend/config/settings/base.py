@@ -119,6 +119,11 @@ TEMPLATES = [
 # `test_jivo_quick_commerce`. Any name not starting with that is refused at settings load.
 TEST_DATABASE_NAME = env_test_database_name()
 
+# Optional explicit GDAL/GEOS library paths (e.g. Windows hosts, where Django cannot find
+# versioned DLLs on its own). Unset: Django searches the default library names.
+GDAL_LIBRARY_PATH = env_str("GDAL_LIBRARY_PATH", default=None)
+GEOS_LIBRARY_PATH = env_str("GEOS_LIBRARY_PATH", default=None)
+
 # Built from separate variables (never a DATABASE_URL: passwords may contain URL-reserved chars).
 # PostGIS since Phase 2 (serviceability, distances). Migrating a test database runs
 # `CREATE EXTENSION IF NOT EXISTS postgis` (the DB user is allowed to); never run it by hand.

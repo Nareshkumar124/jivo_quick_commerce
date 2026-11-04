@@ -145,6 +145,17 @@ MODULES: tuple[NavSection, ...] = (
         ),
     ),
     NavSection(
+        "Orders",
+        (
+            NavItem(
+                "Orders",
+                "receipt",
+                "admin:orders_order_changelist",
+                ("orders.view_order",),
+            ),
+        ),
+    ),
+    NavSection(
         "Customers",
         (
             NavItem(
@@ -152,6 +163,52 @@ MODULES: tuple[NavSection, ...] = (
                 "group",
                 "admin:accounts_customer_changelist",
                 ("accounts.view_customer",),
+            ),
+        ),
+    ),
+    NavSection(
+        "Payments & finance",
+        (
+            NavItem(
+                "Payments",
+                "payments",
+                "admin:payments_payment_changelist",
+                ("payments.view_payment",),
+            ),
+            NavItem(
+                "Refunds",
+                "currency_exchange",
+                "admin:payments_refund_changelist",
+                ("payments.view_refund",),
+            ),
+            NavItem(
+                "Payment webhooks",
+                "webhook",
+                "admin:payments_paymentwebhookevent_changelist",
+                ("payments.view_paymentwebhookevent",),
+            ),
+        ),
+    ),
+    NavSection(
+        "Promotions",
+        (
+            NavItem(
+                "Coupons",
+                "sell",
+                "admin:promotions_coupon_changelist",
+                ("promotions.view_coupon",),
+            ),
+            NavItem(
+                "Coupon redemptions",
+                "redeem",
+                "admin:promotions_couponredemption_changelist",
+                ("promotions.view_couponredemption",),
+            ),
+            NavItem(
+                "Pricing config",
+                "price_change",
+                "admin:stores_pricingconfig_changelist",
+                ("stores.view_pricingconfig",),
             ),
         ),
     ),

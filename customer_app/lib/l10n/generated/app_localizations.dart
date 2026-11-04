@@ -868,12 +868,6 @@ abstract class AppLocalizations {
   /// **'View cart'**
   String get viewCart;
 
-  /// Shown when the cart bar is tapped before the cart screen exists.
-  ///
-  /// In en, this message translates to:
-  /// **'Cart and checkout arrive in the next update.'**
-  String get cartComingSoon;
-
   /// Home header: delivery ETA from the server.
   ///
   /// In en, this message translates to:
@@ -1365,6 +1359,720 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not serviceable'**
   String get addressNotServiceable;
+
+  /// Cart screen title.
+  ///
+  /// In en, this message translates to:
+  /// **'Cart'**
+  String get cartTitle;
+
+  /// Empty cart message.
+  ///
+  /// In en, this message translates to:
+  /// **'Your cart is empty. Add a few Jivo favourites to get started.'**
+  String get cartEmpty;
+
+  /// Empty cart action: goes to Home.
+  ///
+  /// In en, this message translates to:
+  /// **'Start shopping'**
+  String get startShopping;
+
+  /// Heading of the delivery address card.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver to'**
+  String get deliverTo;
+
+  /// Opens the address switcher from the cart or checkout.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get changeAddress;
+
+  /// Shown when the delivery location is a pin without a saved address (orders need address_id).
+  ///
+  /// In en, this message translates to:
+  /// **'Save this location as an address, or choose a saved one, to place the order.'**
+  String get chooseSavedAddress;
+
+  /// Opens the address switcher to choose a saved address.
+  ///
+  /// In en, this message translates to:
+  /// **'Select address'**
+  String get selectAddress;
+
+  /// Tooltip/screen-reader label of a cart line's remove button.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}'**
+  String removeItem(String name);
+
+  /// Cart line flag: fewer units in stock than in the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'Only {count} available'**
+  String onlyAvailable(int count);
+
+  /// Fix action on a cart line with reduced stock.
+  ///
+  /// In en, this message translates to:
+  /// **'Update to {count}'**
+  String updateQuantityTo(int count);
+
+  /// Fix action on an unavailable cart line; removes a coupon.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeAction;
+
+  /// Banner above flagged cart lines (stock re-validation).
+  ///
+  /// In en, this message translates to:
+  /// **'Some items changed since you added them. Fix them to continue.'**
+  String get cartProblemsBanner;
+
+  /// Upsell nudge; the amount comes from the server.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {amount} more for FREE delivery'**
+  String freeDeliveryNudge(String amount);
+
+  /// Opens the coupon sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply coupon'**
+  String get applyCoupon;
+
+  /// Applied coupon row title.
+  ///
+  /// In en, this message translates to:
+  /// **'{code} applied'**
+  String couponApplied(String code);
+
+  /// Applied coupon saving (server value).
+  ///
+  /// In en, this message translates to:
+  /// **'You save {amount}'**
+  String couponSaves(String amount);
+
+  /// Applied coupon that became ineligible.
+  ///
+  /// In en, this message translates to:
+  /// **'{code} no longer applies to this cart'**
+  String couponNoLongerApplies(String code);
+
+  /// Coupon sheet title.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupons'**
+  String get couponsTitle;
+
+  /// Coupon code field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupon code'**
+  String get couponCodeLabel;
+
+  /// Applies a coupon code.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get couponApply;
+
+  /// Screen-reader label of a coupon's Apply button.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply coupon {code}'**
+  String couponApplySemantics(String code);
+
+  /// Coupon sheet empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'No coupons available right now.'**
+  String get couponsEmpty;
+
+  /// Coupon card saving (server value).
+  ///
+  /// In en, this message translates to:
+  /// **'Save {amount} on this order'**
+  String couponSavesOnCart(String amount);
+
+  /// Coupon not eligible: below its minimum (server shortfall).
+  ///
+  /// In en, this message translates to:
+  /// **'Add {amount} more to use this coupon'**
+  String couponAddMore(String amount);
+
+  /// Coupon not eligible: below its minimum, no shortfall sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your cart is below this coupon\'s minimum order'**
+  String get couponBelowMinimum;
+
+  /// Coupon not eligible: other reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Not applicable on this cart'**
+  String get couponNotApplicable;
+
+  /// Snackbar after a coupon is applied.
+  ///
+  /// In en, this message translates to:
+  /// **'{code} applied. You save {amount}.'**
+  String couponAppliedMessage(String code, String amount);
+
+  /// Validation: empty coupon code.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a coupon code'**
+  String get couponCodeRequired;
+
+  /// Rider tip section title.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip your delivery partner'**
+  String get tipTitle;
+
+  /// Rider tip section text.
+  ///
+  /// In en, this message translates to:
+  /// **'Say thanks with a tip. It goes to your delivery partner.'**
+  String get tipBody;
+
+  /// Custom tip chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get tipCustom;
+
+  /// Custom tip dialog title.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a tip'**
+  String get tipCustomTitle;
+
+  /// Custom tip field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip in ₹'**
+  String get tipCustomLabel;
+
+  /// Custom tip validation.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a whole amount from ₹1 to ₹{max}'**
+  String tipCustomInvalid(int max);
+
+  /// Screen-reader label of a tip chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip {amount}'**
+  String tipChipSemantics(String amount);
+
+  /// Delivery instructions section title.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery instructions'**
+  String get instructionsTitle;
+
+  /// Delivery instruction chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t ring the bell'**
+  String get instructionDontRingBell;
+
+  /// Delivery instruction chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave at the door'**
+  String get instructionLeaveAtDoor;
+
+  /// Delivery instruction chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Avoid calling'**
+  String get instructionAvoidCalling;
+
+  /// Free-text delivery instruction label.
+  ///
+  /// In en, this message translates to:
+  /// **'Note for the delivery partner'**
+  String get instructionsNoteLabel;
+
+  /// Snackbar after the note is saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Instructions saved'**
+  String get instructionsSaved;
+
+  /// Bill section title.
+  ///
+  /// In en, this message translates to:
+  /// **'Bill details'**
+  String get billTitle;
+
+  /// Bill row: MRP total.
+  ///
+  /// In en, this message translates to:
+  /// **'Item total (MRP)'**
+  String get billItemTotal;
+
+  /// Bill row.
+  ///
+  /// In en, this message translates to:
+  /// **'Product discount'**
+  String get billProductDiscount;
+
+  /// Bill row without a code.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupon discount'**
+  String get billCouponDiscount;
+
+  /// Bill row with the applied coupon code.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupon ({code})'**
+  String billCouponDiscountCode(String code);
+
+  /// Bill row.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery fee'**
+  String get billDeliveryFee;
+
+  /// Bill value when the delivery fee is zero.
+  ///
+  /// In en, this message translates to:
+  /// **'FREE'**
+  String get billFree;
+
+  /// Bill row.
+  ///
+  /// In en, this message translates to:
+  /// **'Small cart fee'**
+  String get billSmallCartFee;
+
+  /// Bill row.
+  ///
+  /// In en, this message translates to:
+  /// **'Handling fee'**
+  String get billHandlingFee;
+
+  /// Bill row.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery partner tip'**
+  String get billTip;
+
+  /// Bill grand total row and checkout bar label.
+  ///
+  /// In en, this message translates to:
+  /// **'To pay'**
+  String get billToPay;
+
+  /// Total savings banner (server value).
+  ///
+  /// In en, this message translates to:
+  /// **'You save {amount} on this order'**
+  String billSavings(String amount);
+
+  /// A discount shown as a deduction, e.g. −₹50 (display only).
+  ///
+  /// In en, this message translates to:
+  /// **'−{amount}'**
+  String minusAmount(String amount);
+
+  /// Checkout disabled below the minimum (server values).
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum order is {amount}. Add {shortfall} more to check out.'**
+  String minimumOrderShortfall(String amount, String shortfall);
+
+  /// Checkout disabled below the minimum, no shortfall sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum order is {amount}.'**
+  String minimumOrderNotMet(String amount);
+
+  /// Checkout disabled while the store is closed.
+  ///
+  /// In en, this message translates to:
+  /// **'The store is closed right now. You can check out when it opens.'**
+  String get cartStoreClosed;
+
+  /// Cart screen primary action.
+  ///
+  /// In en, this message translates to:
+  /// **'Proceed to checkout'**
+  String get proceedToCheckout;
+
+  /// After re-validation finds stock problems.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items in your cart changed. Please review them.'**
+  String get cartReviewChanges;
+
+  /// Checkout / payment method screen title.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get checkoutTitle;
+
+  /// Payment method section title.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay with'**
+  String get payWith;
+
+  /// Payment method.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay online'**
+  String get payOnline;
+
+  /// Payment method subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'UPI, cards, net banking and wallets'**
+  String get payOnlineSubtitle;
+
+  /// Payment method.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery'**
+  String get payCod;
+
+  /// Payment method subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay by cash or UPI when your order arrives'**
+  String get payCodSubtitle;
+
+  /// Places a COD order.
+  ///
+  /// In en, this message translates to:
+  /// **'Place order'**
+  String get placeOrder;
+
+  /// Places an online order and opens payment.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {amount}'**
+  String payAmount(String amount);
+
+  /// Checkout progress.
+  ///
+  /// In en, this message translates to:
+  /// **'Placing your order…'**
+  String get checkoutPlacing;
+
+  /// Checkout progress while the payment gateway is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your payment…'**
+  String get checkoutPaying;
+
+  /// Checkout progress while the server verifies the payment.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirming your payment…'**
+  String get checkoutVerifying;
+
+  /// Order success title.
+  ///
+  /// In en, this message translates to:
+  /// **'Order placed!'**
+  String get orderPlacedTitle;
+
+  /// Order number line.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {number}'**
+  String orderNumber(String number);
+
+  /// Order success payment line.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid {amount} online'**
+  String paidOnlineAmount(String amount);
+
+  /// Order success payment line for COD.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {amount} on delivery'**
+  String payOnDeliveryAmount(String amount);
+
+  /// Opens order tracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Track order'**
+  String get trackOrder;
+
+  /// Goes back to Home.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue shopping'**
+  String get continueShopping;
+
+  /// Shown until the tracking screen exists.
+  ///
+  /// In en, this message translates to:
+  /// **'Order tracking arrives in a later update.'**
+  String get trackingComingSoon;
+
+  /// Payment failed screen title.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed'**
+  String get paymentFailedTitle;
+
+  /// Payment failed screen text.
+  ///
+  /// In en, this message translates to:
+  /// **'The payment for order {number} wasn\'t completed.'**
+  String paymentNotCompleted(String number);
+
+  /// Payment failed: the customer cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'You closed the payment before it finished.'**
+  String get paymentCancelled;
+
+  /// Payment retry window end (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Pay by {time} to keep this order.'**
+  String paymentPayBy(String time);
+
+  /// Retries an online payment.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry payment'**
+  String get retryPayment;
+
+  /// Cancels the unpaid order and returns to checkout.
+  ///
+  /// In en, this message translates to:
+  /// **'Change payment method'**
+  String get changePaymentMethod;
+
+  /// Cancels an unpaid order.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel order'**
+  String get cancelOrder;
+
+  /// Confirm dialog title.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this order?'**
+  String get cancelOrderConfirm;
+
+  /// Confirm dialog: don't cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep order'**
+  String get keepOrder;
+
+  /// Snackbar/title after cancelling.
+  ///
+  /// In en, this message translates to:
+  /// **'Order cancelled'**
+  String get orderCancelled;
+
+  /// Order became PAYMENT_FAILED (window expired, 08 T4).
+  ///
+  /// In en, this message translates to:
+  /// **'The time to pay for order {number} has run out, so it wasn\'t placed. Your items are still in your cart.'**
+  String paymentWindowOver(String number);
+
+  /// Order is CANCELLED.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {number} was cancelled.'**
+  String paymentOrderCancelled(String number);
+
+  /// Goes to the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to cart'**
+  String get backToCart;
+
+  /// Dev-only fake payment sheet title.
+  ///
+  /// In en, this message translates to:
+  /// **'Test payment (dev build)'**
+  String get fakePaymentTitle;
+
+  /// Dev-only fake payment sheet text.
+  ///
+  /// In en, this message translates to:
+  /// **'No real money moves. Choose how paying {amount} ends.'**
+  String fakePaymentBody(String amount);
+
+  /// Dev-only fake payment option.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment succeeds'**
+  String get fakePaymentSucceed;
+
+  /// Dev-only fake payment option.
+  ///
+  /// In en, this message translates to:
+  /// **'Succeeds with a bad signature'**
+  String get fakePaymentBadSignature;
+
+  /// Dev-only fake payment option.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment fails'**
+  String get fakePaymentFail;
+
+  /// Dev-only fake payment option.
+  ///
+  /// In en, this message translates to:
+  /// **'External wallet (result by webhook)'**
+  String get fakePaymentWallet;
+
+  /// Dev-only fake payment option.
+  ///
+  /// In en, this message translates to:
+  /// **'Close checkout'**
+  String get fakePaymentCancel;
+
+  /// Checkout blocker NOT_SERVICEABLE.
+  ///
+  /// In en, this message translates to:
+  /// **'We don\'t deliver to this address from this store. Choose another address.'**
+  String get blockerNotServiceable;
+
+  /// Checkout blocker COUPON_NOT_ELIGIBLE.
+  ///
+  /// In en, this message translates to:
+  /// **'Your coupon no longer applies. Remove it or add items to continue.'**
+  String get blockerCouponNotEligible;
+
+  /// Checkout blocker COUPON_EXPIRED.
+  ///
+  /// In en, this message translates to:
+  /// **'Your coupon has expired. Remove it to continue.'**
+  String get blockerCouponExpired;
+
+  /// Checkout blocker COUPON_INVALID.
+  ///
+  /// In en, this message translates to:
+  /// **'Your coupon isn\'t valid any more. Remove it to continue.'**
+  String get blockerCouponInvalid;
+
+  /// Checkout blocker COUPON_USAGE_EXCEEDED.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve already used this coupon. Remove it to continue.'**
+  String get blockerCouponUsed;
+
+  /// Coupon not eligible: FIRST_ORDER_ONLY.
+  ///
+  /// In en, this message translates to:
+  /// **'Only for your first order'**
+  String get couponFirstOrderOnly;
+
+  /// Coupon not eligible: NO_ELIGIBLE_ITEMS.
+  ///
+  /// In en, this message translates to:
+  /// **'No items in your cart qualify for this coupon'**
+  String get couponNoEligibleItems;
+
+  /// Coupon not eligible: STORE.
+  ///
+  /// In en, this message translates to:
+  /// **'Not valid at this store'**
+  String get couponWrongStore;
+
+  /// Coupon sheet: the coupon already on the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied'**
+  String get couponAppliedBadge;
+
+  /// Coupon expiry date (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Expires on {date}'**
+  String couponExpiresOn(String date);
+
+  /// PRICE_CHANGED with the server's old and new totals.
+  ///
+  /// In en, this message translates to:
+  /// **'Your total changed from {before} to {after}. Please check the updated bill.'**
+  String priceChangedDetail(String before, String after);
+
+  /// STOCK_UNAVAILABLE for a line that can't be ordered at all.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is now out of stock.'**
+  String stockOutDetail(String name);
+
+  /// STOCK_UNAVAILABLE with the server's orderable quantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Only {count} of {name} can be ordered now.'**
+  String stockOnlyDetail(int count, String name);
+
+  /// Dialog when placing an order while another awaits payment.
+  ///
+  /// In en, this message translates to:
+  /// **'An order is waiting for payment'**
+  String get pendingOrderTitle;
+
+  /// Dialog body (409 with pending_order_id).
+  ///
+  /// In en, this message translates to:
+  /// **'Finish or cancel the payment for that order before placing a new one.'**
+  String get pendingOrderBody;
+
+  /// Opens the pending order's payment screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to that order'**
+  String get pendingOrderAction;
+
+  /// Home banner for a PAYMENT_PENDING order (recovery after the app was closed).
+  ///
+  /// In en, this message translates to:
+  /// **'Order {number} is waiting for payment'**
+  String pendingPaymentBanner(String number);
+
+  /// Home banner action: opens the order's payment screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay now'**
+  String get pendingPaymentAction;
+
+  /// Order success ETA (IST).
+  ///
+  /// In en, this message translates to:
+  /// **'Arriving by {time}'**
+  String arrivingBy(String time);
+
+  /// Payment screen when the server status read failed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t check this order\'s payment status, so payment can\'t be retried yet.'**
+  String get paymentStatusUnchecked;
+
+  /// Re-reads the order's status from the server.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get checkAgain;
+
+  /// Payment screen while the server status loads.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking the payment status…'**
+  String get checkingPayment;
 }
 
 class _AppLocalizationsDelegate

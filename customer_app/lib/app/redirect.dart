@@ -22,6 +22,16 @@ abstract final class Routes {
   static const newAddress = '/account/addresses/new';
   static const deleteAccount = '/account/delete';
 
+  /// Under Home, on the root navigator: `go` keeps Home behind them.
+  static const cart = '/home/cart';
+  static const checkout = '/home/cart/checkout';
+
+  /// The order-placed screen (`03 §2.9`).
+  static String orderSuccess(int orderId) => '/orders/$orderId/success';
+
+  /// Payment failed / retry for a `PAYMENT_PENDING` order (`03 §2.9`).
+  static String paymentFailed(int orderId) => '/orders/$orderId/payment';
+
   static String editAddress(int id) => '/account/addresses/$id';
 
   /// Product list of a category; [sub] preselects a sub-category.

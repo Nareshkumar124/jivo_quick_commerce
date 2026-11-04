@@ -36,6 +36,12 @@ class FakeTaskBackend
   static const deliveryOtp = '4321';
   static const maxOtpAttempts = 5;
 
+  /// What a COD order asks the rider to collect.
+  static const codAmount = '1249.00';
+
+  /// Where the customer's drop pin is.
+  static const customerLocation = GeoPoint(28.5832, 77.3412);
+
   static const store = TaskStore(
     name: 'Jivo Sector 18',
     address: 'Shop 4, Sector 18 Market, Noida',
@@ -87,7 +93,7 @@ class FakeTaskBackend
       dropLocality: 'Sector 21, Noida',
       distanceKm: '2.4',
       paymentType: cod ? PaymentType.cod : PaymentType.prepaid,
-      codAmount: cod ? '1249.00' : null,
+      codAmount: cod ? codAmount : null,
       estimatedPayout: '45.00',
       expiresAt: now.add(expiresIn ?? kOfferWindow),
     );
@@ -157,7 +163,7 @@ class FakeTaskBackend
     store: store,
     storeProgress: StoreOrderProgress.packing,
     paymentType: cod ? PaymentType.cod : PaymentType.prepaid,
-    codAmountDue: cod ? '1249.00' : null,
+    codAmountDue: cod ? codAmount : null,
     payout: '45.00',
     distanceKm: '2.4',
     dropLocality: 'Sector 21, Noida',
@@ -167,7 +173,7 @@ class FakeTaskBackend
       address: 'Flat 302, Tower B, Sector 21, Noida',
       landmark: 'Opposite the park gate',
       instructions: 'Ring the bell twice',
-      location: GeoPoint(28.5832, 77.3412),
+      location: customerLocation,
     ),
     items: const [
       TaskItem(name: 'Jivo Canola Oil', unit: '1 L', quantity: 2),

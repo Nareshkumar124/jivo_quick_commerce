@@ -13,6 +13,10 @@ import '../features/catalog/presentation/categories_screen.dart';
 import '../features/catalog/presentation/collection_screen.dart';
 import '../features/catalog/presentation/product_detail_screen.dart';
 import '../features/catalog/presentation/product_list_screen.dart';
+import '../features/cart/presentation/cart_screen.dart';
+import '../features/checkout/presentation/checkout_screen.dart';
+import '../features/checkout/presentation/order_success_screen.dart';
+import '../features/checkout/presentation/payment_failed_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/launch/presentation/app_control_screens.dart';
 import '../features/launch/presentation/onboarding_screen.dart';
@@ -21,6 +25,7 @@ import '../features/location/presentation/location_flow.dart';
 import '../features/location/presentation/location_screen.dart';
 import '../features/location/presentation/map_picker_screen.dart';
 import '../features/location/presentation/not_serviceable_screen.dart';
+import '../features/orders/domain/order.dart';
 import '../features/orders/presentation/order_again_screen.dart';
 import '../features/profile/presentation/account_screens.dart';
 import '../features/search/presentation/search_screen.dart';
@@ -28,6 +33,7 @@ import 'app_shell.dart';
 import 'launch_state.dart';
 import 'providers.dart';
 import 'redirect.dart';
+import 'repositories.dart';
 
 /// App routes. Each has a `name` (reported as the analytics screen view).
 /// Redirects follow the session, app-control and launch state; see
@@ -48,13 +54,26 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 
   final analytics = ref.watch(analyticsProvider);
-  StatefulShellBranch tab(String path, String name, Widget screen) =>
-      StatefulShellBranch(
-        observers: [AnalyticsNavigatorObserver(analytics)],
-        routes: [route(path, name, (_) => screen)],
-      );
+  final rootNavigatorKey = ref.watch(rootNavigatorKeyProvider);
+  StatefulShellBranch tab(
+    String path,
+    String name,
+    Widget screen, {
+    List<RouteBase> routes = const [],
+  }) => StatefulShellBranch(
+    observers: [AnalyticsNavigatorObserver(analytics)],
+    routes: [
+      GoRoute(
+        path: path,
+        name: name,
+        builder: (context, state) => screen,
+        routes: routes,
+      ),
+    ],
+  );
 
   final router = GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: Routes.splash,
     refreshListenable: Listenable.merge([session, signals, launch]),
     observers: [AnalyticsNavigatorObserver(analytics)],
@@ -91,7 +110,29 @@ final routerProvider = Provider<GoRouter>((ref) {
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => AppShell(shell: shell),
         branches: [
-          tab(Routes.home, 'home', const HomeScreen()),
+          // Cart and checkout sit on the root navigator (no bottom tabs),
+          // under Home so that `go` to them keeps Home behind them.
+          tab(
+            Routes.home,
+            'home',
+            const HomeScreen(),
+            routes: [
+              GoRoute(
+                path: 'cart',
+                name: 'cart',
+                parentNavigatorKey: rootNavigatorKey,
+                builder: (context, state) => const CartScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'checkout',
+                    name: 'checkout',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => const CheckoutScreen(),
+                  ),
+                ],
+              ),
+            ],
+          ),
           tab(Routes.categories, 'categories', const CategoriesScreen()),
           tab(Routes.orderAgain, 'order_again', const OrderAgainScreen()),
           tab(Routes.account, 'account', const AccountScreen()),
@@ -114,6 +155,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         '/collection/:slug',
         'collection',
         (state) => CollectionScreen(slug: state.pathParameters['slug']!),
+      ),
+      route(
+        '/orders/:id/success',
+        'order_success',
+        (state) => OrderSuccessScreen(
+          orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+          order: state.extra is PlacedOrder
+              ? state.extra! as PlacedOrder
+              : null,
+        ),
+      ),
+      route(
+        '/orders/:id/payment',
+        'payment_failed',
+        (state) => PaymentFailedScreen(
+          orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+          args: state.extra is PaymentFailedArgs
+              ? state.extra! as PaymentFailedArgs
+              : null,
+        ),
       ),
       route(Routes.search, 'search', (_) => const SearchScreen()),
       route(Routes.location, 'location', (_) => const LocationScreen()),
