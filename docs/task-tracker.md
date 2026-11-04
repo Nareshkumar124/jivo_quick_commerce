@@ -40,7 +40,7 @@ Last updated: 2026-11-04 (Phase 4 started at the user's request, DL-47; P3 gate 
 | T-413 | P4 admin + Ops Console: live board (HTMX polling), packing console (`05 §1.3`), customer detail, audit log, refund retry screen; T-304 coupon-form minors | ADM | P0 | T-412 services | Admin/ops screens and tests | Role matrix; state changes only via services | In Progress (`admin/phase-4`) |
 | T-414 | Customer P4: order list/detail/timeline, invoice download, cancel sheet, reorder, previously-bought rail; lookahead tracking, inbox, deep links | CUS | P0 | T-411 | Screens on fakes, then real API | No client-side money; tests green | In Progress (`customer/phase-4`) |
 | T-415 | Rider P4 lookahead: gaps in `04 §2.7–2.9` (documents), accept→deliver integration harness with GPX | RID | P1 | – | Screens and harness on fakes | Tests green | Testing (merged; review: Approve; 351 tests; API requests #25-#27; P5 follow-ups: guard `/profile/documents/:type` for approved docs, share the dev-tools and support-phone helpers) |
-| T-416 | QA: P4 test plan and verification; mini-UAT with store staff | QA | P0 | T-412, T-413 | P4 reports | P4 readiness verdict | Not Started (after P3 stage 2) |
+| T-416 | QA: P4 test plan and verification; mini-UAT with store staff | QA | P0 | T-412, T-413 | P4 reports | P4 readiness verdict | In Progress (plan and 60 cases plus UAT-P4-01..13 merged `69fe035`; execution after the backend R2 and admin merges) |
 
 ## Phase 3: Cart, checkout, payments (started 2026-11-03, DL-42)
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
@@ -54,7 +54,7 @@ Last updated: 2026-11-04 (Phase 4 started at the user's request, DL-47; P3 gate 
 | T-307 | Review of T-225 (incl. the unreviewed `b6b6eff`) and of each P3 module branch before merge | REVIEW | P0 | each run | Review verdicts | No Blockers before merge | In Progress (T-225/T-211: Approve with fixes, all fixed, merged; open for CUS: add jivo_core `isVersionBelow` tests for build suffix and short versions) |
 | T-308 | Twilio SMS backend for OTP (`TwilioSmsBackend`, settings, system check, no secrets in logs) at the user's request; production gateway stays D-02 | BE | P1 | – | Backend, tests, `.env.example` | Test numbers send no SMS; live OTP on the user's phone | Testing (merged `88692a1`; review fixes applied. Live SMS off: the Twilio trial account only allows predefined templates (error 572006). User chose to skip real SMS for now; console backend on :8001) |
 | T-309 | New Windows dev machine: worktrees, native Redis 6380, :8001, Celery worker + beat (separate processes: no `-B` on Windows), `C:\dev\flutter` junction (space in the user path breaks native-asset hooks) | PM | P0 | – | Running stack | API ready check OK | Completed (2026-11-04; MinIO/Mailpit not running: no Docker) |
-| T-310 | QA: verify P3 | QA | P0 | T-303, T-304, T-306 | P3 test plan, black-box suite, verdict | P3 readiness verdict | Testing (stage 2 merged `a7269a0`: 61/64 pass, 0 fail, BUG-0009 verified; verdict: ready with conditions; TC-26/TC-63 deferred to P4, DL-50; refund re-check after the fix run) |
+| T-310 | QA: verify P3 | QA | P0 | T-303, T-304, T-306 | P3 test plan, black-box suite, verdict | P3 readiness verdict | Completed (QA verdict: ready for sign-off; 66/69 pass, 0 fail; refund re-check passed `69fe035`; P3-TC-64 passed on the phone; formal gate = CI on the develop -> main PR, waiting on the GitHub login) |
 
 ### Phase 4 carry-overs from the P3 reviews
 | ID | Item | Owner | Status |
@@ -62,11 +62,11 @@ Last updated: 2026-11-04 (Phase 4 started at the user's request, DL-47; P3 gate 
 | T-401c | Ops view for FAILED/PENDING refunds with manual retry (R2b review M2) | BE + ADM | Not Started |
 | T-402c | `payment_status` for mismatch/duplicate refunds; cap total refunds ≤ captured before partial refunds (R2b review Minor 7) | BE | Not Started |
 | T-403c | Gateway calls outside row locks; `skip_locked`/task lock on `expire_unpaid_orders` (R2b review Minors 6, 8) | BE | Not Started |
-| T-404c | Mirror new env vars (`CART_MAX_TIP`, `PAYMENT_GATEWAY`, `RAZORPAY_*`, `ORDERS_CREATE_RATE`, `PAYMENTS_RATE`, `RAZORPAY_TIMEOUT_SECONDS`) into `infra/env/backend.env.example`; Celery beat in every environment; Razorpay webhook config on staging; CI check for the Razorpay native pins | DEVOPS | Not Started |
+| T-404c | Mirror new env vars (`CART_MAX_TIP`, `PAYMENT_GATEWAY`, `RAZORPAY_*`, `ORDERS_CREATE_RATE`, `PAYMENTS_RATE`, `RAZORPAY_TIMEOUT_SECONDS`) into `infra/env/backend.env.example`; Celery beat in every environment; Razorpay webhook config on staging; CI check for the Razorpay native pins | DEVOPS | Completed (merged 2026-11-04) |
 | T-405c | Move `set_cod_blocked` from `accounts/admin.py` into an `accounts` service and have the admin call it (T-304 review Minor 1) | BE + ADM | Not Started |
 | T-406c | `PricingConfig` sanity bounds and cross-field checks; coupon edits guarded against live usage (limit below uses, code rename once used); catch the code-uniqueness race (T-304 review Minors 2-4) | BE + ADM | Not Started |
 | T-407c | Confirm Store Staff `ORDER_VIEW` against `05 §3` in the P4 role refinement (T-304 review Minor 5) | PM | Not Started |
-| T-408c | `pytest-xdist` for the backend suite (single-threaded runs against the remote DB take 40+ min) | BE + DevOps | Not Started |
+| T-408c | `pytest-xdist` for the backend suite (single-threaded runs against the remote DB take 40+ min) | BE + DevOps | Completed (merged 2026-11-04) |
 
 ## Phase 2: Stores, catalog, inventory, home
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
