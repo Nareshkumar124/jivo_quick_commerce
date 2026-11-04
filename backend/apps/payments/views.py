@@ -47,6 +47,19 @@ HEADER_REQUIRED = "This header is required."
 INVALID_WEBHOOK_SIGNATURE = "The webhook signature is invalid."
 
 
+# Local development only: the fake gateway's FAKE_GATEWAY_DOWN switch (P3-TC-63).
+VERIFY_UNAVAILABLE = error_response(
+    "Maintenance mode (`MAINTENANCE`), or the payment gateway could not be reached "
+    "(`SERVICE_UNAVAILABLE`): nothing changed; call verify again.",
+    *app_responses({})[503].examples,
+    error_example(
+        ErrorCode.SERVICE_UNAVAILABLE,
+        "Online payment is temporarily unavailable. Try again, or choose cash on delivery.",
+        name="PAYMENT_GATEWAY_UNAVAILABLE",
+    ),
+)
+
+
 class RazorpayVerifyView(APIView):
     throttle_classes = [PaymentThrottle]
 
@@ -102,6 +115,7 @@ class RazorpayVerifyView(APIView):
                     ),
                 ),
                 429: RATE_LIMITED,
+                503: VERIFY_UNAVAILABLE,
             }
         ),
     )

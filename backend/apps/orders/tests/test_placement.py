@@ -68,7 +68,7 @@ class TestCashOnDelivery:
         assert order["placed_at"]
         assert order["eta_at"]
         assert order["payment_expires_at"] is None
-        assert order["can_cancel"] is False  # Phase 3: only unpaid orders can be cancelled
+        assert order["can_cancel"] is True  # 08 §7: PLACED is cancellable (Phase 4)
         assert [(i["variant_id"], i["quantity"]) for i in order["items"]] == [
             (shop.canola_1l.pk, 2),
             (shop.chia.pk, 1),

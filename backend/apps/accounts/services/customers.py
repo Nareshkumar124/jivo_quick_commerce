@@ -96,3 +96,34 @@ def unblock_customer(user_id: int, *, by: User) -> bool:
         user.save(update_fields=["is_active", "updated_at"])
         _record(by, user, LOG_UNBLOCKED)
     return True
+
+
+# --------------------------------------------------------------------------- COD block (T-405c)
+
+LOG_COD_BLOCKED = "Cash on delivery blocked: COD is not offered at checkout."
+LOG_COD_ALLOWED = "Cash on delivery allowed again."
+MSG_COD_ANONYMISED = "This account has been anonymised; its COD setting cannot change."
+
+
+def set_cod_blocked(user_id: int, blocked: bool, *, by: User) -> bool:
+    """Set `User.cod_blocked` (08 T2: COD is not offered to the customer; 08 §6.4 repeated
+    refusals). Moved here from the admin's interim copy (T-405c), same signature and behaviour:
+    one transaction with the row locked; staff, anonymised and unknown accounts refused with a
+    `ValidationError`; True only when the flag changed; the actor recorded as an admin
+    `LogEntry` on the Customer with no personal data in it ("Customer 42"). No side effects:
+    orders already placed are not touched; the next cart read hides COD."""
+    if by is None or by.pk is None:
+        raise ValueError("set_cod_blocked needs the acting staff user (`by`).")
+    with transaction.atomic():
+        user = User.objects.select_for_update().filter(pk=user_id).first()
+        if user is None:
+            raise ValidationError(MSG_NOT_FOUND, code="not_found")
+        if user.is_staff or user.is_superuser:
+            raise ValidationError(MSG_STAFF, code="staff")
+        if user.anonymised_at is not None:
+            raise ValidationError(MSG_COD_ANONYMISED, code="anonymised")
+        if user.cod_blocked == blocked:
+            return False
+        User.objects.filter(pk=user.pk).update(cod_blocked=blocked, updated_at=timezone.now())
+        _record(by, user, LOG_COD_BLOCKED if blocked else LOG_COD_ALLOWED)
+    return True

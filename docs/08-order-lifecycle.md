@@ -170,6 +170,7 @@ grand_total      = item_total − coupon_discount + delivery_fee + small_cart_fe
 ### 6.3 Partial unavailability (T8a)
 - Removed units → recalculate `item_total`. Coupon: keep the original discount, capped at the new `item_total` (customer is not penalised for store stock errors). Fees: recalculate, but **never increase** the amount payable.
 - ONLINE: refund `old grand_total − new grand_total`. COD: the new amount due is shown to the rider.
+- **Implementation (Phase 4, PM default ⚠ to confirm with D-10):** "never increase" is applied per fee: each fee (delivery, small cart, handling) is recalculated and capped at the fee the order already had, so a fee that removing items would newly trigger (e.g. falling below free delivery) is not charged. Prices are the order's own snapshot; the tip is unchanged. Removing the last units does not leave an empty order: the whole order is cancelled (T12, reason `ITEMS_UNAVAILABLE`, full refund) and its lines keep their quantities. `Order.amount_paid` records what was captured, so refunds after a lower `grand_total` stay bounded by what was paid.
 
 ### 6.4 Refund policy (defaults, to be confirmed in D-10)
 | Situation | Online paid | COD |
@@ -180,6 +181,8 @@ grand_total      = item_total − coupon_discount + delivery_fee + small_cart_fe
 | Delivery failed: customer not reachable / refused | Refund item value; delivery fee kept (configurable) | Nothing due; repeated refusals flag the user for COD block |
 | Delivery failed: Jivo's fault (wrong address resolved by ops, rider issue) | Full refund | Nothing due |
 | Late capture on a failed/cancelled order (T3a) | Full auto-refund | n/a |
+
+Phase 4 defaults (D-10 not decided, DL-47): the table is implemented as written. "Full refund" on a cancellation = everything still refundable (after a T8a partial refund, the rest). The failed-delivery "item value" is implemented as everything still refundable minus the delivery fee when `REFUND_KEEP_DELIVERY_FEE_ON_CUSTOMER_FAULT` is true (tip and other fees refunded) — ⚠ to confirm. A cancelled COD order gets `payment_status` FAILED ("Not paid"). Staff refunds outside these rules (05 §3 Refund) are capped by what is still refundable.
 
 ## 7. Customer cancellation window
 Allowed in `PAYMENT_PENDING`, `PLACED` and `ACCEPTED`. Blocked from `PACKING` onward (setting `CUSTOMER_CANCEL_UNTIL = ACCEPTED`). After that, the app shows "Contact support".

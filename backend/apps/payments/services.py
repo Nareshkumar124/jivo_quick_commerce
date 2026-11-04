@@ -44,9 +44,15 @@ def verify_payment(
         raise NotFound(orders.MSG_NOT_FOUND)
     if not order.payments.filter(gateway_order_id=razorpay_order_id).exists():
         raise ApiError(ErrorCode.PAYMENT_VERIFICATION_FAILED)
-    if not get_gateway().verify_payment_signature(
-        order_id=razorpay_order_id, payment_id=razorpay_payment_id, signature=signature
-    ):
+    from apps.payments.gateways import PaymentGatewayError
+
+    try:
+        valid = get_gateway().verify_payment_signature(
+            order_id=razorpay_order_id, payment_id=razorpay_payment_id, signature=signature
+        )
+    except PaymentGatewayError as exc:  # the fake gateway's FAKE_GATEWAY_DOWN (P3-TC-63)
+        raise ApiError(ErrorCode.SERVICE_UNAVAILABLE, orders.MSG_GATEWAY_DOWN) from exc
+    if not valid:
         raise ApiError(ErrorCode.PAYMENT_VERIFICATION_FAILED)
     # A valid signature is treated as a capture of the full amount (code review Minor 5, PM
     # decision): every gateway order is created for exactly the order's grand_total and with

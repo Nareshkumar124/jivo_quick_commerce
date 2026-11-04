@@ -51,6 +51,10 @@ class TestRoles:
             "view_payment",
             "view_refund",
             "view_paymentwebhookevent",
+            # Phase 4: invoices, refunds (05 §3 Refund ✔), the audit log (view)
+            "view_invoice",
+            "issue_refund",
+            "view_auditlog",
         }
 
     @pytest.mark.parametrize(

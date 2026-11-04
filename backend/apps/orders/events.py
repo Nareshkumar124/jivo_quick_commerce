@@ -10,9 +10,16 @@ from django.db import transaction
 PLACED = "order.placed"  # T2/T3: the store should start
 PAYMENT_PENDING = "order.payment_pending"  # T1
 PAYMENT_FAILED = "order.payment_failed"  # T4
-CANCELLED = "order.cancelled"  # T5
+CANCELLED = "order.cancelled"  # T5, T11, T12
+# Phase 4 (08 §9)
+ACCEPTED = "order.accepted"  # T6: customer "Order confirmed"; dispatch if DISPATCH_TRIGGER
+PACKING = "order.packing"  # T7: customer label only
+PACKED = "order.packed"  # T8: rider "Order ready" (Phase 5), board
+ITEMS_ADJUSTED = "order.items_adjusted"  # T8a: customer push + SMS with the refund / new amount
+ACCEPTANCE_SLA_BREACHED = "order.acceptance_sla_breached"  # ops alert, store re-alert
 LATE_CAPTURE = "payment.late_capture"  # T3a: ops alert
-REFUND_FAILED = "payment.refund_failed"  # ops alert: retry with refunds.retry_failed_refund()
+REFUND_FAILED = "payment.refund_failed"  # ops alert: retry with order_refunds.retry_refund()
+OPS_ALERTS = frozenset({LATE_CAPTURE, REFUND_FAILED, ACCEPTANCE_SLA_BREACHED})
 
 
 def emit(event: str, order_id: int) -> None:

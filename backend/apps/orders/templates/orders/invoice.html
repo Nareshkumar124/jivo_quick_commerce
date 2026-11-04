@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tax invoice {{ invoice.invoice_number }}</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  body { font-family: sans-serif; font-size: 10pt; color: #111; }
+  h1 { font-size: 16pt; margin: 0 0 4mm; }
+  .placeholder { border: 2px solid #b00; color: #b00; padding: 3mm; font-weight: bold; margin-bottom: 4mm; text-align: center; }
+  table { width: 100%; border-collapse: collapse; margin-top: 4mm; }
+  th, td { border: 1px solid #999; padding: 1.5mm; text-align: left; }
+  td.num, th.num { text-align: right; }
+  .meta td { border: none; padding: 0.5mm 0; vertical-align: top; }
+</style>
+</head>
+<body>
+{% if invoice.is_placeholder %}<div class="placeholder">PLACEHOLDER - NOT A VALID TAX INVOICE (GST details pending, D-12)</div>{% endif %}
+<h1>Tax invoice</h1>
+<table class="meta">
+  <tr>
+    <td><strong>{{ seller_name }}</strong><br>{{ store.name }}<br>{{ store.address }}, {{ store.city }}, {{ store.state }} {{ store.pincode }}<br>GSTIN: {{ invoice.seller_gstin }}{% if store.fssai_license_no %}<br>FSSAI: {{ store.fssai_license_no }}{% endif %}</td>
+    <td>Invoice no.: <strong>{{ invoice.invoice_number }}</strong><br>Date: {{ issued_at|date:"d M Y, H:i" }} IST<br>Order: {{ order.order_number }}<br>Payment: {{ order.get_payment_method_display }}</td>
+  </tr>
+  <tr>
+    <td colspan="2">Bill to / ship to: {{ address.receiver_name }}, {{ address.house }}, {{ address.building_street }}, {{ address.area }}, {{ address.city }}, {{ address.state }} {{ address.pincode }}<br>Place of supply: {{ address.state }}</td>
+  </tr>
+</table>
+<table>
+  <thead><tr><th>Item</th><th>HSN/SAC</th><th class="num">Qty</th><th class="num">Taxable value</th><th class="num">GST %</th><th class="num">GST</th><th class="num">Amount</th></tr></thead>
+  <tbody>
+  {% for line in lines %}<tr><td>{{ line.description }}</td><td>{{ line.code }}</td><td class="num">{{ line.quantity }}</td><td class="num">{{ line.taxable }}</td><td class="num">{{ line.rate }}</td><td class="num">{{ line.tax }}</td><td class="num">{{ line.gross }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<table>
+  <tr><td>Taxable value</td><td class="num">₹{{ totals.taxable }}</td></tr>
+  {% if invoice.igst != 0 %}<tr><td>IGST</td><td class="num">₹{{ totals.igst }}</td></tr>{% else %}<tr><td>CGST</td><td class="num">₹{{ totals.cgst }}</td></tr><tr><td>SGST</td><td class="num">₹{{ totals.sgst }}</td></tr>{% endif %}
+  <tr><td><strong>Invoice total</strong></td><td class="num"><strong>₹{{ totals.total }}</strong></td></tr>
+  {% if order.tip %}<tr><td>Rider tip (passed to the rider; not part of this invoice)</td><td class="num">₹{{ totals.tip }}</td></tr>{% endif %}
+  <tr><td>{% if order.payment_method == "COD" %}Amount due (cash on delivery){% else %}Amount paid{% endif %}</td><td class="num">₹{{ totals.grand_total }}</td></tr>
+</table>
+</body>
+</html>
