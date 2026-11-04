@@ -33,6 +33,7 @@ SUPER_ADMIN_APPS = (
     "cart",
     "orders",
     "payments",
+    "delivery",
     "core",  # audit log: view only (see _permissions_for)
 )
 
@@ -82,6 +83,10 @@ ORDER_PROCESS = "orders.process_order"  # packing console: accept, pack, items u
 ORDER_CANCEL = "orders.cancel_order"  # 08 T12 (store manager: own stores, before pickup)
 REFUND_ISSUE = "payments.issue_refund"  # manual refund / retry (Support up to the limit)
 AUDIT_VIEW = "core.view_auditlog"
+# Phase 5 (05 §3 "Rider approval / suspend": Super Admin, Ops ✔; Store Manager view own). State
+# changes go through apps.delivery.services.kyc, which re-checks these and the store scope.
+RIDER_VIEW = ["delivery.view_rider", "delivery.view_riderdocument", "delivery.view_ridershift"]
+RIDER_REVIEW = ["delivery.review_rider", "delivery.view_kyc_document_file"]
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     SUPER_ADMIN: [],  # all permissions of SUPER_ADMIN_APPS (see _permissions_for)
@@ -95,6 +100,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         *ORDER_VIEW,
         ORDER_PROCESS,
         ORDER_CANCEL,
+        *RIDER_VIEW,
+        *RIDER_REVIEW,
     ],
     STORE_MANAGER: [
         *STORE_VIEW,
@@ -104,6 +111,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         *ORDER_VIEW,
         ORDER_PROCESS,
         ORDER_CANCEL,
+        *RIDER_VIEW,
     ],
     STORE_STAFF: [*CATALOG_VIEW, *INVENTORY_VIEW, *ORDER_VIEW, ORDER_PROCESS],
     CATALOG_MANAGER: [*CATALOG_MANAGE, *INVENTORY_VIEW, *COUPON_MANAGE],

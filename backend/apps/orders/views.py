@@ -46,6 +46,7 @@ from apps.orders.serializers import (
     OrderListQuerySerializer,
     OrderPlacementSerializer,
     OrderSerializer,
+    OrderTrackSerializer,
     PaginatedOrderSummaryListSerializer,
     ReorderResultSerializer,
 )
@@ -525,3 +526,37 @@ class OrderReorderView(APIView):
                 "unavailable": unavailable,
             }
         )
+
+
+class OrderTrackView(APIView):
+    @extend_schema(
+        operation_id="orders_track",
+        tags=TAGS,
+        summary="Live tracking",
+        description=(
+            "Status, ETA, the store, the delivery pin, the rider (from assignment until the "
+            "order ends; `rider` is null before) and the delivery OTP (only while "
+            "OUT_FOR_DELIVERY; give it to the rider at the door). Poll every 10 s while the "
+            "tracking screen is open (Phase 6 adds the WebSocket). Another user's order: 404."
+        ),
+        parameters=[ORDER_ID],
+        responses=app_responses(
+            {
+                200: ok_response(
+                    OrderTrackSerializer,
+                    "Tracking.",
+                    ("Accepted, no rider yet", ex.TRACK_NO_RIDER),
+                    ("Rider heading to the store", ex.TRACK_PACKING),
+                    ("Out for delivery (OTP shown)", ex.TRACK_OUT_FOR_DELIVERY),
+                    ("Delivered", ex.TRACK_DELIVERED),
+                ),
+                401: UNAUTHORIZED,
+                404: ORDER_NOT_FOUND,
+            }
+        ),
+    )
+    def get(self, request: Request, id: int) -> Response:
+        from apps.delivery.services.tracking import track_body
+
+        order = services.get_own_order(request.user, id)
+        return Response(track_body(order))

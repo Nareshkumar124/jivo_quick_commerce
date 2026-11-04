@@ -372,3 +372,63 @@ class ReorderResultSerializer(serializers.Serializer):
         many=True,
         help_text="Lines that could not be added in full; [] when everything was added.",
     )
+
+
+# --------------------------------------------------------------------------- tracking (Phase 5)
+
+
+class TrackPointSerializer(serializers.Serializer):
+    lat = serializers.FloatField(help_text="Latitude (WGS84).")
+    lng = serializers.FloatField(help_text="Longitude (WGS84).")
+
+
+class TrackStoreSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    lat = serializers.FloatField()
+    lng = serializers.FloatField()
+
+
+class TrackRiderSerializer(serializers.Serializer):
+    """The assigned rider, shown from assignment until the order ends (08 §9)."""
+
+    name = serializers.CharField(help_text="The rider's first name and last initial.")
+    phone = serializers.CharField(help_text="E.164. Direct dial in v1 (masked calling is v2).")
+    photo = serializers.URLField(
+        allow_null=True,
+        help_text=(
+            "Signed https link to the rider's photo, valid about an hour (re-read `track/` "
+            "for a fresh one); null without a photo."
+        ),
+    )
+    lat = serializers.FloatField(allow_null=True, help_text="Last known position; null if none.")
+    lng = serializers.FloatField(allow_null=True)
+    updated_at = serializers.DateTimeField(
+        allow_null=True, help_text="When that position was recorded."
+    )
+
+
+class OrderTrackSerializer(serializers.Serializer):
+    """`GET /orders/{id}/track/` (api-requests #28): poll every 10 s while the tracking screen is
+    open (WebSocket from Phase 6)."""
+
+    order_id = serializers.IntegerField()
+    order_number = serializers.CharField(help_text='e.g. "JV-261110-001203".')
+    status = serializers.ChoiceField(choices=OrderStatus.choices)
+    eta_at = serializers.DateTimeField(
+        allow_null=True, help_text="Promised delivery time (08 §8); null once the order ended."
+    )
+    store = TrackStoreSerializer()
+    destination = TrackPointSerializer(help_text="The delivery pin.")
+    rider = TrackRiderSerializer(
+        allow_null=True,
+        help_text="Null until a rider accepts, and again once the order is finished.",
+    )
+    delivery_otp = serializers.CharField(
+        allow_null=True,
+        help_text=(
+            "The 4-digit OTP to give the rider, only while OUT_FOR_DELIVERY; null otherwise. "
+            "Never share it before the rider arrives."
+        ),
+    )
+    server_time = serializers.DateTimeField()

@@ -27,6 +27,8 @@ SEED_STEPS: list[str] = [
     "apps.promotions.seed.seed_coupons",
     # Phase 4: a delivered demo order for the test customer (invoice, reorder, order history)
     "apps.orders.seed.seed_orders",
+    # Phase 5: an ACTIVE test rider (+919000000002) and a PENDING_KYC applicant at GGN-01
+    "apps.delivery.seed.seed_riders",
 ]
 
 

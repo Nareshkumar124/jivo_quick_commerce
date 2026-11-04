@@ -40,8 +40,29 @@ class AppConfig(TimeStampedModel):
             "released (01 §5, 08 T4). Applies to orders placed after a change."
         ),
     )
-    rider_location_active_interval_seconds = models.PositiveSmallIntegerField(default=10)
-    rider_location_idle_interval_seconds = models.PositiveSmallIntegerField(default=30)
+    # Rider location (04 §3, api-requests #2): upload ("interval") and sampling periods while on
+    # a task ("active") and while online and idle, and the largest batch the server accepts.
+    rider_location_active_interval_seconds = models.PositiveSmallIntegerField(
+        default=10, validators=[MinValueValidator(5), MaxValueValidator(60)]
+    )
+    rider_location_idle_interval_seconds = models.PositiveSmallIntegerField(
+        default=30, validators=[MinValueValidator(10), MaxValueValidator(300)]
+    )
+    rider_location_active_sample_seconds = models.PositiveSmallIntegerField(
+        default=5,
+        validators=[MinValueValidator(1), MaxValueValidator(60)],
+        help_text="How often the rider app takes a GPS fix on a task (<= the upload interval).",
+    )
+    rider_location_idle_sample_seconds = models.PositiveSmallIntegerField(
+        default=30,
+        validators=[MinValueValidator(5), MaxValueValidator(300)],
+        help_text="How often the rider app takes a GPS fix while idle (<= the upload interval).",
+    )
+    rider_location_max_batch = models.PositiveSmallIntegerField(
+        default=50,
+        validators=[MinValueValidator(10), MaxValueValidator(200)],
+        help_text="Most points the app may send in one `POST /rider/locations/` request.",
+    )
     feature_flags = models.JSONField(
         default=dict, blank=True, help_text='Name -> true/false, e.g. {"new_home": true}.'
     )
@@ -57,6 +78,22 @@ class AppConfig(TimeStampedModel):
 
     def __str__(self) -> str:
         return "App configuration"
+
+    def clean(self) -> None:
+        super().clean()
+        from django.core.exceptions import ValidationError
+
+        errors = {}
+        if self.rider_location_active_sample_seconds > self.rider_location_active_interval_seconds:
+            errors["rider_location_active_sample_seconds"] = (
+                "Must not be longer than the active upload interval."
+            )
+        if self.rider_location_idle_sample_seconds > self.rider_location_idle_interval_seconds:
+            errors["rider_location_idle_sample_seconds"] = (
+                "Must not be longer than the idle upload interval."
+            )
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs) -> None:
         self.pk = SINGLETON_ID

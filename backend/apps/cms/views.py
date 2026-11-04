@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.services.otp import OTP_DIGITS
 from apps.cms.serializers import AppConfigSerializer
-from apps.cms.services import get_app_config
+from apps.cms.services import get_app_config, rider_location_settings
 
 APP_CONFIG_EXAMPLE = {
     "min_supported_version": "1.0.0",
@@ -23,7 +23,13 @@ APP_CONFIG_EXAMPLE = {
     },
     "terms_version": "2026-11-01",
     "otp": {"length": 6, "resend_after_seconds": 30},
-    "rider_location": {"active_interval_seconds": 10, "idle_interval_seconds": 30},
+    "rider_location": {
+        "active_interval_seconds": 10,
+        "idle_interval_seconds": 30,
+        "active_sample_seconds": 5,
+        "idle_sample_seconds": 30,
+        "max_batch": 50,
+    },
     "feature_flags": {},
 }
 
@@ -95,10 +101,7 @@ class AppConfigView(APIView):
                 "length": OTP_DIGITS,
                 "resend_after_seconds": settings.OTP_RESEND_AFTER_SECONDS,
             },
-            "rider_location": {
-                "active_interval_seconds": config.rider_location_active_interval_seconds,
-                "idle_interval_seconds": config.rider_location_idle_interval_seconds,
-            },
+            "rider_location": rider_location_settings(config),
             "feature_flags": config.feature_flags,
         }
         return Response(AppConfigSerializer(data).data)

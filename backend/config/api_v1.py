@@ -10,4 +10,5 @@ urlpatterns = [
     path("", include("apps.cart.urls")),  # cart, coupons (Phase 3)
     path("", include("apps.orders.urls")),  # orders (Phase 3)
     path("", include("apps.payments.urls")),  # payment verify, Razorpay webhook (Phase 3)
+    path("", include("apps.delivery.urls")),  # rider app (Phase 5)
 ]

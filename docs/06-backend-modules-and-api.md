@@ -246,6 +246,66 @@ Contract details for the Phase 4 rows (published in `backend/openapi/schema.yaml
 | GET | `/api/v1/rider/earnings/?from=&to=` | Rider | Earnings summary + lines |
 | GET | `/api/v1/rider/cash/ledger/` | Rider | Cash-in-hand ledger |
 | GET | `/api/v1/rider/payouts/` | Rider | Payout history |
+| DELETE | `/api/v1/me/devices/` | Any logged-in user | Unregister a push token `{fcm_token}` (204, own devices only; added in P5, #39) |
+| GET | `/api/v1/rider/stores/` | Any logged-in user | Active stores for the registration dropdown (added in P5, api-requests #6) |
+| POST | `/api/v1/rider/heartbeat/` | Rider | App alive + status check: `is_online`, pending offer, active task, shift (added in P5) |
+
+Contract details (Phase 5, T-511; published in `backend/openapi/schema.yaml`, tag `rider`, with examples for every case):
+- **operationIds:**
+  - registration: `rider_stores_list`, `rider_register`, `rider_me_retrieve`, `rider_me_partial_update`, `rider_documents_create`, `rider_bank_account_update`
+  - shift and location: `rider_shift_start`, `rider_shift_end`, `rider_locations_create`, `rider_heartbeat`
+  - offers: `rider_offers_current`, `rider_offers_accept`, `rider_offers_reject`
+  - task: `rider_tasks_current`, `rider_tasks_arrived_store`, `rider_tasks_pickup`, `rider_tasks_arrived_customer`, `rider_tasks_cod_qr`, `rider_tasks_deliver`, `rider_tasks_fail`
+  - records: `rider_tasks_history`, `rider_earnings`, `rider_cash_ledger`, `rider_payouts_list`
+  - customer tracking: `orders_track` (tag `orders`)
+  - Live: slices 5.1 and 5.2 and `orders_track`. The rest answer 503 `SERVICE_UNAVAILABLE` until slice 5.3 or 5.4.
+- **Access:** every rider operation except stores and register needs a rider profile, else 403 `PERMISSION_DENIED` with `details.rider_status` = NONE (api-requests #8: 403, not 404, also for `/rider/me/`). Shift, location, offer and task operations need an ACTIVE rider, else 403 with `details.reason` = `RIDER_NOT_ACTIVE` and `rider_status`. Records (history, earnings, ledger, payouts) are open in any status. Another rider's offer or task id is 404.
+- **Registration and KYC** (`apps.delivery.services.riders`):
+  - Register once (409 `INVALID_STATE_TRANSITION` after that).
+  - Age 18 or older on the IST date. The emergency contact is a +91 mobile that is not the rider's own. `vehicle_number` is required for MOTORBIKE/SCOOTER only.
+  - Documents (D-14 default): PHOTO, AADHAAR_FRONT, AADHAAR_BACK and PAN, plus DL and RC for motorised vehicles.
+  - Uploads are `multipart/form-data`, JPEG/PNG of 1 MB or less, re-encoded as JPEG with the metadata stripped, and stored in the private bucket.
+  - A new upload replaces the current copy of that type and returns to PENDING. An APPROVED copy cannot be replaced (409).
+  - PENDING_KYC and REJECTED riders may edit every field; ACTIVE and SUSPENDED riders only the emergency contact.
+  - A REJECTED rider goes back to PENDING_KYC by itself once nothing required is missing or rejected (#9). No separate resubmit endpoint.
+  - Ops can reject one document of an ACTIVE rider: the rider stays ACTIVE but cannot go online until the replacement is approved (#25, D-14 default, to confirm).
+- **`GET /rider/me/` fields:**
+  - status and review: `status`, `rejection_reason`, `suspension_reason`
+  - stores: `preferred_store`, `home_store {id, name, city, lat, lng}` (null before approval; #40)
+  - photo: `photo_url` (signed, 1 h) and `photo_url_expires_at`
+  - `rating_avg` (null until P7)
+  - documents: `documents[]`, `required_documents`, `missing_documents`, `ready_for_review`
+  - `bank_account` (masked)
+  - state: `is_online`, `cash {cash_in_hand, cash_limit, limit_reached}` (#21: here, not in the ledger)
+  - `today {date, orders_delivered, earnings, cash_in_hand, online_seconds}`
+- **Shift** (04 §2.3):
+  - Refusals carry `details.reason`: `RIDER_NOT_ACTIVE` (403), `DOCUMENTS_NOT_APPROVED` (409 `doc_types`), `TOO_FAR_FROM_STORE` (422 `OUTSIDE_GEOFENCE`, `distance_m`, `radius_m`; `RIDER_SHIFT_START_RADIUS_M` 2000).
+  - Cash at or over the limit does not refuse: `prepaid_only` is true.
+  - Start is idempotent. End during a task is 409 `ACTIVE_TASK`.
+  - Shifts report `end_reason` (MANUAL/AUTO_OFFLINE/ADMIN) and `ended_by` (rider/system/ops).
+- **Location** (#2 to #5):
+  - Request `{points: [{lat, lng, accuracy, speed?, heading?, recorded_at, is_mocked?}]}`. Lat/lng are JSON numbers. 1 to `max_batch` (50) points.
+  - Response 200 `{accepted, duplicates, rejected, location, server_time}`.
+  - De-duplicated on (rider, `recorded_at`). Points older than 24 h, or more than 2 min in the future, are rejected (not stored).
+  - An offline rider gets 409 `RIDER_OFFLINE`.
+  - **Auto-offline and heartbeat (#42, PM default ⚠ for Jivo):** no location point for `RIDER_AUTO_OFFLINE_MINUTES` (10) sets an online rider offline, unless a `rider_heartbeat` came in those 10 minutes **and** the last point is at most `RIDER_HEARTBEAT_PRESENCE_MAX_LOCATION_AGE_MINUTES` (30) old. A rider waiting indoors without a GPS fix stays online, but not for ever. A rider on a task is never auto-offlined (ops alert instead).
+  - Intervals: `config/app` `rider_location` and every shift, location and heartbeat response carry `{active_interval_seconds, idle_interval_seconds, active_sample_seconds, idle_sample_seconds, max_batch}` (AppConfig fields).
+- **Paging (#24):** the cash ledger and history use `before_id` with the usual `{count, next, previous, results}` (`next` carries `before_id`, `previous` is null). Payouts use page numbers.
+- **Offers and task (#11 to #18):**
+  - Offer: `{id, task_id, store_name, drop_locality, distance_km, payment_type, cod_amount, estimated_payout, item_count, offered_at, expires_at}`, wrapped with `server_time`. Reject returns 204.
+  - `tasks/current/` returns `{task, recent_task, server_time}`. `recent_task` = a task that ended in the last 10 minutes.
+  - Task fields: `cod_amount_due` and `cod_amount_previous` (the amount before a T8a change; the rider gets a push), `geofence` radii, and `delivery_otp {length, attempts_remaining, locked}`.
+  - Pickup takes the 4-character code or the bag QR payload `JQC1:<order_number>:<code>`. A wrong code is 400 `PICKUP_CODE_INVALID`.
+  - `deliver` checks, in order: state, then the COD collection (exact amount; UPI QR PAID; a mismatch is 400 and uses no OTP attempt), then the OTP. `DELIVERY_OTP_INVALID` and `DELIVERY_OTP_LOCKED` carry `attempts_remaining`.
+  - `fail` (multipart) moves the task straight to RETURNING (`failed_at` recorded). CUSTOMER_NOT_REACHABLE needs `call_attempts` of 2 or more and 10 minutes after arrival (409 `WAIT_NOT_ELAPSED`).
+  - No rider endpoint returns `CASH_LIMIT_EXCEEDED` in v1.
+  - The cod-qr status is polled through `tasks/current/`. A QR paid after cash was taken is refunded automatically.
+- **Earnings (#19):** IST dates, inclusive, at most 366 days. `orders` holds the newest 200 (`orders_truncated`). **Distance pay is the server-computed store-to-drop route distance (`distance_km`), never the GPS trail** (PM default; a patchy or spoofed trail cannot game it).
+- **`GET /orders/{id}/track/` (#28, #33):** `{order_id, order_number, status, eta_at (null once finished), store {id, name, lat, lng}, destination {lat, lng}, rider {name, phone, photo (signed https or null), lat, lng, updated_at} or null, delivery_otp (only while OUT_FOR_DELIVERY), server_time}`. `rider` and `delivery_otp` are filled from slice 5.3.
+- **`support.phone` in `config/app`** is the rider's "Call ops" number (#27).
+- **Staff services** (`apps.delivery.services.kyc`, for the Riders admin): `approve_document`, `reject_document`, `approve_rider`, `reject_rider`, `suspend_rider`, `reinstate_rider`, `set_home_store`, `set_cash_limit`, `document_file_url` and `document_number` (both audited), `staff_riders`, `online_blockers`. Also `shifts.force_offline`.
+  - Each checks `delivery.review_rider` (Super Admin, Ops) and the store scope, and writes the audit log.
+  - Store Manager has `delivery.view_rider` for its own stores.
 
 ## 4. WebSocket endpoints [P6]
 
@@ -271,7 +331,7 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 | `dispatch_order` | Order reaches the dispatch trigger state | Pick the best rider and create an offer (see [08 §5](08-order-lifecycle.md#5-rider-dispatch-algorithm)) | P5 |
 | `expire_offer` | Countdown = offer timeout | If still pending: mark EXPIRED and dispatch to the next rider | P5 |
 | `unassigned_order_alert` | After N failed offers or X minutes | Alert ops for manual assignment | P5 |
-| `rider_heartbeat_check` | Beat, every 2 min | Auto-offline riders with no ping for 10 min | P5 |
+| `rider_heartbeat_check` | Beat, every 2 min | Auto-offline riders with no location point for `RIDER_AUTO_OFFLINE_MINUTES` (10). A rider on a task is not set offline; an ops alert is logged instead. Implemented in P5 slice 5.2 (`delivery.rider_heartbeat_check`). | P5 |
 | `send_push` / `send_sms` | Domain events | FCM / SMS delivery with retries | P5/P6 |
 | `broadcast_ws` | Domain events | Push to channel groups | P6 |
 | `low_stock_alert` | Stock movement | Notify the store manager when available < threshold. P2: logs a warning (re-checks current stock, so it is idempotent); P7: notification | P2/P7 |
@@ -315,6 +375,8 @@ All tasks are **idempotent** (safe to retry) and log with the order/rider ID for
 | `SERVER_ERROR` | 500 | Added in P0. Unexpected error. Logged server-side; no internals in the response. |
 | `SERVICE_UNAVAILABLE` | 503 | Added in P0. `/health/ready` when the database or Redis is unreachable. |
 | `STORE_NOT_FOUND` | 404 | Added in P2. The store in `X-Store-Id` does not exist or was deactivated. `details.store_id`. The app re-checks serviceability. |
+| `RIDER_OFFLINE` | 409 | Added in P5 (api-requests #4). A location batch from a rider the server already set offline: stop the location service. |
+| `PICKUP_CODE_INVALID` | 400 | Added in P5 (api-requests #15). The order code or bag QR does not match the task's order. |
 | `PAYLOAD_TOO_LARGE` | 413 | Added in P2 R3 (BUG-0001). The request body is larger than 2.5 MB (`DATA_UPLOAD_MAX_MEMORY_SIZE`). Any endpoint can return it; it is a client error, never a 500. Other malformed-request conditions Django flags (too many fields or files) are 400 `VALIDATION_ERROR`. Deployed proxies also cap bodies (nginx `client_max_body_size`). |
 
 Rules for the envelope (implemented in `apps.core.exceptions`, codes in `apps.core.errors.ErrorCode`, published as `ErrorCodeEnum` / `ErrorEnvelope` in the OpenAPI schema; the inner `error` object is the component `ErrorBody`, renamed from `ApiError` in Phase 1 R3 because it clashed with `jivo_core`'s `ApiError`; the JSON shape did not change):
