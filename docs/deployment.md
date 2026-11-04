@@ -70,13 +70,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
   | Tool | Version | Source | sha256 |
   |---|---|---|---|
   | Mailpit | v1.33.0 | GitHub `axllent/mailpit` releases, `mailpit-windows-amd64.zip` | `47122dd828ff80dcaef62b2952c478b178afadadf066c990489608e537121bfd` (GitHub's published asset digest; the release ships no checksum file) |
-  | MinIO server and `mc` | **none** | `dl.min.io` returns **410 Gone** for every community build (checked 2026-11-04: open-source MinIO is archived and no longer served) | n/a |
+  | MinIO server (pgsty community build) | `RELEASE.2026-08-04T00-00-00Z` (the same release as the compose image) | GitHub `pgsty/minio` releases (the repo is now named `pgsty/silo`; GitHub redirects), `minio_20260804000000.0.0_windows_amd64.tar.gz` | `c2160a4ccbb80ce1d45f69cc35137cb5ba68f638cc2f86ebfb3d0523ce3e0d74` (GitHub asset digest; matches the release's `_checksums.txt`) |
 
   To upgrade, change `Version`, `Url` and `Sha256` together in `$Pins`, as a reviewed change.
-- **MinIO is not available on this machine yet.** `start` warns and skips it until the user approves a source and its pin goes into `$Pins.minio`. Until then:
-  - uploads to `default`/`public` storage fail locally;
-  - `seed_demo` skips product images with a warning;
-  - tests are unaffected, because they use memory storage.
+- **MinIO is an archived-upstream community build, for local dev only.**
+  - Official `dl.min.io` returns **410 Gone** for every community build (checked 2026-11-04), and upstream open-source MinIO no longer gets security fixes.
+  - The user approved the pgsty fork on 2026-11-04, for local development only. Never use it in staging or production; those use S3 (§6).
+  - That release publishes no `mc`. `-Action init` uses boto3 instead, so no `mc` is needed.
+  - Besides `127.0.0.1:9000`, MinIO also binds the IPv6 loopback `[::1]:9000`. That address is still local-only.
 - **Check that it works:**
   - `curl http://127.0.0.1:8025/readyz` returns 200.
   - `uv run python manage.py sendtestemail you@example.com` (from `backend/`) delivers a message that shows up at `http://127.0.0.1:8025` and in `GET /api/v1/messages`.

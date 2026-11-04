@@ -23,10 +23,10 @@
   Downloads come only from the official sources and must match the sha256 pinned below, or the
   script stops. Upgrading = change Version + Url + Sha256 together, in a reviewed change.
 
-  MinIO: dl.min.io answers "410 Gone" for every community build (checked 2026-11-04: the
-  open-source MinIO server and mc are archived and no longer served). $Pins.minio is therefore
-  empty and MinIO is reported as unavailable until the user approves a source and its pin is
-  filled in. Mailpit works on its own.
+  MinIO: dl.min.io answers "410 Gone" for every community build (checked 2026-11-04: upstream
+  open-source MinIO is archived). The user approved (2026-11-04) the pgsty community build from
+  its GitHub releases, the same build as the compose image, for LOCAL DEV ONLY (no upstream
+  security fixes). No mc is published there; `init` uses boto3 instead.
 
 .PARAMETER Action
   start | stop | status | init
@@ -63,10 +63,12 @@ $Pins = @{
         Exe     = 'mailpit.exe'
     }
     minio   = @{
-        # No approved source: dl.min.io returns 410 Gone for community builds (2026-11-04).
-        Version = ''
-        Url     = ''
-        Sha256  = ''
+        # pgsty community build (github.com/pgsty/minio, renamed pgsty/silo; same repo id), the
+        # same release as the compose image. Upstream MinIO is archived: LOCAL DEV ONLY.
+        # Sha256 = GitHub release-asset digest, equal to the release's *_checksums.txt entry.
+        Version = 'RELEASE.2026-08-04T00-00-00Z'
+        Url     = 'https://github.com/pgsty/silo/releases/download/RELEASE.2026-08-04T00-00-00Z/minio_20260804000000.0.0_windows_amd64.tar.gz'
+        Sha256  = 'c2160a4ccbb80ce1d45f69cc35137cb5ba68f638cc2f86ebfb3d0523ce3e0d74'
         Exe     = 'minio.exe'
     }
 }
@@ -114,9 +116,15 @@ function Install-Tool([string]$name) {
         }
         Write-Host "${name}: sha256 verified $actual"
         New-Item -ItemType Directory -Force -Path $dest | Out-Null
-        if ($file.EndsWith('.zip')) {
+        if ($file.EndsWith('.zip') -or $file.EndsWith('.tar.gz')) {
             $unz = Join-Path $stage 'unzip'
-            Expand-Archive -LiteralPath $file -DestinationPath $unz
+            New-Item -ItemType Directory -Force -Path $unz | Out-Null
+            if ($file.EndsWith('.zip')) {
+                Expand-Archive -LiteralPath $file -DestinationPath $unz
+            } else {
+                & "$env:SystemRoot\System32\tar.exe" -xzf $file -C $unz
+                if ($LASTEXITCODE -ne 0) { throw "${name}: tar extraction failed ($LASTEXITCODE)" }
+            }
             $found = Get-ChildItem -LiteralPath $unz -Recurse -Filter $p.Exe | Select-Object -First 1
             if (-not $found) { throw "${name}: $($p.Exe) not found in archive" }
             Copy-Item -LiteralPath $found.FullName -Destination $exe
