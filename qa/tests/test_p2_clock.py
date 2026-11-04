@@ -113,3 +113,33 @@ def test_p2_tc11_boundary_transition(api):
     print(f"boundary {boundary.time()}: before is_open={before_open}, after {after}")
     assert after["store"]["is_open"] is (not before_open)
     assert (after["eta_minutes"] is None) is before_open
+
+
+def test_p3_tc56_store_closed_blocks_checkout():
+    """P3-TC-56 (clock profile, read-only) Store closed: the cart lists STORE_CLOSED first among
+    the blockers and POST /orders/ answers 422 STORE_CLOSED {store_id, opens_at}; nothing is
+    created. Precondition (prepared on the local profile): QA user C has a non-empty cart with
+    a serviceable address saved, and its access token in private/.p3-clock-token (no login on
+    this profile: nothing is written)."""
+    from p3_support import CART, ORDERS, new_key
+    from qa_support import assert_error, bearer, client, jwt_claims
+
+    is_open, _ = _expected(_fake_now())
+    if is_open:
+        pytest.skip("QA_FAKE_NOW is inside opening hours")
+    token_file = PRIVATE / ".p3-clock-token"
+    if not token_file.exists():
+        pytest.skip("no prepared token (private/.p3-clock-token)")
+    token = token_file.read_text().strip()
+    user_id = jwt_claims(token)["user_id"]
+    with client(STORE_HEADERS) as c:
+        h = {**STORE_HEADERS, **bearer(token)}
+        cart = c.get(CART, headers=h).json()
+        if not cart["items"] or not cart["address"]:
+            pytest.skip("user C's cart was not prepared on the local profile")
+        assert cart["checkout"]["blockers"][0]["code"] == "STORE_CLOSED", cart["checkout"]
+        n0 = db_query("select count(*) from orders_order where user_id=%s", (user_id,))[0][0]
+        body = {"address_id": cart["address"]["id"], "payment_method": "COD", "expected_grand_total": cart["bill"]["grand_total"]}
+        err = assert_error(c.post(ORDERS, json=body, headers={**h, "Idempotency-Key": new_key()}), 422, "STORE_CLOSED")
+        assert err["details"]["store_id"] == 1 and err["details"]["opens_at"]
+        assert db_query("select count(*) from orders_order where user_id=%s", (user_id,))[0][0] == n0

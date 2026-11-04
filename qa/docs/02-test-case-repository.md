@@ -187,6 +187,87 @@ Sources: 03 §2.1/2.2/2.4/2.11, 04 §2.1, 05 §2–§3 (P1 rows), 06 §2.0/2.1/2
 | P1-TC-93 | E2E | P1 | Re-run both apps' `integration_test` login flows against a QA backend | Pass | ⏭ No Flutter this run |
 | P1-TC-94 | CUS/RID | P1 | Static review: tokens/PII in logs, hard-coded URLs or secrets, client-side money, missing states | None found | ✅ (`qa/private/runs/mobile-static-review-4960527.txt`; OBS-05 obfuscation not configured yet) |
 
+## Phase 3: Cart, coupons, orders and payments (stage 1, 2026-11-04)
+**Build:** `qa/phase-2` at `c2c153a` (`develop` merged in: backend R2b WIP and admin T-304 WIP). QA instance `127.0.0.1:8004`, local settings, FakeRazorpayGateway, shared remote DB. **R2b** = re-run after the backend R2b review-fix merge. **T-304** = re-run after the admin T-304 merge.
+
+Sources: 08 §1–§4, §6, §7; 06 §2.5, §2.6, §5, §6; 05 §3 (P3 rows, DL-46); DL-43…46. Automated in `qa/tests/test_p3_*.py` (+ `test_p2_clock.py::test_p3_tc56`).
+
+Oracle: the bill is recomputed independently from the DB (`coalesce(price_override, selling_price)`, `mrp`, the store's `PricingConfig`) with the 08 §6.2 formula, half-up to 2 dp. It never uses the server's numbers.
+
+| ID | Area | Pri | Steps | Expected | Status |
+|---|---|---|---|---|---|
+| P3-TC-01 🔥 | BE | P0 | `GET /cart/` on an empty cart | All-zero bill, only `CART_EMPTY`, ONLINE then COD, strict schema | ✅ |
+| P3-TC-02 🔥 | BE | P0 | 5 carts (below/above free delivery, big, max tip 500) | Every bill field = oracle; 2-dp strings; Σ line_total = item_total | ✅ |
+| P3-TC-03 | BE | P1 | Thresholds below/above free delivery | `amount_to_*` = remaining amount, or null once reached | ✅ |
+| P3-TC-04 | BE | P1 | Set the same qty twice; PATCH line; qty 0; DELETE line | Sets, never adds; PATCH 0 → 400; POST 0 removes | ✅ |
+| P3-TC-05 | BE | P0 | Qty > max; out-of-stock variant; variant not sold; bad qty types | 422 `MAX_QTY_EXCEEDED` {variant_id, max}; 409 `STOCK_UNAVAILABLE` orderable 0; 400 | ✅ (OBS-P3-02: `"2"` is coerced) |
+| P3-TC-06 | BE | P0 | Add 4 units to the cart; read `reserved` | The cart never reserves stock (08 §6.1) | ✅ |
+| P3-TC-07 | BE | P1 | Tip −1 / 500.01 / 3 dp / text; chips duplicate/unknown; note 201; `DELETE /cart/` | 400s; DELETE drops lines and tip, keeps address and instructions | ✅ |
+| P3-TC-08 | BE | P0 | Mumbai address; another user's address; `?address_id=` preview | 422 `NOT_SERVICEABLE` and nothing saved; 400; the preview is not saved | ✅ |
+| P3-TC-09 🔥 | BE | P0 | No token; no / malformed / unknown `X-Store-Id` | 401 `AUTH_REQUIRED`; 400; 404 `STORE_NOT_FOUND` | ✅ |
+| P3-TC-10 🔥 | BE | P0 | User A patches/deletes user B's cart line | 404, B's line unchanged (IDOR) | ✅ |
+| P3-TC-11 | BE | P1 | An orderable cart | No line issue, `can_place_order` true | ✅ (the issue-line case needs stock to drop after the item is added: ⬜, not producible without stock writes) |
+| P3-TC-12 🔥 | BE | P0 | Apply `jivo50` (lower case); remove twice | FLAT discount; bill = oracle with the coupon; DELETE idempotent | ✅ |
+| P3-TC-13 | BE | P0 | JIVO10 on a ₹3,591 cart and a ₹549 cart | Capped at max_discount; 10 % half-up | ✅ |
+| P3-TC-14 | BE | P0 | OILS15 on oil + seeds; seeds only | Discount on the eligible subtotal only; 422 `NO_ELIGIBLE_ITEMS` | ✅ |
+| P3-TC-15 | BE | P1 | JIVO50 on a ₹165 cart | 422 `COUPON_NOT_ELIGIBLE` MIN_ORDER_VALUE + amount_to_unlock | ✅ |
+| P3-TC-16 | BE | P1 | Apply, then drop below the minimum | Coupon kept, `is_applicable` false, 0 discount, unlock 20.00, blocker | ✅ |
+| P3-TC-17 | BE | P1 | Unknown code; empty/long/non-string code | 422 `COUPON_INVALID`; 400 | ✅ |
+| P3-TC-18 | BE | P1 | `GET /cart/coupons/` | Strict schema; hidden coupon absent; eligible first, by savings; savings = discount | ✅ |
+| P3-TC-19 | BE | P1 | Coupon endpoints without a token / store header | 401 / 400 | ✅ |
+| P3-TC-20 🔥 | BE | P0 | COD placement | 201 PLACED, COD_PENDING, `razorpay` null, bill = cart = oracle, +1 reserved (no expiry), lines leave the cart, history `''→PLACED`, JV-number | ✅ R2b |
+| P3-TC-21 🔥 | BE | P0 | ONLINE placement, then cancel (T5) | 201 PAYMENT_PENDING, fake key, amount = paise, reserved with expiry, 15-min window, cart kept; T5: CANCELLED/FAILED, stock released, cart kept; 2nd cancel 409 | ✅ R2b |
+| P3-TC-22 🔥 | BE | P0 | Same key + same body; same key + another body | 200, the same order and gateway order, 1 row, 1 reservation; 400 on `Idempotency-Key` | ✅ |
+| P3-TC-23 | BE | P1 | Key missing / short / spaces / 65 characters | 400 | ✅ |
+| P3-TC-24 🔥 | BE | P0 | `expected_grand_total` ≠ bill | 409 `PRICE_CHANGED` {expected, actual}; nothing created | ✅ |
+| P3-TC-25 | BE | P0 | Empty cart; unserviceable / unknown address; bad method | 400; 422 `NOT_SERVICEABLE`; 400; 400 | ✅ |
+| P3-TC-26 | BE | P1 | Item total below the store minimum | 422 `MIN_ORDER_NOT_MET` with the amounts | ⏭ no demo variant is priced below ₹99 |
+| P3-TC-27 🔥 | BE | P0 | A second placement while one is unpaid | 409 `INVALID_STATE_TRANSITION` {pending_order_id} (DL-44) | ✅ |
+| P3-TC-28 | BE | P1 | COD above ₹2,000 | Cart COD unavailable (ABOVE_LIMIT); 422 `COD_NOT_AVAILABLE` {reason, cod_max}; nothing reserved | ✅ |
+| P3-TC-29 🔥 | BE | P0 | B retrieves/cancels/retries/verifies A's order | 404 ×4; not in B's list; A's order unchanged | ✅ |
+| P3-TC-30 | BE | P1 | `GET /orders/?status=active/past/bogus`, no token | Strict schema; PAYMENT_PENDING in active; past is terminal only; 400; 401 | ✅ |
+| P3-TC-31 | BE | P1 | Cancel with a bad/missing reason; cancel a COD PLACED order | 400; 409 {status: PLACED} (P3: T5 only) | ✅ |
+| P3-TC-32 | BE | P2 | The 06 §2.6 worked signature example | Matches | ✅ |
+| P3-TC-33 🔥 | BE | P0 | Verify a valid signature ×3 | 200 PLACED/PAID, 1 capture, 0 refunds, reservation expiry cleared, cart lines gone, history T3 | ✅ R2b |
+| P3-TC-34 🔥 | BE | P0 | Verify: zero signature, other secret, foreign gateway order, non-ASCII, malformed, other user, no token | 400 `PAYMENT_VERIFICATION_FAILED` ×3; 400; 400; 404; 401; still PAYMENT_PENDING, no capture | ✅ |
+| P3-TC-35 🔥 | BE | P0 | Webhook: bad signature, signature of another body, no signature, no event id | 400; nothing stored; order unchanged | ✅ |
+| P3-TC-36 🔥 | BE | P0 | `payment.captured` webhook, the same event again, a new event id, then verify | processed → duplicate → no 2nd capture → verify 200 PLACED; 1 capture, 0 refunds | ✅ |
+| P3-TC-37 | BE | P0 | Capture of the wrong amount | Not placed; one full refund of that amount; cancel still allowed | ✅ (OBS-P3-01: doc wording) |
+| P3-TC-38 🔥 | BE | P0 | Cancel, then verify + webhook for the same capture (T3a) | 409 {status: CANCELLED}; one full refund; REFUND_PENDING→REFUNDED; stock stays released | ✅ |
+| P3-TC-39 | BE | P0 | Retry-payment (same key ×2), pay the new gateway order, then the old one | New gateway order, same on repeat, window not extended; PLACED; the 2nd capture refunded once (DL-45); retry on PLACED 409 | ✅ |
+| P3-TC-40 | BE | P1 | Retry without a key; retry on a cancelled order | 400; 409 {status: CANCELLED} | ✅ |
+| P3-TC-41 | BE | P1 | `payment.failed`, then capture, then `payment.failed` again | The attempt FAILED, order still pending; then PLACED; the capture is never overwritten | ✅ |
+| P3-TC-42 | BE | P1 | Signed: unknown gateway order, unhandled type, malformed payload; garbage body | 200 ignored ×3; 400 | ✅ |
+| P3-TC-43 🔥 | BE | P0 | 5 customers race for the last 2 units (ONLINE, parallel) | Exactly one 201, four 409 `STOCK_UNAVAILABLE`; reserved ≤ on_hand; released after the cancel | ✅ (`[201, 409, 409, 409, 409]`, reserved back to baseline) |
+| P3-TC-44 🔥 | BE | P0 | One `Idempotency-Key` sent 6× in parallel | One order, one reservation, one 201 and five 200 | ✅ |
+| P3-TC-45 | BE | P0 | ONLINE order with a coupon, then T5 | Redemption HELD (₹50), then RELEASED | ✅ |
+| P3-TC-46 | BE | P1 | 31 placements within an hour | 31st: 429 `RATE_LIMITED` + `retry_after_seconds` + `Retry-After` | ✅ |
+| P3-TC-47 | BE | P0 | Unpaid ONLINE order with a coupon: wait for the :8001 beat (T4), then a late capture | PAYMENT_FAILED/FAILED, stock and coupon released, cart kept, retry 409; late webhook → one refund, not revived | ✅ The :8001 beat failed the order 45 s after the window ended: history T4 actor `system`, reservation and coupon RELEASED, cart and coupon kept, retry 409, late capture → 1 refund, still PAYMENT_FAILED. The automated poll died on the 15-min access-token expiry, so the steps after expiry were run by script. The test is fixed (it logs in again on every poll): re-run with `QA_SLOW=1` after R2b. |
+| P3-TC-48 🔥 | BE | P0 | SQL: order money identities over all orders | 0 violations | ✅ |
+| P3-TC-49 🔥 | BE | P0 | SQL: 0 ≤ reserved ≤ on_hand, reserved ≥ Σ ACTIVE reservations, no ACTIVE on terminal orders | 0 violations | ✅ |
+| P3-TC-50 🔥 | BE | P0 | SQL: duplicate payment ids, two live captures, double refunds, duplicate events, PAID without capture, dead+PAID | 0 | ✅ |
+| P3-TC-51 | BE | P1 | SQL: history matches status; coupon counts within limits | 0 | ✅ |
+| P3-TC-52 | BE | P0 | The same webhook event 6× in parallel | All 200, one `processed`, one capture, one stored event | ✅ |
+| P3-TC-53 | BE | P0 | Verify and cancel at the same instant (3 rounds) | Either PLACED (cancel 409, 0 refunds, reserved) or CANCELLED (verify 409, 1 refund, released); never both | ✅ |
+| P3-TC-54 | BE | P1 | `POST /orders/` without `X-Store-Id`; without the app headers | 400; processed normally (headers are informational, P0-TC-13) | ✅ |
+| P3-TC-55 | BE | P0 | WELCOME100 for a user with a PLACED order / with only cancelled unpaid orders | 422 FIRST_ORDER_ONLY / applicable (DL-45) | ✅ |
+| P3-TC-56 | BE | P1 | Clock profile (store closed): cart and `POST /orders/` | `STORE_CLOSED` first blocker; 422 `STORE_CLOSED` {store_id, opens_at}; nothing created | ✅ (clock profile `QA_FAKE_NOW=2026-11-04T23:30+05:30`, token prepared on local; no writes) |
+| P3-TC-57 | BE | P2 | Signed webhook with a payment id over 64 / over 56 characters (refund) | 200 ignored | ❌ [BUG-0009](../bugs/BUG-0009.md) |
+| P3-TC-58 | BE | P1 | `refund.processed` replayed for a processed refund; `refund.failed` for an unknown refund | No double count; ignored | ✅ |
+| P3-TC-59 | ADM | P0 | 05 §3 P3 rows (DL-46): Catalog Manager manages coupons; Support/Finance view coupons/orders/payments; Finance views webhook events; only Super Admin changes orders | Per the matrix, enforced server-side | ⏭ T-304 |
+| P3-TC-60 | ADM | P1 | Admin order/payment screens show the bill, history, payments and refunds read-only | Per 05 | ⏭ T-304 |
+| P3-TC-61 | BE | P1 | Coupon usage limits exhausted (per user, total); expired / not-started coupons | 422 `COUPON_USAGE_EXCEEDED` {scope} / `COUPON_EXPIRED` / `COUPON_INVALID` | ⏭ needs a QA-owned coupon (admin, T-304); the demo coupons must not be used up |
+| P3-TC-62 | BE | P1 | COD for a `cod_blocked` user; store COD disabled | 422 `COD_NOT_AVAILABLE` NOT_ALLOWED / COD_DISABLED | ⏭ needs admin/shared-config changes |
+| P3-TC-63 | BE | P1 | Gateway unreachable at placement / retry | 503 `SERVICE_UNAVAILABLE`, nothing created | ⏭ cannot be induced black-box with the fake gateway |
+| P3-TC-64 | CUS | P0 | Customer app cart → checkout → pay (fake key) / COD → success; retry/cancel screens | Per 03 §2.8–2.9 | ⬜ device run |
+
+### Totals (Phase 3 stage 1)
+| | Cases | ✅ | ❌ | ⏭ | ⬜ |
+|---|---|---|---|---|---|
+| Phase 3 | 64 | 56 | 1 | 6 | 1 |
+
+Pass rate: 56/64 (87.5%) of all cases, and 56/57 of the cases executed. The Pri P0/P1 cases that have not passed are all ⏭/⬜, none ❌: P3-TC-26 (no data), 59/60 (T-304), 61 (QA coupon needed), 62 (admin/shared config), 63 (gateway fault injection) and 64 (device). The only ❌ is P3-TC-57 (Pri P2, BUG-0009).
+
 ## Totals (QA run 1)
 | | Cases | ✅ | ❌ | ⏭ | ⬜ |
 |---|---|---|---|---|---|

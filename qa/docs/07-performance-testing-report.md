@@ -44,3 +44,10 @@ Earlier functional concurrency checks:
   - **Recommendation (backend/ops):** pooling (pgbouncer or `CONN_MAX_AGE` > 0 with `CONN_HEALTH_CHECKS`) for staging and production.
   - **Re-measure on staging.**
 - Query-count assertions (`django_assert_max_num_queries`) are a backend-suite concern from Phase 2 and are not measured here.
+
+## Phase 3 stage 1 (2026-11-04)
+No dedicated P3 latency baseline yet: re-run `tools/perf_baseline.py` with the P3 operations after the R2b merge. Observed while running the suites (remote shared DB, OBS-01 applies):
+- the slowest server-side timings in the instance log: placement 0.3–0.6 s, verify about 0.5 s, webhook about 0.3–0.5 s
+- 5-way and 6-way parallel bursts (P3-TC-43/44/52) completed without 5xx, deadlock or lock timeout
+
+Real load (50 orders/min) belongs to Phase 8.
