@@ -49,3 +49,11 @@
 | Domain events after commit → QA worker (`Order event order.accepted/cancelled: order <id>`, once each) | ✅ | TC-48 |
 | Acceptance SLA alert once per order (Redis key) | ✅ | TC-37 (the :8001 beat sweep may alert first through its own Redis; accepted as `already`) |
 | Ops Console → services | ⏭ | admin P4 not merged |
+
+## Phase 4 stage 2 (2026-11-04, `f744508`)
+| Integration | Result | Evidence |
+|---|---|---|
+| Ops Console → `order_actions` → `store_ops` services → customer API | ✅ | TC-19c/20c/22c |
+| Refunds admin action + one-time token → `retry_refund` → worker | ✅ | TC-34c |
+| PLACED event → `schedule_acceptance` → `auto_accept_order` (QA worker) on QA-02 | ✅ | TC-36 |
+| Accepting switch → `set_accepting_orders` → serviceability | ✅ | TC-39 (QA-02) |
