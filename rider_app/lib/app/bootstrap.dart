@@ -39,12 +39,13 @@ Future<void> bootstrap(Flavor flavor) async {
   // The location service isolate will refresh tokens too (TODO(api): once
   // its uploader is bound): both sides go through the shared store so a
   // rotation by one never ends the other's session.
-  final tokenStore = SecureTokenStore();
+  final secureStore = SecureTokenStore();
+  final tokenStore = GuardedTokenStore(secureStore);
   final session = SessionManager(
     store: tokenStore,
     refresher: StoreSyncedTokenRefresher(
       inner: ApiTokenRefresher.forEnv(env: env, clientInfo: clientInfo),
-      store: tokenStore,
+      store: secureStore,
     ),
   );
   await session.restore();
@@ -86,6 +87,7 @@ Future<void> bootstrap(Flavor flavor) async {
         signals: signals,
       ),
       offerAlertNotificationsProvider.overrideWithValue(offerAlerts),
+      sharedTokenStoreProvider.overrideWithValue(tokenStore),
       if (launchPayload == OfferAlertNotifications.testPayload &&
           env.showDevTools)
         initialLocationProvider.overrideWithValue(Routes.offerPreview),

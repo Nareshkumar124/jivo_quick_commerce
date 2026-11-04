@@ -2,7 +2,9 @@ import 'package:intl/intl.dart';
 
 import 'rider_task.dart';
 
-final _moneyPattern = RegExp(r'^(-)?(\d+)(?:\.(\d{1,2}))?$');
+/// At most 15 rupee digits (far above any order), so `int.parse` can never
+/// overflow on a malformed server value; longer is "not a money amount".
+final _moneyPattern = RegExp(r'^(-)?(\d{1,15})(?:\.(\d{1,2}))?$');
 
 /// Formats an API money string for display, with the customer app's rule
 /// (03 §4, UX audit RD-02): ₹, `en_IN` grouping, and paise only when they

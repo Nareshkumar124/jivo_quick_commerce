@@ -26,6 +26,10 @@ void main() {
       expect(tryFormatRupees(null), isNull);
       expect(tryFormatRupees(''), isNull);
       expect(tryFormatRupees('12.345'), isNull);
+      // 20 digits from a broken server value: null, never an overflow.
+      expect(tryFormatRupees('12345678901234567890.00'), isNull);
+      expect(isSameAmount('12345678901234567890', '1'), isFalse);
+      expect(tryFormatRupees('100000000000000.00'), '₹10,00,00,00,00,00,000');
     });
 
     test('isSameAmount compares server strings', () {

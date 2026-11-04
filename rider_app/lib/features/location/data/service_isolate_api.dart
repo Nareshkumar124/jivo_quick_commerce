@@ -86,12 +86,12 @@ Future<LocationUploader> createServiceUploader(
     useFakeApi: false,
   );
   final clientInfo = await ClientInfo.fromPlatform(appName: 'rider');
-  final store = SecureTokenStore();
+  final secureStore = SecureTokenStore();
   final session = SessionManager(
-    store: store,
+    store: GuardedTokenStore(secureStore),
     refresher: StoreSyncedTokenRefresher(
       inner: ApiTokenRefresher.forEnv(env: env, clientInfo: clientInfo),
-      store: store,
+      store: secureStore,
     ),
   );
   await session.restore();

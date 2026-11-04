@@ -189,7 +189,10 @@ class PushMessageHandler {
       case TaskUpdatedPush():
         unawaited(_ref.read(taskFlowControllerProvider.notifier).load());
       case UnknownPush():
-        debugPrint('PushMessageHandler: ignored $message');
+        // Only the type: the payload may carry order details.
+        debugPrint(
+          'PushMessageHandler: ignored type ${message.data[RiderPush.typeKey]}',
+        );
     }
   }
 }

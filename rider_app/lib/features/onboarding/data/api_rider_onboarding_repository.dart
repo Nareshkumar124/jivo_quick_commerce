@@ -12,6 +12,7 @@ import 'package:jivo_api/jivo_api.dart'
         RiderStore;
 import 'package:jivo_core/jivo_core.dart';
 
+import '../domain/image_compression.dart';
 import '../domain/kyc_document.dart';
 import '../domain/onboarding_inputs.dart';
 import '../domain/rider_onboarding_repository.dart';
@@ -70,9 +71,20 @@ class ApiRiderOnboardingRepository implements RiderOnboardingRepository {
         profileFromApi((await _api.getRiderApi().riderMeRetrieve()).data!),
   );
 
+  /// The image comes from `compressToLimit` (`image_compression.dart`),
+  /// which guarantees a JPEG of at most [kKycImageMaxBytes]. The size is
+  /// checked again here, cheaply, so nothing larger ever leaves the phone.
   @override
   Future<RiderDocument> uploadDocument(DocumentUpload upload) =>
       _call(() async {
+        if (upload.image.length > kKycImageMaxBytes) {
+          throw const ApiError(
+            code: ApiErrorCode.validationError,
+            details: {
+              'file': ['The photo is larger than 1 MB.'],
+            },
+          );
+        }
         final document = (await _api.getRiderApi().riderDocumentsCreate(
           docType: api.RiderDocumentTypeEnum.values.firstWhere(
             (t) => t.value == upload.type.wireValue,

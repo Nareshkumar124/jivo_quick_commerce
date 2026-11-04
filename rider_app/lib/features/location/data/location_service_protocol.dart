@@ -135,6 +135,12 @@ abstract final class LocationMessages {
     'stats': stats.toJson(),
   };
 
+  /// Sent last by the service's `onDestroy`, after the final flush and the
+  /// buffer's last write: nothing writes the buffer file after it.
+  static const destroyed = {_type: 'destroyed'};
+
+  static bool isDestroyed(Object data) => typeOf(data) == 'destroyed';
+
   static Map<String, Object> serverStop(String code) => {
     _type: 'server_stop',
     'code': code,

@@ -60,6 +60,15 @@ class RiderAccountController extends Notifier<RiderAccountState> {
       debugPrint('RiderAccountController: stopping location: $error');
     }
     await ref.read(locationDataCleanerProvider).clear();
+    if (reason == SignOutReason.userRequested) {
+      // A deliberate logout removes the pair even if the service stored a
+      // newer one than the UI holds (GuardedTokenStore keeps it otherwise).
+      try {
+        await ref.read(sharedTokenStoreProvider)?.clearUnconditionally();
+      } on Object catch (error) {
+        debugPrint('RiderAccountController: clearing tokens: $error');
+      }
+    }
     await discardInterruptedKycCapture(ref);
     try {
       await ref.read(offerAlertNotificationsProvider).dismiss();

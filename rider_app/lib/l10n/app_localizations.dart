@@ -1715,7 +1715,7 @@ abstract class AppLocalizations {
   /// No description provided for @taskCallCustomer.
   ///
   /// In en, this message translates to:
-  /// **'Call customer'**
+  /// **'Call'**
   String get taskCallCustomer;
 
   /// No description provided for @taskStateChanged.
@@ -1757,7 +1757,7 @@ abstract class AppLocalizations {
   /// No description provided for @taskOrderPacking.
   ///
   /// In en, this message translates to:
-  /// **'Packing…'**
+  /// **'Store is packing: wait here'**
   String get taskOrderPacking;
 
   /// No description provided for @taskOrderReady.
@@ -1787,7 +1787,7 @@ abstract class AppLocalizations {
   /// No description provided for @pickupCodeHelp.
   ///
   /// In en, this message translates to:
-  /// **'Scan the QR code on the bag, or type the 4-character code printed on it.'**
+  /// **'Scan the QR on the bag, or type the 4-character code printed on it.'**
   String get pickupCodeHelp;
 
   /// No description provided for @pickupCodeLabel.
@@ -1817,13 +1817,13 @@ abstract class AppLocalizations {
   /// No description provided for @taskPickup.
   ///
   /// In en, this message translates to:
-  /// **'Picked up'**
+  /// **'Confirm pickup'**
   String get taskPickup;
 
   /// No description provided for @pickupScan.
   ///
   /// In en, this message translates to:
-  /// **'Scan QR code'**
+  /// **'Scan bag QR'**
   String get pickupScan;
 
   /// No description provided for @scanTitle.
@@ -1883,13 +1883,13 @@ abstract class AppLocalizations {
   /// No description provided for @taskCantDeliver.
   ///
   /// In en, this message translates to:
-  /// **'Can\'t deliver'**
+  /// **'Can\'t deliver…'**
   String get taskCantDeliver;
 
   /// No description provided for @arrivedOverride.
   ///
   /// In en, this message translates to:
-  /// **'I\'m at the address: the pin is wrong'**
+  /// **'Not at the pin? Arrive anyway'**
   String get arrivedOverride;
 
   /// No description provided for @arrivedOverrideTitle.
@@ -1949,13 +1949,13 @@ abstract class AppLocalizations {
   /// No description provided for @deliveryOtpWrong.
   ///
   /// In en, this message translates to:
-  /// **'That code is wrong. Ask the customer again.'**
+  /// **'Wrong code. Ask the customer to read it again from their app or SMS.'**
   String get deliveryOtpWrong;
 
   /// No description provided for @deliveryOtpWrongLeft.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Wrong code. 1 attempt left.} other{Wrong code. {count} attempts left.}}'**
+  /// **'{count, plural, =1{Wrong code. 1 try left. Ask the customer to read it again from their app or SMS.} other{Wrong code. {count} tries left. Ask the customer to read it again from their app or SMS.}}'**
   String deliveryOtpWrongLeft(int count);
 
   /// No description provided for @deliveryOtpLocked.
@@ -3193,6 +3193,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'See documents'**
   String get guardDocumentsAction;
+
+  /// No description provided for @pickupTypeCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Type the code'**
+  String get pickupTypeCode;
+
+  /// No description provided for @pickupEnterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter all 4 characters.'**
+  String get pickupEnterAll;
+
+  /// No description provided for @pickupCheckBag.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Check the bag: 1 item} other{Check the bag: {count} items}}'**
+  String pickupCheckBag(int count);
+
+  /// No description provided for @scanHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Point at the QR on the bag label'**
+  String get scanHelper;
+
+  /// No description provided for @scanLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get scanLight;
+
+  /// No description provided for @scanLightOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Light on'**
+  String get scanLightOn;
+
+  /// No description provided for @otpLockedHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery code locked'**
+  String get otpLockedHeading;
+
+  /// No description provided for @deliveryOtpLockedNoPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong codes. Jivo support has been alerted. Wait at the door for a call from support, or choose Can\'t deliver.'**
+  String get deliveryOtpLockedNoPhone;
+
+  /// No description provided for @failConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Return the order to the store?'**
+  String get failConfirmTitle;
+
+  /// No description provided for @failConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}. The customer will be told. You can\'t undo this.'**
+  String failConfirmBody(String reason);
+
+  /// No description provided for @failConfirmNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Note: {note}'**
+  String failConfirmNote(String note);
+
+  /// No description provided for @failConfirmBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Go back'**
+  String get failConfirmBack;
+
+  /// No description provided for @failConfirmYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, return to store'**
+  String get failConfirmYes;
+
+  /// No description provided for @failWaitSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait time left: {minutes} minutes {seconds} seconds'**
+  String failWaitSemantics(int minutes, int seconds);
+
+  /// No description provided for @taskReturnNoCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t collect any cash. Nothing is due for this order.'**
+  String get taskReturnNoCash;
 }
 
 class _AppLocalizationsDelegate

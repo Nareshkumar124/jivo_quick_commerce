@@ -955,7 +955,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'No maps app found. Install Mappls or another maps app.';
 
   @override
-  String get taskCallCustomer => 'Call customer';
+  String get taskCallCustomer => 'Call';
 
   @override
   String get taskStateChanged =>
@@ -982,7 +982,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskGoToStoreTitle => 'Go to the store';
 
   @override
-  String get taskOrderPacking => 'Packing…';
+  String get taskOrderPacking => 'Store is packing: wait here';
 
   @override
   String get taskOrderReady => 'Ready for pickup';
@@ -998,7 +998,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pickupCodeHelp =>
-      'Scan the QR code on the bag, or type the 4-character code printed on it.';
+      'Scan the QR on the bag, or type the 4-character code printed on it.';
 
   @override
   String get pickupCodeLabel => 'Order code';
@@ -1015,10 +1015,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The order isn\'t packed yet. Wait until the store marks it ready.';
 
   @override
-  String get taskPickup => 'Picked up';
+  String get taskPickup => 'Confirm pickup';
 
   @override
-  String get pickupScan => 'Scan QR code';
+  String get pickupScan => 'Scan bag QR';
 
   @override
   String get scanTitle => 'Scan the bag QR code';
@@ -1055,10 +1055,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskArrivedCustomer => 'Arrived at customer';
 
   @override
-  String get taskCantDeliver => 'Can\'t deliver';
+  String get taskCantDeliver => 'Can\'t deliver…';
 
   @override
-  String get arrivedOverride => 'I\'m at the address: the pin is wrong';
+  String get arrivedOverride => 'Not at the pin? Arrive anyway';
 
   @override
   String get arrivedOverrideTitle => 'Why are you outside the pin area?';
@@ -1097,15 +1097,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get deliveryOtpWrong => 'That code is wrong. Ask the customer again.';
+  String get deliveryOtpWrong =>
+      'Wrong code. Ask the customer to read it again from their app or SMS.';
 
   @override
   String deliveryOtpWrongLeft(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Wrong code. $count attempts left.',
-      one: 'Wrong code. 1 attempt left.',
+      other:
+          'Wrong code. $count tries left. Ask the customer to read it again from their app or SMS.',
+      one: 'Wrong code. 1 try left. Ask the customer to read it again from their app or SMS.',
     );
     return '$_temp0';
   }
@@ -1843,4 +1845,65 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guardDocumentsAction => 'See documents';
+
+  @override
+  String get pickupTypeCode => 'Type the code';
+
+  @override
+  String get pickupEnterAll => 'Enter all 4 characters.';
+
+  @override
+  String pickupCheckBag(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Check the bag: $count items',
+      one: 'Check the bag: 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get scanHelper => 'Point at the QR on the bag label';
+
+  @override
+  String get scanLight => 'Light';
+
+  @override
+  String get scanLightOn => 'Light on';
+
+  @override
+  String get otpLockedHeading => 'Delivery code locked';
+
+  @override
+  String get deliveryOtpLockedNoPhone =>
+      'Too many wrong codes. Jivo support has been alerted. Wait at the door for a call from support, or choose Can\'t deliver.';
+
+  @override
+  String get failConfirmTitle => 'Return the order to the store?';
+
+  @override
+  String failConfirmBody(String reason) {
+    return 'Reason: $reason. The customer will be told. You can\'t undo this.';
+  }
+
+  @override
+  String failConfirmNote(String note) {
+    return 'Note: $note';
+  }
+
+  @override
+  String get failConfirmBack => 'Go back';
+
+  @override
+  String get failConfirmYes => 'Yes, return to store';
+
+  @override
+  String failWaitSemantics(int minutes, int seconds) {
+    return 'Wait time left: $minutes minutes $seconds seconds';
+  }
+
+  @override
+  String get taskReturnNoCash =>
+      'Don\'t collect any cash. Nothing is due for this order.';
 }

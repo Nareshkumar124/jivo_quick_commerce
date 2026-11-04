@@ -533,7 +533,7 @@
   "taskRefresh": "Refresh",
   "taskNavigate": "Navigate",
   "taskNoMapsApp": "No maps app found. Install Mappls or another maps app.",
-  "taskCallCustomer": "Call customer",
+  "taskCallCustomer": "Call",
   "taskStateChanged": "This order changed. The screen now shows its latest step.",
   "taskLocationUnavailable": "Couldn't get your location. Turn on GPS and try again.",
   "taskOutsideGeofence": "You're not close enough yet. Move closer and try again.",
@@ -547,18 +547,18 @@
   },
   "cashLimitExceeded": "Your cash in hand has reached the limit. Deposit cash at the store to get cash orders again.",
   "taskGoToStoreTitle": "Go to the store",
-  "taskOrderPacking": "Packing…",
+  "taskOrderPacking": "Store is packing: wait here",
   "taskOrderReady": "Ready for pickup",
   "taskArrivedStore": "Arrived at store",
   "taskPickupTitle": "Pick up the order",
   "taskItemsTitle": "Check the items in the bag",
-  "pickupCodeHelp": "Scan the QR code on the bag, or type the 4-character code printed on it.",
+  "pickupCodeHelp": "Scan the QR on the bag, or type the 4-character code printed on it.",
   "pickupCodeLabel": "Order code",
   "pickupCodeFormat": "Enter the 4-character code from the bag.",
   "pickupCodeWrong": "That code doesn't match this order. Check the bag and try again.",
   "pickupNotPacked": "The order isn't packed yet. Wait until the store marks it ready.",
-  "taskPickup": "Picked up",
-  "pickupScan": "Scan QR code",
+  "taskPickup": "Confirm pickup",
+  "pickupScan": "Scan bag QR",
   "scanTitle": "Scan the bag QR code",
   "scanTypeInstead": "Type the code instead",
   "scanNotJivoCode": "This QR isn't a Jivo order code.",
@@ -589,8 +589,8 @@
     }
   },
   "taskArrivedCustomer": "Arrived at customer",
-  "taskCantDeliver": "Can't deliver",
-  "arrivedOverride": "I'm at the address: the pin is wrong",
+  "taskCantDeliver": "Can't deliver…",
+  "arrivedOverride": "Not at the pin? Arrive anyway",
   "arrivedOverrideTitle": "Why are you outside the pin area?",
   "arrivedOverridePinWrong": "The map pin is in the wrong place",
   "arrivedOverrideGate": "I'm at the gate or lobby",
@@ -607,8 +607,8 @@
       }
     }
   },
-  "deliveryOtpWrong": "That code is wrong. Ask the customer again.",
-  "deliveryOtpWrongLeft": "{count, plural, =1{Wrong code. 1 attempt left.} other{Wrong code. {count} attempts left.}}",
+  "deliveryOtpWrong": "Wrong code. Ask the customer to read it again from their app or SMS.",
+  "deliveryOtpWrongLeft": "{count, plural, =1{Wrong code. 1 try left. Ask the customer to read it again from their app or SMS.} other{Wrong code. {count} tries left. Ask the customer to read it again from their app or SMS.}}",
   "@deliveryOtpWrongLeft": {
     "placeholders": {
       "count": {
@@ -1084,5 +1084,51 @@
   "taskWorking": "Working",
   "guardDocumentsTitle": "Some documents need a new upload",
   "guardDocumentsBody": "Upload the documents marked in your profile, then go online.",
-  "guardDocumentsAction": "See documents"
+  "guardDocumentsAction": "See documents",
+  "pickupTypeCode": "Type the code",
+  "pickupEnterAll": "Enter all 4 characters.",
+  "pickupCheckBag": "{count, plural, =1{Check the bag: 1 item} other{Check the bag: {count} items}}",
+  "@pickupCheckBag": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanHelper": "Point at the QR on the bag label",
+  "scanLight": "Light",
+  "scanLightOn": "Light on",
+  "otpLockedHeading": "Delivery code locked",
+  "deliveryOtpLockedNoPhone": "Too many wrong codes. Jivo support has been alerted. Wait at the door for a call from support, or choose Can't deliver.",
+  "failConfirmTitle": "Return the order to the store?",
+  "failConfirmBody": "Reason: {reason}. The customer will be told. You can't undo this.",
+  "@failConfirmBody": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "failConfirmNote": "Note: {note}",
+  "@failConfirmNote": {
+    "placeholders": {
+      "note": {
+        "type": "String"
+      }
+    }
+  },
+  "failConfirmBack": "Go back",
+  "failConfirmYes": "Yes, return to store",
+  "failWaitSemantics": "Wait time left: {minutes} minutes {seconds} seconds",
+  "@failWaitSemantics": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "taskReturnNoCash": "Don't collect any cash. Nothing is due for this order."
 }

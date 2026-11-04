@@ -71,9 +71,13 @@ class FakeLocationServiceClient implements LocationServiceClient {
 
   TrackingConfig? lastConfig;
 
+  /// Runs inside [stop] before it returns (a slow teardown, a log).
+  Future<void> Function()? onStop;
+
   @override
   Future<void> stop() async {
     calls.add('stop');
+    await onStop?.call();
     running = false;
   }
 
@@ -124,9 +128,13 @@ class FakeLocationServiceClient implements LocationServiceClient {
 
 class RecordingLocationCleaner implements LocationDataCleaner {
   int clears = 0;
+  void Function()? onClear;
 
   @override
-  Future<void> clear() async => clears++;
+  Future<void> clear() async {
+    clears++;
+    onClear?.call();
+  }
 }
 
 /// Refresher whose refresh token is always rejected (or [error]).
@@ -237,6 +245,7 @@ class RiderTestHarness {
     fakeTodaySummaryProvider.overrideWithValue(today),
     fakeDeviceRegistryProvider.overrideWithValue(devices),
     qrScannerBuilderProvider.overrideWith((ref) => fakeScanner(scannerValues)),
+    scannerControllerProvider.overrideWith((ref) => null),
     ...extraOverrides,
   ];
 

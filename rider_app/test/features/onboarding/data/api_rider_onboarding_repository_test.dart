@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
+import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/features/onboarding/data/api_rider_onboarding_repository.dart';
 import 'package:rider_app/features/onboarding/domain/kyc_document.dart';
 import 'package:rider_app/features/onboarding/domain/onboarding_inputs.dart';
@@ -143,6 +144,16 @@ void main() {
       expect(doc.reviewNote, isNull);
     },
   );
+
+  test('an image over 1 MB is refused on the phone, nothing is sent', () async {
+    await expectLater(
+      repo.uploadDocument(
+        DocumentUpload(type: KycDocumentType.pan, image: Uint8List(1000001)),
+      ),
+      throwsA(isA<ApiError>()),
+    );
+    expect(http.requests, isEmpty);
+  });
 
   test('bank details: PUT, the answer masked', () async {
     http.answers['/api/v1/rider/bank-account/'] = const Canned(200, {

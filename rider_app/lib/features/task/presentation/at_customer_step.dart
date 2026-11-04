@@ -40,6 +40,7 @@ class AtCustomerStep extends ConsumerStatefulWidget {
 
 class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
   final _otp = TextEditingController();
+  final _otpFocus = FocusNode();
 
   /// OTP entered and the rider moved on to collecting the COD amount.
   bool _collecting = false;
@@ -63,6 +64,7 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
   @override
   void dispose() {
     _otp.dispose();
+    _otpFocus.dispose();
     _upiPoll?.cancel();
     super.dispose();
   }
@@ -81,11 +83,15 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
     if (ok || !mounted) return;
     final error = ref.read(taskFlowControllerProvider).error;
     if (error?.code == ApiErrorCode.deliveryOtpInvalid) {
-      // Back to the code; the collection is kept.
+      // Back to the code; the collection is kept. Clear, refocus and
+      // vibrate (at-customer-and-otp.md §2.2). A network error keeps the
+      // typed code (§2.3).
+      unawaited(HapticFeedback.mediumImpact());
       setState(() {
         _collecting = false;
         _otp.clear();
       });
+      _otpFocus.requestFocus();
     }
   }
 
@@ -168,7 +174,6 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
     RiderTask task,
   ) {
     final theme = Theme.of(context);
-    final left = task.otpAttemptsRemaining;
     return TaskStepScaffold(
       task: task,
       title: l10n.otpStepTitle,
@@ -176,56 +181,54 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
       content: [
         Text(l10n.otpStepHelp, style: theme.textTheme.bodyLarge),
         const SizedBox(height: 16),
-        TextField(
-          key: const Key('delivery-otp'),
-          controller: _otp,
-          keyboardType: TextInputType.number,
-          autocorrect: false,
-          enableSuggestions: false,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.displaySmall?.copyWith(letterSpacing: 12),
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(task.otpLength),
-          ],
-          decoration: InputDecoration(labelText: l10n.otpStepLabel),
-          onChanged: (_) {
-            _controller.clearError();
-            setState(() {});
-          },
-        ),
-        if (left != null && left < FakeTaskBackend.maxOtpAttempts) ...[
-          const SizedBox(height: 8),
-          Text(
-            l10n.otpAttemptsLeft(left),
-            key: const Key('otp-attempts'),
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.error,
+        SizedBox(
+          height: 64,
+          child: TextField(
+            key: const Key('delivery-otp'),
+            controller: _otp,
+            focusNode: _otpFocus,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            autocorrect: false,
+            enableSuggestions: false,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 40,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 12,
             ),
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(task.otpLength),
+            ],
+            decoration: InputDecoration(labelText: l10n.otpStepLabel),
+            onChanged: (_) {
+              _controller.clearError();
+              setState(() {});
+            },
           ),
-        ],
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          key: const Key('call-customer'),
-          onPressed: _controller.callCustomer,
-          icon: const Icon(Icons.call),
-          label: Text(l10n.taskCallCustomer),
         ),
+        // The tries left come only from the server's `attempts_remaining`,
+        // in the error line (taskErrorText), never counted on the phone.
       ],
       actions: PrimaryActionBar(
+        quickRow: [
+          OutlinedButton.icon(
+            key: const Key('call-customer'),
+            onPressed: _controller.callCustomer,
+            icon: const Icon(Icons.call),
+            label: Text(l10n.taskCallCustomer),
+          ),
+        ],
+        exitLink: CantDeliverLink(
+          onPressed: () => context.push(Routes.taskFail),
+        ),
         buttonKey: Key(task.isCod ? 'otp-continue' : 'task-deliver'),
         label: task.isCod ? l10n.otpContinue : l10n.taskDeliver,
         busy: state.busy != null,
         onPressed: _otpComplete ? _continueFromOtp : null,
         errorKey: const Key('task-error'),
         error: taskStepError(context, state, action: TaskAction.deliver),
-        secondary: [
-          TextButton(
-            key: const Key('task-cant-deliver'),
-            onPressed: () => context.push(Routes.taskFail),
-            child: Text(l10n.taskCantDeliver),
-          ),
-        ],
       ),
     );
   }
@@ -454,36 +457,49 @@ class _Locked extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final colors = RiderColors.of(context);
     final phone = ref.watch(launchControllerProvider).config?.support.phone;
+    final canCall = phone != null && phone.trim().isNotEmpty;
+    final cantDeliver = CantDeliverLink(
+      onPressed: () => context.push(Routes.taskFail),
+    );
     return TaskStepScaffold(
       task: task,
       title: l10n.otpLockedTitle,
       content: [
-        Icon(Icons.lock, size: 72, color: Theme.of(context).colorScheme.error),
+        Icon(Icons.lock, size: 72, color: colors.danger),
         const SizedBox(height: 16),
         Text(
-          l10n.deliveryOtpLocked,
+          l10n.otpLockedHeading,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          canCall ? l10n.deliveryOtpLocked : l10n.deliveryOtpLockedNoPhone,
           key: const Key('otp-locked'),
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleMedium,
+          style: const TextStyle(fontSize: 18),
         ),
       ],
-      actions: PrimaryActionBar(
-        buttonKey: const Key('call-support'),
-        label: l10n.callSupport,
-        onPressed: phone == null || phone.trim().isEmpty
-            ? null
-            : () => ref
+      // Without a support phone there is no disabled button: only
+      // "Can't deliver" (at-customer-and-otp.md §2.4).
+      actions: canCall
+          ? PrimaryActionBar(
+              buttonKey: const Key('call-support'),
+              label: l10n.callSupport,
+              onPressed: () => ref
                   .read(urlOpenerProvider)
                   .open(Uri(scheme: 'tel', path: phone)),
-        secondary: [
-          TextButton(
-            key: const Key('task-cant-deliver'),
-            onPressed: () => context.push(Routes.taskFail),
-            child: Text(l10n.taskCantDeliver),
-          ),
-        ],
-      ),
+              exitLink: cantDeliver,
+            )
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: cantDeliver,
+              ),
+            ),
     );
   }
 }

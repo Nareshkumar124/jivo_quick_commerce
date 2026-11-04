@@ -50,6 +50,8 @@ class PrimaryActionBar extends StatelessWidget {
     this.secondary = const [],
     this.secondaryAbove = false,
     this.primaryHeight,
+    this.quickRow = const [],
+    this.exitLink,
     super.key,
   });
 
@@ -68,6 +70,14 @@ class PrimaryActionBar extends StatelessWidget {
   final List<Widget> secondary;
   final bool secondaryAbove;
   final double? primaryHeight;
+
+  /// Navigate / Call: equal 56 dp buttons in one sticky row above the error
+  /// line (task-step shell §1, audit RD-07).
+  final List<Widget> quickRow;
+
+  /// "Can't deliver…": a text button 24 dp below everything else, so a
+  /// rushed tap on the primary never lands on it (shell §1, RD-08).
+  final Widget? exitLink;
 
   @override
   Widget build(BuildContext context) {
@@ -107,6 +117,17 @@ class PrimaryActionBar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (quickRow.isNotEmpty) ...[
+                Row(
+                  children: [
+                    for (var i = 0; i < quickRow.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 8),
+                      Expanded(child: lockable(quickRow[i])),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
               if (error != null) ...[
                 Semantics(
                   liveRegion: true,
@@ -148,6 +169,10 @@ class PrimaryActionBar extends StatelessWidget {
                   const SizedBox(height: 8),
                   lockable(action),
                 ],
+              ],
+              if (exitLink case final link?) ...[
+                const SizedBox(height: 24),
+                lockable(link),
               ],
             ],
           ),

@@ -21,6 +21,11 @@ class ForegroundLocationService implements LocationServiceClient {
   static const _channelId = 'rider_online';
   static const _iconMetaData = 'in.jivo.rider.ONLINE_NOTIFICATION_ICON';
 
+  /// How long [stop] waits for the service's teardown: the 3 s final flush
+  /// plus margin.
+  static const teardownTimeout = Duration(seconds: 6);
+
+  final _taskData = StreamController<Object>.broadcast();
   final _stats = StreamController<TrackerStats>.broadcast();
   final _serverStops = StreamController<String>.broadcast();
   bool _listening = false;
@@ -47,6 +52,7 @@ class ForegroundLocationService implements LocationServiceClient {
   Future<String?> takeServerStop() => LocationTaskSettings.takeServerStop();
 
   void _onTaskData(Object data) {
+    _taskData.add(data);
     final stats = LocationMessages.parseStats(data);
     if (stats != null) {
       _stats.add(stats);
@@ -116,13 +122,22 @@ class ForegroundLocationService implements LocationServiceClient {
     }
   }
 
+  /// Stops the service and returns once its teardown (final flush, last
+  /// buffer write) is done, so the caller may delete the buffer file.
   @override
   Future<void> stop() async {
     if (!await FlutterForegroundTask.isRunningService) return;
-    final result = await FlutterForegroundTask.stopService();
-    if (result is ServiceRequestFailure) {
-      throw LocationServiceException(result.error);
-    }
+    _listen();
+    await stopAndAwaitTeardown(
+      taskData: _taskData.stream,
+      requestStop: () async {
+        final result = await FlutterForegroundTask.stopService();
+        if (result is ServiceRequestFailure) {
+          throw LocationServiceException(result.error);
+        }
+      },
+      timeout: teardownTimeout,
+    );
   }
 
   @override
@@ -146,4 +161,21 @@ class ForegroundLocationService implements LocationServiceClient {
   @override
   void requestStats() =>
       FlutterForegroundTask.sendDataToTask(LocationMessages.requestStats);
+}
+
+/// Asks the service to stop, then waits for its `destroyed` message (sent
+/// after `onDestroy` finished writing the buffer), at most [timeout]. The
+/// listener is attached before the request, so a fast teardown is not
+/// missed.
+Future<void> stopAndAwaitTeardown({
+  required Stream<Object> taskData,
+  required Future<void> Function() requestStop,
+  required Duration timeout,
+}) async {
+  final destroyed = taskData
+      .firstWhere(LocationMessages.isDestroyed)
+      .then<void>((_) {})
+      .timeout(timeout, onTimeout: () {});
+  await requestStop();
+  await destroyed;
 }

@@ -96,7 +96,11 @@ class LocationTaskHandler extends TaskHandler {
     _tracker = null;
     // Stop GPS first; then one bounded attempt to upload what was recorded
     // while online. Anything left stays in the file for the next session.
+    // `stop` also waits for the buffer's pending file writes.
     await tracker?.stop(flushTimeout: const Duration(seconds: 3));
+    // Last: tell the UI nothing writes the buffer file any more, so a
+    // sign-out can delete it safely.
+    FlutterForegroundTask.sendDataToMain(LocationMessages.destroyed);
   }
 
   @override
