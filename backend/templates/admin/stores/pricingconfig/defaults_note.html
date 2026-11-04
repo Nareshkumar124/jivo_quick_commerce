@@ -1,0 +1,19 @@
+{# Above the pricing config list (PricingConfigAdmin.list_before_template): the model defaults (D-09, DL-43) and the stores billed with them because they have no row. Read-only. #}
+<section class="mb-6" data-testid="pricing-defaults" aria-labelledby="pricing-defaults-heading">
+    <h2 id="pricing-defaults-heading" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Defaults</h2>
+    <p class="mb-3 text-xs text-font-subtle-light dark:text-font-subtle-dark">
+        A store without a pricing row below is billed with these values. Every threshold compares with the item total before the coupon.
+    </p>
+    <dl class="grid gap-x-6 gap-y-1 mb-3 text-sm" style="grid-template-columns: max-content max-content;">
+        {% for label, value in pricing_defaults %}
+            <dt class="text-font-subtle-light dark:text-font-subtle-dark">{{ label }}</dt>
+            <dd class="font-medium text-font-default-light dark:text-font-default-dark">{{ value }}</dd>
+        {% endfor %}
+    </dl>
+    {% if stores_without_pricing %}
+        <p class="text-sm" data-testid="stores-without-pricing">
+            Billed with the defaults (no row yet):
+            {% for store in stores_without_pricing %}{{ store.code }} {{ store.name }}{% if not forloop.last %}; {% endif %}{% endfor %}.
+        </p>
+    {% endif %}
+</section>

@@ -49,10 +49,10 @@ class TestVerify:
         assert response.status_code == 400
         assert set(response.json()["error"]["details"]) == {"razorpay_signature"}
 
-    def test_valid_request_reaches_the_r1_stub(self, auth_client):
+    def test_valid_request_for_an_unknown_order(self, auth_client):
         response = auth_client.post(VERIFY, ex.VERIFY_REQUEST)
-        assert response.status_code == 503
-        assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
+        assert response.status_code == 404
+        assert response.json()["error"]["message"] == "Order not found."
 
     @pytest.mark.parametrize(
         ("field", "value"),
@@ -72,17 +72,17 @@ class TestVerify:
 
 @pytest.mark.django_db
 class TestWebhook:
-    def test_valid_signed_event_reaches_the_r1_stub(self, api_client):
+    def test_valid_signed_event_for_an_unknown_order_is_ignored(self, api_client):
         raw, headers = signed(ex.WEBHOOK_PAYMENT_CAPTURED)
         response = post_raw(api_client, raw, {**headers, "X-Razorpay-Event-Id": EVENT_ID})
-        assert response.status_code == 503
-        assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
+        assert response.status_code == 200
+        assert response.json() == {"status": "ignored"}
 
     def test_no_jwt_needed_and_a_garbage_token_is_ignored(self, api_client):
         raw, headers = signed(ex.WEBHOOK_PAYMENT_CAPTURED)
         api_client.credentials(HTTP_AUTHORIZATION="Bearer garbage")
         response = post_raw(api_client, raw, {**headers, "X-Razorpay-Event-Id": EVENT_ID})
-        assert response.status_code == 503  # not 401
+        assert response.status_code == 200  # not 401
 
     @pytest.mark.parametrize(
         "signature", [None, "", "0" * 64, razorpay_webhook_signature("wrong-secret", b"{}")]
@@ -135,7 +135,7 @@ class TestWebhook:
         AppConfig.objects.update_or_create(pk=1, defaults={"maintenance": True})
         raw, headers = signed(ex.WEBHOOK_PAYMENT_CAPTURED)
         response = post_raw(api_client, raw, {**headers, "X-Razorpay-Event-Id": EVENT_ID})
-        assert response.json()["error"]["code"] != "MAINTENANCE"
+        assert response.status_code == 200
         assert post_raw(api_client, raw, {"X-Razorpay-Event-Id": EVENT_ID}).status_code == 400
         verify = auth_client.post(VERIFY, ex.VERIFY_REQUEST)
         assert verify.json()["error"]["code"] == "MAINTENANCE"

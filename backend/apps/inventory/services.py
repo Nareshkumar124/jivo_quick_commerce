@@ -297,3 +297,106 @@ def can_adjust_stock(user, store: DarkStore) -> bool:
     if not (user and user.is_active and user.has_perm("inventory.adjust_stock")):
         return False
     return stores_for(user).filter(pk=store.pk).exists()
+
+
+# --------------------------------------------------------------------------- reservations (P3)
+
+
+@dataclass(frozen=True, slots=True)
+class ReservationLine:
+    variant_id: int
+    quantity: int
+    max_qty_per_order: int
+
+
+def reserve(order, store_id: int, lines: Iterable[ReservationLine], *, expires_at=None) -> None:
+    """08 §6.1 (T1/T2): hold stock for an order's lines. Locks the `StoreInventory` rows in
+    variant-id order (one order for every path, so two placements never deadlock), re-checks
+    what is available under the lock, then adds to `reserved` and writes one `StockReservation`
+    per line. Any line short of stock: 409 `STOCK_UNAVAILABLE` listing every short line with its
+    `orderable_quantity`, and nothing is reserved. Must run inside the placement transaction."""
+    from django.db import connection
+
+    from apps.core.errors import ErrorCode
+    from apps.core.exceptions import ApiError
+    from apps.inventory.models import StockReservation
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Stock is reserved only inside the order-placement transaction.")
+    lines = sorted(lines, key=lambda line: line.variant_id)
+    rows = {
+        row.variant_id: row
+        for row in StoreInventory.objects.select_for_update()
+        .filter(store_id=store_id, variant_id__in=[line.variant_id for line in lines])
+        .order_by("variant_id")
+    }
+    short = []
+    for line in lines:
+        row = rows.get(line.variant_id)
+        available = max(row.available, 0) if row is not None and row.is_available else 0
+        if line.quantity > available:
+            short.append(
+                {
+                    "variant_id": line.variant_id,
+                    "requested_quantity": line.quantity,
+                    "orderable_quantity": min(available, line.max_qty_per_order),
+                }
+            )
+    if short:
+        raise ApiError(ErrorCode.STOCK_UNAVAILABLE, details={"items": short})
+    with stock_write():
+        for line in lines:
+            row = rows[line.variant_id]
+            row.reserved += line.quantity
+            row.save(update_fields=["reserved", "updated_at"])
+    StockReservation.objects.bulk_create(
+        StockReservation(
+            order=order,
+            store_id=store_id,
+            variant_id=line.variant_id,
+            quantity=line.quantity,
+            expires_at=expires_at,
+        )
+        for line in lines
+    )
+
+
+def release_reservations(order) -> int:
+    """08 §6.1: payment failed / cancelled before pickup. Gives the order's ACTIVE reservations
+    back (`reserved -= quantity`, rows locked in variant-id order) and marks them RELEASED.
+    Idempotent: returns how many were released (0 the second time)."""
+    from apps.inventory.models import ReservationStatus, StockReservation
+
+    with transaction.atomic():
+        active = list(
+            StockReservation.objects.select_for_update()
+            .filter(order=order, status=ReservationStatus.ACTIVE)
+            .order_by("variant_id")
+        )
+        if not active:
+            return 0
+        rows = {
+            row.variant_id: row
+            for row in StoreInventory.objects.select_for_update()
+            .filter(store_id=active[0].store_id, variant_id__in=[r.variant_id for r in active])
+            .order_by("variant_id")
+        }
+        with stock_write():
+            for reservation in active:
+                row = rows[reservation.variant_id]
+                row.reserved = max(row.reserved - reservation.quantity, 0)
+                row.save(update_fields=["reserved", "updated_at"])
+        StockReservation.objects.filter(pk__in=[r.pk for r in active]).update(
+            status=ReservationStatus.RELEASED
+        )
+        return len(active)
+
+
+def clear_reservation_expiry(order) -> int:
+    """08 T3: the payment is captured, so the reservation no longer expires (it stays ACTIVE
+    until pickup commits it, T9)."""
+    from apps.inventory.models import ReservationStatus, StockReservation
+
+    return StockReservation.objects.filter(order=order, status=ReservationStatus.ACTIVE).update(
+        expires_at=None
+    )

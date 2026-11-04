@@ -82,6 +82,13 @@ class TestFees:
         assert (bill.delivery_fee, bill.handling_fee) == (Decimal("0.00"), Decimal("4.50"))
         assert bill.grand_total == Decimal("138.50")  # 119 + small cart 15 + handling 4.50
 
+    def test_tip_is_capped_in_the_money_function(self):
+        """Code review F1: CART_MAX_TIP is enforced by compute_bill(), not only the serializer."""
+        bill = compute_bill([line("300.00")], D09, tip=Decimal("9999"))
+        assert bill.tip == Decimal("500.00")
+        assert bill.grand_total == Decimal("800.00")
+        assert compute_bill([line("300.00")], D09, tip=Decimal("-5")).tip == Decimal("0.00")
+
     def test_tip_is_rounded_to_the_paisa(self):
         bill = compute_bill([line("300.00")], D09, tip=Decimal("10.005"))
         assert bill.tip == Decimal("10.01")

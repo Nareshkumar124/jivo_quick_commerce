@@ -4,10 +4,10 @@
 Orders are always looked up in the caller's own orders: another user's order id is a 404.
 State changes go only through `orders.services.transition()` (Phase 3 R2).
 
-Phase 3 R1 (contract): the views authenticate, check the headers and validate the request, then
-answer 503 until the internals land in R2.
+Views are thin: validate, call `apps.orders.services`, render with `apps.orders.presenters`.
 """
 
+from django.db.models import Case, IntegerField, Value, When
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -21,6 +21,7 @@ from apps.core.idempotency import (
     IDEMPOTENCY_KEY_REUSED,
     idempotency_key_from_header,
 )
+from apps.core.pagination import StandardPagination
 from apps.core.schema import (
     MAINTENANCE,
     PAGINATION_PARAMETERS,
@@ -33,9 +34,10 @@ from apps.core.schema import (
     request_examples,
     validation_error,
 )
-from apps.core.stubs import not_available_yet
 from apps.core.throttling import RATE_LIMITED, OrderPlacementThrottle, PaymentThrottle
 from apps.orders import examples as ex
+from apps.orders import presenters, services
+from apps.orders.choices import ACTIVE_STATUSES, TERMINAL_STATUSES, OrderListStatus
 from apps.orders.serializers import (
     OrderCancelSerializer,
     OrderCreateSerializer,
@@ -122,8 +124,29 @@ class OrderListCreateView(APIView):
         ),
     )
     def get(self, request: Request) -> Response:
-        OrderListQuerySerializer(data=request.query_params).is_valid(raise_exception=True)
-        not_available_yet()
+        query = OrderListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        orders = presenters.with_api_relations(services.own_orders(request.user))
+        status = query.validated_data.get("status")
+        if status == OrderListStatus.ACTIVE:
+            orders = orders.filter(status__in=sorted(ACTIVE_STATUSES)).order_by(
+                "-created_at", "-id"
+            )
+        elif status == OrderListStatus.PAST:
+            orders = orders.filter(status__in=sorted(TERMINAL_STATUSES)).order_by(
+                "-created_at", "-id"
+            )
+        else:
+            orders = orders.annotate(
+                finished=Case(
+                    When(status__in=sorted(TERMINAL_STATUSES), then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            ).order_by("finished", "-created_at", "-id")
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(orders, request, view=self)
+        return paginator.get_paginated_response([presenters.summary_body(o) for o in page])
 
     @extend_schema(
         operation_id="orders_create",
@@ -231,10 +254,24 @@ class OrderListCreateView(APIView):
         ),
     )
     def post(self, request: Request) -> Response:
-        idempotency_key_from_header(request)
-        get_store(request)
-        OrderCreateSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet()
+        key = idempotency_key_from_header(request)
+        store = get_store(request)
+        serializer = OrderCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        info = getattr(request, "client_info", None)
+        placement = services.place_order(
+            request.user,
+            store,
+            address_id=data["address_id"],
+            payment_method=data["payment_method"],
+            expected_grand_total=data["expected_grand_total"],
+            idempotency_key=key,
+            client_app_version=getattr(info, "app_version", "") or "",
+            client_platform=getattr(info, "platform", "") or "",
+        )
+        order = services.get_own_order(request.user, placement.order.pk)
+        return Response(presenters.placement_body(order), status=201 if placement.created else 200)
 
 
 class OrderDetailView(APIView):
@@ -265,7 +302,7 @@ class OrderDetailView(APIView):
         ),
     )
     def get(self, request: Request, id: int) -> Response:
-        not_available_yet()
+        return Response(presenters.order_body(services.get_own_order(request.user, id)))
 
 
 class OrderRetryPaymentView(APIView):
@@ -320,8 +357,10 @@ class OrderRetryPaymentView(APIView):
         ),
     )
     def post(self, request: Request, id: int) -> Response:
-        idempotency_key_from_header(request)
-        not_available_yet()
+        key = idempotency_key_from_header(request)
+        order, payment = services.retry_payment(request.user, id, key)
+        order = services.get_own_order(request.user, order.pk)
+        return Response(presenters.placement_body(order, payment))
 
 
 class OrderCancelView(APIView):
@@ -367,5 +406,8 @@ class OrderCancelView(APIView):
         ),
     )
     def post(self, request: Request, id: int) -> Response:
-        OrderCancelSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet()
+        serializer = OrderCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        services.cancel_order(request.user, id, reason=data["reason"], note=data.get("note", ""))
+        return Response(presenters.order_body(services.get_own_order(request.user, id)))

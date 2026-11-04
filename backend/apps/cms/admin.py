@@ -45,6 +45,16 @@ class AppConfigAdmin(ModelAdmin):
         ("Support", {"fields": ("support_phone", "support_email")}),
         ("Policies", {"fields": ("terms_url", "privacy_url", "refund_url", "terms_version")}),
         (
+            "Orders and payments",
+            {
+                "fields": ("payment_window_minutes",),
+                "description": (
+                    "How long an online order waits for payment before it fails and its stock "
+                    "is released (5 to 60 minutes). Orders already placed keep their window."
+                ),
+            },
+        ),
+        (
             "Rider app",
             {
                 "fields": (

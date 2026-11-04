@@ -17,6 +17,8 @@ abstract class _$AppliedCouponCWProxy {
 
   AppliedCoupon message(String? message);
 
+  AppliedCoupon amountToUnlock(String? amountToUnlock);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `AppliedCoupon(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -29,6 +31,7 @@ abstract class _$AppliedCouponCWProxy {
     String discount,
     bool isApplicable,
     String? message,
+    String? amountToUnlock,
   });
 }
 
@@ -55,6 +58,10 @@ class _$AppliedCouponCWProxyImpl implements _$AppliedCouponCWProxy {
   AppliedCoupon message(String? message) => this(message: message);
 
   @override
+  AppliedCoupon amountToUnlock(String? amountToUnlock) =>
+      this(amountToUnlock: amountToUnlock);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `AppliedCoupon(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -67,6 +74,7 @@ class _$AppliedCouponCWProxyImpl implements _$AppliedCouponCWProxy {
     Object? discount = const $CopyWithPlaceholder(),
     Object? isApplicable = const $CopyWithPlaceholder(),
     Object? message = const $CopyWithPlaceholder(),
+    Object? amountToUnlock = const $CopyWithPlaceholder(),
   }) {
     return AppliedCoupon(
       code: code == const $CopyWithPlaceholder()
@@ -89,6 +97,10 @@ class _$AppliedCouponCWProxyImpl implements _$AppliedCouponCWProxy {
           ? _value.message
           // ignore: cast_nullable_to_non_nullable
           : message as String?,
+      amountToUnlock: amountToUnlock == const $CopyWithPlaceholder()
+          ? _value.amountToUnlock
+          // ignore: cast_nullable_to_non_nullable
+          : amountToUnlock as String?,
     );
   }
 }
@@ -104,26 +116,39 @@ extension $AppliedCouponCopyWith on AppliedCoupon {
 // **************************************************************************
 
 AppliedCoupon _$AppliedCouponFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('AppliedCoupon', json, ($checkedConvert) {
-      $checkKeys(
-        json,
-        requiredKeys: const [
-          'code',
-          'title',
-          'discount',
-          'is_applicable',
-          'message',
-        ],
-      );
-      final val = AppliedCoupon(
-        code: $checkedConvert('code', (v) => v as String),
-        title: $checkedConvert('title', (v) => v as String),
-        discount: $checkedConvert('discount', (v) => v as String),
-        isApplicable: $checkedConvert('is_applicable', (v) => v as bool),
-        message: $checkedConvert('message', (v) => v as String?),
-      );
-      return val;
-    }, fieldKeyMap: const {'isApplicable': 'is_applicable'});
+    $checkedCreate(
+      'AppliedCoupon',
+      json,
+      ($checkedConvert) {
+        $checkKeys(
+          json,
+          requiredKeys: const [
+            'code',
+            'title',
+            'discount',
+            'is_applicable',
+            'message',
+            'amount_to_unlock',
+          ],
+        );
+        final val = AppliedCoupon(
+          code: $checkedConvert('code', (v) => v as String),
+          title: $checkedConvert('title', (v) => v as String),
+          discount: $checkedConvert('discount', (v) => v as String),
+          isApplicable: $checkedConvert('is_applicable', (v) => v as bool),
+          message: $checkedConvert('message', (v) => v as String?),
+          amountToUnlock: $checkedConvert(
+            'amount_to_unlock',
+            (v) => v as String?,
+          ),
+        );
+        return val;
+      },
+      fieldKeyMap: const {
+        'isApplicable': 'is_applicable',
+        'amountToUnlock': 'amount_to_unlock',
+      },
+    );
 
 Map<String, dynamic> _$AppliedCouponToJson(AppliedCoupon instance) =>
     <String, dynamic>{
@@ -132,4 +157,5 @@ Map<String, dynamic> _$AppliedCouponToJson(AppliedCoupon instance) =>
       'discount': instance.discount,
       'is_applicable': instance.isApplicable,
       'message': instance.message,
+      'amount_to_unlock': instance.amountToUnlock,
     };

@@ -100,6 +100,22 @@ class TestReadingTheCart:
         assert body["coupon"] is None
         assert body["instructions"] == {"chips": [], "note": ""}
 
+    def test_reads_never_write(self, api, shop, user):
+        """Code review F5: GET /cart/ and the coupon sheet create or change nothing."""
+        from apps.cms.models import AppConfig
+
+        AppConfig.load()  # the app-guard middleware's singleton (Phase 1), created on first use
+        with CaptureQueriesContext(connection) as queries:
+            api.call("get", CART)
+            api.call("get", COUPONS, schema="CouponList")
+        assert not Cart.objects.filter(user=user).exists()
+        writes = [
+            q["sql"]
+            for q in queries
+            if q["sql"].lstrip().upper().startswith(("INSERT", "UPDATE", "DELETE"))
+        ]
+        assert writes == []
+
     def test_ready_cart(self, api, shop, address):
         api.call("patch", CART, {"address_id": address.pk, "tip": "20.00"})
         api.add(shop.canola_1l, 2)
@@ -338,8 +354,10 @@ class TestStoreFollowing:
         assert body["store"]["id"] == shop.other_store_model.pk
         assert body["items"][0]["variant"]["selling_price"] == "1199.00"
         assert body["bill"]["item_total"] == "2398.00"
-        assert Cart.objects.get(user=user).store_id == shop.other_store_model.pk
+        # A read never writes (code review F5); the next change saves the binding.
+        assert Cart.objects.get(user=user).store_id == shop.store_model.pk
         assert api.add(shop.canola_5l, 3, store=shop.other_store_model)["items"][0]["quantity"] == 3
+        assert Cart.objects.get(user=user).store_id == shop.other_store_model.pk
         # Back at the first store, 3 is more than it has: flagged, not changed.
         body = api.call("get", CART)
         assert body["items"][0]["quantity"] == 3
@@ -419,6 +437,7 @@ class TestCoupons:
             "discount": "50.00",
             "is_applicable": True,
             "message": None,
+            "amount_to_unlock": None,
         }
         assert body["bill"]["coupon_discount"] == "50.00"
         assert body["bill"]["grand_total"] == "508.00"
@@ -455,6 +474,28 @@ class TestCoupons:
         assert (body["error"]["code"], body["error"]["details"]) == (error, details)
         assert api.call("get", CART)["coupon"] is None
 
+    def test_per_customer_limit_one_below_and_at_the_limit(self, api, shop, user):
+        """Review of R2a: a coupon used once with a limit of 2 still applies; at 2 it does not."""
+        from apps.promotions.models import CouponRedemption
+
+        limited = coupon(usage_limit_per_user=2, min_order_value=Decimal(0))
+        api.add(shop.canola_1l, 2)
+
+        def use_once():
+            CouponRedemption.objects.create(
+                coupon=limited, user=user, order=OrderFactory(user=user),
+                discount_amount=Decimal(50), status="APPLIED",
+            )  # fmt: skip
+
+        use_once()
+        assert api.call("post", COUPON, {"code": "JIVO50"})["coupon"]["is_applicable"] is True
+        use_once()
+        body = api.call("post", COUPON, {"code": "JIVO50"}, status=422)
+        assert body["error"]["details"] == {"code": "JIVO50", "scope": "per_user"}
+        cart = api.call("get", CART)
+        assert cart["coupon"]["is_applicable"] is False
+        assert cart["coupon"]["amount_to_unlock"] is None
+
     def test_first_order_and_usage(self, api, shop, user):
         coupon("WELCOME100", first_order_only=True, min_order_value=Decimal(0))
         OrderFactory(user=user)
@@ -474,6 +515,7 @@ class TestCoupons:
             "discount": "0.00",
             "is_applicable": False,
             "message": "Add items worth ₹20 more to use this coupon.",
+            "amount_to_unlock": "20.00",
         }
         assert body["bill"]["coupon_discount"] == "0.00"
         assert body["checkout"]["blockers"] == [

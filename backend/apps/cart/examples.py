@@ -186,6 +186,7 @@ JIVO50 = {
     "discount": "50.00",
     "is_applicable": True,
     "message": None,
+    "amount_to_unlock": None,
 }
 
 # --------------------------------------------------------------------------- carts
@@ -350,6 +351,7 @@ CART_COUPON_NOT_APPLICABLE = {
         "discount": ZERO,
         "is_applicable": False,
         "message": "Add items worth ₹74 more to use this coupon.",
+        "amount_to_unlock": "74.00",
     },
     "tip": ZERO,
     "instructions": NO_INSTRUCTIONS,

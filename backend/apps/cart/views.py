@@ -122,7 +122,7 @@ class CartView(APIView):
         address = None
         if "address_id" in query.validated_data:
             address = services.resolve_address(request.user, query.validated_data["address_id"])
-        cart = services.get_cart(request.user, store)
+        cart = services.read_cart(request.user, store)
         return Response(services.cart_body(cart, store, request.user, address=address))
 
     @extend_schema(
@@ -321,7 +321,7 @@ class CartCouponListView(APIView):
     )
     def get(self, request: Request) -> Response:
         store = get_store(request)
-        cart = services.get_cart(request.user, store)
+        cart = services.read_cart(request.user, store)
         return Response(services.coupon_list_body(cart, store, request.user))
 
 
