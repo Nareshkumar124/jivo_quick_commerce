@@ -75,3 +75,13 @@ The dev agents report 62 customer, 112 rider and 75 `jivo_core` tests plus real-
 - **Reorder:** raise-to-ordered (never on top, never lowered), idempotent, no reservation; OUT_OF_STOCK / LIMITED_STOCK with `added_quantity`.
 - **Refunds:** Support limit 500.00 ok / 500.01 refused; Finance no limit; cap ("At most …") enforced; manual partial → PARTIALLY_REFUNDED → REFUNDED; FAILED (refund.failed webhook) shown to the customer as PENDING; retry → `cancel:<id>:retry-1`; a second retry refused; the original queued task never resent the FAILED refund; `sync_refund_status` re-queued a stuck refund twice and exactly one gateway refund resulted.
 - **Hygiene:** the 38 QA orders left PLACED by P3 were cancelled with T11 (31 ONLINE → REFUNDED, ₹6,249 = Σ amount_paid; 7 COD → FAILED; the 5 with an earlier duplicate-capture refund got exactly one more refund, so each capture was refunded once). 9 more left by the smoke run and order 280 (PACKING, T12) were cancelled at the end. No QA order is open; the remaining reservations (variant 1: 7, variant 3: 1) are not QA orders'.
+
+## Phase 4 stage 2 (2026-11-04, `f744508`): Ops Console
+- **Packing console:** the QA order appears with Accept; Accept / Start packing / Mark packed answer 204 with a toast; a repeat Accept is 409 "Only a newly placed order can be accepted."; the slip shows order number, pickup code, QR and the units still coming ("2 items", with "(2 ordered, 1 unavailable)" on the struck line).
+- **"Can't supply":** matches the §6.3 oracle; posting the same quantity again says "already marked; nothing changed" and makes no second refund; bad quantities 400, another order's line 404, PACKED 409.
+- **Live board:** Placed, Accepted, Packing, Packed, Out for delivery and the Exceptions lane; card = number, store, timer, items, payment (no customer name or phone); store / payment / SLA-breach filters; 10 s HTMX poll; the columns partial is a fragment.
+- **Accepting switch** (QA-02 only): pausing makes serviceability report the store closed; resuming reopens it. Offered to the Store Manager on GGN-01, not to Store Staff. GGN-01 was never changed.
+- **QA-02:** auto-accept moves a COD order to ACCEPTED by `system` within seconds (TC-36); a GGN-01 order reordered at QA-02 lists Chia as NOT_AVAILABLE (TC-12).
+- **Refund retry (OBS-P4-01 re-check):** Finance's "Retry failed refund" sends one retry; the identical form posted again is refused ("This form was already sent…"); one `:retry-1` row, settled once.
+- **Gaps:** no manual refund anywhere in the panel (BUG-0010, P2); no CSV export on Orders (BUG-0011, P3).
+- **Hygiene:** 4 QA orders left by the smoke run cancelled (T11); no QA order open; no PENDING refund left.
