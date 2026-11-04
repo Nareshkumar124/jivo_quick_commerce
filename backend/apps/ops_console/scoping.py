@@ -18,6 +18,16 @@ def visible_stores(user) -> QuerySet[DarkStore]:
     return stores_for(user)
 
 
+def is_store_scoped(user) -> bool:
+    """True when `stores_for(user)` is limited to assigned stores (any store-scoped role: the
+    stricter role wins). For labels only ("your assigned stores"); querysets use stores_for."""
+    from apps.accounts import roles
+
+    if user.is_superuser:
+        return False
+    return bool(set(user.groups.values_list("name", flat=True)) & roles.STORE_SCOPED_ROLES)
+
+
 def scope_to_stores(queryset: QuerySet, user, field: str = "store") -> QuerySet:
     """`queryset` limited to rows whose `field` is one of the user's stores."""
     return queryset.filter(**{f"{field}__in": stores_for(user)})

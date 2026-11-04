@@ -83,6 +83,30 @@ class OrderDateFilter(admin.DateFieldListFilter):
         self.title = "order date (IST)"
 
 
+class CustomerFilter(admin.SimpleListFilter):
+    """`?customer=<user id>`: the "See all orders" link on a customer page. Shown only while it
+    is in use (as "This customer", never a name or phone); it only narrows the already
+    store-scoped list."""
+
+    title = "customer"
+    parameter_name = "customer"
+
+    def lookups(self, request, model_admin):
+        value = request.GET.get(self.parameter_name, "")
+        return [(value, "This customer")] if value else []
+
+    def has_output(self) -> bool:
+        return bool(self.value())  # Django applies only the filters that have output
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+        if not value.isdigit():
+            return queryset.none()
+        return queryset.filter(user_id=int(value))
+
+
 class ReadOnlyInline(TabularInline):
     extra = 0
     can_delete = False
@@ -252,6 +276,7 @@ class OrderAdmin(StoreScopedAdminMixin, ModelAdmin):
         "payment_method",
         "payment_status",
         ("created_at", OrderDateFilter),
+        CustomerFilter,
     )
     list_select_related = ("store", "user")
     search_help_text = (
