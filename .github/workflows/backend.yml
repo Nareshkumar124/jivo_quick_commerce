@@ -26,6 +26,10 @@ permissions:
 env:
   UV_VERSION: "0.11.26"
   PYTHON_VERSION: "3.13"
+  # Parallel tests. Added per run with `uv run --with`, so this works whether or not pytest-xdist
+  # is in uv.lock (T-408c). Repository variable BACKEND_PYTEST_WORKERS overrides the worker count
+  # without a YAML change: a number, `auto` (default, one per vCPU), or 0 to run serially.
+  PYTEST_XDIST_VERSION: "3.8.0"
 
 defaults:
   run:
@@ -36,8 +40,8 @@ jobs:
     name: Lint (ruff)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
@@ -46,10 +50,13 @@ jobs:
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - name: Env example lists every variable the backend reads
+        run: python3 ../infra/scripts/check_env_example.py
 
   test:
     name: Checks, tests, schema
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     services:
       postgres:
         # PostGIS image now, so Phase 2 (GeoDjango) needs no CI change. Phase 0 uses plain postgres.
@@ -75,8 +82,8 @@ jobs:
       CHANNELS_REDIS_URL: redis://localhost:6380/2
       REDIS_TEST_URL: redis://localhost:6380/15
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
@@ -104,8 +111,14 @@ jobs:
       - name: Migrations apply on a fresh database
         run: uv run python manage.py migrate --noinput
 
+      # pytest-django gives each xdist worker its own test DB (<name>_gw0, _gw1, ...) on the CI
+      # service container; pytest-cov combines the workers' data, so fail_under (80%) applies to
+      # the whole suite.
       - name: Tests with coverage (fail under 80%)
-        run: uv run pytest --create-db
+        env:
+          PYTEST_WORKERS: ${{ vars.BACKEND_PYTEST_WORKERS || 'auto' }}
+        run: |
+          uv run --with "pytest-xdist==${PYTEST_XDIST_VERSION}"             pytest -n "${PYTEST_WORKERS}" --create-db
 
       - name: OpenAPI schema is valid, warning-free and committed
         run: |
@@ -128,8 +141,8 @@ jobs:
     name: Dependency audit (pip-audit)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ env.PYTHON_VERSION }}
@@ -144,6 +157,6 @@ jobs:
     name: Docker image builds
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build production image (verifies GDAL/GEOS/PROJ and WeasyPrint libraries)
         run: docker build -t jivoqc-backend:ci .

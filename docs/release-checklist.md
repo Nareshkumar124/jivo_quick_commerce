@@ -35,6 +35,7 @@ Use it in Phase 8, before the public launch. Each item points to the doc that de
 
 ## 5. Infrastructure (`02 §8`, D-05)
 - [ ] Production stack up: managed Postgres + PostGIS, managed Redis, S3 + CDN, web/worker/beat processes, nginx/LB with TLS.
+- [ ] Exactly **one** Celery beat running (DatabaseScheduler), and `expire-unpaid-orders` visible as an enabled periodic task with a recent `last_run_at` ([`deployment.md`](deployment.md) §4).
 - [ ] Domains and DNS for `api.` and `ops.`.
 - [ ] Zero-downtime deploys, backward-compatible migrations, a documented rollback plan.
 - [ ] Monitoring: Sentry (backend and apps), structured logs, dashboards, on-call contacts.
@@ -46,6 +47,8 @@ Use it in Phase 8, before the public launch. Each item points to the doc that de
 
 ## 7. Business readiness (`11 §2`)
 - [ ] Razorpay live keys after KYC (or the chosen alternative, Cashfree).
+- [ ] Razorpay **live-mode** webhook configured as in [`deployment.md`](deployment.md) §5 (URL, events `payment.captured`, `payment.failed`, `refund.processed`, `refund.failed`), with its own `RAZORPAY_WEBHOOK_SECRET`.
+- [ ] **Before enabling Razorpay auto-capture in production:** drain or expire every PAYMENT_PENDING ONLINE order whose Razorpay order was created before the release. Those gateway orders lack the per-order `payment.capture: automatic` settings, so a payment on them may stay only authorised. Either let `expire_unpaid_orders` run past their windows (15 min) before switching traffic, or check the Razorpay Dashboard for authorised-but-uncaptured payments on older orders and capture or refund them. Also confirm in Razorpay **test mode** that a repeated refund `receipt` is refused ("Duplicate receipt") and that `refund.*` webhooks carry `receipt`.
 - [ ] Dark store ready: location, polygon, hardware (tablet, printer), trained staff.
 - [ ] Riders recruited and approved, with their cash limits set.
 - [ ] Full product catalog with photos.
