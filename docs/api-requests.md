@@ -35,3 +35,8 @@ App agents raise API gaps in their reports (`development-phase.md` §4). This fi
 | 30 | customer (T-414) | P6 | **FCM data payload:** `{type: order\|product\|collection\|category, order_id or slug}` or `{link}`. | open |
 | 31 | customer (T-414) | P4 | `ReorderResult.added_count` (lines added), so the app doesn't have to guess. | sent to BE P4 run |
 | 32 | customer (T-414) | P4 | Customer-facing refund status: FAILED shows as PENDING (ops retries); the customer enum stays PENDING\|PROCESSED (PM default). | sent to BE P4 run |
+| 33 | customer (T-516) | P5 contract | Extends #28: add `order_number` to `track/`; `rider.photo` must be an https URL. | sent to BE P5 |
+| 34 | customer (T-516) | P7 | **Rating:** `POST /orders/{id}/rating/` `{order_stars 1-5, rider_stars 1-5 or null, tags[], comment ≤500}`, plus a way to read it back (a `rating` field on the order, or GET returning 404 when unrated). Tag codes: ON_TIME, WELL_PACKED, FRESH_PRODUCTS, POLITE_RIDER, LATE_DELIVERY, DAMAGED_ITEMS, MISSING_ITEMS, RUDE_RIDER. | open |
+| 35 | customer (T-516) | P7 | **FAQs:** `GET /faqs/?app=customer` returns `[{id, category, question, answer (plain text)}]` in display order. | open |
+| 36 | customer (T-516) | P7 | **Support tickets:** list, create `{category, message, order_id?}`, detail with messages, and reply (400 on CLOSED). Categories: MISSING/DAMAGED/WRONG_ITEMS and LATE_DELIVERY (these need an order), PAYMENT_REFUND, ACCOUNT, OTHER. Statuses: OPEN, IN_PROGRESS, RESOLVED, CLOSED. Plus an attachment upload contract. | open |
+| 37 | customer (T-516) | P7 | **CMS pages:** `GET /pages/{slug}/` returns `{slug, title, html, updated_at}` for about, terms, privacy and refund-policy. | open |
