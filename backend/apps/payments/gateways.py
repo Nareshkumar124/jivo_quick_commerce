@@ -277,7 +277,8 @@ class RazorpayGateway(PaymentGateway):
         return _gateway_refund(data, payment_id)
 
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
-        data = self._call("GET", f"/payments/{urllib.parse.quote(payment_id)}/refunds")
+        # Razorpay pages 10 by default; 100 is its maximum per request.
+        data = self._call("GET", f"/payments/{urllib.parse.quote(payment_id)}/refunds?count=100")
         return [_gateway_refund(item, payment_id) for item in data.get("items", [])]
 
 

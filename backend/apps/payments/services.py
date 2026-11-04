@@ -8,7 +8,9 @@ for one of this order's gateway orders.
 
 import logging
 import re
+from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import NotFound
@@ -150,8 +152,10 @@ def _refund_by_receipt(entity: dict) -> Refund | None:
     """A `refund.*` event for a refund whose gateway id is not stored yet: `process_refund` may
     still be in its gateway call (code review R2b-fix Major 1). Matched by the payment and the
     refund `receipt` (= `refund_receipt(idempotency_key)`), never by amount. If nothing matches
-    while a refund of that payment is still PENDING without a gateway id, the event is answered
-    503 (`WebhookRetryLater`), not stored, so the gateway's retry finds the id recorded."""
+    while a refund of that payment is still PENDING without a gateway id and younger than
+    `REFUND_WEBHOOK_RETRY_WINDOW_SECONDS` (so `process_refund` may still record it), the event is
+    answered 503 (`WebhookRetryLater`), not stored, so the gateway's retry finds the id recorded.
+    Past that window the event is ignored with a warning, so the 503 is never unbounded."""
     payment_id = entity.get("payment_id")
     if not isinstance(payment_id, str) or not re.fullmatch(RAZORPAY_PAYMENT_ID_PATTERN, payment_id):
         return None
@@ -168,6 +172,20 @@ def _refund_by_receipt(entity: dict) -> Refund | None:
                 )
                 return None
             return refund
-    if any(r.status == RefundStatus.PENDING and not r.gateway_refund_id for r in candidates):
+    unrecorded = [
+        r for r in candidates if r.status == RefundStatus.PENDING and not r.gateway_refund_id
+    ]
+    since = timezone.now() - timedelta(seconds=settings.REFUND_WEBHOOK_RETRY_WINDOW_SECONDS)
+    if any(r.created_at >= since for r in unrecorded):
         raise WebhookRetryLater(f"refund {entity['id']} not recorded yet")
+    if unrecorded:
+        # Bounded (fix review): past the window `process_refund` is no longer running, so a retry
+        # cannot help (a Dashboard refund without a receipt, or a task that gave up).
+        logger.warning(
+            "Refund event %s for payment %s matches no refund; refunds %s are pending past the "
+            "retry window: ignored",
+            entity["id"],
+            payment_id,
+            [r.pk for r in unrecorded],
+        )
     return None
