@@ -3,8 +3,10 @@ projects), so there is no Firebase dependency yet: an `FcmPushBackend` will impl
 
 - DisabledPushBackend (default until D-19): sends nothing; logs the event and the number of
   devices only (never the text, which can hold a delivery OTP). The notification is SKIPPED.
-- ConsolePushBackend (local): logs title and body, so developers can read them.
+- ConsolePushBackend (local): logs the title and data (the body is redacted: it can hold a
+  delivery OTP).
 - LocmemPushBackend (tests): keeps messages in `outbox`. Tests never call a real service.
+Deployed environments refuse the console and locmem backends (system check notifications.E001).
 
 `send()` raises `PushError` for a transient failure (the task retries) and returns the tokens the
 service reported as unregistered (their devices are deactivated).
@@ -60,12 +62,13 @@ class DisabledPushBackend(BasePushBackend):
 
 class ConsolePushBackend(BasePushBackend):
     def send(self, message: PushMessage) -> PushResult:
+        # The body is never logged: it can hold a delivery OTP (code review of f08c329).
         logger.warning(
-            "PUSH (console backend) [%s, %s device(s)] %s: %s %s",
+            "PUSH (console backend) [%s, %s device(s)] %s: <body redacted, %s chars> %s",
             message.event,
             len(message.tokens),
             message.title,
-            message.body,
+            len(message.body),
             message.data,
         )
         return PushResult(sent=len(message.tokens))

@@ -459,3 +459,194 @@ def test_purge_old_notifications(user, settings):
     assert tasks.purge_old_notifications() == 1
     assert not Notification.objects.filter(pk=old.pk).exists()
     assert Notification.objects.filter(pk=recent.pk).exists()
+
+
+# --------------------------------------------------------------------------- code review f08c329
+
+
+def _paid_online_order(amount="300.00"):
+    from apps.payments.models import Gateway, Payment, PaymentAttemptStatus
+
+    order = OrderFactory(
+        payment_method=PaymentMethod.ONLINE,
+        payment_status=PaymentStatus.REFUND_PENDING,
+        amount_paid=Decimal(amount),
+    )
+    payment = Payment.objects.create(
+        order=order,
+        gateway=Gateway.RAZORPAY,
+        gateway_order_id=f"order_T{order.pk}",
+        amount=Decimal(amount),
+        status=PaymentAttemptStatus.CAPTURED,
+    )
+    return order, payment
+
+
+def test_cancel_text_has_the_stored_refund_amount(run_on_commit):
+    """PM default: the stored `Refund.amount` (money_str), never a computed one."""
+    from apps.payments.models import Refund
+
+    order, payment = _paid_online_order()
+    Refund.objects.create(
+        payment=payment,
+        order=order,
+        amount=Decimal("287.50"),
+        reason="customer_cancel",
+        idempotency_key=f"cancel:{order.pk}",
+    )
+    cancelled = run_on_commit(services.notify_order_event, "order.cancelled", order.pk)
+    assert "A refund of ₹287.50 will reach your original payment method" in cancelled.body
+    assert "Rs 287.50" in sms.outbox[-1].body
+
+
+def test_cancel_text_uses_the_newest_retry_and_ignores_other_orders_keys():
+    from apps.payments.models import Refund
+
+    order, payment = _paid_online_order()
+    other, other_payment = _paid_online_order()
+    Refund.objects.create(
+        payment=other_payment,
+        order=other,
+        amount=Decimal("1.00"),
+        reason="customer_cancel",
+        idempotency_key=f"cancel:{other.pk}",
+    )
+    assert services.cancel_refund_lines(order) == {}
+    Refund.objects.create(
+        payment=payment,
+        order=order,
+        amount=Decimal("300.00"),
+        reason="customer_cancel",
+        idempotency_key=f"cancel:{order.pk}",
+        status="FAILED",
+    )
+    Refund.objects.create(
+        payment=payment,
+        order=order,
+        amount=Decimal("299.00"),
+        reason="customer_cancel",
+        idempotency_key=f"cancel:{order.pk}:retry-1",
+    )
+    assert "₹299.00" in services.cancel_refund_lines(order)["refund_line"]
+
+
+def test_refund_processed_has_the_stored_amount_and_is_once_per_refund(run_on_commit):
+    import apps.notifications as notifications
+    from apps.payments.models import Refund
+
+    order, payment = _paid_online_order()
+    refund = Refund.objects.create(
+        payment=payment,
+        order=order,
+        amount=Decimal("120.00"),
+        reason="item_unavailable",
+        idempotency_key=f"t8a:{order.pk}:1:1",
+        status="PROCESSED",
+    )
+    first = run_on_commit(notifications.notify_refund_processed, refund)
+    again = run_on_commit(notifications.notify_refund_processed, refund)
+    assert first.pk == again.pk
+    assert "₹120.00" in first.body
+    assert "Rs 120.00" in sms.outbox[0].body
+    assert len(sms.outbox) == 1
+
+
+def test_console_push_backend_never_logs_the_body(order, run_on_commit, settings, caplog):
+    settings.PUSH_BACKEND = "apps.notifications.push.ConsolePushBackend"
+    device(order.user)
+    run_on_commit(
+        services.notify_order, order, "order.out_for_delivery", rider_name="Ravi", otp="4821"
+    )
+    assert "Your order is on the way" in caplog.text
+    assert "4821" not in caplog.text
+    assert "body redacted" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "backend",
+    ["apps.notifications.push.ConsolePushBackend", "apps.notifications.push.LocmemPushBackend"],
+)
+@pytest.mark.parametrize("environment", ["staging", "production"])
+def test_deployed_settings_refuse_dev_push_backends(settings, backend, environment):
+    from apps.notifications.checks import check_push_backend
+
+    settings.APP_ENVIRONMENT = environment
+    settings.PUSH_BACKEND = backend
+    [error] = check_push_backend(None)
+    assert error.id == "notifications.E001"
+    settings.PUSH_BACKEND = "apps.notifications.push.DisabledPushBackend"
+    assert check_push_backend(None) == []
+
+
+def test_dev_push_backends_are_fine_locally(settings):
+    from apps.notifications.checks import check_push_backend
+
+    settings.APP_ENVIRONMENT = "local"
+    settings.PUSH_BACKEND = "apps.notifications.push.ConsolePushBackend"
+    assert check_push_backend(None) == []
+
+
+def test_sweeper_fails_and_blanks_sends_stuck_in_sending(order, caplog):
+    notification = services.notify_order(
+        order, "order.out_for_delivery", rider_name="Ravi", otp="4821"
+    )
+    fresh = services.notify_order_event("order.accepted", order.pk)
+    Notification.objects.filter(pk__in=[notification.pk, fresh.pk]).update(
+        push_status=DeliveryStatus.SENDING
+    )
+    Notification.objects.filter(pk=notification.pk).update(
+        sms_status=DeliveryStatus.SENDING, updated_at=timezone.now() - timedelta(minutes=20)
+    )
+    assert tasks.sweep_stuck_sends() == 2
+    notification.refresh_from_db()
+    assert notification.push_status == notification.sms_status == DeliveryStatus.FAILED
+    assert notification.push_body == notification.sms_body == ""
+    assert "stuck while sending" in caplog.text
+    fresh.refresh_from_db()
+    assert fresh.push_status == DeliveryStatus.SENDING  # recent: maybe still in flight
+    assert tasks.sweep_stuck_sends() == 0
+
+
+def test_purge_runs_in_batches(user, settings):
+    settings.NOTIFICATION_RETENTION_DAYS = 90
+    with freeze_time(timezone.now() - timedelta(days=100)):
+        for task_id in range(3):
+            services.notify(user, "rider.task_cancelled", {"task_id": task_id})
+    assert services.purge_old_notifications(batch_size=2) == 3
+    assert not Notification.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_workers_claiming_one_sms_send_it_once(monkeypatch):
+    """The PENDING -> SENDING claim is a conditional UPDATE: two concurrent deliveries of the
+    same notification send one SMS."""
+    import threading
+
+    from django.db import connection
+
+    monkeypatch.setattr(services, "_queue", lambda notification: None)  # no eager task send
+    order = OrderFactory()
+    notification = services.notify_order_event("order.placed", order.pk)
+    sent = []
+    barrier = threading.Barrier(2)
+
+    def slow_send(*args):
+        sent.append(args)
+
+    monkeypatch.setattr(services, "send_sms", slow_send)
+    results = []
+
+    def worker():
+        try:
+            barrier.wait(timeout=10)
+            results.append(services.deliver_sms(notification.pk))
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=worker) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    assert sorted(results) == ["sent", "skipped"]
+    assert len(sent) == 1

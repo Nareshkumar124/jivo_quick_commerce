@@ -327,6 +327,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "realtime.purge_old_locations",
         "schedule": crontab(hour=21, minute=55),
     },
+    "sweep-stuck-notification-sends": {
+        "task": "notifications.sweep_stuck_sends",
+        "schedule": 15 * 60.0,
+    },
     "purge-old-notifications": {
         "task": "notifications.purge_old_notifications",
         "schedule": crontab(hour=21, minute=50),
@@ -430,6 +434,8 @@ PUSH_BACKEND = env_str("PUSH_BACKEND", default="apps.notifications.push.Disabled
 # 1007..."). An event without one sends no SMS (logged). OTP keeps SMS_OTP_DLT_TEMPLATE_ID.
 SMS_DLT_TEMPLATE_IDS: dict[str, str] = env_dict("SMS_DLT_TEMPLATE_IDS", default={})
 NOTIFICATION_RETENTION_DAYS = env_int("NOTIFICATION_RETENTION_DAYS", default=90)
+# A push/SMS still SENDING after this long is marked FAILED and its text blanked (sweeper).
+NOTIFICATION_STUCK_SEND_MINUTES = env_int("NOTIFICATION_STUCK_SEND_MINUTES", default=15)
 RIDER_LOCATION_RETENTION_DAYS = env_int("RIDER_LOCATION_RETENTION_DAYS", default=30)  # 07 §2.8
 
 # --------------------------------------------------------------------------- WebSockets (P6)
@@ -437,6 +443,8 @@ RIDER_LOCATION_RETENTION_DAYS = env_int("RIDER_LOCATION_RETENTION_DAYS", default
 WS_AUTH_TIMEOUT_SECONDS = env_float("WS_AUTH_TIMEOUT_SECONDS", default=10.0)
 # /ws/ops/live/ re-checks the staff session, role and stores this often (revoked access ends).
 WS_OPS_RECHECK_SECONDS = env_float("WS_OPS_RECHECK_SECONDS", default=300.0)
+# /ws/v1/rider/ re-checks that the rider is still ACTIVE this often (a suspension ends offers).
+WS_RIDER_RECHECK_SECONDS = env_float("WS_RIDER_RECHECK_SECONDS", default=60.0)
 # `order.eta` while out for delivery is recomputed from rider pings at most this often per order.
 WS_ETA_MIN_INTERVAL_SECONDS = env_int("WS_ETA_MIN_INTERVAL_SECONDS", default=30)
 

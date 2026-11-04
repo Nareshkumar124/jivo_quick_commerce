@@ -450,3 +450,103 @@ def test_logout_closes_the_ops_socket_on_recheck(make_staff, settings):
         await expect_close(socket, contract.CLOSE_UNAUTHENTICATED)
 
     run(scenario)
+
+
+# --------------------------------------------------------------------------- fail closed (review)
+
+
+def test_ops_recheck_that_raises_closes_the_socket(make_staff, settings, monkeypatch):
+    """Code review of f08c329 (Major): a re-check that cannot run never leaves access open."""
+    settings.WS_OPS_RECHECK_SECONDS = 0.3
+    store = DarkStoreFactory()
+    staff = make_staff(roles.OPS)
+    headers = session_headers(Client(), staff)
+    real = consumers.ops_store_ids
+    calls = []
+
+    def flaky(*args):
+        calls.append(args)
+        if len(calls) > 1:
+            raise ConnectionError("database unreachable")
+        return real(*args)
+
+    monkeypatch.setattr(consumers, "ops_store_ids", flaky)
+
+    async def scenario():
+        socket, connected, _ = await open_socket("/ws/ops/live/", headers=headers)
+        assert connected
+        await expect_close(socket, contract.CLOSE_UNAUTHENTICATED)
+        # Closed for good: a store message after the failure is not delivered.
+        await group_send(store_group(store.pk), {"type": "alert", "data": {}})
+        assert await socket.receive_nothing(timeout=0.3)
+
+    run(scenario)
+
+
+def test_rider_suspended_mid_session_is_cut_off(user, settings, monkeypatch):
+    settings.WS_RIDER_RECHECK_SECONDS = 0.3
+    status = {"active": True}
+    monkeypatch.setattr(consumers, "active_rider_id", lambda u: 41 if status["active"] else None)
+    token = token_for(user, "rider")
+
+    async def scenario():
+        socket, _, _ = await open_socket("/ws/v1/rider/")
+        await socket.send_json_to({"type": "auth", "token": token})
+        assert (await receive(socket))["type"] == "auth.ok"
+        status["active"] = False  # ops suspend the rider
+        await expect_close(socket, contract.CLOSE_FORBIDDEN)
+
+    run(scenario)
+
+
+def test_rider_recheck_that_raises_closes_with_4403(user, settings, monkeypatch):
+    settings.WS_RIDER_RECHECK_SECONDS = 0.3
+    calls = []
+
+    def flaky(u):
+        calls.append(u)
+        if len(calls) > 1:
+            raise ConnectionError("database unreachable")
+        return 41
+
+    monkeypatch.setattr(consumers, "active_rider_id", flaky)
+    token = token_for(user, "rider")
+
+    async def scenario():
+        socket, _, _ = await open_socket("/ws/v1/rider/")
+        await socket.send_json_to({"type": "auth", "token": token})
+        assert (await receive(socket))["type"] == "auth.ok"
+        await expect_close(socket, contract.CLOSE_FORBIDDEN)
+
+    run(scenario)
+
+
+def test_rider_reauth_with_a_customer_app_token_closes_with_4403(user, monkeypatch):
+    monkeypatch.setattr(consumers, "active_rider_id", lambda u: 41)
+    rider_token = token_for(user, "rider")
+    customer_token = token_for(user, "customer")
+
+    async def scenario():
+        socket, _, _ = await open_socket("/ws/v1/rider/")
+        await socket.send_json_to({"type": "auth", "token": rider_token})
+        assert (await receive(socket))["type"] == "auth.ok"
+        await socket.send_json_to({"type": "auth", "token": customer_token})
+        await expect_close(socket, contract.CLOSE_FORBIDDEN)
+
+    run(scenario)
+
+
+def test_rider_reauth_after_suspension_closes_with_4403(user, monkeypatch):
+    status = {"active": True}
+    monkeypatch.setattr(consumers, "active_rider_id", lambda u: 41 if status["active"] else None)
+    first, fresh = token_for(user, "rider"), token_for(user, "rider")
+
+    async def scenario():
+        socket, _, _ = await open_socket("/ws/v1/rider/")
+        await socket.send_json_to({"type": "auth", "token": first})
+        assert (await receive(socket))["type"] == "auth.ok"
+        status["active"] = False
+        await socket.send_json_to({"type": "auth", "token": fresh})
+        await expect_close(socket, contract.CLOSE_FORBIDDEN)
+
+    run(scenario)

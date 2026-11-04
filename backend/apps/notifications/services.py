@@ -76,11 +76,44 @@ def mark_all_read(user, app: str) -> int:
     return inbox(user, app).filter(read_at__isnull=True).update(read_at=now, updated_at=now)
 
 
-def purge_old_notifications(now=None) -> int:
-    """Delete notifications older than NOTIFICATION_RETENTION_DAYS (beat, daily)."""
+def purge_old_notifications(now=None, batch_size: int = 5000) -> int:
+    """Delete notifications older than NOTIFICATION_RETENTION_DAYS (beat, daily), in batches."""
     cutoff = (now or timezone.now()) - timedelta(days=settings.NOTIFICATION_RETENTION_DAYS)
-    deleted, _ = Notification.objects.filter(created_at__lt=cutoff).delete()
-    return deleted
+    total = 0
+    while True:
+        ids = list(
+            Notification.objects.filter(created_at__lt=cutoff).values_list("pk", flat=True)[
+                :batch_size
+            ]
+        )
+        if not ids:
+            return total
+        deleted, _ = Notification.objects.filter(pk__in=ids).delete()
+        total += deleted
+
+
+def sweep_stuck_sends(now=None) -> int:
+    """Channels left SENDING longer than NOTIFICATION_STUCK_SEND_MINUTES (a worker died while
+    sending): mark them FAILED and blank their texts (they can hold an OTP). Never resent:
+    the message may have gone out. Logged at ERROR (ops alert). Beat, every 15 minutes."""
+    cutoff = (now or timezone.now()) - timedelta(minutes=settings.NOTIFICATION_STUCK_SEND_MINUTES)
+    stamp = timezone.now()
+    stuck = Notification.objects.filter(updated_at__lt=cutoff)
+    push_ids = list(stuck.filter(push_status=DeliveryStatus.SENDING).values_list("pk", flat=True))
+    sms_ids = list(stuck.filter(sms_status=DeliveryStatus.SENDING).values_list("pk", flat=True))
+    if push_ids:
+        Notification.objects.filter(pk__in=push_ids, push_status=DeliveryStatus.SENDING).update(
+            push_status=DeliveryStatus.FAILED, push_body="", updated_at=stamp
+        )
+    if sms_ids:
+        Notification.objects.filter(pk__in=sms_ids, sms_status=DeliveryStatus.SENDING).update(
+            sms_status=DeliveryStatus.FAILED, sms_body="", updated_at=stamp
+        )
+    if push_ids or sms_ids:
+        logger.error(
+            "Notifications stuck while sending, marked FAILED: push=%s sms=%s", push_ids, sms_ids
+        )
+    return len(push_ids) + len(sms_ids)
 
 
 # --------------------------------------------------------------------------- rendering
@@ -434,6 +467,46 @@ def order_context(order) -> dict[str, Any]:
     }
 
 
+def cancel_refund_lines(order) -> dict[str, str]:
+    """The refund sentence of a cancelled online order, with the **stored** refund amount
+    (`Refund.amount` of `cancel:<order>`, or its newest retry), never a computed one. Empty
+    when there is no such refund (COD, or nothing was paid)."""
+    from django.db.models import Q
+
+    from apps.core.money import money_str
+    from apps.payments.models import Refund
+
+    key = f"cancel:{order.pk}"
+    refund = (
+        Refund.objects.filter(order=order)
+        .filter(Q(idempotency_key=key) | Q(idempotency_key__startswith=f"{key}:"))
+        .order_by("-created_at", "-pk")
+        .first()
+    )
+    if refund is None:
+        return {}
+    amount = money_str(refund.amount)
+    return {
+        "refund_line": f"A refund of ₹{amount} will reach your original payment method in 5-7 "
+        "working days.",
+        "refund_line_sms": f"Your refund of Rs {amount} will reach you in 5-7 working days.",
+    }
+
+
+def notify_refund_processed(refund) -> Notification | None:
+    """`refund.processed` (08 §9: push + SMS) for a refund that reached PROCESSED, with its
+    stored amount. Idempotent per refund. For payments to call after commit."""
+    from apps.core.money import money_str
+
+    order = refund.order
+    return notify_order(
+        order,
+        "refund.processed",
+        amount=money_str(refund.amount),
+        dedupe_key=f"refund.processed:{order.user_id}:{refund.pk}",
+    )
+
+
 def notify_order(order, event: str, **extra) -> Notification | None:
     """`notify` the order's customer of `event`, with the order's context plus `extra`."""
     dedupe_key = extra.pop("dedupe_key", None)
@@ -471,4 +544,6 @@ def notify_order_event(event: str, order_id: int) -> Notification | None:
         # quick adjustments read the same final order and send one message with the result).
         dedupe_key = f"{event}:{order.user_id}:{order.pk}:{order.grand_total}"
     context = order_context(order)
+    if event == "order.cancelled":
+        context.update(cancel_refund_lines(order))
     return notify(order.user, notification_event, context, order_id=order.pk, dedupe_key=dedupe_key)

@@ -61,6 +61,14 @@ def notify_order_event(self, event: str, order_id: int) -> str:
     return "notified" if notification is not None else "none"
 
 
+@shared_task(name="notifications.sweep_stuck_sends")
+def sweep_stuck_sends() -> int:
+    """Beat, every 15 minutes: channels stuck SENDING -> FAILED, texts blanked, alert logged."""
+    from apps.notifications import services
+
+    return services.sweep_stuck_sends()
+
+
 @shared_task(name="notifications.purge_old_notifications")
 def purge_old_notifications() -> int:
     """Beat, daily: delete inbox entries older than NOTIFICATION_RETENTION_DAYS."""

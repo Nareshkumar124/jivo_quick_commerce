@@ -25,6 +25,12 @@ def notify_order(order, event, **context):
     return services.notify_order(order, event, **context)
 
 
+def notify_refund_processed(refund):
+    from apps.notifications import services
+
+    return services.notify_refund_processed(refund)
+
+
 def notify(user, event, context=None, **kwargs):
     from apps.notifications import services
 

@@ -49,20 +49,48 @@ class BaseSocketConsumer(AsyncJsonWebsocketConsumer):
     async def close_with(self, code: int) -> None:
         if self.closing:
             return
+        # Stop forwarding first: whatever fails below, this socket gets nothing more.
         self.closing = True
         self.authorised = False
-        await self.leave(self.joined)
+        try:
+            await self.leave(self.joined)
+        except Exception:
+            logger.exception("Socket close: leaving groups failed (%s)", self.channel_name)
         await self.close(code=code)
+
+    async def fail_closed(self, code: int) -> None:
+        """A check could not run: never stay authorised without it (fail closed)."""
+        self.authorised = False
+        try:
+            await self.close_with(code)
+        except Exception:
+            logger.exception("Socket close failed (%s)", self.channel_name)
 
     async def disconnect(self, code) -> None:
         for task in self.tasks:
             task.cancel()
         await self.leave(self.joined)
 
-    def later(self, delay: float, coro_fn) -> asyncio.Task:
+    def later(
+        self, delay: float, coro_fn, fail_code: int = contract.CLOSE_UNAUTHENTICATED
+    ) -> asyncio.Task:
+        """Run `coro_fn` after `delay`. If it raises (DB or Redis down), log it and close the
+        socket with `fail_code`: a timer or re-check that cannot run never leaves it open."""
+
         async def run():
             await asyncio.sleep(max(0.0, delay))
-            await coro_fn()
+            try:
+                await coro_fn()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "Socket timer %s failed: closing %s with %s",
+                    getattr(coro_fn, "__name__", coro_fn),
+                    self.channel_name,
+                    fail_code,
+                )
+                await self.fail_closed(fail_code)
 
         task = asyncio.ensure_future(run())
         self.tasks.append(task)
@@ -139,11 +167,12 @@ class JwtSocketConsumer(BaseSocketConsumer):
             await self.close_with(contract.CLOSE_UNAUTHENTICATED)
             return
         first = self.identity is None
-        if first:
-            code = await self.authorize(identity)
-            if code is not None:
-                await self.close_with(code)
-                return
+        # Every auth, first or renewal, re-runs the access check (rider status, token app,
+        # order owner): a renewed token never extends access that is gone.
+        code = await self.authorize(identity)
+        if code is not None:
+            await self.close_with(code)
+            return
         self.identity = identity
         self.authorised = True
         if hasattr(self, "auth_deadline"):
@@ -163,10 +192,31 @@ class JwtSocketConsumer(BaseSocketConsumer):
             },
         )
         if first:
+            self.schedule_recheck()
             await self.after_auth()
 
     async def _expired(self) -> None:
         await self.close_with(contract.CLOSE_UNAUTHENTICATED)
+
+    def recheck_seconds(self) -> float | None:
+        """How often to re-run `authorize()` while connected (None: never)."""
+        return None
+
+    def schedule_recheck(self) -> None:
+        interval = self.recheck_seconds()
+        if not interval:
+            return
+
+        async def recheck():
+            if self.closing or self.identity is None:
+                return
+            code = await self.authorize(self.identity)
+            if code is not None:
+                await self.close_with(code)
+            else:
+                self.schedule_recheck()
+
+        self.later(interval, recheck, fail_code=contract.CLOSE_FORBIDDEN)
 
     async def authorize(self, identity: SocketIdentity) -> int | None:
         """Join this socket's groups; return a close code to refuse."""
@@ -217,13 +267,24 @@ def active_rider_id(user) -> int | None:
     except LookupError:
         return None
     return (
-        Rider.objects.filter(user=user, status=RiderStatus.ACTIVE)
+        Rider.objects.filter(
+            user=user,
+            user__is_active=True,
+            user__deleted_at__isnull=True,
+            status=RiderStatus.ACTIVE,
+        )
         .values_list("pk", flat=True)
         .first()
     )
 
 
 class RiderConsumer(JwtSocketConsumer):
+    """An ACTIVE rider with a rider-app token, checked at every auth and every
+    WS_RIDER_RECHECK_SECONDS, so a suspended rider stops getting offers."""
+
+    def recheck_seconds(self) -> float | None:
+        return settings.WS_RIDER_RECHECK_SECONDS
+
     async def authorize(self, identity: SocketIdentity) -> int | None:
         from apps.accounts.choices import AppName
 
@@ -232,7 +293,9 @@ class RiderConsumer(JwtSocketConsumer):
         rider_id = await database_sync_to_async(active_rider_id)(identity.user)
         if rider_id is None:
             return contract.CLOSE_FORBIDDEN
-        await self.join([rider_group(rider_id)])
+        wanted = {rider_group(rider_id)}
+        await self.leave(self.joined - wanted)
+        await self.join(sorted(wanted))
         return None
 
 
@@ -295,6 +358,7 @@ class OpsLiveConsumer(BaseSocketConsumer):
             if await self.check_access():
                 self.schedule_recheck()
 
+        # A re-check that raises closes the socket (4401: sign in again), never leaves it open.
         self.later(settings.WS_OPS_RECHECK_SECONDS, recheck)
 
     async def receive_json(self, content, **kwargs) -> None:

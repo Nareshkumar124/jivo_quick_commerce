@@ -263,7 +263,8 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 ### 4.1 Connecting (Phase 6, `apps.realtime`)
 - **App sockets (`/ws/v1/`):** connect, then send `{"type": "auth", "token": "<access JWT>"}` within `WS_AUTH_TIMEOUT_SECONDS` (10 s). Or offer the subprotocols `["jivo.v1", "jivo.auth.<access JWT>"]`: the server selects `jivo.v1` and never echoes the token. The server answers `auth.ok` with the token's `expires_at`. Before then, send a new auth message with a refreshed token (same user), or the socket closes with 4401. `{"type": "ping"}` is answered with `pong`. There is no Origin check: native apps send none, and the JWT is not ambient, so a cross-site page cannot use it.
 - **`/ws/v1/orders/{id}/`:** the order's owner only. Right after `auth.ok` the server sends one `order.status` snapshot. The delivery OTP is never sent on a socket: when `order.status` is OUT_FOR_DELIVERY, re-read `GET /orders/{id}/track/`.
-- **`/ws/v1/rider/`:** a token issued to the rider app (`app` claim `rider`) and an ACTIVE rider profile (Phase 5 model; until it is installed every rider socket closes with 4403).
+- **`/ws/v1/rider/`:** a token issued to the rider app (`app` claim `rider`) and an ACTIVE rider profile (Phase 5 model; until it is installed every rider socket closes with 4403). Checked again at every re-auth and every `WS_RIDER_RECHECK_SECONDS` (60 s): a suspended rider is closed with 4403.
+- **Fail closed:** every auth renewal re-runs the socket's access check. A timer or periodic re-check that raises (database or Redis down) closes the socket (4401 ops, 4403 rider); a socket never stays authorised without a working check.
 - **`/ws/ops/live/`:** the staff session cookie (the same login as `/admin/` and `/ops/`), an Origin from `ALLOWED_HOSTS`, permission `orders.view_order`, and at least one store in `stores_for(user)` (05 §3). The socket joins one group per permitted store, fixed at connect. It re-checks the session, role and stores every `WS_OPS_RECHECK_SECONDS` (300 s) and closes with 4401/4403 when access is gone, or rejoins the new store list.
 - **Close codes:**
   - 4400: the first message is not `auth`
@@ -306,7 +307,7 @@ Control messages, on every socket:
 ```
 
 ### 4.3 Push data payloads (FCM `data`; every value is a string)
-FCM is sent for every important event in 08 §9, even while a socket is open. Until D-19 the push backend is disabled (`PUSH_BACKEND`), but the notification and inbox entry are still recorded. The `notification` part carries the title and body; the `data` part is what a tap routes on:
+FCM is sent for every important event in 08 §9, even while a socket is open. Until D-19 the push backend is disabled (`PUSH_BACKEND`), but the notification and inbox entry are still recorded. Staging and production refuse the console and locmem push backends (system check `notifications.E001`); the console backend never logs the body. Refund texts quote the stored `Refund.amount` (cancel: the `cancel:<order>` refund; `refund.processed` via `apps.notifications.notify_refund_processed(refund)`, which payments must call when a refund reaches PROCESSED). The `notification` part carries the title and body; the `data` part is what a tap routes on:
 - **Customer app** (api-requests #30): `{"type": "order", "order_id": "1203"}`. Later, `{"type": "product" | "collection" | "category", "slug": "..."}`. Or `{"link": "jivo://..."}` when no type applies.
 - **Rider app** (api-requests #41): `{"type": "offer.new", "offer_id": "9001", "task_id": "7001"}`, `{"type": "offer.withdrawn", "offer_id": "9001", "task_id": "7001"}`, `{"type": "task.updated", "task_id": "7001"}`.
 
@@ -339,7 +340,8 @@ Phase 5 calls the functions in `apps.realtime`: `publish_rider_location`, `publi
 | `reconcile_payments` | Beat, nightly | Compare Razorpay settlements/payments with local records and flag mismatches | P7 |
 | `daily_reports_email` | Beat, daily | Store-wise daily summary to managers | P7 |
 | `purge_old_locations` | Beat, daily | Delete `RiderLocation` rows older than `RIDER_LOCATION_RETENTION_DAYS` (30), in batches (`realtime.purge_old_locations`; a no-op until the Phase 5 model exists) | P6 |
-| `purge_old_notifications` | Beat, daily | Delete notifications (inbox) older than `NOTIFICATION_RETENTION_DAYS` (90) | P6 |
+| `sweep_stuck_sends` | Beat, every 15 min | A push/SMS still SENDING after `NOTIFICATION_STUCK_SEND_MINUTES` (15; a worker died mid-send) is marked FAILED, its text blanked (it can hold an OTP) and logged at ERROR. Never resent | P6 |
+| `purge_old_notifications` | Beat, daily | Delete notifications (inbox) older than `NOTIFICATION_RETENTION_DAYS` (90), in batches | P6 |
 | `anonymise_deleted_accounts` | Beat, daily | Complete account deletions after the grace period | P1 |
 | `purge_old_otp_requests` | Beat, daily | Delete `OTPRequest` rows older than 30 days (07 §4) | P1 |
 

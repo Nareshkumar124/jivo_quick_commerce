@@ -42,9 +42,10 @@ class Notification(TimeStampedModel):
     """One event for one user: the inbox entry (when `in_inbox`) and the push / SMS sent for it.
 
     `dedupe_key` makes the event idempotent per (event, user, order): a retried task or a
-    replayed domain event finds the row instead of notifying twice. The push and SMS texts are
-    kept only until their channel is final (they can hold a delivery OTP); the inbox text never
-    holds one.
+    replayed domain event finds the row instead of notifying twice. The push and SMS texts can
+    hold a delivery OTP, so they are kept only while their channel is not final: blanked when it
+    becomes SENT, SKIPPED or FAILED, and by the stuck-send sweeper (`sweep_stuck_sends`) for a
+    channel left SENDING by a dead worker. The inbox `title`/`body` never hold an OTP.
     """
 
     user = models.ForeignKey(
