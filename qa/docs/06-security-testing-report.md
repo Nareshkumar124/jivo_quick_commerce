@@ -44,3 +44,18 @@ Exploit-level details of open security findings are in `qa/private/` (gitignored
 - **Uploads and KYC storage:** Phase 5.
 - **TLS/HSTS on a real host:** no staging deployment yet.
 - **OWASP API Top 10 review and penetration test:** Phase 8.
+
+## Phase 3 stage 1 (2026-11-04, `c2c153a`)
+| Area | Result |
+|---|---|
+| IDOR: cart lines (PATCH/DELETE), orders (retrieve/cancel/retry), verify on another user's order, another user's address on cart/order | ✅ 404 / 400, nothing changed, nothing leaked (P3-TC-08/10/29/34) |
+| Payment trust: verify needs a valid HMAC over `order_id|payment_id` **and** a gateway order belonging to this order; the app callback alone never places an order | ✅ P3-TC-34 |
+| Webhook auth: HMAC of the raw body bytes; tampered body, wrong secret, missing signature/event id → 400, nothing stored; app headers not needed | ✅ P3-TC-35 |
+| No duplicate financial transactions: event-id idempotency (also 6× parallel), one capture per payment, one refund per capture, verify/cancel race | ✅ P3-TC-36/50/52/53 |
+| The amount always comes from the server: a wrong-amount capture never places the order (it is refunded) | ✅ P3-TC-37 |
+| Money/stock tamper: the client total is only a guard (PRICE_CHANGED); quantities bounded by max qty and stock | ✅ P3-TC-05/24 |
+| Abuse limits: 30/h placement → 429 RATE_LIMITED with Retry-After | ✅ P3-TC-46 |
+| Malformed webhook input | ❌ [BUG-0009](../bugs/BUG-0009.md) (P3 Low): over-long ids → 500. Needs the webhook secret, so it is not exploitable; it is a robustness issue only. |
+| PII in logs (all P3 instance logs) | ✅ 0 unmasked `+91` numbers, 0 JWTs. Every 500 in the logs is a BUG-0009 probe. |
+| Fake gateway refused outside local/test (payments.E001) | ⏭ Covered by the backend suite; re-check with staging settings after R2b |
+| Admin P3 role matrix (DL-46) | ⏭ T-304 |
