@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:jivo_core/jivo_core.dart' show formatRupeeAmount;
 
 /// Display locale for currency and dates (`09 §6`).
 const kDisplayLocale = 'en_IN';
@@ -13,22 +14,17 @@ final _moneyPattern = RegExp(r'^(-)?(\d+)(?:\.(\d{1,2}))?$');
 /// `"249.00"` → `₹249`, `"249.50"` → `₹249.50`, `"100000.00"` → `₹1,00,000`,
 /// `"-20.00"` → `-₹20`.
 ///
-/// The amount is parsed as integers, never as a double. Display only: never
-/// compute totals in the app. Throws [FormatException] for anything that is
-/// not a decimal string with at most two decimal places.
-String formatRupees(String amount) {
-  final match = _moneyPattern.firstMatch(amount.trim());
-  if (match == null) {
-    throw FormatException('Not a money amount', amount);
-  }
-  final rupees = int.parse(match.group(2)!);
-  final paise = int.parse((match.group(3) ?? '0').padRight(2, '0'));
-  final isNegative = match.group(1) != null && (rupees != 0 || paise != 0);
+/// Formatting is jivo_core's [formatRupeeAmount] (shared with the rider
+/// app). Display only: never compute totals in the app. Throws
+/// [FormatException] for anything that is not a decimal string with at most
+/// two decimal places; use [formatRupeesOrNull] where a bad amount should
+/// hide the value and block the action instead.
+String formatRupees(String amount) =>
+    formatRupeeAmount(amount) ??
+    (throw FormatException('Not a money amount', amount));
 
-  final grouped = NumberFormat.decimalPattern(kDisplayLocale).format(rupees);
-  final fraction = paise == 0 ? '' : '.${paise.toString().padLeft(2, '0')}';
-  return '${isNegative ? '-' : ''}₹$grouped$fraction';
-}
+/// [formatRupeeAmount]: null for a null or unparseable amount.
+String? formatRupeesOrNull(String? amount) => formatRupeeAmount(amount);
 
 /// Whether an API money string is zero (`"0.00"`, `"0"`), e.g. to hide
 /// "You save ₹0". A check on the server's value, not arithmetic.
