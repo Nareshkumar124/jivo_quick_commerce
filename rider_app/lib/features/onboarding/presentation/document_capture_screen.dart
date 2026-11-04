@@ -19,9 +19,18 @@ import 'onboarding_text.dart';
 /// <= 1 MB, a preview with Retake, the document number (masked once typed),
 /// then upload. Closes itself when the upload succeeds.
 class DocumentCaptureScreen extends ConsumerStatefulWidget {
-  const DocumentCaptureScreen({required this.type, this.recovered, super.key});
+  const DocumentCaptureScreen({
+    required this.type,
+    this.recovered,
+    this.fromProfile = false,
+    super.key,
+  });
 
   final KycDocumentType type;
+
+  /// Opened from the ACTIVE rider's profile documents (04 §2.9) rather than
+  /// the application steps.
+  final bool fromProfile;
 
   /// A photo recovered after Android stopped the app mid-capture.
   final PickedImage? recovered;
@@ -126,7 +135,9 @@ class _DocumentCaptureScreenState extends ConsumerState<DocumentCaptureScreen> {
         if (context.canPop()) {
           context.pop();
         } else {
-          context.go(Routes.documents);
+          context.go(
+            widget.fromProfile ? Routes.profileDocuments : Routes.documents,
+          );
         }
       }
     });

@@ -48,4 +48,32 @@ void main() {
 
     expect(h.tasks.calls.last, 'deliver cash 1249.00');
   });
+
+  testWidgets('QR pickup, app restarted mid-ride, resumes and delivers '
+      '(GPX route, fakes)', (tester) async {
+    final h = RiderTestHarness();
+    await h.signedInBefore('+919811122231');
+    await h.pump(tester);
+
+    await driveAcceptToDeliver(
+      tester,
+      h,
+      pickupByQr: true,
+      restartAfterPickup: true,
+    );
+
+    expect(h.tasks.calls.last, 'deliver prepaid null');
+  });
+
+  testWidgets('customer refuses: return to store (GPX route, fakes)', (
+    tester,
+  ) async {
+    final h = RiderTestHarness();
+    await h.signedInBefore('+919811122231');
+    await h.pump(tester);
+
+    await driveAcceptToReturn(tester, h);
+
+    expect(h.tasks.calls, contains('fail CUSTOMER_REFUSED'));
+  });
 }
