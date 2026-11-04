@@ -5099,6 +5099,99 @@ paths:
                     feature_flags: {}
                   summary: No app headers
           description: Configuration.
+  /api/v1/faqs/:
+    get:
+      operationId: faqs_list
+      description: 'Public, not paginated. Active FAQs of the app in display order,
+        grouped by `category`: entries of one category are consecutive, so start a
+        new heading whenever `category` changes. Answers are plain text. Cached for
+        up to 5 minutes.'
+      summary: FAQs for an app's help screen
+      parameters:
+      - in: query
+        name: app
+        schema:
+          enum:
+          - customer
+          - rider
+          type: string
+          minLength: 1
+        description: |-
+          Which app's help screen: customer or rider.
+
+          * `customer` - Customer app
+          * `rider` - Rider app
+        required: true
+      tags:
+      - cms
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Faq'
+              examples:
+                CustomerApp:
+                  value:
+                  - id: 1
+                    category: Orders
+                    question: How long does delivery take?
+                    answer: Most orders arrive in 10 to 30 minutes.
+                  summary: Customer app
+          description: The FAQs (may be empty). The example shows one entry of the
+            list.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                InvalidApp:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        app:
+                        - '"shop" is not a valid choice.'
+                  summary: Invalid app
+          description: '`app` is missing or not customer/rider.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/home/:
     get:
       operationId: home_retrieve
@@ -10105,6 +10198,88 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+  /api/v1/pages/{slug}/:
+    get:
+      operationId: pages_retrieve
+      description: 'Public. Slugs the apps use: `about`, `terms`, `privacy`, `refund-policy`.
+        The HTML is sanitised server-side to a small allow-list (see `html`). An unknown
+        or unpublished slug is 404 `NOT_FOUND`: fall back to the policy URL from `GET
+        /config/app/`. Cached for up to 5 minutes.'
+      summary: Static page (About, Terms, Privacy, Refund policy)
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        description: '`Page.slug`.'
+        required: true
+      tags:
+      - cms
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Page'
+              examples:
+                RefundPolicy:
+                  value:
+                    slug: refund-policy
+                    title: Refund Policy
+                    html: <h1>Refund Policy</h1><p>Refunds go back to the original
+                      payment method within 5 to 7 working days.</p><p>Questions?
+                      Write to <a href="mailto:support@jivo.in">support@jivo.in</a>.</p>
+                    updated_at: '2026-11-04T06:30:00Z'
+                  summary: Refund policy
+          description: The page.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Page not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: No published page with this slug.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/payments/razorpay/verify/:
     post:
       operationId: payments_razorpay_verify
@@ -12109,6 +12284,621 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/support/tickets/:
+    get:
+      operationId: support_tickets_list
+      description: The caller's tickets, newest activity first (a new message or a
+        status change moves a ticket to the top).
+      summary: My support tickets
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number (1-based). Default 1.
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: 'Items per page: default 20, max 100.'
+      tags:
+      - support
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTicketSummaryList'
+              examples:
+                Tickets:
+                  value:
+                    count: 2
+                    next: null
+                    previous: null
+                    results:
+                    - id: 12
+                      number: TK-000012
+                      category: DAMAGED_ITEMS
+                      status: IN_PROGRESS
+                      order_id: 1002
+                      order_number: JV-261104-001002
+                      last_message: Sorry about that! We have started a refund for
+                        the bottle.
+                      created_at: '2026-11-04T05:10:00Z'
+                      updated_at: '2026-11-04T05:25:00Z'
+                    - id: 9
+                      number: TK-000009
+                      category: ACCOUNT
+                      status: RESOLVED
+                      order_id: null
+                      order_number: null
+                      last_message: Your phone number is updated. Anything else we
+                        can help with?
+                      created_at: '2026-11-01T09:00:00Z'
+                      updated_at: '2026-11-01T10:30:00Z'
+                NoTickets:
+                  value:
+                    count: 0
+                    next: null
+                    previous: null
+                    results: []
+                  summary: No tickets
+          description: One page of tickets.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                PAGENOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Invalid page.
+                      details: {}
+                  summary: Page out of range
+          description: '`page` is not a page of this list: 0, past the last page,
+            or not a number. Go back to page 1.'
+    post:
+      operationId: support_tickets_create
+      description: 'Creates an OPEN ticket whose first message is `message`. MISSING_ITEMS,
+        DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY are about an order and need `order_id`;
+        the other categories may name one. The order must be the caller''s own. Attachments
+        are not accepted yet (planned contract: 06 §2.7). Rate limited per user (`SUPPORT_TICKETS_CREATE_RATE`,
+        default 10 per hour).'
+      summary: Open a support ticket
+      tags:
+      - support
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketCreateRequest'
+            examples:
+              AboutAnOrder:
+                value:
+                  category: DAMAGED_ITEMS
+                  message: The oil bottle cap was broken when it arrived.
+                  order_id: 1002
+                summary: About an order
+              GeneralQuestion:
+                value:
+                  category: ACCOUNT
+                  message: How do I change the phone number on my account?
+                summary: General question
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              examples:
+                Created:
+                  value:
+                    id: 12
+                    number: TK-000012
+                    category: DAMAGED_ITEMS
+                    status: OPEN
+                    order_id: 1002
+                    order_number: JV-261104-001002
+                    last_message: The oil bottle cap was broken when it arrived.
+                    created_at: '2026-11-04T05:10:00Z'
+                    updated_at: '2026-11-04T05:10:00Z'
+                    can_reply: true
+                    messages:
+                    - id: 31
+                      body: The oil bottle cap was broken when it arrived.
+                      from_support: false
+                      created_at: '2026-11-04T05:10:00Z'
+          description: The new ticket.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OrderRequired:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        order_id:
+                        - Choose the order this is about.
+                  summary: Order required
+                NotMyOrder:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        order_id:
+                        - Order not found.
+                  summary: Not my order
+                MessageTooShort:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        message:
+                        - Ensure this field has at least 10 characters.
+                  summary: Message too short
+          description: 'Invalid input: unknown category, message shorter than 10 or
+            longer than 1000 characters, an order category without `order_id`, or
+            an `order_id` that is not one of the caller''s orders.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/support/tickets/{id}/:
+    get:
+      operationId: support_tickets_retrieve
+      description: Messages oldest first. Another user's ticket id is a 404.
+      summary: One of my tickets with its messages
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: '`SupportTicket.id` (not the TK- number).'
+        required: true
+      tags:
+      - support
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              examples:
+                AnsweredBySupport:
+                  value:
+                    id: 12
+                    number: TK-000012
+                    category: DAMAGED_ITEMS
+                    status: IN_PROGRESS
+                    order_id: 1002
+                    order_number: JV-261104-001002
+                    last_message: Sorry about that! We have started a refund for the
+                      bottle.
+                    created_at: '2026-11-04T05:10:00Z'
+                    updated_at: '2026-11-04T05:25:00Z'
+                    can_reply: true
+                    messages:
+                    - id: 31
+                      body: The oil bottle cap was broken when it arrived.
+                      from_support: false
+                      created_at: '2026-11-04T05:10:00Z'
+                    - id: 32
+                      body: Sorry about that! We have started a refund for the bottle.
+                      from_support: true
+                      created_at: '2026-11-04T05:25:00Z'
+                  summary: Answered by support
+                Closed:
+                  value:
+                    id: 12
+                    number: TK-000012
+                    category: DAMAGED_ITEMS
+                    status: CLOSED
+                    order_id: 1002
+                    order_number: JV-261104-001002
+                    last_message: Sorry about that! We have started a refund for the
+                      bottle.
+                    created_at: '2026-11-04T05:10:00Z'
+                    updated_at: '2026-11-04T05:25:00Z'
+                    can_reply: false
+                    messages:
+                    - id: 31
+                      body: The oil bottle cap was broken when it arrived.
+                      from_support: false
+                      created_at: '2026-11-04T05:10:00Z'
+                    - id: 32
+                      body: Sorry about that! We have started a refund for the bottle.
+                      from_support: true
+                      created_at: '2026-11-04T05:25:00Z'
+          description: The ticket.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Ticket not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The ticket does not exist or is not the caller's.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/support/tickets/{id}/messages/:
+    post:
+      operationId: support_tickets_messages_create
+      description: 'Adds the caller''s message and returns the whole ticket. A RESOLVED
+        ticket is reopened (OPEN). A CLOSED ticket refuses replies with 400 `VALIDATION_ERROR`
+        (`details.ticket`): offer a new ticket instead. Rate limited per user (`SUPPORT_MESSAGES_RATE`,
+        default 60 per hour).'
+      summary: Reply on my ticket
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: '`SupportTicket.id` (not the TK- number).'
+        required: true
+      tags:
+      - support
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TicketReplyRequest'
+            examples:
+              Reply:
+                value:
+                  message: Thank you, I can see the refund now.
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+              examples:
+                Replied:
+                  value:
+                    id: 12
+                    number: TK-000012
+                    category: DAMAGED_ITEMS
+                    status: OPEN
+                    order_id: 1002
+                    order_number: JV-261104-001002
+                    last_message: Thank you, I can see the refund now.
+                    created_at: '2026-11-04T05:10:00Z'
+                    updated_at: '2026-11-04T06:02:00Z'
+                    can_reply: true
+                    messages:
+                    - id: 31
+                      body: The oil bottle cap was broken when it arrived.
+                      from_support: false
+                      created_at: '2026-11-04T05:10:00Z'
+                    - id: 32
+                      body: Sorry about that! We have started a refund for the bottle.
+                      from_support: true
+                      created_at: '2026-11-04T05:25:00Z'
+                    - id: 33
+                      body: Thank you, I can see the refund now.
+                      from_support: false
+                      created_at: '2026-11-04T06:02:00Z'
+          description: The ticket with the new message.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                TicketClosed:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: This ticket is closed. Open a new ticket if you still
+                        need help.
+                      details:
+                        ticket:
+                        - This ticket is closed. Open a new ticket if you still need
+                          help.
+                  summary: Ticket closed
+                EmptyMessage:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        message:
+                        - This field may not be blank.
+                  summary: Empty message
+          description: Empty or too long message (1 to 1000 characters), or the ticket
+            is CLOSED.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Ticket not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The ticket does not exist or is not the caller's.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /health/live:
     get:
       operationId: health_live
@@ -13374,6 +14164,25 @@ components:
           $ref: '#/components/schemas/ErrorBody'
       required:
       - error
+    Faq:
+      type: object
+      properties:
+        id:
+          type: integer
+        category:
+          type: string
+          description: Group heading. Entries of one category are consecutive in the
+            list.
+        question:
+          type: string
+        answer:
+          type: string
+          description: Plain text; show as text, never as HTML.
+      required:
+      - answer
+      - category
+      - id
+      - question
     HealthCheckStatusEnum:
       enum:
       - ok
@@ -14341,6 +15150,29 @@ components:
       - otp
       - phone
       - terms_version
+    Page:
+      type: object
+      properties:
+        slug:
+          type: string
+          description: about, terms, privacy or refund-policy.
+        title:
+          type: string
+        html:
+          type: string
+          description: 'Sanitised HTML: h1-h6, p, br, ul/ol/li, blockquote, strong/em/b/i
+            and <a href> with https:, mailto: or tel: only. No attributes other than
+            href, no scripts, styles, images or relative links. Still render it with
+            the app''s own safe HTML parser.'
+        updated_at:
+          type: string
+          format: date-time
+          description: Last edit (UTC).
+      required:
+      - html
+      - slug
+      - title
+      - updated_at
     PaginatedAddressList:
       type: object
       description: 'Standard page (02 §5): `?page=&page_size=`, default 20, max 100.'
@@ -14405,6 +15237,28 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProductCard'
+      required:
+      - count
+      - next
+      - previous
+      - results
+    PaginatedTicketSummaryList:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          format: uri
+          nullable: true
+        previous:
+          type: string
+          format: uri
+          nullable: true
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TicketSummary'
       required:
       - count
       - next
@@ -15092,6 +15946,204 @@ components:
       required:
       - email
       - phone
+    Ticket:
+      type: object
+      description: A ticket with its whole thread, oldest message first.
+      properties:
+        id:
+          type: integer
+        number:
+          type: string
+          description: Shown to the customer and support, e.g. "TK-000123".
+        category:
+          $ref: '#/components/schemas/TicketCategoryEnum'
+        status:
+          allOf:
+          - $ref: '#/components/schemas/TicketStatusEnum'
+          description: |-
+            The customer can reply unless CLOSED; a reply to RESOLVED reopens it (OPEN).
+
+            * `OPEN` - Open
+            * `IN_PROGRESS` - In progress
+            * `RESOLVED` - Resolved
+            * `CLOSED` - Closed
+        order_id:
+          type: integer
+          nullable: true
+        order_number:
+          type: string
+          nullable: true
+        last_message:
+          type: string
+          nullable: true
+          description: The newest message, cut to 140 characters (plain text).
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          description: Last message or status change; the list is sorted by it, newest
+            first.
+        can_reply:
+          type: boolean
+          readOnly: true
+          description: 'False once the ticket is CLOSED: hide the reply box and offer
+            a new ticket.'
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/TicketMessage'
+      required:
+      - can_reply
+      - category
+      - created_at
+      - id
+      - last_message
+      - messages
+      - number
+      - order_id
+      - order_number
+      - status
+      - updated_at
+    TicketCategoryEnum:
+      enum:
+      - MISSING_ITEMS
+      - DAMAGED_ITEMS
+      - WRONG_ITEMS
+      - LATE_DELIVERY
+      - PAYMENT_REFUND
+      - ACCOUNT
+      - OTHER
+      type: string
+      description: |-
+        * `MISSING_ITEMS` - Missing items
+        * `DAMAGED_ITEMS` - Damaged items
+        * `WRONG_ITEMS` - Wrong items
+        * `LATE_DELIVERY` - Late delivery
+        * `PAYMENT_REFUND` - Payment or refund
+        * `ACCOUNT` - Account
+        * `OTHER` - Other
+    TicketCreateRequest:
+      type: object
+      properties:
+        category:
+          allOf:
+          - $ref: '#/components/schemas/TicketCategoryEnum'
+          description: |-
+            MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY need `order_id`.
+
+            * `MISSING_ITEMS` - Missing items
+            * `DAMAGED_ITEMS` - Damaged items
+            * `WRONG_ITEMS` - Wrong items
+            * `LATE_DELIVERY` - Late delivery
+            * `PAYMENT_REFUND` - Payment or refund
+            * `ACCOUNT` - Account
+            * `OTHER` - Other
+        message:
+          type: string
+          minLength: 10
+          description: Plain text, 10 to 1000 characters after trimming.
+          maxLength: 1000
+        order_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: One of the caller's orders (another user's order is refused
+            as not found).
+      required:
+      - category
+      - message
+    TicketMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        body:
+          type: string
+          description: Plain text; show as text, never as HTML.
+        from_support:
+          type: boolean
+          description: Sent by Jivo support, not the customer.
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - body
+      - created_at
+      - from_support
+      - id
+    TicketReplyRequest:
+      type: object
+      properties:
+        message:
+          type: string
+          minLength: 1
+          description: Plain text, 1 to 1000 characters after trimming.
+          maxLength: 1000
+      required:
+      - message
+    TicketStatusEnum:
+      enum:
+      - OPEN
+      - IN_PROGRESS
+      - RESOLVED
+      - CLOSED
+      type: string
+      description: |-
+        * `OPEN` - Open
+        * `IN_PROGRESS` - In progress
+        * `RESOLVED` - Resolved
+        * `CLOSED` - Closed
+    TicketSummary:
+      type: object
+      description: One row of "My tickets".
+      properties:
+        id:
+          type: integer
+        number:
+          type: string
+          description: Shown to the customer and support, e.g. "TK-000123".
+        category:
+          $ref: '#/components/schemas/TicketCategoryEnum'
+        status:
+          allOf:
+          - $ref: '#/components/schemas/TicketStatusEnum'
+          description: |-
+            The customer can reply unless CLOSED; a reply to RESOLVED reopens it (OPEN).
+
+            * `OPEN` - Open
+            * `IN_PROGRESS` - In progress
+            * `RESOLVED` - Resolved
+            * `CLOSED` - Closed
+        order_id:
+          type: integer
+          nullable: true
+        order_number:
+          type: string
+          nullable: true
+        last_message:
+          type: string
+          nullable: true
+          description: The newest message, cut to 140 characters (plain text).
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          description: Last message or status change; the list is sorted by it, newest
+            first.
+      required:
+      - category
+      - created_at
+      - id
+      - last_message
+      - number
+      - order_id
+      - order_number
+      - status
+      - updated_at
     TokenPair:
       type: object
       properties:
@@ -15337,3 +16389,7 @@ tags:
   description: Place orders, list them, retry a payment, cancel (06 §2.6, 08).
 - name: payments
   description: Online payment confirmation and the gateway webhook (06 §2.6, 08 §4).
+- name: cms
+  description: Static pages and FAQs (06 §2.7). No authentication.
+- name: support
+  description: The caller's support tickets and replies (06 §2.7).

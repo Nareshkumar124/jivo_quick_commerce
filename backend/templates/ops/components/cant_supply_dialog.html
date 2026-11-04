@@ -1,0 +1,60 @@
+{# "Can't supply" dialog (design/screens/ops/cant-supply-dialog.md; 08 T8a). One per page, driven by the Alpine store "cantSupply" (ops/js/orders.js); a line's button calls $store.cantSupply.ask($el) with the server-rendered data-* attributes. Posts the line's new TOTAL unavailable units (already + chosen). No money here: the consequence copy is units and payment type only. #}
+<div class="ops-dialog-backdrop" x-data x-show="$store.cantSupply.open" x-cloak
+     x-on:click.self="$store.cantSupply.close()" x-on:keydown.escape.window="$store.cantSupply.open && $store.cantSupply.close()">
+    <div class="ops-dialog ops-dialog--wide bg-white border border-base-200 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800"
+         role="alertdialog" aria-modal="true" aria-labelledby="cs-title" aria-describedby="cs-body cs-consequence"
+         x-on:keydown.tab="$store.cantSupply.trapTab($event, $el)"
+         x-effect="if ($store.cantSupply.open) $nextTick(() => $refs.back && $refs.back.focus())"
+         data-testid="cant-supply-dialog">
+        <div class="ops-dialog__scroll">
+            <h2 id="cs-title" class="ops-dialog__title">Can't supply <strong x-text="$store.cantSupply.line.product"></strong>?</h2>
+            <p class="ops-variant">
+                <span x-text="$store.cantSupply.line.variant"></span><template x-if="$store.cantSupply.line.variant && $store.cantSupply.line.sku"><span> · </span></template><span class="ops-sku" x-show="$store.cantSupply.line.sku" x-text="'SKU ' + $store.cantSupply.line.sku"></span>
+            </p>
+            <p id="cs-body" class="mt-3 ops-dialog__body">The customer ordered <strong x-text="$store.cantSupply.line.quantity"></strong>. <span id="cs-question">How many can't you supply?</span></p>
+            <p class="ops-text-secondary" x-show="$store.cantSupply.line.already > 0" x-text="'(' + $store.cantSupply.line.already + ' already marked unavailable)'"></p>
+
+            {# Chips (up to 6 units left) or a stepper; Enter never submits (a scanner may send one). #}
+            <div class="ops-chips mt-3" role="radiogroup" aria-labelledby="cs-question" x-show="$store.cantSupply.line.toPack <= 6"
+                 x-on:keydown.enter.prevent>
+                <template x-for="n in $store.cantSupply.choices()" x-bind:key="n">
+                    <label class="ops-chip" x-bind:class="{ 'ops-chip--on': $store.cantSupply.chosen === n }">
+                        <input type="radio" name="cs-chosen" class="sr-only" x-bind:value="n"
+                               x-bind:checked="$store.cantSupply.chosen === n" x-on:change="$store.cantSupply.choose(n)"
+                               x-bind:disabled="$store.cantSupply.busy">
+                        <span class="material-symbols-outlined md-18" aria-hidden="true" x-show="$store.cantSupply.chosen === n">check</span>
+                        <span x-text="n === $store.cantSupply.line.toPack ? n + ' (all)' : n"></span>
+                    </label>
+                </template>
+            </div>
+            <div class="ops-stepper mt-3" x-show="$store.cantSupply.line.toPack > 6" x-on:keydown.enter.prevent>
+                <button type="button" class="ops-stepper__btn" aria-label="One fewer" x-on:click="$store.cantSupply.step(-1)" x-bind:disabled="$store.cantSupply.busy">−</button>
+                <input type="number" inputmode="numeric" class="ops-stepper__value" aria-labelledby="cs-question" min="1"
+                       x-bind:max="$store.cantSupply.line.toPack" x-bind:value="$store.cantSupply.chosen || ''"
+                       x-on:input="$store.cantSupply.choose(parseInt($event.target.value, 10))" x-bind:disabled="$store.cantSupply.busy">
+                <button type="button" class="ops-stepper__btn" aria-label="One more" x-on:click="$store.cantSupply.step(1)" x-bind:disabled="$store.cantSupply.busy">+</button>
+                <button type="button" class="ops-chip" x-on:click="$store.cantSupply.choose($store.cantSupply.line.toPack)" x-text="'All ' + $store.cantSupply.line.toPack"></button>
+            </div>
+
+            <div id="cs-consequence" class="ops-consequence mt-3" aria-live="polite"
+                 x-bind:class="{ 'ops-consequence--danger': $store.cantSupply.cancelsOrder() }">
+                <span class="material-symbols-outlined md-18" aria-hidden="true" x-text="$store.cantSupply.cancelsOrder() ? 'warning' : 'info'">info</span>
+                <span x-html="$store.cantSupply.consequence()"></span>
+            </div>
+            <p class="ops-irreversible mt-2">You can't undo this.</p>
+            <p class="ops-dialog__error mt-2" role="alert" x-show="$store.cantSupply.error" x-cloak>
+                <span class="material-symbols-outlined md-18" aria-hidden="true">error</span><span x-html="$store.cantSupply.error"></span>
+            </p>
+        </div>
+        <div class="ops-dialog__footer">
+            <button type="button" class="ops-button ops-button--secondary" x-ref="back" x-on:click="$store.cantSupply.close()"
+                    x-bind:disabled="$store.cantSupply.busy" x-text="$store.cantSupply.closeOnly ? 'Close' : 'Go back'" data-testid="cs-back">Go back</button>
+            <button type="button" class="ops-button ops-button--danger" x-show="!$store.cantSupply.closeOnly"
+                    x-bind:aria-disabled="$store.cantSupply.chosen ? 'false' : 'true'" x-bind:aria-busy="$store.cantSupply.busy ? 'true' : 'false'"
+                    x-bind:disabled="$store.cantSupply.busy" x-on:click="$store.cantSupply.submit($el)" data-testid="cs-submit">
+                <span class="ops-spinner" x-show="$store.cantSupply.busy" aria-hidden="true"></span>
+                <span x-text="$store.cantSupply.primaryLabel()"></span>
+            </button>
+        </div>
+    </div>
+</div>

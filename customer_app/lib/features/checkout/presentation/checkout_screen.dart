@@ -95,8 +95,11 @@ class CheckoutScreen extends ConsumerWidget {
     final addressId = location?.addressId;
     // The server decides (`Cart.checkout`); the order also needs a saved
     // address id and an offered method.
+    // A total that can't be shown can't be paid (RD-02).
+    final grandTotal = formatRupeesOrNull(bill.grandTotal);
     final canPlace =
         !checkout.busy &&
+        grandTotal != null &&
         addressId != null &&
         snapshot.checkout.canPlaceOrder &&
         offered.contains(method);
@@ -205,7 +208,7 @@ class CheckoutScreen extends ConsumerWidget {
                   BusyButton(
                     key: const Key('place-order'),
                     label: method == PaymentMethod.online
-                        ? l10n.payAmount(formatRupees(bill.grandTotal))
+                        ? l10n.payAmount(grandTotal ?? '')
                         : l10n.placeOrder,
                     busy: checkout.busy,
                     onPressed: canPlace

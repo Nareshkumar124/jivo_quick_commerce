@@ -147,3 +147,20 @@ def admin_form_data(response) -> dict:
             _form_values(form, data)
     data["_save"] = "Save"
     return data
+
+
+# Phase 4 (05 §3 rows; apps/ops_console/capabilities.py). Before the backend's Phase 4 roles
+# are merged the capabilities use interim permission combinations; the sets are the same except
+# that Support may retry refunds only with `payments.issue_refund` (limit in the service).
+def _dedicated() -> bool:
+    from apps.ops_console.capabilities import dedicated_active
+
+    return dedicated_active()
+
+
+LIVE_BOARD_ROLES = frozenset({*_SA, roles.OPS, roles.STORE_MANAGER, roles.SUPPORT})
+PACKING_ROLES = frozenset({*_SA, roles.OPS, roles.STORE_MANAGER, roles.STORE_STAFF})
+CANCEL_ORDER_ROLES = frozenset({*_SA, roles.OPS, roles.STORE_MANAGER, roles.SUPPORT})
+RETRY_REFUND_ROLES = frozenset({*_SA, roles.FINANCE, *([roles.SUPPORT] if _dedicated() else [])})
+TOGGLE_STORE_ROLES = frozenset({*_SA, roles.STORE_MANAGER})  # 05 §1.3 "Store Manager can toggle"
+AUDIT_LOG_ROLES = frozenset({*_SA, roles.FINANCE})
