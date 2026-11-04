@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_api/jivo_api.dart' show AppConfig;
 import 'package:rider_app/features/launch/data/fake_app_config_repository.dart';
-import 'package:rider_app/features/launch/domain/app_version.dart';
 import 'package:rider_app/features/launch/domain/launch_gate.dart';
 
 AppConfig config({
@@ -22,25 +21,7 @@ AppConfig config({
 }
 
 void main() {
-  group('compareVersions', () {
-    test('numeric, part by part', () {
-      expect(compareVersions('1.0.0', '1.0.0'), 0);
-      expect(compareVersions('1.0.0', '1.2.0'), lessThan(0));
-      expect(compareVersions('1.10.0', '1.9.0'), greaterThan(0));
-      expect(compareVersions('2.0.0', '1.99.99'), greaterThan(0));
-    });
-
-    test('missing parts count as zero', () {
-      expect(compareVersions('1.2', '1.2.0'), 0);
-      expect(compareVersions('1', '1.0.1'), lessThan(0));
-    });
-
-    test('pre-release and build suffixes are ignored', () {
-      expect(compareVersions('1.2.0-beta+3', '1.2.0'), 0);
-      expect(compareVersions('1.0.0+7', '1.0.1'), lessThan(0));
-    });
-  });
-
+  // Version comparison itself: jivo_core's `compareAppVersions` tests.
   group('launchGateFor', () {
     test('proceeds when the app is up to date', () {
       expect(

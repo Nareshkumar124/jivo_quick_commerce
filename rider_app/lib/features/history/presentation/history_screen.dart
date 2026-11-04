@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/format/ist_format.dart';
 import '../../../shared/widgets/paged_list_view.dart';
-import '../../earnings/presentation/records_providers.dart';
 import '../../task/domain/task_rules.dart';
 import '../../task/domain/task_status.dart';
 import '../../task/presentation/task_text.dart';
 import '../domain/task_history.dart';
+import 'history_providers.dart';
 
 /// Past tasks (04 §2.8, screen 17): order number, date, store to drop,
 /// distance, payout and how it ended.
@@ -83,8 +83,12 @@ class _HistoryTile extends StatelessWidget {
             Text(l10n.historyRoute(entry.storeName, entry.dropLocality)),
             Row(
               children: [
-                if (entry.distanceKm != null)
-                  Expanded(child: Text(distanceText(l10n, entry.distanceKm))),
+                // Keeps the payout on the right when there is no distance.
+                Expanded(
+                  child: entry.distanceKm == null
+                      ? const SizedBox.shrink()
+                      : Text(distanceText(l10n, entry.distanceKm)),
+                ),
                 if (entry.payout case final payout?)
                   Text(
                     formatRupees(payout),

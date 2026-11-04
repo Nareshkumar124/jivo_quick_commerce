@@ -23,6 +23,13 @@ MAX_LINE_QUANTITY = 1000  # request sanity bound; the real limit is the variant'
 INSTRUCTIONS_NOTE_MAX_LENGTH = 200
 
 
+def money_or_null(help_text: str) -> serializers.DecimalField:
+    """A 2-decimal money string, or null."""
+    return serializers.DecimalField(
+        max_digits=12, decimal_places=2, allow_null=True, help_text=help_text
+    )
+
+
 class BillSerializer(serializers.Serializer):
     """The bill (08 §6.2), from `cart.services.compute_bill()`: the same function prices the
     cart, places the order and recalculates it. Every amount is a 2-decimal string, rounded
@@ -129,12 +136,10 @@ class AppliedCouponSerializer(serializers.Serializer):
         allow_null=True,
         help_text="Why it does not apply (e.g. 'Add items worth ₹74 more'); null when it does.",
     )
-
-
-def money_or_null(help_text: str) -> serializers.DecimalField:
-    """A 2-decimal money string, or null."""
-    return serializers.DecimalField(
-        max_digits=12, decimal_places=2, allow_null=True, help_text=help_text
+    amount_to_unlock = money_or_null(
+        "When it does not apply because the item total is below its minimum: the item value "
+        "still needed (for the app's own 'Add items worth ₹X more'). Null otherwise. Added in "
+        "Phase 3 R2b, like `CouponOffer.amount_to_unlock`."
     )
 
 

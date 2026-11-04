@@ -1431,6 +1431,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get cashCodCollectedNoOrder => 'Cash collected';
+
+  @override
   String get cashDeposit => 'Deposited at the store';
 
   @override

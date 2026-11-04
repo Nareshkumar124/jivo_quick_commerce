@@ -1,10 +1,14 @@
 // Real-API integration test of the Phase 1 rider login (no fakes, no stubbed
-// responses). Needs the local backend on the host at port 8001 (the dev
-// flavor's default `http://10.0.2.2:8001` from the emulator) and the backend's
-// fixed-OTP test numbers (D-15).
+// responses). Needs the local backend on the host at port 8001 and the
+// backend's fixed-OTP test numbers (D-15). There is no emulator on this
+// machine (CLAUDE.md): run it on the USB phone, only when nobody else is
+// using it, with the host's port forwarded, then reinstall the normal dev
+// build (`adb install -r`):
 //
+//   adb -s 9TY5KF8H49Z5YDON reverse tcp:8001 tcp:8001
 //   flutter test integration_test/rider_login_real_api_test.dart \
-//     --flavor dev -d emulator-5554
+//     --flavor dev -d 9TY5KF8H49Z5YDON \
+//     --dart-define=API_BASE_URL=http://localhost:8001
 //
 // Repeatable: it starts and ends signed out (the stored tokens are cleared
 // and the test logs out at the end).
@@ -16,11 +20,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
+import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/app/app.dart';
 import 'package:rider_app/app/bootstrap.dart';
 import 'package:rider_app/app/providers.dart';
-import 'package:rider_app/features/auth/data/otp_autofill.dart';
 import 'package:rider_app/features/auth/domain/rider_account.dart';
 import 'package:rider_app/features/auth/presentation/auth_providers.dart';
 import 'package:rider_app/features/auth/presentation/rider_account_controller.dart';

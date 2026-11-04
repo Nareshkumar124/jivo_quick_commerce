@@ -290,6 +290,30 @@ class TestUseByOrders:
         assert caught.value.error_code == "COUPON_USAGE_EXCEEDED"
         assert caught.value.details["scope"] == "per_user"
 
+    def test_use_needs_the_placement_transaction(self, order):
+        """Code review F2: the coupon row lock only protects inside the outer transaction."""
+        from django.db import connection
+
+        coupon = make()
+        connection.in_atomic_block, saved = False, connection.in_atomic_block
+        try:
+            with pytest.raises(RuntimeError, match="order-placement transaction"):
+                services.hold_coupon(order, coupon, Decimal("50.00"))
+        finally:
+            connection.in_atomic_block = saved
+
+    def test_limits_are_read_from_the_locked_row(self, order):
+        """Code review F2: an expired or deactivated coupon is refused even with a stale copy."""
+        stale = make(usage_limit_per_user=None)
+        Coupon.objects.filter(pk=stale.pk).update(is_active=False)
+        with pytest.raises(ApiError) as caught:
+            services.hold_coupon(order, stale, Decimal("50.00"))
+        assert caught.value.error_code == "COUPON_INVALID"
+        Coupon.objects.filter(pk=stale.pk).update(is_active=True, ends_at=timezone.now())
+        with pytest.raises(ApiError) as caught:
+            services.hold_coupon(order, stale, Decimal("50.00"))
+        assert caught.value.error_code == "COUPON_EXPIRED"
+
     def test_total_limit_is_rechecked_when_used(self, order):
         coupon = make(usage_limit_total=1, usage_limit_per_user=None)
         redeem(coupon, UserFactory())

@@ -6,7 +6,9 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../auth/domain/indian_mobile.dart';
+
+import 'package:jivo_core/helpers.dart';
+
 import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../../onboarding/domain/rider_profile.dart';

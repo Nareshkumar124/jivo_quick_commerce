@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.gis.geos import Point
 from django.db import transaction
 from django.db.models import F, FilteredRelation, Prefetch, Q, Value
@@ -140,6 +141,18 @@ class Bill:
 EMPTY_BILL = Bill()
 
 
+def item_total(lines: Sequence[BillLine]) -> Decimal:
+    """Σ selling price x quantity, rounded (08 §6.2): the base of every fee threshold and of the
+    coupon's minimum order. The only place it is computed (code review F6)."""
+    return round_money(sum((line.line_total for line in lines), ZERO))
+
+
+def clamp_tip(tip) -> Decimal:
+    """The tip billed: rounded, never negative and never above `CART_MAX_TIP` (code review F1:
+    the cap is enforced here, in the money function, not only by the API serializer)."""
+    return min(max(round_money(tip), ZERO), round_money(settings.CART_MAX_TIP))
+
+
 def compute_bill(
     lines: Sequence[BillLine],
     rules: PricingRules,
@@ -153,19 +166,19 @@ def compute_bill(
     if not lines:
         return EMPTY_BILL
     mrp_total = round_money(sum((line.line_mrp_total for line in lines), ZERO))
-    item_total = round_money(sum((line.line_total for line in lines), ZERO))
+    items_total = item_total(lines)
     coupon_discount = ZERO
     if coupon is not None:
-        coupon_discount = min(promotions.coupon_discount(coupon, lines), item_total)
-    delivery_fee = ZERO if item_total >= rules.free_delivery_threshold else rules.delivery_fee
-    small_cart_fee = rules.small_cart_fee if item_total < rules.small_cart_threshold else ZERO
+        coupon_discount = min(promotions.coupon_discount(coupon, lines), items_total)
+    delivery_fee = ZERO if items_total >= rules.free_delivery_threshold else rules.delivery_fee
+    small_cart_fee = rules.small_cart_fee if items_total < rules.small_cart_threshold else ZERO
     handling_fee = rules.handling_fee
-    tip = round_money(tip)
-    product_discount = mrp_total - item_total
-    grand_total = item_total - coupon_discount + delivery_fee + small_cart_fee + handling_fee + tip
+    tip = clamp_tip(tip)
+    product_discount = mrp_total - items_total
+    grand_total = items_total - coupon_discount + delivery_fee + small_cart_fee + handling_fee + tip
     return Bill(
         mrp_total=mrp_total,
-        item_total=item_total,
+        item_total=items_total,
         product_discount=product_discount,
         coupon_discount=round_money(coupon_discount),
         delivery_fee=round_money(delivery_fee),
@@ -295,8 +308,9 @@ def line_issue(quantity: int, summary: dict) -> dict | None:
 
 
 def load_lines(cart: Cart, store_id: int) -> list[CartLine]:
-    """The cart's lines priced and checked at `store_id` (a fixed number of queries)."""
-    items = list(cart.items.all())
+    """The cart's lines priced and checked at `store_id` (a fixed number of queries). An
+    unsaved cart (a reader with no cart yet) has none."""
+    items = list(cart.items.all()) if cart.pk is not None else []
     variants = store_variants(store_id, [item.variant_id for item in items])
     lines = []
     for item in items:
@@ -309,9 +323,21 @@ def load_lines(cart: Cart, store_id: int) -> list[CartLine]:
 # --------------------------------------------------------------------------- the cart
 
 
+def read_cart(user, store: StoreArea) -> Cart:
+    """For reads (`GET /cart/`, the coupon sheet): the user's cart priced at `store`, without
+    writing (code review F5). A user with no cart gets an unsaved empty one; the store binding is
+    saved by the next change."""
+    cart = Cart.objects.select_related("coupon", "address").filter(user=user).first()
+    if cart is None:
+        return Cart(user=user, store_id=store.pk, instructions=empty_instructions())
+    cart.store_id = store.pk  # priced at the requested store; persisted only by changes
+    return cart
+
+
 def get_cart(user, store: StoreArea) -> Cart:
-    """The user's cart (created empty on first use), bound to `store` (08: the cart follows
-    the store in X-Store-Id)."""
+    """For changes: the user's cart (created empty on first use), bound to `store` (the cart
+    follows the store in X-Store-Id). `store` is an active store: `get_store()` answers 404
+    `STORE_NOT_FOUND` for an unknown or deactivated one before any cart call."""
     cart, _ = Cart.objects.select_related("coupon", "address").get_or_create(
         user=user, defaults={"store_id": store.pk, "instructions": empty_instructions()}
     )
@@ -363,7 +389,7 @@ def evaluate(cart: Cart, store: StoreArea, user, *, now: datetime | None = None)
     lines = load_lines(cart, store.pk)
     rules = pricing_rules(store.pk)
     bill_lines = [line.bill_line for line in lines]
-    item_total = round_money(sum((line.line_total for line in bill_lines), ZERO))
+    items_total = item_total(bill_lines)
     check = None
     if cart.coupon is not None:
         prefetch_related_objects([cart.coupon], "stores", "categories__children")
@@ -372,7 +398,7 @@ def evaluate(cart: Cart, store: StoreArea, user, *, now: datetime | None = None)
             user=user,
             store_id=store.pk,
             lines=bill_lines,
-            item_total=item_total,
+            item_total=items_total,
             now=now,
         )
     coupon = cart.coupon if check is not None and check.ok else None
@@ -440,6 +466,9 @@ def _coupon_body(state: CartState) -> dict | None:
         "discount": money_str(state.bill.coupon_discount),
         "is_applicable": check.ok,
         "message": check.message,
+        "amount_to_unlock": (
+            money_str(check.amount_to_unlock) if check.amount_to_unlock is not None else None
+        ),
     }
 
 
@@ -535,12 +564,11 @@ def cart_body(
 def coupon_list_body(cart: Cart, store: StoreArea, user, *, now: datetime | None = None) -> dict:
     lines = load_lines(cart, store.pk)
     bill_lines = [line.bill_line for line in lines]
-    item_total = round_money(sum((line.line_total for line in bill_lines), ZERO))
     offers = promotions.coupon_offers(
         user=user,
         store_id=store.pk,
         lines=bill_lines,
-        item_total=item_total,
+        item_total=item_total(bill_lines),
         applied=cart.coupon,
         now=now,
     )
@@ -677,9 +705,13 @@ def apply_coupon(cart: Cart, store: StoreArea, user, code: str, *, now=None) -> 
             details={"code": promotions.normalise_code(code)},
         )
     bill_lines = [line.bill_line for line in load_lines(cart, store.pk)]
-    item_total = round_money(sum((line.line_total for line in bill_lines), ZERO))
     check = promotions.check_coupon(
-        coupon, user=user, store_id=store.pk, lines=bill_lines, item_total=item_total, now=now
+        coupon,
+        user=user,
+        store_id=store.pk,
+        lines=bill_lines,
+        item_total=item_total(bill_lines),
+        now=now,
     )
     if not check.ok:
         raise check.as_error()

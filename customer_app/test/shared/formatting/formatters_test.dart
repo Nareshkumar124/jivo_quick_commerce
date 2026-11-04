@@ -60,4 +60,12 @@ void main() {
       expect(formatTime(local), formatTime(instant));
     });
   });
+
+  test('isSameAmount compares the server strings, not floats', () {
+    expect(isSameAmount('20', '20.00'), isTrue);
+    expect(isSameAmount('20.5', '20.50'), isTrue);
+    expect(isSameAmount('20.00', '20.01'), isFalse);
+    expect(isSameAmount('020.00', '20.00'), isTrue);
+    expect(isSameAmount('abc', '20.00'), isFalse);
+  });
 }

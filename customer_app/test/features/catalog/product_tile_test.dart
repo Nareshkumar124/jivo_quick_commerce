@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/cart/data/cart_repository.dart';
+import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/cart/domain/cart.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
 import 'package:customer_app/features/catalog/presentation/widgets/product_tile.dart';
@@ -12,12 +13,12 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../helpers/widget_harness.dart';
 import 'catalog_fixtures.dart';
 
-Future<InMemoryCartRepository> pumpTile(
+Future<FakeCommerceBackend> pumpTile(
   WidgetTester tester,
   CatalogProduct tile, {
   CartRepository? repository,
 }) async {
-  final cart = InMemoryCartRepository();
+  final cart = FakeCommerceBackend(latency: Duration.zero);
   await tester.pumpWidget(
     harness(
       Center(
@@ -38,7 +39,9 @@ String qty(WidgetTester tester, Object id) =>
     tester.widget<Text>(find.byKey(ValueKey('qty-$id'))).data!;
 
 /// Holds every change until [release] (an in-flight request).
-class SlowCartRepository implements CartRepository {
+class SlowCartRepository extends FakeCommerceBackend {
+  SlowCartRepository() : super(latency: Duration.zero);
+
   final calls = <(int, int)>[];
   Completer<void> _gate = Completer<void>();
 
@@ -48,17 +51,15 @@ class SlowCartRepository implements CartRepository {
   }
 
   @override
-  Future<CartSnapshot> load() async => CartSnapshot.empty;
-
-  @override
-  Future<CartSnapshot> setQuantity(int variantId, int quantity) async {
+  Future<CartSnapshot> setQuantity(
+    int variantId,
+    int quantity, {
+    CartLinePreview? preview,
+  }) async {
     calls.add((variantId, quantity));
     await _gate.future;
-    return CartSnapshot(quantities: {variantId: quantity}, itemCount: quantity);
+    return super.setQuantity(variantId, quantity, preview: preview);
   }
-
-  @override
-  Future<CartSnapshot> clear() async => CartSnapshot.empty;
 }
 
 void main() {
@@ -210,9 +211,9 @@ void main() {
   });
 
   testWidgets('a server error is shown as a friendly message', (tester) async {
-    final cart = InMemoryCartRepository()
-      ..failNext = const ApiError(code: ApiErrorCode.stockUnavailable);
+    final cart = FakeCommerceBackend(latency: Duration.zero);
     await pumpTile(tester, product(), repository: cart);
+    cart.failNext = const ApiError(code: ApiErrorCode.stockUnavailable);
 
     await tester.tap(find.text('ADD'));
     await tester.pumpAndSettle();
@@ -337,7 +338,9 @@ void main() {
             ],
           ),
           overrides: [
-            cartRepositoryProvider.overrideWithValue(InMemoryCartRepository()),
+            cartRepositoryProvider.overrideWithValue(
+              FakeCommerceBackend(latency: Duration.zero),
+            ),
           ],
           textScaler: TextScaler.linear(scale),
         ),

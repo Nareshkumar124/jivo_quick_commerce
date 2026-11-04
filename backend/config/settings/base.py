@@ -119,6 +119,11 @@ TEMPLATES = [
 # `test_jivo_quick_commerce`. Any name not starting with that is refused at settings load.
 TEST_DATABASE_NAME = env_test_database_name()
 
+# Optional explicit GDAL/GEOS library paths (e.g. Windows hosts, where Django cannot find
+# versioned DLLs on its own). Unset: Django searches the default library names.
+GDAL_LIBRARY_PATH = env_str("GDAL_LIBRARY_PATH", default=None)
+GEOS_LIBRARY_PATH = env_str("GEOS_LIBRARY_PATH", default=None)
+
 # Built from separate variables (never a DATABASE_URL: passwords may contain URL-reserved chars).
 # PostGIS since Phase 2 (serviceability, distances). Migrating a test database runs
 # `CREATE EXTENSION IF NOT EXISTS postgis` (the DB user is allowed to); never run it by hand.
@@ -310,6 +315,8 @@ CELERY_BEAT_SCHEDULE = {
         "task": "accounts.purge_old_otp_requests",
         "schedule": crontab(hour=21, minute=45),
     },
+    # Phase 3 (06 §5): fail online orders whose payment window ended (after asking the gateway).
+    "expire-unpaid-orders": {"task": "orders.expire_unpaid_orders", "schedule": 60.0},
 }
 
 # --------------------------------------------------------------------------- email
@@ -522,6 +529,8 @@ PAYMENT_GATEWAY = env_str("PAYMENT_GATEWAY", default="apps.payments.gateways.Raz
 RAZORPAY_KEY_ID = env_str("RAZORPAY_KEY_ID", default="")
 RAZORPAY_KEY_SECRET = env_str("RAZORPAY_KEY_SECRET", default="")
 RAZORPAY_WEBHOOK_SECRET = env_str("RAZORPAY_WEBHOOK_SECRET", default="")
+# Seconds to wait for a Razorpay API call (create order, list payments, refund).
+RAZORPAY_TIMEOUT_SECONDS = env_float("RAZORPAY_TIMEOUT_SECONDS", default=10.0)
 
 # --------------------------------------------------------------------------- import / export
 # The admin's import is two requests (preview, then confirm), possibly served by different web
