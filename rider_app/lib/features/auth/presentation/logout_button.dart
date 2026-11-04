@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 import 'rider_account_controller.dart';
 
-/// Log out (04 §2.9). Refused with a message while the rider is online.
+/// Log out (04 §2.9). Refused with a message while the rider is online or
+/// has an active task.
 class LogoutButton extends ConsumerWidget {
   const LogoutButton({super.key});
 
@@ -15,20 +16,24 @@ class LogoutButton extends ConsumerWidget {
       key: const Key('logout'),
       tooltip: l10n.logout,
       icon: const Icon(Icons.logout),
-      onPressed: () async {
-        final messenger = ScaffoldMessenger.of(context);
-        final result = await ref
-            .read(riderAccountControllerProvider.notifier)
-            .logout();
-        final message = switch (result) {
-          LogoutResult.blockedWhileOnline => l10n.logoutBlockedOnline,
-          LogoutResult.blockedDuringTask => l10n.logoutBlockedDuringTask,
-          LogoutResult.done => null,
-        };
-        if (message != null) {
-          messenger.showSnackBar(SnackBar(content: Text(message)));
-        }
-      },
+      onPressed: () => logoutWithFeedback(context, ref),
     );
+  }
+}
+
+/// Logs out, or explains in a snack bar why the rider can't yet.
+Future<void> logoutWithFeedback(BuildContext context, WidgetRef ref) async {
+  final l10n = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final result = await ref
+      .read(riderAccountControllerProvider.notifier)
+      .logout();
+  final message = switch (result) {
+    LogoutResult.blockedWhileOnline => l10n.logoutBlockedOnline,
+    LogoutResult.blockedDuringTask => l10n.logoutBlockedDuringTask,
+    LogoutResult.done => null,
+  };
+  if (message != null) {
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 }

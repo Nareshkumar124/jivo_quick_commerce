@@ -9029,7 +9029,7 @@ paths:
       description: |-
         Configured in the Razorpay dashboard for `payment.captured`, `payment.failed`, `refund.processed` and `refund.failed`. **Not for the apps.**
 
-        `X-Razorpay-Signature` must be the hex HMAC-SHA256 of the exact raw body bytes, keyed with the webhook secret; anything else is a 400 and nothing is stored. Events are processed once per `X-Razorpay-Event-Id` (a repeat answers `duplicate`) and in any order relative to verify (08 §4). Unhandled event types answer `ignored`. A 2xx tells Razorpay not to retry.
+        `X-Razorpay-Signature` must be the hex HMAC-SHA256 of the exact raw body bytes, keyed with the webhook secret; anything else is a 400 and nothing is stored. Events are processed once per `X-Razorpay-Event-Id` (a repeat answers `duplicate`) and in any order relative to verify (08 §4). Unhandled event types answer `ignored`. A 2xx tells Razorpay not to retry; a 503 asks it to.
       summary: Razorpay webhook (server to server)
       parameters:
       - in: header
@@ -9141,6 +9141,22 @@ paths:
           description: '`PAYMENT_VERIFICATION_FAILED`: missing or wrong signature
             (nothing stored). `VALIDATION_ERROR`: no event id header, or not a Razorpay
             event.'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: The service is temporarily unavailable.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: '`SERVICE_UNAVAILABLE`: the event cannot be applied yet (a
+            refund whose gateway id is still being recorded). Nothing is stored; Razorpay
+            retries it.'
   /api/v1/products/:
     get:
       operationId: products_list
