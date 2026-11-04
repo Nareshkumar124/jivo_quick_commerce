@@ -26,9 +26,9 @@ Every development agent reads this before running anything. It records how the s
   | QA instance on :8004 | QA's own settings | 5–7 |
 - **Fast test loop:**
   1. While iterating, run only the test files you touched.
-  2. Run the full suite **once** at the end, in parallel: `uv run --with pytest-xdist pytest -n 4`, plus your env vars. This adds xdist for the run only; never add it to `pyproject.toml` or `uv.lock` yourself.
-  3. Re-run any failures serially (`--no-cov <node ids>`) and report which ones are xdist-only.
-  4. Known xdist-only flakes until T-408c lands: OTP send limits, query-count tests, the xlsx import preview, and `test_only_this_test_database_is_ever_created`. All of them come from workers sharing one Redis DB.
+  2. Run the full suite **once** at the end, in parallel: `uv run pytest -n 4`, plus your env vars. `pytest-xdist` is a dev dependency (T-408c).
+  3. Each xdist worker gets its own test DB (`<POSTGRES_TEST_DB>_gwN`) and its own Redis key namespace (`jqc-test-gwN`), so the suite is xdist-safe. A failure under `-n` is a real failure.
+  4. **Never run two `-n` runs at once with the same `POSTGRES_TEST_DB` and the same `TEST_REDIS_DB`.** They would share the `_gwN` databases and namespaces. A serial run and a `-n` run can share a `TEST_REDIS_DB`.
 - **Celery on Windows:** run `celery -A config worker --pool threads` and `celery -A config beat` as **separate** processes. `-B` is refused on Windows.
 - **Text files:** always open them with `encoding="utf-8"`, because the Windows default is cp1252. Git uses `core.autocrlf=true`, so checked-out text files have CRLF. Tests must not compare file bytes against string constants unless `.gitattributes` forces LF for that file type (see `.gitattributes`).
 - Native libraries: GDAL and GEOS come from `GDAL_LIBRARY_PATH` / `GEOS_LIBRARY_PATH` in `.env`. WeasyPrint's Pango/GTK libraries may be missing. If so, degrade cleanly, skip the render tests with a clear reason, and report it. Never install system software yourself.

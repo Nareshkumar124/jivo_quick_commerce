@@ -8,8 +8,8 @@ Usage (from anywhere; standard library only, Python 3.9+):
     python3 infra/scripts/check_env_example.py --help
 
 What it scans: every ``*.py`` under ``backend/config/`` (settings, sentry, celery) and
-``backend/apps/`` (e.g. the seed command), except ``tests/`` folders and ``config/env.py`` (the
-helper definitions), via the AST, for:
+``backend/apps/`` (e.g. the seed command), except ``tests/`` folders, ``config/env.py`` (the
+helper definitions) and the test-only ``config/testing.py``, via the AST, for:
 
 - ``env_str/env_int/env_bool/env_float/env_list/env_dict("NAME", ...)``
 - ``env_test_database_name()`` / ``env_test_redis_db()`` (their default names) or with a name
@@ -44,7 +44,10 @@ DEFAULT_NAME_HELPERS = {
     "env_test_database_name": "POSTGRES_TEST_DB",
     "env_test_redis_db": "TEST_REDIS_DB",
 }
-SKIP_FILES = {REPO_ROOT / "backend" / "config" / "env.py"}  # the helper definitions themselves
+SKIP_FILES = {
+    REPO_ROOT / "backend" / "config" / "env.py",  # the helper definitions themselves
+    REPO_ROOT / "backend" / "config" / "testing.py",  # test-only (reads PYTEST_XDIST_WORKER)
+}
 SKIP_DIR_NAMES = {"tests", "migrations"}
 EXAMPLE_LINE = re.compile(r"^([A-Z][A-Z0-9_]*)=")
 # Read by docker-compose interpolation, not by Django settings.
