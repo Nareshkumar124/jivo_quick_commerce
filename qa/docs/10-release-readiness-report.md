@@ -96,3 +96,19 @@ Phase 1 sign-off
 2. Get a pass on P3-TC-64 from the user's phone test.
 3. Decide on the two ⏭ P1 cases: accept them as deferred, or seed a variant below ₹99 and add a gateway-down switch for the fake gateway.
 4. CI evidence and a staging run (D-05) for the formal gate.
+
+### Phase 3 update (refund re-check, 2026-11-04, `9ed7ffc`, T-310): verdict **Ready for sign-off on the QA instance; formal gate pending (device test, CI, staging)**
+Condition 1 of stage 2 (the refund re-check) is **met**. The refund fixes in develop `dff62d5` hold black-box.
+
+| §5.2 criterion | Result |
+|---|---|
+| CI green | ⬜ Not verified by QA |
+| 100% of P0/P1 cases passed, ≥ 95% of all | **66/69 = 95.7%** ✅. Every P0 case passed except P3-TC-64 (the user's device test). The two P1 ⏭ cases, P3-TC-26 and 63, moved to Phase 4 as P4-TC-49/50 (DL-50), so they no longer block P3 |
+| Smoke set | ✅ `77 passed` (P0–P4 🔥; the P4 stubs skip) |
+| No open P0/P1 bugs | ✅ (open: BUG-0006 and BUG-0008, both P3; no new bug in this run) |
+| No unauthorised access, data corruption, duplicate financial transaction or crash | ✅ No duplicate or excess refund anywhere in the DB (P4-TC-44); the webhook-before-task race settles exactly once (P3-TC-65/66); FAILED is never reopened (P3-TC-68); the 503 is bounded (P3-TC-69) |
+
+**Remaining before sign-off:**
+1. P3-TC-64 on the user's phone (PM).
+2. CI evidence and a staging run (D-05) for the formal gate.
+3. Optional: re-verify BUG-0008 (P3).

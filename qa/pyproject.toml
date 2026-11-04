@@ -30,6 +30,8 @@ markers = [
     "profile_shortsession: needs the instance started with the shortsession profile (BUG-0006)",
     "profile_clock: needs the instance started with the clock profile (QA_FAKE_NOW)",
     "profile_db_down: needs the instance started with the db-down profile (500 trigger)",
+    "profile_refundwindow: needs the instance started with REFUND_WEBHOOK_RETRY_WINDOW_SECONDS=20 (P3-TC-69)",
+    "profile_gwdown: needs the instance started with FAKE_GATEWAY_DOWN=1 (P4-TC-50, after the P4 R2 merge)",
     "any_profile: runs on every instance profile",
     "db: read-only SQL checks against the shared database",
     "slow: long-running (minutes); runs only with QA_SLOW=1 (e.g. the P3 15-minute payment-window expiry)",
