@@ -6,6 +6,7 @@ see ``infra/env/backend.env.example`` for the full list.
 """
 
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from celery.schedules import crontab
@@ -70,6 +71,10 @@ INSTALLED_APPS = [
     "apps.stores",
     "apps.catalog",
     "apps.inventory",
+    "apps.promotions",
+    "apps.cart",
+    "apps.orders",
+    "apps.payments",
     "apps.ops_console",
 ]
 
@@ -305,6 +310,8 @@ CELERY_BEAT_SCHEDULE = {
         "task": "accounts.purge_old_otp_requests",
         "schedule": crontab(hour=21, minute=45),
     },
+    # Phase 3 (06 §5): fail online orders whose payment window ended (after asking the gateway).
+    "expire-unpaid-orders": {"task": "orders.expire_unpaid_orders", "schedule": 60.0},
 }
 
 # --------------------------------------------------------------------------- email
@@ -416,6 +423,9 @@ SPECTACULAR_SETTINGS = {
     # Separate request/response components: better generated clients (read-only fields etc.).
     "COMPONENT_SPLIT_REQUEST": True,
     "SCHEMA_PATH_PREFIX": r"/api/v[0-9]+",
+    # A nullable choice field is published as a nullable `$ref` to its enum, not as
+    # `oneOf: [XEnum, NullEnum]`, which the Dart (dart-dio) generator cannot compile (Phase 3).
+    "ENUM_ADD_EXPLICIT_BLANK_NULL_CHOICE": False,
     "ENUM_NAME_OVERRIDES": {
         "ErrorCodeEnum": "apps.core.errors.ErrorCode",
         "HealthStatusEnum": "apps.core.serializers.HealthStatus",
@@ -429,6 +439,19 @@ SPECTACULAR_SETTINGS = {
         "StockStatusEnum": "apps.catalog.choices.StockStatus",
         "BannerLinkTypeEnum": "apps.catalog.choices.BannerLinkType",
         "SearchSuggestionTypeEnum": "apps.catalog.choices.SuggestionType",
+        # Phase 3: cart, coupons, orders, payments
+        "DeliveryInstructionChipEnum": "apps.cart.choices.DeliveryInstructionChip",
+        "CartLineIssueCodeEnum": "apps.cart.choices.CartLineIssueCode",
+        "CheckoutBlockerCodeEnum": "apps.cart.choices.CheckoutBlockerCode",
+        "PaymentUnavailableReasonEnum": "apps.cart.choices.PaymentUnavailableReason",
+        "CouponDiscountTypeEnum": "apps.promotions.choices.DiscountType",
+        "CouponIneligibleReasonEnum": "apps.promotions.choices.CouponIneligibleReason",
+        "OrderStatusEnum": "apps.orders.choices.OrderStatus",
+        "PaymentMethodEnum": "apps.orders.choices.PaymentMethod",
+        "PaymentStatusEnum": "apps.orders.choices.PaymentStatus",
+        "OrderListStatusEnum": "apps.orders.choices.OrderListStatus",
+        "CancelReasonEnum": "apps.orders.choices.CancelReason",
+        "WebhookResultEnum": "apps.payments.choices.WebhookResult",
     },
     "TAGS": [
         {"name": "health", "description": "Liveness and readiness probes. No authentication."},
@@ -446,6 +469,21 @@ SPECTACULAR_SETTINGS = {
                 "Home, categories, products, search and collections for one store: every "
                 "operation takes the `X-Store-Id` header (06 §2.4)."
             ),
+        },
+        {
+            "name": "cart",
+            "description": (
+                "The server cart, its bill and coupons, priced at the store in `X-Store-Id` "
+                "(06 §2.5). The app renders the bill; it never computes money."
+            ),
+        },
+        {
+            "name": "orders",
+            "description": "Place orders, list them, retry a payment, cancel (06 §2.6, 08).",
+        },
+        {
+            "name": "payments",
+            "description": "Online payment confirmation and the gateway webhook (06 §2.6, 08 §4).",
         },
     ],
     "SWAGGER_UI_SETTINGS": {"persistAuthorization": True, "displayOperationId": True},
@@ -468,7 +506,26 @@ ETA_RIDER_WAIT_MINUTES = env_int("ETA_RIDER_WAIT_MINUTES", default=3)
 # Notify-me leads per user (or IP when anonymous). Fails open when Redis is down.
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
     "notify_me": env_str("NOTIFY_ME_RATE", default="10/hour"),
+    # Phase 3 (code review of R1): per user, fail open (apps.core.throttling). Generous: a
+    # customer places a few orders a day; these only stop scripted abuse.
+    "orders_create": env_str("ORDERS_CREATE_RATE", default="30/hour"),
+    "payments": env_str("PAYMENTS_RATE", default="60/hour"),
 }
+
+# --------------------------------------------------------------------------- cart & payments (P3)
+# Largest rider tip the cart accepts (PM default, pending confirmation; 03 §2.8 offers 10/20/30
+# or a custom amount).
+CART_MAX_TIP = Decimal(env_str("CART_MAX_TIP", default="500.00"))
+# Payment gateway (D-01, DL-21): Razorpay by default, behind apps.payments.gateways. local.py and
+# test.py default to FakeRazorpayGateway; staging and production refuse it (payments.E001).
+PAYMENT_GATEWAY = env_str("PAYMENT_GATEWAY", default="apps.payments.gateways.RazorpayGateway")
+# Razorpay keys (test keys on staging, live keys in production). Environment only, never
+# committed. Empty here: the Razorpay gateway fails loudly when used without them.
+RAZORPAY_KEY_ID = env_str("RAZORPAY_KEY_ID", default="")
+RAZORPAY_KEY_SECRET = env_str("RAZORPAY_KEY_SECRET", default="")
+RAZORPAY_WEBHOOK_SECRET = env_str("RAZORPAY_WEBHOOK_SECRET", default="")
+# Seconds to wait for a Razorpay API call (create order, list payments, refund).
+RAZORPAY_TIMEOUT_SECONDS = env_float("RAZORPAY_TIMEOUT_SECONDS", default=10.0)
 
 # --------------------------------------------------------------------------- import / export
 # The admin's import is two requests (preview, then confirm), possibly served by different web

@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../app/redirect.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
-import '../../../shared/widgets/state_views.dart';
 import 'cart_controller.dart';
 
 /// The floating cart bar: "2 items · ₹348 · View cart" (`03 §1`). Hidden
-/// while the cart is empty. The total appears only when the server sends
-/// it (Phase 3); the app never adds prices up.
+/// while the cart is empty. The amount is the server's item total, shown
+/// only when the server sends it; the app never adds prices up.
 class CartBar extends ConsumerWidget {
   const CartBar({super.key});
 
@@ -42,8 +43,7 @@ class CartBar extends ConsumerWidget {
           borderRadius: BorderRadius.circular(JivoRadii.md),
           child: InkWell(
             borderRadius: BorderRadius.circular(JivoRadii.md),
-            // TODO(P3): open the cart screen.
-            onTap: () => showMessage(context, l10n.cartComingSoon),
+            onTap: () => context.push(Routes.cart),
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 56),
               child: Padding(

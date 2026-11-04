@@ -5,14 +5,20 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/app/app.dart';
 import 'package:rider_app/app/bootstrap.dart';
 import 'package:rider_app/app/providers.dart';
 import 'package:rider_app/app/router.dart';
 import 'package:rider_app/features/auth/data/fake_auth_backend.dart';
-import 'package:rider_app/features/auth/data/otp_autofill.dart';
 import 'package:rider_app/features/auth/presentation/auth_providers.dart';
+import 'package:rider_app/features/cash/data/fake_cash_backend.dart';
+import 'package:rider_app/features/cash/presentation/cash_providers.dart';
+import 'package:rider_app/features/earnings/data/fake_earnings_backend.dart';
+import 'package:rider_app/features/earnings/presentation/earnings_providers.dart';
+import 'package:rider_app/features/history/data/fake_history_backend.dart';
+import 'package:rider_app/features/history/presentation/history_providers.dart';
 import 'package:rider_app/features/launch/data/fake_app_config_repository.dart';
 import 'package:rider_app/features/launch/presentation/launch_controller.dart';
 import 'package:rider_app/features/location/data/location_buffer_file.dart';
@@ -25,12 +31,9 @@ import 'package:rider_app/features/offers/presentation/offer_alert_providers.dar
 import 'package:rider_app/features/onboarding/data/fake_rider_onboarding_backend.dart';
 import 'package:rider_app/features/onboarding/domain/image_picking.dart';
 import 'package:rider_app/features/onboarding/presentation/onboarding_providers.dart';
-import 'package:rider_app/features/earnings/data/fake_rider_records_backend.dart';
-import 'package:rider_app/features/earnings/presentation/records_providers.dart';
 import 'package:rider_app/features/task/data/fake_task_backend.dart';
 import 'package:rider_app/features/task/presentation/pickup_scan_screen.dart';
 import 'package:rider_app/features/task/presentation/task_providers.dart';
-import 'package:rider_app/shared/platform/url_opener.dart';
 
 import 'kyc_image_fakes.dart';
 import 'task_fakes.dart';
@@ -68,16 +71,6 @@ class FakeLocationServiceClient implements LocationServiceClient {
 
   @override
   Stream<TrackerStats> get stats => _stats.stream;
-}
-
-class RecordingUrlOpener implements UrlOpener {
-  final opened = <Uri>[];
-
-  @override
-  Future<bool> open(Uri uri) async {
-    opened.add(uri);
-    return true;
-  }
 }
 
 class RecordingLocationCleaner implements LocationDataCleaner {
@@ -133,7 +126,7 @@ class RiderTestHarness {
   );
   final backend = FakeAuthBackend(delay: Duration.zero);
   final location = FakeLocationServiceClient();
-  final urls = RecordingUrlOpener();
+  final urls = FakeUrlOpener();
   final cleaner = RecordingLocationCleaner();
   final offerAlerts = NoopOfferAlerts();
 
@@ -148,7 +141,12 @@ class RiderTestHarness {
   final pendingCapture = InMemoryPendingCaptureStore();
   late final tasks = FakeTaskBackend(delay: Duration.zero, clock: () => now);
   final locationReader = FakeLocationReader();
-  final records = FakeRiderRecordsBackend(delay: Duration.zero);
+  final earnings = FakeEarningsBackend(delay: Duration.zero);
+  late final cash = FakeCashBackend(delay: Duration.zero, clock: () => now);
+  late final history = FakeHistoryBackend(
+    delay: Duration.zero,
+    clock: () => now,
+  );
   final alerter = RecordingOfferAlerter();
   List<String> scannerValues = const ['7K2P', 'HELLO-WORLD'];
 
@@ -173,7 +171,9 @@ class RiderTestHarness {
     imageCodecProvider.overrideWithValue(codec),
     pendingCaptureStoreProvider.overrideWithValue(pendingCapture),
     fakeTaskBackendProvider.overrideWithValue(tasks),
-    fakeRiderRecordsBackendProvider.overrideWithValue(records),
+    fakeEarningsBackendProvider.overrideWithValue(earnings),
+    fakeCashBackendProvider.overrideWithValue(cash),
+    fakeHistoryBackendProvider.overrideWithValue(history),
     currentLocationReaderProvider.overrideWithValue(locationReader),
     offerAlerterProvider.overrideWithValue(alerter),
     qrScannerBuilderProvider.overrideWith((ref) => fakeScanner(scannerValues)),

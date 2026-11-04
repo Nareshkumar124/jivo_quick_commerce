@@ -211,6 +211,74 @@ The iOS config pair (`.i.olf`/`.i.conf`) is still pending. On a Mac:
 
 Until then iOS always shows the no-map fallback.
 
+## Payments: Razorpay (D-01)
+
+`razorpay_flutter` **1.4.7, pinned exactly** sits behind `PaymentLauncher`
+(`lib/features/checkout/data/`). The app never trusts the SDK's answer: an
+order is shown as placed only after `POST /payments/razorpay/verify/` (or
+the order's server status) confirms it (`08 §4`).
+- **Which checkout opens** (`GatewayPaymentLauncher`) depends on the
+  `razorpay.key_id` that `POST /orders/` returns:
+  - `rzp_fake_…` in the **dev** flavor: the backend's local fake gateway
+    (`06 §2.6`). No Razorpay, no money: the "Test payment (dev build)"
+    sheet lets the tester pick success, a bad signature, failure, an
+    external wallet (result by webhook) or closing checkout. Success makes
+    up a `pay_` + 14-character id and signs `"<order_id>|<payment_id>"`
+    with HMAC-SHA256 and the published dev-only secret
+    `jivo-fake-razorpay-key-secret-local-only` (not a secret: only the fake
+    gateway accepts it, and deployed servers refuse that gateway).
+  - `rzp_fake_…` in **staging or prod**: refused as a failed payment; the
+    fake is never opened there.
+  - any other key, in every flavor: real Razorpay Standard Checkout, with
+    the server's options passed through unchanged (key, order id, amount
+    in paise, currency, name, description, prefill, `timeout`).
+- **Stale results.** The plugin keeps a checkout result that arrives after
+  the app was killed and replays it (its `resync`) on the next checkout.
+  The launcher drains that reply first, ignores success and error events
+  for another Razorpay order, and gives up after the payment window plus
+  2 minutes if no event ever arrives. These rely on the plugin's channel
+  name and `resync` call: re-check them on any plugin upgrade (the version
+  is pinned for that reason).
+- **Release builds (R8):** `android/app/proguard-rules.pro` holds Razorpay's
+  documented keep rules; the Flutter Gradle plugin adds that file to every
+  release build automatically. The SDK also ships its own consumer rules.
+- **Native SDK pinned:** the plugin asks for `com.razorpay:checkout:1.6.+`,
+  and checkout for `standard-core:latest.integration`: both float.
+  `android/app/build.gradle.kts` forces **checkout 1.6.41, standard-core
+  1.7.22 and core 1.0.22**, the set the R8 rules, manifest and permissions
+  below were checked against. Check with
+  `./gradlew :app:dependencies --configuration devReleaseRuntimeClasspath | grep razorpay`.
+- `razorpay_flutter` registers through `GeneratedPluginRegistrant` like any
+  plugin; the Mappls strip task removes only `MapplsMapsPlugin`.
+
+## Play Data Safety / permissions
+
+Everything the release manifest adds beyond what the app's own code asks
+for, checked in the merged manifest
+(`build/app/outputs/logs/manifest-merger-dev-release-report.txt`) with
+`com.razorpay:checkout` 1.6.41. None of these shows a runtime prompt.
+
+| Permission or component | From | Why | Kept? |
+|---|---|---|---|
+| `INTERNET`, `ACCESS_NETWORK_STATE` | the app, Razorpay `core` | API calls; Razorpay checks connectivity | Yes |
+| `READ_BASIC_PHONE_STATE` | Razorpay `core` 1.0.22 | Razorpay reads basic device/network state during checkout. Android documents it as a non-dangerous permission (no prompt; network type, software version only). | Yes (PM decision, review of `06b7c07`) |
+| `NFC` | Razorpay `standard-core` 1.7.22 | Razorpay's "Card Tap & Read" in Standard Checkout reads the card number and expiry by tapping the card; on by default, opted out only through Razorpay support | Yes: removing it could break card payments, which can't be tested without a device |
+| `USE_BIOMETRIC`, `USE_FINGERPRINT` | `androidx.biometric` 1.1.0, through `androidx.credentials` used by `smart_auth` (OTP autofill, since Phase 1), not Razorpay | Credential Manager's biometric prompts | Yes: not proven unneeded by `smart_auth` without a device test |
+| `ACCESS_WIFI_STATE` | Mappls SDK 9.0.4 (Phase 2) | map SDK network checks | Yes |
+| `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` | the app (`geolocator`, Phase 2) | delivery location | Yes |
+| `com.razorpay.CheckoutActivity` (not exported) | Razorpay `checkout` | the checkout screen | Yes |
+| `com.razorpay.DeeplinkActivity`, **exported**, `razorpay://<applicationId>` (per flavor) | Razorpay `core` | the return link after a UPI app or bank page. Its bytecode only records the URL in Razorpay's SDK analytics, disables itself and finishes; it passes nothing to the app. | Yes |
+| `MagicXActivity`, `UpiChooserSelectionReceiver` (not exported) | Razorpay | UPI app chooser | Yes |
+| `RazorpayInitializer`, `CoreInitializer` (androidx.startup, not exported) | Razorpay `standard-core` | run at process start (post work to the main thread, register activity callbacks) in every flavor | Yes; **launch check on a device pending** |
+
+**Data Safety (Play Console), for the Razorpay SDK (to confirm):** what we
+can see is that customers enter card and UPI details in Razorpay's own
+screens (sent to Razorpay, never to Jivo's servers), the prefill passes the
+customer's name, phone and email to checkout, and the SDK has its own
+analytics (seen in `DeeplinkActivity`). The Play SDK index gives no Data
+Safety guidance for `com.razorpay:checkout`, so get the exact data types
+from Razorpay before filling the form.
+
 ## Tests
 
 ```sh
@@ -222,7 +290,7 @@ Integration tests run on an emulator or device, one file at a time:
 | File | Flow | Default backend |
 |------|------|-----------------|
 | `integration_test/login_flow_test.dart` | P1: phone, OTP, profile, address, logout | fakes; `--dart-define=REAL_API=true` for the real API |
-| `integration_test/browse_flow_test.dart` | P2: login, detect location (serviceability), home, product, search, add to the dev in-memory cart | **real API**; `--dart-define=FAKE_API=true` for fakes |
+| `integration_test/browse_flow_test.dart` | P2: login, detect location (serviceability), home, product, search, add to the dev fake cart (TODO(api) until S3-A) | **real API**; `--dart-define=FAKE_API=true` for fakes |
 | `integration_test/map_picker_test.dart` | Mappls map or fallback (D-03) | none |
 
 ```sh

@@ -7,4 +7,7 @@ urlpatterns = [
     path("", include("apps.cms.urls")),  # config/app (Phase 1)
     path("", include("apps.stores.urls")),  # serviceability, notify-me (Phase 2)
     path("", include("apps.catalog.urls")),  # home, categories, products, search (Phase 2)
+    path("", include("apps.cart.urls")),  # cart, coupons (Phase 3)
+    path("", include("apps.orders.urls")),  # orders (Phase 3)
+    path("", include("apps.payments.urls")),  # payment verify, Razorpay webhook (Phase 3)
 ]

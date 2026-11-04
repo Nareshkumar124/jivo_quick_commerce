@@ -92,8 +92,9 @@ def test_every_example_matches_its_schema(schema):
     assert checked > 50
 
 
-# Exempt from 426/503 by design: the splash call and the session-keeping refresh.
-NO_APP_GUARDS = {"config_app", "auth_token_refresh"}
+# Exempt from 426/503 by design: the splash call, the session-keeping refresh, and the payment
+# gateway's server-to-server webhook (a payment event is never refused, Phase 3).
+NO_APP_GUARDS = {"config_app", "auth_token_refresh", "payments_razorpay_webhook"}
 PUBLIC = {
     "auth_otp_request",
     "auth_otp_verify",
@@ -107,10 +108,12 @@ PUBLIC = {
     "search_products",
     "search_suggest",
     "collections_retrieve",
+    # Phase 3: authenticated by the Razorpay signature, never by a JWT.
+    "payments_razorpay_webhook",
 }
 # Anonymous allowed, but a token that is sent is checked (401 TOKEN_INVALID when invalid).
 OPTIONAL_AUTH = {"home_retrieve", "serviceability_notify_me"}
-# Phase 2: per-store operations (X-Store-Id header).
+# Phase 2: per-store operations (X-Store-Id header). Phase 3: the cart and order placement.
 STORE_SCOPED = {
     "home_retrieve",
     "categories_list",
@@ -119,7 +122,19 @@ STORE_SCOPED = {
     "search_products",
     "search_suggest",
     "collections_retrieve",
+    "cart_retrieve",
+    "cart_update",
+    "cart_clear",
+    "cart_items_add",
+    "cart_items_update",
+    "cart_items_delete",
+    "cart_coupons_list",
+    "cart_coupon_apply",
+    "cart_coupon_remove",
+    "orders_create",
 }
+# Phase 3: operations that take the Idempotency-Key header (02 §5).
+IDEMPOTENT = {"orders_create", "orders_retry_payment"}
 
 
 def test_app_endpoints_document_force_update_and_maintenance(schema):
@@ -210,6 +225,20 @@ def test_store_scoped_operations_require_the_store_header(schema):
     assert found == STORE_SCOPED
 
 
+BILL_FIELDS = [
+    "mrp_total",
+    "item_total",
+    "product_discount",
+    "coupon_discount",
+    "delivery_fee",
+    "small_cart_fee",
+    "handling_fee",
+    "tip",
+    "grand_total",
+    "total_savings",
+]
+
+
 def test_money_fields_are_decimal_strings(schema):
     """02 §5: money is a 2-decimal string, never a float."""
     components = schema["components"]["schemas"]
@@ -218,10 +247,141 @@ def test_money_fields_are_decimal_strings(schema):
         ("VariantSummary", "selling_price"),
         ("VariantSummary", "discount_amount"),
         ("UnitPrice", "amount"),
+        *[("Bill", field) for field in BILL_FIELDS],
+        ("Cart", "tip"),
+        ("CartLine", "line_total"),
+        ("CartLine", "line_mrp_total"),
+        ("AppliedCoupon", "discount"),
+        ("CartThresholds", "min_order_value"),
+        ("CartThresholds", "amount_to_free_delivery"),
+        ("CouponOffer", "savings"),
+        ("OrderLine", "selling_price"),
+        ("OrderLine", "line_total"),
+        ("OrderSummary", "grand_total"),
+        ("PatchedCartUpdateRequest", "tip"),
+        ("OrderCreateRequest", "expected_grand_total"),
     ]:
         prop = components[name]["properties"][field]
         assert prop["type"] == "string", (name, field)
         assert prop["format"] == "decimal", (name, field)
+
+
+def test_bill_is_exactly_08_6_2(schema):
+    """The bill the apps render: the 08 §6.2 amounts plus total_savings, all required."""
+    bill = schema["components"]["schemas"]["Bill"]
+    assert list(bill["properties"]) == BILL_FIELDS
+    assert sorted(bill["required"]) == sorted(BILL_FIELDS)
+    order = schema["components"]["schemas"]["Order"]
+    assert order["properties"]["bill"] == {"$ref": "#/components/schemas/Bill"}
+
+
+def test_idempotency_key_header(schema):
+    """02 §5: order placement and payment retries take Idempotency-Key."""
+    found = set()
+    for _path, _method, operation in operations(schema):
+        headers = {p["name"]: p for p in operation.get("parameters", []) if p["in"] == "header"}
+        op_id = operation["operationId"]
+        if op_id not in IDEMPOTENT:
+            assert "Idempotency-Key" not in headers, op_id
+            continue
+        found.add(op_id)
+        assert headers["Idempotency-Key"]["required"] is True
+        bad = [
+            example["value"]["error"]["details"]
+            for example in json_content(operation["responses"]["400"])["examples"].values()
+        ]
+        assert {"Idempotency-Key": ["This header is required."]} in bad, op_id
+    assert found == IDEMPOTENT
+
+
+def test_no_oneof_the_dart_generator_cannot_handle(schema):
+    """packages/tool/normalize_openapi.py only collapses a `oneOf`/`anyOf` whose branches are all
+    inline schemas of one primitive type without enums (e.g. blank-allowed strings). Anything
+    else (e.g. `oneOf: [XEnum, NullEnum]`) breaks the generated Dart client."""
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            for key in ("oneOf", "anyOf"):
+                branches = node.get(key)
+                if branches is None:
+                    continue
+                types = {branch.get("type") for branch in branches}
+                assert all("$ref" not in branch for branch in branches), path
+                assert all("enum" not in branch for branch in branches), path
+                assert len(types) == 1, path
+            for key, value in node.items():
+                walk(value, f"{path}/{key}")
+        elif isinstance(node, list):
+            for index, value in enumerate(node):
+                walk(value, f"{path}/{index}")
+
+    walk(schema["components"], "#/components")
+    walk(schema["paths"], "#/paths")
+    assert "NullEnum" not in schema["components"]["schemas"]
+
+
+def test_nullable_enums_are_nullable_refs(schema):
+    components = schema["components"]["schemas"]
+    for name, field, enum in [
+        ("PaymentOption", "unavailable_reason", "PaymentUnavailableReasonEnum"),
+        ("CouponOffer", "ineligible_reason", "CouponIneligibleReasonEnum"),
+    ]:
+        prop = components[name]["properties"][field]
+        assert prop["nullable"] is True, (name, field)
+        assert prop["allOf"] == [{"$ref": f"#/components/schemas/{enum}"}], (name, field)
+
+
+def test_cart_line_update_requires_quantity(schema):
+    """A PATCH body that is complete by design: not published as an all-optional `Patched...`."""
+    components = schema["components"]["schemas"]
+    assert "PatchedCartItemUpdateRequest" not in components
+    assert components["CartItemUpdateRequest"]["required"] == ["quantity"]
+    operation = schema["paths"]["/api/v1/cart/items/{id}/"]["patch"]
+    body = json_content(operation["requestBody"])["schema"]
+    assert body == {"$ref": "#/components/schemas/CartItemUpdateRequest"}
+    assert operation["requestBody"]["required"] is True
+
+
+def test_phase_3_enums(schema):
+    components = schema["components"]["schemas"]
+    assert components["OrderStatusEnum"]["enum"] == [
+        "PAYMENT_PENDING",
+        "PLACED",
+        "ACCEPTED",
+        "PACKING",
+        "PACKED",
+        "OUT_FOR_DELIVERY",
+        "DELIVERED",
+        "CANCELLED",
+        "PAYMENT_FAILED",
+        "DELIVERY_FAILED",
+        "RETURNED",
+    ]
+    assert components["PaymentMethodEnum"]["enum"] == ["ONLINE", "COD"]
+    assert components["PaymentStatusEnum"]["enum"] == [
+        "PENDING",
+        "PAID",
+        "FAILED",
+        "REFUND_PENDING",
+        "REFUNDED",
+        "PARTIALLY_REFUNDED",
+        "COD_PENDING",
+        "COD_COLLECTED",
+    ]
+    status = next(
+        param
+        for param in schema["paths"]["/api/v1/orders/"]["get"]["parameters"]
+        if param["name"] == "status"
+    )
+    assert status["schema"]["enum"] == ["active", "past"]  # query enums are inlined
+    assert status.get("required", False) is False
+    assert components["CouponDiscountTypeEnum"]["enum"] == ["FLAT", "PERCENT"]
+    assert components["CartLineIssueCodeEnum"]["enum"] == ["OUT_OF_STOCK", "QUANTITY_UNAVAILABLE"]
+    assert components["WebhookResultEnum"]["enum"] == ["processed", "duplicate", "ignored"]
+    # Blocker codes that are also error codes keep the same spelling (one app message map).
+    error_codes = set(components["ErrorCodeEnum"]["enum"])
+    blockers = set(components["CheckoutBlockerCodeEnum"]["enum"])
+    assert blockers - error_codes == {"CART_EMPTY", "ADDRESS_REQUIRED"}
 
 
 def test_patterns_are_portable(schema):

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:jivo_core/helpers.dart';
 
-import '../../../shared/platform/url_opener.dart';
 import '../../offers/data/offer_alert_notifications.dart';
 import '../../offers/domain/delivery_offer.dart';
 import '../domain/rider_task.dart';
