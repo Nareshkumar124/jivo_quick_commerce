@@ -579,18 +579,27 @@ def capture_payment(
 
 def mark_payment_failed(gateway_order_id: str, *, error_code: str, error_description: str, raw):
     """`payment.failed`: that attempt failed. The order keeps waiting until its window ends (the
-    customer may retry); T4 is the expiry job's decision."""
-    payment = Payment.objects.filter(
-        gateway_order_id=gateway_order_id, status=PaymentAttemptStatus.CREATED
-    ).first()
-    if payment is None:
+    customer may retry); T4 is the expiry job's decision. Under the order lock, and only while
+    the attempt is still CREATED, so a capture is never overwritten (code review Minor 4)."""
+    order_id = (
+        Payment.objects.filter(gateway_order_id=gateway_order_id)
+        .values_list("order_id", flat=True)
+        .first()
+    )
+    if order_id is None:
         return False
-    payment.status = PaymentAttemptStatus.FAILED
-    payment.error_code = (error_code or "")[:64]
-    payment.error_description = (error_description or "")[:255]
-    payment.raw = raw or {}
-    payment.save(update_fields=["status", "error_code", "error_description", "raw", "updated_at"])
-    return True
+    with transaction.atomic():
+        _locked_order(order_id)  # lock order: the order row first, then its payments
+        changed = Payment.objects.filter(
+            gateway_order_id=gateway_order_id, status=PaymentAttemptStatus.CREATED
+        ).update(
+            status=PaymentAttemptStatus.FAILED,
+            error_code=(error_code or "")[:64],
+            error_description=(error_description or "")[:255],
+            raw=raw or {},
+            updated_at=timezone.now(),
+        )
+    return bool(changed)
 
 
 # --------------------------------------------------------------------------- reads

@@ -5,8 +5,13 @@ is not the order's `grand_total`. The full refund flow
 (cancellations, partial refunds, `sync_refund_status`) is Phase 4.
 
 `request_refund()` is idempotent on `idempotency_key` (one Refund row per key) and hands the
-gateway call to the `payments.process_refund` task after commit, which is itself safe to retry:
-it calls the gateway only while the refund has no gateway id yet.
+gateway call to the `payments.process_refund` task after commit. The task is safe to redeliver
+and to retry (code review M1): it locks the refund, calls the gateway only while the refund has
+no gateway id, and sends `receipt` = the refund key, which Razorpay treats as the refund's
+idempotency key; a repeat is answered "Duplicate receipt" and the existing refund is recorded.
+
+A refund that ends FAILED raises the `payment.refund_failed` ops alert. `retry_failed_refund()`
+is the hook for a manual retry (the Phase 4 ops screen calls it).
 """
 
 import logging
@@ -76,5 +81,22 @@ def record_refund_status(refund: Refund, gateway_status: str, gateway_refund_id:
             order.payment_status = PaymentStatus.REFUNDED
             order.save(update_fields=["amount_refunded", "payment_status", "updated_at"])
         if status == RefundStatus.FAILED:
+            from apps.orders import events
+
             logger.error("Refund %s for order %s failed at the gateway", refund.pk, refund.order_id)
+            events.emit(events.REFUND_FAILED, refund.order_id)
         return status == RefundStatus.PROCESSED
+
+
+def retry_failed_refund(refund: Refund, *, initiated_by=None) -> Refund:
+    """Manual retry of a FAILED refund (Phase 4 ops screen). A new Refund row with its own key
+    (so the gateway sees a new receipt); the failed one stays as the record of the attempt."""
+    if refund.status != RefundStatus.FAILED:
+        raise ValueError("Only a failed refund can be retried.")
+    attempt = Refund.objects.filter(idempotency_key__startswith=f"{refund.idempotency_key}:retry-")
+    key = f"{refund.idempotency_key}:retry-{attempt.count() + 1}"
+    retry = request_refund(refund.payment, refund.amount, reason=refund.reason, key=key)
+    if initiated_by is not None and retry.initiated_by_id is None:
+        retry.initiated_by = initiated_by
+        retry.save(update_fields=["initiated_by", "updated_at"])
+    return retry

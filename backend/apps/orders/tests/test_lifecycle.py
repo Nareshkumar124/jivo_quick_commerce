@@ -186,6 +186,14 @@ class TestWebhook:
         )
         assert response.status_code == 200
 
+    def test_payment_failed_never_overwrites_a_capture(self, checkout, pending, api_client):
+        """Code review Minor 4: a late `payment.failed` for an attempt already captured."""
+        checkout.verify(pending, "pay_CapturedFirst1")
+        event = captured_event(pending["razorpay"]["order_id"], kind="payment.failed")
+        assert webhook(api_client, event, "evt_failed_late").json() == {"status": "ignored"}
+        assert Payment.objects.get().status == "CAPTURED"
+        assert Order.objects.get().status == "PLACED"
+
     def test_payment_failed_keeps_the_window_open(self, checkout, pending, api_client):
         event = captured_event(pending["razorpay"]["order_id"], kind="payment.failed")
         assert webhook(api_client, event, "evt_0003").json() == {"status": "processed"}

@@ -134,9 +134,13 @@ class TestFakeGateway:
 
     def test_refund(self):
         refund = FakeRazorpayGateway().refund(
-            payment_id="pay_Nq3vA1bC2dE3fG", amount_paise=75300, notes={}
+            payment_id="pay_Nq3vA1bC2dE3fG", amount_paise=75300, notes={}, receipt="k1"
         )
         assert refund.id.startswith("rfnd_")
+        again = FakeRazorpayGateway().refund(
+            payment_id="pay_Nq3vA1bC2dE3fG", amount_paise=75300, notes={}, receipt="k1"
+        )
+        assert again.id == refund.id  # idempotent on the receipt, like Razorpay
         assert (refund.payment_id, refund.amount_paise, refund.status) == (
             "pay_Nq3vA1bC2dE3fG",
             75300,

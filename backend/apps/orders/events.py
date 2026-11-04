@@ -12,6 +12,7 @@ PAYMENT_PENDING = "order.payment_pending"  # T1
 PAYMENT_FAILED = "order.payment_failed"  # T4
 CANCELLED = "order.cancelled"  # T5
 LATE_CAPTURE = "payment.late_capture"  # T3a: ops alert
+REFUND_FAILED = "payment.refund_failed"  # ops alert: retry with refunds.retry_failed_refund()
 
 
 def emit(event: str, order_id: int) -> None:

@@ -34,6 +34,17 @@ from django.utils.module_loading import import_string
 
 DEPLOYED_ENVIRONMENTS = frozenset({"staging", "production"})
 RAZORPAY_API_BASE = "https://api.razorpay.com/v1"
+# Orders API per-order capture settings (they override the Dashboard's): capture automatically;
+# an authorised payment not captured within 12 minutes (the documented minimum, inside our
+# 15-minute payment window) is not captured later and Razorpay refunds it.
+AUTO_CAPTURE = {
+    "capture": "automatic",
+    "capture_options": {
+        "automatic_expiry_period": 12,
+        "manual_expiry_period": 12,
+        "refund_speed": "normal",
+    },
+}
 _ID_ALPHABET = string.ascii_letters + string.digits
 
 
@@ -43,8 +54,27 @@ def to_paise(amount) -> int:
 
 
 class PaymentGatewayError(Exception):
-    """The gateway could not be reached or answered with an error. Transient: the caller
-    answers 503 `SERVICE_UNAVAILABLE` (API) or retries (Celery)."""
+    """The gateway call did not succeed. API callers answer 503 `SERVICE_UNAVAILABLE`."""
+
+
+class GatewayUnavailable(PaymentGatewayError):
+    """Network error, timeout or a 5xx: transient, safe to retry (Celery tasks retry these)."""
+
+
+class PaymentGatewayRejected(PaymentGatewayError):
+    """A 4xx: the gateway refused the request. Retrying the same request cannot help."""
+
+    def __init__(self, message: str, *, status: int = 400, description: str = "") -> None:
+        super().__init__(message)
+        self.status = status
+        self.description = description
+
+    @property
+    def already_done(self) -> bool:
+        """The refund was made before (a repeated receipt) or the payment is fully refunded:
+        look the refund up instead of failing (code review M1)."""
+        text = self.description.lower()
+        return "duplicate receipt" in text or "refunded already" in text
 
 
 @dataclass(frozen=True)
@@ -75,6 +105,13 @@ class GatewayRefund:
     payment_id: str
     amount_paise: int
     status: str  # pending / processed / failed
+    receipt: str = ""
+
+
+def refund_receipt(key: str) -> str:
+    """The refund `receipt`, which Razorpay treats as the refund's idempotency key (a repeat is
+    refused with "Duplicate receipt found"). At most 40 characters."""
+    return key if len(key) <= 40 else "rk_" + hashlib.sha256(key.encode()).hexdigest()[:37]
 
 
 def razorpay_payment_signature(secret: str, order_id: str, payment_id: str) -> str:
@@ -120,8 +157,15 @@ class PaymentGateway(ABC):
         failing an order, in case a capture webhook was missed (08 §4 rule 3)."""
 
     @abstractmethod
-    def refund(self, *, payment_id: str, amount_paise: int, notes: dict) -> GatewayRefund:
-        """Refund to the original payment (08 §4 rule 4; T3a late captures)."""
+    def refund(
+        self, *, payment_id: str, amount_paise: int, notes: dict, receipt: str
+    ) -> GatewayRefund:
+        """Refund to the original payment (08 §4 rule 4; T3a late captures). `receipt` is the
+        refund's idempotency key at the gateway (`refund_receipt()`)."""
+
+    @abstractmethod
+    def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
+        """Every refund of a payment, to find one made before (a repeated receipt)."""
 
     @abstractmethod
     def _key_secret(self) -> str: ...
@@ -175,15 +219,28 @@ class RazorpayGateway(PaymentGateway):
             ) as response:
                 return json.loads(response.read() or b"{}")
         except urllib.error.HTTPError as exc:
-            raise PaymentGatewayError(f"Razorpay {method} {path}: HTTP {exc.code}") from exc
+            message = f"Razorpay {method} {path}: HTTP {exc.code}"
+            if 400 <= exc.code < 500:
+                raise PaymentGatewayRejected(
+                    message, status=exc.code, description=_error_description(exc)
+                ) from exc
+            raise GatewayUnavailable(message) from exc
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
-            raise PaymentGatewayError(f"Razorpay {method} {path}: {type(exc).__name__}") from exc
+            raise GatewayUnavailable(f"Razorpay {method} {path}: {type(exc).__name__}") from exc
 
     def create_order(self, *, amount_paise: int, receipt: str, notes: dict) -> GatewayOrder:
         data = self._call(
             "POST",
             "/orders",
-            {"amount": amount_paise, "currency": "INR", "receipt": receipt, "notes": notes},
+            {
+                "amount": amount_paise,
+                "currency": "INR",
+                "receipt": receipt,
+                "notes": notes,
+                # PM decision (code review Minor 5): every order auto-captures, so a payment the
+                # checkout reports as successful is captured, not just authorised.
+                "payment": AUTO_CAPTURE,
+            },
         )
         return GatewayOrder(
             id=data["id"],
@@ -206,18 +263,37 @@ class RazorpayGateway(PaymentGateway):
             for item in data.get("items", [])
         ]
 
-    def refund(self, *, payment_id: str, amount_paise: int, notes: dict) -> GatewayRefund:
+    def refund(
+        self, *, payment_id: str, amount_paise: int, notes: dict, receipt: str
+    ) -> GatewayRefund:
         data = self._call(
             "POST",
             f"/payments/{urllib.parse.quote(payment_id)}/refund",
-            {"amount": amount_paise, "notes": notes, "speed": "normal"},
+            {"amount": amount_paise, "notes": notes, "speed": "normal", "receipt": receipt},
         )
-        return GatewayRefund(
-            id=data["id"],
-            payment_id=data.get("payment_id", payment_id),
-            amount_paise=data["amount"],
-            status=data.get("status", "pending"),
-        )
+        return _gateway_refund(data, payment_id)
+
+    def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
+        data = self._call("GET", f"/payments/{urllib.parse.quote(payment_id)}/refunds")
+        return [_gateway_refund(item, payment_id) for item in data.get("items", [])]
+
+
+def _gateway_refund(data: dict, payment_id: str) -> GatewayRefund:
+    return GatewayRefund(
+        id=data["id"],
+        payment_id=data.get("payment_id", payment_id),
+        amount_paise=data["amount"],
+        status=data.get("status", "pending"),
+        receipt=data.get("receipt") or "",
+    )
+
+
+def _error_description(exc: urllib.error.HTTPError) -> str:
+    """Razorpay's `{"error": {"description": ...}}`, if the body has one."""
+    try:
+        return str(json.loads(exc.read() or b"{}").get("error", {}).get("description", ""))
+    except (ValueError, OSError, AttributeError):
+        return ""
 
 
 # --------------------------------------------------------------------------- fake (local/test)
@@ -275,13 +351,36 @@ class FakeRazorpayGateway(PaymentGateway):
             ).exclude(gateway_payment_id=None)
         ]
 
-    def refund(self, *, payment_id: str, amount_paise: int, notes: dict) -> GatewayRefund:
+    def refund(
+        self, *, payment_id: str, amount_paise: int, notes: dict, receipt: str
+    ) -> GatewayRefund:
+        """Processed at once. Idempotent on `receipt` like Razorpay: the same receipt always
+        gives the same refund id."""
+        digest = hashlib.sha256(f"{payment_id}|{receipt}".encode()).hexdigest()[:14]
         return GatewayRefund(
-            id=_fake_id("rfnd_"),
+            id=f"rfnd_{digest}",
             payment_id=payment_id,
             amount_paise=amount_paise,
             status="processed",
+            receipt=receipt,
         )
+
+    def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
+        """The refunds the server recorded for this payment (the fake keeps no state)."""
+        from apps.payments.models import Refund
+
+        return [
+            GatewayRefund(
+                id=refund.gateway_refund_id,
+                payment_id=payment_id,
+                amount_paise=to_paise(refund.amount),
+                status="processed",
+                receipt=refund_receipt(refund.idempotency_key),
+            )
+            for refund in Refund.objects.filter(payment__gateway_payment_id=payment_id).exclude(
+                gateway_refund_id=""
+            )
+        ]
 
 
 # Gateways that move no money. Refused in deployed environments (payments.E001).

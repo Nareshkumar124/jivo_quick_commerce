@@ -215,6 +215,9 @@ class TestNotifyMe:
         again = api_client.post(self.URL, nearby, format="json").json()
         assert again["id"] == first["id"]
         assert (again["lat"], again["address_text"]) == (28.6693, "A1")  # the caller's values
+        # BUG-0008 residual (R2b review): not the earlier lead's time either.
+        stored = ServiceabilityRequest.objects.get().created_at
+        assert again["created_at"] != stored.isoformat().replace("+00:00", "Z")
         assert ServiceabilityRequest.objects.count() == 1
 
     def test_throttled(self, api_client):

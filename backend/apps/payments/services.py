@@ -44,6 +44,9 @@ def verify_payment(
         order_id=razorpay_order_id, payment_id=razorpay_payment_id, signature=signature
     ):
         raise ApiError(ErrorCode.PAYMENT_VERIFICATION_FAILED)
+    # A valid signature is treated as a capture of the full amount (code review Minor 5, PM
+    # decision): every gateway order is created for exactly the order's grand_total and with
+    # automatic capture (`gateways.AUTO_CAPTURE`). The webhook still checks the captured amount.
     result = orders.capture_payment(
         order.pk,
         gateway_order_id=razorpay_order_id,
