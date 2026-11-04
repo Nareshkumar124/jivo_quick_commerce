@@ -10,11 +10,16 @@ Parallel runs against the same servers use separate state:
 - `TEST_REDIS_DB` (default 15): Redis DB index, 3-15.
 Example (admin agent):
 `POSTGRES_TEST_DB=test_jivo_quick_commerce_admin TEST_REDIS_DB=14 uv run pytest`.
+
+pytest-xdist (`uv run pytest -n 4`, T-408c): pytest-django gives each worker its own database
+(`<POSTGRES_TEST_DB>_gw0`, ...) and config/testing.py gives each worker its own Redis key
+namespace inside TEST_REDIS_DB.
 """
 
 from urllib.parse import urlsplit
 
 from config.env import env_test_redis_db
+from config.testing import worker_redis_namespace
 
 from .base import *
 
@@ -56,17 +61,22 @@ REDIS_TEST_URL = (
     .geturl()
 )
 REDIS_URL = REDIS_TEST_URL
+# T-408c: pytest-xdist workers share TEST_REDIS_DB, so each one keeps its keys under its own
+# namespace (`jqc-test`, or `jqc-test-gw0`, ... under xdist): cache, channel layer and rate-limit
+# counters (re-keyed in conftest.py). `cache.clear()` deletes only that namespace, never FLUSHDB.
+TEST_REDIS_NAMESPACE = worker_redis_namespace()
 CACHES = {
     "default": {
         **CACHES["default"],
+        "BACKEND": "config.testing.NamespacedRedisCache",
         "LOCATION": REDIS_TEST_URL,
-        "KEY_PREFIX": "jqc-test",
+        "KEY_PREFIX": TEST_REDIS_NAMESPACE,
     }
 }
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [REDIS_TEST_URL], "prefix": "jqc-test-asgi"},
+        "CONFIG": {"hosts": [REDIS_TEST_URL], "prefix": f"{TEST_REDIS_NAMESPACE}:asgi"},
     }
 }
 
