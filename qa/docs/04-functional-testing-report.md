@@ -50,3 +50,13 @@ The dev agents report 62 customer, 112 rider and 75 `jivo_core` tests plus real-
 | COD blocked user / COD disabled; gateway down 503 | ⏭ | Admin/shared config; fault injection |
 | Admin P3 screens and roles (05 §3, DL-46) | ⏭ | T-304 in progress |
 | Customer app P3 screens | ⬜ | No device this run |
+
+## Phase 3 stage 2 (2026-11-04, `f84482f`)
+| Feature | Result |
+|---|---|
+| Admin P3 role matrix (coupons, redemptions, orders, payments, refunds, webhook events; 7 roles) | ✅ |
+| Order/payment admin screens read-only; PII masked for roles without PII | ✅ |
+| Coupon creation in admin; validity (expired / not started / inactive); usage limits incl. holds; last-use race | ✅ |
+| COD blocked customer (admin action) | ✅. Store COD disabled ⏭ (PM: demo store in use) |
+| Webhook malformed ids (BUG-0009) | ✅ fixed |
+| Customer app P3 | ⬜ the user's phone test |

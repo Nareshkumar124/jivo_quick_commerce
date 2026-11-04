@@ -232,9 +232,9 @@ Oracle: the bill is recomputed independently from the DB (`coalesce(price_overri
 | P3-TC-34 🔥 | BE | P0 | Verify: zero signature, other secret, foreign gateway order, non-ASCII, malformed, other user, no token | 400 `PAYMENT_VERIFICATION_FAILED` ×3; 400; 400; 404; 401; still PAYMENT_PENDING, no capture | ✅ |
 | P3-TC-35 🔥 | BE | P0 | Webhook: bad signature, signature of another body, no signature, no event id | 400; nothing stored; order unchanged | ✅ |
 | P3-TC-36 🔥 | BE | P0 | `payment.captured` webhook, the same event again, a new event id, then verify | processed → duplicate → no 2nd capture → verify 200 PLACED; 1 capture, 0 refunds | ✅ |
-| P3-TC-37 | BE | P0 | Capture of the wrong amount | Not placed; one full refund of that amount; cancel still allowed | ✅ (OBS-P3-01: doc wording) |
-| P3-TC-38 🔥 | BE | P0 | Cancel, then verify + webhook for the same capture (T3a) | 409 {status: CANCELLED}; one full refund; REFUND_PENDING→REFUNDED; stock stays released | ✅ |
-| P3-TC-39 | BE | P0 | Retry-payment (same key ×2), pay the new gateway order, then the old one | New gateway order, same on repeat, window not extended; PLACED; the 2nd capture refunded once (DL-45); retry on PLACED 409 | ✅ |
+| P3-TC-37 | BE | P0 | Capture of the wrong amount | Not placed; one full refund of that amount; cancel still allowed | ✅ stage 2 · refund path: re-check after the refund fix run |
+| P3-TC-38 🔥 | BE | P0 | Cancel, then verify + webhook for the same capture (T3a) | 409 {status: CANCELLED}; one full refund; REFUND_PENDING→REFUNDED; stock stays released | ✅ stage 2 · refund path: re-check after the refund fix run |
+| P3-TC-39 | BE | P0 | Retry-payment (same key ×2), pay the new gateway order, then the old one | New gateway order, same on repeat, window not extended; PLACED; the 2nd capture refunded once (DL-45); retry on PLACED 409 | ✅ stage 2 · refund path: re-check after the refund fix run |
 | P3-TC-40 | BE | P1 | Retry without a key; retry on a cancelled order | 400; 409 {status: CANCELLED} | ✅ |
 | P3-TC-41 | BE | P1 | `payment.failed`, then capture, then `payment.failed` again | The attempt FAILED, order still pending; then PLACED; the capture is never overwritten | ✅ |
 | P3-TC-42 | BE | P1 | Signed: unknown gateway order, unhandled type, malformed payload; garbage body | 200 ignored ×3; 400 | ✅ |
@@ -242,7 +242,7 @@ Oracle: the bill is recomputed independently from the DB (`coalesce(price_overri
 | P3-TC-44 🔥 | BE | P0 | One `Idempotency-Key` sent 6× in parallel | One order, one reservation, one 201 and five 200 | ✅ |
 | P3-TC-45 | BE | P0 | ONLINE order with a coupon, then T5 | Redemption HELD (₹50), then RELEASED | ✅ |
 | P3-TC-46 | BE | P1 | 31 placements within an hour | 31st: 429 `RATE_LIMITED` + `retry_after_seconds` + `Retry-After` | ✅ |
-| P3-TC-47 | BE | P0 | Unpaid ONLINE order with a coupon: wait for the :8001 beat (T4), then a late capture | PAYMENT_FAILED/FAILED, stock and coupon released, cart kept, retry 409; late webhook → one refund, not revived | ✅ The :8001 beat failed the order 45 s after the window ended: history T4 actor `system`, reservation and coupon RELEASED, cart and coupon kept, retry 409, late capture → 1 refund, still PAYMENT_FAILED. The automated poll died on the 15-min access-token expiry, so the steps after expiry were run by script. The test is fixed (it logs in again on every poll): re-run with `QA_SLOW=1` after R2b. |
+| P3-TC-47 | BE | P0 | Unpaid ONLINE order with a coupon: wait for the :8001 beat (T4), then a late capture | PAYMENT_FAILED/FAILED, stock and coupon released, cart kept, retry 409; late webhook → one refund, not revived | ✅ stage 2: automated run `1 passed in 969.11s` (`QA_SLOW=1`) · refund path: re-check after the refund fix run |
 | P3-TC-48 🔥 | BE | P0 | SQL: order money identities over all orders | 0 violations | ✅ |
 | P3-TC-49 🔥 | BE | P0 | SQL: 0 ≤ reserved ≤ on_hand, reserved ≥ Σ ACTIVE reservations, no ACTIVE on terminal orders | 0 violations | ✅ |
 | P3-TC-50 🔥 | BE | P0 | SQL: duplicate payment ids, two live captures, double refunds, duplicate events, PAID without capture, dead+PAID | 0 | ✅ |
@@ -252,21 +252,24 @@ Oracle: the bill is recomputed independently from the DB (`coalesce(price_overri
 | P3-TC-54 | BE | P1 | `POST /orders/` without `X-Store-Id`; without the app headers | 400; processed normally (headers are informational, P0-TC-13) | ✅ |
 | P3-TC-55 | BE | P0 | WELCOME100 for a user with a PLACED order / with only cancelled unpaid orders | 422 FIRST_ORDER_ONLY / applicable (DL-45) | ✅ |
 | P3-TC-56 | BE | P1 | Clock profile (store closed): cart and `POST /orders/` | `STORE_CLOSED` first blocker; 422 `STORE_CLOSED` {store_id, opens_at}; nothing created | ✅ (clock profile `QA_FAKE_NOW=2026-11-04T23:30+05:30`, token prepared on local; no writes) |
-| P3-TC-57 | BE | P2 | Signed webhook with a payment id over 64 / over 56 characters (refund) | 200 ignored | ❌ [BUG-0009](../bugs/BUG-0009.md) |
-| P3-TC-58 | BE | P1 | `refund.processed` replayed for a processed refund; `refund.failed` for an unknown refund | No double count; ignored | ✅ |
-| P3-TC-59 | ADM | P0 | 05 §3 P3 rows (DL-46): Catalog Manager manages coupons; Support/Finance view coupons/orders/payments; Finance views webhook events; only Super Admin changes orders | Per the matrix, enforced server-side | ⏭ T-304 |
-| P3-TC-60 | ADM | P1 | Admin order/payment screens show the bill, history, payments and refunds read-only | Per 05 | ⏭ T-304 |
-| P3-TC-61 | BE | P1 | Coupon usage limits exhausted (per user, total); expired / not-started coupons | 422 `COUPON_USAGE_EXCEEDED` {scope} / `COUPON_EXPIRED` / `COUPON_INVALID` | ⏭ needs a QA-owned coupon (admin, T-304); the demo coupons must not be used up |
-| P3-TC-62 | BE | P1 | COD for a `cod_blocked` user; store COD disabled | 422 `COD_NOT_AVAILABLE` NOT_ALLOWED / COD_DISABLED | ⏭ needs admin/shared-config changes |
+| P3-TC-57 | BE | P2 | Signed webhook with a payment id over 64 / over 56 characters (refund) | 200 ignored | ✅ stage 2: [BUG-0009](../bugs/BUG-0009.md) verified, both events `ignored`, nothing stored |
+| P3-TC-58 | BE | P1 | `refund.processed` replayed for a processed refund; `refund.failed` for an unknown refund | No double count; ignored | ✅ stage 2 · refund path: re-check after the refund fix run |
+| P3-TC-59 | ADM | P0 | 05 §3 P3 rows (DL-46): Catalog Manager manages coupons; Support/Finance view coupons/orders/payments; Finance views webhook events; only Super Admin changes orders | Per the matrix, enforced server-side | ✅ stage 2: 7 roles × 7 pages = 49 checks match the matrix (`test_p3_tc59`); 59b: Catalog Manager saves a coupon, Support/Finance get 403 on a change POST, nobody can add an order or payment |
+| P3-TC-60 | ADM | P1 | Admin order/payment screens show the bill, history, payments and refunds read-only | Per 05 | ✅ stage 2: order screen read-only (no Save; change POST 403 even for Super Admin; order unchanged); 60b: no full QA phone for Store Manager/Staff or Finance on the order list, detail or search |
+| P3-TC-61 | BE | P1 | Coupon usage limits exhausted (per user, total); expired / not-started coupons | 422 `COUPON_USAGE_EXCEEDED` {scope} / `COUPON_EXPIRED` / `COUPON_INVALID` | ✅ stage 2 with QA coupons `QAP3*` (hidden, made in admin as Super Admin, switched off afterwards): expired → COUPON_EXPIRED; not started or inactive → COUPON_INVALID; expired after applying → blocker + 422, nothing created; per_user and total limits count HELD; T5 gives the use back; last-use race of 3 → `[201, 422, 422]` |
+| P3-TC-62 | BE | P1 | COD for a `cod_blocked` user; store COD disabled | 422 `COD_NOT_AVAILABLE` NOT_ALLOWED / COD_DISABLED | ✅ stage 2 (cod_blocked part, QA user E via the Customers admin action, then reset): COD NOT_ALLOWED in the cart and 422 on placement; allowed again after reset. Store COD-disabled ⏭ by PM instruction (the demo store's COD is in use on the phone) |
 | P3-TC-63 | BE | P1 | Gateway unreachable at placement / retry | 503 `SERVICE_UNAVAILABLE`, nothing created | ⏭ cannot be induced black-box with the fake gateway |
-| P3-TC-64 | CUS | P0 | Customer app cart → checkout → pay (fake key) / COD → success; retry/cancel screens | Per 03 §2.8–2.9 | ⬜ device run |
+| P3-TC-64 | CUS | P0 | Customer app cart → checkout → pay (fake key) / COD → success; retry/cancel screens | Per 03 §2.8–2.9 | ⬜ the user's phone test (in progress; PM) |
 
 ### Totals (Phase 3 stage 1)
 | | Cases | ✅ | ❌ | ⏭ | ⬜ |
 |---|---|---|---|---|---|
-| Phase 3 | 64 | 56 | 1 | 6 | 1 |
+| Phase 3 (stage 1) | 64 | 56 | 1 | 6 | 1 |
+| Phase 3 (stage 2, `f84482f`) | 64 | 61 | 0 | 2 | 1 (P3-TC-64, the user's phone test) |
 
-Pass rate: 56/64 (87.5%) of all cases, and 56/57 of the cases executed. The Pri P0/P1 cases that have not passed are all ⏭/⬜, none ❌: P3-TC-26 (no data), 59/60 (T-304), 61 (QA coupon needed), 62 (admin/shared config), 63 (gateway fault injection) and 64 (device). The only ❌ is P3-TC-57 (Pri P2, BUG-0009).
+**Stage 2:** 61/64 (95.3%). The 2 not passed are ⏭: P3-TC-26 (P1, no demo variant below ₹99) and P3-TC-63 (P1, gateway fault injection). P3-TC-64 is counted as not run and belongs to the user's device test. No ❌.
+
+Stage 1: 56/64 (87.5%) of all cases, and 56/57 of the cases executed. The Pri P0/P1 cases that have not passed are all ⏭/⬜, none ❌: P3-TC-26 (no data), 59/60 (T-304), 61 (QA coupon needed), 62 (admin/shared config), 63 (gateway fault injection) and 64 (device). The only ❌ is P3-TC-57 (Pri P2, BUG-0009).
 
 ## Totals (QA run 1)
 | | Cases | ✅ | ❌ | ⏭ | ⬜ |
