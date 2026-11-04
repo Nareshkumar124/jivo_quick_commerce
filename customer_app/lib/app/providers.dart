@@ -73,7 +73,7 @@ final jivoApiProvider = Provider<JivoApi>(
 
 /// The analytics wrapper (`03 §4`).
 ///
-/// TODO(D-19): back it with the chosen provider (Firebase Analytics
+/// Open decision D-19: back it with the chosen provider (Firebase Analytics
 /// recommended). Until then events go to the debug log, and nowhere in prod.
 final analyticsProvider = Provider<AnalyticsClient>(
   (ref) => ref.watch(appEnvProvider).isProd

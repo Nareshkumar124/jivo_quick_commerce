@@ -61,6 +61,13 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         help_text="Reserved: Jivo Auth identity (D-04). Set only by the Jivo Auth integration.",
     )
     marketing_opt_in = models.BooleanField(default=False, help_text="Promotional push consent.")
+    cod_blocked = models.BooleanField(
+        default=False,
+        help_text=(
+            "Cash on delivery is not offered to this customer (08 T2). Set by ops for now; "
+            "repeated refused deliveries set it automatically from Phase 5."
+        ),
+    )
     deleted_at = models.DateTimeField(
         null=True, blank=True, help_text="Set on account deletion; PII is anonymised by a job."
     )

@@ -35,7 +35,7 @@ flowchart TD
     P --> HS[Help & support]
 ```
 
-A floating **cart bar** ("2 items · ₹348 · View cart") stays visible on Home, Category, Product list, Product detail and Search when the cart is not empty. The amount is the server's cart total; until the cart API (P3) it shows the item count only.
+A floating **cart bar** ("2 items · ₹348 · View cart") stays visible on Home, Category, Product list, Product detail and Search when the cart is not empty. The amount is the server's item total (`bill.item_total`), shown only when the server sends it; it opens the cart.
 
 Until a delivery location is chosen, Home shows a "Choose a delivery location" prompt that opens the location screen (instead of a forced redirect after login); catalog data needs a store.
 
@@ -89,7 +89,7 @@ Until a delivery location is chosen, Home shows a "Choose a delivery location" p
 | Previously bought | Rail of variants from past delivered orders (when logged in and history exists) |
 | Pull to refresh | Reloads home and re-checks serviceability |
 
-**Phase 2 cart stand-in** (until the Phase 3 cart API, §2.8): the **dev** flavor keeps ADD/stepper quantities in memory, and its cart bar shows the item count only, because the app never computes money. **Staging and prod** show "Cart coming soon" in place of ADD and no cart bar. Catalog data is always the real API (`GET /home/`, `/categories/`, `/products/`, `/collections/{slug}/`, `/search/`, `/search/suggest/`, each with `X-Store-Id`). The fake catalog only serves tests and the dev flavor's `FAKE_API=true`.
+**Cart availability** (§2.8): the **dev** flavor uses the real cart and order API (`06 §2.5`, `§2.6`); with `FAKE_API=true` it uses `FakeCommerceBackend`, a stand-in that follows the same contract with demo rule values (D-09 undecided) and is the only code in the app that adds money up. **Staging and prod** still show "Cart coming soon" in place of ADD and no cart bar until the cart is proven against the backend (S3-B). Catalog data is always the real API (`GET /home/`, `/categories/`, `/products/`, `/collections/{slug}/`, `/search/`, `/search/suggest/`, each with `X-Store-Id`). The fake catalog only serves tests and the dev flavor's `FAKE_API=true`.
 
 All product tiles show the image, name, variant (e.g., 1 L), selling price, struck-out MRP, a discount badge ("12% OFF", the server's `discount_percent` when above 0) and an **ADD** button that becomes a − qty + stepper. Out-of-stock tiles are greyed out with "Out of stock". A product with several variants shows "1 L · 3 options"; its ADD (and its stepper, which shows the total over its variants) opens a variant picker with a stepper per variant.
 
@@ -131,6 +131,20 @@ All product tiles show the image, name, variant (e.g., 1 L), selling price, stru
 | Payment result | Success leads to verify-on-server then the success screen. Failure or cancel shows "Payment failed" with **Retry** (within 15 min) and **Change method**. |
 | Order success | Animation, order number, ETA, "Track order" |
 | Edge cases | App killed mid-payment: on next launch, pending orders are fetched and the server status (webhook-confirmed) is shown. Double-tap protection on Place Order. |
+
+**How the P3 screens behave** (bound to the Phase 3 contract at S3-A, 2026-11-03; decisions DL-44):
+- **Money is rendered, never derived.** Bill rows are the server's strings (`Bill`); zero rows are hidden (delivery shows FREE). "You save ₹X" is `bill.total_savings`; the "Add ₹X more for FREE delivery" nudge is `thresholds.amount_to_free_delivery` (hidden when null).
+- **Checkout is the server's call.** "Proceed to checkout" and "Place order" are enabled only when `checkout.can_place_order` is true; otherwise the first `checkout.blockers` entry says why (missing address, store closed, stock, minimum order with `thresholds.amount_to_min_order`, coupon). Blocker and line-issue codes map to app text filled with the server's amounts; the server's own `message` is shown only for a code the app doesn't know and for an applied coupon that stopped applying.
+- **Stock re-validation:** the cart reloads on open and again on "Proceed". A flagged line (`issue`: `OUT_OF_STOCK` / `QUANTITY_UNAVAILABLE`) shows "Out of stock" / "Only N available" and a fix that sets it to the server's `orderable_quantity` (removing it at 0). The ADD stepper sets quantities with `POST /cart/items/` (a set, not an increment).
+- **Coupons:** the sheet lists what `GET /cart/coupons/` returns (no expired or used-up coupons), eligible ones with their savings, others with the reason (add ₹X more, first order only, no eligible items, not valid at this store); the applied one is marked "Applied". A coupon that stops applying stays on the cart with its reason and blocks checkout until removed.
+- **Saved address required:** orders need an `address_id`; a detected or pinned location shows "Save this location as an address, or choose a saved one", and the address switcher offers both. The cart is priced for the selected saved address (`GET /cart/?address_id=`).
+- **Payment methods** are the cart's `payment_methods` with `is_available` (COD only when eligible).
+- **Tip:** ₹10 / ₹20 / ₹30 chips; tapping the selected chip removes the tip. Custom tips accept whole rupees from ₹1 to ₹500 (`CART_MAX_TIP`). **Instructions:** the three chips save as they are toggled; the note (up to 200 characters) saves with its button or Done.
+- **Place order:** online is the default. The button is disabled while the order is placed and paid, Back is blocked, and the `Idempotency-Key` is sent again only for the same request after an unknown outcome (a changed address, method or total gets a new key). Error messages say what changed: "Your total changed from ₹X to ₹Y" (`PRICE_CHANGED`), "Only N of <item> can be ordered now" (`STOCK_UNAVAILABLE`, then back to the cart). If another order is still awaiting payment, the app offers to open that order instead of placing a second one.
+- **Which payment opens:** the server's `razorpay.key_id` decides. `rzp_fake_…` (the backend's local fake gateway) opens the "Test payment (dev build)" sheet in the dev flavor only; in staging or prod it is refused. Any other key opens real Razorpay with the server's options unchanged.
+- **Payment failed screen** first reads the order's status from the server; a webhook-confirmed payment moves on to success. Retry needs that read to have succeeded on this visit and the server's `can_retry_payment`; Cancel and Change payment method need `can_cancel`. After an attempt that ends unpaid, the status is read again before anything else is allowed. If the read fails, the screen says so and offers "Check again". The device clock only drives the "Pay by 3:45 pm" hint. Change payment method cancels with `CHANGE_PAYMENT_METHOD` and reopens checkout (the cart stays); Cancel order uses `PAYMENT_PROBLEM`. An expired order (`PAYMENT_FAILED`, T4) shows "the time to pay has run out" and Back to cart.
+- **App killed mid-payment:** on start, Home asks for active orders; a `PAYMENT_PENDING` one opens its payment screen once by itself, and a banner ("Order X is waiting for payment · Pay now") stays until it is paid or cancelled.
+- **Order success** is reached only after the server confirmed the order. It shows "Arriving by <time>" from `eta_at`. Back goes Home. "Track order" says tracking arrives later until the order detail (Phase 4) and live tracking (Phase 6) screens exist.
 
 ### 2.10 Orders & tracking [P4 history, P6 live]
 | Feature | Details |

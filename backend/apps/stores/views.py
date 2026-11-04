@@ -169,12 +169,11 @@ class NotifyMeView(APIView):
             address_text=data.get("address_text", ""),
             user=request.user if request.user.is_authenticated else None,
         )
-        body = {
-            "id": lead.pk,
-            "lat": lead.location.y,
-            "lng": lead.location.x,
-            "phone": lead.phone,
-            "address_text": lead.address_text,
-            "created_at": lead.created_at,
-        }
+        body = services.notify_me_body(
+            lead,
+            lat=data["lat"],
+            lng=data["lng"],
+            phone=data.get("phone"),
+            address_text=data.get("address_text", ""),
+        )
         return Response(NotifyMeSerializer(body).data, status=201)

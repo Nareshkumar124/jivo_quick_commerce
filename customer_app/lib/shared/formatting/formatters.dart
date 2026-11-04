@@ -39,6 +39,19 @@ bool isZeroAmount(String amount) {
       int.parse((match.group(3) ?? '0').padRight(2, '0')) == 0;
 }
 
+/// Whether two API money strings are the same amount (`"20"` and
+/// `"20.00"`), e.g. to mark the selected tip chip. A comparison of the
+/// server's values, not arithmetic. False when either is malformed.
+bool isSameAmount(String a, String b) {
+  final left = _moneyPattern.firstMatch(a.trim());
+  final right = _moneyPattern.firstMatch(b.trim());
+  if (left == null || right == null) return false;
+  String normalised(RegExpMatch m) =>
+      '${m.group(1) ?? ''}${int.parse(m.group(2)!)}.'
+      '${(m.group(3) ?? '0').padRight(2, '0')}';
+  return normalised(left) == normalised(right);
+}
+
 /// The IST wall-clock time of [instant], for formatting only. The API sends
 /// UTC (`02 §5`); India has no daylight saving, so a fixed offset is exact.
 DateTime toIst(DateTime instant) => instant.toUtc().add(_istOffset);

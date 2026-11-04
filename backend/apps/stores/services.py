@@ -359,9 +359,15 @@ def set_accepting_orders(store: DarkStore, accepting: bool, *, actor) -> bool:
 def record_notify_me(
     *, lat: float, lng: float, phone: str | None, address_text: str, user=None
 ) -> ServiceabilityRequest:
-    """Save a notify-me lead. The same person (user, else phone) asking again within 24 h and
-    100 m gets the existing lead back, so repeated taps do not multiply leads."""
+    """Save a notify-me lead. A repeat within 24 h and 100 m gets the existing lead back, so
+    repeated taps do not multiply leads:
+    - signed in: the user's own lead;
+    - anonymous (BUG-0008): only the *same submission* (same phone and address text). A phone
+      typed by an anonymous caller proves nothing, so an anonymous request is never merged into
+      a lead with other details, and the API answers with the caller's own values
+      (`notify_me_body`), never stored ones."""
     point = store_point(lat, lng)
+    address_text = address_text.strip()
     if user is not None and not phone:
         phone = user.phone or None
     since = timezone.now() - timedelta(hours=NOTIFY_ME_DEDUPE_HOURS)
@@ -371,14 +377,40 @@ def record_notify_me(
     if user is not None:
         existing = recent.filter(user=user).first()
     elif phone:
-        existing = recent.filter(user__isnull=True, phone=phone).first()
+        existing = recent.filter(user__isnull=True, phone=phone, address_text=address_text).first()
     else:
         existing = None
     if existing is not None:
         return existing
     return ServiceabilityRequest.objects.create(
-        location=point, user=user, phone=phone, address_text=address_text.strip()
+        location=point, user=user, phone=phone, address_text=address_text
     )
+
+
+def notify_me_body(
+    lead: ServiceabilityRequest, *, lat: float, lng: float, phone: str | None, address_text: str
+) -> dict:
+    """The notify-me response. A signed-in caller sees their own lead; an anonymous caller gets
+    their own submitted values back and `created_at` = the time of this request (BUG-0008: no
+    stored field of an earlier request; the lead `id` is kept because the contract publishes it
+    as a required integer, so a merged repeat returns the id of the identical submission)."""
+    if lead.user_id is not None:
+        return {
+            "id": lead.pk,
+            "lat": lead.location.y,
+            "lng": lead.location.x,
+            "phone": lead.phone,
+            "address_text": lead.address_text,
+            "created_at": lead.created_at,
+        }
+    return {
+        "id": lead.pk,
+        "lat": lat,
+        "lng": lng,
+        "phone": phone,
+        "address_text": address_text.strip(),
+        "created_at": timezone.now(),
+    }
 
 
 # --------------------------------------------------------------------------- staff scoping

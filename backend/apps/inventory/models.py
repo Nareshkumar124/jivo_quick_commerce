@@ -3,8 +3,10 @@
 `available = on_hand - reserved`. Database check constraints keep `on_hand >= 0`,
 `reserved >= 0` and `reserved <= on_hand`. `on_hand` changes only through
 `apps.inventory.services`, which locks the row and writes a `StockMovement` for every change, so
-the sum of a row's movement deltas always equals its `on_hand`. `StockReservation` (and the
-movement's `order` link) arrive with orders in Phase 3.
+the sum of a row's movement deltas always equals its `on_hand`.
+
+`StockReservation` (Phase 3): one row per order line while the order holds stock (08 §6.1). Its
+quantity is part of `StoreInventory.reserved`; the reservation services change both together.
 """
 
 import contextvars
@@ -193,6 +195,14 @@ class StockMovement(models.Model):
         related_name="stock_movements",
     )
     on_hand_after = models.IntegerField()
+    order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="stock_movements",
+        help_text="The order behind a SALE or RETURN (Phase 3+).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     objects = StockMovementQuerySet.as_manager()
@@ -223,3 +233,49 @@ class StockMovement(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Stock movements are append-only.")
+
+
+class ReservationStatus(models.TextChoices):
+    ACTIVE = "ACTIVE", "Active (stock held)"
+    COMMITTED = "COMMITTED", "Committed (picked up: sold)"
+    RELEASED = "RELEASED", "Released (payment failed, cancelled or unavailable)"
+
+
+class StockReservation(TimeStampedModel):
+    """Stock held for one order line (08 §6.1). ACTIVE reservations of a (store, variant) sum to
+    `StoreInventory.reserved`. Placement creates them (rows locked in variant-id order); payment
+    failure, cancellation and unavailability release them; pickup commits them (SALE)."""
+
+    order = models.ForeignKey("orders.Order", on_delete=models.PROTECT, related_name="reservations")
+    store = models.ForeignKey(
+        "stores.DarkStore", on_delete=models.PROTECT, related_name="stock_reservations"
+    )
+    variant = models.ForeignKey(
+        "catalog.ProductVariant", on_delete=models.PROTECT, related_name="stock_reservations"
+    )
+    quantity = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=10, choices=ReservationStatus.choices, default=ReservationStatus.ACTIVE
+    )
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Online orders: the payment window end. Empty for COD (no expiry).",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["order", "variant"], name="stockreservation_order_variant_unique"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=1), name="stockreservation_quantity_positive"
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "expires_at"], name="reservation_status_exp_idx"),
+            models.Index(fields=["store", "variant", "status"], name="reservation_stock_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.quantity} x variant {self.variant_id} for order {self.order_id}"

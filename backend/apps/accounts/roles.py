@@ -1,7 +1,8 @@
 """Staff roles (05 §3) as Django Groups. `sync_roles()` is idempotent: it runs after every
 `migrate` and from `seed_demo`, and sets each group's permissions to exactly this list.
 
-Each phase grants permissions for the models it adds (Phase 2: stores, catalog, inventory).
+Each phase grants permissions for the models it adds (Phase 2: stores, catalog, inventory;
+Phase 3: coupons, orders and payments, read-only except coupons).
 Store scoping: StaffStoreAccess + apps.stores.services.stores_for().
 """
 
@@ -28,6 +29,10 @@ SUPER_ADMIN_APPS = (
     "stores",
     "catalog",
     "inventory",
+    "promotions",
+    "cart",
+    "orders",
+    "payments",
 )
 
 CUSTOMER_CARE = ["accounts.view_customer", "accounts.change_customer"]
@@ -55,6 +60,17 @@ STORE_VIEW = ["stores.view_darkstore", "stores.view_storetiming"]
 INVENTORY_VIEW = ["inventory.view_storeinventory", "inventory.view_stockmovement"]
 INVENTORY_ADJUST = ["inventory.adjust_stock", "inventory.toggle_availability"]
 
+# Phase 3 (05 §3 rows Coupons, Refund, Live order board, Packing console; PM default ⚠ until the
+# order and refund screens of Phase 4 refine them). Orders are read-only here: state changes go
+# through orders.services.transition(), never through model permissions.
+COUPON_VIEW = ["promotions.view_coupon", "promotions.view_couponredemption"]
+COUPON_MANAGE = [
+    *[f"promotions.{action}_coupon" for action in ("add", "change", "delete", "view")],
+    "promotions.view_couponredemption",
+]
+ORDER_VIEW = ["orders.view_order", "orders.view_orderitem", "orders.view_orderstatushistory"]
+PAYMENT_VIEW = ["payments.view_payment", "payments.view_refund"]
+
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     SUPER_ADMIN: [],  # all permissions of SUPER_ADMIN_APPS (see _permissions_for)
     # 05 §3: Customers (PII) ✔; stores view; catalog view; inventory view; notify-me leads.
@@ -64,12 +80,21 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         *CATALOG_VIEW,
         *INVENTORY_VIEW,
         "stores.view_serviceabilityrequest",
+        *ORDER_VIEW,
     ],
-    STORE_MANAGER: [*STORE_VIEW, *CATALOG_VIEW, *INVENTORY_VIEW, *INVENTORY_ADJUST],
-    STORE_STAFF: [*CATALOG_VIEW, *INVENTORY_VIEW],
-    CATALOG_MANAGER: [*CATALOG_MANAGE, *INVENTORY_VIEW],
-    SUPPORT: [*CUSTOMER_CARE, *CATALOG_VIEW],  # 05 §3: Customers (PII) ✔
-    FINANCE: [*INVENTORY_VIEW, "stores.view_pricingconfig"],
+    STORE_MANAGER: [*STORE_VIEW, *CATALOG_VIEW, *INVENTORY_VIEW, *INVENTORY_ADJUST, *ORDER_VIEW],
+    STORE_STAFF: [*CATALOG_VIEW, *INVENTORY_VIEW, *ORDER_VIEW],
+    CATALOG_MANAGER: [*CATALOG_MANAGE, *INVENTORY_VIEW, *COUPON_MANAGE],
+    # 05 §3: Customers (PII) ✔; coupons view; order board view; refunds (payments view).
+    SUPPORT: [*CUSTOMER_CARE, *CATALOG_VIEW, *COUPON_VIEW, *ORDER_VIEW, *PAYMENT_VIEW],
+    FINANCE: [
+        *INVENTORY_VIEW,
+        "stores.view_pricingconfig",
+        *COUPON_VIEW,
+        *ORDER_VIEW,
+        *PAYMENT_VIEW,
+        "payments.view_paymentwebhookevent",
+    ],
 }
 # Roles limited to the stores in StaffStoreAccess.
 STORE_SCOPED_ROLES = frozenset({STORE_MANAGER, STORE_STAFF})

@@ -224,7 +224,8 @@ StockStatus _stock(api.StockStatusEnum s) => switch (s) {
 UnitPrice? _unitPrice(api.UnitPrice? u) =>
     u == null ? null : (amount: u.amount, per: u.per);
 
-CatalogVariant _variant(api.VariantSummary v) => CatalogVariant(
+/// `VariantSummary` as the app's [CatalogVariant] (also used for cart lines).
+CatalogVariant variantFromApi(api.VariantSummary v) => CatalogVariant(
   id: v.id,
   name: v.name,
   sellingPrice: v.sellingPrice,
@@ -264,7 +265,7 @@ CatalogProduct _card(api.ProductCard p) => CatalogProduct(
   isVeg: p.isVeg,
   imageUrl: p.image?.medium,
   defaultVariantId: p.defaultVariantId,
-  variants: [for (final v in p.variants) _variant(v)],
+  variants: [for (final v in p.variants) variantFromApi(v)],
 );
 
 Future<T> _guard<T>(Future<T> Function() call) async {
