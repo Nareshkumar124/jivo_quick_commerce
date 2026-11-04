@@ -115,6 +115,10 @@ class Column:
     def hidden(self) -> int:
         return max(self.count - len(self.cards), 0)
 
+    @property
+    def late(self) -> int:
+        return sum(card.timer.breached for card in self.cards)
+
 
 @dataclass
 class Board:
@@ -181,6 +185,9 @@ def build(user, queryset, now: datetime | None = None, limit: int = COLUMN_LIMIT
         )
         breached += card.timer.breached
         by_status[order.status].append(card)
+
+    for cards in by_status.values():
+        cards.sort(key=lambda card: not card.timer.breached)  # stable: LATE first, then oldest
 
     def column(code, title) -> Column:
         return Column(code, title, counts.get(code, 0), by_status[code])

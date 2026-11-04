@@ -198,7 +198,13 @@ def test_query_count_does_not_grow_with_orders(client, shop):
 # --------------------------------------------------------------------------- buttons
 
 
-def test_buttons_disabled_while_services_are_missing(client, shop):
+def test_buttons_disabled_while_services_are_missing(client, shop, monkeypatch):
+    from apps.ops_console import order_actions
+
+    for action in (order_actions.ACCEPT, order_actions.MARK_UNAVAILABLE):
+        monkeypatch.setitem(
+            order_actions.SERVICES, action, ("apps.orders.store_ops", "no_such_service")
+        )
     login_with_stores(client, roles.STORE_STAFF, shop["own"])
     html = client.get(page(shop["own"])).content.decode()
     assert step_url(shop["own"], shop["placed"], "accept") not in html
@@ -342,7 +348,7 @@ def test_accepting_switch_matrix(client, shop, principal):
     url = reverse("ops:packing-accepting", args=[shop["own"].code])
     response = client.post(url, {"accepting": "0"}, **HX)
     if principal in TOGGLE_STORE_ROLES:
-        expected = 204
+        expected = 200  # the store bar, swapped in place (PC-21)
     elif principal in (NON_STAFF, ANONYMOUS):
         expected = 401
     else:
@@ -357,7 +363,13 @@ def test_accepting_switch_goes_through_the_service(client, shop):
     client.force_login(staff)
     assert "accepting-toggle" in client.get(page(shop["own"])).content.decode()
     url = reverse("ops:packing-accepting", args=[shop["own"].code])
-    assert client.post(url, {"accepting": "0"}, **HX).status_code == 204
+    response = client.post(url, {"accepting": "0"}, **HX)
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert 'id="store-bar"' in html
+    assert 'data-testid="alert-paused"' in html  # the paused banner (component spec A1)
+    assert "Resume orders" in html
+    assert "Store paused" in response["HX-Trigger"]
     shop["own"].refresh_from_db()
     assert shop["own"].is_accepting_orders is False
     assert LogEntry.objects.filter(user=staff, object_id=str(shop["own"].pk)).exists()
@@ -369,7 +381,7 @@ def test_store_manager_switches_own_store_only(client, shop):
     manager = login_with_stores(client, roles.STORE_MANAGER, shop["own"])
     assert "accepting-toggle" in client.get(page(shop["own"])).content.decode()
     url = reverse("ops:packing-accepting", args=[shop["own"].code])
-    assert client.post(url, {"accepting": "0"}, **HX).status_code == 204
+    assert client.post(url, {"accepting": "0"}, **HX).status_code == 200
     assert LogEntry.objects.filter(user=manager, object_id=str(shop["own"].pk)).exists()
     other = reverse("ops:packing-accepting", args=[shop["other"].code])
     assert client.post(other, {"accepting": "0"}, **HX).status_code == 404

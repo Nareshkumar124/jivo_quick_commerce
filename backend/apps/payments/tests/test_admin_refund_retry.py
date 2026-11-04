@@ -58,10 +58,20 @@ def failed():
     )
 
 
-def run_action(client, *refunds):
+def form_token(client) -> str:
+    """The one-time token the changelist rendered into its action bar (OBS-P4-01)."""
+    return client.get(reverse(LIST)).context["action_form"]["once"].value()
+
+
+def run_action(client, *refunds, token=None):
     return client.post(
         reverse(LIST),
-        {"action": "retry_failed", ACTION_CHECKBOX_NAME: [str(r.pk) for r in refunds]},
+        {
+            "action": "retry_failed",
+            "index": "0",
+            ACTION_CHECKBOX_NAME: [str(r.pk) for r in refunds],
+            "once": token if token is not None else form_token(client),
+        },
         follow=True,
     )
 
@@ -106,3 +116,38 @@ def test_processed_refund_is_skipped_with_the_service_message(client, failed):
     response = run_action(client, failed)
     assert "can be retried" in response.content.decode()
     assert Refund.objects.count() == 1
+
+
+def test_same_form_twice_makes_one_refund(client, failed, monkeypatch):
+    """OBS-P4-01: a double-submitted form (same one-time token) reaches the service once."""
+    from apps.payments import order_refunds
+
+    calls = []
+    real = order_refunds.retry_refund
+
+    def counting(refund_id, *, by):
+        calls.append(refund_id)
+        return real(refund_id, by=by)
+
+    monkeypatch.setattr(order_refunds, "retry_refund", counting)
+    login_as(client, roles.FINANCE)
+    token = form_token(client)
+    first = run_action(client, failed, token=token)
+    second = run_action(client, failed, token=token)
+    assert "Sent 1 refund(s)" in first.content.decode()
+    assert "already sent" in second.content.decode()
+    assert calls == [failed.pk]
+    assert Refund.objects.count() == 2  # the failed row and one retry
+
+
+@pytest.mark.parametrize("token", ["", "forged-token"])
+def test_missing_or_forged_token_is_refused(client, failed, token):
+    login_as(client, roles.FINANCE)
+    response = run_action(client, failed, token=token)
+    assert "already sent" in response.content.decode()
+    assert Refund.objects.count() == 1
+
+
+def test_changelist_loads_the_submit_once_script(client, failed):
+    login_as(client, roles.FINANCE)
+    assert "ops/js/submit_once.js" in client.get(reverse(LIST)).content.decode()

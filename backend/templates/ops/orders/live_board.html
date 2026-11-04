@@ -16,6 +16,11 @@
         <noscript><button type="submit" class="ops-button ops-button--secondary">Apply</button></noscript>
     </form>
 
+    {# Alerts live outside the polled region (focus survives a poll); orders.js fills them. #}
+    <div id="ops-alerts" class="ops-alerts" aria-live="off" data-surface="board"></div>
+    <div id="ops-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="ops-announcer-urgent" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
     {% include "ops/partials/live_board_columns.html" %}
 
     {% if caps.cancel_order and actions.cancel %}

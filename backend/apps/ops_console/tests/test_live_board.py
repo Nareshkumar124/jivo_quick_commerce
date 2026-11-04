@@ -230,7 +230,7 @@ def test_query_count_does_not_grow_with_orders(client, shop):
 def test_acceptance_sla_tone(settings, shop, age_minutes, tone):
     """PLACED counts against the acceptance SLA (setting; 05 §1.1 default 2 min); amber in the
     last quarter, red once past."""
-    settings.ORDER_ACCEPTANCE_SLA_SECONDS = 120
+    settings.STORE_ACCEPTANCE_SLA_SECONDS = 120
     settings.OPS_SLA_WARNING_FRACTION = 0.25
     order = make_order(shop["own"], age_minutes=age_minutes)
     timer = sla.timer_for(order)
@@ -239,7 +239,7 @@ def test_acceptance_sla_tone(settings, shop, age_minutes, tone):
 
 
 def test_sla_setting_is_read(settings, shop):
-    settings.ORDER_ACCEPTANCE_SLA_SECONDS = 600
+    settings.STORE_ACCEPTANCE_SLA_SECONDS = 600
     order = make_order(shop["own"], age_minutes=3)
     assert sla.timer_for(order).tone == sla.OK
 
@@ -252,7 +252,7 @@ def test_eta_deadline_after_acceptance(shop):
 
 
 def test_breached_filter(client, settings, shop):
-    settings.ORDER_ACCEPTANCE_SLA_SECONDS = 120
+    settings.STORE_ACCEPTANCE_SLA_SECONDS = 120
     make_order(shop["own"], age_minutes=10, order_number="JV-BOARD-LATE")
     make_order(shop["own"], OrderStatus.PACKING, age_minutes=40, order_number="JV-BOARD-ETA")
     make_order(shop["own"], OrderStatus.PACKING, age_minutes=5, order_number="JV-BOARD-FINE")
@@ -291,14 +291,24 @@ def cancel_url(order) -> str:
     return reverse("ops:board-cancel", args=[order.pk])
 
 
-def test_cancel_button_hidden_until_the_service_exists(client, shop):
+@pytest.fixture
+def no_cancel_service(monkeypatch):
+    """A branch without the cancel service: the adapter cannot find it."""
+    from apps.ops_console import order_actions
+
+    monkeypatch.setitem(
+        order_actions.SERVICES, order_actions.CANCEL, ("apps.orders.store_ops", "no_such_service")
+    )
+
+
+def test_cancel_button_hidden_until_the_service_exists(client, shop, no_cancel_service):
     client.force_login(staff_in_role(roles.OPS))
     html = client.get(reverse(PAGE)).content.decode()
     assert "cancel-JV-BOARD-0001" not in html
     assert 'data-testid="cancel-dialog"' not in html
 
 
-def test_cancel_unavailable_is_501(client, shop):
+def test_cancel_unavailable_is_501(client, shop, no_cancel_service):
     client.force_login(staff_in_role(roles.OPS))
     response = client.post(cancel_url(shop["placed"]), {"reason": "OTHER_STAFF"}, **HX)
     assert response.status_code == 501

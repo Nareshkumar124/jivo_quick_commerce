@@ -1,0 +1,56 @@
+{# Store bar of the packing console (05 §1.3 "Store switch"). Context: store, low_stock, caps, actions. The pause / resume form swaps this element in place (PC-21), so the page never reloads and keeps its audio unlock (PC-02). #}
+<div id="store-bar" data-testid="store-bar-wrap">
+    <section class="ops-card bg-white border border-base-200 flex flex-wrap items-center gap-3 mb-4 p-3 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800"
+             aria-label="Store" data-testid="store-bar">
+        <div class="flex flex-col">
+            <span class="font-semibold text-font-important-light dark:text-font-important-dark">{{ store.code }} {{ store.name }}</span>
+            <span class="ops-text-secondary">
+                {% if store.auto_accept_orders %}Auto-accept is on: new orders are accepted by the system.{% else %}Accept each new order before the countdown ends.{% endif %}
+            </span>
+        </div>
+
+        <div class="flex items-center gap-2" data-testid="accepting-state">
+            {% if store.is_accepting_orders %}
+                {% include "unfold/helpers/label.html" with text="Taking orders" variant="success" %}
+            {% else %}
+                {% include "unfold/helpers/label.html" with text="Paused: no new orders" variant="danger" %}
+            {% endif %}
+            {% if caps.toggle_store and actions.set_accepting and store.is_accepting_orders %}
+                <form hx-post="{% url 'ops:packing-accepting' store.code %}" hx-target="#store-bar" hx-swap="outerHTML"
+                      hx-confirm="Customers cannot place orders at this store until you resume." data-confirm-title="Pause orders?" data-confirm-label="Pause" data-confirm-tone="danger">
+                    <input type="hidden" name="accepting" value="0">
+                    <button type="submit" class="ops-button ops-button--secondary" data-testid="accepting-toggle">Pause orders</button>
+                </form>
+            {% endif %}
+        </div>
+
+        {% if low_stock %}
+            <a class="ops-link-button ops-tone-warning" href="{% url 'admin:inventory_storeinventory_changelist' %}?store={{ store.pk }}&amp;stock=low&amp;on_sale=1" data-testid="low-stock">
+                <span class="material-symbols-outlined md-18" aria-hidden="true">warning</span>{{ low_stock }} low-stock SKU{{ low_stock|pluralize }}
+            </a>
+        {% endif %}
+
+        <div class="flex flex-wrap items-center gap-2 ml-auto" x-data>
+            <button type="button" class="ops-button ops-button--secondary" x-show="$store.alerts.notifications === 'default'" x-cloak
+                    x-on:click="$store.alerts.askNotifications()">
+                <span class="material-symbols-outlined md-18" aria-hidden="true">notifications</span>Allow notifications
+            </button>
+            <p class="ops-text-secondary" x-show="$store.alerts.notifications === 'denied' || $store.alerts.notifications === 'unsupported'" x-cloak data-testid="notifications-off">
+                Browser notifications are off on this device. Keep this tab open and the sound on.
+            </p>
+        </div>
+    </section>
+
+    {% if not store.is_accepting_orders %}
+        <div class="ops-alert ops-alert--paused" role="region" aria-label="Alert: store paused" data-testid="alert-paused">
+            <span class="material-symbols-outlined" aria-hidden="true">block</span>
+            <strong>Paused: customers can't order from this store.</strong>
+            {% if caps.toggle_store and actions.set_accepting %}
+                <form class="ml-auto" hx-post="{% url 'ops:packing-accepting' store.code %}" hx-target="#store-bar" hx-swap="outerHTML">
+                    <input type="hidden" name="accepting" value="1">
+                    <button type="submit" class="ops-button ops-button--on-danger" data-testid="accepting-toggle">Resume orders</button>
+                </form>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>

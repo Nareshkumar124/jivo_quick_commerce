@@ -145,8 +145,15 @@
 		toast("Request failed (" + status + ").", "danger");
 	});
 
+	// One network toast per outage (UX audit PC-19): polls keep failing every few seconds.
+	let offline = false;
 	document.addEventListener("htmx:sendError", function () {
+		if (offline) return;
+		offline = true;
 		toast("Network error: check the connection and try again.", "danger");
+	});
+	document.addEventListener("htmx:afterRequest", function (event) {
+		if (event.detail && event.detail.successful) offline = false;
 	});
 
 	document.addEventListener("htmx:timeout", function () {

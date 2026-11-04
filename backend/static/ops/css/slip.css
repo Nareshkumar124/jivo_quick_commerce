@@ -14,6 +14,8 @@ body { font-family: Inter, system-ui, sans-serif; color: #111; margin: 1rem; }
 .slip--list h1 { font-size: 1rem; margin: 0 0 0.5rem; }
 .slip--list table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .slip--list th, .slip--list td { border-bottom: 1px solid #ccc; padding: 0.25rem 0.25rem; text-align: left; }
+.slip__pack { font-size: 14pt; font-weight: 700; white-space: nowrap; }
+.slip__footer { margin-top: 0.5rem; font-size: 0.85rem; }
 @media print {
 	.slip-actions { display: none; }
 	body { margin: 0; }

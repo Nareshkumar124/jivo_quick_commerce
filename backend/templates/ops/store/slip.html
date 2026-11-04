@@ -25,15 +25,16 @@
     <section class="slip slip--list" aria-label="Order slip">
         <h1>Order slip {{ order.order_number }}</h1>
         <table>
-            <thead><tr><th scope="col">Item</th><th scope="col">SKU</th><th scope="col">Qty</th></tr></thead>
+            <thead><tr><th scope="col">Item</th><th scope="col">SKU</th><th scope="col">Pack</th><th scope="col"></th></tr></thead>
             <tbody>
                 {% for line in order.lines %}
-                    {% if line.quantity > line.quantity_unavailable %}
-                        <tr><td>{{ line.product_name }} {{ line.variant_name }}</td><td>{{ line.sku }}</td><td>{{ line.quantity }}{% if line.quantity_unavailable %} ({{ line.quantity_unavailable }} unavailable){% endif %}</td></tr>
+                    {% if not line.not_in_order %}
+                        <tr><td>{{ line.product_name }} {{ line.variant_name }}</td><td>{{ line.sku }}</td><td class="slip__pack" data-testid="slip-pack-{{ line.sku }}">Pack {{ line.to_pack }}</td><td>{% if line.quantity_unavailable %}({{ line.quantity }} ordered, {{ line.quantity_unavailable }} unavailable){% endif %}</td></tr>
                     {% endif %}
                 {% endfor %}
             </tbody>
         </table>
+        {% if order.lines_not_in_order %}<p class="slip__footer" data-testid="slip-gone">{{ order.lines_not_in_order }} line{{ order.lines_not_in_order|pluralize }} not in this order</p>{% endif %}
     </section>
 </body>
 </html>

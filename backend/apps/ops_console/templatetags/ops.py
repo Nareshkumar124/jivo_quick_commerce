@@ -43,3 +43,18 @@ def minutes_since(moment, now) -> int:
     if not moment or not now:
         return 0
     return max(int((now - moment).total_seconds() // 60), 0)
+
+
+@register.inclusion_tag("ops/components/sla_badge.html")
+def sla_badge(timer, now=None) -> dict:
+    """`{% sla_badge ticket.timer console.generated_at %}`: DUE SOON / LATE badge plus the time
+    text (design/system/components/ops-alert-banner-and-sla-badges.md, Part B)."""
+    from apps.ops_console import sla
+
+    return {
+        "timer": timer,
+        "label": sla.BADGE_LABELS.get(timer.tone, ""),
+        "icon": sla.BADGE_ICONS.get(timer.tone, "timer"),
+        "text": sla.time_text(timer, now),
+        "aria": sla.aria_text(timer, now),
+    }

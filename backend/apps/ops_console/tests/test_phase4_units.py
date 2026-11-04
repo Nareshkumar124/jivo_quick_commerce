@@ -198,3 +198,20 @@ def test_staff_cancel_reasons_are_the_backend_enum():
     except ImportError:
         pytest.skip("StaffCancelReason is not on this branch yet")
     assert order_actions.cancel_reasons() == list(StaffCancelReason.choices)
+
+
+# --------------------------------------------------------------------------- one-time tokens
+
+
+def test_one_time_token_is_consumed_once():
+    from apps.accounts.tests.factories import StaffUserFactory
+    from apps.ops_console import once
+
+    user = StaffUserFactory()
+    token = once.new_token(once.MANUAL_REFUND)
+    assert once.consume(user, once.MANUAL_REFUND, token) is True
+    assert once.consume(user, once.MANUAL_REFUND, token) is False
+    other = once.new_token(once.MANUAL_REFUND)
+    assert once.consume(user, once.REFUND_RETRY, other) is False  # wrong purpose
+    assert once.consume(user, once.MANUAL_REFUND, "not-signed") is False
+    assert once.consume(user, once.MANUAL_REFUND, None) is False

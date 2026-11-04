@@ -28,7 +28,9 @@ class CancelOrderForm(forms.Form):
 
 
 class UnavailableForm(forms.Form):
-    """T8a for one line: how many units of it cannot be supplied (the new total, 0 undoes)."""
+    """T8a for one line: the line's new **total** of units that cannot be supplied. It can only
+    grow: the minimum is the line's current count (the same value again is a no-op in the
+    service, so a resend after a lost response is safe)."""
 
     item = forms.IntegerField(min_value=1)
     quantity_unavailable = forms.IntegerField(
@@ -50,7 +52,13 @@ class UnavailableForm(forms.Form):
         self.line = self.order.items.filter(pk=item_id).first() if self.order else None
         if self.line is None:
             raise forms.ValidationError("This item is not in the order.", code="not_found")
-        if quantity > self.line.quantity:
+        if quantity < self.line.quantity_unavailable:
+            self.add_error(
+                "quantity_unavailable",
+                f"Already {self.line.quantity_unavailable} marked unavailable; "
+                "that can't be undone.",
+            )
+        elif quantity > self.line.quantity:
             self.add_error(
                 "quantity_unavailable",
                 f"At most {self.line.quantity}: the customer ordered {self.line.quantity}.",

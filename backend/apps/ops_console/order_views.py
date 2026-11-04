@@ -30,6 +30,7 @@ from apps.ops_console.access import is_htmx, ops_view
 from apps.ops_console.forms import AcceptingForm, CancelOrderForm, UnavailableForm
 from apps.ops_console.scoping import scope_to_stores
 from apps.ops_console.views import ops_context
+from apps.orders.choices import OrderStatus
 from apps.orders.models import Order
 
 DEFAULT_POLL_SECONDS = 10  # 05 §1.2 "falls back to HTMX polling every 10 s"
@@ -73,14 +74,15 @@ def _form_message(form) -> str:
     return " ".join(str(error) for errors in form.errors.values() for error in errors)
 
 
-def _run(request, back: str, call, success: str) -> HttpResponse:
+def _run(request, back: str, call, success) -> HttpResponse:
+    """Run the service call; `success` is the toast text, or a function of the call's result."""
     try:
-        call()
+        result = call()
     except order_actions.ActionUnavailable:
         return _refused(request, order_actions.MSG_UNAVAILABLE, 501, back)
     except order_actions.ActionRefused as refusal:
         return _refused(request, refusal.message, refusal.status, back)
-    return _done(request, success, back)
+    return _done(request, success(result) if callable(success) else success, back)
 
 
 # --------------------------------------------------------------------------- live board
@@ -215,13 +217,23 @@ def packing_unavailable(request, code: str, order_id: int):
         if form.has_error(NON_FIELD_ERRORS, "not_found"):
             return HttpResponse(status=404)  # another order's line: as if it did not exist
         return _refused(request, _form_message(form), 400, back)
-    quantity = form.cleaned_data["quantity_unavailable"]
+    line = form.line
+    total = form.cleaned_data["quantity_unavailable"]
+    removed = total - line.quantity_unavailable  # units, for the message only
+    name = f"{line.product_name} {line.variant_name}".strip()
+
+    def message(result) -> str:
+        if getattr(result, "status", None) == OrderStatus.CANCELLED:
+            return f"Order {order.order_number} cancelled: nothing left to pack."
+        if removed <= 0:
+            return f"{name}: already marked; nothing changed."
+        return f"{name}: {removed} unit{'s' if removed != 1 else ''} removed."
+
     return _run(
         request,
         back,
-        lambda: order_actions.mark_unavailable(order, form.line.pk, quantity, actor=request.user),
-        f"{form.line.product_name}: {quantity} unit(s) marked unavailable. "
-        "The bill and refund are updated by the system.",
+        lambda: order_actions.mark_unavailable(order, line.pk, total, actor=request.user),
+        message,
     )
 
 
@@ -242,12 +254,21 @@ def packing_accepting(request, code: str):
         return _refused(request, _form_message(form), 400, back)
     accepting = form.cleaned_data["accepting"]
     message = "Store is taking orders again." if accepting else "Store paused: no new orders."
-    return _run(
+    response = _run(
         request,
         back,
         lambda: order_actions.set_accepting(store, accepting, actor=request.user),
         message,
     )
+    if not (is_htmx(request) and response.status_code == 204):
+        return response
+    # Swap the store bar in place (PC-21): a page reload would lose the audio unlock (PC-02).
+    store.refresh_from_db()
+    context = {"request": request, "store": store, "low_stock": packing.low_stock_count(store)}
+    context.update(_common(request))
+    swapped = render(request, "ops/partials/store_bar.html", context)
+    swapped["HX-Trigger"] = json.dumps({"ops:toast": {"message": message, "tone": "success"}})
+    return swapped
 
 
 @ops_view(capability=capabilities.PACKING)

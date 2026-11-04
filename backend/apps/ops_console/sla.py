@@ -2,8 +2,8 @@
 
 Each active order has one **deadline** that its card counts against:
 - `PAYMENT_PENDING`: the end of the payment window (`payment_expires_at`).
-- `PLACED`: the store-acceptance SLA, `placed_at + ORDER_ACCEPTANCE_SLA_SECONDS` (05 §1.1
-  "orders waiting > 2 min for store acceptance").
+- `PLACED`: the store-acceptance SLA, `placed_at + STORE_ACCEPTANCE_SLA_SECONDS` (the backend's
+  setting for its acceptance SLA alert, default 60 s), so the console and the alert agree.
 - `ACCEPTED` to `OUT_FOR_DELIVERY`: the delivery time promised to the customer (`eta_at`).
 - `DELIVERY_FAILED`: none; the exceptions lane is already an alert.
 
@@ -12,9 +12,7 @@ of the time between the start (placed, or created for unpaid orders) and the dea
 otherwise `success`. The page's script (`ops/js/orders.js`) recomputes the tone every second from
 the same `data-*` timestamps, so a card turns amber or red between polls.
 
-Thresholds are settings, never constants in templates. `ORDER_ACCEPTANCE_SLA_SECONDS` is the
-backend's setting for the acceptance SLA alert (Phase 4); until it exists the 05 §1.1 value
-applies (reported under "APIs required").
+Thresholds are settings, never constants in templates.
 """
 
 from dataclasses import dataclass
@@ -26,7 +24,6 @@ from django.utils import timezone
 
 from apps.orders.choices import OrderStatus
 
-DEFAULT_ACCEPTANCE_SLA_SECONDS = 120  # 05 §1.1, until the backend setting exists
 DEFAULT_WARNING_FRACTION = 0.25
 
 ETA_STATUSES = (
@@ -42,8 +39,7 @@ BREACHED = "danger"
 
 
 def acceptance_sla() -> timedelta:
-    seconds = getattr(settings, "ORDER_ACCEPTANCE_SLA_SECONDS", DEFAULT_ACCEPTANCE_SLA_SECONDS)
-    return timedelta(seconds=int(seconds))
+    return timedelta(seconds=int(settings.STORE_ACCEPTANCE_SLA_SECONDS))
 
 
 def warning_fraction() -> float:
@@ -107,3 +103,54 @@ def breached_q(now: datetime | None = None) -> Q:
         | Q(status__in=ETA_STATUSES, eta_at__lte=now)
         | Q(status=OrderStatus.DELIVERY_FAILED)
     )
+
+
+# --------------------------------------------------------------------------- time text
+# design/system/components/ops-alert-banner-and-sla-badges.md B3. The page's script applies the
+# same rules every second (`orders.js` `timeText`); the server renders the first value.
+
+BADGE_LABELS = {OK: "", WARNING: "DUE SOON", BREACHED: "LATE"}
+BADGE_ICONS = {OK: "timer", WARNING: "schedule", BREACHED: "alarm"}
+
+
+def duration_text(seconds: float) -> str:
+    total = max(int(seconds), 0)
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m"
+    if minutes >= 2:
+        return f"{minutes}m"
+    if minutes:
+        return f"{minutes}m {secs:02d}s"
+    return f"{secs}s"
+
+
+def time_text(timer: Timer, now: datetime | None = None) -> str:
+    """ "12m left", "3m late", or "Waiting 14m" when there is no deadline."""
+    now = now or timezone.now()
+    if timer.deadline is None:
+        age = (now - timer.start).total_seconds() if timer.start else 0
+        return f"Waiting {duration_text(age)}"
+    seconds = (timer.deadline - now).total_seconds()
+    if seconds >= 0:
+        return f"{duration_text(seconds)} left"
+    return f"{duration_text(-seconds)} late"
+
+
+def aria_text(timer: Timer, now: datetime | None = None) -> str:
+    """For the badge group's aria-label (refreshed per poll, never per second)."""
+    from django.utils import timezone as tz
+
+    from apps.ops_console.dates import DISPLAY_TZ
+
+    now = now or timezone.now()
+    if timer.deadline is None:
+        return time_text(timer, now)
+    when = tz.localtime(timer.deadline, DISPLAY_TZ).strftime("%H:%M")
+    seconds = (timer.deadline - now).total_seconds()
+    minutes = max(int(abs(seconds) // 60), 1)
+    state = f"Late by {minutes} minutes" if seconds < 0 else f"{minutes} minutes left"
+    if timer.tone == WARNING:
+        state = f"Due soon, {state.lower()}"
+    return f"{state}, {timer.label.lower()} {when}"
