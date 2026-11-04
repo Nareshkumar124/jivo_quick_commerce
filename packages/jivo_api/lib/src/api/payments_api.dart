@@ -111,7 +111,7 @@ class PaymentsApi {
   }
 
   /// Razorpay webhook (server to server)
-  /// Configured in the Razorpay dashboard for &#x60;payment.captured&#x60;, &#x60;payment.failed&#x60;, &#x60;refund.processed&#x60; and &#x60;refund.failed&#x60;. **Not for the apps.**  &#x60;X-Razorpay-Signature&#x60; must be the hex HMAC-SHA256 of the exact raw body bytes, keyed with the webhook secret; anything else is a 400 and nothing is stored. Events are processed once per &#x60;X-Razorpay-Event-Id&#x60; (a repeat answers &#x60;duplicate&#x60;) and in any order relative to verify (08 §4). Unhandled event types answer &#x60;ignored&#x60;. A 2xx tells Razorpay not to retry.
+  /// Configured in the Razorpay dashboard for &#x60;payment.captured&#x60;, &#x60;payment.failed&#x60;, &#x60;refund.processed&#x60; and &#x60;refund.failed&#x60;. **Not for the apps.**  &#x60;X-Razorpay-Signature&#x60; must be the hex HMAC-SHA256 of the exact raw body bytes, keyed with the webhook secret; anything else is a 400 and nothing is stored. Events are processed once per &#x60;X-Razorpay-Event-Id&#x60; (a repeat answers &#x60;duplicate&#x60;) and in any order relative to verify (08 §4). Unhandled event types answer &#x60;ignored&#x60;. A 2xx tells Razorpay not to retry; a 503 asks it to.
   ///
   /// Parameters:
   /// * [xRazorpayEventId] - Unique per event: the idempotency key.

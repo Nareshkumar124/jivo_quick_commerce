@@ -1495,4 +1495,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileNoRating => 'No ratings yet';
+
+  @override
+  String get documentsProfileIntro =>
+      'Your KYC documents and their review status. Approved documents can\'t be changed. Upload again any document marked Rejected.';
+
+  @override
+  String documentsNeedAttention(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count documents need a new upload.',
+      one: '1 document needs a new upload.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String profileDocumentsAttention(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count need a new upload',
+      one: '1 needs a new upload',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get profileDocumentsAllGood => 'All approved';
+
+  @override
+  String get profileDocumentsInReview => 'In review';
+
+  @override
+  String get profileSupport => 'Support';
+
+  @override
+  String get profileSupportBody =>
+      'Problems with an order, a payout or the app? Call Jivo rider support.';
+
+  @override
+  String get devRejectDocument => 'Ops: reject the driving licence (dev)';
 }

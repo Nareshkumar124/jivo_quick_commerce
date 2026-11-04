@@ -132,3 +132,57 @@ Not observed: 503 `SERVICE_UNAVAILABLE` (gateway down, P3-TC-63 ⏭), 426/503 ma
 - Store GGN-01 still has variant 1 at 40/9 (`on_hand/reserved`; the 5 reserved before the run had no reservation rows), variant 13 at 40/16, and variant 6 (the oversell race item) at 2/0, unchanged.
 - No demo coupon redemption remains HELD or APPLIED.
 - These orders can be cancelled through T11/T12 when Phase 4 ships, or by Super Admin. All QA addresses were soft-deleted and all QA carts emptied.
+
+## Phase 3 stage 2 (2026-11-04)
+**Build:** `qa/phase-2` at `f84482f`, i.e. `develop` `a2b0762` merged in (clean merge). It contains the R2b review fixes (`41f02f6`: BUG-0009, OBS-P3-01, the `process_refund` locking), admin T-304 and Twilio SMS (T-308). The instance was started as in stage 1, plus **`SMS_BACKEND=apps.notifications.sms.ConsoleSmsBackend`**, so no real SMS can be sent: the instance log has 0 Twilio lines.
+
+| Run | Result (actual pytest summary) |
+|---|---|
+| P3 full suite (stage-1 files) | `1 failed, 58 passed, 2 skipped in 598.75s`. The single failure is **XPASS(strict) of BUG-0009**, which is the cue that the fix landed; it was verified and the marker removed. Re-run: `1 passed`. |
+| Admin + coupons + COD (`test_p3_admin.py`, new) and P3-TC-57 | `9 passed in 133.40s` (the first attempt had 1 test-logic error in P3-TC-61b: with both limits reached the server reports `total`; the test was reordered to check `per_user` first) |
+| P3-TC-43 oversell race | `1 passed` |
+| `QA_SLOW=1` P3-TC-47 (T4 via the :8001 beat + late capture) | `1 passed in 969.11s` |
+| Smoke P0–P3 (now including P3-TC-59) | `73 passed, 1 skipped in 319.59s` |
+| DB invariants (P3-TC-48…51), after the QA worker settled refunds | `4 passed` |
+| QA Celery worker on broker DB 7 | 28/28 refunds `PROCESSED`; every REFUNDED order has `amount_refunded = grand_total` |
+
+**Refund cases** (P3-TC-37/38/39/47/58 and worker settlement): they pass on this build. Per the PM, mark them **"re-check after the refund fix run"** (webhook race and idempotency lookup).
+
+**Test-isolation note:** running `-m smoke` while `QA_SLOW` P3-TC-47 runs breaks P3-TC-47, because P1 smoke cases use QA user D too. Run the slow case alone.
+
+**QA data added on the shared DB:**
+- 47 more QA orders, 134 in total, none unpaid.
+- PLACED QA orders reserve: variant 1 ×6, variant 2 ×1, variant 13 ×24.
+- 7 hidden QA coupons `QAP3*`, all switched off.
+- QA user E's `cod_blocked` was set and reset (0 users blocked now).
+- The demo store's COD setting was never touched.
+
+## Phase 3 refund re-check (T-310, 2026-11-04)
+**Build:** `qa/phase-2` at `9ed7ffc` = `git merge --no-ff develop` (develop `dff62d5`: refund webhook receipt fallback, bounded 503 within `REFUND_WEBHOOK_RETRY_WINDOW_SECONDS`, lookup before every refund POST, FAILED never back to PENDING, `count=100`). **Target:** QA instance `127.0.0.1:8004`, started by hand from `.worktrees/qa/backend` (`config.settings.local`, `SMS_BACKEND=apps.notifications.sms.ConsoleSmsBackend`, Redis 6380 DB 5/6/7, QA OTP numbers, shared remote DB). QA Celery worker on DB 7 only (`--pool=solo`). Both stopped at the end; :8001 untouched.
+
+### Commands
+```bash
+uv run pytest tests/test_p3_payments.py -q                         # private/runs/p3r-payments.txt
+QA_SLOW=1 uv run pytest tests/test_p3_concurrency.py -k tc47 -q     # private/runs/p3r-tc47.txt (T4 via the :8001 beat)
+# external worker stopped; these tests start and kill their own QA worker:
+uv run pytest tests/test_p3_refunds.py -q                          # private/runs/p3r-refunds-run1.txt
+# instance restarted with REFUND_WEBHOOK_RETRY_WINDOW_SECONDS=20 (profile marker refundwindow):
+uv run pytest tests/test_p3_refunds.py -k tc69 -q                   # private/runs/p3r-refundwindow.txt
+# instance back on local:
+uv run pytest -m smoke -q                                           # private/runs/p3r-smoke.txt
+uv run pytest tests/test_p4_*.py -q                                 # private/runs/p4-plan-run1.txt
+```
+
+### Results (actual pytest summaries)
+| Run | Result |
+|---|---|
+| P3 payments (TC-32…42, 57, 58) with the QA worker | `13 passed in 134.58s` |
+| P3-TC-47 slow | `1 passed, 7 deselected in 948.52s`; its late-capture refund PROCESSED, order REFUNDED, `amount_refunded = grand_total` |
+| Refund settlement (SQL after the runs) | Every refund of the run PROCESSED with a gateway id (amount_mismatch, duplicate_capture, late_capture); late-capture orders REFUNDED once; 0 duplicate keys, 0 duplicate gateway ids, 0 payments refunded above their capture, 0 PENDING after draining (16 PROCESSED + 1 FAILED, the deliberate P3-TC-68) |
+| New refund-ordering tests P3-TC-65…68 | `4 passed, 1 skipped in 128.85s` (the skip is TC-69, profile-only) |
+| P3-TC-69 on the `refundwindow` profile | `1 passed in 63.09s`; the instance log has the "pending past the retry window: ignored" warning once |
+| Smoke P0–P4 (🔥) | `77 passed, 13 skipped, 393 deselected in 408.76s` (skips: 12 P4 stubs awaiting R2, 1 staging-profile case) |
+| P4 files on develop | `5 passed, 38 skipped in 35.17s` |
+| Instance log | 0 × 500, 0 tracebacks |
+
+**Observed:** a 503 carries the `SERVICE_UNAVAILABLE` envelope and leaves no `PaymentWebhookEvent` row, so the gateway's retry with the same event id is processed, not answered `duplicate`. New observation OBS-P3-05 (08): `amount_refunded` is capped at `grand_total` when an order had two separately refunded late captures.

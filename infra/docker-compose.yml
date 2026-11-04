@@ -11,6 +11,9 @@
 #   docker compose -f infra/docker-compose.yml up -d redis minio mailpit
 #   docker compose -f infra/docker-compose.yml run --rm backend python manage.py migrate
 #   docker compose -f infra/docker-compose.yml up -d backend worker beat
+#
+# Celery beat is required in every environment (expire_unpaid_orders every minute); see
+# docs/deployment.md "Processes". Never run two beats against the same database.
 
 name: jivoqc
 
@@ -22,7 +25,7 @@ x-backend: &backend
   env_file:
     - path: ../backend/.env
       required: false
-  environment:
+  environment: &backend-env
     DJANGO_SETTINGS_MODULE: config.settings.local
     REDIS_URL: redis://redis:6380/0
     CELERY_BROKER_URL: redis://redis:6380/1
@@ -99,11 +102,36 @@ services:
   worker:
     <<: *backend
     command: ["celery", "-A", "config", "worker", "--loglevel", "INFO"]
+    environment:
+      <<: *backend-env
+      # T-218: long-lived sync threads reuse connections; no pool outside the web process.
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "60"
 
+  # Exactly ONE beat per environment (two would enqueue every periodic task twice). Required:
+  # orders.expire_unpaid_orders runs every minute (06 §5), plus the nightly accounts jobs.
+  # django-celery-beat's DatabaseScheduler (settings CELERY_BEAT_SCHEDULER, named here too) syncs
+  # CELERY_BEAT_SCHEDULE into its tables at start: run `migrate` once before starting beat.
   beat:
     <<: *backend
-    # DatabaseScheduler: run `migrate` once before starting beat.
-    command: ["celery", "-A", "config", "beat", "--loglevel", "INFO"]
+    command:
+      - celery
+      - -A
+      - config
+      - beat
+      - --loglevel
+      - INFO
+      - --scheduler
+      - django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      <<: *backend-env
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "60"
+    depends_on:
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
 
 volumes:
   minio-data:

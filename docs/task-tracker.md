@@ -22,7 +22,7 @@
 - `PM` = the main session
 - `USER` = you or Jivo
 
-Last updated: 2026-11-04 (P3: all runs merged; P3-TC-64 passed on the phone; refund fix run and QA stage 2 in progress).
+Last updated: 2026-11-04 (Phase 4 started at the user's request, DL-47; P3 gate items finishing in parallel).
 
 ## Phase 1: built, awaiting QA verification
 | ID | Task | Owner | Pri | Deliverables | Acceptance criteria | Status |
@@ -32,19 +32,29 @@ Last updated: 2026-11-04 (P3: all runs merged; P3-TC-64 passed on the phone; ref
 | T-103 | P1 customer app: login, profile, addresses, delete account | CUS | P0 | `customer_app` P1 screens | 62 tests and the real-API itest green; QA functional check | Testing |
 | T-104 | P1 rider app: login, routing by status | RID | P0 | `rider_app` P1 screens | 112 tests and the real-API itest green; QA functional check | Testing |
 
+## Phase 4: Order processing & store ops (started 2026-11-04, DL-47)
+| ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
+|----|------|-------|-----|-----------|--------------|---------------------|--------|
+| T-411 | P4 R1 contract: order list, detail, cancel, reorder, invoice (`06 §2.6`) | BE | P0 | – | Serializers, routes, examples, schema | Additive; schema re-exported | In Progress (`backend/phase-4`, `.worktrees/backend4`) |
+| T-412 | P4 R2: T6–T8a/T11/T12 with partial unavailability, cancel window, refunds (`08 §6.4` defaults), `sync_refund_status`, invoices (WeasyPrint, placeholder GST), auto-accept + SLA alert, packing services; carry-overs T-401c..T-403c, T-405c, T-406c | BE | P0 | T-411 | Services, migrations, tasks, tests | `08` exactly; coverage ≥ 90% on services | In Progress |
+| T-413 | P4 admin + Ops Console: live board (HTMX polling), packing console (`05 §1.3`), customer detail, audit log, refund retry screen; T-304 coupon-form minors | ADM | P0 | T-412 services | Admin/ops screens and tests | Role matrix; state changes only via services | In Progress (`admin/phase-4`) |
+| T-414 | Customer P4: order list/detail/timeline, invoice download, cancel sheet, reorder, previously-bought rail; lookahead tracking, inbox, deep links | CUS | P0 | T-411 | Screens on fakes, then real API | No client-side money; tests green | In Progress (`customer/phase-4`) |
+| T-415 | Rider P4 lookahead: gaps in `04 §2.7–2.9` (documents), accept→deliver integration harness with GPX | RID | P1 | – | Screens and harness on fakes | Tests green | Testing (merged; review: Approve; 351 tests; API requests #25-#27; P5 follow-ups: guard `/profile/documents/:type` for approved docs, share the dev-tools and support-phone helpers) |
+| T-416 | QA: P4 test plan and verification; mini-UAT with store staff | QA | P0 | T-412, T-413 | P4 reports | P4 readiness verdict | In Progress (plan and 60 cases plus UAT-P4-01..13 merged `69fe035`; execution after the backend R2 and admin merges) |
+
 ## Phase 3: Cart, checkout, payments (started 2026-11-03, DL-42)
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
 |----|------|-------|-----|-----------|--------------|---------------------|--------|
 | T-301 | P3 API contract (R1): `06 §2.5` cart and coupons, P3 rows of `§2.6` (orders, verify, retry, webhook, active orders); apps `cart`, `promotions`, `orders`, `payments`; fake-gateway scheme | BE | P0 | – | Serializers, routes, examples, schema | Schema validates with no warnings; examples for every error code; deployed settings refuse the fake gateway | Testing (merged to `develop` in `cd5e53e`; review Approve with fixes: 1 Major (non-ASCII webhook signature 500) + 2 Minor + 1 Nit, sent to R2a; `jivo_api` regenerated `48aaddd`) |
 | T-302 | P3 R2a: models and migrations (pricing config, coupons, cart, orders, payments), `compute_bill`, cart | BE | P0 | T-301 | Models, `compute_bill` (`08 §6.2`), cart API | D-09 defaults; thresholds before coupon; coverage ≥ 90% on cart | Testing (merged `c4ff7d9`; review Approve with fixes, no Blocker, 3 Major sent to R2b; 12 migrations + `seed_demo` applied to the shared DB on 2026-11-03 with the user's approval (only GGN-01's all-zero pricing changed); live cart smoke-tested on :8001; `jivo_api` regenerated `fcd4e7a`) |
-| T-303 | P3 R2b: `place_order` with reservations and `Idempotency-Key`, `transition()` T1–T5 + T3a, Razorpay verify, webhook, retry, `expire_unpaid_orders`; BUG-0008 fix | BE | P0 | T-302 | Services, tasks, tests | `08` exactly; coverage ≥ 90% on payments and inventory; retry-payment rejects PAID or expired orders (server time is authoritative; from the T-305 review) | Testing (R2b review fixes + BUG-0009 merged `a2b0762`, 2249 passed / 97.15%; review: Approve with fixes, refund webhook race and receipt-lookup guard in a fix run; QA stage 2 running) |
+| T-303 | P3 R2b: `place_order` with reservations and `Idempotency-Key`, `transition()` T1–T5 + T3a, Razorpay verify, webhook, retry, `expire_unpaid_orders`; BUG-0008 fix | BE | P0 | T-302 | Services, tasks, tests | `08` exactly; coverage ≥ 90% on payments and inventory; retry-payment rejects PAID or expired orders (server time is authoritative; from the T-305 review) | Testing (review fixes merged `476dfd5`: refund webhook never lost, lookup-first refund guard; 2300 passed / 97.27%; follow-up running: bound the webhook 503 by refund age, refunds list count=100) |
 | T-304 | P3 admin: pricing config, coupons, read-only orders and payments, `cod_blocked` | ADM | P1 | T-302 (models) | `admin.py` for the P3 apps | Role matrix; state changes only through services | Testing (merged `984e634`; review: Approve with fixes, minors in T-405c..T-407c; QA stage 2 checks the role rows) |
 | T-305 | Customer P3 Start: cart, bill breakdown (server bill), coupon sheet, tip and instructions, payment method, success/failure, `PaymentLauncher` + `razorpay_flutter` (dev fake launcher) | CUS | P0 | – | Screens with fakes | Widget tests; no client-side money; fakes only in tests and dev; R8 release build works | Testing (merged to `develop` in `9dbe11c`; both reviews' findings fixed; device launch check passed 2026-11-03: 0 FATAL) |
 | T-306 | Customer P3 after S3-A/S3-B: real API, `Idempotency-Key`, `PRICE_CHANGED`/`STOCK_UNAVAILABLE`, `PAYMENT_PENDING` recovery, server cart behind the stepper, integration tests | CUS | P0 | T-301, T-303 | Real repositories, integration tests | COD and test-payment checkout pass on the phone | Testing (P3-TC-64 passed on the user's phone 2026-11-04: COD JV-261104-000135 PLACED/COD_PENDING, online JV-261104-000136 PLACED/PAID, no 5xx, no crashes) |
 | T-307 | Review of T-225 (incl. the unreviewed `b6b6eff`) and of each P3 module branch before merge | REVIEW | P0 | each run | Review verdicts | No Blockers before merge | In Progress (T-225/T-211: Approve with fixes, all fixed, merged; open for CUS: add jivo_core `isVersionBelow` tests for build suffix and short versions) |
 | T-308 | Twilio SMS backend for OTP (`TwilioSmsBackend`, settings, system check, no secrets in logs) at the user's request; production gateway stays D-02 | BE | P1 | – | Backend, tests, `.env.example` | Test numbers send no SMS; live OTP on the user's phone | Testing (merged `88692a1`; review fixes applied. Live SMS off: the Twilio trial account only allows predefined templates (error 572006). User chose to skip real SMS for now; console backend on :8001) |
 | T-309 | New Windows dev machine: worktrees, native Redis 6380, :8001, Celery worker + beat (separate processes: no `-B` on Windows), `C:\dev\flutter` junction (space in the user path breaks native-asset hooks) | PM | P0 | – | Running stack | API ready check OK | Completed (2026-11-04; MinIO/Mailpit not running: no Docker) |
-| T-310 | QA: verify P3 | QA | P0 | T-303, T-304, T-306 | P3 test plan, black-box suite, verdict | P3 readiness verdict | In Progress (stage 1 on `develop`; re-run after the R2b and T-304 merges) |
+| T-310 | QA: verify P3 | QA | P0 | T-303, T-304, T-306 | P3 test plan, black-box suite, verdict | P3 readiness verdict | Completed (QA verdict: ready for sign-off; 66/69 pass, 0 fail; refund re-check passed `69fe035`; P3-TC-64 passed on the phone; formal gate = CI on the develop -> main PR, waiting on the GitHub login) |
 
 ### Phase 4 carry-overs from the P3 reviews
 | ID | Item | Owner | Status |
@@ -52,11 +62,11 @@ Last updated: 2026-11-04 (P3: all runs merged; P3-TC-64 passed on the phone; ref
 | T-401c | Ops view for FAILED/PENDING refunds with manual retry (R2b review M2) | BE + ADM | Not Started |
 | T-402c | `payment_status` for mismatch/duplicate refunds; cap total refunds ≤ captured before partial refunds (R2b review Minor 7) | BE | Not Started |
 | T-403c | Gateway calls outside row locks; `skip_locked`/task lock on `expire_unpaid_orders` (R2b review Minors 6, 8) | BE | Not Started |
-| T-404c | Mirror new env vars (`CART_MAX_TIP`, `PAYMENT_GATEWAY`, `RAZORPAY_*`, `ORDERS_CREATE_RATE`, `PAYMENTS_RATE`, `RAZORPAY_TIMEOUT_SECONDS`) into `infra/env/backend.env.example`; Celery beat in every environment; Razorpay webhook config on staging; CI check for the Razorpay native pins | DEVOPS | Not Started |
+| T-404c | Mirror new env vars (`CART_MAX_TIP`, `PAYMENT_GATEWAY`, `RAZORPAY_*`, `ORDERS_CREATE_RATE`, `PAYMENTS_RATE`, `RAZORPAY_TIMEOUT_SECONDS`) into `infra/env/backend.env.example`; Celery beat in every environment; Razorpay webhook config on staging; CI check for the Razorpay native pins | DEVOPS | Completed (merged 2026-11-04) |
 | T-405c | Move `set_cod_blocked` from `accounts/admin.py` into an `accounts` service and have the admin call it (T-304 review Minor 1) | BE + ADM | Not Started |
 | T-406c | `PricingConfig` sanity bounds and cross-field checks; coupon edits guarded against live usage (limit below uses, code rename once used); catch the code-uniqueness race (T-304 review Minors 2-4) | BE + ADM | Not Started |
 | T-407c | Confirm Store Staff `ORDER_VIEW` against `05 §3` in the P4 role refinement (T-304 review Minor 5) | PM | Not Started |
-| T-408c | `pytest-xdist` for the backend suite (single-threaded runs against the remote DB take 40+ min) | BE + DevOps | Not Started |
+| T-408c | `pytest-xdist` for the backend suite (single-threaded runs against the remote DB take 40+ min) | BE + DevOps | Completed (merged 2026-11-04) |
 
 ## Phase 2: Stores, catalog, inventory, home
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |

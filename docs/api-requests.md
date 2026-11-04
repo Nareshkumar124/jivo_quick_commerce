@@ -27,3 +27,11 @@ App agents raise API gaps in their reports (`development-phase.md` §4). This fi
 | 22 | rider (T-225) | P5 contract | **`GET /api/v1/rider/tasks/history/?page=&from=&to=`**: paged `{task_id, order_number, completed_at, store_name, drop_locality, status: DELIVERED\|RETURNED\|CANCELLED\|FAILED, distance_km?, payout?}`; a task cancelled before pickup has null distance and payout. | open |
 | 23 | rider (T-225) | P5 contract | Additions to #8 (`GET /rider/me/`): `photo_url` (signed https URL; state its expiry) and `rating_avg` (string such as `"4.8"`, or null). | open |
 | 24 | rider (T-225) | P5 contract | Cursor or `before_id` paging for the cash ledger and task history, because page numbers shift when new entries arrive (the app's skip-by-id is only a mitigation). | open |
+| 25 | rider (T-415) | P5 contract | Extends #9. `POST /rider/documents/` from an **ACTIVE** rider: can ops reject one document (for example an expired DL) without changing `rider_status`? Does the replacement return `PENDING`? Does a rejected document block dispatch or going online? (D-14) | open |
+| 26 | rider (T-415) | P6 | Should a document rejection reach the rider by push and in the inbox? | open |
+| 27 | rider (T-415) | P5 contract | Confirm that `support.phone` in `GET /config/app/` is the rider's "Call ops" number (the fake already uses it). | open |
+| 28 | customer (T-414) | P5 contract | **`GET /orders/{id}/track/`** returns `{status, eta_at, store{name, lat, lng}, destination{lat, lng}, rider{name, phone, photo, lat, lng, updated_at} or null, delivery_otp (only while OUT_FOR_DELIVERY)}`. | open |
+| 29 | customer (T-414) | P6 | **Inbox:** `GET /me/notifications/?page=` returns `{id, title, body, created_at, read, link (jivo://)}`; `POST /me/notifications/{id}/read/`. | open |
+| 30 | customer (T-414) | P6 | **FCM data payload:** `{type: order\|product\|collection\|category, order_id or slug}` or `{link}`. | open |
+| 31 | customer (T-414) | P4 | `ReorderResult.added_count` (lines added), so the app doesn't have to guess. | sent to BE P4 run |
+| 32 | customer (T-414) | P4 | Customer-facing refund status: FAILED shows as PENDING (ops retries); the customer enum stays PENDING\|PROCESSED (PM default). | sent to BE P4 run |
