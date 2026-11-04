@@ -9,6 +9,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/env.dart';
 import '../../../app/providers.dart';
 import '../../../app/routes.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/primary_action_bar.dart';
 import '../../launch/presentation/launch_controller.dart';
@@ -16,6 +17,7 @@ import '../data/fake_task_backend.dart';
 import '../domain/rider_task.dart';
 import '../domain/task_rules.dart';
 import '../domain/task_status.dart';
+import 'cod_amount_changed_notice.dart';
 import 'task_flow_controller.dart';
 import 'task_providers.dart';
 import 'task_screen.dart';
@@ -99,22 +101,27 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
 
   Future<void> _confirmCash() async {
     final l10n = AppLocalizations.of(context);
-    final amount = formatRupees(_task.codAmountDue ?? '');
+    // Never confirm an unknown amount (RD-02): the button is not offered
+    // without one, and this re-checks.
+    final amount = codAmountText(_task);
+    if (amount == null) return;
     final yes = await showDialog<bool>(
       context: context,
       builder: (dialog) => AlertDialog(
-        title: Text(l10n.codConfirmTitle),
-        content: Text(l10n.codConfirmBody(amount)),
+        title: Text(l10n.codConfirmTitle(amount)),
+        content: Text(l10n.codConfirmBody),
         actions: [
           TextButton(
             key: const Key('cod-cash-cancel'),
+            // Focus starts on "Not yet" (cod.md §4).
+            autofocus: true,
             onPressed: () => Navigator.of(dialog).pop(false),
             child: Text(l10n.codConfirmNo),
           ),
           FilledButton(
             key: const Key('cod-cash-confirm'),
             onPressed: () => Navigator.of(dialog).pop(true),
-            child: Text(l10n.codConfirmYes),
+            child: Text(l10n.codConfirmYes(amount)),
           ),
         ],
       ),
@@ -223,6 +230,61 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
     );
   }
 
+  /// A COD task without a usable amount (RD-02): no cash or UPI action,
+  /// only Refresh, so the rider never confirms an unknown amount.
+  Widget _amountMissing(
+    BuildContext context,
+    AppLocalizations l10n,
+    TaskFlowState state,
+    RiderTask task,
+  ) => TaskStepScaffold(
+    task: task,
+    title: l10n.codTitle,
+    content: [
+      Container(
+        key: const Key('cod-amount-missing'),
+        padding: const EdgeInsets.all(16),
+        decoration: riderCodDecoration(context),
+        child: Text(
+          l10n.codAmountMissing,
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(color: RiderColors.of(context).codText),
+        ),
+      ),
+      const SizedBox(height: 8),
+      TextButton(
+        key: const Key('cod-back'),
+        onPressed: state.busy != null
+            ? null
+            : () => setState(() => _collecting = false),
+        child: Text(l10n.codChangeOtp),
+      ),
+    ],
+    actions: PrimaryActionBar(
+      buttonKey: const Key('cod-refresh'),
+      label: l10n.codRefresh,
+      busy: state.busy != null || state.refreshing,
+      onPressed: () => _controller.load(force: true),
+      secondary: [
+        if (_supportPhone case final phone?)
+          OutlinedButton.icon(
+            key: const Key('cod-call-support'),
+            onPressed: () => ref
+                .read(urlOpenerProvider)
+                .open(Uri(scheme: 'tel', path: phone)),
+            icon: const Icon(Icons.call),
+            label: Text(l10n.callSupport),
+          ),
+      ],
+    ),
+  );
+
+  /// `support.phone` from `config/app`, when set.
+  String? get _supportPhone {
+    final phone = ref.read(launchControllerProvider).config?.support.phone;
+    return phone == null || phone.trim().isEmpty ? null : phone;
+  }
+
   Widget _codStep(
     BuildContext context,
     AppLocalizations l10n,
@@ -230,9 +292,10 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
     RiderTask task,
   ) {
     final theme = Theme.of(context);
-    final amount = formatRupees(task.codAmountDue ?? '');
-    final qr = task.codQr;
+    final amount = codAmountText(task);
     final busy = state.busy != null;
+    if (amount == null) return _amountMissing(context, l10n, state, task);
+    final qr = task.codQr;
     final Widget actions;
     final showQr = qr != null && !_cashConfirmed && !_preferCash;
     if (showQr) {
@@ -260,7 +323,7 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
               child: Text(l10n.codUpiCheck),
             ),
           if (!paid)
-            TextButton(
+            OutlinedButton(
               key: const Key('cod-take-cash'),
               onPressed: busy ? null : () => setState(() => _preferCash = true),
               child: Text(l10n.codTakeCashInstead),
@@ -295,21 +358,63 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
       task: task,
       title: l10n.codTitle,
       content: [
-        Text(l10n.codAmountDueLabel, style: theme.textTheme.titleMedium),
-        Text(
-          amount,
-          key: const Key('cod-amount'),
-          style: theme.textTheme.displaySmall?.copyWith(
-            fontWeight: FontWeight.w700,
+        CodAmountChangedNotice(task: task),
+        Container(
+          key: const Key('cod-amount-block'),
+          padding: const EdgeInsets.all(16),
+          decoration: riderCodDecoration(context),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.codAmountDueLabel,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: RiderColors.of(context).codText,
+                ),
+              ),
+              if (codAmountWasText(task) case final was?)
+                Semantics(
+                  label: l10n.codAmountPreviously(was),
+                  excludeSemantics: true,
+                  child: Text(
+                    was,
+                    key: const Key('cod-amount-was'),
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: RiderColors.of(context).textSecondary,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                ),
+              Text(
+                amount,
+                key: const Key('cod-amount'),
+                semanticsLabel: l10n.codAmountSemantics(amount),
+                style: theme.textTheme.displayMedium?.copyWith(
+                  fontSize: 48,
+                  fontWeight: FontWeight.w800,
+                  color: RiderColors.of(context).codText,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l10n.codExactAmount,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: RiderColors.of(context).codText,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 4),
-        Text(l10n.codExactAmount, style: theme.textTheme.bodyLarge),
         if (_cashConfirmed) ...[
           const SizedBox(height: 16),
           ListTile(
             key: const Key('cod-cash-done'),
-            leading: Icon(Icons.check_circle, color: theme.colorScheme.primary),
+            leading: Icon(
+              Icons.check_circle,
+              color: RiderColors.of(context).onlineBg,
+            ),
             title: Text(l10n.codCashDone(amount)),
           ),
         ],

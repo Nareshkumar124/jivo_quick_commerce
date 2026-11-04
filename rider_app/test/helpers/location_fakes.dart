@@ -63,6 +63,18 @@ class ScriptedUploader implements LocationUploader {
     batches.add(batch);
     return script.isEmpty ? const UploadAccepted() : script.removeAt(0);
   }
+
+  /// Heartbeats sent, with the last known fix of each.
+  final heartbeatsSent = <LocationPoint?>[];
+  final heartbeatScript = <UploadResult>[];
+
+  @override
+  Future<UploadResult> heartbeat({LocationPoint? lastKnown}) async {
+    heartbeatsSent.add(lastKnown);
+    return heartbeatScript.isEmpty
+        ? const UploadAccepted()
+        : heartbeatScript.removeAt(0);
+  }
 }
 
 /// Store whose writes can be made to fail.

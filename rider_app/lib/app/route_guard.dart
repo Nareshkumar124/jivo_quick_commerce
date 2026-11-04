@@ -20,7 +20,8 @@ import 'routes.dart';
 /// 6. signed out: login (the OTP step only while an OTP is pending);
 /// 7. signed in and ACTIVE: the task screens while a task is active (or its
 ///    end is unread), else the offer screen while an offer is open, else
-///    home or the rider's records (earnings, cash, history, profile) in
+///    the permissions gate (also reachable during a task), home or the
+///    rider's records (earnings, cash, history, profile) in
 ///    builds that have them ([recordsEnabled]; dev flavor until the rider
 ///    API lands);
 /// 8. signed in: the screen for `rider_status`. `PENDING_KYC` and
@@ -64,10 +65,16 @@ String? riderRedirect({
     return _goTo(location, Routes.login);
   }
   if (account.riderStatus == RiderStatusEnum.ACTIVE) {
+    final permissions = Routes.isPermissionsRoute(location);
     // One order at a time: a task (until the rider acknowledges how it
-    // ended) keeps them on the task screens, then an open offer.
-    if (hasRiderTask) return Routes.isTaskRoute(location) ? null : Routes.task;
+    // ended) keeps them on the task screens, then an open offer. The
+    // permissions gate stays reachable during a task (GPS switched off,
+    // permission revoked) but not over an open offer.
+    if (hasRiderTask) {
+      return Routes.isTaskRoute(location) || permissions ? null : Routes.task;
+    }
     if (hasOffer) return _goTo(location, Routes.offer);
+    if (permissions) return null;
     // Between orders: home and the rider's own records, where those routes
     // exist (a stray link elsewhere goes home, not to an error page).
     if (recordsEnabled && Routes.isAccountRoute(location)) return null;

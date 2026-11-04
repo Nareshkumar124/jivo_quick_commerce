@@ -123,6 +123,12 @@ class LocationDebugScreen extends ConsumerWidget {
             value: state.simulateOffline,
             onChanged: controller.setSimulateOffline,
           ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(l10n.debugSimulateServerOffline),
+            value: state.simulateServerOffline,
+            onChanged: controller.setSimulateServerOffline,
+          ),
           OutlinedButton(
             onPressed: state.online ? controller.flush : null,
             child: Text(l10n.debugFlushNow),
@@ -187,6 +193,7 @@ class _StatsCard extends StatelessWidget {
           stats.lastUploadStatus.name,
           time.format(stats.lastUploadAt!.toLocal()),
         ),
+      l10n.debugStatsLink(stats.consecutiveFailures, stats.heartbeats),
       if (stats.lastError != null) l10n.debugStatsLastError(stats.lastError!),
     ];
     return Card(

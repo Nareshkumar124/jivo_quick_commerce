@@ -7,6 +7,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/env.dart';
 import '../../../app/providers.dart';
 import '../../../app/routes.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/primary_action_bar.dart';
 import '../../../shared/widgets/sensitive_number_field.dart';
@@ -17,6 +18,7 @@ import '../domain/rider_task.dart';
 import '../domain/task_rules.dart';
 import '../domain/task_status.dart';
 import 'at_customer_step.dart';
+import 'cod_amount_changed_notice.dart';
 import 'task_flow_controller.dart';
 import 'task_providers.dart';
 import 'task_text.dart';
@@ -87,8 +89,11 @@ class TaskScreen extends ConsumerWidget {
   }
 }
 
-/// Scaffold shared by the steps: title and order number, a refresh action,
-/// pull to refresh, and the actions pinned at the bottom.
+/// Scaffold shared by the steps (`design/screens/rider/task-step-shell.md`):
+/// title and order number (18 sp / 700), the offline banner after a network
+/// error, a refresh action, pull to refresh, and the actions pinned at the
+/// bottom. After a network error the primary reads "Try again: {label}"
+/// until the next success (shell §3).
 class TaskStepScaffold extends ConsumerWidget {
   const TaskStepScaffold({
     required this.task,
@@ -111,6 +116,9 @@ class TaskStepScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final controller = ref.read(taskFlowControllerProvider.notifier);
+    final offline = ref.watch(
+      taskFlowControllerProvider.select((s) => isNetworkError(s.error)),
+    );
     final list = RefreshIndicator(
       onRefresh: controller.load,
       child: ListView(
@@ -120,7 +128,8 @@ class TaskStepScaffold extends ConsumerWidget {
         children: [
           Text(
             l10n.taskOrderNumber(task.orderNumber),
-            style: Theme.of(context).textTheme.labelLarge,
+            key: const Key('task-order-number'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           ...content,
@@ -143,15 +152,62 @@ class TaskStepScaffold extends ConsumerWidget {
             ),
           ],
         ),
-        body: bottomInBody
-            ? Column(
-                children: [
-                  Expanded(child: list),
-                  actions,
-                ],
-              )
-            : list,
-        bottomNavigationBar: bottomInBody ? null : actions,
+        body: Column(
+          children: [
+            if (offline) const _OfflineBanner(),
+            Expanded(child: list),
+            if (bottomInBody)
+              PrimaryActionRetry(retrying: offline, child: actions),
+          ],
+        ),
+        bottomNavigationBar: bottomInBody
+            ? null
+            : PrimaryActionRetry(retrying: offline, child: actions),
+      ),
+    );
+  }
+}
+
+/// The last request failed for lack of network (shell §3).
+bool isNetworkError(ApiError? error) =>
+    error != null &&
+    (error.code == ApiErrorCode.network || error.code == ApiErrorCode.timeout);
+
+/// "No internet. Your progress is saved on Jivo's server; ..." (shell §3).
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = RiderColors.of(context);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        key: const Key('task-offline-banner'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.codBg,
+          border: Border(
+            bottom: BorderSide(
+              color: colors.codBorder,
+              width: RiderColors.borderWidth,
+            ),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.wifi_off, color: colors.codText),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                AppLocalizations.of(context).taskOfflineBanner,
+                style: TextStyle(fontSize: 16, color: colors.codText),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -387,18 +443,25 @@ class _GoToCustomerStep extends ConsumerWidget {
               label: Text(l10n.taskCallCustomer),
             ),
           ),
-        if (task.isCod)
-          Card(
+        if (task.isCod) ...[
+          CodAmountChangedNotice(task: task),
+          Container(
             key: const Key('cod-banner'),
-            color: Theme.of(context).colorScheme.tertiaryContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                l10n.taskCollectCash(formatRupees(task.codAmountDue ?? '')),
-                style: Theme.of(context).textTheme.titleLarge,
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.all(16),
+            decoration: riderCodDecoration(context),
+            child: Text(
+              switch (codAmountText(task)) {
+                final amount? => l10n.taskCollectCash(amount),
+                null => l10n.codAmountMissing,
+              },
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: RiderColors.of(context).codText,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
+        ],
       ],
       actions: PrimaryActionBar(
         buttonKey: const Key('task-arrived-customer'),
@@ -656,6 +719,11 @@ class _DevTaskTools extends ConsumerWidget {
             key: const Key('dev-cancel'),
             onPressed: () => act(repository.cancelOrder),
             child: Text(l10n.devCancelOrder),
+          ),
+          TextButton(
+            key: const Key('dev-cod-changed'),
+            onPressed: () => act(repository.changeCodAmount),
+            child: Text(l10n.devCodAmountChanged),
           ),
           TextButton(
             key: const Key('dev-returned'),

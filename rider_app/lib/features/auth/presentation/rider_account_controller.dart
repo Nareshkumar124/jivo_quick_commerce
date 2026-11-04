@@ -51,6 +51,14 @@ class RiderAccountController extends Notifier<RiderAccountState> {
   /// Runs after jivo_core cleared the tokens and before it announces
   /// `signedOut`, for both logout and an expired session.
   Future<void> _onSignOut(SignOutReason reason) async {
+    // Never track without a session (an expired session can end while the
+    // rider is online; logout itself is refused while online). Stop the
+    // service before deleting its buffer: it is the buffer's only writer.
+    try {
+      await ref.read(locationServiceClientProvider).stop();
+    } on Object catch (error) {
+      debugPrint('RiderAccountController: stopping location: $error');
+    }
     await ref.read(locationDataCleanerProvider).clear();
     await discardInterruptedKycCapture(ref);
     try {

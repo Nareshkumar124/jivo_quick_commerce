@@ -17,6 +17,7 @@ import 'package:jivo_api/src/api/config_api.dart';
 import 'package:jivo_api/src/api/health_api.dart';
 import 'package:jivo_api/src/api/orders_api.dart';
 import 'package:jivo_api/src/api/payments_api.dart';
+import 'package:jivo_api/src/api/rider_api.dart';
 import 'package:jivo_api/src/api/serviceability_api.dart';
 
 class JivoApi {
@@ -180,6 +181,12 @@ class JivoApi {
   /// by doing that all interceptors will not be executed
   PaymentsApi getPaymentsApi() {
     return PaymentsApi(dio);
+  }
+
+  /// Get RiderApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  RiderApi getRiderApi() {
+    return RiderApi(dio);
   }
 
   /// Get ServiceabilityApi instance, base route and serializer can be overridden by a given but be careful,

@@ -41,7 +41,7 @@ class OrderRefund {
   @JsonKey(name: r'amount', required: true, includeIfNull: false)
   final String amount;
 
-  /// PENDING: started; banks usually take 5-7 working days. PROCESSED: the gateway has sent it.  * `PENDING` - Refund in progress * `PROCESSED` - Refunded
+  /// PENDING: started; banks usually take 5-7 working days. PROCESSED: the gateway has sent it. A refund the gateway refused is retried by Jivo's team and stays PENDING here (never FAILED).  * `PENDING` - Refund in progress * `PROCESSED` - Refunded
   @JsonKey(
     name: r'status',
     required: true,

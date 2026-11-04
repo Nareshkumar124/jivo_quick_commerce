@@ -9,6 +9,8 @@ part of 'reorder_result.dart';
 abstract class _$ReorderResultCWProxy {
   ReorderResult cart(Cart cart);
 
+  ReorderResult addedCount(int addedCount);
+
   ReorderResult unavailable(List<ReorderIssue> unavailable);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ReorderResult(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -17,7 +19,11 @@ abstract class _$ReorderResultCWProxy {
   /// ```dart
   /// ReorderResult(...).copyWith(id: 12, name: "My name")
   /// ````
-  ReorderResult call({Cart cart, List<ReorderIssue> unavailable});
+  ReorderResult call({
+    Cart cart,
+    int addedCount,
+    List<ReorderIssue> unavailable,
+  });
 }
 
 /// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfReorderResult.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfReorderResult.copyWith.fieldName(...)`
@@ -28,6 +34,9 @@ class _$ReorderResultCWProxyImpl implements _$ReorderResultCWProxy {
 
   @override
   ReorderResult cart(Cart cart) => this(cart: cart);
+
+  @override
+  ReorderResult addedCount(int addedCount) => this(addedCount: addedCount);
 
   @override
   ReorderResult unavailable(List<ReorderIssue> unavailable) =>
@@ -42,6 +51,7 @@ class _$ReorderResultCWProxyImpl implements _$ReorderResultCWProxy {
   /// ````
   ReorderResult call({
     Object? cart = const $CopyWithPlaceholder(),
+    Object? addedCount = const $CopyWithPlaceholder(),
     Object? unavailable = const $CopyWithPlaceholder(),
   }) {
     return ReorderResult(
@@ -49,6 +59,10 @@ class _$ReorderResultCWProxyImpl implements _$ReorderResultCWProxy {
           ? _value.cart
           // ignore: cast_nullable_to_non_nullable
           : cart as Cart,
+      addedCount: addedCount == const $CopyWithPlaceholder()
+          ? _value.addedCount
+          // ignore: cast_nullable_to_non_nullable
+          : addedCount as int,
       unavailable: unavailable == const $CopyWithPlaceholder()
           ? _value.unavailable
           // ignore: cast_nullable_to_non_nullable
@@ -69,12 +83,16 @@ extension $ReorderResultCopyWith on ReorderResult {
 
 ReorderResult _$ReorderResultFromJson(Map<String, dynamic> json) =>
     $checkedCreate('ReorderResult', json, ($checkedConvert) {
-      $checkKeys(json, requiredKeys: const ['cart', 'unavailable']);
+      $checkKeys(
+        json,
+        requiredKeys: const ['cart', 'added_count', 'unavailable'],
+      );
       final val = ReorderResult(
         cart: $checkedConvert(
           'cart',
           (v) => Cart.fromJson(v as Map<String, dynamic>),
         ),
+        addedCount: $checkedConvert('added_count', (v) => (v as num).toInt()),
         unavailable: $checkedConvert(
           'unavailable',
           (v) => (v as List<dynamic>)
@@ -83,10 +101,11 @@ ReorderResult _$ReorderResultFromJson(Map<String, dynamic> json) =>
         ),
       );
       return val;
-    });
+    }, fieldKeyMap: const {'addedCount': 'added_count'});
 
 Map<String, dynamic> _$ReorderResultToJson(ReorderResult instance) =>
     <String, dynamic>{
       'cart': instance.cart.toJson(),
+      'added_count': instance.addedCount,
       'unavailable': instance.unavailable.map((e) => e.toJson()).toList(),
     };

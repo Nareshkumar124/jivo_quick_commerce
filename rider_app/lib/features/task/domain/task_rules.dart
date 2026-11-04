@@ -1,30 +1,62 @@
+import 'package:intl/intl.dart';
+
 import 'rider_task.dart';
 
-/// `"1249.00"` → `₹1,249.00` (Indian digit grouping). Formatting only: the
-/// amount string from the server is never parsed into a number, so nothing
-/// is rounded or computed in the app.
-String formatRupees(String amount) {
-  final trimmed = amount.trim();
-  final match = RegExp(r'^(-?)(\d+)(\.\d+)?$').firstMatch(trimmed);
-  if (match == null) return '₹$trimmed';
-  final sign = match.group(1)!;
-  final whole = match.group(2)!;
-  final fraction = match.group(3) ?? '';
-  String grouped;
-  if (whole.length <= 3) {
-    grouped = whole;
-  } else {
-    final last3 = whole.substring(whole.length - 3);
-    var rest = whole.substring(0, whole.length - 3);
-    final parts = <String>[];
-    while (rest.length > 2) {
-      parts.insert(0, rest.substring(rest.length - 2));
-      rest = rest.substring(0, rest.length - 2);
-    }
-    if (rest.isNotEmpty) parts.insert(0, rest);
-    grouped = '${parts.join(',')},$last3';
-  }
-  return '$sign₹$grouped$fraction';
+final _moneyPattern = RegExp(r'^(-)?(\d+)(?:\.(\d{1,2}))?$');
+
+/// Formats an API money string for display, with the customer app's rule
+/// (03 §4, UX audit RD-02): ₹, `en_IN` grouping, and paise only when they
+/// are not zero. `"249.00"` → `₹249`, `"249.50"` → `₹249.50`,
+/// `"100000.00"` → `₹1,00,000`, `"-20.00"` → `-₹20`.
+///
+/// Parsed as integers, never as a double; display only, nothing is
+/// computed. Returns null for a missing or malformed amount, so callers can
+/// show "can't load the amount" instead of a bare "₹".
+///
+/// TODO(jivo_core): switch to the shared `en_IN` formatter the customer
+/// agent is moving into jivo_core, once it merges. Same behaviour.
+String? tryFormatRupees(String? amount) {
+  if (amount == null) return null;
+  final match = _moneyPattern.firstMatch(amount.trim());
+  if (match == null) return null;
+  final rupees = int.parse(match.group(2)!);
+  final paise = int.parse((match.group(3) ?? '0').padRight(2, '0'));
+  final negative = match.group(1) != null && (rupees != 0 || paise != 0);
+  final grouped = NumberFormat.decimalPattern('en_IN').format(rupees);
+  final fraction = paise == 0 ? '' : '.${paise.toString().padLeft(2, '0')}';
+  return '${negative ? '-' : ''}₹$grouped$fraction';
+}
+
+/// [tryFormatRupees] for amounts the API always sends (records, payouts).
+/// A malformed value is shown as sent, never with a bare "₹".
+String formatRupees(String amount) => tryFormatRupees(amount) ?? amount.trim();
+
+/// Whether two API money strings are the same amount (`"20"` and
+/// `"20.00"`). A comparison of server values for display, not arithmetic.
+/// False when either is malformed.
+bool isSameAmount(String a, String b) {
+  final left = _moneyPattern.firstMatch(a.trim());
+  final right = _moneyPattern.firstMatch(b.trim());
+  if (left == null || right == null) return false;
+  String normalised(RegExpMatch m) =>
+      '${m.group(1) ?? ''}${int.parse(m.group(2)!)}.'
+      '${(m.group(3) ?? '0').padRight(2, '0')}';
+  return normalised(left) == normalised(right);
+}
+
+/// The COD amount to collect, formatted, or null when a COD task has no
+/// usable amount: then no cash or UPI action may be offered (RD-02).
+String? codAmountText(RiderTask task) =>
+    task.isCod ? tryFormatRupees(task.codAmountDue) : null;
+
+/// The amount offered before the store changed the order, formatted, when
+/// it differs from the amount due now (RD-03); else null.
+String? codAmountWasText(RiderTask task) {
+  final was = task.codAmountChangedFrom;
+  final now = task.codAmountDue;
+  if (!task.isCod || was == null || now == null) return null;
+  if (isSameAmount(was, now)) return null;
+  return tryFormatRupees(was);
 }
 
 // ------------------------------------------------------------------ COD

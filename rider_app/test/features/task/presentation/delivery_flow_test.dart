@@ -118,7 +118,7 @@ void main() {
 
       expect(find.text('Asha Verma'), findsOneWidget);
       expect(find.text('Landmark: Opposite the park gate'), findsOneWidget);
-      expect(find.text('Collect ₹1,249.00 in cash'), findsOneWidget);
+      expect(find.text('Collect ₹1,249 in cash'), findsOneWidget);
 
       await tap(tester, 'call-customer');
       expect(h.urls.opened.last, Uri(scheme: 'tel', path: '+919876512345'));
@@ -163,7 +163,7 @@ void main() {
       await tester.pump();
       await tap(tester, 'task-deliver');
       expect(find.text('Delivered!'), findsOneWidget);
-      expect(find.text('You earned ₹45.00 for this order.'), findsOneWidget);
+      expect(find.text('You earned ₹45 for this order.'), findsOneWidget);
 
       await tap(tester, 'task-done');
       expect(byKey('home-flavor'), findsOneWidget);
@@ -197,13 +197,10 @@ void main() {
       await toCollect(tester, FakeTaskBackend.deliveryOtp);
 
       expect(find.text('Collect payment'), findsOneWidget);
-      expect(tester.widget<Text>(byKey('cod-amount')).data, '₹1,249.00');
+      expect(tester.widget<Text>(byKey('cod-amount')).data, '₹1,249');
 
       await tap(tester, 'cod-cash');
-      expect(
-        find.text('Did you collect exactly ₹1,249.00 in cash?'),
-        findsOneWidget,
-      );
+      expect(find.text('Collected ₹1,249?'), findsOneWidget);
       await tap(tester, 'cod-cash-cancel');
       expect(h.tasks.calls, isNot(contains(startsWith('deliver'))));
 
@@ -211,6 +208,80 @@ void main() {
       await tap(tester, 'cod-cash-confirm');
       expect(h.tasks.calls.last, 'deliver cash 1249.00');
       expect(find.text('Delivered!'), findsOneWidget);
+    });
+
+    testWidgets('the confirmation repeats the amount on Yes; '
+        'focus starts on "Not yet" (cod.md §4)', (tester) async {
+      await resume(tester, TaskStatus.atCustomer, cod: true);
+      await toCollect(tester, FakeTaskBackend.deliveryOtp);
+      await tap(tester, 'cod-cash');
+      expect(find.text('Yes, ₹1,249 collected'), findsOneWidget);
+      expect(find.text('Not yet'), findsOneWidget);
+      final notYet = tester.widget<TextButton>(byKey('cod-cash-cancel'));
+      expect(notYet.autofocus, isTrue);
+    });
+
+    testWidgets('a COD task without an amount: no cash or UPI action, only '
+        'Refresh, never a bare ₹ (RD-02)', (tester) async {
+      await resume(
+        tester,
+        TaskStatus.atCustomer,
+        cod: true,
+        edit: (t) => RiderTask(
+          id: t.id,
+          status: t.status,
+          orderNumber: t.orderNumber,
+          store: t.store,
+          storeProgress: t.storeProgress,
+          paymentType: t.paymentType,
+          items: t.items,
+          customer: t.customer,
+          arrivedCustomerAt: t.arrivedCustomerAt,
+        ),
+      );
+      await toCollect(tester, FakeTaskBackend.deliveryOtp);
+
+      expect(byKey('cod-amount-missing'), findsOneWidget);
+      expect(byKey('cod-cash'), findsNothing);
+      expect(byKey('cod-upi'), findsNothing);
+      expect(byKey('cod-refresh'), findsOneWidget);
+      for (final text in tester.widgetList<Text>(find.byType(Text))) {
+        expect(text.data ?? '', isNot(matches(RegExp(r'₹(\s|$)'))));
+      }
+    });
+
+    testWidgets('the amount changed after the offer: notice on the way and '
+        'at collection, old amount struck through (RD-03)', (tester) async {
+      await resume(
+        tester,
+        TaskStatus.pickedUp,
+        cod: true,
+        edit: (t) =>
+            t.copyWith(codAmountDue: '990.00', codAmountChangedFrom: '1249.00'),
+      );
+      expect(find.text('Amount changed: collect ₹990'), findsOneWidget);
+      expect(
+        find.text("Was ₹1,249. The store couldn't supply some items."),
+        findsOneWidget,
+      );
+      expect(find.text('Collect ₹990 in cash'), findsOneWidget);
+    });
+
+    testWidgets('changed amount on the COD step', (tester) async {
+      await resume(
+        tester,
+        TaskStatus.atCustomer,
+        cod: true,
+        edit: (t) =>
+            t.copyWith(codAmountDue: '990.00', codAmountChangedFrom: '1249.00'),
+      );
+      await toCollect(tester, FakeTaskBackend.deliveryOtp);
+      expect(byKey('cod-amount-changed'), findsOneWidget);
+      expect(tester.widget<Text>(byKey('cod-amount')).data, '₹990');
+      final was = tester.widget<Text>(byKey('cod-amount-was'));
+      expect(was.data, '₹1,249');
+      expect(was.style?.decoration, TextDecoration.lineThrough);
+      expect(tester.getSize(byKey('cod-amount')).height, greaterThan(48));
     });
 
     testWidgets('a wrong OTP after collecting cash keeps the collection', (

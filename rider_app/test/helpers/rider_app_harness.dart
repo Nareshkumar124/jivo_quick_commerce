@@ -31,6 +31,12 @@ import 'package:rider_app/features/offers/presentation/offer_alert_providers.dar
 import 'package:rider_app/features/onboarding/data/fake_rider_onboarding_backend.dart';
 import 'package:rider_app/features/onboarding/domain/image_picking.dart';
 import 'package:rider_app/features/onboarding/presentation/onboarding_providers.dart';
+import 'package:rider_app/features/notifications/data/api_device_registry.dart';
+import 'package:rider_app/features/notifications/presentation/push_providers.dart';
+import 'package:rider_app/features/shift/data/fake_shift_backend.dart';
+import 'package:rider_app/features/shift/data/fake_today_summary.dart';
+import 'package:rider_app/features/shift/presentation/home_providers.dart';
+import 'package:rider_app/features/shift/presentation/shift_controller.dart';
 import 'package:rider_app/features/task/data/fake_task_backend.dart';
 import 'package:rider_app/features/task/presentation/pickup_scan_screen.dart';
 import 'package:rider_app/features/task/presentation/task_providers.dart';
@@ -52,10 +58,24 @@ class FakeLocationServiceClient implements LocationServiceClient {
     required TrackingMode mode,
     required bool simulateOffline,
     required OnlineNotificationText text,
-  }) async => running = true;
+  }) async {
+    calls.add('start(${mode.name})');
+    final error = startError;
+    if (error != null) {
+      startError = null;
+      throw error;
+    }
+    running = true;
+    lastConfig = config;
+  }
+
+  TrackingConfig? lastConfig;
 
   @override
-  Future<void> stop() async => running = false;
+  Future<void> stop() async {
+    calls.add('stop');
+    running = false;
+  }
 
   @override
   void setMode(TrackingMode mode) {}
@@ -71,6 +91,35 @@ class FakeLocationServiceClient implements LocationServiceClient {
 
   @override
   Stream<TrackerStats> get stats => _stats.stream;
+
+  final _serverStops = StreamController<String>.broadcast();
+
+  /// A server stop left by the service while the app was closed.
+  String? pendingServerStop;
+  final calls = <String>[];
+
+  /// Thrown by the next [start].
+  Object? startError;
+
+  @override
+  void setSimulateServerOffline(bool value) {}
+
+  @override
+  Stream<String> get serverStops => _serverStops.stream;
+
+  @override
+  Future<String?> takeServerStop() async {
+    final code = pendingServerStop;
+    pendingServerStop = null;
+    return code;
+  }
+
+  /// The service stopped itself because the server ended the shift.
+  void serverStop(String code) {
+    running = false;
+    pendingServerStop = code;
+    _serverStops.add(code);
+  }
 }
 
 class RecordingLocationCleaner implements LocationDataCleaner {
@@ -148,7 +197,15 @@ class RiderTestHarness {
     clock: () => now,
   );
   final alerter = RecordingOfferAlerter();
+  final shift = FakeShiftBackend(delay: Duration.zero);
+  final today = FakeTodaySummary(delay: Duration.zero);
+  final devices = FakeDeviceRegistry();
   List<String> scannerValues = const ['7K2P', 'HELLO-WORLD'];
+
+  /// The test screen in physical pixels (DPR 2.625): 411×914 dp. Screens
+  /// whose lists the tests read whole use a taller one, since the rider
+  /// theme's larger text (RD-05) makes them longer than one phone screen.
+  Size surface = const Size(1080, 2400);
 
   List<Override> overrides() => [
     ...riderAppOverrides(
@@ -176,8 +233,15 @@ class RiderTestHarness {
     fakeHistoryBackendProvider.overrideWithValue(history),
     currentLocationReaderProvider.overrideWithValue(locationReader),
     offerAlerterProvider.overrideWithValue(alerter),
+    fakeShiftBackendProvider.overrideWithValue(shift),
+    fakeTodaySummaryProvider.overrideWithValue(today),
+    fakeDeviceRegistryProvider.overrideWithValue(devices),
     qrScannerBuilderProvider.overrideWith((ref) => fakeScanner(scannerValues)),
+    ...extraOverrides,
   ];
+
+  /// More overrides for every container and pump (e.g. permissions).
+  List<Override> extraOverrides = [];
 
   /// A container for unit tests (session restored first).
   Future<ProviderContainer> container({List<Override> extra = const []}) async {
@@ -207,7 +271,7 @@ class RiderTestHarness {
     bool settle = true,
   }) async {
     await session.restore();
-    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.physicalSize = surface;
     tester.view.devicePixelRatio = 2.625;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
