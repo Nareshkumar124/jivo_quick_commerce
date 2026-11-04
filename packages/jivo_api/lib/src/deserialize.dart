@@ -45,11 +45,15 @@ import 'package:jivo_api/src/model/nutrition_table.dart';
 import 'package:jivo_api/src/model/order.dart';
 import 'package:jivo_api/src/model/order_address.dart';
 import 'package:jivo_api/src/model/order_cancel_request.dart';
+import 'package:jivo_api/src/model/order_cancellation.dart';
 import 'package:jivo_api/src/model/order_create_request.dart';
+import 'package:jivo_api/src/model/order_invoice.dart';
 import 'package:jivo_api/src/model/order_line.dart';
 import 'package:jivo_api/src/model/order_placement.dart';
+import 'package:jivo_api/src/model/order_refund.dart';
 import 'package:jivo_api/src/model/order_store.dart';
 import 'package:jivo_api/src/model/order_summary.dart';
+import 'package:jivo_api/src/model/order_timeline_entry.dart';
 import 'package:jivo_api/src/model/otp_send_request.dart';
 import 'package:jivo_api/src/model/otp_sent.dart';
 import 'package:jivo_api/src/model/otp_settings.dart';
@@ -68,6 +72,8 @@ import 'package:jivo_api/src/model/product_detail.dart';
 import 'package:jivo_api/src/model/razorpay_checkout.dart';
 import 'package:jivo_api/src/model/razorpay_prefill.dart';
 import 'package:jivo_api/src/model/razorpay_webhook_event_request.dart';
+import 'package:jivo_api/src/model/reorder_issue.dart';
+import 'package:jivo_api/src/model/reorder_result.dart';
 import 'package:jivo_api/src/model/rider_location_settings.dart';
 import 'package:jivo_api/src/model/search_suggestion.dart';
 import 'package:jivo_api/src/model/search_suggestions.dart';
@@ -127,6 +133,7 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'Bill':
       return Bill.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'CancelReasonEnum':
+    case 'CancelledByEnum':
     case 'Cart':
       return Cart.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'CartItemAddRequest':
@@ -225,22 +232,35 @@ ReturnType deserialize<ReturnType, BaseType>(
       return Order.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'OrderAddress':
       return OrderAddress.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'OrderCancelReasonEnum':
     case 'OrderCancelRequest':
       return OrderCancelRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'OrderCancellation':
+      return OrderCancellation.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'OrderCreateRequest':
       return OrderCreateRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'OrderInvoice':
+      return OrderInvoice.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'OrderLine':
       return OrderLine.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'OrderPlacement':
       return OrderPlacement.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'OrderRefund':
+      return OrderRefund.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'OrderRefundReasonEnum':
+    case 'OrderRefundStatusEnum':
     case 'OrderStatusEnum':
     case 'OrderStore':
       return OrderStore.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'OrderSummary':
       return OrderSummary.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'OrderTimelineEntry':
+      return OrderTimelineEntry.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'OtpPurposeEnum':
     case 'OtpSendRequest':
       return OtpSendRequest.fromJson(value as Map<String, dynamic>)
@@ -295,6 +315,12 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'RazorpayWebhookEventRequest':
       return RazorpayWebhookEventRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ReorderIssue':
+      return ReorderIssue.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ReorderIssueReasonEnum':
+    case 'ReorderResult':
+      return ReorderResult.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'RiderLocationSettings':
       return RiderLocationSettings.fromJson(value as Map<String, dynamic>)

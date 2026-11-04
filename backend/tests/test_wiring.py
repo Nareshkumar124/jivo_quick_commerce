@@ -12,6 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 from rest_framework_simplejwt.settings import api_settings as jwt_settings
 
 from config.env import env_test_database_name, env_test_redis_db
+from config.testing import NamespacedRedisCache, worker_redis_namespace, xdist_worker
 
 PROJECT_REDIS_PORT = 6380
 
@@ -33,8 +34,14 @@ class TestSettings:
         assert square.contains(Point(77.05, 28.45))
 
     def test_only_this_test_database_is_ever_created(self):
+        """Serial: exactly POSTGRES_TEST_DB. Under pytest-xdist, pytest-django appends the worker
+        id (`_gw0`, ...) and nothing else (T-408c)."""
         name = settings.DATABASES["default"]["TEST"]["NAME"]
-        assert name == settings.TEST_DATABASE_NAME
+        worker = xdist_worker()
+        expected = (
+            f"{settings.TEST_DATABASE_NAME}_{worker}" if worker else settings.TEST_DATABASE_NAME
+        )
+        assert name == expected
         assert name.startswith("test_jivo_quick_commerce")
 
     @pytest.mark.parametrize("name", ["jivo_quick_commerce", "test_other_project", " "])
@@ -58,6 +65,67 @@ class TestSettings:
     def test_tests_use_their_own_redis_db(self):
         assert 3 <= settings.TEST_REDIS_DB <= 15
         assert urlparse(settings.CACHES["default"]["LOCATION"]).path == f"/{settings.TEST_REDIS_DB}"
+
+    def test_redis_keys_are_namespaced_per_xdist_worker(self):
+        worker = xdist_worker()
+        namespace = "jqc-test" + (f"-{worker}" if worker else "")
+        assert settings.TEST_REDIS_NAMESPACE == namespace
+        assert settings.CACHES["default"]["KEY_PREFIX"] == namespace
+        assert settings.CACHES["default"]["BACKEND"] == "config.testing.NamespacedRedisCache"
+        assert settings.CHANNEL_LAYERS["default"]["CONFIG"]["prefix"] == f"{namespace}:asgi"
+
+    @pytest.mark.parametrize(
+        ("worker", "namespace"),
+        [("", "jqc-test"), ("gw0", "jqc-test-gw0"), ("gw12", "jqc-test-gw12")],
+    )
+    def test_worker_namespace(self, monkeypatch, worker, namespace):
+        monkeypatch.setenv("PYTEST_XDIST_WORKER", worker)
+        assert worker_redis_namespace() == namespace
+
+    @pytest.mark.parametrize("worker", ["gw", "gw0:x", "*", "master"])
+    def test_unexpected_worker_ids_are_refused(self, monkeypatch, worker):
+        monkeypatch.setenv("PYTEST_XDIST_WORKER", worker)
+        with pytest.raises(ValueError, match="PYTEST_XDIST_WORKER"):
+            worker_redis_namespace()
+
+    def test_cache_clear_leaves_other_workers_keys_alone(self):
+        """T-408c: Django's RedisCache.clear() is FLUSHDB, which wiped every parallel worker's
+        cache, rate-limit counters and channel groups mid-test."""
+        from django.core.cache import cache, caches
+
+        assert isinstance(caches["default"], NamespacedRedisCache)
+        client = cache._cache.get_client(None, write=True)
+        neighbour = "jqc-test-neighbour-t408c:1:kept"
+        ours = [f"{settings.TEST_REDIS_NAMESPACE}:rl:t408c:{i}" for i in range(1203)]
+        try:
+            client.set(neighbour, 1, ex=60)
+            client.mset(dict.fromkeys(ours, 1))
+            cache.set("t408c", 1)
+            assert cache.clear() is True
+            assert cache.get("t408c") is None
+            assert client.exists(*ours) == 0
+            assert client.exists(neighbour) == 1
+        finally:
+            client.delete(neighbour)
+
+    def test_rate_limit_counters_live_in_the_worker_namespace(self):
+        from django.core.cache import cache
+
+        from apps.core import ratelimit
+
+        limit = ratelimit.Limit("t408c", limit=1, window_seconds=60)
+        key = ratelimit._key(limit, "+919000000009")
+        assert key.startswith(f"{settings.TEST_REDIS_NAMESPACE}:jqc:rl:t408c:")
+        assert ratelimit.hit(limit, "+919000000009") == 0
+        assert ratelimit.hit(limit, "+919000000009") > 0
+        cache.clear()
+        assert ratelimit.hit(limit, "+919000000009") == 0
+
+    @pytest.mark.parametrize("prefix", ["", "a:b", "a*", "a[b]"])
+    def test_namespaced_cache_needs_a_plain_prefix(self, prefix):
+        cache = NamespacedRedisCache(settings.REDIS_URL, {"KEY_PREFIX": prefix})
+        with pytest.raises(ValueError, match="KEY_PREFIX"):
+            cache.clear()
 
     def test_custom_user_model(self):
         assert settings.AUTH_USER_MODEL == "accounts.User"

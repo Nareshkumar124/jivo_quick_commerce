@@ -460,14 +460,15 @@ class TestCancel:
         assert checkout.cart()["items"]
         assert checkout.place("COD")["order"]["status"] == "PLACED"
 
-    def test_only_unpaid_orders_in_phase_3(self, checkout, shop):
+    def test_placed_orders_too_from_phase_4(self, checkout, shop):
+        """08 §7 / T11 (Phase 4): a PLACED order is cancellable; a second cancel is a 409."""
         checkout.fill((shop.canola_1l, 2))
         cod = checkout.place("COD")
-        response = checkout.client.post(
-            f"{ORDERS}{cod['order']['id']}/cancel/", {"reason": "OTHER"}
-        )
+        url = f"{ORDERS}{cod['order']['id']}/cancel/"
+        assert checkout.client.post(url, {"reason": "OTHER"}).status_code == 200
+        response = checkout.client.post(url, {"reason": "OTHER"})
         assert response.status_code == 409
-        assert response.json()["error"]["details"] == {"status": "PLACED"}
+        assert response.json()["error"]["details"] == {"status": "CANCELLED"}
 
     def test_another_users_order_is_404(self, pending, make_auth_client):
         other = make_auth_client(UserFactory())
@@ -631,7 +632,7 @@ class TestTransition:
             ("PLACED", "PAYMENT_FAILED"),
             ("PAYMENT_FAILED", "PLACED"),  # T3a: never revived
             ("CANCELLED", "PLACED"),
-            ("PLACED", "ACCEPTED"),  # Phase 4
+            ("PLACED", "PACKED"),  # Phase 4: T6/T7 first
             ("PAYMENT_PENDING", "DELIVERED"),
         ],
     )

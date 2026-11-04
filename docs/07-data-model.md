@@ -174,7 +174,7 @@ Phase 3 R2a additions to Order: `payment_expires_at` (PAYMENT_PENDING only: the 
 
 **OrderStatusHistory**: `order`, `from_status`, `to_status`, `actor` (user nullable), `actor_type` (customer/store/rider/ops/system), `note`, `created_at`. Append-only (the model and its queryset refuse updates and deletes, like `StockMovement`).
 
-**Invoice**: `order` (1:1), `invoice_number` (per store GSTIN, per financial year sequence, e.g., `DEL01/26-27/000123`), `issued_at`, `pdf`, `taxable_value`, `cgst`, `sgst`, `igst`, `total`. Credit notes for refunds after invoicing: `CreditNote` with the same structure (Phase 4).
+**Invoice**: `order` (1:1), `invoice_number` (per store GSTIN, per financial year sequence, e.g., `DEL01/26-27/000123`), `issued_at`, `pdf`, `taxable_value`, `cgst`, `sgst`, `igst`, `total`. Credit notes for refunds after invoicing: `CreditNote` with the same structure (Phase 4). Phase 4 built `Invoice` with `seller_gstin`, `is_placeholder` (placeholder GST data, D-12) and `pdf` (private bucket), numbered through `InvoiceSequence (store, financial_year, last_number)`; `CreditNote` is deferred (invoices exist only for DELIVERED orders, and post-delivery refunds arrive with returns in Phase 5). `Order` gains `amount_paid` (the sale capture; refunds are bounded by it, constraint `order_refund_within_paid`) and the permissions `process_order` / `cancel_order`.
 
 **Rating**: `order`, `user`, `target` (ORDER/RIDER), `rider` (nullable), `stars` (1–5), `tags` (JSON), `comment`.
 

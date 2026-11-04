@@ -34,6 +34,18 @@ abstract final class Routes {
 
   static String editAddress(int id) => '/account/addresses/$id';
 
+  /// "My orders" (`03 §2.10`).
+  static const orders = '/account/orders';
+
+  /// The notification inbox (`03 §2.11`, Phase 6 lookahead).
+  static const notifications = '/account/notifications';
+
+  /// Order detail (`03 §2.10`).
+  static String order(int orderId) => '/orders/$orderId';
+
+  /// Live tracking (`03 §2.10`, Phase 6 lookahead).
+  static String orderTracking(int orderId) => '/orders/$orderId/track';
+
   /// Product list of a category; [sub] preselects a sub-category.
   static String category(String slug, {String? sub}) => Uri(
     path: '/category/$slug',

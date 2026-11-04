@@ -332,7 +332,21 @@ class FakeRazorpayGateway(PaymentGateway):
     def _webhook_secret(self) -> str:
         return FAKE_WEBHOOK_SECRET
 
+    @staticmethod
+    def _check_up() -> None:
+        """`FAKE_GATEWAY_DOWN` (local development only, P3-TC-63): every gateway call fails as
+        if Razorpay could not be reached, so the "payment unavailable" paths can be tried."""
+        if getattr(settings, "FAKE_GATEWAY_DOWN", False):
+            raise GatewayUnavailable("Fake gateway is down (FAKE_GATEWAY_DOWN).")
+
+    def verify_payment_signature(self, *, order_id: str, payment_id: str, signature: str) -> bool:
+        self._check_up()
+        return super().verify_payment_signature(
+            order_id=order_id, payment_id=payment_id, signature=signature
+        )
+
     def create_order(self, *, amount_paise: int, receipt: str, notes: dict) -> GatewayOrder:
+        self._check_up()
         return GatewayOrder(
             id=_fake_id("order_"), amount_paise=amount_paise, currency="INR", receipt=receipt
         )
@@ -341,6 +355,8 @@ class FakeRazorpayGateway(PaymentGateway):
         """The fake has no payment service: it reports the captures the server itself learnt
         (through verify or a signed webhook). A dev payment never verified is never captured."""
         from apps.payments.models import Payment, PaymentAttemptStatus
+
+        self._check_up()
 
         return [
             GatewayPayment(
@@ -360,6 +376,7 @@ class FakeRazorpayGateway(PaymentGateway):
     ) -> GatewayRefund:
         """Processed at once. Idempotent on `receipt` like Razorpay: the same receipt always
         gives the same refund id."""
+        self._check_up()
         digest = hashlib.sha256(f"{payment_id}|{receipt}".encode()).hexdigest()[:14]
         return GatewayRefund(
             id=f"rfnd_{digest}",
@@ -372,6 +389,8 @@ class FakeRazorpayGateway(PaymentGateway):
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
         """The refunds the server recorded for this payment (the fake keeps no state)."""
         from apps.payments.models import Refund
+
+        self._check_up()
 
         return [
             GatewayRefund(

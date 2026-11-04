@@ -132,6 +132,7 @@ STORE_SCOPED = {
     "cart_coupon_apply",
     "cart_coupon_remove",
     "orders_create",
+    "orders_reorder",  # Phase 4: the cart is priced at that store
 }
 # Phase 3: operations that take the Idempotency-Key header (02 §5).
 IDEMPOTENT = {"orders_create", "orders_retry_payment"}

@@ -160,7 +160,9 @@ PRODUCTS = [
     ("jivo-wheatgrass-powder", "Jivo Wheatgrass Powder", "wheatgrass", "2106", "18",
      "wheatgrass, powder, superfood", ["Mix in water or smoothies"],
      _food("Dried wheatgrass powder (100%)."),
-     [("JV-WG-PW-100", "100 g", "100 g", 100, "g", 399, 349, 4)]),
+     [("JV-WG-PW-100", "100 g", "100 g", 100, "g", 399, 349, 4),
+      # P3-TC-26: a variant below the ₹99 minimum order (D-09), for MIN_ORDER_NOT_MET checks
+      ("JV-WG-PW-10S", "10 g sachet", "10 g", 10, "g", 49, 45, 10)]),
     ("jivo-wheatgrass-tablets", "Jivo Wheatgrass Tablets", "wheatgrass", "2106", "18",
      "wheatgrass, tablets", ["60 tablets per bottle"],
      _food("Wheatgrass powder, binder (INS 460)."),

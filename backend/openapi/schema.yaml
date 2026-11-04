@@ -6907,10 +6907,34 @@ paths:
                   summary: Active orders
                 PastOrders:
                   value:
-                    count: 1
+                    count: 2
                     next: null
                     previous: null
                     results:
+                    - id: 4901
+                      order_number: JV-261102-000088
+                      status: DELIVERED
+                      payment_method: COD
+                      payment_status: COD_COLLECTED
+                      store:
+                        id: 1
+                        name: Jivo Sector 14, Gurugram
+                      item_count: 3
+                      images:
+                      - thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      - thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      grand_total: '753.00'
+                      created_at: '2026-11-03T06:30:00Z'
+                      placed_at: '2026-11-03T06:30:00Z'
+                      payment_expires_at: null
+                      eta_at: '2026-11-03T06:44:00Z'
+                      can_retry_payment: false
                     - id: 4870
                       order_number: JV-261101-000057
                       status: CANCELLED
@@ -7122,6 +7146,7 @@ paths:
                         mrp: '349.00'
                         selling_price: '279.00'
                         quantity: 2
+                        quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
                       - id: 9002
@@ -7137,6 +7162,7 @@ paths:
                         mrp: '250.00'
                         selling_price: '225.00'
                         quantity: 1
+                        quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
                       item_count: 3
@@ -7172,11 +7198,19 @@ paths:
                         - LEAVE_AT_DOOR
                         note: Please leave it with the guard if no one answers.
                       created_at: '2026-11-03T06:30:00Z'
+                      cancellation: null
+                      amount_refunded: '0.00'
+                      refunds: []
+                      can_download_invoice: false
                       placed_at: null
                       payment_expires_at: '2026-11-03T06:45:00Z'
                       eta_at: null
                       can_cancel: true
                       can_retry_payment: true
+                      timeline:
+                      - status: PAYMENT_PENDING
+                        title: Completing payment…
+                        at: '2026-11-03T06:30:00Z'
                     razorpay:
                       key_id: rzp_test_Jv7x2QmP9kLs4T
                       order_id: order_Nq3uVxY7kL9pQe
@@ -7216,6 +7250,7 @@ paths:
                         mrp: '349.00'
                         selling_price: '279.00'
                         quantity: 2
+                        quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
                       - id: 9002
@@ -7231,6 +7266,7 @@ paths:
                         mrp: '250.00'
                         selling_price: '225.00'
                         quantity: 1
+                        quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
                       item_count: 3
@@ -7266,11 +7302,19 @@ paths:
                         - LEAVE_AT_DOOR
                         note: Please leave it with the guard if no one answers.
                       created_at: '2026-11-03T06:30:00Z'
+                      cancellation: null
+                      amount_refunded: '0.00'
+                      refunds: []
+                      can_download_invoice: false
                       placed_at: null
                       payment_expires_at: '2026-11-03T06:45:00Z'
                       eta_at: null
                       can_cancel: true
                       can_retry_payment: true
+                      timeline:
+                      - status: PAYMENT_PENDING
+                        title: Completing payment…
+                        at: '2026-11-03T06:30:00Z'
                     razorpay:
                       key_id: rzp_fake_jivo_local
                       order_id: order_Nq3uVxY7kL9pQe
@@ -7310,6 +7354,7 @@ paths:
                         mrp: '349.00'
                         selling_price: '279.00'
                         quantity: 2
+                        quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
                       - id: 9002
@@ -7325,6 +7370,7 @@ paths:
                         mrp: '250.00'
                         selling_price: '225.00'
                         quantity: 1
+                        quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
                       item_count: 3
@@ -7360,11 +7406,19 @@ paths:
                         - LEAVE_AT_DOOR
                         note: Please leave it with the guard if no one answers.
                       created_at: '2026-11-03T06:30:00Z'
+                      cancellation: null
+                      amount_refunded: '0.00'
+                      refunds: []
+                      can_download_invoice: false
                       placed_at: '2026-11-03T06:30:00Z'
                       payment_expires_at: null
                       eta_at: '2026-11-03T06:44:00Z'
-                      can_cancel: false
+                      can_cancel: true
                       can_retry_payment: false
+                      timeline:
+                      - status: PLACED
+                        title: Order placed
+                        at: '2026-11-03T06:30:00Z'
                     razorpay: null
                   summary: Cash on delivery
           description: Placed.
@@ -7399,6 +7453,7 @@ paths:
                         mrp: '349.00'
                         selling_price: '279.00'
                         quantity: 2
+                        quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
                       - id: 9002
@@ -7414,6 +7469,7 @@ paths:
                         mrp: '250.00'
                         selling_price: '225.00'
                         quantity: 1
+                        quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
                       item_count: 3
@@ -7449,11 +7505,19 @@ paths:
                         - LEAVE_AT_DOOR
                         note: Please leave it with the guard if no one answers.
                       created_at: '2026-11-03T06:30:00Z'
+                      cancellation: null
+                      amount_refunded: '0.00'
+                      refunds: []
+                      can_download_invoice: false
                       placed_at: null
                       payment_expires_at: '2026-11-03T06:45:00Z'
                       eta_at: null
                       can_cancel: true
                       can_retry_payment: true
+                      timeline:
+                      - status: PAYMENT_PENDING
+                        title: Completing payment…
+                        at: '2026-11-03T06:30:00Z'
                     razorpay:
                       key_id: rzp_test_Jv7x2QmP9kLs4T
                       order_id: order_Nq3uVxY7kL9pQe
@@ -7493,6 +7557,7 @@ paths:
                         mrp: '349.00'
                         selling_price: '279.00'
                         quantity: 2
+                        quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
                       - id: 9002
@@ -7508,6 +7573,7 @@ paths:
                         mrp: '250.00'
                         selling_price: '225.00'
                         quantity: 1
+                        quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
                       item_count: 3
@@ -7543,11 +7609,22 @@ paths:
                         - LEAVE_AT_DOOR
                         note: Please leave it with the guard if no one answers.
                       created_at: '2026-11-03T06:30:00Z'
+                      cancellation: null
+                      amount_refunded: '0.00'
+                      refunds: []
+                      can_download_invoice: false
                       placed_at: '2026-11-03T06:32:10Z'
                       payment_expires_at: null
                       eta_at: '2026-11-03T06:46:00Z'
-                      can_cancel: false
+                      can_cancel: true
                       can_retry_payment: false
+                      timeline:
+                      - status: PAYMENT_PENDING
+                        title: Completing payment…
+                        at: '2026-11-03T06:30:00Z'
+                      - status: PLACED
+                        title: Order placed
+                        at: '2026-11-03T06:32:10Z'
                     razorpay: null
                   summary: 'Replay: already paid'
           description: 'A repeat with the same `Idempotency-Key`: the order placed
@@ -7855,11 +7932,10 @@ paths:
   /api/v1/orders/{id}/:
     get:
       operationId: orders_retrieve
-      description: 'The order with its bill, items and state (added to Phase 3, PM
-        decision): poll it after checkout while the payment is being confirmed (e.g.
-        verify''s response was lost), and for the success screen. Another user''s
-        order id is a 404. Phase 4 adds the status timeline and invoice to the same
-        shape.'
+      description: |-
+        The order with its bill, items and state (added to Phase 3, PM decision): poll it after checkout while the payment is being confirmed (e.g. verify's response was lost), and for the success screen. Another user's order id is a 404.
+
+        **Phase 4** adds `timeline` (every state reached), `cancellation`, `amount_refunded`, `refunds` and `can_download_invoice`, and per line `quantity_unavailable`: when the store cannot supply some units (08 T8a) they are removed, `bill` becomes the recomputed bill (never more than before) and, for an online payment, the difference is refunded. Show the bill as it is: the app never computes money.
       summary: One of my orders
       parameters:
       - in: path
@@ -7903,6 +7979,7 @@ paths:
                       mrp: '349.00'
                       selling_price: '279.00'
                       quantity: 2
+                      quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                     - id: 9002
@@ -7918,6 +7995,7 @@ paths:
                       mrp: '250.00'
                       selling_price: '225.00'
                       quantity: 1
+                      quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                     item_count: 3
@@ -7953,11 +8031,19 @@ paths:
                       - LEAVE_AT_DOOR
                       note: Please leave it with the guard if no one answers.
                     created_at: '2026-11-03T06:30:00Z'
+                    cancellation: null
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: false
                     placed_at: null
                     payment_expires_at: '2026-11-03T06:45:00Z'
                     eta_at: null
                     can_cancel: true
                     can_retry_payment: true
+                    timeline:
+                    - status: PAYMENT_PENDING
+                      title: Completing payment…
+                      at: '2026-11-03T06:30:00Z'
                   summary: Awaiting payment
                 PaidOnline:
                   value:
@@ -7983,6 +8069,7 @@ paths:
                       mrp: '349.00'
                       selling_price: '279.00'
                       quantity: 2
+                      quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                     - id: 9002
@@ -7998,6 +8085,7 @@ paths:
                       mrp: '250.00'
                       selling_price: '225.00'
                       quantity: 1
+                      quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                     item_count: 3
@@ -8033,11 +8121,22 @@ paths:
                       - LEAVE_AT_DOOR
                       note: Please leave it with the guard if no one answers.
                     created_at: '2026-11-03T06:30:00Z'
+                    cancellation: null
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: false
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
-                    can_cancel: false
+                    can_cancel: true
                     can_retry_payment: false
+                    timeline:
+                    - status: PAYMENT_PENDING
+                      title: Completing payment…
+                      at: '2026-11-03T06:30:00Z'
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:32:10Z'
                   summary: Paid online
                 CashOnDelivery:
                   value:
@@ -8063,6 +8162,7 @@ paths:
                       mrp: '349.00'
                       selling_price: '279.00'
                       quantity: 2
+                      quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                     - id: 9002
@@ -8078,6 +8178,7 @@ paths:
                       mrp: '250.00'
                       selling_price: '225.00'
                       quantity: 1
+                      quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                     item_count: 3
@@ -8113,11 +8214,19 @@ paths:
                       - LEAVE_AT_DOOR
                       note: Please leave it with the guard if no one answers.
                     created_at: '2026-11-03T06:30:00Z'
+                    cancellation: null
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: false
                     placed_at: '2026-11-03T06:30:00Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:44:00Z'
-                    can_cancel: false
+                    can_cancel: true
                     can_retry_payment: false
+                    timeline:
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:30:00Z'
                   summary: Cash on delivery
                 CancelledBeforePaying:
                   value:
@@ -8143,6 +8252,7 @@ paths:
                       mrp: '349.00'
                       selling_price: '279.00'
                       quantity: 2
+                      quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                     - id: 9002
@@ -8158,6 +8268,7 @@ paths:
                       mrp: '250.00'
                       selling_price: '225.00'
                       quantity: 1
+                      quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                     item_count: 3
@@ -8193,12 +8304,539 @@ paths:
                       - LEAVE_AT_DOOR
                       note: Please leave it with the guard if no one answers.
                     created_at: '2026-11-03T06:30:00Z'
+                    cancellation:
+                      reason: CHANGE_PAYMENT_METHOD
+                      message: I want to pay another way
+                      cancelled_by: customer
+                      cancelled_at: '2026-11-03T06:40:00Z'
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: false
                     placed_at: null
                     payment_expires_at: null
                     eta_at: null
                     can_cancel: false
                     can_retry_payment: false
+                    timeline:
+                    - status: PAYMENT_PENDING
+                      title: Completing payment…
+                      at: '2026-11-03T06:30:00Z'
+                    - status: CANCELLED
+                      title: Cancelled
+                      at: '2026-11-03T06:40:00Z'
                   summary: Cancelled before paying
+                AcceptedByTheStore:
+                  value:
+                    id: 5012
+                    order_number: JV-261103-000123
+                    status: ACCEPTED
+                    payment_method: ONLINE
+                    payment_status: PAID
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      quantity_unavailable: 0
+                      line_mrp_total: '698.00'
+                      line_total: '558.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      quantity_unavailable: 0
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 3
+                    bill:
+                      mrp_total: '948.00'
+                      item_total: '783.00'
+                      product_discount: '165.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '753.00'
+                      total_savings: '215.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    cancellation: null
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: false
+                    placed_at: '2026-11-03T06:32:10Z'
+                    payment_expires_at: null
+                    eta_at: '2026-11-03T06:46:00Z'
+                    can_cancel: true
+                    can_retry_payment: false
+                    timeline:
+                    - status: PAYMENT_PENDING
+                      title: Completing payment…
+                      at: '2026-11-03T06:30:00Z'
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:32:10Z'
+                    - status: ACCEPTED
+                      title: Order confirmed
+                      at: '2026-11-03T06:32:40Z'
+                  summary: Accepted by the store
+                Packing,AnItemUnavailable(refundPending):
+                  value:
+                    id: 5012
+                    order_number: JV-261103-000123
+                    status: PACKING
+                    payment_method: ONLINE
+                    payment_status: REFUND_PENDING
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      quantity_unavailable: 1
+                      line_mrp_total: '349.00'
+                      line_total: '279.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      quantity_unavailable: 0
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 2
+                    bill:
+                      mrp_total: '599.00'
+                      item_total: '504.00'
+                      product_discount: '95.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '474.00'
+                      total_savings: '145.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    cancellation: null
+                    amount_refunded: '0.00'
+                    refunds:
+                    - id: 7101
+                      amount: '279.00'
+                      status: PENDING
+                      reason: ITEMS_UNAVAILABLE
+                      created_at: '2026-11-03T06:34:05Z'
+                      processed_at: null
+                    can_download_invoice: false
+                    placed_at: '2026-11-03T06:32:10Z'
+                    payment_expires_at: null
+                    eta_at: '2026-11-03T06:46:00Z'
+                    can_cancel: false
+                    can_retry_payment: false
+                    timeline:
+                    - status: PAYMENT_PENDING
+                      title: Completing payment…
+                      at: '2026-11-03T06:30:00Z'
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:32:10Z'
+                    - status: ACCEPTED
+                      title: Order confirmed
+                      at: '2026-11-03T06:32:40Z'
+                    - status: PACKING
+                      title: Packing your order
+                      at: '2026-11-03T06:33:30Z'
+                  summary: Packing, an item unavailable (refund pending)
+                CancelledByTheCustomer,Refunded:
+                  value:
+                    id: 5012
+                    order_number: JV-261103-000123
+                    status: CANCELLED
+                    payment_method: ONLINE
+                    payment_status: REFUNDED
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      quantity_unavailable: 0
+                      line_mrp_total: '698.00'
+                      line_total: '558.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      quantity_unavailable: 0
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 3
+                    bill:
+                      mrp_total: '948.00'
+                      item_total: '783.00'
+                      product_discount: '165.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '753.00'
+                      total_savings: '215.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    cancellation:
+                      reason: CHANGED_MIND
+                      message: I changed my mind
+                      cancelled_by: customer
+                      cancelled_at: '2026-11-03T06:35:00Z'
+                    amount_refunded: '753.00'
+                    refunds:
+                    - id: 7102
+                      amount: '753.00'
+                      status: PROCESSED
+                      reason: ORDER_CANCELLED
+                      created_at: '2026-11-03T06:35:00Z'
+                      processed_at: '2026-11-03T06:35:04Z'
+                    can_download_invoice: false
+                    placed_at: '2026-11-03T06:32:10Z'
+                    payment_expires_at: null
+                    eta_at: '2026-11-03T06:46:00Z'
+                    can_cancel: false
+                    can_retry_payment: false
+                    timeline:
+                    - status: PAYMENT_PENDING
+                      title: Completing payment…
+                      at: '2026-11-03T06:30:00Z'
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:32:10Z'
+                    - status: ACCEPTED
+                      title: Order confirmed
+                      at: '2026-11-03T06:32:40Z'
+                    - status: CANCELLED
+                      title: Cancelled
+                      at: '2026-11-03T06:35:00Z'
+                  summary: Cancelled by the customer, refunded
+                CancelledByTheStore(COD):
+                  value:
+                    id: 5011
+                    order_number: JV-261103-000122
+                    status: CANCELLED
+                    payment_method: COD
+                    payment_status: FAILED
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      quantity_unavailable: 0
+                      line_mrp_total: '698.00'
+                      line_total: '558.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      quantity_unavailable: 0
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 3
+                    bill:
+                      mrp_total: '948.00'
+                      item_total: '783.00'
+                      product_discount: '165.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '753.00'
+                      total_savings: '215.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    cancellation:
+                      reason: ITEMS_UNAVAILABLE
+                      message: Items are not available at the store
+                      cancelled_by: store
+                      cancelled_at: '2026-11-03T06:31:30Z'
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: false
+                    placed_at: '2026-11-03T06:30:00Z'
+                    payment_expires_at: null
+                    eta_at: '2026-11-03T06:44:00Z'
+                    can_cancel: false
+                    can_retry_payment: false
+                    timeline:
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:30:00Z'
+                    - status: CANCELLED
+                      title: Cancelled
+                      at: '2026-11-03T06:31:30Z'
+                  summary: Cancelled by the store (COD)
+                Delivered,InvoiceAvailable:
+                  value:
+                    id: 5011
+                    order_number: JV-261103-000122
+                    status: DELIVERED
+                    payment_method: COD
+                    payment_status: COD_COLLECTED
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      quantity_unavailable: 0
+                      line_mrp_total: '698.00'
+                      line_total: '558.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      quantity_unavailable: 0
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 3
+                    bill:
+                      mrp_total: '948.00'
+                      item_total: '783.00'
+                      product_discount: '165.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '753.00'
+                      total_savings: '215.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    cancellation: null
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: true
+                    placed_at: '2026-11-03T06:30:00Z'
+                    payment_expires_at: null
+                    eta_at: '2026-11-03T06:44:00Z'
+                    can_cancel: false
+                    can_retry_payment: false
+                    timeline:
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:30:00Z'
+                    - status: ACCEPTED
+                      title: Order confirmed
+                      at: '2026-11-03T06:30:20Z'
+                    - status: PACKING
+                      title: Packing your order
+                      at: '2026-11-03T06:31:00Z'
+                    - status: PACKED
+                      title: Packed, rider on the way to store
+                      at: '2026-11-03T06:34:00Z'
+                    - status: OUT_FOR_DELIVERY
+                      title: On the way
+                      at: '2026-11-03T06:35:30Z'
+                    - status: DELIVERED
+                      title: Delivered
+                      at: '2026-11-03T06:43:10Z'
+                  summary: Delivered, invoice available
           description: The order.
         '401':
           content:
@@ -8274,11 +8912,13 @@ paths:
   /api/v1/orders/{id}/cancel/:
     post:
       operationId: orders_cancel
-      description: '08 §7. **Phase 3:** only an order in PAYMENT_PENDING (T5, e.g.
-        the customer gives up on paying or wants to pay another way): the stock and
-        the coupon hold are released; the cart is still there. **From Phase 4:** also
-        PLACED and ACCEPTED (T11, with a refund for paid orders). Use `can_cancel`
-        to show the button.'
+      description: |-
+        08 §7: allowed in PAYMENT_PENDING, PLACED and ACCEPTED; use `can_cancel` to show the button (from PACKING on, show 'Contact support').
+
+        - **PAYMENT_PENDING (T5):** the customer gives up on paying or wants to pay another way: the stock and the coupon hold are released; the cart is still there.
+        - **PLACED / ACCEPTED (T11, Phase 4):** the stock is released and the coupon can be used again. Paid online: the full amount is refunded to the original payment (`refunds[]`, `payment_status` REFUND_PENDING, then REFUNDED; 08 §6.4). COD: nothing is due.
+
+        Repeating the call on an order already cancelled returns 409.
       summary: Cancel my order
       parameters:
       - in: path
@@ -8299,6 +8939,10 @@ paths:
                 value:
                   reason: CHANGE_PAYMENT_METHOD
                 summary: Pay another way
+              ChangedMyMind:
+                value:
+                  reason: CHANGED_MIND
+                summary: Changed my mind
               Other,WithANote:
                 value:
                   reason: OTHER
@@ -8314,7 +8958,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Order'
               examples:
-                Cancelled:
+                CancelledBeforePaying(T5):
                   value:
                     id: 5012
                     order_number: JV-261103-000123
@@ -8338,6 +8982,7 @@ paths:
                       mrp: '349.00'
                       selling_price: '279.00'
                       quantity: 2
+                      quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                     - id: 9002
@@ -8353,6 +8998,7 @@ paths:
                       mrp: '250.00'
                       selling_price: '225.00'
                       quantity: 1
+                      quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                     item_count: 3
@@ -8388,11 +9034,136 @@ paths:
                       - LEAVE_AT_DOOR
                       note: Please leave it with the guard if no one answers.
                     created_at: '2026-11-03T06:30:00Z'
+                    cancellation:
+                      reason: CHANGE_PAYMENT_METHOD
+                      message: I want to pay another way
+                      cancelled_by: customer
+                      cancelled_at: '2026-11-03T06:40:00Z'
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: false
                     placed_at: null
                     payment_expires_at: null
                     eta_at: null
                     can_cancel: false
                     can_retry_payment: false
+                    timeline:
+                    - status: PAYMENT_PENDING
+                      title: Completing payment…
+                      at: '2026-11-03T06:30:00Z'
+                    - status: CANCELLED
+                      title: Cancelled
+                      at: '2026-11-03T06:40:00Z'
+                  summary: Cancelled before paying (T5)
+                CancelledAfterPaying:Refunded(T11):
+                  value:
+                    id: 5012
+                    order_number: JV-261103-000123
+                    status: CANCELLED
+                    payment_method: ONLINE
+                    payment_status: REFUNDED
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9001
+                      variant_id: 1001
+                      product_id: 101
+                      product_name: Jivo Cold Pressed Canola Oil
+                      variant_name: 1 L
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                        medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                        large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                        alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                      mrp: '349.00'
+                      selling_price: '279.00'
+                      quantity: 2
+                      quantity_unavailable: 0
+                      line_mrp_total: '698.00'
+                      line_total: '558.00'
+                    - id: 9002
+                      variant_id: 2001
+                      product_id: 201
+                      product_name: Jivo Wheatgrass Juice
+                      variant_name: 500 ml
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                        medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                        large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                        alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                      mrp: '250.00'
+                      selling_price: '225.00'
+                      quantity: 1
+                      quantity_unavailable: 0
+                      line_mrp_total: '250.00'
+                      line_total: '225.00'
+                    item_count: 3
+                    bill:
+                      mrp_total: '948.00'
+                      item_total: '783.00'
+                      product_discount: '165.00'
+                      coupon_discount: '50.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '20.00'
+                      grand_total: '753.00'
+                      total_savings: '215.00'
+                    coupon_code: JIVO50
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips:
+                      - DONT_RING_BELL
+                      - LEAVE_AT_DOOR
+                      note: Please leave it with the guard if no one answers.
+                    created_at: '2026-11-03T06:30:00Z'
+                    cancellation:
+                      reason: CHANGED_MIND
+                      message: I changed my mind
+                      cancelled_by: customer
+                      cancelled_at: '2026-11-03T06:35:00Z'
+                    amount_refunded: '753.00'
+                    refunds:
+                    - id: 7102
+                      amount: '753.00'
+                      status: PROCESSED
+                      reason: ORDER_CANCELLED
+                      created_at: '2026-11-03T06:35:00Z'
+                      processed_at: '2026-11-03T06:35:04Z'
+                    can_download_invoice: false
+                    placed_at: '2026-11-03T06:32:10Z'
+                    payment_expires_at: null
+                    eta_at: '2026-11-03T06:46:00Z'
+                    can_cancel: false
+                    can_retry_payment: false
+                    timeline:
+                    - status: PAYMENT_PENDING
+                      title: Completing payment…
+                      at: '2026-11-03T06:30:00Z'
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:32:10Z'
+                    - status: ACCEPTED
+                      title: Order confirmed
+                      at: '2026-11-03T06:32:40Z'
+                    - status: CANCELLED
+                      title: Cancelled
+                      at: '2026-11-03T06:35:00Z'
+                  summary: 'Cancelled after paying: refunded (T11)'
           description: Cancelled.
         '400':
           content:
@@ -8498,6 +9269,551 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/orders/{id}/invoice/:
+    get:
+      operationId: orders_invoice
+      description: |-
+        A short-lived signed link to the order's GST tax invoice (PDF), made on the first request. Only for DELIVERED orders (`can_download_invoice`). Open or download the link before `expires_at`; call again for a fresh link.
+
+        Until Jivo's GST details are configured (D-12), invoices carry placeholder GST data and a 'not a valid tax invoice' banner.
+      summary: Download the GST invoice
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: '`Order.id`.'
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderInvoice'
+              examples:
+                Invoice:
+                  value:
+                    invoice_number: GGN01/26-27/000122
+                    issued_at: '2026-11-03T06:43:10Z'
+                    url: https://media.jivo.example/jivo-media/invoices/1/GGN01-26-27-000122.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=600&X-Amz-Signature=3b1f0c
+                    expires_at: '2026-11-03T07:00:00Z'
+          description: The invoice link.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Order not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The order does not exist or is not the caller's.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                INVOICENOTREADY:
+                  value:
+                    error:
+                      code: INVALID_STATE_TRANSITION
+                      message: The invoice is available once the order is delivered.
+                      details:
+                        status: PACKING
+                  summary: INVOICE_NOT_READY
+          description: '`INVALID_STATE_TRANSITION`: the order is not delivered (`details.status`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                INVOICERENDERINGUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: The invoice cannot be created right now. Try again
+                        in a few minutes.
+                      details: {}
+                  summary: INVOICE_RENDERING_UNAVAILABLE
+          description: Maintenance mode, or the PDF cannot be made right now (retry
+            later).
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+  /api/v1/orders/{id}/reorder/:
+    post:
+      operationId: orders_reorder
+      description: 'Puts the order''s items back in the cart, priced at the store
+        in `X-Store-Id`, as far as they can be ordered now (03 §2.10). Each line is
+        raised to the units of the past order, capped by what can be ordered (`orderable_quantity`);
+        it is never added on top, so repeating the call changes nothing. Lines already
+        in the cart with more units are left as they are. Returns the whole cart and
+        the lines that could not be added in full (`unavailable`): show them, then
+        open the cart.'
+      summary: Order again
+      parameters:
+      - in: header
+        name: X-Store-Id
+        schema:
+          type: integer
+        description: 'The store id from `GET /serviceability/` (`store.id`) for the
+          selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR`
+          with `details: {"X-Store-Id": [...]}`. Unknown or deactivated store: 404
+          `STORE_NOT_FOUND`; drop the saved store and check serviceability again.
+          A closed store is still browsable.'
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: '`Order.id`.'
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReorderResult'
+              examples:
+                EverythingAdded:
+                  value:
+                    cart:
+                      store:
+                        id: 1
+                        name: Jivo Sector 14, Gurugram
+                        is_open: true
+                        opens_at: null
+                      items:
+                      - id: 501
+                        product:
+                          id: 101
+                          slug: jivo-cold-pressed-canola-oil
+                          name: Jivo Cold Pressed Canola Oil
+                          brand: Jivo
+                          is_veg: true
+                        variant:
+                          id: 1001
+                          name: 1 L
+                          mrp: '349.00'
+                          selling_price: '279.00'
+                          discount_amount: '70.00'
+                          discount_percent: 20
+                          unit_price:
+                            amount: '27.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                            medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                            large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        quantity: 2
+                        line_mrp_total: '698.00'
+                        line_total: '558.00'
+                        issue: null
+                      - id: 502
+                        product:
+                          id: 201
+                          slug: jivo-wheatgrass-juice
+                          name: Jivo Wheatgrass Juice
+                          brand: Jivo
+                          is_veg: true
+                        variant:
+                          id: 2001
+                          name: 500 ml
+                          mrp: '250.00'
+                          selling_price: '225.00'
+                          discount_amount: '25.00'
+                          discount_percent: 10
+                          unit_price:
+                            amount: '45.00'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 4
+                          units_left: null
+                          max_qty_per_order: 4
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                            medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                            large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                            alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                        quantity: 1
+                        line_mrp_total: '250.00'
+                        line_total: '225.00'
+                        issue: null
+                      item_count: 3
+                      coupon:
+                        code: JIVO50
+                        title: Flat ₹50 off
+                        discount: '50.00'
+                        is_applicable: true
+                        message: null
+                        amount_to_unlock: null
+                      tip: '20.00'
+                      instructions:
+                        chips:
+                        - DONT_RING_BELL
+                        - LEAVE_AT_DOOR
+                        note: Please leave it with the guard if no one answers.
+                      address:
+                        id: 12
+                        label: home
+                        custom_label: ''
+                        receiver_name: Asha Verma
+                        receiver_phone: '+919876543210'
+                        house: Flat 402, Tower B
+                        building_street: Sunshine Apartments, MG Road
+                        landmark: Opposite City Mall
+                        area: Sector 14
+                        city: Gurugram
+                        state: Haryana
+                        pincode: '122001'
+                        lat: 28.4595
+                        lng: 77.0266
+                        is_default: true
+                        is_serviceable: true
+                        created_at: '2026-10-20T06:35:00Z'
+                        updated_at: '2026-10-20T06:35:00Z'
+                      bill:
+                        mrp_total: '948.00'
+                        item_total: '783.00'
+                        product_discount: '165.00'
+                        coupon_discount: '50.00'
+                        delivery_fee: '0.00'
+                        small_cart_fee: '0.00'
+                        handling_fee: '0.00'
+                        tip: '20.00'
+                        grand_total: '753.00'
+                        total_savings: '215.00'
+                      thresholds:
+                        min_order_value: '99.00'
+                        amount_to_min_order: null
+                        free_delivery_threshold: '299.00'
+                        amount_to_free_delivery: null
+                      payment_methods:
+                      - method: ONLINE
+                        is_available: true
+                        unavailable_reason: null
+                        message: null
+                      - method: COD
+                        is_available: true
+                        unavailable_reason: null
+                        message: null
+                      checkout:
+                        can_place_order: true
+                        blockers: []
+                    added_count: 2
+                    unavailable: []
+                  summary: Everything added
+                SomeItemsUnavailable:
+                  value:
+                    cart:
+                      store:
+                        id: 1
+                        name: Jivo Sector 14, Gurugram
+                        is_open: true
+                        opens_at: null
+                      items:
+                      - id: 501
+                        product:
+                          id: 101
+                          slug: jivo-cold-pressed-canola-oil
+                          name: Jivo Cold Pressed Canola Oil
+                          brand: Jivo
+                          is_veg: true
+                        variant:
+                          id: 1001
+                          name: 1 L
+                          mrp: '349.00'
+                          selling_price: '279.00'
+                          discount_amount: '70.00'
+                          discount_percent: 20
+                          unit_price:
+                            amount: '27.90'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 5
+                          units_left: null
+                          max_qty_per_order: 5
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
+                            medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
+                            large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
+                            alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
+                        quantity: 2
+                        line_mrp_total: '698.00'
+                        line_total: '558.00'
+                        issue: null
+                      - id: 502
+                        product:
+                          id: 201
+                          slug: jivo-wheatgrass-juice
+                          name: Jivo Wheatgrass Juice
+                          brand: Jivo
+                          is_veg: true
+                        variant:
+                          id: 2001
+                          name: 500 ml
+                          mrp: '250.00'
+                          selling_price: '225.00'
+                          discount_amount: '25.00'
+                          discount_percent: 10
+                          unit_price:
+                            amount: '45.00'
+                            per: 100 ml
+                          stock_status: IN_STOCK
+                          orderable_quantity: 4
+                          units_left: null
+                          max_qty_per_order: 4
+                          image:
+                            thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
+                            medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
+                            large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
+                            alt_text: Jivo Wheatgrass Juice 500 ml bottle
+                        quantity: 1
+                        line_mrp_total: '250.00'
+                        line_total: '225.00'
+                        issue: null
+                      item_count: 3
+                      coupon:
+                        code: JIVO50
+                        title: Flat ₹50 off
+                        discount: '50.00'
+                        is_applicable: true
+                        message: null
+                        amount_to_unlock: null
+                      tip: '20.00'
+                      instructions:
+                        chips:
+                        - DONT_RING_BELL
+                        - LEAVE_AT_DOOR
+                        note: Please leave it with the guard if no one answers.
+                      address:
+                        id: 12
+                        label: home
+                        custom_label: ''
+                        receiver_name: Asha Verma
+                        receiver_phone: '+919876543210'
+                        house: Flat 402, Tower B
+                        building_street: Sunshine Apartments, MG Road
+                        landmark: Opposite City Mall
+                        area: Sector 14
+                        city: Gurugram
+                        state: Haryana
+                        pincode: '122001'
+                        lat: 28.4595
+                        lng: 77.0266
+                        is_default: true
+                        is_serviceable: true
+                        created_at: '2026-10-20T06:35:00Z'
+                        updated_at: '2026-10-20T06:35:00Z'
+                      bill:
+                        mrp_total: '948.00'
+                        item_total: '783.00'
+                        product_discount: '165.00'
+                        coupon_discount: '50.00'
+                        delivery_fee: '0.00'
+                        small_cart_fee: '0.00'
+                        handling_fee: '0.00'
+                        tip: '20.00'
+                        grand_total: '753.00'
+                        total_savings: '215.00'
+                      thresholds:
+                        min_order_value: '99.00'
+                        amount_to_min_order: null
+                        free_delivery_threshold: '299.00'
+                        amount_to_free_delivery: null
+                      payment_methods:
+                      - method: ONLINE
+                        is_available: true
+                        unavailable_reason: null
+                        message: null
+                      - method: COD
+                        is_available: true
+                        unavailable_reason: null
+                        message: null
+                      checkout:
+                        can_place_order: true
+                        blockers: []
+                    added_count: 2
+                    unavailable:
+                    - variant_id: 3001
+                      product_name: Jivo Chia Seeds
+                      variant_name: 100 g
+                      requested_quantity: 2
+                      added_quantity: 0
+                      reason: OUT_OF_STOCK
+                  summary: Some items unavailable
+          description: The cart after adding the items.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                XSTOREIDMISSING:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - This header is required.
+                  summary: X_STORE_ID_MISSING
+                XSTOREIDINVALID:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        X-Store-Id:
+                        - A valid store id is required.
+                  summary: X_STORE_ID_INVALID
+          description: 'Invalid request: the `X-Store-Id` header is missing or malformed.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                STORENOTFOUND:
+                  value:
+                    error:
+                      code: STORE_NOT_FOUND
+                      message: This store is not available. Check serviceability again.
+                      details:
+                        store_id: 7
+                  summary: 'Unknown or deactivated store: check serviceability again'
+                ORDERNOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Order not found.
+                      details: {}
+                  summary: ORDER_NOT_FOUND
+          description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
+            or was deactivated. `NOT_FOUND`: the requested object or page does not
+            exist.'
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/orders/{id}/retry-payment/:
     post:
       operationId: orders_retry_payment
@@ -8563,6 +9879,7 @@ paths:
                         mrp: '349.00'
                         selling_price: '279.00'
                         quantity: 2
+                        quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
                       - id: 9002
@@ -8578,6 +9895,7 @@ paths:
                         mrp: '250.00'
                         selling_price: '225.00'
                         quantity: 1
+                        quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
                       item_count: 3
@@ -8613,11 +9931,19 @@ paths:
                         - LEAVE_AT_DOOR
                         note: Please leave it with the guard if no one answers.
                       created_at: '2026-11-03T06:30:00Z'
+                      cancellation: null
+                      amount_refunded: '0.00'
+                      refunds: []
+                      can_download_invoice: false
                       placed_at: null
                       payment_expires_at: '2026-11-03T06:45:00Z'
                       eta_at: null
                       can_cancel: true
                       can_retry_payment: true
+                      timeline:
+                      - status: PAYMENT_PENDING
+                        title: Completing payment…
+                        at: '2026-11-03T06:30:00Z'
                     razorpay:
                       key_id: rzp_test_Jv7x2QmP9kLs4T
                       order_id: order_Nq4BcD5eF6gH7i
@@ -8838,6 +10164,7 @@ paths:
                       mrp: '349.00'
                       selling_price: '279.00'
                       quantity: 2
+                      quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                     - id: 9002
@@ -8853,6 +10180,7 @@ paths:
                       mrp: '250.00'
                       selling_price: '225.00'
                       quantity: 1
+                      quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                     item_count: 3
@@ -8888,11 +10216,22 @@ paths:
                       - LEAVE_AT_DOOR
                       note: Please leave it with the guard if no one answers.
                     created_at: '2026-11-03T06:30:00Z'
+                    cancellation: null
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: false
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
-                    can_cancel: false
+                    can_cancel: true
                     can_retry_payment: false
+                    timeline:
+                    - status: PAYMENT_PENDING
+                      title: Completing payment…
+                      at: '2026-11-03T06:30:00Z'
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:32:10Z'
           description: 'Paid: the order is PLACED.'
         '400':
           content:
@@ -8989,6 +10328,29 @@ paths:
                   summary: RATE_LIMITED
           description: Too many requests from this account. Wait `details.retry_after_seconds`
             (also in `Retry-After`), then try again with the same request.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                PAYMENTGATEWAYUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Online payment is temporarily unavailable. Try again,
+                        or choose cash on delivery.
+                      details: {}
+                  summary: PAYMENT_GATEWAY_UNAVAILABLE
+          description: 'Maintenance mode (`MAINTENANCE`), or the payment gateway could
+            not be reached (`SERVICE_UNAVAILABLE`): nothing changed; call verify again.'
         '426':
           content:
             application/json:
@@ -9008,21 +10370,6 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance. We will be
-                        back by 6:00 AM.
-                      details: {}
-          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
-            true`). `message` is the text to show.'
   /api/v1/payments/razorpay/webhook/:
     post:
       operationId: payments_razorpay_webhook
@@ -11277,6 +12624,20 @@ components:
         * `CHANGED_MIND` - I changed my mind
         * `DELIVERY_TOO_SLOW` - Delivery is taking too long
         * `OTHER` - Other
+    CancelledByEnum:
+      enum:
+      - customer
+      - store
+      - rider
+      - ops
+      - system
+      type: string
+      description: |-
+        * `customer` - Customer
+        * `store` - Store staff
+        * `rider` - Rider
+        * `ops` - Ops / support
+        * `system` - System
     Cart:
       type: object
       description: The customer's cart at the store in `X-Store-Id` (one cart per
@@ -12393,17 +13754,46 @@ components:
           description: Promised delivery time (UTC; show it in IST). Null until PLACED.
         can_cancel:
           type: boolean
-          description: 'True when `POST /orders/{id}/cancel/` is allowed now (08 §7).
-            Phase 3: only in PAYMENT_PENDING; from Phase 4 also PLACED and ACCEPTED.'
+          description: 'True when `POST /orders/{id}/cancel/` is allowed now (08 §7):
+            PAYMENT_PENDING, PLACED or ACCEPTED (from PACKING on, show ''Contact support'').'
         can_retry_payment:
           type: boolean
           description: 'True when `POST /orders/{id}/retry-payment/` is allowed now:
             an ONLINE order in PAYMENT_PENDING before `payment_expires_at`.'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderTimelineEntry'
+          description: Every state reached, oldest first (Phase 4).
+        cancellation:
+          allOf:
+          - $ref: '#/components/schemas/OrderCancellation'
+          nullable: true
+          description: Set when the order is CANCELLED; null otherwise (Phase 4).
+        amount_refunded:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: 'Refunded so far (processed refunds), Phase 4. `bill` is always
+            the current bill: after items were found unavailable it is the reduced
+            one.'
+        refunds:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderRefund'
+          description: Refunds of this order, oldest first; [] when none (Phase 4).
+        can_download_invoice:
+          type: boolean
+          description: 'True when `GET /orders/{id}/invoice/` has an invoice: DELIVERED
+            orders (Phase 4).'
       required:
       - address
+      - amount_refunded
       - bill
       - can_cancel
+      - can_download_invoice
       - can_retry_payment
+      - cancellation
       - coupon_code
       - created_at
       - eta_at
@@ -12416,8 +13806,10 @@ components:
       - payment_method
       - payment_status
       - placed_at
+      - refunds
       - status
       - store
+      - timeline
     OrderAddress:
       type: object
       description: |-
@@ -12490,6 +13882,36 @@ components:
       - receiver_name
       - receiver_phone
       - state
+    OrderCancelReasonEnum:
+      enum:
+      - CHANGE_PAYMENT_METHOD
+      - PAYMENT_PROBLEM
+      - ORDERED_BY_MISTAKE
+      - CHANGED_MIND
+      - DELIVERY_TOO_SLOW
+      - OTHER
+      - ITEMS_UNAVAILABLE
+      - STORE_CLOSING
+      - ADDRESS_ISSUE
+      - CUSTOMER_REQUEST
+      - SUSPECTED_FRAUD
+      - NO_RIDER
+      - OTHER_STAFF
+      type: string
+      description: |-
+        * `CHANGE_PAYMENT_METHOD` - I want to pay another way
+        * `PAYMENT_PROBLEM` - The payment did not work
+        * `ORDERED_BY_MISTAKE` - I ordered by mistake
+        * `CHANGED_MIND` - I changed my mind
+        * `DELIVERY_TOO_SLOW` - Delivery is taking too long
+        * `OTHER` - Other
+        * `ITEMS_UNAVAILABLE` - Items are not available at the store
+        * `STORE_CLOSING` - The store had to close
+        * `ADDRESS_ISSUE` - We could not deliver to this address
+        * `CUSTOMER_REQUEST` - Cancelled at your request
+        * `SUSPECTED_FRAUD` - The order could not be verified
+        * `NO_RIDER` - No delivery partner was available
+        * `OTHER_STAFF` - Cancelled by the store
     OrderCancelRequest:
       type: object
       properties:
@@ -12500,6 +13922,33 @@ components:
           description: Optional free text, e.g. for OTHER.
           maxLength: 250
       required:
+      - reason
+    OrderCancellation:
+      type: object
+      properties:
+        reason:
+          $ref: '#/components/schemas/OrderCancelReasonEnum'
+        message:
+          type: string
+          description: The reason as text to show.
+        cancelled_by:
+          allOf:
+          - $ref: '#/components/schemas/CancelledByEnum'
+          description: |-
+            `customer`, `store`, `ops` (Jivo support) or `system` (payment window).
+
+            * `customer` - Customer
+            * `store` - Store staff
+            * `rider` - Rider
+            * `ops` - Ops / support
+            * `system` - System
+        cancelled_at:
+          type: string
+          format: date-time
+      required:
+      - cancelled_at
+      - cancelled_by
+      - message
       - reason
     OrderCreateRequest:
       type: object
@@ -12522,6 +13971,29 @@ components:
       - address_id
       - expected_grand_total
       - payment_method
+    OrderInvoice:
+      type: object
+      description: '`GET /orders/{id}/invoice/`: a short-lived link to the GST invoice
+        PDF.'
+      properties:
+        invoice_number:
+          type: string
+          description: e.g. "GGN01/26-27/000123".
+        issued_at:
+          type: string
+          format: date-time
+        url:
+          type: string
+          format: uri
+          description: Signed link to the PDF; open or download it before `expires_at`.
+        expires_at:
+          type: string
+          format: date-time
+      required:
+      - expires_at
+      - invoice_number
+      - issued_at
+      - url
     OrderLine:
       type: object
       description: An ordered variant, with the names and prices as they were at order
@@ -12555,16 +14027,24 @@ components:
         quantity:
           type: integer
           minimum: 1
+          description: Units ordered.
+        quantity_unavailable:
+          type: integer
+          minimum: 0
+          description: 'Units the store could not supply (08 T8a, Phase 4): removed
+            from the order and the bill (refunded if paid online). 0 normally. Units
+            coming = `quantity` - `quantity_unavailable`; show the removed ones struck
+            through.'
         line_mrp_total:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
-          description: '`mrp` x `quantity`.'
+          description: '`mrp` x the units coming (`quantity` - `quantity_unavailable`).'
         line_total:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
-          description: '`selling_price` x `quantity`.'
+          description: '`selling_price` x the units coming (`quantity` - `quantity_unavailable`).'
       required:
       - id
       - image
@@ -12574,6 +14054,7 @@ components:
       - product_id
       - product_name
       - quantity
+      - quantity_unavailable
       - selling_price
       - variant_id
       - variant_name
@@ -12592,6 +14073,64 @@ components:
       required:
       - order
       - razorpay
+    OrderRefund:
+      type: object
+      description: Money going back to the original payment method (08 §4 rule 4,
+        §6.4).
+      properties:
+        id:
+          type: integer
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Amount refunded.
+        status:
+          allOf:
+          - $ref: '#/components/schemas/OrderRefundStatusEnum'
+          description: |-
+            PENDING: started; banks usually take 5-7 working days. PROCESSED: the gateway has sent it. A refund the gateway refused is retried by Jivo's team and stays PENDING here (never FAILED).
+
+            * `PENDING` - Refund in progress
+            * `PROCESSED` - Refunded
+        reason:
+          $ref: '#/components/schemas/OrderRefundReasonEnum'
+        created_at:
+          type: string
+          format: date-time
+        processed_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - amount
+      - created_at
+      - id
+      - processed_at
+      - reason
+      - status
+    OrderRefundReasonEnum:
+      enum:
+      - ORDER_CANCELLED
+      - ITEMS_UNAVAILABLE
+      - DELIVERY_FAILED
+      - PAYMENT_ISSUE
+      - GOODWILL
+      type: string
+      description: |-
+        * `ORDER_CANCELLED` - Order cancelled
+        * `ITEMS_UNAVAILABLE` - Items not available
+        * `DELIVERY_FAILED` - Delivery unsuccessful
+        * `PAYMENT_ISSUE` - Extra or late payment returned
+        * `GOODWILL` - Refund from customer support
+    OrderRefundStatusEnum:
+      enum:
+      - PENDING
+      - PROCESSED
+      type: string
+      description: |-
+        * `PENDING` - Refund in progress
+        * `PROCESSED` - Refunded
     OrderStatusEnum:
       enum:
       - PAYMENT_PENDING
@@ -12691,6 +14230,22 @@ components:
       - placed_at
       - status
       - store
+    OrderTimelineEntry:
+      type: object
+      description: A state the order reached (08 §1), oldest first.
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        title:
+          type: string
+          description: The customer label of the state, e.g. "Order confirmed".
+        at:
+          type: string
+          format: date-time
+      required:
+      - at
+      - status
+      - title
     OtpPurposeEnum:
       enum:
       - login
@@ -13314,6 +14869,64 @@ components:
       required:
       - event
       - payload
+    ReorderIssue:
+      type: object
+      properties:
+        variant_id:
+          type: integer
+        product_name:
+          type: string
+        variant_name:
+          type: string
+        requested_quantity:
+          type: integer
+          minimum: 1
+          description: Units in the past order (those that were delivered or coming).
+        added_quantity:
+          type: integer
+          minimum: 0
+          description: Units now in the cart for this variant (0 = not added).
+        reason:
+          $ref: '#/components/schemas/ReorderIssueReasonEnum'
+      required:
+      - added_quantity
+      - product_name
+      - reason
+      - requested_quantity
+      - variant_id
+      - variant_name
+    ReorderIssueReasonEnum:
+      enum:
+      - OUT_OF_STOCK
+      - LIMITED_STOCK
+      - NOT_AVAILABLE
+      type: string
+      description: |-
+        * `OUT_OF_STOCK` - Out of stock
+        * `LIMITED_STOCK` - Only part of the quantity is available
+        * `NOT_AVAILABLE` - No longer sold at this store
+    ReorderResult:
+      type: object
+      properties:
+        cart:
+          allOf:
+          - $ref: '#/components/schemas/Cart'
+          description: The whole cart after the items were added.
+        added_count:
+          type: integer
+          minimum: 0
+          description: 'How many of the order''s lines now have at least one unit
+            in the cart (e.g. for "3 items added"). 0: nothing could be added.'
+        unavailable:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReorderIssue'
+          description: Lines that could not be added in full; [] when everything was
+            added.
+      required:
+      - added_count
+      - cart
+      - unavailable
     RiderLocationSettings:
       type: object
       properties:

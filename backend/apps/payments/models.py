@@ -113,6 +113,9 @@ class Refund(TimeStampedModel):
             ),
             models.CheckConstraint(condition=Q(amount__gt=0), name="refund_amount_positive"),
         ]
+        permissions = [
+            ("issue_refund", "Can refund an order (within the role's limit) or retry a refund"),
+        ]
 
     def __str__(self) -> str:
         return f"Refund {self.amount} on order {self.order_id}: {self.status}"
