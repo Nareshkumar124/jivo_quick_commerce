@@ -82,7 +82,8 @@ enum TicketCategory {
 /// The longest message the app sends.
 const ticketMessageMaxLength = 1000;
 
-/// The shortest new-ticket description the app accepts.
+/// The shortest new-ticket description the app accepts (the server's
+/// limit, `support_tickets_create`). A reply needs one character.
 const ticketMessageMinLength = 10;
 
 /// One ticket in "My tickets".
@@ -138,10 +139,18 @@ class TicketMessage {
 /// A ticket with its messages, oldest first.
 @immutable
 class TicketThread {
-  const TicketThread({required this.ticket, required this.messages});
+  TicketThread({
+    required this.ticket,
+    required this.messages,
+    bool? canReply,
+  }) : canReply = canReply ?? ticket.status != TicketStatus.closed;
 
   final SupportTicket ticket;
   final List<TicketMessage> messages;
+
+  /// The server's `can_reply` (false once CLOSED; a reply to a RESOLVED
+  /// ticket reopens it).
+  final bool canReply;
 }
 
 @immutable
