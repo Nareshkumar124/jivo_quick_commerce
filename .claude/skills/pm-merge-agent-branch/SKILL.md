@@ -27,7 +27,7 @@ Out-of-scope edits: revert them or ask the user; never silently commit another a
 git -C $W add -A
 git -C $W diff --cached --name-only | grep -E '(^|/)\.env(\.localdb)?$|\.(a|i)\.(olf|conf)$|^qa/private/|incoming/' && echo "STOP: secret file staged"
 git -C $W diff --cached | grep -E '^\+' | grep -nE 'AC[0-9a-f]{32}|POSTGRES_PASSWORD=.+|SEED_DEMO_STAFF_PASSWORD=.+|rzp_live_|-----BEGIN|FIELD_ENCRYPTION_KEYS=.+' \
-  | grep -vE 'AC0{32}|rzp_test_Jv7x2QmP9kLs4T|=unused|=<[a-z-]+>|re\.compile'
+  | grep -vE 'AC0{32}|=unused|=<[a-z-]+>|re\.compile'
 ```
 Any remaining hit: unstage, inspect the line (without echoing a real value to the user), fix, rescan. Only print file:line, never the value.
 

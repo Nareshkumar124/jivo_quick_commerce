@@ -439,8 +439,9 @@ Record each tuned threshold here with its date and reason (after the pilot week,
 ### 11.1 Required secrets in staging and production
 Kept per environment in the secrets manager; never in git or in images:
 - `DJANGO_SECRET_KEY` (at least 50 characters): sessions, CSRF, signing.
-- **`JWT_SIGNING_KEY`:** signs the apps' access and refresh tokens. In staging and production it must be **set and different from `DJANGO_SECRET_KEY`**, so rotating one never invalidates the other. The fallback to the secret key is for local use only.
-- **`OTP_HASH_KEY`:** the key used to hash OTP codes (HMAC). Required once the backend's P8 security change lands; never reuse another key.
+- **`JWT_SIGNING_KEY`:** signs the apps' access and refresh tokens. In staging and production it must be **set, at least 50 characters, and different from `DJANGO_SECRET_KEY`** (system check `accounts.E005`, which fails the deploy-time check, §8.1), so rotating one never invalidates the other. The fallback to the secret key is for local use only. Generate with `secrets.token_urlsafe(64)`.
+- **`OTP_HASH_KEY`:** the key used to hash OTP codes (HMAC). Staging and production: **at least 32 characters, distinct from both keys above**; never reuse another key. Generate with `secrets.token_urlsafe(48)`.
+- CI's `check --deploy` step (`backend.yml`) generates throwaway values for all three on every run; the staging preflight (`deploy-staging.yml`) refuses a `STAGING_BACKEND_ENV` that lacks `DJANGO_SECRET_KEY`, `JWT_SIGNING_KEY` or `OTP_HASH_KEY`.
 - **`FIELD_ENCRYPTION_KEYS`:** comma-separated Fernet keys, **newest first**, for rider bank and KYC numbers (09 §3.3). Required in staging and production (`delivery.E001`).
 - `POSTGRES_PASSWORD`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN`, `S3_SECRET_ACCESS_KEY` (or an instance role instead), `SENTRY_DSN`, `EMAIL_HOST_PASSWORD`.
 - Generate keys with `python3 -c "import secrets; print(secrets.token_urlsafe(64))"` and Fernet keys with `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` (from `backend/`), straight into the secrets manager.
