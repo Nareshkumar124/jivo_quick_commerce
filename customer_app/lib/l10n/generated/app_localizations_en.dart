@@ -1730,4 +1730,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openInBrowser => 'Open in browser';
+
+  @override
+  String get onlinePaymentUnavailable =>
+      'Payment service is unavailable right now. Try again, or choose Cash on Delivery.';
 }

@@ -55,6 +55,10 @@ class CheckoutState {
 ///   screens show the server's new bill and flags; the message says what
 ///   changed, from the error's `details` (`cartErrorText`).
 /// - Another order awaiting payment: [CheckoutState.pendingOrderId].
+/// - ONLINE and 503 `SERVICE_UNAVAILABLE` (the gateway is down, M6): the
+///   server made the order and ended it `PAYMENT_FAILED`; the cart stays,
+///   the error is published for the screen, and the next tap is a new
+///   order (a definite answer retires the key).
 class CheckoutController extends Notifier<CheckoutState> {
   String? _idempotencyKey;
 

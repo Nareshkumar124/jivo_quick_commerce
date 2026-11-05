@@ -1003,5 +1003,7 @@
   "cmsPageUnavailable": "This page isn't available in the app right now. You can read it in your browser.",
   "@cmsPageUnavailable": {"description": "CMS page missing on the server (404): fall back to the policy URL."},
   "openInBrowser": "Open in browser",
-  "@openInBrowser": {"description": "Button: open a page in the browser."}
+  "@openInBrowser": {"description": "Button: open a page in the browser."},
+  "onlinePaymentUnavailable": "Payment service is unavailable right now. Try again, or choose Cash on Delivery.",
+  "@onlinePaymentUnavailable": {"description": "Checkout: the payment gateway is down when placing an ONLINE order (503 SERVICE_UNAVAILABLE, M6)."}
 }
