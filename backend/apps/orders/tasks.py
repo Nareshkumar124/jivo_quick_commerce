@@ -21,7 +21,21 @@ def order_event(event: str, order_id: int) -> str:
         logger.info("Order event %s: order %s", event, order_id)
     if event == events.PLACED:
         schedule_acceptance(order_id)
+    fan_out(event, order_id)
     return event
+
+
+def fan_out(event: str, order_id: int) -> None:
+    """Phase 6 (08 §9): the socket messages and the customer notification of the event, each its
+    own retried, idempotent task, so one failing never blocks the other (or this handler)."""
+    from apps.notifications.tasks import notify_order_event
+    from apps.realtime.tasks import publish_order_event
+
+    for task in (publish_order_event, notify_order_event):
+        try:
+            task.delay(event, order_id)
+        except Exception:
+            logger.exception("Order event %s: %s not run for order %s", event, task.name, order_id)
 
 
 def schedule_acceptance(order_id: int) -> None:

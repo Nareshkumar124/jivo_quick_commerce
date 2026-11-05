@@ -121,6 +121,8 @@ void main() {
       expect(summary.cashInHand, '1840.00');
       expect(summary.limitReached, isFalse);
       expect(summary.homeStoreName, 'Sector 18');
+      // The store pin enables "Navigate to store" on the too-far guard.
+      expect(summary.homeStoreLocation, const GeoPoint(28.57, 77.321));
     },
   );
 }
@@ -138,7 +140,13 @@ const _riderMe = {
   'vehicle_type': 'MOTORBIKE',
   'vehicle_number': 'DL01AB1234',
   'preferred_store': {'id': 1, 'name': 'Sector 18', 'city': 'Noida'},
-  'home_store': {'id': 1, 'name': 'Sector 18', 'city': 'Noida'},
+  'home_store': {
+    'id': 1,
+    'name': 'Sector 18',
+    'city': 'Noida',
+    'lat': 28.57,
+    'lng': 77.321,
+  },
   'photo_url': null,
   'photo_url_expires_at': null,
   'rating_avg': null,

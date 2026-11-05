@@ -1,0 +1,248 @@
+# Alert rules (09 §2, §5; docs/deployment.md §10). Prometheus rule-file format, so any
+# Prometheus-compatible evaluator can load it as is (Prometheus, Amazon Managed Prometheus, Grafana
+# Mimir/Cloud); other providers translate one rule per alert, keeping the thresholds.
+#
+# severity:
+#   page   - wake the on-call engineer (customer-visible outage or money/stock at risk)
+#   ticket - fix in working hours; posted to the team channel
+#   ops    - business SLA: goes to the store/ops on-call, not engineering (also on the ops dashboard)
+#
+# Validated by infra/monitoring/check_monitoring.py (structure, metric catalog, runbook anchors)
+# and, in CI, by `promtool check rules`. Thresholds are v1 starting points: tune them after the
+# pilot week (10 §7) and record changes in docs/deployment.md §10.5.
+groups:
+  # ------------------------------------------------------------------ availability
+  - name: jqc-availability
+    rules:
+      - alert: JqcApiNotReady
+        expr: avg_over_time(probe_success{job="jqc-health-ready"}[2m]) < 0.5
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: /health/ready is failing (DB or Redis unreachable from the web tier).
+          description: Readiness probe success {{ $value | humanizePercentage }} over 2 minutes. 99.5% monthly uptime allows about 3.6 h of downtime a month.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-api-availability
+
+      - alert: JqcApi5xxRateHigh
+        expr: |
+          sum(rate(jqc_http_requests_total{status_class="5xx"}[5m]))
+            / clamp_min(sum(rate(jqc_http_requests_total[5m])), 1e-9) > 0.02
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: More than 2% of API requests fail with 5xx.
+          description: 5xx ratio {{ $value | humanizePercentage }} over 5 minutes.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-api-availability
+
+      - alert: JqcRedisDown
+        expr: max(redis_up) < 1
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: Redis is down (cache, Celery broker, channel layer, OTP limits).
+          description: OTP sends fail closed (503) and WebSockets drop to polling while Redis is down (09 §2).
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-data-stores
+
+      - alert: JqcPostgresDown
+        expr: max(pg_up) < 1
+        for: 1m
+        labels: {severity: page}
+        annotations:
+          summary: PostgreSQL is unreachable.
+          description: Every API call that touches the database fails.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-data-stores
+
+  # ------------------------------------------------------------------ latency (09 §1)
+  - name: jqc-latency
+    rules:
+      - alert: JqcReadLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum by (le, route) (rate(jqc_http_request_duration_seconds_bucket{method="GET", route=~"api/v1/(home|categories|products|search|cart).*"}[5m]))) > 0.3
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "p95 latency above 300 ms on {{ $labels.route }}."
+          description: "Target p95 < 300 ms for home, catalog and cart reads (09 §1). Current {{ $value | humanizeDuration }}."
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-latency
+
+      - alert: JqcOrderPlacementLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(jqc_http_request_duration_seconds_bucket{method="POST", route="api/v1/orders/"}[5m]))) > 0.8
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: Order placement p95 above 800 ms.
+          description: "Target p95 < 800 ms (09 §1). Current {{ $value | humanizeDuration }}. Check DB locks on inventory rows."
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-latency
+
+      - alert: JqcServiceabilityLatencyP95High
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(jqc_http_request_duration_seconds_bucket{route=~"api/v1/serviceability.*"}[5m]))) > 0.15
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: Serviceability check p95 above 150 ms.
+          description: "Target p95 < 150 ms (09 §1). A cold or missing Redis snapshot falls back to PostGIS. Current {{ $value | humanizeDuration }}."
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-latency
+
+  # ------------------------------------------------------------------ background jobs
+  - name: jqc-jobs
+    rules:
+      - alert: JqcCeleryQueueBacklog
+        expr: sum(celery_queue_length) > 200
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: Celery backlog above 200 messages for 10 minutes.
+          description: "Push, SMS, refunds and dispatch are delayed. Backlog {{ $value }}."
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery
+
+      - alert: JqcCeleryWorkersDown
+        expr: sum(celery_worker_up) < 1
+        for: 3m
+        labels: {severity: page}
+        annotations:
+          summary: No Celery worker is alive.
+          description: Nothing consumes the queue; OTP SMS, push and refunds stop.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery
+
+      - alert: JqcCeleryTaskFailures
+        expr: sum by (name) (increase(celery_task_failed_total[15m])) > 5
+        for: 0m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Task {{ $labels.name }} failed more than 5 times in 15 minutes."
+          description: Tasks are idempotent and retried; repeated failures need a look at Sentry.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery
+
+      - alert: JqcBeatNotRunning
+        expr: max(jqc_beat_task_last_run_age_seconds{task="expire-unpaid-orders"}) > 300
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: Celery beat has not run expire-unpaid-orders for 5+ minutes.
+          description: Without beat, unpaid online orders never expire and their reserved stock is never released (deployment.md §4).
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery-beat
+
+      - alert: JqcBeatDailyJobMissed
+        expr: |
+          max by (task) (jqc_beat_task_last_run_age_seconds{task=~"anonymise-deleted-accounts|purge-old-otp-requests|purge-old-notifications|purge-old-rider-locations|purge-offboarded-kyc"}) > 93600
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Daily job {{ $labels.task }} has not run for 26 hours."
+          description: Retention jobs (DPDP, 07 §4) are overdue.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery-beat
+
+      - alert: JqcPaymentWindowOverdue
+        expr: max(jqc_orders_payment_window_overdue) > 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: Unpaid orders are past their payment window and still hold stock.
+          description: "{{ $value }} PAYMENT_PENDING orders are 5+ minutes overdue: expire_unpaid_orders is failing or beat is down."
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery-beat
+
+  # ------------------------------------------------------------------ payments and refunds
+  - name: jqc-payments
+    rules:
+      - alert: JqcRefundFailed
+        expr: max(delta(jqc_refunds{status="FAILED"}[1h])) > 0
+        for: 0m
+        labels: {severity: ticket}
+        annotations:
+          summary: A refund failed at the gateway in the last hour.
+          description: Retry it from the admin (Payments > Refunds) after checking the Razorpay dashboard.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-payments
+
+      - alert: JqcRefundPendingTooLong
+        expr: max(jqc_refund_pending_oldest_age_seconds) > 7200
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: A refund has been PENDING for more than 2 hours.
+          description: sync_refund_status runs every 30 minutes; a refund this old was not answered by the gateway.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-payments
+
+      - alert: JqcWebhookSignatureFailures
+        expr: |
+          sum(rate(jqc_http_requests_total{route="api/v1/payments/razorpay/webhook/", status="400"}[10m])) * 600 > 5
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: Razorpay webhooks are being rejected (400).
+          description: A burst of 400s usually means RAZORPAY_WEBHOOK_SECRET no longer matches the dashboard after a rotation (deployment.md §5).
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-payments
+
+      - alert: JqcWebhookRetryLoop
+        expr: |
+          sum(rate(jqc_http_requests_total{route="api/v1/payments/razorpay/webhook/", status="503"}[5m])) > 0
+        for: 15m
+        labels: {severity: page}
+        annotations:
+          summary: Razorpay webhooks have answered 503 for 15+ minutes.
+          description: Short 503 bursts are expected (Razorpay retries); 15 minutes is not (deployment.md §5).
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-payments
+
+  # ------------------------------------------------------------------ notifications and realtime
+  - name: jqc-notifications
+    rules:
+      - alert: JqcNotificationsStuckSending
+        expr: sum(jqc_notifications_stuck_sending) > 0
+        for: 30m
+        labels: {severity: ticket}
+        annotations:
+          summary: Push/SMS sends stuck in SENDING for 45+ minutes.
+          description: The stuck-send sweeper (every 15 minutes) should have failed these; check that it runs and that workers are healthy.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-notifications
+
+      - alert: JqcNotificationFailuresHigh
+        expr: sum by (channel) (jqc_notifications_failed_last_hour) > 50
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "More than 50 {{ $labels.channel }} notifications failed in the last hour."
+          description: FCM or the SMS gateway (Twilio, DLT templates) is failing.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-notifications
+
+      - alert: JqcWebsocketConnectionsCollapsed
+        expr: |
+          sum(jqc_ws_connections) < 1 and on () sum(jqc_ws_connections offset 15m) > 20
+        for: 5m
+        labels: {severity: ticket}
+        annotations:
+          summary: WebSocket connections dropped to zero.
+          description: Apps fall back to polling, so this is degraded, not down. Check the channel layer (Redis) and the edge's /ws/ route.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-notifications
+
+  # ------------------------------------------------------------------ business SLA (ops)
+  - name: jqc-business
+    rules:
+      - alert: JqcStoreAcceptanceSlaBreach
+        expr: max by (store_id) (jqc_orders_awaiting_acceptance_over_sla) > 0
+        for: 2m
+        labels: {severity: ops}
+        annotations:
+          summary: "Store {{ $labels.store_id }} has orders waiting for acceptance beyond the SLA."
+          description: "{{ $value }} PLACED orders are past STORE_ACCEPTANCE_SLA_SECONDS."
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-business-sla
+
+      - alert: JqcOrdersPastEta
+        expr: max by (store_id) (jqc_orders_past_eta) > 3
+        for: 10m
+        labels: {severity: ops}
+        annotations:
+          summary: "Store {{ $labels.store_id }} has more than 3 active orders past their ETA."
+          description: Check packing and rider availability for this store.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-business-sla
+
+      - alert: JqcNoOrdersDuringOpenHours
+        # 03:00-16:00 UTC = 08:30-21:30 IST; replace with the real store hours after the pilot.
+        expr: |
+          max(jqc_orders_placed_last_30m) < 1 and on () (hour() >= 3 and hour() < 16)
+        for: 30m
+        labels: {severity: ticket}
+        annotations:
+          summary: No orders placed for an hour during open hours.
+          description: Could be checkout, payments, serviceability or the apps. Try a test order.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-business-sla

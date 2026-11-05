@@ -7,6 +7,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../location/presentation/location_debug_controller.dart';
+import '../../notifications/presentation/push_providers.dart';
 import '../../offers/presentation/offer_alert_providers.dart';
 import '../../onboarding/presentation/onboarding_providers.dart';
 import '../../task/presentation/task_block.dart';
@@ -156,9 +157,21 @@ class RiderAccountController extends Notifier<RiderAccountState> {
       return LogoutResult.blockedWhileOnline;
     }
     final refresh = _session.refreshToken;
+    // Stop push to this phone first, while the session can still call the
+    // API (best effort).
+    String? fcmToken;
+    try {
+      fcmToken = await ref
+          .read(pushRegistrationControllerProvider.notifier)
+          .unregisterForLogout();
+    } on Object catch (error) {
+      debugPrint('RiderAccountController.logout: unregister push: $error');
+    }
     if (refresh != null) {
       try {
-        await ref.read(authRepositoryProvider).logout(refreshToken: refresh);
+        await ref
+            .read(authRepositoryProvider)
+            .logout(refreshToken: refresh, fcmToken: fcmToken);
       } on Object catch (error) {
         debugPrint('RiderAccountController.logout: server logout: $error');
       }

@@ -17,6 +17,9 @@ ALLOWED_HOSTS = env_list(
 
 API_DOCS_PUBLIC = env_bool("API_DOCS_PUBLIC", default=True)
 
+# Phase 6: log pushes (title and body) until FCM exists (D-19).
+PUSH_BACKEND = env_str("PUSH_BACKEND", default="apps.notifications.push.ConsolePushBackend")
+
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,
     "DEFAULT_RENDERER_CLASSES": [
