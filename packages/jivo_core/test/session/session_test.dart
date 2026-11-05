@@ -278,6 +278,104 @@ void main() {
       expect(await h.getMe(), 200, reason: 'the kept session recovers');
     });
 
+    test('two concurrent 401s share one refresh call (single-flight)',
+        () async {
+      final h = Harness(
+        api: meAcceptsNewToken,
+        refresh: (_) async {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          return (200, newTokens.toJson());
+        },
+      );
+      await h.session.restore();
+      expect(await Future.wait([h.getMe(), h.getMe()]), [200, 200]);
+      expect(h.refreshBackend.requests, hasLength(1));
+    });
+
+    test('a refresh whose answer was lost (receive timeout) is never '
+        'replayed: the next 401 signs out locally instead (M2)', () async {
+      final h = Harness(
+        api: meAcceptsNewToken,
+        refresh: (request) => throw DioException(
+          requestOptions: request,
+          type: DioExceptionType.receiveTimeout,
+        ),
+      );
+      await h.session.restore();
+
+      final first = await h.getMe().then<Object?>(
+        (_) => null,
+        onError: (Object e) => e,
+      );
+      expect(ApiError.from(first!).code, ApiErrorCode.timeout);
+      expect(h.session.status, SessionStatus.signedIn);
+      expect(h.refreshBackend.requests, hasLength(1));
+
+      await h.getMe().then<Object?>((_) => null, onError: (Object e) => e);
+      expect(
+        h.refreshBackend.requests,
+        hasLength(1),
+        reason: 'the possibly rotated refresh token is not sent again',
+      );
+      expect(h.session.status, SessionStatus.signedOut);
+      expect(h.session.lastSignOutReason, SignOutReason.sessionExpired);
+      expect(await h.store.read(), isNull);
+    });
+
+    test('a refresh that never left the device (connect timeout) may be '
+        'retried with the same token', () async {
+      var works = false;
+      final h = Harness(
+        api: meAcceptsNewToken,
+        refresh: (request) {
+          if (!works) {
+            throw DioException(
+              requestOptions: request,
+              type: DioExceptionType.connectionTimeout,
+            );
+          }
+          return (200, newTokens.toJson());
+        },
+      );
+      await h.session.restore();
+      await h.getMe().then<Object?>((_) => null, onError: (Object e) => e);
+      works = true;
+      expect(await h.getMe(), 200);
+      expect(h.refreshBackend.requests, hasLength(2));
+      expect(h.session.refreshToken, 'new-refresh');
+    });
+
+    test('mayHaveReachedServer classifies refresh failures', () {
+      DioException dio(DioExceptionType type) =>
+          DioException(requestOptions: RequestOptions(), type: type);
+      bool reached(ApiError e) => SessionManager.mayHaveReachedServer(e);
+      expect(
+        reached(ApiError.fromDioException(dio(DioExceptionType.receiveTimeout))),
+        isTrue,
+      );
+      expect(
+        reached(ApiError.fromDioException(dio(DioExceptionType.sendTimeout))),
+        isTrue,
+      );
+      expect(
+        reached(
+          ApiError.fromDioException(dio(DioExceptionType.connectionTimeout)),
+        ),
+        isFalse,
+      );
+      expect(
+        reached(
+          ApiError.fromDioException(dio(DioExceptionType.connectionError)),
+        ),
+        isFalse,
+      );
+      expect(
+        reached(const ApiError(code: ApiErrorCode.serverError, statusCode: 503)),
+        isFalse,
+      );
+      expect(reached(const ApiError(code: ApiErrorCode.unknown)), isTrue);
+    });
+
     test('a 5xx during refresh also keeps the session', () async {
       final h = Harness(
         api: meAcceptsNewToken,

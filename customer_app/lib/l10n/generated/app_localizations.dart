@@ -3015,6 +3015,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open in browser'**
   String get openInBrowser;
+
+  /// Checkout: the payment gateway is down when placing an ONLINE order (503 SERVICE_UNAVAILABLE, M6).
+  ///
+  /// In en, this message translates to:
+  /// **'Payment service is unavailable right now. Try again, or choose Cash on Delivery.'**
+  String get onlinePaymentUnavailable;
 }
 
 class _AppLocalizationsDelegate
