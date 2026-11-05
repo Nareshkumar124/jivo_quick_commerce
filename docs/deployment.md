@@ -10,6 +10,7 @@ This file records what is **actually set up today**, plus the target for the env
 | **CI** (GitHub Actions) | ✅ green on `main` (`.github/workflows/backend.yml`, `mobile.yml`). T-404c (2026-11-04) added parallel backend tests and the env-example and Razorpay pin checks. |
 | **staging** | ⬜ **not set up.** Needs D-05 (hosting), domains/TLS, Razorpay test keys, and the Firebase staging project |
 | **production** | ⬜ **not set up** (Phase 8, [`release-checklist.md`](release-checklist.md)) |
+| **P8 hardening (prepared, T-813)** | ✅ backup/restore scripts + verifier with a schema-only drill (§7), deploy-time checks and release step in the image (§8), edge limits and log hygiene (§9), monitoring as code (§10), secrets and rotation (§11). Nothing is applied to staging/production until D-05. |
 
 ## 1. Local development
 
@@ -128,6 +129,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
   - Caching:
     - the Flutter SDK and `~/.pub-cache`, through `subosito/flutter-action`, keyed on every `pubspec.lock`
     - Gradle for the APK builds, through `setup-java` `cache: gradle`, keyed on each app's Gradle files
+- **`infra.yml`** (paths `infra/**`): `bash -n` + shellcheck and a PowerShell parse of `infra/backup/`, the restore script's refusal of non-test targets, ruff on the infra Python, `check_monitoring.py`, `promtool check rules` and `nginx -t` (pinned images by digest).
+- **`deploy-staging.yml`** (manual, environment `staging`): builds the production image and runs its deploy checks against the real staging env file (§8.1); the deploy step is a placeholder until D-05.
 - **Pins and local runs:**
   - Every action is pinned by commit SHA, with its version in a comment.
   - Run either script locally with `python3 infra/scripts/<script>.py`. Both use only the standard library and support `--help`.
@@ -139,11 +142,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
 - Release tags and deploy jobs are added when staging exists.
 
 ## 4. Processes (every environment)
-There is one image (`backend/Dockerfile`) and three process types (doc 02). **All three run in every environment:** local compose, staging and production. Without beat, unpaid online orders never expire and their reserved stock is never released.
+There is one image (`backend/Dockerfile`) and three process types (doc 02). **All three run in every environment:** local compose, staging and production. In the production image every container first runs `manage.py check --deploy --fail-level ERROR` against its real environment (the `jqc-entrypoint`, §8.1). Without beat, unpaid online orders never expire and their reserved stock is never released.
 
 | Process | Command | Replicas | DB connections (T-218) |
 |---|---|---|---|
-| `web` (ASGI) | image default: `gunicorn config.asgi:application -k uvicorn_worker.UvicornWorker` | 2+ (rolling) | `POSTGRES_POOL=true`, `POSTGRES_CONN_MAX_AGE=0` |
+| `release` (one-off, once per deploy) | `jqc-release`: `check --deploy --fail-level ERROR`, then `migrate` (§8) | 1 task, before the others roll | as `worker` |
+| `web` (ASGI) | image default: `gunicorn config.asgi:application -k jqc_asgi_worker.JqcUvicornWorker` (uvicorn with `ws_max_size` and no access log, §9.4) | 2+ (rolling) | `POSTGRES_POOL=true`, `POSTGRES_CONN_MAX_AGE=0` |
 | `worker` | `celery -A config worker -l INFO` | 1+ | `POSTGRES_POOL=false`, `POSTGRES_CONN_MAX_AGE=60` |
 | `beat` | `celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler` | **exactly 1** | same as `worker` |
 
@@ -202,3 +206,242 @@ This is prepared for when staging exists (D-05) and the Razorpay test keys arriv
 - **Secrets:** a secrets manager, with separate keys per environment. Production refuses `OTP_TEST_NUMBERS` (except the reviewer number, D-15).
 - **Deploys:** zero-downtime rolling deploys, backward-compatible migrations, and a backup + PITR **restore test before launch**. Every environment runs the three processes in §4, with exactly one beat.
 - **Apps:** staging/prod flavors need `--dart-define=API_BASE_URL=https://…`. Distribution goes through Firebase App Distribution or Play internal testing, then the stores.
+
+## 7. Backup and restore (P8, T-813; `09 §2`)
+
+A backup only counts once a restore of it has passed `verify_restore.py` (§7.3). Nothing here creates cloud resources: bucket names, KMS keys and retention settings are applied when D-05 is approved.
+
+### 7.1 Targets
+`09 §2` sets daily backups with 7–30 days of point-in-time recovery and 99.5% monthly uptime, but no explicit RPO/RTO. **Proposed (⚠ to confirm with the user/Jivo):**
+
+| Data | RPO (data we may lose) | RTO (time to serve again) | How |
+|---|---|---|---|
+| PostgreSQL + PostGIS | ≤ 5 min | ≤ 1 h | managed PITR (continuous WAL archiving) + daily snapshots |
+| PostgreSQL, logical copy | ≤ 24 h | ≤ 4 h | daily `pg_dump -Fc` to a separate bucket (protects against a deleted instance or a bad PITR window) |
+| Object storage (KYC, invoices, media) | 0 for overwrites and deletes (versioning) | ≤ 1 h | bucket versioning + lifecycle |
+| Redis | not backed up | minutes (empty start) | see §7.5 |
+
+### 7.2 PostgreSQL
+- **Managed PITR (primary mechanism).** On RDS (the D-05 default): automated backups on, **retention 14 days** (inside 09's 7–30), backup window 20:30–21:00 UTC (02:00–02:30 IST, the quietest hour). Copy snapshots to a second region only if the user approves the cost. PITR always restores into a **new** instance; you then repoint `POSTGRES_HOST`.
+- **Logical dumps (second line).** `infra/backup/backup_db.sh` (or `backup_db.ps1`) once a day from a scheduled job inside the VPC, uploading to `BACKUP_UPLOAD_URI` (an S3 prefix in a bucket the app's role cannot write or delete). Keep 35 daily and 12 monthly dumps.
+  - Each run writes `<db>_<UTC stamp>.dump` (`pg_dump -Fc`), a `.sha256` per dump and a `.manifest.json` (server, PostGIS and pg_dump versions, repo commit, sizes, checksums). It never overwrites a file and refuses an output directory inside the git repo.
+  - `--schema-only` (no PII) also writes `<base>.migrations.dump` with the `django_migrations` rows, so a schema-only restore can still be checked for migration state. Used for restore drills on shared servers.
+  - Use the same PostgreSQL client major as the server, or newer. pg_restore 17+ into PostgreSQL 16 issues `SET transaction_timeout`, which the server rejects; the restore scripts tolerate exactly that error and fail on any other.
+  - A full dump contains PII (phones, addresses; KYC and bank numbers stay Fernet-encrypted). Never write it inside the repo (the scripts refuse) or to a laptop; only to encrypted storage.
+  - `--upload` is a placeholder until D-05: it supports `s3://` (AWS CLI, `--sse aws:kms`) and exits 3 when `BACKUP_UPLOAD_URI` is unset.
+- **Restore into a named database, never over the live one:**
+  ```bash
+  # restore drill (refuses every target except test_jivo_quick_commerce_restore*)
+  infra/backup/restore_db.sh --env-file backend/.env --dump <dir>/<db>_<stamp>.dump \
+      --target-db test_jivo_quick_commerce_restore_check --drop-existing --verify --source-db jivo_quick_commerce
+  infra/backup/restore_db.sh --env-file backend/.env --target-db test_jivo_quick_commerce_restore_check --drop-only
+
+  # production disaster recovery (user approval first): always into a NEW database
+  infra/backup/restore_db.sh --dump <file> --target-db jivo_quick_commerce_restored_20261201 \
+      --production --confirm "RESTORE INTO jivo_quick_commerce_restored_20261201" --verify
+  ```
+  PowerShell: the same options in PascalCase (`-EnvFile`, `-Dump`, `-TargetDb`, `-DropExisting`, `-DropOnly`, `-Verify`, `-SourceDb`, `-Production`, `-Confirm`, `-DryRun`); `Get-Help infra\backup\restore_db.ps1 -Full`.
+  - **Safety rules (both scripts):** the target must match `test_jivo_quick_commerce_restore*` unless `--production` and the exact phrase `RESTORE INTO <target>` are given; a production target must not exist yet; only `test_jivo_quick_commerce_restore*` databases can ever be dropped; the dump's `.sha256` must match before anything is created; database names are restricted to `[a-z0-9_]`.
+  - **Production restore runbook:**
+    1. Declare the incident. Stop `beat` and `worker`, so no jobs run on a half-restored database.
+    2. PITR to a new instance at the chosen time, **or** `restore_db.sh --production` into a new database from the latest good dump.
+    3. `verify_restore.py --target-db <new> --full` must pass.
+    4. Point `POSTGRES_HOST`/`POSTGRES_DB` at it and roll `web`, then `worker`, then the single `beat`.
+    5. Run `anonymise_deleted_accounts` once: a restored backup may hold accounts erased after it was taken (DPDP).
+    6. Reconcile payments for the lost window from the Razorpay dashboard. Webhooks are idempotent, so re-send them.
+    7. Keep the old instance read-only for 7 days, then delete it.
+- **Restore test cadence:** before go-live (release checklist §3), then quarterly and after any PostgreSQL or PostGIS major upgrade. Record each run in the log below.
+
+### 7.3 `verify_restore.py`
+Read-only: every transaction is `READ ONLY`, on the target and on the source. Run `uv run --project backend python infra/backup/verify_restore.py --target-db <db> [--source-db <db>] [--env-file backend/.env] [--counts] [--json]`. Exit 0 = OK (warnings allowed), 1 = a check failed, 2 = usage or connection error.
+- PostGIS is installed; the exact row count of every `public` table (`--counts` prints them).
+- Migration state: `django_migrations` exists and is not empty. With `--source-db`, the applied migrations, tables, columns, constraints and indexes must equal the source's (and row counts for a full restore; a live source keeps changing, so a row-count difference is a warning).
+- Key money and stock constraints exist (`storeinventory_reserved_within_on_hand`, `payment_amount_positive`, …).
+- Business invariants (08 §6, like QA's read-only SQL): `on_hand` = Σ `StockMovement.delta`; the latest `on_hand_after` = `on_hand`; `reserved` = Σ ACTIVE reservations; `0 ≤ reserved ≤ on_hand`; the 08 §6.2 bill formula; `product_discount = mrp_total − item_total`; no negative amounts; `amount_refunded ≤ amount_paid`; refunds never exceed their payment. Warnings: ACTIVE reservations on terminal orders, duplicate captures without a refund, orders without status history. Tables a later phase adds are skipped, not failed.
+
+**Restore test log**
+
+| Date | Who | Source | Mode | Target | Result |
+|---|---|---|---|---|---|
+| 2026-11-04 | devops agent (T-813) | shared dev DB (PostgreSQL 16.15, PostGIS 3.4.2) | schema-only + `django_migrations` rows; bash and PowerShell scripts | `test_jivo_quick_commerce_restore_check`, dropped afterwards | ✅ 25/25 checks: 69 tables, 90 migrations, 682 columns, 265 constraints and 280 indexes equal to the source; restore 8 s. A read-only invariant run on the dev DB itself (10,356 rows): 0 violations. **A full-data restore test is still required before launch** (needs staging/production, D-05). |
+
+### 7.4 Object storage (S3 in staging/production; MinIO locally)
+| Bucket | Holds | Protection |
+|---|---|---|
+| private (`S3_MEDIA_BUCKET`) | KYC documents, invoices (GST PDFs), other private files | Block Public Access; SSE-KMS; **versioning on**; lifecycle: noncurrent versions expire after **30 days** (so `purge_offboarded_kyc` and DPDP erasure really complete), incomplete multipart uploads after 7 days. Invoices are statutory records (GST: keep at least 72 months). **⚠ D-12:** decide whether invoices get Object Lock (governance mode) on their own bucket or prefix. |
+| public (`S3_PUBLIC_MEDIA_BUCKET`) | product, category and banner images | versioning on, noncurrent versions expire after 30 days; also recoverable from Jivo's catalog sources (`data/`) |
+| backups (new, D-05) | daily `pg_dump` files, checksums, manifests | separate bucket, SSE-KMS, versioning, writable only by the backup job's role, no delete for the app role; lifecycle 35 days daily, 12 months monthly |
+
+Cross-region replication of the private bucket is optional and doubles its storage cost: ask the user. To restore an object, copy its previous version back (`aws s3api list-object-versions`).
+
+### 7.5 Redis: what is and isn't backed up
+Nothing in Redis is a system of record (09 §2), so it is **not backed up** and runs without persistence (`--save "" --appendonly no`, as in compose):
+- **Cache** (catalog and home per store, serviceability snapshot, app config): rebuilt on demand from PostgreSQL.
+- **Celery broker:** tasks in flight are lost with Redis. They are idempotent, and the critical ones are re-derived from the DB by beat: `expire_unpaid_orders` (stock release), `sync_refund_status`, `auto_accept_orders`, and the Phase 6 stuck-notification sweeper.
+- **Channel layer and rider latest locations:** ephemeral. Apps fall back to polling; a rider's next ping restores the position.
+- **OTP throttling counters:** losing them only resets the limits. OTP codes are in PostgreSQL (`accounts_otprequest`, hashed). OTP sends fail closed while Redis is down (DL-13).
+
+### 7.6 Access and encryption
+- Encryption at rest everywhere: RDS storage encryption (KMS), S3 SSE-KMS, encrypted volumes for any worker scratch space. In transit: `POSTGRES_SSLMODE=require` (or `verify-full` with the RDS CA) in staging and production.
+- Backups are readable only through the on-call break-glass role, with access logged (CloudTrail). The backup job's role can write new objects but not delete them.
+- The scripts read credentials from the libpq variables or `--env-file` (only the `POSTGRES_*` connection keys are read), never print them, and print neither host nor role unless `JQC_SHOW_HOST=1`. Dumps are created with umask 077 (bash) or a user-only ACL (PowerShell).
+
+## 8. Deploy, release step and rollback
+
+### 8.1 Deploy-time configuration checks (P8 OWASP M8)
+CI runs `check --deploy` with placeholder values, so it cannot catch a real environment that is misconfigured. Two places now run the checks against the **real** environment:
+- **`jqc-entrypoint`** (the production image's `ENTRYPOINT`): every `web`, `worker` and `beat` container runs `python manage.py check --deploy --fail-level ERROR` before its command starts. A failing check stops the container, so a rolling deploy halts with the old version still serving. At ERROR level, deploy warnings are printed but not fatal. It catches `accounts.E003` (console SMS backend), `payments.E001`/`E004` (fake gateway, `FAKE_GATEWAY_DOWN`), `delivery.E001` (no `FIELD_ENCRYPTION_KEYS`) and `notifications.E001` (dev push backend), as those checks land from the backend branches, plus every other registered error. `JQC_SKIP_STARTUP_CHECK=1` skips it for one one-off command (e.g. `manage.py shell` during an incident); never set it on a service.
+- **`jqc-release`** (the release task, §8.2) runs the same check before `migrate`.
+- **Staging deploy job** (`.github/workflows/deploy-staging.yml`, manual only, GitHub environment `staging`): builds the image and runs it once with the staging environment (the `STAGING_BACKEND_ENV` environment secret, a `KEY=value` env file), so the entrypoint's check runs before anything is deployed. The deploy step itself fails with "not configured" until D-05.
+- Some checks skip themselves when `DJANGO_ALLOWED_HOSTS` lists only reserved example hosts (CI's dry run). Real environments must list their real hosts, or those checks never fire.
+
+### 8.2 Release order (zero downtime)
+1. Build and push the image tagged with the git SHA. Set `SENTRY_RELEASE` to the same SHA.
+2. Run the **release task** once: `jqc-release` (deploy checks, then `migrate --noinput`). Migrations must stay compatible with the running version: expand now, contract in a later release (add nullable columns or columns with defaults, backfill in a task, drop a column only once no running code reads it).
+3. Roll `web`: health check `/health/ready`, at least 2 replicas, 30 s drain (`--graceful-timeout 30`).
+4. Roll `worker`: Celery's warm shutdown finishes running tasks (`CELERY_TASK_TIME_LIMIT` is 5 min).
+5. Stop the old `beat`, then start the new one (never two, §4).
+6. Smoke: `/health/ready`, `/api/v1/config/app/`, a test-number OTP login on staging, and the new release visible in Sentry.
+
+### 8.3 Rollback
+- **Code:** redeploy the previous image tag (steps 3–5). Because migrations are expand-only, the previous version runs against the new schema.
+- **A migration must be reverted:** only when it is reversible and data-safe: `manage.py migrate <app> <previous>` as a one-off task, then roll back the code. Otherwise fix forward.
+- **Data damage:** the production restore runbook (§7.2).
+- The release checklist §8 names the rollback owner for each deploy window.
+
+## 9. Edge proxy hardening (`infra/nginx/default.conf`, P8 OWASP review)
+
+### 9.1 Rate limits, connection limits and body sizes (H3, edge half)
+These are coarse per-IP limits. The backend keeps its own per-user and per-phone throttles, which return the real error codes (06 §6). The limits are generous because mobile carriers put many users behind one CGNAT address.
+
+| Location | Limit per IP | Burst | Max body |
+|---|---|---|---|
+| `/api/v1/auth/otp/` | 10 req/min (`jqc_otp`); 429 `OTP_RATE_LIMITED` | 5 | 16 KB |
+| `/api/v1/search/` (search, suggest) | 5 req/s | 20 | 16 KB |
+| `/api/v1/rider/documents/` | 20 req/s | 10 | 1200 KB (1 MB image + multipart overhead; `RIDER_DOCUMENT_MAX_BYTES`) |
+| `/api/v1/payments/razorpay/webhook/` | none (signed, idempotent, Razorpay retries) | n/a | 256 KB |
+| `/api/` (all other) and `/` | 20 req/s | 40 | 2560 KB (= `DATA_UPLOAD_MAX_MEMORY_SIZE`, 2.5 MB) |
+| `/admin/`, `/ops/` | 10 req/s | 40 | 6 MB (product images up to 5 MB, 09 §3.6) |
+| `/ws/` | **10 concurrent sockets** (`limit_conn`); upgrades 20 req/s | 20 | 64 KB |
+| `/health/` | none; not logged | n/a | default |
+
+Over a limit, nginx answers 429 with the JSON error envelope and `Retry-After: 60`; an oversized body gets 413 `PAYLOAD_TOO_LARGE`.
+
+**Behind a load balancer,** uncomment the `set_real_ip_from <lb-subnet>` block, so the limits key on the client and not on the balancer.
+
+**Load-balancer equivalents,** if nginx is dropped (D-05):
+- **AWS:** WAF on the ALB with rate-based rules per IP (5-minute windows: e.g. 300 for `/api/v1/auth/otp/`, 6,000 for `/api/`, using URI scope-down statements) and the AWS managed core rule set. Body limits through WAF size-constraint rules (2.5 MB; 1.2 MB on `/api/v1/rider/documents/`). ALB idle timeout 3600 s for WebSockets. An ALB has no per-IP connection cap, so keep nginx in front of `/ws/` or enforce the cap in the app.
+- **Cloudflare:** rate-limiting rules per path, WAF managed rules, and a WAF rule on `http.request.body.size`.
+- **GCP:** Cloud Armor rate-based throttle or ban rules per path.
+
+### 9.2 Access logs without query strings (L8)
+- nginx logs JSON with `$uri` (path only, no query string), because serviceability and notify-me carry lat/lng in the query string. There is no `$request`, `$request_uri` or `$args` in the format.
+- The app server writes **no** access log. uvicorn's access line holds the full request line, so the image's worker class `jqc_asgi_worker.JqcUvicornWorker` sets `access_log=False` (gunicorn's own `--access-logformat` does not apply to uvicorn workers). The edge log is the access log of record; requests are correlated by `X-Request-ID` (`$request_id`).
+- An ALB's access logs contain the full request line, query string included. If ALB access logs are enabled, restrict that bucket to on-call and give it a 30-day lifecycle, or log at nginx only.
+
+### 9.3 No token-bearing headers in logs (L11)
+No proxy log format includes `Sec-WebSocket-Protocol`, `Authorization` or `Cookie`: nginx logs no `$http_*` request header except `User-Agent`, and the app server logs no requests. The socket JWT travels in the first message anyway. Adding a header to a log format needs a review.
+
+### 9.4 WebSocket message size (L5)
+uvicorn's default `ws_max_size` is 16 MiB. The image's worker class sets it to **64 KiB** (override with `WS_MAX_MESSAGE_BYTES`), since our socket messages are small JSON. A larger frame closes the socket with code 1009. Local `runserver` (Daphne) keeps its defaults; deployed environments never run Daphne.
+
+### 9.5 `NUM_PROXIES` per topology (L1)
+`NUM_PROXIES` is the number of proxies in front of Django that append to `X-Forwarded-For`. DRF and the OTP and lockout limits take the client IP at that position from the right. A value that is too high trusts a spoofed header; one that is too low rate-limits the proxy instead of the client. `deployed.py` requires it explicitly.
+
+| Topology | `NUM_PROXIES` |
+|---|---|
+| Internet → nginx → Django | 1 |
+| Internet → load balancer (ALB) → nginx → Django | 2 |
+| Internet → load balancer → Django (no nginx) | 1 |
+| Internet → CDN (CloudFront/Cloudflare) → load balancer → nginx → Django | 3 (only if the CDN fronts the API; otherwise 2) |
+
+nginx keeps `X-Forwarded-For $proxy_add_x_forwarded_for` in every topology, including with `set_real_ip_from`, so these counts hold. After any topology change, send a request with a spoofed `X-Forwarded-For: 1.2.3.4` and confirm the OTP throttle keys on your real IP.
+
+## 10. Monitoring and alerting (`09 §2`, `§5`; `infra/monitoring/`)
+
+### 10.1 Sentry (D-19)
+- Already wired: `config/sentry.py`, called from `deployed.py` (staging and production only), with `send_default_pii=False` and no frame locals.
+- **Environment names:** `SENTRY_DSN` (secret; empty disables Sentry), `SENTRY_ENVIRONMENT` (defaults to the settings module, `staging` or `production`), `SENTRY_RELEASE` (set by the deploy to the git SHA), `SENTRY_TRACES_SAMPLE_RATE`.
+- **Sample-rate policy:** errors are always sent at 100% (the SDK's default `sample_rate`). Traces: **0.2 in staging and 0.05 in production** at launch, lowered if the Sentry quota is reached; never 1.0 in production. `/health/*` should be excluded from tracing (backend ask, §10.3).
+- **Apps:** a DSN per Sentry project and flavor (`--dart-define=SENTRY_DSN=…`), with release = app version + build. Owned by the app agents.
+
+### 10.2 Probes
+`/health/live` checks only the process (use it for liveness and restarts). `/health/ready` checks PostgreSQL (`SELECT 1`) and Redis (`PING`) and answers 503 otherwise: use it for the load balancer's target health and for the `JqcApiNotReady` alert (blackbox exporter `probe_success{job="jqc-health-ready"}`). Both are exempt from the HTTPS redirect and are neither rate limited nor logged at the edge.
+
+### 10.3 Metrics
+Catalogued in `infra/monitoring/metrics.yml` (name, type, labels, source, status):
+- **Request latency p95 per route** and request/5xx counters: `jqc_http_request_duration_seconds` and `jqc_http_requests_total`. **Needs backend:** a `/metrics` endpoint (prometheus_client in multiprocess mode, `PROMETHEUS_MULTIPROC_DIR`) on an internal port or path that nginx does not expose, with `route` = the resolver's URL pattern, never the raw path (no ids or PII in labels).
+- **WebSocket connections:** `jqc_ws_connections{consumer}`. **Needs backend:** a gauge updated in the consumers' connect and disconnect (`livesum`).
+- **Celery queue depth, task failures, live workers:** `celery_queue_length`, `celery_task_failed_total` and `celery_worker_up` from a `celery-exporter` sidecar. **Needs backend settings** `CELERY_WORKER_SEND_TASK_EVENTS=True` and `CELERY_TASK_SEND_SENT_EVENT=True` (queue length works without them).
+- **Beat liveness (`last_run_at`), refund FAILED count, stuck notifications, order SLA breaches** and other business counts: `infra/monitoring/sql_exporter/jqc_business.collector.yml`, all read-only aggregates. Every query was run read-only against the dev DB on 2026-11-04; the two notification queries wait for the Phase 6 table.
+- **Redis/PostgreSQL up:** exporters or the managed provider's metrics. DB CPU and storage come from the provider: RDS `CPUUtilization` > 80% for 15 min and `FreeStorageSpace` < 20% raise tickets.
+- **Structured logs:** `LOGGING` is plain text today. **Backend ask:** a JSON formatter with the request id (`X-Request-ID` from the edge), hashed user id and order id, and phone masking (`09 §3.3`, `§5`).
+
+### 10.4 Alert rules
+`infra/monitoring/alerts.yml` (Prometheus rule format) has 23 rules:
+- **availability:** API not ready, 5xx > 2%, Redis or PostgreSQL down;
+- **latency:** the 09 §1 p95 targets (reads 300 ms, order placement 800 ms, serviceability 150 ms);
+- **jobs:** queue > 200, no workers, repeated task failures, beat stale > 5 min, daily jobs > 26 h, unpaid orders past their window;
+- **payments:** new FAILED refunds, PENDING > 2 h, webhook 400 bursts, webhook 503 > 15 min;
+- **notifications:** stuck sends, many failures, WebSocket collapse;
+- **business SLA:** store acceptance SLA, orders past ETA, no orders during open hours.
+
+Severities: `page` (on-call engineer), `ticket` (working hours), `ops` (store/ops on-call). The SQL exporter connects with its own read-only role, never the app's login:
+```sql
+create role jqc_metrics login password '<from the secrets manager>';
+grant connect on database jivo_quick_commerce to jqc_metrics;
+grant usage on schema public to jqc_metrics;
+grant select on django_celery_beat_periodictask, orders_order, payments_refund,
+      payments_paymentwebhookevent, notifications_notification to jqc_metrics;
+alter role jqc_metrics set default_transaction_read_only = on;
+```
+Validate locally with `uv run --project backend python infra/monitoring/check_monitoring.py` (structure, every metric catalogued, every runbook anchor present). CI also runs `promtool check rules` and `nginx -t` in pinned images (`.github/workflows/infra.yml`).
+
+### 10.5 Threshold changes
+Record each tuned threshold here with its date and reason (after the pilot week, 10 §7).
+
+### 10.6 Alert runbooks
+
+#### Runbook: API availability
+`JqcApiNotReady`, `JqcApi5xxRateHigh`. Read `/health/ready`'s `details.checks`, look in Sentry for the new error, and check the last deploy (roll back per §8.3 if the alert started with a release). Check DB connections: web processes × `POSTGRES_POOL_MAX_SIZE` + workers must stay within the server's limit (§4).
+
+#### Runbook: data stores
+`JqcRedisDown`, `JqcPostgresDown`. Redis: OTP fails closed and sockets fall back to polling; there is nothing to restore (§7.5). Restart or fail over, then watch the Celery backlog drain. PostgreSQL: check the provider's status and failover; if data is damaged, follow §7.2.
+
+#### Runbook: latency
+`JqcReadLatencyP95High`, `JqcOrderPlacementLatencyP95High`, `JqcServiceabilityLatencyP95High`. Compare with the deploy timeline. Check slow queries (`pg_stat_statements`), the Redis cache (catalog cache, serviceability snapshot) and lock waits on `inventory_storeinventory` during order bursts.
+
+#### Runbook: Celery
+`JqcCeleryQueueBacklog`, `JqcCeleryWorkersDown`, `JqcCeleryTaskFailures`. Read the worker logs and Sentry. Scale workers within the DB connection budget. One task name failing repeatedly usually means an external provider (SMS, FCM, Razorpay) is down; the tasks retry with back-off.
+
+#### Runbook: Celery beat
+`JqcBeatNotRunning`, `JqcBeatDailyJobMissed`, `JqcPaymentWindowOverdue`. Exactly one `beat` must run (§4). Check that it is up, that `migrate` ran before it started, and its `last_run_at` in `/admin/` > Periodic Tasks. Overdue unpaid orders hold stock; once beat recovers they expire within a minute.
+
+#### Runbook: payments
+`JqcRefundFailed`, `JqcRefundPendingTooLong`, `JqcWebhookSignatureFailures`, `JqcWebhookRetryLoop`. Start with the Razorpay dashboard. A failed refund is retried from the admin by a role allowed to. A burst of 400s after a secret rotation: follow the §5 rotation steps. Persistent 503s: check Sentry for the webhook handler.
+
+#### Runbook: notifications
+`JqcNotificationsStuckSending`, `JqcNotificationFailuresHigh`, `JqcWebsocketConnectionsCollapsed`. Check that the sweeper runs (beat), the FCM credentials, the SMS gateway and the DLT template status. For a WebSocket collapse, check the channel-layer Redis and the edge's `/ws/` route (`limit_conn`, idle timeouts).
+
+#### Runbook: business SLA
+`JqcStoreAcceptanceSlaBreach`, `JqcOrdersPastEta`, `JqcNoOrdersDuringOpenHours`. These go to the store/ops on-call: call the store and check the packing console and rider availability. For no orders during open hours, place a test order end to end (serviceability, cart, payment).
+
+## 11. Secrets and rotation
+
+### 11.1 Required secrets in staging and production
+Kept per environment in the secrets manager; never in git or in images:
+- `DJANGO_SECRET_KEY` (at least 50 characters): sessions, CSRF, signing.
+- **`JWT_SIGNING_KEY`:** signs the apps' access and refresh tokens. In staging and production it must be **set and different from `DJANGO_SECRET_KEY`**, so rotating one never invalidates the other. The fallback to the secret key is for local use only.
+- **`OTP_HASH_KEY`:** the key used to hash OTP codes (HMAC). Required once the backend's P8 security change lands; never reuse another key.
+- **`FIELD_ENCRYPTION_KEYS`:** comma-separated Fernet keys, **newest first**, for rider bank and KYC numbers (09 §3.3). Required in staging and production (`delivery.E001`).
+- `POSTGRES_PASSWORD`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN`, `S3_SECRET_ACCESS_KEY` (or an instance role instead), `SENTRY_DSN`, `EMAIL_HOST_PASSWORD`.
+- Generate keys with `python3 -c "import secrets; print(secrets.token_urlsafe(64))"` and Fernet keys with `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` (from `backend/`), straight into the secrets manager.
+
+### 11.2 Rotation runbooks
+- **`DJANGO_SECRET_KEY`:** set the new value and roll `web`. Staff sessions end and staff log in again. The apps are unaffected while `JWT_SIGNING_KEY` is separate.
+- **`JWT_SIGNING_KEY`:** set the new value and roll `web`. Every app access and refresh token becomes invalid, so every customer and rider logs in again. Rotate only on suspected compromise, announce it first, and expect an OTP SMS spike.
+- **`FIELD_ENCRYPTION_KEYS`:** add the new key **first** and keep the old ones after it; deploy; run `manage.py rotate_field_keys` as a one-off task and confirm it reports no undecryptable values; remove the old key in the next deploy.
+- **`OTP_HASH_KEY`:** set it and roll `web` and `worker`. OTPs in flight (5-minute lifetime) fail and users request a new one, so rotate in a quiet window.
+- **`RAZORPAY_WEBHOOK_SECRET`:** §5.
+- **Database password:** set the new password on the role, update the secret, roll `web`, `worker` and `beat` in that order, then confirm no connection still uses the old one. **Least privilege:** staging and production must use a role that owns only the app's database (never a superuser), plus the separate read-only `jqc_metrics` role (§10.4).
+- After any rotation, check Sentry for auth errors, `/health/ready`, and the webhook-events list.

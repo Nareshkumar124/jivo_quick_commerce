@@ -1,0 +1,93 @@
+# Infra-as-code checks (docs/deployment.md §7, §9, §10): backup scripts, monitoring rules and the
+# nginx edge config. Touches no database and no cloud account.
+name: infra
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra.yml"
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.11.26"
+  PYTHON_VERSION: "3.13"
+  # Pinned images (tag for readability, digest for integrity). Upgrades are deliberate changes.
+  PROMETHEUS_IMAGE: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+  NGINX_IMAGE: nginx:1.30.5-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+  SHELLCHECK_IMAGE: koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d
+
+jobs:
+  checks:
+    name: Backup scripts, monitoring rules, nginx
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Backend environment (psycopg, PyYAML, ruff)
+        working-directory: backend
+        run: uv sync --locked
+
+      - name: Shell syntax and shellcheck
+        run: |
+          for f in infra/backup/*.sh; do bash -n "$f"; done
+          docker run --rm -v "$PWD:/mnt:ro" -w /mnt "$SHELLCHECK_IMAGE" -x infra/backup/*.sh
+
+      - name: PowerShell parse
+        shell: pwsh
+        run: |
+          $bad = 0
+          foreach ($f in Get-ChildItem infra/backup/*.ps1) {
+            $errs = $null; $tok = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tok, [ref]$errs) | Out-Null
+            foreach ($e in $errs) { Write-Host "::error file=$($f.Name)::$e"; $bad++ }
+          }
+          if ($bad) { exit 1 }
+
+      - name: Restore script refuses non-test targets
+        run: |
+          set +e
+          bash infra/backup/restore_db.sh --target-db jivo_quick_commerce --dump x.dump; rc1=$?
+          bash infra/backup/restore_db.sh --target-db jivo_quick_commerce --drop-only --production \
+            --confirm "RESTORE INTO jivo_quick_commerce"; rc2=$?
+          set -e
+          test "$rc1" = 2 && test "$rc2" = 2
+
+      - name: Ruff (infra Python)
+        working-directory: backend
+        run: |
+          uv run ruff check --config pyproject.toml ../infra/backup ../infra/monitoring
+          uv run ruff format --config pyproject.toml --check ../infra/backup ../infra/monitoring
+
+      - name: Monitoring catalog, alerts and runbook anchors
+        working-directory: backend
+        run: uv run python ../infra/monitoring/check_monitoring.py
+
+      - name: promtool check rules
+        run: |
+          docker run --rm -v "$PWD/infra/monitoring:/rules:ro" --entrypoint promtool \
+            "$PROMETHEUS_IMAGE" check rules /rules/alerts.yml
+
+      - name: nginx -t
+        run: |
+          docker run --rm --add-host backend:127.0.0.1 \
+            -v "$PWD/infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
+            "$NGINX_IMAGE" nginx -t

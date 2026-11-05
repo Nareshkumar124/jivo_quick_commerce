@@ -1,0 +1,64 @@
+# Staging deploy (docs/deployment.md §8). Manual only, and gated by the GitHub environment
+# "staging" (add required reviewers there). Until D-05 (hosting) is approved it only proves the
+# release is deployable: it builds the production image and runs its entrypoint's
+# `manage.py check --deploy --fail-level ERROR` against the REAL staging environment (P8 OWASP M8),
+# so accounts.E003, payments.E001/E004, delivery.E001, notifications.E001 and every other error
+# fail here, before anything is deployed. The deploy step is a placeholder that fails on purpose.
+name: deploy-staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy (branch, tag or SHA)
+        required: true
+        default: develop
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Build image and check the staging configuration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Build the production image
+        run: docker build --target production -t "jivoqc-backend:${GITHUB_SHA}" backend/
+
+      # STAGING_BACKEND_ENV: environment secret holding the staging env file (KEY=value lines, no
+      # quotes, no `export`), with the real DJANGO_ALLOWED_HOSTS. It is written to a 0600 file in
+      # the runner's temp dir and removed afterwards; it is never echoed.
+      - name: Deploy checks against the real staging environment
+        env:
+          STAGING_BACKEND_ENV: ${{ secrets.STAGING_BACKEND_ENV }}
+        run: |
+          if [ -z "$STAGING_BACKEND_ENV" ]; then
+            echo "::error::STAGING_BACKEND_ENV is not set in the 'staging' environment (staging is not set up yet, D-05)."
+            exit 1
+          fi
+          envfile="$RUNNER_TEMP/staging.env"
+          trap 'rm -f "$envfile"' EXIT
+          (umask 077; printf '%s\n' "$STAGING_BACKEND_ENV" > "$envfile")
+          # The image ENTRYPOINT runs `check --deploy --fail-level ERROR`, then the command (`true`).
+          docker run --rm --network none --env-file "$envfile" "jivoqc-backend:${GITHUB_SHA}" true
+
+  deploy:
+    name: Deploy (not configured until D-05)
+    needs: preflight
+    runs-on: ubuntu-24.04
+    environment: staging
+    steps:
+      - name: Placeholder
+        run: |
+          echo "::error::Staging hosting is not decided (D-05). Push the image, run the release task (jqc-release), then roll web, worker and beat (docs/deployment.md §8.2) once it is."
+          exit 1

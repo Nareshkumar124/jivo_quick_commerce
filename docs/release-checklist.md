@@ -21,9 +21,22 @@ Use it in Phase 8, before the public launch. Each item points to the doc that de
 
 ## 3. Performance and resilience (`09 §1`, `§2`)
 - [ ] The load test passes: 50 orders/min and 500 concurrent sessions, with p95 targets met.
-- [ ] Backup **restore tested**, with point-in-time recovery configured.
+- [ ] Backup **restore tested**, with point-in-time recovery configured (§3a below).
 - [ ] The app degrades gracefully: Redis down, FCM/SMS failures, WebSocket drop leading to polling.
 - [ ] `/health/live` and `/health/ready` are wired to the load balancer, and alerts are configured (`09 §5`).
+
+## 3a. P8 hardening (T-813; [`deployment.md`](deployment.md) §7–§11)
+- [ ] **Backups:** managed PITR on (retention 14 days), daily `pg_dump` job to the backup bucket (§7.2), bucket versioning and lifecycle on the private, public and backup buckets (§7.4). RPO/RTO targets (§7.1) confirmed by the user.
+- [ ] **Full-data restore test** on staging or production infrastructure with `infra/backup/restore_db.sh --verify` (and one PITR restore), recorded in the §7.3 log. The 2026-11-04 schema-only drill on the dev DB does not count for go-live.
+- [ ] Production restore runbook (§7.2) walked through once by the rollback owner.
+- [ ] **Deploy-time checks:** the production image's entrypoint and the `jqc-release` task run `check --deploy --fail-level ERROR` against the real environment (§8.1); the staging deploy job's preflight passed for the release candidate; `DJANGO_ALLOWED_HOSTS` lists real hosts (not example hosts).
+- [ ] Release order and rollback (§8.2, §8.3) rehearsed on staging, including one rollback to the previous image.
+- [ ] **Edge:** rate limits, `limit_conn` on `/ws/` and body sizes per location live (§9.1), or their load-balancer/WAF equivalents; `set_real_ip_from` set when behind a load balancer.
+- [ ] Access logs contain no query strings and no `Sec-WebSocket-Protocol`/`Authorization`/`Cookie` (§9.2, §9.3); checked by reading a sample of real staging log lines.
+- [ ] `NUM_PROXIES` matches the production topology and the spoofed-`X-Forwarded-For` test passed (§9.5).
+- [ ] WebSocket max message size 64 KiB in effect (§9.4).
+- [ ] **Monitoring:** Sentry DSNs and sample rates per §10.1; `/health/ready` wired to the load balancer and the readiness probe alert (§10.2); the metrics marked `needs-backend` in `infra/monitoring/metrics.yml` exported; the SQL exporter running with the read-only `jqc_metrics` role; `infra/monitoring/alerts.yml` loaded, with a test alert delivered to each severity's channel (page, ticket, ops).
+- [ ] **Secrets:** `JWT_SIGNING_KEY` set and different from `DJANGO_SECRET_KEY`, `OTP_HASH_KEY` and `FIELD_ENCRYPTION_KEYS` set (§11.1); the app's DB login is a least-privilege role, not a superuser; rotation runbooks (§11.2) reviewed.
 
 ## 4. Compliance (`09 §4`)
 - [ ] GST invoices: GSTINs, HSN and rates, invoice series, the GSTR-1 report (D-12).
