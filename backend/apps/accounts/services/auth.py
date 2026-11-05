@@ -188,6 +188,10 @@ def anonymise_user(user_id: int) -> bool:
             OTPRequest.objects.filter(phone=phone).delete()
         revoke_all_tokens(user)
         _scrub_admin_log(user)
+        # Phase 5: the rider profile's personal data (DPDP); KYC files follow D-14 retention.
+        from apps.delivery.services.privacy import scrub_rider
+
+        scrub_rider(user)
     return True
 
 

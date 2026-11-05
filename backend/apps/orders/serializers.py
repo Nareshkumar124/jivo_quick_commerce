@@ -393,7 +393,13 @@ class TrackRiderSerializer(serializers.Serializer):
     """The assigned rider, shown from assignment until the order ends (08 §9)."""
 
     name = serializers.CharField(help_text="The rider's first name and last initial.")
-    phone = serializers.CharField(help_text="E.164. Direct dial in v1 (masked calling is v2).")
+    phone = serializers.CharField(
+        allow_null=True,
+        help_text=(
+            "E.164. Only while the order is OUT_FOR_DELIVERY (and only to the order's owner); "
+            "null otherwise. Masked/proxy calling is planned."
+        ),
+    )
     photo = serializers.URLField(
         allow_null=True,
         help_text=(

@@ -203,6 +203,10 @@ Phase 5 implementation (slices 5.1/5.2, migration `delivery.0001`):
 - **RiderDocument:**
   - One row per (rider, `doc_type`). Adds `number_encrypted`, `reviewed_at` and `uploaded_at`.
   - Aadhaar is stored masked only (never the full number); PAN, DL and RC are encrypted plus masked.
+- **Rider, review additions:**
+  - `last_location_received_at`: server time, used for presence.
+  - `kyc_purge_after` and `anonymised_at`.
+  - `dob` is nullable (blanked on erasure).
 - **RiderShift** adds `ended_by`, with at most one open shift per rider.
 - **RiderLocation** adds `is_mocked`, `received_at` and `shift`. It is unique on (`rider`, `recorded_at`) and has no spatial index. Its `task` FK arrives with slice 5.3.
 
@@ -258,5 +262,5 @@ Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, 
 | Orders, invoices, payments | 8 years (GST record-keeping) |
 | Rider location history | 30 days |
 | OTP requests | 30 days |
-| KYC documents | While the rider is active + period mandated by policy (D-14). Then deleted. |
+| KYC documents | While the rider is active + period mandated by policy (D-14). Then deleted. P5 default: 365 days after offboarding or account erasure (`KYC_RETENTION_DAYS`, `purge_offboarded_kyc`). |
 | Deleted customer accounts | PII anonymised after a 30-day grace period. Order financial records are kept without PII. |

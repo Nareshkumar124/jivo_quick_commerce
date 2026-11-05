@@ -341,7 +341,7 @@ def _online(client, rider, location_age_min, heartbeat_age_min=None):
     client.post(START, AT_STORE, format="json")
     now = timezone.now()
     Rider.objects.filter(pk=rider.pk).update(
-        last_location_at=now - timedelta(minutes=location_age_min),
+        last_location_received_at=now - timedelta(minutes=location_age_min),
         last_heartbeat_at=(
             now - timedelta(minutes=heartbeat_age_min) if heartbeat_age_min is not None else None
         ),
@@ -403,3 +403,77 @@ def test_has_active_task_with_a_task_model(rider, monkeypatch):
 
     monkeypatch.setattr(django_apps, "get_model", lambda *args: FakeTask)
     assert shifts.has_active_task(rider) is True
+
+
+# --------------------------------------------------------------------------- clock skew (review)
+
+
+def test_presence_uses_server_receipt_time_not_the_device_clock(client, rider):
+    """A phone clock 20 minutes behind: its fresh points still keep the rider online."""
+    client.post(START, AT_STORE, format="json")
+    # 12 minutes later (the 15-minute access token is still valid), a point stamped 20 minutes
+    # ago by the phone: by the device clock the rider looks stale, by receipt time not.
+    with freeze_time(timezone.now() + timedelta(minutes=12)):
+        response = client.post(LOC, {"points": [point(20 * 60)]}, format="json")
+        assert response.status_code == 200, response.json()
+        assert response.json()["accepted"] == 1
+        assert shifts.auto_offline_stale()["offline"] == 0
+    rider.refresh_from_db()
+    assert rider.last_location_received_at > rider.last_location_at
+
+
+def test_a_clock_running_ahead_never_moves_the_position_time_past_now(client, rider):
+    client.post(START, AT_STORE, format="json")
+    Rider.objects.filter(pk=rider.pk).update(last_location_at=timezone.now() - timedelta(minutes=1))
+    before = timezone.now()
+    body = client.post(LOC, {"points": [point(-90)]}, format="json").json()  # 90 s ahead
+    assert body["accepted"] == 1
+    rider.refresh_from_db()
+    assert rider.last_location_at <= timezone.now()
+    assert rider.last_location_at >= before
+
+
+def test_on_task_warning_is_throttled(client, monkeypatch, caplog):
+    client.post(START, AT_STORE, format="json")
+    monkeypatch.setattr(shifts, "has_active_task", lambda rider: True)
+    with freeze_time(timezone.now() + timedelta(minutes=11)):
+        shifts.auto_offline_stale()
+        shifts.auto_offline_stale()
+    assert sum("is on a task" in r.message for r in caplog.records) == 1
+
+
+# --------------------------------------------------------------------------- rate limits (review)
+
+
+@pytest.mark.parametrize(
+    ("throttle", "scope", "method", "path", "body"),
+    [
+        ("RiderHeartbeatThrottle", "rider_heartbeat", "post", BEAT, None),
+        ("RiderLocationsThrottle", "rider_locations", "post", LOC, {"points": []}),
+    ],
+)
+def test_rider_rate_limits(client, monkeypatch, throttle, scope, method, path, body):
+    from apps.delivery import throttling
+
+    monkeypatch.setattr(getattr(throttling, throttle), "THROTTLE_RATES", {scope: "1/min"})
+    getattr(client, method)(path, body, format="json")
+    response = getattr(client, method)(path, body, format="json")
+    assert response.status_code == 429
+    assert response.json()["error"]["code"] == "RATE_LIMITED"
+    assert "retry_after_seconds" in response.json()["error"]["details"]
+
+
+def test_rate_limits_fail_open(client, monkeypatch):
+    from apps.delivery import throttling
+
+    def boom(*args, **kwargs):
+        import redis
+
+        raise redis.ConnectionError("redis down")
+
+    monkeypatch.setattr(
+        throttling.RiderHeartbeatThrottle, "THROTTLE_RATES", {"rider_heartbeat": "1/min"}
+    )
+    monkeypatch.setattr(throttling.RiderHeartbeatThrottle.cache, "get", boom)
+    assert client.post(BEAT).status_code == 200
+    assert client.post(BEAT).status_code == 200

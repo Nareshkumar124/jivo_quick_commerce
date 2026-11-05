@@ -27,10 +27,17 @@ from apps.core.schema import (
     request_examples,
     validation_error,
 )
+from apps.core.throttling import RATE_LIMITED
 from apps.delivery import examples as ex
 from apps.delivery import serializers as s
 from apps.delivery.services import presenters, riders, shifts
 from apps.delivery.stubs import not_available_yet
+from apps.delivery.throttling import (
+    RiderDocumentsThrottle,
+    RiderHeartbeatThrottle,
+    RiderLocationsThrottle,
+    RiderProfileWriteThrottle,
+)
 
 TAGS = ["rider"]
 
@@ -121,6 +128,8 @@ class RiderStoresView(APIView):
 
 
 class RiderRegisterView(APIView):
+    throttle_classes = [RiderProfileWriteThrottle]
+
     @extend_schema(
         operation_id="rider_register",
         tags=TAGS,
@@ -161,6 +170,7 @@ class RiderRegisterView(APIView):
                         {"preferred_store_id": [riders.MSG_UNKNOWN_STORE]}, name="Unknown store"
                     ),
                 ),
+                429: RATE_LIMITED,
                 401: UNAUTHORIZED,
                 403: error_response(
                     "Staff accounts cannot register.",
@@ -255,6 +265,7 @@ class RiderMeView(APIView):
 
 class RiderDocumentsView(APIView):
     parser_classes = [MultiPartParser, FormParser]
+    throttle_classes = [RiderDocumentsThrottle]
 
     @extend_schema(
         operation_id="rider_documents_create",
@@ -290,6 +301,7 @@ class RiderDocumentsView(APIView):
                     ),
                     validation_error({"doc_type": [riders.MSG_NOT_NEEDED]}, name="Not needed"),
                 ),
+                429: RATE_LIMITED,
                 401: UNAUTHORIZED,
                 403: RIDER_FORBIDDEN,
                 409: error_response(
@@ -314,6 +326,7 @@ class RiderDocumentsView(APIView):
 
 
 class RiderBankAccountView(APIView):
+    throttle_classes = [RiderProfileWriteThrottle]
     http_method_names = ["put", "options"]
 
     @extend_schema(
@@ -335,6 +348,7 @@ class RiderBankAccountView(APIView):
                     "Invalid fields.",
                     validation_error({"ifsc": ["Enter a valid IFSC, e.g. HDFC0001234."]}),
                 ),
+                429: RATE_LIMITED,
                 401: UNAUTHORIZED,
                 403: RIDER_FORBIDDEN,
             }
@@ -458,6 +472,8 @@ class ShiftEndView(APIView):
 
 
 class LocationsView(APIView):
+    throttle_classes = [RiderLocationsThrottle]
+
     @extend_schema(
         operation_id="rider_locations_create",
         tags=TAGS,
@@ -486,6 +502,7 @@ class LocationsView(APIView):
                         {"points": ["Send at most 50 points per request."]}, name="Too many"
                     ),
                 ),
+                429: RATE_LIMITED,
                 401: UNAUTHORIZED,
                 403: ACTIVE_FORBIDDEN,
                 409: error_response(
@@ -508,6 +525,8 @@ class LocationsView(APIView):
 
 
 class HeartbeatView(APIView):
+    throttle_classes = [RiderHeartbeatThrottle]
+
     @extend_schema(
         operation_id="rider_heartbeat",
         tags=TAGS,
@@ -530,6 +549,7 @@ class HeartbeatView(APIView):
                     ("Offer waiting", ex.HEARTBEAT_OFFER),
                     ("Set offline by the server", ex.HEARTBEAT_OFFLINE),
                 ),
+                429: RATE_LIMITED,
                 401: UNAUTHORIZED,
                 403: RIDER_FORBIDDEN,
             }

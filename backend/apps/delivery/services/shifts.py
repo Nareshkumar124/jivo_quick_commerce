@@ -47,6 +47,11 @@ MSG_OFFLINE = "You are offline. Go online again to continue."
 LOCATION_CACHE_SECONDS = 60 * 60
 
 
+def _record(ip, *args):
+    """`audit.record` with the request IP the panel passes (`ip=`)."""
+    return audit.record(*args, ip=ip)
+
+
 def location_cache_key(rider_id: int) -> str:
     return f"delivery:rider-location:{rider_id}"
 
@@ -157,7 +162,11 @@ def start_shift(user, *, lat: float, lng: float, accuracy: float | None = None):
         point = Point(lng, lat, srid=4326)
         shift = RiderShift.objects.create(rider=rider, started_at=now, start_location=point)
         Rider.objects.filter(pk=rider.pk).update(
-            is_online=True, current_location=point, last_location_at=now, updated_at=now
+            is_online=True,
+            current_location=point,
+            last_location_at=now,
+            last_location_received_at=now,
+            updated_at=now,
         )
         rider.is_online = True
         rider.current_location = point
@@ -201,7 +210,7 @@ def end_shift(user):
     return rider, shift
 
 
-def force_offline(rider_id: int, *, by) -> Rider:
+def force_offline(rider_id: int, *, by, ip: str | None = None) -> Rider:
     """Ops "force a rider offline" (05 §1.4): needs `delivery.review_rider` and the rider in
     scope; refused during a task. Audited."""
     from apps.delivery.services import kyc
@@ -217,7 +226,7 @@ def force_offline(rider_id: int, *, by) -> Rider:
                 details={"reason": "ACTIVE_TASK"},
             )
         end_open_shift(rider, reason=ShiftEndReason.ADMIN, by=by)
-        audit.record(by, "rider.force_offline", rider, {})
+        _record(ip, by, "rider.force_offline", rider, {})
     return rider
 
 
@@ -228,6 +237,9 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
     """`POST /rider/locations/`. Returns `{accepted, duplicates, rejected}`."""
     now = now or timezone.now()
     rider = require_rider(user, active=True)
+    # Unlocked read on purpose: ingestion is frequent and must not queue behind shift changes.
+    # A batch racing an auto-offline may still be stored (harmless history); the rider's position
+    # is only moved by the conditional update below.
     if not rider.is_online:
         raise ApiError(ErrorCode.RIDER_OFFLINE, MSG_OFFLINE)
     oldest = now - timedelta(hours=settings.RIDER_LOCATION_MAX_AGE_HOURS)
@@ -271,27 +283,32 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
         ignore_conflicts=True,  # a concurrent resend of the same batch
     )
     if fresh:
+        # Presence (auto-offline) uses the server's receipt time, never the device clock.
+        Rider.objects.filter(pk=rider.pk).update(last_location_received_at=now)
         latest = fresh[-1]
+        # The device clock may run ahead (points up to 2 min in the future are accepted):
+        # never record a position time later than the server's now.
+        latest_at = min(latest["recorded_at"], now)
         updated = Rider.objects.filter(
-            Q(last_location_at__isnull=True) | Q(last_location_at__lt=latest["recorded_at"]),
+            Q(last_location_at__isnull=True) | Q(last_location_at__lt=latest_at),
             pk=rider.pk,
         ).update(
             current_location=Point(latest["lng"], latest["lat"], srid=4326),
-            last_location_at=latest["recorded_at"],
+            last_location_at=latest_at,
         )
         if updated:
             from apps.delivery import hooks
 
             transaction.on_commit(
                 lambda: hooks.publish_rider_location(
-                    rider.pk, latest["lat"], latest["lng"], latest["recorded_at"]
+                    rider.pk, latest["lat"], latest["lng"], latest_at
                 )
             )
             _remember_location(
                 rider.pk,
                 latest["lat"],
                 latest["lng"],
-                latest["recorded_at"],
+                latest_at,
                 latest["accuracy"],
             )
         if any(p.get("is_mocked") for p in fresh):
@@ -322,9 +339,27 @@ def stale_riders_filter(now) -> Q:
     a GPS fix stays online, but not for ever."""
     cutoff = now - timedelta(minutes=settings.RIDER_AUTO_OFFLINE_MINUTES)
     presence = now - timedelta(minutes=settings.RIDER_HEARTBEAT_PRESENCE_MAX_LOCATION_AGE_MINUTES)
-    no_recent_location = Q(last_location_at__isnull=True) | Q(last_location_at__lt=cutoff)
-    heartbeat_presence = Q(last_heartbeat_at__gte=cutoff, last_location_at__gte=presence)
+    # Server receipt times only (a phone clock running behind or ahead cannot keep a rider
+    # online or knock them offline).
+    no_recent_location = Q(last_location_received_at__isnull=True) | Q(
+        last_location_received_at__lt=cutoff
+    )
+    heartbeat_presence = Q(last_heartbeat_at__gte=cutoff, last_location_received_at__gte=presence)
     return no_recent_location & ~heartbeat_presence
+
+
+ON_TASK_WARNING_SECONDS = 30 * 60
+
+
+def _warn_on_task_once(rider_id: int) -> None:
+    """A rider on a task with no location: one warning per rider per 30 minutes (the beat job
+    runs every 2 minutes). Ops see the rider on the map; slice 5.3 adds a proper alert."""
+    try:
+        first = cache.add(f"delivery:on-task-stale:{rider_id}", "1", ON_TASK_WARNING_SECONDS)
+    except Exception:
+        first = True
+    if first:
+        logger.warning("Rider %s is on a task but sent no location for 10 minutes", rider_id)
 
 
 def auto_offline_stale(now=None) -> dict:
@@ -345,7 +380,7 @@ def auto_offline_stale(now=None) -> dict:
             if rider is None:
                 continue
             if has_active_task(rider):
-                logger.error("Ops alert: rider %s on a task sent no location for 10 min", rider.pk)
+                _warn_on_task_once(rider.pk)
                 result["on_task"] += 1
                 continue
             end_open_shift(rider, reason=ShiftEndReason.AUTO_OFFLINE, now=now)

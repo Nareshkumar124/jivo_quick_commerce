@@ -313,8 +313,21 @@ Contract details (Phase 5, T-511; published in `backend/openapi/schema.yaml`, ta
   - No rider endpoint returns `CASH_LIMIT_EXCEEDED` in v1.
   - The cod-qr status is polled through `tasks/current/`. A QR paid after cash was taken is refunded automatically.
 - **Earnings (#19):** IST dates, inclusive, at most 366 days. `orders` holds the newest 200 (`orders_truncated`). **Distance pay is the server-computed store-to-drop route distance (`distance_km`), never the GPS trail** (PM default; a patchy or spoofed trail cannot game it).
-- **`GET /orders/{id}/track/` (#28, #33):** `{order_id, order_number, status, eta_at (null once finished), store {id, name, lat, lng}, destination {lat, lng}, rider {name, phone, photo (signed https or null), lat, lng, updated_at} or null, delivery_otp (only while OUT_FOR_DELIVERY), server_time}`. `rider` and `delivery_otp` are filled from slice 5.3.
+- **`GET /orders/{id}/track/` (#28, #33):** `{order_id, order_number, status, eta_at (null once finished), store {id, name, lat, lng}, destination {lat, lng}, rider {name ("Ravi K."), phone (only while OUT_FOR_DELIVERY, to the order's owner; null otherwise; masked/proxy calling planned; user decision 2026-11-04), photo (signed https or null), lat, lng, updated_at} or null, delivery_otp (only while OUT_FOR_DELIVERY), server_time}`. `rider` and `delivery_otp` are filled from slice 5.3.
 - **`support.phone` in `config/app`** is the rider's "Call ops" number (#27).
+- **Rate limits** (per user, fail open, `apps.delivery.throttling`; 429 `RATE_LIMITED`):
+  - documents: `RIDER_DOCUMENTS_RATE` 30/hour
+  - register and bank account: `RIDER_PROFILE_WRITE_RATE` 20/hour
+  - locations: `RIDER_LOCATIONS_RATE` 6/min
+  - heartbeat: `RIDER_HEARTBEAT_RATE` 6/min
+- **Presence** uses the server's receipt time of location points (`last_location_received_at`), never the phone clock. A position time is never later than the server's now.
+- **Erasure (DPDP):** `anonymise_user` also calls `delivery.services.privacy.scrub_rider`.
+  - It blanks the rider's name, date of birth, emergency contact, vehicle number and bank details.
+  - It deletes the location history and the rider's simple_history rows.
+  - It sets `kyc_purge_after` to today + `KYC_RETENTION_DAYS` (365, D-14 default).
+  - The beat job `delivery.purge_offboarded_kyc` (daily) then deletes the KYC documents and their files.
+- **Key rotation:** `manage.py rotate_field_keys` re-encrypts every encrypted field under the newest `FIELD_ENCRYPTION_KEYS` key.
+- **Audit IPs:** staff services take `ip=` (the request IP) for the audit log.
 - **Staff services** (`apps.delivery.services.kyc`, for the Riders admin): `approve_document`, `reject_document`, `approve_rider`, `reject_rider`, `suspend_rider`, `reinstate_rider`, `set_home_store`, `set_cash_limit`, `document_file_url` and `document_number` (both audited), `staff_riders`, `online_blockers`. Also `shifts.force_offline`.
   - Each checks `delivery.review_rider` (Super Admin, Ops) and the store scope, and writes the audit log.
   - Store Manager has `delivery.view_rider` for its own stores.
@@ -349,6 +362,7 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 | `low_stock_alert` | Stock movement | Notify the store manager when available < threshold. P2: logs a warning (re-checks current stock, so it is idempotent); P7: notification | P2/P7 |
 | `reconcile_payments` | Beat, nightly | Compare Razorpay settlements/payments with local records and flag mismatches | P7 |
 | `daily_reports_email` | Beat, daily | Store-wise daily summary to managers | P7 |
+| `purge_offboarded_kyc` | Beat, daily | Delete KYC documents (rows and bucket files) of riders past `kyc_purge_after` (D-14 default: 1 year after offboarding/erasure). The file is deleted first; on failure the row stays for the next run | P5 |
 | `purge_old_locations` | Beat, daily | Delete `RiderLocation` rows older than 30 days | P6 |
 | `anonymise_deleted_accounts` | Beat, daily | Complete account deletions after the grace period | P1 |
 | `purge_old_otp_requests` | Beat, daily | Delete `OTPRequest` rows older than 30 days (07 §4) | P1 |

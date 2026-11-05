@@ -405,7 +405,7 @@ TRACK_PACKING = {
     "eta_at": "2026-11-10T09:58:00Z",
     "rider": {
         "name": "Ravi K.",
-        "phone": "+919811122233",
+        "phone": None,
         "photo": (
             "https://jivo-media.s3.ap-south-1.amazonaws.com/kyc/42/photo-5f1c2a9be03d47a1.jpg"
             "?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=3b1f0c"
@@ -420,7 +420,12 @@ TRACK_NO_RIDER = {**TRACK_PACKING, "status": "ACCEPTED", "rider": None}
 TRACK_OUT_FOR_DELIVERY = {
     **TRACK_PACKING,
     "status": "OUT_FOR_DELIVERY",
-    "rider": {**TRACK_PACKING["rider"], "lat": 28.4890, "lng": 77.0570},
+    "rider": {
+        **TRACK_PACKING["rider"],
+        "phone": "+919811122233",
+        "lat": 28.4890,
+        "lng": 77.0570,
+    },
     "delivery_otp": "4821",
 }
 TRACK_DELIVERED = {**TRACK_PACKING, "status": "DELIVERED", "eta_at": None, "rider": None}

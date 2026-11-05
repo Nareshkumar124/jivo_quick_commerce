@@ -48,6 +48,11 @@ REASON_MAX = 300
 # --------------------------------------------------------------------------- scope
 
 
+def _record(ip, *args):
+    """`audit.record` with the request IP the panel passes (`ip=`)."""
+    return audit.record(*args, ip=ip)
+
+
 def _has(user, perm: str) -> bool:
     return bool(user and user.is_active and user.is_staff and user.has_perm(perm))
 
@@ -109,7 +114,7 @@ def _locked_document(user, document_id: int) -> RiderDocument:
     return document
 
 
-def approve_document(document_id: int, *, by) -> RiderDocument:
+def approve_document(document_id: int, *, by, ip: str | None = None) -> RiderDocument:
     """PENDING (or REJECTED) -> APPROVED. Approving an approved document changes nothing."""
     with transaction.atomic():
         document = _locked_document(by, document_id)
@@ -123,7 +128,8 @@ def approve_document(document_id: int, *, by) -> RiderDocument:
         document.save(
             update_fields=["status", "review_note", "reviewed_by", "reviewed_at", "updated_at"]
         )
-        audit.record(
+        _record(
+            ip,
             by,
             "rider.document_approve",
             document,
@@ -132,7 +138,7 @@ def approve_document(document_id: int, *, by) -> RiderDocument:
     return document
 
 
-def reject_document(document_id: int, *, by, note: str) -> RiderDocument:
+def reject_document(document_id: int, *, by, ip: str | None = None, note: str) -> RiderDocument:
     """Any status -> REJECTED with a note shown to the rider (api-requests #25). The rider's
     status does not change: an ACTIVE rider stays ACTIVE (and cannot go online until a new copy
     is approved); a PENDING_KYC rider is asked for a new copy. A rider already online stays
@@ -148,7 +154,8 @@ def reject_document(document_id: int, *, by, note: str) -> RiderDocument:
         document.save(
             update_fields=["status", "review_note", "reviewed_by", "reviewed_at", "updated_at"]
         )
-        audit.record(
+        _record(
+            ip,
             by,
             "rider.document_reject",
             document,
@@ -162,7 +169,7 @@ def reject_document(document_id: int, *, by, note: str) -> RiderDocument:
     return document
 
 
-def document_file_url(document_id: int, *, by) -> tuple[str, datetime]:
+def document_file_url(document_id: int, *, by, ip: str | None = None) -> tuple[str, datetime]:
     """A short-lived signed link to a KYC file (09 §3: authorised staff only, private bucket).
     Needs `delivery.view_kyc_document_file` and the rider in scope. Every opening is audited."""
     from datetime import timedelta
@@ -177,7 +184,8 @@ def document_file_url(document_id: int, *, by) -> tuple[str, datetime]:
         raise ValidationError(MSG_DOC_NOT_FOUND)
     seconds = settings.KYC_FILE_URL_EXPIRY_SECONDS
     with transaction.atomic():
-        audit.record(
+        _record(
+            ip,
             by,
             "rider.document_view",
             document,
@@ -186,7 +194,7 @@ def document_file_url(document_id: int, *, by) -> tuple[str, datetime]:
     return signed_url(document.file.name, seconds), timezone.now() + timedelta(seconds=seconds)
 
 
-def document_number(document_id: int, *, by) -> str:
+def document_number(document_id: int, *, by, ip: str | None = None) -> str:
     """The full PAN/DL/RC number (decrypted) for verification by an authorised reviewer;
     audited. Aadhaar is never stored in full ("" for it and for image-only documents)."""
     if not can_review(by) or not _has(by, OPEN_FILES):
@@ -196,19 +204,22 @@ def document_number(document_id: int, *, by) -> str:
     if document is None:
         raise ValidationError(MSG_DOC_NOT_FOUND)
     with transaction.atomic():
-        audit.record(
+        _record(
+            ip,
             by,
             "rider.document_number_view",
             document,
             {"rider": document.rider_id, "doc_type": document.doc_type},
         )
-    return document.number()
+    return document.number()  # ValidationError (readable) when it cannot be decrypted
 
 
 # --------------------------------------------------------------------------- rider status
 
 
-def approve_rider(rider_id: int, *, by, home_store_id: int | None = None, cash_limit=None) -> Rider:
+def approve_rider(
+    rider_id: int, *, by, ip: str | None = None, home_store_id: int | None = None, cash_limit=None
+) -> Rider:
     """PENDING_KYC -> ACTIVE (04 §2.2). Needs every required document APPROVED and bank
     details. The home store defaults to the preferred store and must be in the caller's scope;
     `cash_limit` defaults to the rider's current limit (₹5,000 for a new rider)."""
@@ -241,7 +252,8 @@ def approve_rider(rider_id: int, *, by, home_store_id: int | None = None, cash_l
         rider.approved_at = timezone.now()
         rider.approved_by = by
         rider.save()
-        audit.record(
+        _record(
+            ip,
             by,
             "rider.approve",
             rider,
@@ -250,7 +262,7 @@ def approve_rider(rider_id: int, *, by, home_store_id: int | None = None, cash_l
     return rider
 
 
-def reject_rider(rider_id: int, *, by, reason: str) -> Rider:
+def reject_rider(rider_id: int, *, by, ip: str | None = None, reason: str) -> Rider:
     """PENDING_KYC -> REJECTED with a reason shown to the rider. The rider can fix what is
     asked (re-upload, edit the profile); once nothing required is missing or rejected the
     application returns to PENDING_KYC by itself (`riders._after_change`)."""
@@ -264,11 +276,11 @@ def reject_rider(rider_id: int, *, by, reason: str) -> Rider:
         rider.status = RiderStatus.REJECTED
         rider.rejection_reason = reason
         rider.save(update_fields=["status", "rejection_reason", "updated_at"])
-        audit.record(by, "rider.reject", rider, {"reason_length": len(reason)})
+        _record(ip, by, "rider.reject", rider, {"reason_length": len(reason)})
     return rider
 
 
-def suspend_rider(rider_id: int, *, by, reason: str) -> Rider:
+def suspend_rider(rider_id: int, *, by, ip: str | None = None, reason: str) -> Rider:
     """ACTIVE -> SUSPENDED. The rider is set offline (shift ended, reason ADMIN). Refused while
     the rider has an active delivery task (reassign it first, slice 5.3)."""
     from apps.delivery.services import shifts
@@ -285,11 +297,11 @@ def suspend_rider(rider_id: int, *, by, reason: str) -> Rider:
         rider.suspension_reason = reason
         rider.is_online = False
         rider.save(update_fields=["status", "suspension_reason", "is_online", "updated_at"])
-        audit.record(by, "rider.suspend", rider, {"reason_length": len(reason)})
+        _record(ip, by, "rider.suspend", rider, {"reason_length": len(reason)})
     return rider
 
 
-def reinstate_rider(rider_id: int, *, by) -> Rider:
+def reinstate_rider(rider_id: int, *, by, ip: str | None = None) -> Rider:
     """SUSPENDED -> ACTIVE."""
     with transaction.atomic():
         rider = _locked(by, rider_id)
@@ -298,11 +310,11 @@ def reinstate_rider(rider_id: int, *, by) -> Rider:
         rider.status = RiderStatus.ACTIVE
         rider.suspension_reason = ""
         rider.save(update_fields=["status", "suspension_reason", "updated_at"])
-        audit.record(by, "rider.reinstate", rider, {})
+        _record(ip, by, "rider.reinstate", rider, {})
     return rider
 
 
-def set_home_store(rider_id: int, store_id: int, *, by) -> Rider:
+def set_home_store(rider_id: int, store_id: int, *, by, ip: str | None = None) -> Rider:
     """Move a rider to another home store (offline riders only: offers follow the store)."""
     with transaction.atomic():
         rider = _locked(by, rider_id)
@@ -312,11 +324,11 @@ def set_home_store(rider_id: int, store_id: int, *, by) -> Rider:
         before = rider.home_store_id
         rider.home_store = store
         rider.save(update_fields=["home_store", "updated_at"])
-        audit.record(by, "rider.home_store", rider, {"from": before, "to": store.pk})
+        _record(ip, by, "rider.home_store", rider, {"from": before, "to": store.pk})
     return rider
 
 
-def set_cash_limit(rider_id: int, amount, *, by) -> Rider:
+def set_cash_limit(rider_id: int, amount, *, by, ip: str | None = None) -> Rider:
     """Change a rider's cash-in-hand limit (04 §2.7). Money: a 2-decimal amount, 0 or more."""
     limit = _cash_limit(amount)
     with transaction.atomic():
@@ -324,8 +336,8 @@ def set_cash_limit(rider_id: int, amount, *, by) -> Rider:
         before = rider.cash_limit
         rider.cash_limit = limit
         rider.save(update_fields=["cash_limit", "updated_at"])
-        audit.record(
-            by, "rider.cash_limit", rider, {"from": str(before), "to": str(rider.cash_limit)}
+        _record(
+            ip, by, "rider.cash_limit", rider, {"from": str(before), "to": str(rider.cash_limit)}
         )
     return rider
 

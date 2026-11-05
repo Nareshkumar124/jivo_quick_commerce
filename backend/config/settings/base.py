@@ -325,6 +325,11 @@ CELERY_BEAT_SCHEDULE = {
     "auto-accept-orders": {"task": "orders.auto_accept_orders", "schedule": 60.0},
     # Phase 5 (06 §5): auto-offline riders with no location for RIDER_AUTO_OFFLINE_MINUTES.
     "rider-heartbeat-check": {"task": "delivery.rider_heartbeat_check", "schedule": 120.0},
+    # Phase 5 (D-14 default): KYC documents deleted 1 year after offboarding/erasure. 04:15 IST.
+    "purge-offboarded-kyc": {
+        "task": "delivery.purge_offboarded_kyc",
+        "schedule": crontab(hour=22, minute=45),
+    },
 }
 
 # --------------------------------------------------------------------------- email
@@ -640,6 +645,18 @@ RIDER_DOCUMENT_MAX_BYTES = env_int("RIDER_DOCUMENT_MAX_BYTES", default=1024 * 10
 # opened by staff in the panel (short, 09 §3).
 RIDER_PHOTO_URL_EXPIRY_SECONDS = env_int("RIDER_PHOTO_URL_EXPIRY_SECONDS", default=3600)
 KYC_FILE_URL_EXPIRY_SECONDS = env_int("KYC_FILE_URL_EXPIRY_SECONDS", default=300)
+# D-14 default (to confirm with Jivo HR/Ops): KYC documents are kept this long after a rider is
+# offboarded or erased, then deleted (`purge_offboarded_kyc`).
+KYC_RETENTION_DAYS = env_int("KYC_RETENTION_DAYS", default=365)
+# Per-user rate limits on rider endpoints (fail open, apps.core.throttling).
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
+    {
+        "rider_documents": env_str("RIDER_DOCUMENTS_RATE", default="30/hour"),
+        "rider_profile_write": env_str("RIDER_PROFILE_WRITE_RATE", default="20/hour"),
+        "rider_locations": env_str("RIDER_LOCATIONS_RATE", default="6/min"),
+        "rider_heartbeat": env_str("RIDER_HEARTBEAT_RATE", default="6/min"),
+    }
+)
 RIDER_MIN_AGE_YEARS = env_int("RIDER_MIN_AGE_YEARS", default=18)
 # 04 §2.7: cash-in-hand limit of a new rider (ops can change it per rider).
 RIDER_DEFAULT_CASH_LIMIT = Decimal(env_str("RIDER_DEFAULT_CASH_LIMIT", default="5000.00"))

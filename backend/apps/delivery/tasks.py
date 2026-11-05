@@ -16,3 +16,11 @@ def rider_heartbeat_check() -> dict:
     if result["offline"] or result["on_task"]:
         logger.info("rider_heartbeat_check: %s", result)
     return result
+
+
+@shared_task(name="delivery.purge_offboarded_kyc")
+def purge_offboarded_kyc() -> int:
+    """Beat, daily: delete KYC documents past their retention (D-14 default: 1 year)."""
+    from apps.delivery.services.privacy import purge_offboarded_kyc as purge
+
+    return purge()

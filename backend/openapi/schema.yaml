@@ -10356,7 +10356,7 @@ paths:
                     eta_at: '2026-11-10T09:58:00Z'
                     rider:
                       name: Ravi K.
-                      phone: '+919811122233'
+                      phone: null
                       photo: https://jivo-media.s3.ap-south-1.amazonaws.com/kyc/42/photo-5f1c2a9be03d47a1.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=3b1f0c
                       lat: 28.4702
                       lng: 77.0411
@@ -11864,6 +11864,22 @@ paths:
                         - Enter a valid IFSC, e.g. HDFC0001234.
                   summary: VALIDATION_ERROR
           description: Invalid fields.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
         '401':
           content:
             application/json:
@@ -12159,6 +12175,22 @@ paths:
                         - This document is not needed for your vehicle.
                   summary: Not needed
           description: Invalid file or number.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
         '401':
           content:
             application/json:
@@ -12508,6 +12540,22 @@ paths:
                     server_time: '2026-11-10T09:30:00.120000Z'
                   summary: Set offline by the server
           description: Status.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
         '401':
           content:
             application/json:
@@ -12668,6 +12716,22 @@ paths:
                         - Send at most 50 points per request.
                   summary: Too many
           description: Invalid points.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
         '401':
           content:
             application/json:
@@ -14258,6 +14322,22 @@ paths:
                         - Choose a store from the list.
                   summary: Unknown store
           description: Invalid fields.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
         '401':
           content:
             application/json:
@@ -22954,7 +23034,9 @@ components:
           description: The rider's first name and last initial.
         phone:
           type: string
-          description: E.164. Direct dial in v1 (masked calling is v2).
+          nullable: true
+          description: E.164. Only while the order is OUT_FOR_DELIVERY (and only to
+            the order's owner); null otherwise. Masked/proxy calling is planned.
         photo:
           type: string
           format: uri

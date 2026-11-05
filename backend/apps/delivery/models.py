@@ -19,7 +19,7 @@ from django.db import models
 from simple_history.models import HistoricalRecords
 
 from apps.accounts.choices import RiderStatus
-from apps.core.crypto import decrypt
+from apps.core.crypto import DecryptionError, decrypt
 from apps.core.models import TimeStampedModel
 from apps.delivery.choices import (
     RIDER_PROFILE_STATUSES,
@@ -52,7 +52,7 @@ class Rider(TimeStampedModel):
     )
     suspension_reason = models.CharField(max_length=300, blank=True)
     full_name = models.CharField(max_length=120, help_text="Legal name, as on the documents.")
-    dob = models.DateField("date of birth")
+    dob = models.DateField("date of birth", null=True, help_text="Null once anonymised.")
     emergency_contact_name = models.CharField(max_length=120)
     emergency_contact_phone = models.CharField(max_length=15)
     vehicle_type = models.CharField(max_length=12, choices=VehicleType.choices)
@@ -76,7 +76,14 @@ class Rider(TimeStampedModel):
     # Shift and location state (slice 5.2). Location writes use queryset updates (no history).
     is_online = models.BooleanField(default=False)
     current_location = gis_models.PointField(srid=4326, null=True, blank=True)
-    last_location_at = models.DateTimeField(null=True, blank=True)
+    last_location_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the newest point was recorded (device clock)."
+    )
+    last_location_received_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Server time a location point last arrived: presence and auto-offline use it.",
+    )
     last_heartbeat_at = models.DateTimeField(null=True, blank=True)
     # Cash (slice 5.4): `cash_in_hand` is the running balance of RiderCashLedger.
     cash_in_hand = models.DecimalField(**MONEY, default=Decimal("0.00"))
@@ -109,6 +116,15 @@ class Rider(TimeStampedModel):
         help_text="When the application was last (re)submitted for review.",
     )
     approved_at = models.DateTimeField(null=True, blank=True)
+    kyc_purge_after = models.DateField(
+        null=True,
+        blank=True,
+        help_text=(
+            "D-14 default: KYC documents are deleted on this date (1 year after offboarding or "
+            "account erasure) by `purge_offboarded_kyc`."
+        ),
+    )
+    anonymised_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -121,6 +137,7 @@ class Rider(TimeStampedModel):
         excluded_fields=[
             "current_location",
             "last_location_at",
+            "last_location_received_at",
             "last_heartbeat_at",
             "updated_at",
         ]
@@ -161,12 +178,25 @@ class Rider(TimeStampedModel):
         return bool(self.bank_account_number_encrypted)
 
     def bank_account_number(self) -> str:
-        """The full account number (decrypted). Only for payouts; never shown in lists."""
-        return decrypt(self.bank_account_number_encrypted)
+        """The full account number (decrypted). Only for payouts; never shown in lists.
+        Raises `ValidationError` (readable) when it cannot be decrypted."""
+        return _decrypt_or_error(self.bank_account_number_encrypted, "bank account number")
 
     @property
     def cash_limit_reached(self) -> bool:
         return self.cash_in_hand >= self.cash_limit
+
+
+def _decrypt_or_error(token: str, what: str) -> str:
+    from django.core.exceptions import ValidationError
+
+    try:
+        return decrypt(token)
+    except DecryptionError:
+        raise ValidationError(
+            f"The stored {what} cannot be decrypted (encryption key missing or rotated). "
+            "Ask the rider to enter it again."
+        ) from None
 
 
 def kyc_upload_to(instance, filename: str) -> str:
@@ -213,8 +243,9 @@ class RiderDocument(TimeStampedModel):
         return f"{self.get_doc_type_display()} ({self.get_status_display()})"
 
     def number(self) -> str:
-        """The full document number (PAN/DL/RC), decrypted; "" for Aadhaar and images."""
-        return decrypt(self.number_encrypted)
+        """The full document number (PAN/DL/RC), decrypted; "" for Aadhaar and images.
+        Raises `ValidationError` (readable) when it cannot be decrypted."""
+        return _decrypt_or_error(self.number_encrypted, "document number")
 
 
 # --------------------------------------------------------------------------- slice 5.2
