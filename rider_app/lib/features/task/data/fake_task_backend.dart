@@ -3,18 +3,20 @@ import 'dart:math' as math;
 
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../shared/errors/rider_error_codes.dart';
 import '../../offers/domain/delivery_offer.dart';
 import '../domain/rider_task.dart';
 import '../domain/task_repositories.dart';
 import '../domain/task_rules.dart';
 import '../domain/task_status.dart';
 
-/// TODO(api): stands in for the rider offer and task endpoints of 06 §3
-/// until the rider contract lands (end of P4). It plays the server's rules
-/// from 08 (geofence, pickup only when PACKED, 5 OTP attempts then lock, COD
-/// amount must match, "not reachable" after the 10-minute wait) so the app
-/// can be built and tested against them. Behaviour the docs leave open is
-/// marked "assumed" and listed as API questions in the run report.
+/// TODO(api): stands in for the rider offer and task endpoints until the
+/// app is bound to the generated client (slice 5.3 schema, T-515b). It
+/// plays the contract's rules (geofence 422, pickup only when PACKED, 5
+/// wrong pickup codes then 423 `PICKUP_CODE_LOCKED`, 5 OTP attempts then
+/// 423, COD amount must equal `cod_amount_due` (400 with `amount_due`),
+/// CUSTOMER_NOT_REACHABLE only after `not_reachable_after` and 2 calls,
+/// `fail` straight to RETURNING, ended tasks reported as `recent_task`).
 ///
 /// Dev controls stand in for what other people do: dispatch (offers), the
 /// store (packed, receive return), ops (cancel, unassign) and the customer
@@ -31,6 +33,7 @@ class FakeTaskBackend
 
   /// The code printed on the bag label (and in its QR).
   static const pickupCode = '7K2P';
+  static const maxPickupAttempts = 5;
 
   /// The OTP the customer reads out.
   static const deliveryOtp = '4321';
@@ -53,6 +56,8 @@ class FakeTaskBackend
   DeliveryOffer? _offer;
   PaymentType? _offerPayment;
   RiderTask? _task;
+  RecentTask? _recent;
+  int _pickupAttemptsLeft = maxPickupAttempts;
   int _nextId = 501;
 
   /// Calls made, for tests. Never contains OTPs or codes.
@@ -89,10 +94,14 @@ class FakeTaskBackend
     bool cod = false,
     Duration? expiresIn,
     bool withoutCodAmount = false,
+    bool pushed = true,
   }) {
     final now = _clock().toUtc();
+    final id = _nextId++;
     final offer = DeliveryOffer(
-      id: _nextId++,
+      id: id,
+      taskId: id,
+      itemCount: 3,
       storeName: store.name,
       dropLocality: 'Sector 21, Noida',
       distanceKm: '2.4',
@@ -103,7 +112,8 @@ class FakeTaskBackend
     );
     _offer = offer;
     _offerPayment = offer.paymentType;
-    _events.add(OfferArrived(ReceivedOffer(offer, serverNow: now)));
+    // `pushed: false` plays a lost FCM push: only polling finds it.
+    if (pushed) _events.add(OfferArrived(ReceivedOffer(offer, serverNow: now)));
     return offer;
   }
 
@@ -141,6 +151,7 @@ class FakeTaskBackend
     }
     final cod = _offerPayment == PaymentType.cod;
     _task = _newTask(offer.id, cod: cod);
+    _pickupAttemptsLeft = maxPickupAttempts;
     return _respond(_task!);
   }
 
@@ -153,7 +164,10 @@ class FakeTaskBackend
   // -------------------------------------------------------------- tasks
 
   /// Starts with [task] already assigned (tests, restore).
-  void seedTask(RiderTask task) => _task = task;
+  void seedTask(RiderTask task) {
+    _task = task;
+    _pickupAttemptsLeft = maxPickupAttempts;
+  }
 
   RiderTask newTask({bool cod = false, TaskStatus? status}) {
     final task = _newTask(_nextId++, cod: cod);
@@ -183,24 +197,40 @@ class FakeTaskBackend
       TaskItem(name: 'Jivo Canola Oil', unit: '1 L', quantity: 2),
       TaskItem(name: 'Jivo Wheatgrass Juice', unit: '500 ml', quantity: 1),
     ],
+    itemCount: 3,
     otpAttemptsRemaining: maxOtpAttempts,
   );
 
-  /// Assumed (api-requests #13, undecided): `GET current` returns a task
-  /// that just ended (delivered, returned, cancelled) once more, so the
-  /// rider sees how it ended; after that there is no current task. Tests set
-  /// false to play the other answer (ended tasks are never returned).
+  /// The contract: an ended task is no longer `task`; it is reported as
+  /// `recent_task` for 10 minutes. Tests set false to play a lost
+  /// `recent_task` (nothing explains the end).
   bool returnsEndedTasks = true;
 
   @override
-  Future<RiderTask?> fetchCurrentTask() async {
+  Future<CurrentTask> fetchCurrentTask() async {
     await _call('fetchCurrentTask');
     final task = _task;
     if (task != null && task.status.isTerminal) {
       _task = null;
-      if (!returnsEndedTasks) return null;
+      _recent = RecentTask(
+        id: task.id,
+        orderNumber: task.orderNumber,
+        status: task.status,
+        endedAt: _clock().toUtc(),
+      );
     }
-    return task;
+    final now = _clock().toUtc();
+    final recent = _recent;
+    final showRecent =
+        _task == null &&
+        returnsEndedTasks &&
+        recent != null &&
+        now.difference(recent.endedAt ?? now) < const Duration(minutes: 10);
+    return CurrentTask(
+      task: _task,
+      recentTask: showRecent ? recent : null,
+      serverTime: now,
+    );
   }
 
   @override
@@ -215,18 +245,38 @@ class FakeTaskBackend
   Future<RiderTask> pickup(int taskId, String orderCode) async {
     await _call('pickup');
     final task = _require(taskId, TaskStatus.atStore);
+    if (_pickupAttemptsLeft <= 0) {
+      throw _riderError(
+        RiderErrorCode.pickupCodeLocked,
+        423,
+        details: {'attempts_remaining': 0},
+      );
+    }
     if (task.storeProgress != StoreOrderProgress.ready) {
       // Order not PACKED yet (T9 guard).
-      throw _error(ApiErrorCode.invalidStateTransition, 409);
-    }
-    if (orderCode != pickupCode) {
-      // Assumed error for a wrong code (06 does not name one).
       throw _error(
-        ApiErrorCode.validationError,
+        ApiErrorCode.invalidStateTransition,
+        409,
+        details: {'status': 'AT_STORE', 'order_status': 'PACKING'},
+      );
+    }
+    final parts = orderCode.toUpperCase().split(':');
+    final code = parts.length == 3 && parts[0] == 'JQC1'
+        ? (parts[1] == task.orderNumber.toUpperCase() ? parts[2] : '')
+        : orderCode.toUpperCase();
+    if (code != pickupCode) {
+      _pickupAttemptsLeft -= 1;
+      if (_pickupAttemptsLeft <= 0) {
+        throw _riderError(
+          RiderErrorCode.pickupCodeLocked,
+          423,
+          details: {'attempts_remaining': 0},
+        );
+      }
+      throw _riderError(
+        RiderErrorCode.pickupCodeInvalid,
         400,
-        details: {
-          'order_code': ['The code does not match this order.'],
-        },
+        details: {'attempts_remaining': _pickupAttemptsLeft},
       );
     }
     return _update(
@@ -248,10 +298,12 @@ class FakeTaskBackend
     );
     final task = _require(taskId, TaskStatus.pickedUp);
     if (overrideReason == null) _geofence(at, task.customer?.location);
+    final now = _clock().toUtc();
     return _update(
       task.copyWith(
         status: TaskStatus.atCustomer,
-        arrivedCustomerAt: _clock().toUtc(),
+        arrivedCustomerAt: now,
+        notReachableAfter: now.add(kNotReachableWait),
       ),
     );
   }
@@ -260,11 +312,18 @@ class FakeTaskBackend
   Future<CodQr> createCodQr(int taskId) async {
     await _call('createCodQr');
     final task = _require(taskId, TaskStatus.atCustomer);
-    if (!task.isCod) throw _error(ApiErrorCode.codNotAvailable, 422);
+    if (!task.isCod) {
+      throw _error(ApiErrorCode.invalidStateTransition, 409);
+    }
+    final existing = task.codQr;
+    if (existing != null && existing.status == UpiQrStatus.pending) {
+      return existing;
+    }
     final qr = CodQr(
       imageUrl: null,
       amount: task.codAmountDue!,
       status: UpiQrStatus.pending,
+      expiresAt: _clock().toUtc().add(const Duration(minutes: 15)),
     );
     _task = task.copyWith(codQr: qr);
     return qr;
@@ -279,6 +338,34 @@ class FakeTaskBackend
   }) async {
     await _call('deliver ${codMode?.wireValue ?? 'prepaid'} $codAmount');
     final task = _require(taskId, TaskStatus.atCustomer);
+    // The contract checks the COD collection before the OTP, and a
+    // mismatch does not use an attempt.
+    if (task.isCod) {
+      if (codMode == null ||
+          codAmount == null ||
+          !isSameAmount(codAmount, task.codAmountDue ?? '')) {
+        throw _error(
+          ApiErrorCode.validationError,
+          400,
+          details: {
+            'cod': {
+              'amount': ['Collect exactly ${task.codAmountDue}.'],
+            },
+            'amount_due': task.codAmountDue,
+          },
+        );
+      }
+      if (codMode == CodMode.upi && task.codQr?.status != UpiQrStatus.paid) {
+        throw _error(
+          ApiErrorCode.validationError,
+          400,
+          details: {
+            'cod': ['The UPI payment is not confirmed yet.'],
+          },
+        );
+      }
+    }
+
     if (task.otpLocked) throw _error(ApiErrorCode.deliveryOtpLocked, 423);
     if (otp != deliveryOtp) {
       final left = (task.otpAttemptsRemaining ?? maxOtpAttempts) - 1;
@@ -293,22 +380,9 @@ class FakeTaskBackend
         details: {'attempts_remaining': left},
       );
     }
-    if (task.isCod) {
-      final paidByUpi =
-          codMode == CodMode.upi && task.codQr?.status == UpiQrStatus.paid;
-      if (codAmount != task.codAmountDue ||
-          codMode == null ||
-          (codMode == CodMode.upi && !paidByUpi)) {
-        throw _error(
-          ApiErrorCode.validationError,
-          400,
-          details: {
-            'cod': ['The collected amount does not match.'],
-          },
-        );
-      }
-    }
-    return _update(task.copyWith(status: TaskStatus.delivered));
+    return _update(
+      task.copyWith(status: TaskStatus.delivered, earningsTotal: '45.00'),
+    );
   }
 
   @override
@@ -320,14 +394,41 @@ class FakeTaskBackend
         !TaskAction.fail.allowedIn(task.status)) {
       throw _error(ApiErrorCode.invalidStateTransition, 409);
     }
+    if (report.reason == FailReason.other && report.note.trim().isEmpty) {
+      throw _error(
+        ApiErrorCode.validationError,
+        400,
+        details: {
+          'note': ['This field is required.'],
+        },
+      );
+    }
     if (report.reason == FailReason.notReachable) {
-      final arrived = task.arrivedCustomerAt;
-      if (arrived == null ||
-          _clock().toUtc().isBefore(arrived.add(kNotReachableWait))) {
-        throw _error(ApiErrorCode.validationError, 400);
+      if (report.callAttempts < kMinCallAttempts) {
+        throw _error(
+          ApiErrorCode.validationError,
+          400,
+          details: {
+            'call_attempts': ['Call the customer at least 2 times first.'],
+          },
+        );
+      }
+      final after =
+          task.notReachableAfter ??
+          task.arrivedCustomerAt?.add(kNotReachableWait);
+      if (after == null || _clock().toUtc().isBefore(after)) {
+        throw _error(
+          ApiErrorCode.invalidStateTransition,
+          409,
+          details: {
+            'status': task.status.wireValue,
+            'reason': 'WAIT_NOT_ELAPSED',
+            if (after != null) 'not_reachable_after': after.toIso8601String(),
+          },
+        );
       }
     }
-    // T13: FAILED, and the task moves on to RETURNING.
+    // T13: the order DELIVERY_FAILED and the task RETURNING in one call.
     return _update(task.copyWith(status: TaskStatus.returning));
   }
 
@@ -459,6 +560,17 @@ class FakeTaskBackend
     }
     return task;
   }
+
+  static ApiError _riderError(
+    RiderErrorCode code,
+    int status, {
+    Map<String, Object?> details = const {},
+  }) => ApiError(
+    code: ApiErrorCode.unknown,
+    rawCode: code.wireValue,
+    statusCode: status,
+    details: details,
+  );
 
   static ApiError _error(
     ApiErrorCode code,

@@ -97,7 +97,12 @@ void main() {
       await tap(tester, 'task-pickup');
       expect(
         barError(tester),
-        "That code doesn't match this order. Check the bag and try again.",
+        "That code doesn't match this order. 4 tries left.",
+      );
+      expect(
+        find.text("That code doesn't match this order. 4 tries left."),
+        findsNWidgets(2),
+        reason: 'bar error and the attempts line',
       );
       // The wrong code is selected, so typing replaces it.
       final field = tester.widget<TextField>(byKey('pickup-code'));
@@ -617,6 +622,77 @@ void main() {
       expect(byKey('cod-qr-image'), findsNothing);
       // Cash is still possible.
       expect(byKey('cod-take-cash'), findsOneWidget);
+    });
+  });
+
+  group('slice 5.3', () {
+    testWidgets('5 wrong pickup codes: locked (423), call the store', (
+      tester,
+    ) async {
+      await resume(tester, TaskStatus.atStore);
+      h.tasks.markPacked();
+      for (var i = 0; i < 5; i++) {
+        await tester.enterText(byKey('pickup-code'), 'AAAA');
+        await tester.pump();
+        await tap(tester, 'task-pickup');
+      }
+      expect(byKey('pickup-locked'), findsOneWidget);
+      expect(byKey('pickup-code'), findsNothing);
+      await tap(tester, 'pickup-call-store');
+      expect(h.urls.opened.last.scheme, 'tel');
+      expect(h.urls.opened.last.path, FakeTaskBackend.store.phone);
+    });
+
+    testWidgets('a bag label for another order is refused before any call', (
+      tester,
+    ) async {
+      h.scannerValues = ['JQC1:JV-OTHER:7K2P'];
+      final task = await resume(tester, TaskStatus.atStore);
+      h.tasks.markPacked();
+      h.scannerValues.add('JQC1:${task.orderNumber}:7K2P');
+      await tap(tester, 'pickup-scan');
+      await tap(tester, 'fake-scan-JQC1:JV-OTHER:7K2P');
+      expect(
+        find.text('This bag is for order JV-OTHER, not this one.'),
+        findsOneWidget,
+      );
+      expect(h.tasks.calls, isNot(contains(startsWith('pickup'))));
+      await tap(tester, 'fake-scan-JQC1:${task.orderNumber}:7K2P');
+      expect(find.text('Deliver to the customer'), findsOneWidget);
+    });
+
+    testWidgets('returning: the poll sees the store receive the items', (
+      tester,
+    ) async {
+      await resume(tester, TaskStatus.returning);
+      expect(find.text('Return to store'), findsOneWidget);
+      expect(byKey('return-waiting'), findsOneWidget);
+      h.tasks.markReturned();
+      await tester.pump(const Duration(seconds: 11));
+      await tester.pumpAndSettle();
+      expect(find.text('Items returned'), findsOneWidget);
+    });
+
+    testWidgets('COD amount changed at deliver: the new amount must be '
+        'confirmed again', (tester) async {
+      await resume(tester, TaskStatus.atCustomer, cod: true);
+      await tester.enterText(
+        byKey('delivery-otp'),
+        FakeTaskBackend.deliveryOtp,
+      );
+      await tester.pump();
+      await tap(tester, 'otp-continue');
+      h.tasks.changeCodAmount();
+      await tap(tester, 'cod-cash');
+      await tap(tester, 'cod-cash-confirm');
+      expect(barError(tester), 'The amount changed. Collect exactly ₹990.');
+      expect(tester.widget<Text>(byKey('cod-amount')).data, '₹990');
+      // The ₹1,249 confirmation does not count for ₹990.
+      await tap(tester, 'cod-cash');
+      expect(find.byKey(const Key('cod-cash-confirm')), findsOneWidget);
+      await tap(tester, 'cod-cash-confirm');
+      expect(find.text('Delivered!'), findsOneWidget);
+      expect(h.tasks.calls.last, 'deliver cash 990.00');
     });
   });
 

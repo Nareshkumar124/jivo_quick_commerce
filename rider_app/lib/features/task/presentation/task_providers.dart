@@ -95,7 +95,7 @@ class _Unavailable
       throw _error;
 
   @override
-  Future<RiderTask?> fetchCurrentTask() async => throw _error;
+  Future<CurrentTask> fetchCurrentTask() async => throw _error;
 
   @override
   Future<RiderTask> arrivedAtStore(int taskId, GeoPoint at) async =>

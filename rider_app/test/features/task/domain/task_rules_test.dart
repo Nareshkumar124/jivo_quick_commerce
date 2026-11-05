@@ -130,10 +130,90 @@ void main() {
       expect(normalisePickupCode('7K-P'), isNull);
     });
 
-    test('QR content is accepted only when it is exactly the code', () {
-      expect(pickupCodeFromQr('7K2P'), '7K2P');
-      expect(pickupCodeFromQr('https://example.com/7K2P'), isNull);
-      expect(pickupCodeFromQr(null), isNull);
+    test('bag QR JQC1:<order>:<code> is sent whole (api-requests #15)', () {
+      final scanned = parseScannedPickup(
+        'jqc1:JV-261110-001203:k7qx',
+        orderNumber: 'JV-261110-001203',
+      );
+      expect(scanned, isA<ScannedCode>());
+      expect((scanned as ScannedCode).orderCode, 'JQC1:JV-261110-001203:K7QX');
+      expect(pickupCodeFromPayload(scanned.orderCode), 'K7QX');
+    });
+
+    test('a bare 4-character QR is the code', () {
+      final scanned = parseScannedPickup(' 7k2p ', orderNumber: 'JQ-1');
+      expect((scanned as ScannedCode).orderCode, '7K2P');
+      expect(pickupCodeFromPayload('7K2P'), '7K2P');
+    });
+
+    test('a label for another order is caught without a call', () {
+      final scanned = parseScannedPickup(
+        'JQC1:JV-OTHER:K7QX',
+        orderNumber: 'JV-261110-001203',
+      );
+      expect((scanned as ScannedOtherOrder).orderNumber, 'JV-OTHER');
+    });
+
+    test('anything else is unreadable', () {
+      for (final raw in [
+        null,
+        'https://example.com/7K2P',
+        'JQC1:JV-1:K7',
+        'JQC1::K7QX',
+        'JQC2:JV-1:K7QX',
+      ]) {
+        expect(
+          parseScannedPickup(raw, orderNumber: 'JV-1'),
+          isA<ScannedUnreadable>(),
+          reason: '$raw',
+        );
+      }
+    });
+  });
+
+  group('taskPollInterval (polling fallback)', () {
+    test('no task, or an ended one: no polling', () {
+      expect(taskPollInterval(null), isNull);
+      expect(
+        taskPollInterval(prepaid.copyWith(status: TaskStatus.delivered)),
+        isNull,
+      );
+    });
+
+    test('3 s while a UPI QR is open, as the contract says', () {
+      final qr = cod.copyWith(
+        codQr: const CodQr(
+          imageUrl: null,
+          amount: '1249.00',
+          status: UpiQrStatus.pending,
+        ),
+      );
+      expect(taskPollInterval(qr), const Duration(seconds: 3));
+      expect(
+        taskPollInterval(
+          qr.copyWith(codQr: qr.codQr!.withStatus(UpiQrStatus.paid)),
+        ),
+        const Duration(seconds: 15),
+      );
+    });
+
+    test('5 s at the store while packing, 10 s returning, else 15 s', () {
+      final atStore = prepaid.copyWith(status: TaskStatus.atStore);
+      expect(taskPollInterval(atStore), const Duration(seconds: 5));
+      expect(
+        taskPollInterval(
+          atStore.copyWith(storeProgress: StoreOrderProgress.ready),
+        ),
+        const Duration(seconds: 15),
+      );
+      expect(
+        taskPollInterval(prepaid.copyWith(status: TaskStatus.returning)),
+        const Duration(seconds: 10),
+      );
+      expect(
+        taskPollInterval(prepaid.copyWith(status: TaskStatus.assigned)),
+        const Duration(seconds: 15),
+      );
     });
   });
 
@@ -184,6 +264,16 @@ void main() {
         Duration.zero,
       );
       expect(notReachableWaitLeft(prepaid, arrived), isNull);
+    });
+
+    test('the server not_reachable_after wins over the local 10 min', () {
+      final later = atDrop.copyWith(
+        notReachableAfter: arrived.add(const Duration(minutes: 12)),
+      );
+      expect(
+        notReachableWaitLeft(later, arrived.add(const Duration(minutes: 10))),
+        const Duration(minutes: 2),
+      );
     });
 
     test('other needs a note; refused and wrong address need nothing', () {

@@ -46,26 +46,28 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
   bool _collecting = false;
 
   /// Kept across a wrong-OTP retry, so the rider does not collect twice.
-  bool _cashConfirmed = false;
+  /// The amount due when the rider confirmed the cash. If the server's
+  /// amount changes afterwards (`deliver` 400 with `amount_due`), the
+  /// confirmation no longer counts: the rider confirms the new amount.
+  String? _confirmedAmount;
+
+  bool get _cashConfirmed {
+    final confirmed = _confirmedAmount;
+    final due = ref.read(taskFlowControllerProvider).task?.codAmountDue;
+    return confirmed != null && due != null && isSameAmount(confirmed, due);
+  }
 
   /// The rider switched from an unpaid UPI QR to cash (the customer's UPI
   /// failed). Showing the QR again switches back.
   bool _preferCash = false;
-  Timer? _upiPoll;
 
-  @override
-  void initState() {
-    super.initState();
-    // Restored with a QR still waiting (app restarted mid-payment): keep
-    // asking the server until it is paid or expires.
-    if (widget.task.codQr?.status == UpiQrStatus.pending) _startUpiPoll();
-  }
+  // While a UPI QR is open, the task controller polls the task every 3 s
+  // (taskPollInterval), also after a restart mid-payment.
 
   @override
   void dispose() {
     _otp.dispose();
     _otpFocus.dispose();
-    _upiPoll?.cancel();
     super.dispose();
   }
 
@@ -133,27 +135,13 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
       ),
     );
     if (yes != true || !mounted) return;
-    setState(() => _cashConfirmed = true);
+    setState(() => _confirmedAmount = _task.codAmountDue);
     await _deliver(const CodCollection.cash(cashConfirmed: true));
   }
 
   Future<void> _showQr() async {
     setState(() => _preferCash = false);
-    final ok = await _controller.createCodQr();
-    if (ok && mounted) _startUpiPoll();
-  }
-
-  /// The server confirms the UPI payment (Razorpay); poll the task.
-  void _startUpiPoll() {
-    _upiPoll?.cancel();
-    _upiPoll = Timer.periodic(const Duration(seconds: 5), (_) {
-      final status = ref.read(taskFlowControllerProvider).task?.codQr?.status;
-      if (status != UpiQrStatus.pending) {
-        _upiPoll?.cancel();
-        return;
-      }
-      unawaited(_controller.load());
-    });
+    await _controller.createCodQr();
   }
 
   @override
@@ -303,7 +291,9 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
     final showQr = qr != null && !_cashConfirmed && !_preferCash;
     if (showQr) {
       final paid = qr.status == UpiQrStatus.paid;
-      final expired = qr.status == UpiQrStatus.expired;
+      final expired =
+          qr.status == UpiQrStatus.expired ||
+          qr.status == UpiQrStatus.cancelled;
       actions = PrimaryActionBar(
         buttonKey: const Key('cod-upi-deliver'),
         label: l10n.taskDeliver,
@@ -427,7 +417,8 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
           Text(
             switch (qr.status) {
               UpiQrStatus.paid => l10n.codUpiPaid,
-              UpiQrStatus.expired => l10n.codUpiExpired,
+              UpiQrStatus.expired ||
+              UpiQrStatus.cancelled => l10n.codUpiExpired,
               UpiQrStatus.pending => l10n.codUpiWaiting,
             },
             key: const Key('cod-upi-status'),

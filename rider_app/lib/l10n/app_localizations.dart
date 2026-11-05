@@ -3295,6 +3295,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Jivo operations set you offline. Go online again when you are ready, or call support.'**
   String get shiftEndedByOpsBody;
+
+  /// No description provided for @pickupCodeWrongLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'That code doesn\'t match this order. {count, plural, =1{1 try left.} other{{count} tries left.}}'**
+  String pickupCodeWrongLeft(int count);
+
+  /// No description provided for @pickupCodeLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong codes. Ask the store staff or call support to hand over this order.'**
+  String get pickupCodeLocked;
+
+  /// No description provided for @pickupLockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Code entry locked'**
+  String get pickupLockedTitle;
+
+  /// No description provided for @pickupCallStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Call store'**
+  String get pickupCallStore;
+
+  /// No description provided for @riderOfflineError.
+  ///
+  /// In en, this message translates to:
+  /// **'You are offline. Go online again to continue.'**
+  String get riderOfflineError;
+
+  /// No description provided for @failWaitNotElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait 10 minutes at the drop location before choosing this.'**
+  String get failWaitNotElapsed;
+
+  /// No description provided for @failNeedsCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Call the customer at least 2 times first.'**
+  String get failNeedsCalls;
+
+  /// No description provided for @codAmountChangedCollect.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount changed. Collect exactly {amount}.'**
+  String codAmountChangedCollect(String amount);
+
+  /// No description provided for @codUpiNotConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'The UPI payment isn\'t confirmed yet. Wait for it, or collect cash.'**
+  String get codUpiNotConfirmed;
+
+  /// No description provided for @scanOtherOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'This bag is for order {orderNumber}, not this one.'**
+  String scanOtherOrder(String orderNumber);
+
+  /// No description provided for @taskReturnWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking with the store every few seconds…'**
+  String get taskReturnWaiting;
+
+  /// No description provided for @offerItemCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String offerItemCount(int count);
 }
 
 class _AppLocalizationsDelegate

@@ -69,6 +69,21 @@ void main() {
     expect(textOf(tester, 'shift-status'), "You're offline");
   });
 
+  testWidgets('offer polling fallback: only online; a lost push is found '
+      'within 5 s', (tester) async {
+    await pumpActiveHome(tester, h);
+    int polls() => h.tasks.calls.where((c) => c == 'fetchCurrentOffer').length;
+    final offline = polls();
+    await tester.pump(const Duration(seconds: 11));
+    expect(polls(), offline, reason: 'offline: no polling');
+
+    await tapToggle(tester);
+    h.tasks.simulateOffer(pushed: false);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(byKey('offer-drop'), findsOneWidget);
+  });
+
   testWidgets('permissions missing: guard card, "Go online" disabled, '
       '"Fix permissions" opens the gate', (tester) async {
     perms.current = allGranted.copyWith(notifications: Grant.denied);
