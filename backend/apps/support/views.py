@@ -62,7 +62,9 @@ def _ticket_body(user, ticket_id: int) -> dict:
 class TicketListCreateView(APIView):
     def get_throttles(self):
         # Opening tickets is rate limited per user; reading the list is not.
-        return [TicketCreateThrottle()] if self.request.method == "POST" else []
+        if self.request.method == "POST":
+            return [TicketCreateThrottle()]
+        return super().get_throttles()  # T-814 (H3): the baseline
 
     @extend_schema(
         operation_id="support_tickets_list",

@@ -299,7 +299,7 @@ REORDER_SOME_UNAVAILABLE = {
 
 GATEWAY_ORDER_ID = "order_Nq3uVxY7kL9pQe"
 RAZORPAY_CHECKOUT = {
-    "key_id": "rzp_test_Jv7x2QmP9kLs4T",
+    "key_id": "rzp_test_EXAMPLEEXAMPLE",
     "order_id": GATEWAY_ORDER_ID,
     "amount": 75300,
     "currency": "INR",

@@ -26,11 +26,13 @@ import logging
 import re
 from datetime import timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from celery import shared_task
 from django.conf import settings
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection, transaction
+from django.db.models import Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -77,7 +79,13 @@ RETRY_SUFFIX = re.compile(r":retry-\d+$")
 
 MSG_NOT_PAID = "This order has no online payment to refund."
 MSG_ABOVE_REFUNDABLE = "At most {amount} can still be refunded on this order."
-MSG_ABOVE_LIMIT = "Your role can refund at most {amount} at a time."
+MSG_ABOVE_LIMIT = (
+    "Support can refund at most {limit} in total on an order; {left} is left. "
+    "Ask Finance for a larger refund."
+)
+MSG_ABOVE_DAILY_LIMIT = (
+    "You can refund at most {limit} a day; {left} is left today. Ask Finance for more."
+)
 MSG_NO_PERMISSION = "You do not have permission to refund orders."
 MSG_NOT_RETRYABLE = "Only a failed refund, or one stuck without a gateway answer, can be retried."
 MSG_REFUND_NOT_FOUND = "Refund not found."
@@ -283,16 +291,87 @@ def failed_delivery_refund(order, *, customer_fault: bool) -> Decimal:
 # --------------------------------------------------------------------------- staff (05 §3)
 
 
-def _refund_limit(user) -> Decimal | None:
-    """None = no limit (Super Admin, Finance); Support: `SUPPORT_REFUND_LIMIT` per refund."""
+def _is_capped(user) -> bool:
+    """DL-59: Super Admin and Finance refund without caps; anyone else allowed to refund
+    (Support) is capped (`SUPPORT_REFUND_LIMIT` per order, `SUPPORT_REFUND_DAILY_LIMIT` a day)."""
     from apps.accounts import roles
 
     if user.is_superuser:
-        return None
-    groups = set(user.groups.values_list("name", flat=True))
-    if groups & {roles.SUPER_ADMIN, roles.FINANCE}:
-        return None
-    return round_money(settings.SUPPORT_REFUND_LIMIT)
+        return False
+    return not user.groups.filter(name__in=[roles.SUPER_ADMIN, roles.FINANCE]).exists()
+
+
+def _capped_staff_ids(user_ids) -> set[int]:
+    from apps.accounts import roles
+    from apps.accounts.models import User
+
+    uncapped = User.objects.filter(pk__in=user_ids).filter(
+        Q(is_superuser=True) | Q(groups__name__in=[roles.SUPER_ADMIN, roles.FINANCE])
+    )
+    return set(user_ids) - set(uncapped.values_list("pk", flat=True))
+
+
+def support_refunded_on_order(order) -> Decimal:
+    """Manual refunds standing on the order that capped staff (Support) issued (DL-59)."""
+    manual = live_refunds(list(Refund.objects.filter(order=order, reason=MANUAL)))
+    capped = _capped_staff_ids({r.initiated_by_id for r in manual if r.initiated_by_id})
+    return sum((r.amount for r in manual if r.initiated_by_id in capped), ZERO)
+
+
+def ist_day_start(now=None):
+    """The start of the current IST day (`STAFF_TIME_ZONE`), as an aware datetime."""
+    zone = ZoneInfo(settings.STAFF_TIME_ZONE)
+    local = timezone.localtime(now or timezone.now(), zone)
+    return local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def refunded_today_by(user, now=None) -> Decimal:
+    """Manual refunds standing that `user` issued since the start of the IST day (DL-59)."""
+    refunds = Refund.objects.filter(
+        reason=MANUAL, initiated_by=user, created_at__gte=ist_day_start(now)
+    )
+    return _committed(refunds)
+
+
+def _check_caps(order, amount: Decimal, by) -> None:
+    """DL-59, under the order lock and the refunder's user-row lock (so two refunds by one agent
+    on two orders cannot both pass the daily cap)."""
+    order_limit = round_money(settings.SUPPORT_REFUND_LIMIT)
+    left = max(order_limit - support_refunded_on_order(order), ZERO)
+    if amount > left:
+        raise RefundCapExceeded(
+            MSG_ABOVE_LIMIT.format(limit=f"₹{money_str(order_limit)}", left=f"₹{money_str(left)}")
+        )
+    daily_limit = round_money(settings.SUPPORT_REFUND_DAILY_LIMIT)
+    left = max(daily_limit - refunded_today_by(by), ZERO)
+    if amount > left:
+        raise RefundCapExceeded(
+            MSG_ABOVE_DAILY_LIMIT.format(
+                limit=f"₹{money_str(daily_limit)}", left=f"₹{money_str(left)}"
+            )
+        )
+
+
+def _alert_on_refund_volume(order, by) -> None:
+    """DL-59: ops alert `payment.refund_volume_high` when one staff member has issued more than
+    `REFUND_VOLUME_ALERT_PER_HOUR` manual refunds in the last hour; at most once per member per
+    hour (a cache key; without Redis the alert is still raised)."""
+    from django.core.cache import cache
+
+    from apps.orders import events
+
+    since = timezone.now() - timedelta(hours=1)
+    count = Refund.objects.filter(reason=MANUAL, initiated_by=by, created_at__gte=since).count()
+    if count <= settings.REFUND_VOLUME_ALERT_PER_HOUR:
+        return
+    try:
+        first = cache.add(f"refund-volume-alert:{by.pk}", 1, timeout=60 * 60)
+    except Exception:
+        logger.warning("refund volume alert dedupe unavailable", exc_info=True)
+        first = True
+    if first:
+        logger.error("Refund volume: staff %s issued %s refunds in the last hour", by.pk, count)
+        events.emit(events.REFUND_VOLUME_HIGH, order.pk)
 
 
 def can_refund(user) -> bool:
@@ -310,21 +389,25 @@ def staff_refund_orders(user):
 
 
 def manual_refund(order_id: int, amount: Decimal, *, by, note: str = "") -> Refund:
-    """A staff refund (full or partial) of an ONLINE order (05 §2 Orders "refund", §3 Refund:
-    Super Admin and Finance; Support up to `SUPPORT_REFUND_LIMIT` per refund). Never more than
-    is still refundable. Audited. Raises `PermissionDenied` / `ValidationError`."""
+    """A staff refund (full or partial) of an ONLINE order (05 §2 Orders "refund", §3 Refund).
+    Super Admin and Finance: no cap. Support (DL-59): `SUPPORT_REFUND_LIMIT` in total per order
+    and `SUPPORT_REFUND_DAILY_LIMIT` per IST day. Never more than is still refundable. Audited.
+    Raises `PermissionDenied` or `ValidationError` (`RefundCapExceeded` above a cap)."""
     if not can_refund(by):
         raise PermissionDenied(MSG_NO_PERMISSION)
+    from apps.accounts.models import User
+
     amount = round_money(Decimal(amount))
     if amount <= ZERO:
         raise ValidationError("Enter an amount above zero.")
-    limit = _refund_limit(by)
-    if limit is not None and amount > limit:
-        raise ValidationError(MSG_ABOVE_LIMIT.format(amount=f"₹{money_str(limit)}"))
+    capped = _is_capped(by)
     with transaction.atomic():
         order = staff_refund_orders(by).select_for_update().filter(pk=order_id).first()
         if order is None:
             raise ValidationError("Order not found.")
+        if capped:
+            User.objects.select_for_update().filter(pk=by.pk).first()  # Lock: the refunder
+            _check_caps(order, amount, by)
         number = Refund.objects.filter(order=order, reason=MANUAL).count() + 1
         refund = refund_order(
             order,
@@ -340,6 +423,7 @@ def manual_refund(order_id: int, amount: Decimal, *, by, note: str = "") -> Refu
             order,
             {"refund_id": refund.pk, "amount": money_str(amount), "note_length": len(note or "")},
         )
+        _alert_on_refund_volume(order, by)
     return refund
 
 

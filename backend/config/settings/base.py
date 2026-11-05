@@ -619,7 +619,7 @@ DISPATCH_TRIGGER = env_str("DISPATCH_TRIGGER", default="ACCEPTED")
 REFUND_KEEP_DELIVERY_FEE_ON_CUSTOMER_FAULT = env_bool(
     "REFUND_KEEP_DELIVERY_FEE_ON_CUSTOMER_FAULT", default=True
 )
-# 05 §3: Support may refund up to this per refund (Super Admin and Finance: no limit).
+# 05 §3, DL-59: Support may refund up to this in total per order (Super Admin, Finance: no cap).
 SUPPORT_REFUND_LIMIT = Decimal(env_str("SUPPORT_REFUND_LIMIT", default="500.00"))
 # A PENDING refund with no gateway answer after this long is sent again (sync, ops retry).
 REFUND_STUCK_MINUTES = env_int("REFUND_STUCK_MINUTES", default=10)
@@ -733,3 +733,61 @@ LOGGING = {
         "django.db.backends": {"level": "WARNING"},
     },
 }
+# --------------------------------------------------------------------------- security (P8, T-814)
+# OWASP review fixes. Kept as one appended block (parallel branches merge more easily).
+# H3: baseline throttles on every DRF view (fail open, apps.core.throttling). A view with its own
+# `throttle_classes` (stricter scopes: orders, payments, rider endpoints, ...) replaces them, so
+# nothing is throttled twice; `throttle_classes = []` exempts a view (health, gateway webhook).
+# Generous on purpose: many customers can share one carrier IP (CGNAT).
+REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = [
+    "apps.core.throttling.BaselineAnonThrottle",
+    "apps.core.throttling.BaselineUserThrottle",
+]
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
+    {
+        "anon": env_str("API_ANON_RATE", default="300/min"),
+        "user": env_str("API_USER_RATE", default="300/min"),
+        "search": env_str("SEARCH_RATE", default="60/min"),
+        "serviceability": env_str("SERVICEABILITY_RATE", default="60/min"),
+        "coupon_apply": env_str("COUPON_APPLY_RATE", default="20/hour"),
+        "address_write": env_str("ADDRESS_WRITE_RATE", default="30/hour"),
+        "invoice": env_str("INVOICE_RATE", default="30/hour"),
+    }
+)
+# H2 (DL-59): staff lockout per username (whatever the IP: rotating IPs cannot brute-force one
+# account) and per username+IP. Staff TOTP is the admin track's part of DL-59.
+AXES_LOCKOUT_PARAMETERS = ["username", ["ip_address", "username"]]
+# M2: expired refresh tokens and sessions are deleted daily (UTC; 22:00 / 22:15 = 03:30 / 03:45
+# IST). M4 (DL-60): payment payloads are scrubbed of personal data after the retention period.
+CELERY_BEAT_SCHEDULE.update(
+    {
+        "flush-expired-tokens": {
+            "task": "accounts.flush_expired_tokens",
+            "schedule": crontab(hour=22, minute=0),
+        },
+        "clear-expired-sessions": {
+            "task": "accounts.clear_expired_sessions",
+            "schedule": crontab(hour=22, minute=15),
+        },
+        "scrub-payment-payloads": {
+            "task": "payments.scrub_payment_payloads",
+            "schedule": crontab(hour=22, minute=30),
+        },
+    }
+)
+# M3 (DL-59): Support refunds. SUPPORT_REFUND_LIMIT (order processing block above) caps Support's
+# refunds in total per order; this caps each Support agent's refunds per IST day. Super Admin and
+# Finance have no cap.
+SUPPORT_REFUND_DAILY_LIMIT = Decimal(env_str("SUPPORT_REFUND_DAILY_LIMIT", default="5000.00"))
+# Ops alert `payment.refund_volume_high` when one staff member issues more refunds than this in
+# an hour (any role; at most one alert per member per hour).
+REFUND_VOLUME_ALERT_PER_HOUR = env_int("REFUND_VOLUME_ALERT_PER_HOUR", default=10)
+# M4 (DL-60, ⚠ Jivo): days after which Payment.raw and webhook payloads lose contact, email, VPA
+# and card fields (ids, amounts and statuses are kept).
+PAYMENT_PAYLOAD_RETENTION_DAYS = env_int("PAYMENT_PAYLOAD_RETENTION_DAYS", default=90)
+PAYMENT_PAYLOAD_SCRUB_BATCH = env_int("PAYMENT_PAYLOAD_SCRUB_BATCH", default=500)
+# L3: the key that hashes OTP codes. Empty: derived from SECRET_KEY with its own label (never the
+# raw SECRET_KEY). Deployed environments may set it; it must then differ from the other keys.
+OTP_HASH_KEY = env_str("OTP_HASH_KEY", default="")
+# L10: saved addresses per user.
+MAX_ADDRESSES_PER_USER = env_int("MAX_ADDRESSES_PER_USER", default=20)

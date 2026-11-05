@@ -147,16 +147,47 @@ class TestOnline:
         order = Order.objects.get(pk=checkout.place("ONLINE")["order"]["id"])
         assert timedelta(minutes=10) <= order.payment_expires_at - before < timedelta(minutes=11)
 
-    def test_gateway_down_creates_nothing(self, checkout, shop, monkeypatch):
+    def test_gateway_down_leaves_nothing_held(self, checkout, shop, monkeypatch):
+        """T-814 (M6): the gateway is called after the placement commits. When it fails, the
+        order is ended (T4), nothing stays reserved, and the same Idempotency-Key places afresh
+        once the gateway is back."""
+
         def down(self, **kwargs):
             raise PaymentGatewayError("timeout")
 
-        monkeypatch.setattr(FakeRazorpayGateway, "create_order", down)
         checkout.fill((shop.canola_1l, 2))
-        body = checkout.place("ONLINE", status=503)
+        key = new_key()
+        expected = checkout.cart()["bill"]["grand_total"]
+        with monkeypatch.context() as patch:
+            patch.setattr(FakeRazorpayGateway, "create_order", down)
+            body = checkout.place("ONLINE", key=key, expected=expected, status=503)
         assert body["error"]["code"] == "SERVICE_UNAVAILABLE"
-        assert not Order.objects.exists()
+        failed = Order.objects.get()
+        assert (failed.status, failed.payment_status) == ("PAYMENT_FAILED", "FAILED")
+        assert not failed.payments.exists()
+        assert failed.idempotency_key != key
         assert reserved(shop, shop.canola_1l) == 0
+        assert not Order.objects.filter(status="PAYMENT_PENDING").exists()
+
+        again = checkout.place("ONLINE", key=key, expected=expected)
+        assert again["order"]["id"] != failed.pk
+        assert again["razorpay"]["order_id"]
+        assert reserved(shop, shop.canola_1l) == 2
+
+    def test_replay_completes_an_order_left_without_an_attempt(self, checkout, shop):
+        """T-814 (M6): a crash between the placement commit and the gateway call leaves the
+        order PAYMENT_PENDING without an attempt; a replay of its key attaches one."""
+        checkout.fill((shop.canola_1l, 2))
+        key = new_key()
+        expected = checkout.cart()["bill"]["grand_total"]
+        first = checkout.place("ONLINE", key=key, expected=expected)
+        order = Order.objects.get(pk=first["order"]["id"])
+        order.payments.all().delete()
+        again = checkout.place("ONLINE", key=key, expected=expected, status=200)
+        assert again["order"]["id"] == order.pk
+        assert again["razorpay"]["order_id"]
+        assert order.payments.count() == 1
+        assert reserved(shop, shop.canola_1l) == 2
 
 
 class TestIdempotency:

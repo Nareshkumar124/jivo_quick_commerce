@@ -76,8 +76,10 @@ class TestTokenRefresh:
         }
         assert reused["WWW-Authenticate"].startswith("Bearer")
 
+        # T-814 (M2): reusing a revoked refresh token is treated as theft and revokes the whole
+        # chain, so the token issued by the rotation is revoked as well.
         again = api_client.post(self.URL, {"refresh": body["refresh"]}, format="json")
-        assert again.status_code == 200
+        assert again.status_code == 401
 
     def test_garbage_token(self, api_client):
         response = api_client.post(self.URL, {"refresh": "garbage"}, format="json")

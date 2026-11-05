@@ -388,3 +388,109 @@ def test_refund_gateway_call_holds_no_row_lock(shop, monkeypatch):
     assert outcome["result"] == "processed"
     refund.refresh_from_db()
     assert refund.status == "PROCESSED"
+
+
+def test_slow_gateway_at_placement_holds_no_lock(shop, monkeypatch):
+    """T-814 (M6): while the placement waits on a slow gateway, the customer's cart, the coupon
+    and the stock rows are not locked (another transaction locks them NOWAIT), the order is
+    already committed with its stock reserved, and the attempt is attached when the call
+    returns."""
+    from apps.payments.gateways import FakeRazorpayGateway
+
+    user = UserFactory()
+    address = make_address(user)
+    cart = Cart.objects.create(user=user, store=shop.store_model, address=address)
+    CartItem.objects.create(cart=cart, variant=shop.canola_1l, quantity=2)
+    in_call, release = threading.Event(), threading.Event()
+    original = FakeRazorpayGateway.create_order
+
+    def slow_create_order(self, **kwargs):
+        in_call.set()
+        release.wait(10)
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(FakeRazorpayGateway, "create_order", slow_create_order)
+    outcome = {}
+
+    def worker():
+        try:
+            outcome["placement"] = services.place_order(
+                user,
+                shop.store,
+                address_id=address.pk,
+                payment_method="ONLINE",
+                expected_grand_total=Decimal("558.00"),
+                idempotency_key=str(uuid.uuid4()),
+            )
+        except Exception as exc:  # pragma: no cover - reported by the assert below
+            outcome["error"] = exc
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    try:
+        assert in_call.wait(10)
+        with transaction.atomic():
+            Cart.objects.select_for_update(nowait=True).get(pk=cart.pk)
+            list(
+                StoreInventory.objects.select_for_update(nowait=True).filter(store=shop.store_model)
+            )
+        pending = Order.objects.get(user=user)
+        assert pending.status == "PAYMENT_PENDING"
+        assert not pending.payments.exists()
+        assert reserved(shop) == 2
+    finally:
+        release.set()
+        thread.join(15)
+    assert "error" not in outcome, outcome
+    order = outcome["placement"].order
+    assert outcome["placement"].created
+    assert order.payments.get().status == "CREATED"
+    assert reserved(shop) == 2
+
+
+def test_gateway_failure_at_placement_races_a_replay(shop, monkeypatch):
+    """T-814 (M6): the creating request's gateway call fails while a replay of the same key
+    succeeds: the order keeps the replay's attempt (not ended), and stock stays reserved once."""
+    from apps.payments.gateways import FakeRazorpayGateway, PaymentGatewayError
+
+    user = UserFactory()
+    address = make_address(user)
+    cart = Cart.objects.create(user=user, store=shop.store_model, address=address)
+    CartItem.objects.create(cart=cart, variant=shop.canola_1l, quantity=2)
+    key = str(uuid.uuid4())
+    calls = {"n": 0}
+    lock = threading.Lock()
+    original = FakeRazorpayGateway.create_order
+
+    def first_fails(self, **kwargs):
+        with lock:
+            calls["n"] += 1
+            first = calls["n"] == 1
+        if first:
+            raise PaymentGatewayError("timeout")
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(FakeRazorpayGateway, "create_order", first_fails)
+
+    def place():
+        return services.place_order(
+            user,
+            shop.store,
+            address_id=address.pk,
+            payment_method="ONLINE",
+            expected_grand_total=Decimal("558.00"),
+            idempotency_key=key,
+        )
+
+    results = race(place, place)
+    orders = Order.objects.filter(user=user)
+    live = [o for o in orders if o.status == "PAYMENT_PENDING"]
+    # Either the replay attached first (one live order, one attempt) or the failure ended the
+    # order first (then the replay placed a fresh one, or got 503): never a stuck reservation.
+    assert len(live) <= 1
+    assert reserved(shop) == 2 * len(live)
+    for order in live:
+        assert order.payments.count() == 1
+    assert any(not isinstance(r, Exception) for r in results) or not live

@@ -199,7 +199,9 @@ class TestFakeGatewayDown:
         )
         assert response.status_code == 503
         assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
-        assert not Order.objects.exists()
+        # T-814 (M6): the order committed before the gateway call is ended (T4), nothing held.
+        assert not Order.objects.filter(status="PAYMENT_PENDING").exists()
+        assert Order.objects.get().status == "PAYMENT_FAILED"
         settings.FAKE_GATEWAY_DOWN = False
         placement = checkout.place("ONLINE")
         settings.FAKE_GATEWAY_DOWN = True
@@ -214,7 +216,7 @@ class TestFakeGatewayDown:
             },
         )
         assert response.status_code == 503
-        assert Order.objects.get().status == "PAYMENT_PENDING"
+        assert Order.objects.get(pk=placement["order"]["id"]).status == "PAYMENT_PENDING"
 
     def test_expiry_waits_while_down(self, checkout, shop, settings):
         from apps.orders import services
