@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "apps.orders",
     "apps.payments",
     "apps.support",
+    "apps.loadtest",  # P8 T-812: load-test data commands (no models, no API)
     "apps.ops_console",
 ]
 
@@ -628,6 +629,10 @@ from config.admin_ui import UNFOLD  # noqa: E402, F401  (owned by the admin pane
 # --------------------------------------------------------------------------- project flags
 # `manage.py seed_demo` is refused where this is False (production).
 SEED_DEMO_ALLOWED = env_bool("SEED_DEMO_ALLOWED", default=True)
+# P8 T-812: `manage.py loadtest_seed` / `loadtest_cleanup` (create and delete the +9190000002xx
+# load-test customers, their orders and stock top-ups). Off unless explicitly enabled; staging
+# only. Production refuses it at startup and with the system check loadtest.E001.
+LOADTEST_DATA_ALLOWED = env_bool("LOADTEST_DATA_ALLOWED", default=False)
 
 # --------------------------------------------------------------------------- logging
 LOG_LEVEL = env_str("LOG_LEVEL", default="INFO")
