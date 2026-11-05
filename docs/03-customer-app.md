@@ -156,6 +156,8 @@ All product tiles show the image, name, variant (e.g., 1 L), selling price, stru
 | Reorder | "Order again" adds available items from a past order to the cart and reports any that are unavailable |
 | Rate | After delivery: rate the order (1–5 stars + tags) and rate the rider [P7] |
 
+**Built so far (P5, 2026-11-04):** while an order is active, the order detail polls `GET /orders/{id}/track/` every 10 s and shows the rider card (photo, name, call button) and, while `OUT_FOR_DELIVERY`, the delivery OTP; a status change reloads the detail. Rating is built ahead on fakes (P7): a "How was your order?" card on delivered orders opens the rate screen with the tapped stars preselected; 4–5 stars offer positive tags, 1–3 negative ones (proposed codes `ON_TIME`, `WELL_PACKED`, `FRESH_PRODUCTS`, `POLITE_RIDER`, `LATE_DELIVERY`, `DAMAGED_ITEMS`, `MISSING_ITEMS`, `RUDE_RIDER`); rider stars are optional; comment up to 500 characters.
+
 ### 2.11 Account [P1/P7]
 | Feature | Details |
 |---------|---------|
@@ -165,6 +167,8 @@ All product tiles show the image, name, variant (e.g., 1 L), selling price, stru
 | Help & support | FAQs, "Get help with an order" (choose an order, then an issue type, which creates a ticket with an optional photo), ticket list and replies, call support [P7] |
 | Legal | About, Terms, Privacy Policy, Refund Policy (CMS pages) |
 | App info | Version, rate us |
+
+**Built so far (P5, ahead on fakes):** Help & support with FAQs (grouped by category), "Get help with an order" (order optional from Help; order issue types only when an order is chosen; message 10–1000 characters), ticket list, thread and reply (no reply box once `CLOSED`). The optional photo waits for the attachment contract. Legal pages and About open in an in-app viewer that renders a safe subset of the CMS HTML (headings, paragraphs, lists, bold/italic, `https`/`mailto`/`tel`/`jivo` links; scripts, styles, frames, attributes and other links are dropped). Until the P7 endpoints exist the real-API build keeps the browser policy links and shows only "Call support".
 | Logout / Delete account | See 2.2 |
 
 ### 2.12 Notifications [P6]
@@ -179,6 +183,8 @@ All product tiles show the image, name, variant (e.g., 1 L), selling price, stru
 | Promotions (opt-out) | ✔ | |
 
 Tapping a notification deep-links to the relevant screen (order tracking, product, collection).
+
+**Push registration (P5):** the FCM token is registered with `POST /me/devices/` after sign-in, on every app start while signed in (covers app-version changes) and on every token refresh; logout sends it as `fcm_token` so the device stops getting pushes. It runs behind a push interface that is a no-op until the Firebase projects exist (D-19); a tap that arrives before the user is in the app is opened after start-up.
 
 ## 3. Screen inventory (for design)
 

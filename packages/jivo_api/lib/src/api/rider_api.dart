@@ -3,6 +3,8 @@
 // AUTO-GENERATED FILE, DO NOT MODIFY!
 //
 
+import 'package:jivo_api/src/date_only.dart';
+
 import 'dart:async';
 
 // ignore: unused_import
@@ -361,8 +363,8 @@ class RiderApi {
     );
 
     final _queryParameters = <String, dynamic>{
-      if (from != null) r'from': from,
-      if (to != null) r'to': to,
+      if (from != null) r'from': jivoDateToQuery(from),
+      if (to != null) r'to': jivoDateToQuery(to),
     };
 
     final _response = await _dio.request<Object>(
@@ -408,7 +410,7 @@ class RiderApi {
   }
 
   /// App alive + status check
-  /// Call every minute or so while online, and on returning to the foreground. Records \&quot;last seen\&quot; for ops and returns whether the server still has the rider online, a pending offer and the active task (polling fallback, 04 §2.4). It does not keep the rider online: only location points do.
+  /// Call every minute or so while online, and on returning to the foreground. Records \&quot;last seen\&quot; for ops and returns whether the server still has the rider online, a pending offer and the active task (polling fallback, 04 §2.4). Auto-offline (api-requests #42, ⚠ PM default): no location point for 10 minutes sets the rider offline, unless a heartbeat came in those 10 minutes and the last point is at most 30 minutes old (e.g. waiting indoors without a GPS fix).
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -1990,9 +1992,9 @@ class RiderApi {
 
     final _queryParameters = <String, dynamic>{
       if (beforeId != null) r'before_id': beforeId,
-      if (from != null) r'from': from,
+      if (from != null) r'from': jivoDateToQuery(from),
       if (pageSize != null) r'page_size': pageSize,
-      if (to != null) r'to': to,
+      if (to != null) r'to': jivoDateToQuery(to),
     };
 
     final _response = await _dio.request<Object>(

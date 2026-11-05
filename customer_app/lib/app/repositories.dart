@@ -19,6 +19,7 @@ import '../features/checkout/data/payment_flow.dart';
 import '../features/checkout/data/payment_launcher.dart';
 import '../features/checkout/data/razorpay_payment_launcher.dart';
 import '../features/checkout/domain/idempotency_key.dart';
+import '../features/cms/data/cms_repository.dart';
 import '../features/launch/data/config_repository.dart';
 import '../features/location/data/api_serviceability_repository.dart';
 import '../features/location/data/delivery_location_store.dart';
@@ -32,13 +33,18 @@ import '../features/orders/data/api_order_repository.dart';
 import '../features/orders/data/order_history_repository.dart';
 import '../features/orders/data/order_repository.dart';
 import '../features/profile/data/profile_repository.dart';
+import '../features/rating/data/rating_repository.dart';
+import '../features/support/data/support_repository.dart';
 import '../features/tracking/data/track_repository.dart';
 import 'providers.dart';
 
 /// Repositories: the API implementation, or a fake with `FAKE_API=true` in
 /// the dev flavor only (never staging or prod). Tests override these
 /// providers.
-bool _fake(Ref ref) {
+bool _fake(Ref ref) => isFakeApi(ref);
+
+/// Whether this build runs on fakes (`FAKE_API=true`, dev flavor only).
+bool isFakeApi(Ref ref) {
   final env = ref.watch(appEnvProvider);
   return env.useFakeApi && env.flavor == Flavor.dev;
 }
@@ -146,15 +152,22 @@ final orderHistoryRepositoryProvider = Provider<OrderHistoryRepository>((ref) {
   );
 });
 
-/// Whether this build can show live tracking. TODO(api): true only on
-/// fakes until `GET /orders/{id}/track/` (Phase 5) is bound.
-final trackingAvailableProvider = Provider<bool>((ref) => _fake(ref));
-
-/// Live tracking data (Phase 6 lookahead on fakes).
-final trackRepositoryProvider = Provider<TrackRepository>(
-  (ref) =>
-      _fake(ref) ? FakeTrackRepository() : const UnavailableTrackRepository(),
+/// Whether this build can show live tracking: wherever orders exist (the
+/// dev flavor today, like [cartAvailableProvider]); `GET /orders/{id}/track/`
+/// is bound since P5.
+final trackingAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(cartAvailableProvider),
 );
+
+/// Live tracking (`GET /orders/{id}/track/`, polled every 10 s): the API,
+/// the fake with `FAKE_API`, nothing where there are no orders.
+final trackRepositoryProvider = Provider<TrackRepository>((ref) {
+  if (!ref.watch(trackingAvailableProvider)) {
+    return const UnavailableTrackRepository();
+  }
+  if (_fake(ref)) return FakeTrackRepository();
+  return ApiTrackRepository(ref.watch(jivoApiProvider));
+});
 
 /// The notification inbox (Phase 6 lookahead on fakes). TODO(api): bind the
 /// inbox endpoints when the Phase 6 contract lands.
@@ -162,6 +175,37 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => _fake(ref)
       ? FakeNotificationRepository()
       : const UnavailableNotificationRepository(),
+);
+
+/// Whether order rating is shown. TODO(api): true only on fakes until
+/// `POST /orders/{id}/rating/` (Phase 7) is bound.
+final ratingAvailableProvider = Provider<bool>((ref) => _fake(ref));
+
+/// Order and rider ratings (Phase 7 lookahead on fakes).
+final ratingRepositoryProvider = Provider<RatingRepository>(
+  (ref) =>
+      _fake(ref) ? FakeRatingRepository() : const UnavailableRatingRepository(),
+);
+
+/// Whether FAQs and support tickets are shown. TODO(api): true only on
+/// fakes until the Phase 7 support endpoints are bound.
+final supportAvailableProvider = Provider<bool>((ref) => _fake(ref));
+
+/// FAQs and tickets (Phase 7 lookahead on fakes).
+final supportRepositoryProvider = Provider<SupportRepository>(
+  (ref) => _fake(ref)
+      ? FakeSupportRepository()
+      : const UnavailableSupportRepository(),
+);
+
+/// Whether Legal and About open in the in-app CMS viewer. TODO(api): true
+/// only on fakes until `GET /pages/{slug}/` (Phase 7); otherwise the
+/// policy URLs from `config/app` open in the browser.
+final cmsAvailableProvider = Provider<bool>((ref) => _fake(ref));
+
+/// CMS pages (Phase 7 lookahead on fakes).
+final cmsRepositoryProvider = Provider<CmsRepository>(
+  (ref) => _fake(ref) ? FakeCmsRepository() : const UnavailableCmsRepository(),
 );
 
 /// The root navigator, for sheets opened outside a widget (the dev fake

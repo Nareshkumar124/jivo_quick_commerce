@@ -190,7 +190,7 @@ Map<String, dynamic> _$RiderRegisterRequestToJson(
   RiderRegisterRequest instance,
 ) => <String, dynamic>{
   'full_name': instance.fullName,
-  'dob': instance.dob.toIso8601String(),
+  'dob': jivoDateToJson(instance.dob),
   'emergency_contact_name': instance.emergencyContactName,
   'emergency_contact_phone': instance.emergencyContactPhone,
   'preferred_store_id': instance.preferredStoreId,

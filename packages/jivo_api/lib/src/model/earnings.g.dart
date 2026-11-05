@@ -188,8 +188,8 @@ Earnings _$EarningsFromJson(Map<String, dynamic> json) => $checkedCreate(
 );
 
 Map<String, dynamic> _$EarningsToJson(Earnings instance) => <String, dynamic>{
-  'from': instance.from.toIso8601String(),
-  'to': instance.to.toIso8601String(),
+  'from': jivoDateToJson(instance.from),
+  'to': jivoDateToJson(instance.to),
   'total': instance.total,
   'orders_count': instance.ordersCount,
   'totals_by_type': instance.totalsByType.toJson(),

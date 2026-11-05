@@ -186,3 +186,48 @@ uv run pytest tests/test_p4_*.py -q                                 # private/ru
 | Instance log | 0 × 500, 0 tracebacks |
 
 **Observed:** a 503 carries the `SERVICE_UNAVAILABLE` envelope and leaves no `PaymentWebhookEvent` row, so the gateway's retry with the same event id is processed, not answered `duplicate`. New observation OBS-P3-05 (08): `amount_refunded` is capped at `grand_total` when an order had two separately refunded late captures.
+
+## Phase 4 stage 1 (2026-11-04, T-416)
+**Build:** `qa/phase-2` at `1b3552d` = `git merge --no-ff develop` (develop `74f47d1`: backend P4 R2 T-411/412 + customer P4 T-414; admin P4 **not** merged). **Target:** QA instance `127.0.0.1:8004` started by hand from `.worktrees/qa/backend` (`config.settings.local`, `SMS_BACKEND=apps.notifications.sms.ConsoleSmsBackend`, Redis 6380 DB 5/6/7, QA OTP numbers, shared remote DB with the 4 P4 migrations applied by the PM; `seed_demo` run by the PM). QA Celery worker on DB 7 only (`--pool=solo`), no QA beat (the :8001 beat serves the shared DB). Both stopped at the end; :8001 untouched. **Date:** 2026-11-04.
+
+**Store and ops actions** (T6/T7/T8/T8a/T12, manual refund, retry, `sync_refund_status`, SLA alert) were driven through the **backend services** (`apps.orders.store_ops`, `apps.payments.order_refunds`) by `qa/tools/store_ops_driver.py`, run in the QA worktree backend with the QA environment, as the seeded staff users, because the Ops Console (admin P4) is not merged. The driver refuses any order that is not a QA customer's. Console pages, HTMX, CSRF and hidden-button checks stay ⏭.
+
+### Commands
+```bash
+cd qa
+uv run pytest tests/test_p4_orders.py -q -rfEsxX          # private/runs/p4s1-orders-run1.txt, run2 (fixes), p4s1-tc12b.txt
+uv run pytest tests/test_p4_store_ops.py -q -rfEsxX       # private/runs/p4s1-storeops-run1.txt
+uv run pytest tests/test_p4_refund_worker.py -q           # stops/starts the QA worker; p4s1-refundworker-run2.txt
+uv run pytest tests/test_p4_carryover.py tests/test_p4_db.py tests/test_p3_db.py
+# profiles (environment only): FAKE_GATEWAY_DOWN=True -> p4s1-gwdown.txt ; CUSTOMER_CANCEL_UNTIL=PLACED -> p4s1-cancelplaced.txt
+uv run pytest -m smoke                                    # p4s1-smoke-run2.txt
+```
+
+### Results (actual pytest summaries)
+| Run | Result |
+|---|---|
+| P4 customer API, run 1 | `3 failed, 16 passed, 2 skipped in 298.51s`: all 3 were QA test defects (cart line shape `variant.id`; the driver's error mapping). Fixed |
+| Re-run of the 3 | `3 passed in 86.63s`; TC-09 race outcomes `['cancelled', 'packing', 'packing']` |
+| TC-12b (OUT_OF_STOCK / LIMITED_STOCK) | `1 passed in 37.58s` |
+| P4 store ops | `1 failed, 20 passed, 6 skipped in 783.72s`: TC-26 expected `REDEEMED`, which is not a state (07: APPLIED). QA wording error; corrected, `1 passed` |
+| Refund worker (TC-34/35) | run 1: 2 failed (the QA worker-stop helper did not find the process; fixed) · run 2 `2 passed in 107.38s` |
+| `gwdown` profile (TC-50) | `2 passed, 1 skipped`: ONLINE placement 503 `SERVICE_UNAVAILABLE`, nothing created; COD 201; retry-payment 503; verify 503 and the order stays `PAYMENT_PENDING` |
+| `cancelplaced` profile (TC-10) | `1 passed in 38.94s` |
+| TC-49 (₹45 sachet) | passed: 422 `MIN_ORDER_NOT_MET`, COD and ONLINE, nothing created |
+| SQL (P3 + P4 db) | `8 passed in 11.52s` (final, after cleanup) |
+
+Invoice: `GET /orders/{id}/invoice/` is 409 `INVALID_STATE_TRANSITION {status}` before DELIVERED (TC-15 ✅) and 404 for another user (TC-14 ✅). The 503 for the missing WeasyPrint libraries on this host is only reachable for a DELIVERED order: not exercised (no QA DELIVERED order before P5; the seeded DELIVERED order belongs to the user's test account and was not touched).
+
+Every P4 response was validated strictly against `schema.yaml` @ `1b3552d` (`orders_retrieve`, `orders_cancel`, `orders_list`, `orders_reorder`): no contract drift.
+
+## Phase 4 stage 2 (2026-11-04, Ops Console and QA-02)
+**Build:** `qa/phase-2` at `f744508` = `git merge --no-ff develop` (develop `ef1426a`: admin P4 T-413 merged: live board, packing console, "Can't supply", SLA badges, audit view, refund-retry one-time tokens; P7 support API). QA instance `127.0.0.1:8004` from `.worktrees/qa/backend` (local settings, console SMS, Redis 5/6/7, QA OTP numbers, shared remote DB); QA worker on DB 7 only. Stopped at the end; :8001 untouched. Console cases were posted like HTMX does (`HX-Request`, `X-CSRFToken` from the page's `hx-headers`) with the real form field names (`qa/tests/p4_console.py`); admin actions through the changelist form (`qa/tests/admin_forms.py`).
+
+| Run | Result |
+|---|---|
+| `uv run pytest tests/test_p4_console.py -s` run 1 | `6 failed, 14 passed in 458.33s`. 3 QA test defects (GET on the cancel URL by a role that may not cancel is 403 before 405; `accepting` takes `0/1`; the QA worker started inside pytest died with it, fixed by starting it through `nohup`). 2 real gaps: BUG-0010, BUG-0011 |
+| Re-run of the affected cases | `4 passed, 2 xfailed in 67.43s` (xfail strict = BUG-0010/0011) |
+| Smoke P0–P4 (`-m smoke`) | `98 passed, 2 skipped, 418 deselected in 807.71s` (skips: P0 staging profile; the old TC-30 stub, now redirected to the QA-02 case) |
+| SQL (P3 + P4) after cleanup | `8 passed in 12.74s` |
+
+Console poll latency (TC-60, 20 sequential each): live-board columns p50 253 ms / p95 278 ms; packing queues p50 264 ms / p95 310 ms (remote DB ~10 ms/query).

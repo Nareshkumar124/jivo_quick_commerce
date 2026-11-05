@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/date_only.dart';
 import 'package:jivo_api/src/model/vehicle_type_enum.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -40,7 +41,12 @@ class RiderRegisterRequest {
   final String fullName;
 
   /// Date of birth. The rider must be 18 or older (IST).
-  @JsonKey(name: r'dob', required: true, includeIfNull: false)
+  @JsonKey(
+    name: r'dob',
+    toJson: jivoDateToJson,
+    required: true,
+    includeIfNull: false,
+  )
   final DateTime dob;
 
   @JsonKey(

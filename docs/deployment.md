@@ -14,7 +14,7 @@ This file records what is **actually set up today**, plus the target for the env
 ## 1. Local development
 
 ### Prerequisites
-- **Backend:** `uv` (Python 3.13 is installed through uv; never use the system Python 3.14) and Docker with Compose.
+- **Backend:** `uv` (Python 3.13 is installed through uv; never use the system Python 3.14) and Docker with Compose. On the Windows dev machine (no Docker), Redis runs natively and MinIO/Mailpit come from `infra/scripts/windows/dev-services.ps1` (below).
 - **Geo libraries:** GDAL/GEOS/PROJ for GeoDjango: `sudo apt install -y gdal-bin libgdal-dev libgeos-dev libproj-dev`. The backend Docker image already has them.
 - **Flutter:** 3.47.9 / Dart 3.13.7, the Android SDK with **platform 37**, Java 17. The API generator needs Java 17 and python3.
 
@@ -36,6 +36,52 @@ uv run celery -A config beat -l info               # scheduled jobs (required: e
 ```
 - **Windows host** (the current dev machine, no Docker; see `dev-environment.md`): run `uv run celery -A config worker -l info --pool threads` and `uv run celery -A config beat -l info` as two separate processes. Windows refuses `-B` (embedded beat).
 - **Alternative:** the compose services `backend`, `worker` and `beat` run the same stack in Docker, using `backend/.env`. Don't run them alongside a host `runserver` on 8001.
+
+### Windows dev machine: MinIO and Mailpit without Docker
+The user approved this on 2026-11-04. `infra/scripts/windows/dev-services.ps1` replaces the compose `minio` and `mailpit` services.
+- **No admin rights, nothing installed system-wide.**
+- **Binaries:** `%USERPROFILE%\.local\share\jivoqc-tools\<tool>\<version>\`
+- **Data and logs:** `…\jivoqc-tools\data\{minio,mailpit,logs}`
+- **Binding:** everything binds to `127.0.0.1` only. The ports are the compose ports: MinIO 9000/9001, Mailpit SMTP 1025 and UI 8025.
+
+```powershell
+# from the repo root; every action is idempotent. -Service all|minio|mailpit (default all)
+powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-services.ps1 -Action start
+powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-services.ps1 -Action status   # processes + listening ports
+powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-services.ps1 -Action init     # MinIO buckets + policy + checks
+powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-services.ps1 -Action stop
+```
+- **`start`:**
+  - Downloads any missing pinned binary from its official source and checks its sha256 against the pin in the script. On a mismatch it stops and installs nothing.
+  - Then starts each service as a hidden background process that outlives the shell. Logs go to `data\logs\<service>.log`.
+  - If another process already holds a service's port, it refuses to start that service.
+  - **Exit codes:** `0` if everything requested is running, `2` if anything was skipped or failed.
+- **`stop`:** kills only processes whose executable path is inside the tools folder.
+- **`init`:** runs `infra/scripts/minio_buckets.py` through the backend's uv environment.
+  - It reads the endpoint, credentials and bucket names from the Django storage settings, so `backend/.env` overrides apply. It refuses any endpoint that isn't localhost.
+  - It creates the private bucket `jivo-media` (`S3_MEDIA_BUCKET`) and the public bucket `jivo-public` (`S3_PUBLIC_MEDIA_BUCKET`).
+  - It sets the anonymous `s3:GetObject` policy on the public bucket. This is the same policy `seed_demo` sets.
+  - It then proves both buckets: a test object round-trips in each. An anonymous GET must return 403 on the private bucket and 200 on the public one.
+- **Credentials:**
+  - MinIO starts with `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` from the environment, or with the compose and `local.py` defaults.
+  - If `backend/.env` sets `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`, export the same values as `MINIO_ROOT_*` before `start`.
+- **Pins:**
+
+  | Tool | Version | Source | sha256 |
+  |---|---|---|---|
+  | Mailpit | v1.33.0 | GitHub `axllent/mailpit` releases, `mailpit-windows-amd64.zip` | `47122dd828ff80dcaef62b2952c478b178afadadf066c990489608e537121bfd` (GitHub's published asset digest; the release ships no checksum file) |
+  | MinIO server (pgsty community build) | `RELEASE.2026-08-04T00-00-00Z` (the same release as the compose image) | GitHub `pgsty/minio` releases (the repo is now named `pgsty/silo`; GitHub redirects), `minio_20260804000000.0.0_windows_amd64.tar.gz` | `c2160a4ccbb80ce1d45f69cc35137cb5ba68f638cc2f86ebfb3d0523ce3e0d74` (GitHub asset digest; matches the release's `_checksums.txt`) |
+
+  To upgrade, change `Version`, `Url` and `Sha256` together in `$Pins`, as a reviewed change.
+- **MinIO is an archived-upstream community build, for local dev only.**
+  - Official `dl.min.io` returns **410 Gone** for every community build (checked 2026-11-04), and upstream open-source MinIO no longer gets security fixes.
+  - The user approved the pgsty fork on 2026-11-04, for local development only. Never use it in staging or production; those use S3 (§6).
+  - That release publishes no `mc`. `-Action init` uses boto3 instead, so no `mc` is needed.
+  - Besides `127.0.0.1:9000`, MinIO also binds the IPv6 loopback `[::1]:9000`. That address is still local-only.
+- **Check that it works:**
+  - `curl http://127.0.0.1:8025/readyz` returns 200.
+  - `uv run python manage.py sendtestemail you@example.com` (from `backend/`) delivers a message that shows up at `http://127.0.0.1:8025` and in `GET /api/v1/messages`.
+  - For MinIO: `curl http://127.0.0.1:9000/minio/health/live`, then `-Action init`.
 
 ### Mobile apps (dev flavor)
 - **Emulator:** the default dev API URL is `http://10.0.2.2:8001`.

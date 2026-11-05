@@ -27,8 +27,9 @@ abstract interface class AuthRepository {
     required String termsVersion,
   });
 
-  /// `POST /auth/logout/`: revokes [refreshToken]. Throws [ApiError].
-  Future<void> logout(String refreshToken);
+  /// `POST /auth/logout/`: revokes [refreshToken] and, with [fcmToken],
+  /// stops pushes to this device. Throws [ApiError].
+  Future<void> logout(String refreshToken, {String? fcmToken});
 }
 
 UserProfile userProfileFromMe(Me me) => UserProfile(
@@ -90,9 +91,9 @@ class ApiAuthRepository implements AuthRepository {
   });
 
   @override
-  Future<void> logout(String refreshToken) => _guard(
+  Future<void> logout(String refreshToken, {String? fcmToken}) => _guard(
     () => _api.getAuthApi().authLogout(
-      logoutRequest: LogoutRequest(refresh: refreshToken),
+      logoutRequest: LogoutRequest(refresh: refreshToken, fcmToken: fcmToken),
     ),
   );
 }
@@ -171,6 +172,11 @@ class FakeAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> logout(String refreshToken) async =>
-      loggedOutTokens.add(refreshToken);
+  Future<void> logout(String refreshToken, {String? fcmToken}) async {
+    loggedOutTokens.add(refreshToken);
+    if (fcmToken != null) loggedOutFcmTokens.add(fcmToken);
+  }
+
+  /// The push tokens sent with [logout].
+  final List<String> loggedOutFcmTokens = [];
 }

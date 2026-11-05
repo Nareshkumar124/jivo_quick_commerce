@@ -31,7 +31,7 @@ abstract class _$RiderProfileCWProxy {
 
   RiderProfile preferredStore(RiderStore preferredStore);
 
-  RiderProfile homeStore(RiderStore? homeStore);
+  RiderProfile homeStore(RiderHomeStore? homeStore);
 
   RiderProfile photoUrl(String? photoUrl);
 
@@ -76,7 +76,7 @@ abstract class _$RiderProfileCWProxy {
     VehicleTypeEnum vehicleType,
     String? vehicleNumber,
     RiderStore preferredStore,
-    RiderStore? homeStore,
+    RiderHomeStore? homeStore,
     String? photoUrl,
     DateTime? photoUrlExpiresAt,
     String? ratingAvg,
@@ -142,7 +142,8 @@ class _$RiderProfileCWProxyImpl implements _$RiderProfileCWProxy {
       this(preferredStore: preferredStore);
 
   @override
-  RiderProfile homeStore(RiderStore? homeStore) => this(homeStore: homeStore);
+  RiderProfile homeStore(RiderHomeStore? homeStore) =>
+      this(homeStore: homeStore);
 
   @override
   RiderProfile photoUrl(String? photoUrl) => this(photoUrl: photoUrl);
@@ -274,7 +275,7 @@ class _$RiderProfileCWProxyImpl implements _$RiderProfileCWProxy {
       homeStore: homeStore == const $CopyWithPlaceholder()
           ? _value.homeStore
           // ignore: cast_nullable_to_non_nullable
-          : homeStore as RiderStore?,
+          : homeStore as RiderHomeStore?,
       photoUrl: photoUrl == const $CopyWithPlaceholder()
           ? _value.photoUrl
           // ignore: cast_nullable_to_non_nullable
@@ -337,166 +338,169 @@ extension $RiderProfileCopyWith on RiderProfile {
 // JsonSerializableGenerator
 // **************************************************************************
 
-RiderProfile _$RiderProfileFromJson(
-  Map<String, dynamic> json,
-) => $checkedCreate(
-  'RiderProfile',
-  json,
-  ($checkedConvert) {
-    $checkKeys(
+RiderProfile _$RiderProfileFromJson(Map<String, dynamic> json) =>
+    $checkedCreate(
+      'RiderProfile',
       json,
-      requiredKeys: const [
-        'id',
-        'phone',
-        'status',
-        'rejection_reason',
-        'suspension_reason',
-        'full_name',
-        'dob',
-        'emergency_contact_name',
-        'emergency_contact_phone',
-        'vehicle_type',
-        'vehicle_number',
-        'preferred_store',
-        'home_store',
-        'photo_url',
-        'photo_url_expires_at',
-        'rating_avg',
-        'documents',
-        'required_documents',
-        'missing_documents',
-        'bank_account',
-        'ready_for_review',
-        'is_online',
-        'cash',
-        'today',
-        'created_at',
-      ],
+      ($checkedConvert) {
+        $checkKeys(
+          json,
+          requiredKeys: const [
+            'id',
+            'phone',
+            'status',
+            'rejection_reason',
+            'suspension_reason',
+            'full_name',
+            'dob',
+            'emergency_contact_name',
+            'emergency_contact_phone',
+            'vehicle_type',
+            'vehicle_number',
+            'preferred_store',
+            'home_store',
+            'photo_url',
+            'photo_url_expires_at',
+            'rating_avg',
+            'documents',
+            'required_documents',
+            'missing_documents',
+            'bank_account',
+            'ready_for_review',
+            'is_online',
+            'cash',
+            'today',
+            'created_at',
+          ],
+        );
+        final val = RiderProfile(
+          id: $checkedConvert('id', (v) => (v as num).toInt()),
+          phone: $checkedConvert('phone', (v) => v as String),
+          status: $checkedConvert(
+            'status',
+            (v) => $enumDecode(
+              _$RiderStatusEnumEnumMap,
+              v,
+              unknownValue: RiderStatusEnum.unknownDefaultOpenApi,
+            ),
+          ),
+          rejectionReason: $checkedConvert(
+            'rejection_reason',
+            (v) => v as String,
+          ),
+          suspensionReason: $checkedConvert(
+            'suspension_reason',
+            (v) => v as String,
+          ),
+          fullName: $checkedConvert('full_name', (v) => v as String),
+          dob: $checkedConvert('dob', (v) => DateTime.parse(v as String)),
+          emergencyContactName: $checkedConvert(
+            'emergency_contact_name',
+            (v) => v as String,
+          ),
+          emergencyContactPhone: $checkedConvert(
+            'emergency_contact_phone',
+            (v) => v as String,
+          ),
+          vehicleType: $checkedConvert(
+            'vehicle_type',
+            (v) => $enumDecode(
+              _$VehicleTypeEnumEnumMap,
+              v,
+              unknownValue: VehicleTypeEnum.unknownDefaultOpenApi,
+            ),
+          ),
+          vehicleNumber: $checkedConvert('vehicle_number', (v) => v as String?),
+          preferredStore: $checkedConvert(
+            'preferred_store',
+            (v) => RiderStore.fromJson(v as Map<String, dynamic>),
+          ),
+          homeStore: $checkedConvert(
+            'home_store',
+            (v) => v == null
+                ? null
+                : RiderHomeStore.fromJson(v as Map<String, dynamic>),
+          ),
+          photoUrl: $checkedConvert('photo_url', (v) => v as String?),
+          photoUrlExpiresAt: $checkedConvert(
+            'photo_url_expires_at',
+            (v) => v == null ? null : DateTime.parse(v as String),
+          ),
+          ratingAvg: $checkedConvert('rating_avg', (v) => v as String?),
+          documents: $checkedConvert(
+            'documents',
+            (v) => (v as List<dynamic>)
+                .map((e) => RiderDocument.fromJson(e as Map<String, dynamic>))
+                .toList(),
+          ),
+          requiredDocuments: $checkedConvert(
+            'required_documents',
+            (v) => (v as List<dynamic>)
+                .map(
+                  (e) => $enumDecode(
+                    _$RiderDocumentTypeEnumEnumMap,
+                    e,
+                    unknownValue: RiderDocumentTypeEnum.unknownDefaultOpenApi,
+                  ),
+                )
+                .toList(),
+          ),
+          missingDocuments: $checkedConvert(
+            'missing_documents',
+            (v) => (v as List<dynamic>)
+                .map(
+                  (e) => $enumDecode(
+                    _$RiderDocumentTypeEnumEnumMap,
+                    e,
+                    unknownValue: RiderDocumentTypeEnum.unknownDefaultOpenApi,
+                  ),
+                )
+                .toList(),
+          ),
+          bankAccount: $checkedConvert(
+            'bank_account',
+            (v) => v == null
+                ? null
+                : RiderBankAccount.fromJson(v as Map<String, dynamic>),
+          ),
+          readyForReview: $checkedConvert('ready_for_review', (v) => v as bool),
+          isOnline: $checkedConvert('is_online', (v) => v as bool),
+          cash: $checkedConvert(
+            'cash',
+            (v) => RiderCash.fromJson(v as Map<String, dynamic>),
+          ),
+          today: $checkedConvert(
+            'today',
+            (v) => RiderToday.fromJson(v as Map<String, dynamic>),
+          ),
+          createdAt: $checkedConvert(
+            'created_at',
+            (v) => DateTime.parse(v as String),
+          ),
+        );
+        return val;
+      },
+      fieldKeyMap: const {
+        'rejectionReason': 'rejection_reason',
+        'suspensionReason': 'suspension_reason',
+        'fullName': 'full_name',
+        'emergencyContactName': 'emergency_contact_name',
+        'emergencyContactPhone': 'emergency_contact_phone',
+        'vehicleType': 'vehicle_type',
+        'vehicleNumber': 'vehicle_number',
+        'preferredStore': 'preferred_store',
+        'homeStore': 'home_store',
+        'photoUrl': 'photo_url',
+        'photoUrlExpiresAt': 'photo_url_expires_at',
+        'ratingAvg': 'rating_avg',
+        'requiredDocuments': 'required_documents',
+        'missingDocuments': 'missing_documents',
+        'bankAccount': 'bank_account',
+        'readyForReview': 'ready_for_review',
+        'isOnline': 'is_online',
+        'createdAt': 'created_at',
+      },
     );
-    final val = RiderProfile(
-      id: $checkedConvert('id', (v) => (v as num).toInt()),
-      phone: $checkedConvert('phone', (v) => v as String),
-      status: $checkedConvert(
-        'status',
-        (v) => $enumDecode(
-          _$RiderStatusEnumEnumMap,
-          v,
-          unknownValue: RiderStatusEnum.unknownDefaultOpenApi,
-        ),
-      ),
-      rejectionReason: $checkedConvert('rejection_reason', (v) => v as String),
-      suspensionReason: $checkedConvert(
-        'suspension_reason',
-        (v) => v as String,
-      ),
-      fullName: $checkedConvert('full_name', (v) => v as String),
-      dob: $checkedConvert('dob', (v) => DateTime.parse(v as String)),
-      emergencyContactName: $checkedConvert(
-        'emergency_contact_name',
-        (v) => v as String,
-      ),
-      emergencyContactPhone: $checkedConvert(
-        'emergency_contact_phone',
-        (v) => v as String,
-      ),
-      vehicleType: $checkedConvert(
-        'vehicle_type',
-        (v) => $enumDecode(
-          _$VehicleTypeEnumEnumMap,
-          v,
-          unknownValue: VehicleTypeEnum.unknownDefaultOpenApi,
-        ),
-      ),
-      vehicleNumber: $checkedConvert('vehicle_number', (v) => v as String?),
-      preferredStore: $checkedConvert(
-        'preferred_store',
-        (v) => RiderStore.fromJson(v as Map<String, dynamic>),
-      ),
-      homeStore: $checkedConvert(
-        'home_store',
-        (v) =>
-            v == null ? null : RiderStore.fromJson(v as Map<String, dynamic>),
-      ),
-      photoUrl: $checkedConvert('photo_url', (v) => v as String?),
-      photoUrlExpiresAt: $checkedConvert(
-        'photo_url_expires_at',
-        (v) => v == null ? null : DateTime.parse(v as String),
-      ),
-      ratingAvg: $checkedConvert('rating_avg', (v) => v as String?),
-      documents: $checkedConvert(
-        'documents',
-        (v) => (v as List<dynamic>)
-            .map((e) => RiderDocument.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      ),
-      requiredDocuments: $checkedConvert(
-        'required_documents',
-        (v) => (v as List<dynamic>)
-            .map(
-              (e) => $enumDecode(
-                _$RiderDocumentTypeEnumEnumMap,
-                e,
-                unknownValue: RiderDocumentTypeEnum.unknownDefaultOpenApi,
-              ),
-            )
-            .toList(),
-      ),
-      missingDocuments: $checkedConvert(
-        'missing_documents',
-        (v) => (v as List<dynamic>)
-            .map(
-              (e) => $enumDecode(
-                _$RiderDocumentTypeEnumEnumMap,
-                e,
-                unknownValue: RiderDocumentTypeEnum.unknownDefaultOpenApi,
-              ),
-            )
-            .toList(),
-      ),
-      bankAccount: $checkedConvert(
-        'bank_account',
-        (v) => v == null
-            ? null
-            : RiderBankAccount.fromJson(v as Map<String, dynamic>),
-      ),
-      readyForReview: $checkedConvert('ready_for_review', (v) => v as bool),
-      isOnline: $checkedConvert('is_online', (v) => v as bool),
-      cash: $checkedConvert(
-        'cash',
-        (v) => RiderCash.fromJson(v as Map<String, dynamic>),
-      ),
-      today: $checkedConvert(
-        'today',
-        (v) => RiderToday.fromJson(v as Map<String, dynamic>),
-      ),
-      createdAt: $checkedConvert(
-        'created_at',
-        (v) => DateTime.parse(v as String),
-      ),
-    );
-    return val;
-  },
-  fieldKeyMap: const {
-    'rejectionReason': 'rejection_reason',
-    'suspensionReason': 'suspension_reason',
-    'fullName': 'full_name',
-    'emergencyContactName': 'emergency_contact_name',
-    'emergencyContactPhone': 'emergency_contact_phone',
-    'vehicleType': 'vehicle_type',
-    'vehicleNumber': 'vehicle_number',
-    'preferredStore': 'preferred_store',
-    'homeStore': 'home_store',
-    'photoUrl': 'photo_url',
-    'photoUrlExpiresAt': 'photo_url_expires_at',
-    'ratingAvg': 'rating_avg',
-    'requiredDocuments': 'required_documents',
-    'missingDocuments': 'missing_documents',
-    'bankAccount': 'bank_account',
-    'readyForReview': 'ready_for_review',
-    'isOnline': 'is_online',
-    'createdAt': 'created_at',
-  },
-);
 
 Map<String, dynamic> _$RiderProfileToJson(RiderProfile instance) =>
     <String, dynamic>{
@@ -506,7 +510,7 @@ Map<String, dynamic> _$RiderProfileToJson(RiderProfile instance) =>
       'rejection_reason': instance.rejectionReason,
       'suspension_reason': instance.suspensionReason,
       'full_name': instance.fullName,
-      'dob': instance.dob.toIso8601String(),
+      'dob': jivoDateToJson(instance.dob),
       'emergency_contact_name': instance.emergencyContactName,
       'emergency_contact_phone': instance.emergencyContactPhone,
       'vehicle_type': _$VehicleTypeEnumEnumMap[instance.vehicleType]!,

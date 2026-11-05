@@ -35,3 +35,13 @@ App agents raise API gaps in their reports (`development-phase.md` §4). This fi
 | 30 | customer (T-414) | P6 | **FCM data payload:** `{type: order\|product\|collection\|category, order_id or slug}` or `{link}`. | open |
 | 31 | customer (T-414) | P4 | `ReorderResult.added_count` (lines added), so the app doesn't have to guess. | sent to BE P4 run |
 | 32 | customer (T-414) | P4 | Customer-facing refund status: FAILED shows as PENDING (ops retries); the customer enum stays PENDING\|PROCESSED (PM default). | sent to BE P4 run |
+| 33 | customer (T-516) | P5 contract | Extends #28: add `order_number` to `track/`; `rider.photo` must be an https URL. | sent to BE P5 |
+| 34 | customer (T-516) | P7 | **Rating:** `POST /orders/{id}/rating/` `{order_stars 1-5, rider_stars 1-5 or null, tags[], comment ≤500}`, plus a way to read it back (a `rating` field on the order, or GET returning 404 when unrated). Tag codes: ON_TIME, WELL_PACKED, FRESH_PRODUCTS, POLITE_RIDER, LATE_DELIVERY, DAMAGED_ITEMS, MISSING_ITEMS, RUDE_RIDER. | open |
+| 35 | customer (T-516) | P7 | **FAQs:** `GET /faqs/?app=customer` returns `[{id, category, question, answer (plain text)}]` in display order. | open |
+| 36 | customer (T-516) | P7 | **Support tickets:** list, create `{category, message, order_id?}`, detail with messages, and reply (400 on CLOSED). Categories: MISSING/DAMAGED/WRONG_ITEMS and LATE_DELIVERY (these need an order), PAYMENT_REFUND, ACCOUNT, OTHER. Statuses: OPEN, IN_PROGRESS, RESOLVED, CLOSED. Plus an attachment upload contract. | open |
+| 37 | customer (T-516) | P7 | **CMS pages:** `GET /pages/{slug}/` returns `{slug, title, html, updated_at}` for about, terms, privacy and refund-policy. | open |
+| 38 | rider (T-515) | tooling | **Generator bug:** `format: date` request fields (e.g. `RiderRegisterRequest.dob`) serialise as a datetime, which DRF rejects. The rider app works around it with a hand-built body (`TODO(jivo_api)`). Fix in `packages/tool` normalisation or the generator config (owner: customer-dev). | open |
+| 39 | rider (T-515) | P5/P6 | `DELETE /me/devices/` (or unregister by token), so logout can remove the push token. | open |
+| 40 | rider (T-515) | P5 contract | `home_store` on `GET /rider/me/` needs `lat`/`lng`, for the "Navigate to store" action on the too-far guard. | sent to BE P5 |
+| 41 | rider (T-515) | P6 | Rider FCM data payload: `type` = offer.new\|offer.withdrawn\|task.updated, with `offer_id`/`task_id` as strings (the app's assumption). | sent to BE P6 |
+| 42 | rider (T-515) | P5 decision | **Heartbeat semantics:** only location points keep a rider online, so a rider indoors without a GPS fix is auto-offlined after 10 min. Should a heartbeat count as presence? | ⚠ needs Jivo/PM decision |

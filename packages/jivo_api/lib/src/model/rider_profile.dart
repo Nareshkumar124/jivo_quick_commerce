@@ -4,9 +4,11 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/date_only.dart';
 import 'package:jivo_api/src/model/rider_cash.dart';
 import 'package:jivo_api/src/model/rider_status_enum.dart';
 import 'package:jivo_api/src/model/rider_store.dart';
+import 'package:jivo_api/src/model/rider_home_store.dart';
 import 'package:jivo_api/src/model/rider_bank_account.dart';
 import 'package:jivo_api/src/model/vehicle_type_enum.dart';
 import 'package:jivo_api/src/model/rider_document.dart';
@@ -106,7 +108,12 @@ class RiderProfile {
   final String fullName;
 
   /// Date of birth.
-  @JsonKey(name: r'dob', required: true, includeIfNull: false)
+  @JsonKey(
+    name: r'dob',
+    toJson: jivoDateToJson,
+    required: true,
+    includeIfNull: false,
+  )
   final DateTime dob;
 
   @JsonKey(
@@ -142,7 +149,7 @@ class RiderProfile {
 
   /// Set by ops on approval; offers come only from this store. Null before.
   @JsonKey(name: r'home_store', required: true, includeIfNull: true)
-  final RiderStore? homeStore;
+  final RiderHomeStore? homeStore;
 
   /// Signed link to the rider's photo (the PHOTO document), valid until `photo_url_expires_at` (1 hour). Null without a photo. Do not cache past expiry.
   @JsonKey(name: r'photo_url', required: true, includeIfNull: true)

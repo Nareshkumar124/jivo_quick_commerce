@@ -1,0 +1,19 @@
+{% extends "ops/base.html" %}
+
+{% block content %}
+    {# Packing console store picker (05 §1.3). Store staff with one store go straight to it. Context: stores (the user's active stores). #}
+    {% if stores %}
+        <p class="mb-4 text-font-subtle-light dark:text-font-subtle-dark">Choose the store you are packing for.</p>
+        <div class="ops-grid-kpi" data-testid="store-list">
+            {% for store in stores %}
+                <a href="{% url 'ops:packing' store.code %}" class="ops-card bg-white border border-base-200 flex flex-col gap-1 p-4 rounded-default shadow-xs hover:border-base-300 dark:bg-base-900 dark:border-base-800">
+                    <span class="font-semibold text-font-important-light dark:text-font-important-dark">{{ store.code }}</span>
+                    <span>{{ store.name }}</span>
+                    <span class="text-xs text-font-subtle-light dark:text-font-subtle-dark">{% if store.is_accepting_orders %}Taking orders{% else %}Paused{% endif %}</span>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        {% include "ops/components/empty_state.html" with icon="store" title="No store assigned" message="Ask a Super Admin to give you access to your store (Staff users, Store access)." %}
+    {% endif %}
+{% endblock %}

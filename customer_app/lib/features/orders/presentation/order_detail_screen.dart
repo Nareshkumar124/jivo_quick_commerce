@@ -14,6 +14,11 @@ import '../../../shared/widgets/state_views.dart';
 import '../../addresses/domain/saved_address.dart';
 import '../../cart/domain/cart.dart';
 import '../../cart/presentation/widgets/bill_details.dart';
+import '../../rating/presentation/rate_order_screen.dart';
+import '../../rating/presentation/rating_controllers.dart';
+import '../../tracking/domain/order_track.dart';
+import '../../tracking/presentation/delivery_cards.dart';
+import '../../tracking/presentation/tracking_providers.dart';
 import '../domain/order.dart';
 import '../domain/order_history.dart';
 import 'cancel_order_sheet.dart';
@@ -81,7 +86,20 @@ class _OrderBody extends ConsumerWidget {
         ref.watch(trackingAvailableProvider) &&
         order.isActive &&
         order.status != OrderStatus.paymentPending;
-    final eta = order.etaAt;
+    // Live data while the order is active (`GET /orders/{id}/track/`,
+    // polled every 10 s): the rider and the delivery OTP (`03 §2.10`).
+    final track = canTrack ? ref.watch(trackProvider(order.id)).value : null;
+    if (canTrack) {
+      ref.listen<AsyncValue<OrderTrack>>(trackProvider(order.id), (_, next) {
+        final status = next.value?.status;
+        if (status != null && status != order.status) {
+          ref.read(orderDetailProvider(order.id).notifier).refreshQuietly();
+        }
+      });
+    }
+    final rider = track?.rider;
+    final otp = track?.deliveryOtp;
+    final eta = track?.etaAt ?? order.etaAt;
     final coupon = order.couponCode;
 
     Widget section(String title, List<Widget> children, {Key? key}) => Padding(
@@ -142,6 +160,17 @@ class _OrderBody extends ConsumerWidget {
             ),
           ],
         ],
+        if (otp != null) ...[
+          const SizedBox(height: JivoSpacing.md),
+          DeliveryOtpCard(otp: otp),
+        ],
+        if (rider != null && order.isActive) ...[
+          const SizedBox(height: JivoSpacing.sm),
+          RiderCard(rider: rider),
+        ],
+        if (order.status == OrderStatus.delivered &&
+            ref.watch(ratingAvailableProvider))
+          _RateOrderCard(orderId: order.id),
         if (canTrack) ...[
           const SizedBox(height: JivoSpacing.md),
           FilledButton.icon(
@@ -231,6 +260,16 @@ class _OrderBody extends ConsumerWidget {
           )
         else if (order.needsSupportToCancel)
           _ContactSupportCard(),
+        if (ref.watch(supportAvailableProvider))
+          _ActionButton(
+            buttonKey: const Key('order-help'),
+            icon: Icons.support_agent,
+            label: l10n.helpWithThisOrder,
+            busy: false,
+            enabled: true,
+            onPressed: () =>
+                context.push(Routes.newTicket(orderId: order.id)),
+          ),
         const SizedBox(height: JivoSpacing.xl),
       ],
     );
@@ -534,6 +573,47 @@ class _AddressInfo extends StatelessWidget {
             style: theme.textTheme.bodySmall,
           ),
       ],
+    );
+  }
+}
+
+/// "How was your order?" after delivery (P7 lookahead): stars that open
+/// the rate screen, or the customer's rating once given.
+class _RateOrderCard extends ConsumerWidget {
+  const _RateOrderCard({required this.orderId});
+
+  final int orderId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final rating = ref.watch(orderRatingProvider(orderId));
+    final Widget body = switch (rating) {
+      AsyncData(value: final given?) => Column(
+        key: const Key('order-rated'),
+        children: [
+          Text(l10n.ratedOrder(given.orderStars)),
+          StarRatingPicker(value: given.orderStars, onChanged: null),
+        ],
+      ),
+      AsyncData() => Column(
+        key: const Key('rate-order-card'),
+        children: [
+          Text(l10n.rateOrderQuestion, style: theme.textTheme.titleSmall),
+          StarRatingPicker(
+            value: 0,
+            onChanged: (stars) =>
+                context.push(Routes.rateOrder(orderId, stars: stars)),
+          ),
+        ],
+      ),
+      // A rating that fails to load is not worth an error on the order.
+      _ => const SizedBox.shrink(),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: JivoSpacing.md),
+      child: body,
     );
   }
 }

@@ -108,6 +108,8 @@ Phase 4 permissions and services (R2, `apps.accounts.roles`; ⚠ PM default, T-4
 
 Import/export (P2 R3): CSV and Excel (`.xlsx`) only (`apps.core.export_formats`). On export, any text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading apostrophe, so a spreadsheet shows it as text and never runs it as a formula (CSV/formula injection); plain numbers are unchanged. The import preview is kept in Redis between the preview and confirm requests (`IMPORT_EXPORT_TMP_STORAGE_CLASS`), so it works across web processes.
 
+Phase 7 permissions (T-711, ⚠ PM default): `support.handle_ticket` plus view on tickets and messages for Super Admin, Ops and Support (the "Support tickets" row). The admin calls `apps.support.services` (`staff_reply`, `change_status`, `assign`, `set_priority`), which re-check the permission; support is not store scoped. FAQs belong to the Support module, so Support also adds/changes/deletes FAQs; CMS pages stay Super Admin only.
+
 Phase 1 implementation: the seven roles are Django Groups (`Super Admin`, `Ops / Dispatch`, `Store Manager`, `Store Staff`, `Catalog Manager`, `Support`, `Finance`), synced idempotently after every `migrate` (`apps.accounts.roles.sync_roles`). Each phase adds the permissions for its models. Store scoping (`StaffStoreAccess`) arrives in Phase 2 with stores. In Phase 1, Super Admin manages staff users, roles and app config; Ops and Support can view customers and block/unblock them (Customers admin, a proxy model so they cannot edit staff accounts).
 
 ## 4. Reports [P7]

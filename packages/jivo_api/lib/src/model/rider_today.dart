@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/date_only.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -31,7 +32,12 @@ class RiderToday {
   });
 
   /// IST calendar date, YYYY-MM-DD.
-  @JsonKey(name: r'date', required: true, includeIfNull: false)
+  @JsonKey(
+    name: r'date',
+    toJson: jivoDateToJson,
+    required: true,
+    includeIfNull: false,
+  )
   final DateTime date;
 
   @JsonKey(name: r'orders_delivered', required: true, includeIfNull: false)

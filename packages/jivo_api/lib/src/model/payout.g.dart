@@ -176,8 +176,8 @@ Payout _$PayoutFromJson(Map<String, dynamic> json) => $checkedCreate(
 
 Map<String, dynamic> _$PayoutToJson(Payout instance) => <String, dynamic>{
   'id': instance.id,
-  'period_start': instance.periodStart.toIso8601String(),
-  'period_end': instance.periodEnd.toIso8601String(),
+  'period_start': jivoDateToJson(instance.periodStart),
+  'period_end': jivoDateToJson(instance.periodEnd),
   'amount': instance.amount,
   'status': _$PayoutStatusEnumEnumMap[instance.status]!,
   'reference': instance.reference,

@@ -142,7 +142,7 @@ RiderToday _$RiderTodayFromJson(Map<String, dynamic> json) => $checkedCreate(
 
 Map<String, dynamic> _$RiderTodayToJson(RiderToday instance) =>
     <String, dynamic>{
-      'date': instance.date.toIso8601String(),
+      'date': jivoDateToJson(instance.date),
       'orders_delivered': instance.ordersDelivered,
       'earnings': instance.earnings,
       'cash_in_hand': instance.cashInHand,

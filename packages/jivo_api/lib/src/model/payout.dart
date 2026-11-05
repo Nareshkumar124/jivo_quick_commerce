@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/date_only.dart';
 import 'package:jivo_api/src/model/payout_status_enum.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -39,11 +40,21 @@ class Payout {
   final int id;
 
   /// IST calendar date, YYYY-MM-DD.
-  @JsonKey(name: r'period_start', required: true, includeIfNull: false)
+  @JsonKey(
+    name: r'period_start',
+    toJson: jivoDateToJson,
+    required: true,
+    includeIfNull: false,
+  )
   final DateTime periodStart;
 
   /// IST calendar date, YYYY-MM-DD. Inclusive.
-  @JsonKey(name: r'period_end', required: true, includeIfNull: false)
+  @JsonKey(
+    name: r'period_end',
+    toJson: jivoDateToJson,
+    required: true,
+    includeIfNull: false,
+  )
   final DateTime periodEnd;
 
   /// Paid or to be paid.
