@@ -24,11 +24,13 @@ SUBPROTOCOL = "jivo.v1"
 TOKEN_SUBPROTOCOL_PREFIX = "jivo.auth."  # noqa: S105 - a prefix, not a secret
 
 # Close codes (4000-4999 are application codes, RFC 6455 §7.4.2), modelled on HTTP statuses.
-CLOSE_BAD_MESSAGE = 4400  # the first message was not {"type": "auth", "token": ...}
+CLOSE_BAD_MESSAGE = 4400  # first message not auth, or more than WS_MAX_BAD_MESSAGES bad ones
 CLOSE_UNAUTHENTICATED = 4401  # missing / invalid / expired token, or no staff session
 CLOSE_FORBIDDEN = 4403  # authenticated, but not allowed (no role, not an active rider)
 CLOSE_NOT_FOUND = 4404  # the order does not exist or is another user's (IDOR: same code)
 CLOSE_AUTH_TIMEOUT = 4408  # no auth message within WS_AUTH_TIMEOUT_SECONDS
+CLOSE_TOO_MANY_SOCKETS = 4429  # the user already has WS_MAX_SOCKETS_PER_USER sockets open
+CLOSE_MESSAGE_TOO_BIG = 1009  # RFC 6455: an inbound message over WS_MAX_MESSAGE_BYTES
 CLOSE_CODES = {
     CLOSE_BAD_MESSAGE: "The first message must be the auth message.",
     CLOSE_UNAUTHENTICATED: (
@@ -38,6 +40,8 @@ CLOSE_CODES = {
     CLOSE_FORBIDDEN: "Signed in, but this socket is not for you (role, rider status).",
     CLOSE_NOT_FOUND: "The order does not exist or is not yours.",
     CLOSE_AUTH_TIMEOUT: "No auth message in time.",
+    CLOSE_TOO_MANY_SOCKETS: "Too many open sockets for this user: close one, then reconnect.",
+    CLOSE_MESSAGE_TOO_BIG: "A message was larger than the server accepts.",
 }
 
 # --------------------------------------------------------------------------- message types

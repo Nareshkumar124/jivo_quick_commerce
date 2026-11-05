@@ -550,3 +550,167 @@ def test_rider_reauth_after_suspension_closes_with_4403(user, monkeypatch):
         await expect_close(socket, contract.CLOSE_FORBIDDEN)
 
     run(scenario)
+
+
+# --------------------------------------------------------------------------- P8 OWASP review
+
+
+def _staff_clocks(client, *, login_ago: float, seen_ago: float) -> None:
+    """Move the staff session clocks (apps.accounts.middleware) back in time."""
+    import time
+
+    session = client.session
+    now = time.time()
+    session["_staff_login_at"] = now - login_ago
+    session["_staff_last_seen"] = now - seen_ago
+    session.save()
+
+
+def _ops_socket_closes(headers, code):
+    async def scenario():
+        socket, connected, _ = await open_socket("/ws/ops/live/", headers=headers)
+        assert connected
+        await expect_close(socket, code)
+
+    run(scenario)
+
+
+def test_ops_socket_refuses_a_session_past_the_8_hour_limit(make_staff, settings):
+    """M1: the absolute staff limit applies to the socket too (store-only staff, no idle)."""
+    staff = make_staff(roles.STORE_STAFF, DarkStoreFactory())
+    client = Client()
+    headers = session_headers(client, staff)
+    _staff_clocks(client, login_ago=settings.STAFF_SESSION_MAX_AGE_SECONDS + 5, seen_ago=1)
+    _ops_socket_closes(headers, contract.CLOSE_UNAUTHENTICATED)
+
+
+def test_ops_socket_closes_when_the_session_reaches_its_limit(make_staff, settings):
+    """M1: closed at the deadline itself, not at the next 300 s re-check."""
+    staff = make_staff(roles.STORE_STAFF, DarkStoreFactory())
+    client = Client()
+    headers = session_headers(client, staff)
+    _staff_clocks(client, login_ago=settings.STAFF_SESSION_MAX_AGE_SECONDS - 8, seen_ago=1)
+
+    async def scenario():
+        socket, connected, _ = await open_socket("/ws/ops/live/", headers=headers)
+        assert connected
+        await socket.send_json_to({"type": "ping"})
+        assert (await receive(socket))["type"] == "pong"  # open before the deadline
+        output = await socket.receive_output(timeout=20)
+        assert output == {"type": "websocket.close", "code": contract.CLOSE_UNAUTHENTICATED}
+
+    run(scenario)
+
+
+def test_ops_socket_refuses_an_idle_admin_session(make_staff, settings):
+    """M1: admin roles end after 2 h without a request; the socket follows."""
+    DarkStoreFactory()
+    staff = make_staff(roles.OPS)
+    client = Client()
+    headers = session_headers(client, staff)
+    _staff_clocks(client, login_ago=3 * 3600, seen_ago=settings.STAFF_SESSION_IDLE_SECONDS + 5)
+    _ops_socket_closes(headers, contract.CLOSE_UNAUTHENTICATED)
+
+
+def test_store_only_staff_have_no_idle_limit_on_the_socket(make_staff, settings):
+    staff = make_staff(roles.STORE_STAFF, DarkStoreFactory())
+    client = Client()
+    headers = session_headers(client, staff)
+    _staff_clocks(client, login_ago=3 * 3600, seen_ago=settings.STAFF_SESSION_IDLE_SECONDS + 5)
+
+    async def scenario():
+        socket, connected, _ = await open_socket("/ws/ops/live/", headers=headers)
+        assert connected
+        await socket.send_json_to({"type": "ping"})
+        assert (await receive(socket))["type"] == "pong"
+        await socket.disconnect()
+
+    run(scenario)
+
+
+def test_ops_socket_refuses_an_expired_or_deleted_session(make_staff):
+    """M1: `exists()` ignored `expire_date`; the session is now loaded."""
+    from django.contrib.sessions.models import Session
+    from django.utils import timezone as tz
+
+    DarkStoreFactory()
+    staff = make_staff(superuser=True)
+    client = Client()
+    headers = session_headers(client, staff)
+    Session.objects.filter(session_key=client.session.session_key).update(
+        expire_date=tz.now() - timedelta(seconds=1)
+    )
+    _ops_socket_closes(headers, contract.CLOSE_UNAUTHENTICATED)
+
+    other = Client()
+    headers = session_headers(other, staff)
+    other.logout()  # deletes the session row
+    _ops_socket_closes(headers, contract.CLOSE_UNAUTHENTICATED)
+
+
+def test_ops_socket_refuses_a_session_without_the_login_stamp(make_staff):
+    DarkStoreFactory()
+    staff = make_staff(superuser=True)
+    client = Client()
+    headers = session_headers(client, staff)
+    session = client.session
+    del session["_staff_login_at"]
+    session.save()
+    _ops_socket_closes(headers, contract.CLOSE_UNAUTHENTICATED)
+
+
+def test_too_many_sockets_per_user_closes_with_4429(order, settings):
+    """L5: at most WS_MAX_SOCKETS_PER_USER sockets per user; a closed one frees its slot."""
+    settings.WS_MAX_SOCKETS_PER_USER = 2
+    token = token_for(order.user)
+
+    async def scenario():
+        sockets = []
+        for _ in range(2):
+            socket, _, _ = await open_socket(order_path(order))
+            await socket.send_json_to({"type": "auth", "token": token})
+            assert (await receive(socket))["type"] == "auth.ok"
+            await receive(socket)  # snapshot
+            sockets.append(socket)
+        third, _, _ = await open_socket(order_path(order))
+        await third.send_json_to({"type": "auth", "token": token})
+        await expect_close(third, contract.CLOSE_TOO_MANY_SOCKETS)
+        await sockets[0].disconnect()
+        again, _, _ = await open_socket(order_path(order))
+        await again.send_json_to({"type": "auth", "token": token})
+        assert (await receive(again))["type"] == "auth.ok"
+        for socket in (sockets[1], again):
+            await socket.disconnect()
+
+    run(scenario)
+
+
+def test_too_many_bad_messages_close_with_4400(order, settings):
+    """L5: after WS_MAX_BAD_MESSAGES malformed or unknown messages the socket closes."""
+    settings.WS_MAX_BAD_MESSAGES = 2
+    token = token_for(order.user)
+
+    async def scenario():
+        socket, _, _ = await open_socket(order_path(order))
+        await socket.send_json_to({"type": "auth", "token": token})
+        await receive(socket)
+        await receive(socket)
+        await socket.send_json_to({"type": "nope"})
+        assert (await receive(socket))["type"] == "error"
+        await socket.send_to(text_data="[1, 2]")
+        assert (await receive(socket))["type"] == "error"
+        await socket.send_json_to({"type": "nope"})
+        await expect_close(socket, contract.CLOSE_BAD_MESSAGE)
+
+    run(scenario)
+
+
+def test_oversized_message_closes_with_1009(order, settings):
+    settings.WS_MAX_MESSAGE_BYTES = 100
+
+    async def scenario():
+        socket, _, _ = await open_socket(order_path(order))
+        await socket.send_json_to({"type": "auth", "token": "x" * 200})
+        await expect_close(socket, contract.CLOSE_MESSAGE_TOO_BIG)
+
+    run(scenario)

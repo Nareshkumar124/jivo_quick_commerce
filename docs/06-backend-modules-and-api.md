@@ -350,15 +350,19 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 - **`/ws/v1/orders/{id}/`:** the order's owner only. Right after `auth.ok` the server sends one `order.status` snapshot. The delivery OTP is never sent on a socket: when `order.status` is OUT_FOR_DELIVERY, re-read `GET /orders/{id}/track/`.
 - **`/ws/v1/rider/`:** a token issued to the rider app (`app` claim `rider`) and an ACTIVE rider profile (Phase 5 model; until it is installed every rider socket closes with 4403). Checked again at every re-auth and every `WS_RIDER_RECHECK_SECONDS` (60 s): a suspended rider is closed with 4403.
 - **Fail closed:** every auth renewal re-runs the socket's access check. A timer or periodic re-check that raises (database or Redis down) closes the socket (4401 ops, 4403 rider); a socket never stays authorised without a working check.
-- **`/ws/ops/live/`:** the staff session cookie (the same login as `/admin/` and `/ops/`), an Origin from `ALLOWED_HOSTS`, permission `orders.view_order`, and at least one store in `stores_for(user)` (05 §3). The socket joins one group per permitted store, fixed at connect. It re-checks the session, role and stores every `WS_OPS_RECHECK_SECONDS` (300 s) and closes with 4401/4403 when access is gone, or rejoins the new store list.
+- **`/ws/ops/live/`:** the staff session cookie (the same login as `/admin/` and `/ops/`), an Origin from `ALLOWED_HOSTS`, permission `orders.view_order`, and at least one store in `stores_for(user)` (05 §3). The socket joins one group per permitted store, fixed at connect. It re-checks the session, role and stores every `WS_OPS_RECHECK_SECONDS` (300 s) and closes with 4401/4403 when access is gone, or rejoins the new store list. **Session (P8 review M1):** the session is loaded with its `expire_date` (a deleted or expired session is 4401), and the HTTP staff policy applies to the socket too (05 §5, `apps.accounts.middleware`): 8 h after login for everyone, 2 h after the last HTTP request for admin roles. The socket re-checks exactly at that deadline and closes with 4401; activity on the socket itself does not count as activity.
 - **Close codes:**
   - 4400: the first message is not `auth`
   - 4401: missing, invalid or expired token, or no staff session
   - 4403: signed in but not allowed (no role or store, not an active rider, wrong app)
   - 4404: the order does not exist **or is another user's** (the same code, so ids leak nothing)
   - 4408: auth timeout
+  - 4429: the user already has `WS_MAX_SOCKETS_PER_USER` (5) sockets open
+  - 1009: an inbound message over `WS_MAX_MESSAGE_BYTES` (4096)
+  - 4400 also after more than `WS_MAX_BAD_MESSAGES` (10) malformed or unknown messages
 
   On any close the app falls back to polling (`GET /orders/{id}/track/` every 10 s, `GET /rider/offers/current/`) and reconnects with backoff.
+- **Abuse limits (P8 review L5, `apps.realtime.limits`):** sockets per user are counted in Redis as leases (`WS_SOCKET_LEASE_SECONDS`, 1200 s, renewed on auth, ping and re-check), so a socket lost with a crashed server stops counting when its lease ends; the count fails open if Redis is down (the channel layer is down then anyway). **Frame size is capped by the ASGI server before the app sees it (DevOps):** uvicorn `--ws-max-size 65536` (default 16 MiB), daphne `--websocket_max_size 65536`; the app closes anything over 4096 bytes with 1009.
 - **Message shape:** every server message is `{"type", "data", "sent_at"}` and carries the current state, not a diff, so a duplicate or missed message is harmless. On reconnect, re-read the REST endpoint. Each message is published in `openapi/schema.yaml` as a `Ws...Message` component with its `Ws...Data` (`apps.realtime.contract`), so the generated client has the models.
 
 ### 4.2 Message examples

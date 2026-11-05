@@ -452,6 +452,13 @@ RIDER_LOCATION_RETENTION_DAYS = env_int("RIDER_LOCATION_RETENTION_DAYS", default
 WS_AUTH_TIMEOUT_SECONDS = env_float("WS_AUTH_TIMEOUT_SECONDS", default=10.0)
 # /ws/ops/live/ re-checks the staff session, role and stores this often (revoked access ends).
 WS_OPS_RECHECK_SECONDS = env_float("WS_OPS_RECHECK_SECONDS", default=300.0)
+# Abuse limits (P8 OWASP review L5): sockets per user (4429), each slot a lease renewed on
+# auth/ping/re-check; malformed or unknown messages before 4400; inbound message size (1009).
+# The ASGI server must also cap frames (uvicorn --ws-max-size, daphne --websocket_max_size).
+WS_MAX_SOCKETS_PER_USER = env_int("WS_MAX_SOCKETS_PER_USER", default=5)
+WS_SOCKET_LEASE_SECONDS = env_int("WS_SOCKET_LEASE_SECONDS", default=1200)
+WS_MAX_BAD_MESSAGES = env_int("WS_MAX_BAD_MESSAGES", default=10)
+WS_MAX_MESSAGE_BYTES = env_int("WS_MAX_MESSAGE_BYTES", default=4096)
 # /ws/v1/rider/ re-checks that the rider is still ACTIVE this often (a suspension ends offers).
 WS_RIDER_RECHECK_SECONDS = env_float("WS_RIDER_RECHECK_SECONDS", default=60.0)
 # `order.eta` while out for delivery is recomputed from rider pings at most this often per order.

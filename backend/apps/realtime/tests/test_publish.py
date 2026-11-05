@@ -254,8 +254,7 @@ def test_rider_location_goes_to_the_store_and_the_order(
 
 
 def test_rider_location_without_a_store_or_order_reaches_nobody():
-    """Before Phase 5 there is no Rider model to find the home store."""
-    assert services.rider_home_store_id(41) is None
+    """No `store_id` and no rider 41 to find a home store from: nothing is sent."""
     assert (
         services.send_rider_location(
             41, 28.47, 77.04, "2026-11-10T09:47:12Z", store_id=None, order_id=None, heading=None
@@ -305,10 +304,8 @@ def test_iso_is_utc_with_z():
     assert services.iso(None) is None
 
 
-def test_purge_old_locations_is_a_no_op_without_the_model():
-    from apps.realtime.tasks import purge_old_locations
-
-    assert purge_old_locations() == 0
+def test_rider_location_of_an_unknown_rider_reaches_nobody():
+    assert services.rider_home_store_id(999_999) is None
 
 
 def test_money_in_order_created_is_a_string():
