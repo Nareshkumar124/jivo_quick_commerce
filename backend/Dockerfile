@@ -83,12 +83,27 @@ PYEOF
 # its REAL environment before it starts, so accounts.E003 (console SMS backend), payments.E001/E004
 # (fake gateway), delivery.E001 (field encryption keys), notifications.E001 (dev push backend) and
 # the other errors stop a misconfigured release, instead of only passing CI with placeholders.
-# ERROR level: deploy warnings are printed but do not block. JQC_SKIP_STARTUP_CHECK=1 skips it for
-# a one-off command (e.g. `manage.py shell` in an incident); never set it on a service.
+# ERROR level: deploy warnings are printed but do not block.
+# JQC_SKIP_STARTUP_CHECK=1 is for local/dev settings only (with a loud warning). Under the staging,
+# production or deployed settings it is REFUSED for every command (gunicorn, uvicorn, celery,
+# jqc-release, anything): a skipped check must never reach a deployed service. Break-glass in an
+# incident is an explicit `--entrypoint python` override, which leaves an audit trail in the
+# orchestrator. Tested by infra/scripts/test_entrypoint.sh (CI: infra.yml).
 COPY --chmod=0755 <<'SHEOF' /usr/local/bin/jqc-entrypoint
 #!/bin/sh
 set -eu
-if [ "${JQC_SKIP_STARTUP_CHECK:-0}" != "1" ]; then
+settings="${DJANGO_SETTINGS_MODULE:-}"
+case "$settings" in
+    config.settings.production|config.settings.staging|config.settings.deployed) deployed=1 ;;
+    *) deployed=0 ;;
+esac
+if [ "${JQC_SKIP_STARTUP_CHECK:-0}" = "1" ]; then
+    if [ "$deployed" = "1" ]; then
+        echo "jqc-entrypoint: ERROR: JQC_SKIP_STARTUP_CHECK=1 is refused under $settings (command: ${1:-none}). Remove it; deploy checks always run in staging and production." >&2
+        exit 64
+    fi
+    echo "jqc-entrypoint: WARNING: JQC_SKIP_STARTUP_CHECK=1: deploy checks SKIPPED under '${settings:-unset}'. Local/dev only." >&2
+else
     python /app/manage.py check --deploy --fail-level ERROR
 fi
 exec "$@"

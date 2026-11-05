@@ -129,8 +129,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
   - Caching:
     - the Flutter SDK and `~/.pub-cache`, through `subosito/flutter-action`, keyed on every `pubspec.lock`
     - Gradle for the APK builds, through `setup-java` `cache: gradle`, keyed on each app's Gradle files
-- **`infra.yml`** (paths `infra/**`): `bash -n` + shellcheck and a PowerShell parse of `infra/backup/`, the restore script's refusal of non-test targets, ruff on the infra Python, `check_monitoring.py`, `promtool check rules` and `nginx -t` (pinned images by digest).
-- **`deploy-staging.yml`** (manual, environment `staging`): builds the production image and runs its deploy checks against the real staging env file (§8.1); the deploy step is a placeholder until D-05.
+- **`infra.yml`** (paths `infra/**`): `bash -n` + shellcheck and a PowerShell parse of `infra/backup/`, the restore scripts' refusal of non-test targets and of names with a trailing newline (bash and PowerShell), `infra/scripts/test_entrypoint.sh` (a failing deploy check blocks start; `JQC_SKIP_STARTUP_CHECK` is refused under staging/production settings), a grep that rejects `JQC_SKIP_STARTUP_CHECK` in any env or compose file, ruff on the infra Python, `check_monitoring.py`, `promtool check rules` and `nginx -t` (pinned images by digest).
+- **`deploy-staging.yml`** (manual, protected branches only, environment `staging` with required reviewers, §8.4): builds the production image tagged with the checked-out commit and runs its deploy checks against the real staging env file (§8.1); the deploy step is a placeholder until D-05.
 - **Pins and local runs:**
   - Every action is pinned by commit SHA, with its version in a comment.
   - Run either script locally with `python3 infra/scripts/<script>.py`. Both use only the standard library and support `--help`.
@@ -290,7 +290,7 @@ Nothing in Redis is a system of record (09 §2), so it is **not backed up** and 
 
 ### 8.1 Deploy-time configuration checks (P8 OWASP M8)
 CI runs `check --deploy` with placeholder values, so it cannot catch a real environment that is misconfigured. Two places now run the checks against the **real** environment:
-- **`jqc-entrypoint`** (the production image's `ENTRYPOINT`): every `web`, `worker` and `beat` container runs `python manage.py check --deploy --fail-level ERROR` before its command starts. A failing check stops the container, so a rolling deploy halts with the old version still serving. At ERROR level, deploy warnings are printed but not fatal. It catches `accounts.E003` (console SMS backend), `payments.E001`/`E004` (fake gateway, `FAKE_GATEWAY_DOWN`), `delivery.E001` (no `FIELD_ENCRYPTION_KEYS`) and `notifications.E001` (dev push backend), as those checks land from the backend branches, plus every other registered error. `JQC_SKIP_STARTUP_CHECK=1` skips it for one one-off command (e.g. `manage.py shell` during an incident); never set it on a service.
+- **`jqc-entrypoint`** (the production image's `ENTRYPOINT`): every `web`, `worker` and `beat` container runs `python manage.py check --deploy --fail-level ERROR` before its command starts. A failing check stops the container, so a rolling deploy halts with the old version still serving. At ERROR level, deploy warnings are printed but not fatal. It catches `accounts.E003` (console SMS backend), `payments.E001`/`E004` (fake gateway, `FAKE_GATEWAY_DOWN`), `delivery.E001` (no `FIELD_ENCRYPTION_KEYS`) and `notifications.E001` (dev push backend), as those checks land from the backend branches, plus every other registered error. **`JQC_SKIP_STARTUP_CHECK=1` is for local/dev settings only**, where it skips the check with a loud WARNING. Under `config.settings.staging`, `production` or `deployed` the entrypoint **refuses** it for every command (gunicorn, uvicorn, celery, `jqc-release`, anything) and exits 64. It must never appear in a service env file, compose file or secret: CI rejects it in env and compose files, and the staging preflight rejects it in `STAGING_BACKEND_ENV`. Break-glass during an incident is an explicit `--entrypoint python` override on a one-off task, which the orchestrator records.
 - **`jqc-release`** (the release task, §8.2) runs the same check before `migrate`.
 - **Staging deploy job** (`.github/workflows/deploy-staging.yml`, manual only, GitHub environment `staging`): builds the image and runs it once with the staging environment (the `STAGING_BACKEND_ENV` environment secret, a `KEY=value` env file), so the entrypoint's check runs before anything is deployed. The deploy step itself fails with "not configured" until D-05.
 - Some checks skip themselves when `DJANGO_ALLOWED_HOSTS` lists only reserved example hosts (CI's dry run). Real environments must list their real hosts, or those checks never fire.
@@ -309,6 +309,13 @@ CI runs `check --deploy` with placeholder values, so it cannot catch a real envi
 - **Data damage:** the production restore runbook (§7.2).
 - The release checklist §8 names the rollback owner for each deploy window.
 
+### 8.4 Who can run the staging deploy
+`deploy-staging.yml` is `workflow_dispatch` only, and its jobs run only when dispatched on a **protected** `develop` or `main` (`github.ref_protected`); it deploys exactly that commit, and the image tag is `git rev-parse HEAD` of the checkout. One-time GitHub setup (repository admin, no cost):
+1. Branch protection on `develop` and `main` (PR required, CI green, no force-push).
+2. Settings > Environments > `staging`: **required reviewers** (at least one person other than the dispatcher; tick "Prevent self-review"), and **deployment branches** limited to `develop` and `main`.
+3. Store `STAGING_BACKEND_ENV` (and later the cloud deploy credentials, preferably OIDC rather than keys) as **environment** secrets of `staging`, never repository secrets, so only an approved run can read them.
+4. Later, `deploy-production.yml` follows the same pattern with a `production` environment, `main` only, and two reviewers.
+
 ## 9. Edge proxy hardening (`infra/nginx/default.conf`, P8 OWASP review)
 
 ### 9.1 Rate limits, connection limits and body sizes (H3, edge half)
@@ -316,21 +323,22 @@ These are coarse per-IP limits. The backend keeps its own per-user and per-phone
 
 | Location | Limit per IP | Burst | Max body |
 |---|---|---|---|
-| `/api/v1/auth/otp/` | 10 req/min (`jqc_otp`); 429 `OTP_RATE_LIMITED` | 5 | 16 KB |
+| `/api/v1/auth/otp/request/` only (each costs an SMS) | 60 req/min (`jqc_otp`); 429 `OTP_RATE_LIMITED` | 30 | 16 KB |
+| `/api/v1/auth/otp/verify/` | the general API zone (the backend limits attempts per OTP, per phone and per IP) | 40 | 2560 KB |
 | `/api/v1/search/` (search, suggest) | 5 req/s | 20 | 16 KB |
 | `/api/v1/rider/documents/` | 20 req/s | 10 | 1200 KB (1 MB image + multipart overhead; `RIDER_DOCUMENT_MAX_BYTES`) |
 | `/api/v1/payments/razorpay/webhook/` | none (signed, idempotent, Razorpay retries) | n/a | 256 KB |
 | `/api/` (all other) and `/` | 20 req/s | 40 | 2560 KB (= `DATA_UPLOAD_MAX_MEMORY_SIZE`, 2.5 MB) |
 | `/admin/`, `/ops/` | 10 req/s | 40 | 6 MB (product images up to 5 MB, 09 §3.6) |
-| `/ws/` | **10 concurrent sockets** (`limit_conn`); upgrades 20 req/s | 20 | 64 KB |
+| `/ws/` | **50 concurrent sockets** (`limit_conn`); upgrades 20 req/s | 20 | 64 KB |
 | `/health/` | none; not logged | n/a | default |
 
 Over a limit, nginx answers 429 with the JSON error envelope and `Retry-After: 60`; an oversized body gets 413 `PAYLOAD_TOO_LARGE`.
 
-**Behind a load balancer,** uncomment the `set_real_ip_from <lb-subnet>` block, so the limits key on the client and not on the balancer.
+**Behind a load balancer, the `set_real_ip_from <lb-subnet>` block (with `real_ip_header X-Forwarded-For` and `real_ip_recursive on`) MUST be set.** Without it every request appears to come from the balancer, all clients share one OTP bucket and one 50-socket bucket, and the first busy minute locks everyone out. Leave it commented only when nginx itself faces the internet. Check after setting it: the nginx access log's `remote_addr` shows client addresses, not the balancer's.
 
 **Load-balancer equivalents,** if nginx is dropped (D-05):
-- **AWS:** WAF on the ALB with rate-based rules per IP (5-minute windows: e.g. 300 for `/api/v1/auth/otp/`, 6,000 for `/api/`, using URI scope-down statements) and the AWS managed core rule set. Body limits through WAF size-constraint rules (2.5 MB; 1.2 MB on `/api/v1/rider/documents/`). ALB idle timeout 3600 s for WebSockets. An ALB has no per-IP connection cap, so keep nginx in front of `/ws/` or enforce the cap in the app.
+- **AWS:** WAF on the ALB with rate-based rules per IP (5-minute windows: e.g. 300 for `/api/v1/auth/otp/request/`, 6,000 for `/api/`, using URI scope-down statements) and the AWS managed core rule set. Body limits through WAF size-constraint rules (2.5 MB; 1.2 MB on `/api/v1/rider/documents/`). ALB idle timeout 3600 s for WebSockets. An ALB has no per-IP connection cap, so keep nginx in front of `/ws/` or enforce the cap in the app.
 - **Cloudflare:** rate-limiting rules per path, WAF managed rules, and a WAF rule on `http.request.body.size`.
 - **GCP:** Cloud Armor rate-based throttle or ban rules per path.
 

@@ -62,14 +62,46 @@ jobs:
           }
           if ($bad) { exit 1 }
 
-      - name: Restore script refuses non-test targets
+      - name: Restore script refuses non-test targets (bash)
         run: |
           set +e
           bash infra/backup/restore_db.sh --target-db jivo_quick_commerce --dump x.dump; rc1=$?
           bash infra/backup/restore_db.sh --target-db jivo_quick_commerce --drop-only --production \
             --confirm "RESTORE INTO jivo_quick_commerce"; rc2=$?
+          bash infra/backup/restore_db.sh --target-db "$(printf 'test_jivo_quick_commerce_restore_x\n_')" --drop-only; rc3=$?
+          bash infra/backup/restore_db.sh --target-db $'test_jivo_quick_commerce_restore_x\n' --drop-only; rc4=$?
           set -e
-          test "$rc1" = 2 && test "$rc2" = 2
+          echo "rc: $rc1 $rc2 $rc3 $rc4 (all must be 2)"
+          test "$rc1" = 2 && test "$rc2" = 2 && test "$rc3" = 2 && test "$rc4" = 2
+
+      - name: Restore script refuses non-test targets (PowerShell)
+        shell: pwsh
+        run: |
+          # Each case runs in its own process, because the script ends with `exit`.
+          $script = './infra/backup/restore_db.ps1'
+          $cases = @(
+            "& '$script' -TargetDb 'jivo_quick_commerce' -Dump 'x.dump'",
+            "& '$script' -TargetDb 'jivo_quick_commerce' -DropOnly -Production -Confirm 'RESTORE INTO jivo_quick_commerce'",
+            "& '$script' -TargetDb `"test_jivo_quick_commerce_restore_x``n`" -DropOnly"
+          )
+          $bad = 0
+          foreach ($c in $cases) {
+            & pwsh -NoProfile -Command "$c; exit `$LASTEXITCODE"
+            if ($LASTEXITCODE -ne 2) { Write-Host "::error::expected exit 2, got $LASTEXITCODE for: $c"; $bad++ }
+          }
+          if ($bad) { exit 1 }
+
+      - name: Entrypoint tests (failing check blocks start; skip refused under deployed settings)
+        run: bash infra/scripts/test_entrypoint.sh
+
+      - name: JQC_SKIP_STARTUP_CHECK is never set in env or compose files
+        run: |
+          if git grep -n -I 'JQC_SKIP_STARTUP_CHECK' -- \
+              '*.env' '*.env.*' '*env.example' 'infra/env/**' \
+              '*compose*.yml' '*compose*.yaml' 'infra/deploy/**' 'infra/terraform/**' 'infra/ansible/**'; then
+            echo "::error::JQC_SKIP_STARTUP_CHECK must not appear in service env or compose files (docs/deployment.md §8.1)."
+            exit 1
+          fi
 
       - name: Ruff (infra Python)
         working-directory: backend

@@ -36,7 +36,7 @@ if ($EnvFile) { Import-JqcEnvFile $EnvFile }
 Set-JqcPgEnv
 if (-not $Database) { $Database = $env:PGDATABASE }
 if (-not $Database) { Stop-Jqc 'no database: pass -Database or set PGDATABASE/POSTGRES_DB' 2 }
-if ($Database -notmatch $script:JqcDbNameRe) { Stop-Jqc "refusing unusual database name: $Database" 2 }
+if ($Database -cnotmatch $script:JqcDbNameRe) { Stop-Jqc "refusing unusual database name: $Database" 2 }
 Assert-JqcConn
 Assert-JqcTool @('pg_dump', 'psql')
 

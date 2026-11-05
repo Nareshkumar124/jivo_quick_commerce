@@ -2,8 +2,10 @@
 # Same rules as lib.sh: connection settings go into the libpq PG* variables of this process only,
 # and are never printed.
 
-$script:JqcTestRestoreRe = '^test_jivo_quick_commerce_restore[a-z0-9_]*$'
-$script:JqcDbNameRe = '^[a-z_][a-z0-9_]{0,62}$'
+# \z, not $: in .NET, $ also matches before a final newline, so 'name`n' would pass. Always use
+# the case-sensitive operators (-cmatch / -cnotmatch) with these.
+$script:JqcTestRestoreRe = '^test_jivo_quick_commerce_restore[a-z0-9_]*\z'
+$script:JqcDbNameRe = '^[a-z_][a-z0-9_]{0,62}\z'
 $script:JqcEnvMap = @{
     'POSTGRES_HOST'     = 'PGHOST'
     'POSTGRES_PORT'     = 'PGPORT'
@@ -101,8 +103,20 @@ function Invoke-JqcNative([string]$Exe, [string[]]$Arguments) {
     }
 }
 
-function Invoke-JqcPsql([string]$Database, [string]$Sql) {
-    $r = Invoke-JqcNative 'psql' @('--no-psqlrc', '--no-password', '-X', '-v', 'ON_ERROR_STOP=1', '-qAt', '-d', $Database, '-c', $Sql)
+# Run SQL through a temp script file (-f), so psql variables (-v name=value, used in the SQL as
+# :'name' or :"name") are interpolated and quoted by psql, never spliced into the SQL text.
+function Invoke-JqcPsql([string]$Database, [string]$Sql, [hashtable]$Vars = @{}) {
+    $sqlFile = [System.IO.Path]::GetTempFileName()
+    try {
+        [System.IO.File]::WriteAllText($sqlFile, $Sql + "`n", (New-Object System.Text.UTF8Encoding $false))
+        $psqlArgs = @('--no-psqlrc', '--no-password', '-X', '-v', 'ON_ERROR_STOP=1', '-qAt', '-d', $Database)
+        foreach ($k in $Vars.Keys) { $psqlArgs += @('-v', "$k=$($Vars[$k])") }
+        $psqlArgs += @('-f', $sqlFile)
+        $r = Invoke-JqcNative 'psql' $psqlArgs
+    }
+    finally {
+        Remove-Item -LiteralPath $sqlFile -Force -ErrorAction SilentlyContinue
+    }
     if ($r.Code -ne 0) { Stop-Jqc ("psql failed: " + ($r.StdErr.Trim() -split "`n")[0]) }
     return $r.StdOut.Trim()
 }

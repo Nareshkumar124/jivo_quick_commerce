@@ -13,6 +13,7 @@
 # restrict who can read it (docs/deployment.md §7.4). Files are created with umask 077.
 
 set -euo pipefail
+export LC_ALL=C  # byte-wise regex classes: [a-z] means ASCII a-z in every locale
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=infra/backup/lib.sh

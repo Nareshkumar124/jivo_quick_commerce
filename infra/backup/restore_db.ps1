@@ -61,7 +61,7 @@ Assert-JqcTool @('psql', 'pg_restore')
 function Remove-TargetDb {
     if ($TargetDb -cnotmatch $script:JqcTestRestoreRe) { Stop-Jqc "internal: refusing to drop $TargetDb" 2 }
     Write-JqcLog "dropping test database $TargetDb"
-    Invoke-JqcPsql $MaintenanceDb "drop database if exists `"$TargetDb`" with (force)" | Out-Null
+    Invoke-JqcPsql $MaintenanceDb 'drop database if exists :"dbname" with (force);' @{ dbname = $TargetDb } | Out-Null
 }
 
 if ($DryRun) {
@@ -93,13 +93,13 @@ if (-not $SkipChecksum) {
 }
 
 # ---------------------------------------------------------------- create + restore
-$exists = Invoke-JqcPsql $MaintenanceDb "select 1 from pg_database where datname = '$TargetDb'"
+$exists = Invoke-JqcPsql $MaintenanceDb "select 1 from pg_database where datname = :'dbname';" @{ dbname = $TargetDb }
 if ($exists -eq '1') {
     if ($DropExisting) { Remove-TargetDb }
     else { Stop-Jqc "target $TargetDb already exists (use -DropExisting for a test target; a production restore always goes into a new database)" 2 }
 }
 Write-JqcLog "creating $TargetDb on $(Get-JqcConnLabel)"
-Invoke-JqcPsql $MaintenanceDb "create database `"$TargetDb`"" | Out-Null
+Invoke-JqcPsql $MaintenanceDb 'create database :"dbname";' @{ dbname = $TargetDb } | Out-Null
 
 # pg_restore 17+ into PostgreSQL 16 issues SET transaction_timeout, which the server rejects;
 # that is harmless and the only error tolerated.

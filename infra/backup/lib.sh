@@ -7,6 +7,8 @@
 
 # shellcheck shell=bash
 
+export LC_ALL=C  # also set by each script before sourcing; [a-z] must mean ASCII a-z
+
 # Restore targets that need no production flag (CLAUDE.md: tests may only create or drop
 # databases named test_jivo_quick_commerce*). Nothing else is ever dropped by these scripts.
 # shellcheck disable=SC2034  # used by the scripts that source this file

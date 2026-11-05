@@ -10,6 +10,7 @@
 # - The dump's sha256 is checked before anything is created.
 
 set -euo pipefail
+export LC_ALL=C  # byte-wise regex classes: [a-z] means ASCII a-z in every locale
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=infra/backup/lib.sh
@@ -105,13 +106,17 @@ jqc_require_conn
 jqc_require_tools psql pg_restore
 
 psql_maint() { psql --no-psqlrc --no-password -X -v ON_ERROR_STOP=1 -qAt -d "$MAINT_DB" "$@"; }
-db_exists() { [ "$(psql_maint -c "select 1 from pg_database where datname = '$1'")" = "1" ]; }
+# Run one statement with the database name bound as the psql variable :dbname (quoted by psql as
+# :'dbname' literal or :"dbname" identifier), never spliced into SQL. Variables are only
+# interpolated in script input, so the statement goes through stdin, not -c.
+psql_maint_db() { printf '%s\n' "$2" | psql_maint -v "dbname=$1" -f -; }
+db_exists() { [ "$(psql_maint_db "$1" "select 1 from pg_database where datname = :'dbname';")" = "1" ]; }
 
 drop_target() {
   # Re-checked here so no code path can drop anything else.
   [[ "$TARGET" =~ $JQC_TEST_RESTORE_RE ]] || jqc_die "internal: refusing to drop $TARGET" 2
   jqc_log "dropping test database $TARGET"
-  psql_maint -c "drop database if exists \"$TARGET\" with (force)"
+  psql_maint_db "$TARGET" 'drop database if exists :"dbname" with (force);'
 }
 
 if [ "$DRY_RUN" -eq 1 ]; then
@@ -158,7 +163,7 @@ if db_exists "$TARGET"; then
 fi
 
 jqc_log "creating $TARGET on $(jqc_conn_label)"
-psql_maint -c "create database \"$TARGET\""
+psql_maint_db "$TARGET" 'create database :"dbname";'
 
 jqc_log "restoring $dump_name into $TARGET (jobs=$JOBS)"
 t0=$(date +%s)
