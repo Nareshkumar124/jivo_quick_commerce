@@ -212,4 +212,61 @@ void main() {
       expect(h.offerAlerts.dismissed, greaterThan(0));
     });
   });
+
+  group('logout unregisters the push token (DELETE /me/devices/)', () {
+    late RiderTestHarness h;
+    late FakePushMessaging push;
+    late ProviderContainer c;
+
+    Future<void> start() async {
+      h = RiderTestHarness();
+      push = FakePushMessaging();
+      await h.signedInBefore('+919811122231');
+      c = await h.container(
+        extra: [pushMessagingProvider.overrideWithValue(push)],
+      );
+      await c.read(riderAccountControllerProvider.notifier).load();
+      c.listen(pushRegistrationControllerProvider, (_, _) {});
+      await pumpEventQueue();
+      expect(h.devices.registered, ['fcm-token-1']);
+    }
+
+    test(
+      'before the session ends; the token also goes with auth/logout',
+      () async {
+        await start();
+        final result = await c
+            .read(riderAccountControllerProvider.notifier)
+            .logout();
+
+        expect(result, LogoutResult.done);
+        expect(h.devices.unregistered, ['fcm-token-1']);
+        expect(h.backend.calls, contains('logout fcm=fcm-token-1'));
+        expect(h.session.isSignedIn, isFalse);
+      },
+    );
+
+    test('a failed unregister never blocks logout', () async {
+      await start();
+      h.devices.nextError = const ApiError(code: ApiErrorCode.network);
+      final result = await c
+          .read(riderAccountControllerProvider.notifier)
+          .logout();
+
+      expect(result, LogoutResult.done);
+      expect(h.devices.unregistered, isEmpty);
+      expect(h.backend.calls, contains('logout fcm=fcm-token-1'));
+      expect(h.session.isSignedIn, isFalse);
+    });
+
+    test('no push set up (no Firebase yet): plain logout', () async {
+      h = RiderTestHarness();
+      await h.signedInBefore('+919811122231');
+      c = await h.container();
+      await c.read(riderAccountControllerProvider.notifier).load();
+      await c.read(riderAccountControllerProvider.notifier).logout();
+      expect(h.devices.unregistered, isEmpty);
+      expect(h.backend.calls, contains('logout'));
+    });
+  });
 }

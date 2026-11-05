@@ -76,6 +76,9 @@ enum ShiftProblem {
   /// The server ended the shift (no heartbeat for 10 min, 04 §2.3).
   autoOffline,
 
+  /// Jivo operations ended the shift (`shift.ended_by: ops`).
+  endedByOps,
+
   /// Tracking stopped, but `shift/end` did not reach the server. The rider
   /// is offline on the phone; "Try again" repeats the call.
   endNotConfirmed,
@@ -230,10 +233,13 @@ class ShiftController extends Notifier<ShiftState> {
       debugPrint('ShiftController: stop after server offline: $error');
     }
     if (ref.mounted) {
+      // The reason comes from `shift.ended_by` (#42).
       state = ShiftState(
-        problem: status.endedBy == ShiftEndedBy.rider
-            ? null
-            : ShiftProblem.autoOffline,
+        problem: switch (status.endedBy) {
+          ShiftEndedBy.rider => null,
+          ShiftEndedBy.ops => ShiftProblem.endedByOps,
+          _ => ShiftProblem.autoOffline,
+        },
       );
     }
   }

@@ -1910,4 +1910,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get riderTooManyTries =>
       'Too many tries. Wait a moment, then try again.';
+
+  @override
+  String get shiftEndedByOpsBody =>
+      'Jivo operations set you offline. Go online again when you are ready, or call support.';
 }
