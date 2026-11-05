@@ -13,6 +13,10 @@ Services (Phase 4, final names; `tests/test_phase4_units.py` checks their signat
     orders.store_ops.cancel_by_staff(order_id, *, by, reason, note="") -> Order            T12
         reason: one of orders.choices.StaffCancelReason
     payments.order_refunds.retry_refund(refund_id, *, by) -> Refund        T-401c
+    payments.order_refunds.manual_refund(order_id, amount, *, by, note="") -> Refund
+        05 §2 Orders "refund (full/partial, within role limit)"; the service enforces the role,
+        the Support limit (SUPPORT_REFUND_LIMIT), the refundable cap and ONLINE-only
+    orders.store_ops.refundable_amount(order) -> Decimal   (read: shown on the refund form)
     stores.services.set_accepting_orders(store, accepting, *, actor) -> bool
     accounts.services.customers.set_cod_blocked(user_id, blocked, *, by) -> bool
 
@@ -43,6 +47,7 @@ MARK_UNAVAILABLE = "mark_unavailable"
 MARK_PACKED = "mark_packed"
 CANCEL = "cancel"
 RETRY_REFUND = "retry_refund"
+MANUAL_REFUND = "manual_refund"
 SET_ACCEPTING = "set_accepting"
 SET_COD_BLOCKED = "set_cod_blocked"
 
@@ -54,6 +59,7 @@ SERVICES: dict[str, tuple[str, str]] = {
     MARK_PACKED: (STORE_OPS, "mark_packed"),
     CANCEL: (STORE_OPS, "cancel_by_staff"),
     RETRY_REFUND: ("apps.payments.order_refunds", "retry_refund"),
+    MANUAL_REFUND: ("apps.payments.order_refunds", "manual_refund"),
     SET_ACCEPTING: ("apps.stores.services", "set_accepting_orders"),
     SET_COD_BLOCKED: ("apps.accounts.services.customers", "set_cod_blocked"),
 }
@@ -192,6 +198,21 @@ def cancel(order, *, actor, reason: str, note: str = ""):
 
 def retry_refund(refund, *, actor):
     return _call(RETRY_REFUND, refund.pk, by=actor)
+
+
+def manual_refund(order, amount, *, actor, note: str = ""):
+    return _call(MANUAL_REFUND, order.pk, amount, by=actor, note=note)
+
+
+REFUNDABLE = (STORE_OPS, "refundable_amount")
+
+
+def refundable(order):
+    """What can still be refunded on the order, as the server computes it (display only)."""
+    function = _lookup(*REFUNDABLE)
+    if function is None:
+        raise ActionUnavailable("orders.store_ops.refundable_amount does not exist yet.")
+    return function(order)
 
 
 def set_accepting(store, accepting: bool, *, actor) -> bool:

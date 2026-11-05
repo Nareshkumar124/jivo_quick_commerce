@@ -24,6 +24,8 @@ from config.testing import worker_redis_namespace
 from .base import *
 
 APP_ENVIRONMENT = "test"
+# Staff MFA is off for the suite (tests log staff in with force_login); the MFA tests turn it on.
+STAFF_MFA_ENFORCED = False
 DEBUG = False
 SECRET_KEY = "test-only-secret-key-not-used-anywhere-else-0123456789abcdefghij"  # noqa: S105
 ALLOWED_HOSTS = ["testserver", "localhost"]

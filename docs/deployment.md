@@ -160,6 +160,7 @@ There is one image (`backend/Dockerfile`) and three process types (doc 02). **Al
   - In `/admin/` > Periodic Tasks, `expire-unpaid-orders` is enabled and its `last_run_at` is under 2 minutes old.
   - The worker log shows `orders.expire_unpaid_orders` succeeding every minute.
   - Alert if `last_run_at` is more than 5 minutes old (`09 §5`).
+- **Staff MFA (H2) rollout:** run `migrate` (it creates the django-otp tables `otp_totp_totpdevice`, `otp_static_staticdevice`, `otp_static_statictoken`) **before** starting web processes whose settings enable `STAFF_MFA_ENFORCED`; the middleware queries those tables on every privileged staff request. Set `STAFF_MFA_ENFORCED=false` in the local dev and QA `.env`; leave it on (the default) in staging and production. The recovery-code table holds plain-text codes: include it in the secret-handling rules for backups (09 §3.1).
 - **Connection budget:** the DB server is shared. `web processes x POSTGRES_POOL_MAX_SIZE + worker concurrency + 1 (beat)` must stay under its connection limit.
 
 ## 5. Razorpay webhook (staging runbook, not done yet)

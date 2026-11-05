@@ -63,6 +63,10 @@ INSTALLED_APPS = [
     "import_export",
     "simple_history",
     "axes",
+    # Staff TOTP MFA (H2, DL-59; interim until Jivo SSO, D-04): devices + recovery codes.
+    "django_otp",
+    "django_otp.plugins.otp_totp",
+    "django_otp.plugins.otp_static",
     # Project apps
     "apps.core",
     "apps.accounts",
@@ -87,6 +91,9 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "apps.accounts.middleware.staff_session_policy_middleware",  # 05 §5 staff session limits
+    "django_otp.middleware.OTPMiddleware",  # request.user.is_verified() (staff MFA, H2)
+    "apps.ops_console.mfa.staff_mfa_middleware",  # privileged staff: MFA on /admin/ and /ops/
+    "apps.ops_console.csp.report_only_csp_middleware",  # L7: CSP report-only on the panel
     "apps.core.middleware.staff_timezone_middleware",  # staff panel in IST, storage UTC
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -96,6 +103,20 @@ MIDDLEWARE = [
     # Last, per django-axes: locks out repeated failed staff logins.
     "axes.middleware.AxesMiddleware",
 ]
+
+# Staff MFA (H2, DL-59): TOTP for Super Admin, Finance and Support (and Ops when set) on /admin/
+# and /ops/. apps/ops_console/mfa.py. Interim until Jivo SSO (D-04).
+STAFF_MFA_ENFORCED = env_bool("STAFF_MFA_ENFORCED", default=True)
+# Ops / Dispatch is in by default: it has the broadest customer PII and rider KYC access.
+STAFF_MFA_INCLUDE_OPS = env_bool("STAFF_MFA_INCLUDE_OPS", default=True)
+OTP_TOTP_ISSUER = "Jivo Ops"
+# django-otp throttling: after each wrong code the device waits 5 s, then 10, 20, ... seconds.
+OTP_TOTP_THROTTLE_FACTOR = 5
+OTP_STATIC_THROTTLE_FACTOR = 5
+# Orders admin export (05 §2): at most this many rows per file; larger exports are a P7 report.
+ORDERS_EXPORT_MAX_ROWS = env_int("ORDERS_EXPORT_MAX_ROWS", default=5000)
+# L7: Content-Security-Policy on /admin/ and /ops/, report-only until a week of clean reports.
+CSP_REPORT_ONLY = env_bool("CSP_REPORT_ONLY", default=True)
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"

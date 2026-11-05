@@ -192,6 +192,36 @@ MODULES: tuple[NavSection, ...] = (
         ),
     ),
     NavSection(
+        "Riders",
+        (
+            NavItem(
+                "Riders",
+                "two_wheeler",
+                "admin:delivery_rider_changelist",
+                ("delivery.view_rider",),
+            ),
+            NavItem(
+                "KYC documents",
+                "badge",
+                "admin:delivery_riderdocument_changelist",
+                ("delivery.view_riderdocument",),
+                query="status__exact=PENDING",
+            ),
+            NavItem(
+                "Shifts",
+                "schedule",
+                "admin:delivery_ridershift_changelist",
+                ("delivery.view_ridershift",),
+            ),
+            NavItem(
+                "Location history",
+                "location_on",
+                "admin:delivery_riderlocation_changelist",
+                ("delivery.view_riderlocation",),
+            ),
+        ),
+    ),
+    NavSection(
         "Customers",
         (
             NavItem(

@@ -17,17 +17,37 @@ refund services, never through this form.
   added up here.
 - Payments and refunds appear on the order only for roles that may view them
   (`payments.view_payment` / `payments.view_refund`). Gateway payloads are never shown.
+- Phase 4 follow-up (QA BUG-0010): "Issue refund" (a detail action, `/<id>/refund/`) for
+  `payments.issue_refund` (Super Admin, Finance; Support up to `SUPPORT_REFUND_LIMIT`). It shows
+  the server's refundable amount, posts once (one-time token + `submit_once.js`) and calls
+  `order_refunds.manual_refund` through `ops_console.order_actions`; refusals (role limit, cap,
+  not paid online, state) are form errors.
+- QA BUG-0011: CSV / Excel export (django-import-export, the project's formula-escaping
+  formats) of the store-scoped, filtered list. Roles without full PII get the masked phone and
+  no address. Money is written as plain numbers ("300.00"); Excel cells are text because of the
+  known XLSX type gap (xfail in apps/catalog/tests/test_admin_import_export.py).
 """
 
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.contrib.admin.utils import unquote
+from django.core.exceptions import PermissionDenied
 from django.db.models import BooleanField, Value
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
+from import_export import fields as export_fields
+from import_export import resources
+from import_export.admin import ExportMixin
 from unfold.admin import ModelAdmin, TabularInline
-from unfold.decorators import display
+from unfold.contrib.import_export.forms import ExportForm
+from unfold.decorators import action, display
 
-from apps.ops_console import status
+from apps.ops_console import capabilities, once, order_actions, status
+from apps.ops_console.admin_support import ImportExportPermissionsMixin
+from apps.ops_console.forms import ManualRefundForm
 from apps.ops_console.money import inr
 from apps.ops_console.pii import address_lines, can_view_full_phone, customer_label, person_label
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin
@@ -81,6 +101,123 @@ class OrderDateFilter(admin.DateFieldListFilter):
     def __init__(self, field, request, params, model, model_admin, field_path):
         super().__init__(field, request, params, model, model_admin, field_path)
         self.title = "order date (IST)"
+
+
+class OrderResource(resources.ModelResource):
+    """Orders export (05 §2 "export CSV", BUG-0011). Built per request with the viewer's PII
+    level: full-PII roles get the customer's phone and the delivery locality; everyone else the
+    masked phone and no address. Money is written as stored, two decimals."""
+
+    order = export_fields.Field(column_name="order_number", attribute="order_number")
+    placed = export_fields.Field(column_name="placed_at_ist")
+    store_code = export_fields.Field(column_name="store")
+    customer_name = export_fields.Field(column_name="customer_name")
+    customer_phone = export_fields.Field(column_name="customer_phone")
+    delivery_area = export_fields.Field(column_name="delivery_area")
+    status_label = export_fields.Field(column_name="status", attribute="status")
+    method = export_fields.Field(column_name="payment_method", attribute="payment_method")
+    payment = export_fields.Field(column_name="payment_status", attribute="payment_status")
+    coupon = export_fields.Field(column_name="coupon_code", attribute="coupon_code")
+    item_total = export_fields.Field(column_name="item_total", attribute="item_total")
+    coupon_discount = export_fields.Field(
+        column_name="coupon_discount", attribute="coupon_discount"
+    )
+    delivery_fee = export_fields.Field(column_name="delivery_fee", attribute="delivery_fee")
+    small_cart_fee = export_fields.Field(column_name="small_cart_fee", attribute="small_cart_fee")
+    handling_fee = export_fields.Field(column_name="handling_fee", attribute="handling_fee")
+    tip = export_fields.Field(column_name="tip", attribute="tip")
+    grand_total = export_fields.Field(column_name="grand_total", attribute="grand_total")
+    amount_refunded = export_fields.Field(
+        column_name="amount_refunded", attribute="amount_refunded"
+    )
+
+    MONEY = (
+        "item_total",
+        "coupon_discount",
+        "delivery_fee",
+        "small_cart_fee",
+        "handling_fee",
+        "tip",
+        "grand_total",
+        "amount_refunded",
+    )
+
+    class Meta:
+        model = Order
+        # import-export 4 applies this list to declared fields too: name every column.
+        fields = (
+            "order",
+            "placed",
+            "store_code",
+            "customer_name",
+            "customer_phone",
+            "delivery_area",
+            "status_label",
+            "method",
+            "payment",
+            "coupon",
+            "item_total",
+            "coupon_discount",
+            "delivery_fee",
+            "small_cart_fee",
+            "handling_fee",
+            "tip",
+            "grand_total",
+            "amount_refunded",
+        )
+
+    def __init__(self, *args, full_pii: bool = False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.full_pii = full_pii
+
+    def get_export_order(self):
+        return (
+            "order",
+            "placed",
+            "store_code",
+            "customer_name",
+            "customer_phone",
+            "delivery_area",
+            "status_label",
+            "method",
+            "payment",
+            "coupon",
+            *self.MONEY,
+        )
+
+    def dehydrate_placed(self, order) -> str:
+        from django.utils import timezone
+
+        from apps.ops_console.dates import DISPLAY_TZ
+
+        moment = order.placed_at or order.created_at
+        return timezone.localtime(moment, DISPLAY_TZ).strftime("%Y-%m-%d %H:%M")
+
+    def dehydrate_store_code(self, order) -> str:
+        return order.store.code
+
+    def dehydrate_customer_name(self, order) -> str:
+        return (order.user.name or "").strip()
+
+    def dehydrate_customer_phone(self, order) -> str:
+        from apps.ops_console.pii import mask_phone
+
+        phone = order.user.phone or ""
+        return phone if self.full_pii else mask_phone(phone)
+
+    def dehydrate_delivery_area(self, order) -> str:
+        if not self.full_pii:
+            return ""
+        snapshot = order.address_snapshot if isinstance(order.address_snapshot, dict) else {}
+        parts = (snapshot.get(key) for key in ("area", "city", "pincode"))
+        return ", ".join(str(part) for part in parts if part)
+
+    def export_field(self, field, instance, **kwargs):
+        value = super().export_field(field, instance, **kwargs)
+        if field.column_name in self.MONEY:
+            amount = getattr(instance, field.column_name)
+            return f"{amount:.2f}" if amount is not None else ""
+        return value
 
 
 class CustomerFilter(admin.SimpleListFilter):
@@ -258,7 +395,7 @@ class StatusHistoryInline(ReadOnlyInline):
 
 
 @admin.register(Order)
-class OrderAdmin(StoreScopedAdminMixin, ModelAdmin):
+class OrderAdmin(StoreScopedAdminMixin, ImportExportPermissionsMixin, ExportMixin, ModelAdmin):
     list_display = (
         "order_number",
         "created_at",
@@ -286,6 +423,9 @@ class OrderAdmin(StoreScopedAdminMixin, ModelAdmin):
     list_per_page = 50
     show_full_result_count = False
     inlines = [OrderItemInline, PaymentInline, RefundInline, StatusHistoryInline]
+    actions_detail = ["issue_refund"]
+    resource_classes = [OrderResource]
+    export_form_class = ExportForm
     fieldsets = (
         (
             "Order",
@@ -332,6 +472,116 @@ class OrderAdmin(StoreScopedAdminMixin, ModelAdmin):
 
     def get_queryset(self, request):
         return with_pii_flag(super().get_queryset(request), request.user)
+
+    # ---------------------------------------------------------------- export (BUG-0011)
+
+    def get_export_queryset(self, request):
+        # The changelist's queryset (store-scoped, filtered, searched) with what the rows need.
+        return super().get_export_queryset(request).select_related("store", "user")
+
+    def get_data_for_export(self, request, queryset, **kwargs):
+        """At most `ORDERS_EXPORT_MAX_ROWS` rows per file (oldest dropped: the list's newest-first
+        order); every export is audited (`orders.export`: rows, cap, PII level)."""
+        from django.conf import settings
+
+        from apps.core import audit
+        from apps.core.net import client_ip
+
+        cap = int(getattr(settings, "ORDERS_EXPORT_MAX_ROWS", 5000))
+        rows = queryset.count()
+        capped = rows > cap
+        if capped:
+            queryset = queryset[:cap]
+            self.message_user(
+                request,
+                f"The export has the newest {cap} of {rows} orders. "
+                "Narrow the filters for the rest.",
+                messages.WARNING,
+            )
+        audit.record(
+            request.user,
+            "orders.export",
+            ("orders.order", "list"),
+            {
+                "rows": min(rows, cap),
+                "matched": rows,
+                "capped": capped,
+                "full_pii": can_view_full_phone(request.user),
+            },
+            ip=client_ip(request),
+        )
+        return super().get_data_for_export(request, queryset, **kwargs)
+
+    def get_export_resource_kwargs(self, request, **kwargs):
+        kwargs = super().get_export_resource_kwargs(request, **kwargs)
+        kwargs["full_pii"] = can_view_full_phone(request.user)
+        return kwargs
+
+    # ---------------------------------------------------------------- refund (BUG-0010)
+
+    def has_issue_refund_permission(self, request, object_id=None) -> bool:
+        return (
+            self.has_view_permission(request)
+            and capabilities.allowed(request.user, capabilities.ISSUE_REFUND)
+            and order_actions.available(order_actions.MANUAL_REFUND)
+        )
+
+    @action(description="Issue refund", url_path="refund", permissions=["issue_refund"])
+    def issue_refund(self, request, object_id):
+        if not self.has_issue_refund_permission(request):
+            raise PermissionDenied
+        # Scoped first: another store's order is a 404, never fetched and then checked.
+        order = get_object_or_404(self.get_queryset(request), pk=unquote(object_id))
+        back = reverse("admin:orders_order_change", args=[order.pk])
+        refundable = order_actions.refundable(order)
+        form = ManualRefundForm(
+            request.POST or None,
+            refundable=refundable,
+            initial={"once": once.new_token(once.MANUAL_REFUND)},
+        )
+        if request.method == "POST" and form.is_valid():
+            if not once.consume(request.user, once.MANUAL_REFUND, form.cleaned_data["once"]):
+                form.add_error(None, once.MSG_REUSED)
+            else:
+                amount = form.cleaned_data["amount"]
+                try:
+                    refund = order_actions.manual_refund(
+                        order, amount, actor=request.user, note=form.cleaned_data["note"]
+                    )
+                except order_actions.ActionRefused as refusal:
+                    form.add_error(
+                        "amount" if refusal.code == order_actions.INVALID else None,
+                        refusal.message,
+                    )
+                else:
+                    self.message_user(
+                        request,
+                        f"Refund of {inr(refund.amount)} started for {order.order_number}. "
+                        "The customer gets it in 5-7 working days.",
+                        messages.SUCCESS,
+                    )
+                    return HttpResponseRedirect(back)
+        if request.method == "POST":
+            # A fresh token for the next attempt (a consumed or refused one cannot be reused).
+            data = form.data.copy()
+            data["once"] = once.new_token(once.MANUAL_REFUND)
+            form.data = data
+        context = {
+            **self.admin_site.each_context(request),
+            "opts": self.opts,
+            "title": f"Refund {order.order_number}",
+            "order": order,
+            "form": form,
+            "refundable": refundable,
+            "refundable_display": inr(refundable),
+            "grand_total": inr(order.grand_total),
+            "amount_paid": inr(getattr(order, "amount_paid", None)),
+            "amount_refunded": inr(order.amount_refunded),
+            "is_online": order.payment_method == "ONLINE",
+            "back": back,
+        }
+        request.current_app = self.admin_site.name
+        return TemplateResponse(request, "admin/orders/order/refund.html", context)
 
     def get_search_fields(self, request):
         if can_view_full_phone(request.user):

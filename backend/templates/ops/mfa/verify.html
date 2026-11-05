@@ -1,0 +1,11 @@
+{% extends "ops/mfa/base.html" %}
+{# Second step at sign-in: an authenticator code, or one recovery code. Context: form, next. #}
+{% block content %}
+    <p class="mb-4">Enter the 6-digit code from your authenticator app. Lost your phone? Use one of your recovery codes, or ask a Super Admin to reset your two-step sign-in.</p>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        {% include "unfold/helpers/field.html" with field=form.code %}
+        <button type="submit" class="ops-button mt-2">Verify</button>
+    </form>
+{% endblock %}
