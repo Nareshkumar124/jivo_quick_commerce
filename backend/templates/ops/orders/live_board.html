@@ -1,0 +1,29 @@
+{% extends "ops/base.html" %}
+{% load static %}
+
+{% block page_scripts %}<script src="{% static 'ops/js/orders.js' %}" defer></script>{% endblock %}
+
+{% block content %}
+    {# Live order board (05 §1.2). Filters only narrow the user's stores. The columns poll every poll_seconds and reload at once after a button (ops:refresh). #}
+    <form id="board-filters" class="ops-table__filters" method="get" action="{% url 'ops:live-board' %}"
+          hx-get="{% url 'ops:live-board-columns' %}" hx-target="#board-columns" hx-swap="outerHTML" hx-trigger="change"
+          data-testid="board-filters">
+        {% include "ops/components/form_field.html" with field=form.store %}
+        {% include "ops/components/form_field.html" with field=form.payment %}
+        <label class="flex items-center gap-2 h-[38px]" for="{{ form.breached.id_for_label }}">
+            {{ form.breached }} <span>{{ form.breached.label }}</span>
+        </label>
+        <noscript><button type="submit" class="ops-button ops-button--secondary">Apply</button></noscript>
+    </form>
+
+    {# Alerts live outside the polled region (focus survives a poll); orders.js fills them. #}
+    <div id="ops-alerts" class="ops-alerts" aria-live="off" data-surface="board"></div>
+    <div id="ops-announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="ops-announcer-urgent" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+    {% include "ops/partials/live_board_columns.html" %}
+
+    {% if caps.cancel_order and actions.cancel %}
+        {% include "ops/components/cancel_dialog.html" %}
+    {% endif %}
+{% endblock %}

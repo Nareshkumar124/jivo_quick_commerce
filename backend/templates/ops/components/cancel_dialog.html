@@ -1,0 +1,20 @@
+{# Cancel an order (08 T12, reason required). One per page, driven by the Alpine store "cancelOrder" (ops/js/orders.js): a button calls $store.cancelOrder.ask(url, orderNumber). Context: cancel_form (forms.CancelOrderForm). #}
+<div class="ops-dialog-backdrop" x-data x-show="$store.cancelOrder.open" x-cloak x-on:click.self="$store.cancelOrder.close()"
+     x-on:keydown.escape.window="$store.cancelOrder.close()">
+    <form class="ops-dialog bg-white border border-base-200 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800"
+          role="dialog" aria-modal="true" aria-labelledby="ops-cancel-title"
+          x-on:submit.prevent="$store.cancelOrder.submit($el)" data-testid="cancel-dialog">
+        <h2 id="ops-cancel-title" class="font-semibold text-[15px] text-font-important-light dark:text-font-important-dark">
+            Cancel order <span x-text="$store.cancelOrder.number"></span>?
+        </h2>
+        <p class="mt-2 text-font-subtle-light dark:text-font-subtle-dark">Reserved stock is released, a prepaid order is refunded in full and the customer is told. This cannot be undone.</p>
+        <div class="flex flex-col gap-3 mt-4">
+            {% include "ops/components/form_field.html" with field=cancel_form.reason %}
+            {% include "ops/components/form_field.html" with field=cancel_form.note %}
+        </div>
+        <div class="flex gap-2 justify-end mt-6">
+            <button type="button" class="ops-button ops-button--secondary" x-on:click="$store.cancelOrder.close()">Keep the order</button>
+            <button type="submit" class="ops-button ops-button--danger">Cancel order</button>
+        </div>
+    </form>
+</div>

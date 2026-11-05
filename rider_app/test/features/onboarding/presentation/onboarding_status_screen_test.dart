@@ -13,7 +13,7 @@ Finder byKey(String key) => find.byKey(Key(key));
 void main() {
   late RiderTestHarness h;
 
-  setUp(() => h = RiderTestHarness());
+  setUp(() => h = RiderTestHarness()..surface = const Size(1080, 3200));
 
   Future<void> openAs(WidgetTester tester, String phone) async {
     await h.signedInBefore(phone);

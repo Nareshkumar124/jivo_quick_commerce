@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/task_rules.dart';
 
@@ -11,11 +12,21 @@ import '../domain/task_rules.dart';
 typedef QrScannerBuilder = Widget Function(
   BuildContext context,
   void Function(String raw) onScan,
+  MobileScannerController? controller,
 );
+
+/// The camera controller (torch). Null in tests: no camera, no torch.
+final scannerControllerProvider =
+    Provider.autoDispose<MobileScannerController?>((ref) {
+      final controller = MobileScannerController();
+      ref.onDispose(controller.dispose);
+      return controller;
+    });
 
 final qrScannerBuilderProvider = Provider<QrScannerBuilder>(
   (ref) =>
-      (context, onScan) => MobileScanner(
+      (context, onScan, controller) => MobileScanner(
+        controller: controller,
         onDetect: (capture) {
           for (final barcode in capture.barcodes) {
             final raw = barcode.rawValue;
@@ -36,9 +47,11 @@ final qrScannerBuilderProvider = Provider<QrScannerBuilder>(
       ),
 );
 
-/// Scan the QR on the packed bag (04 §2.5). Returns the 4-character code to
-/// the pickup step, which sends it; the server checks it. Typing the code is
-/// always possible instead.
+/// Scan the QR on the packed bag (04 §2.5, `design/screens/rider/pickup.md`
+/// §4): a 240 dp viewfinder, a helper line, a torch toggle that says its
+/// state in words, and "Type the code instead" bottom-most. Returns the
+/// 4-character code to the pickup step, which sends it; the server checks
+/// it.
 class PickupScanScreen extends ConsumerStatefulWidget {
   const PickupScanScreen({super.key});
 
@@ -49,6 +62,8 @@ class PickupScanScreen extends ConsumerStatefulWidget {
 class _PickupScanScreenState extends ConsumerState<PickupScanScreen> {
   bool _done = false;
   String? _lastRejected;
+
+  static const _viewfinder = 240.0;
 
   void _onScan(String raw) {
     if (_done || !mounted) return;
@@ -70,23 +85,67 @@ class _PickupScanScreenState extends ConsumerState<PickupScanScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scanner = ref.watch(qrScannerBuilderProvider);
+    final controller = ref.watch(scannerControllerProvider);
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(title: Text(l10n.scanTitle)),
       body: Column(
         children: [
-          Expanded(child: scanner(context, _onScan)),
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                scanner(context, _onScan, controller),
+                // Viewfinder over a 50 % scrim; taps pass through.
+                IgnorePointer(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        key: const Key('scan-viewfinder'),
+                        width: _viewfinder,
+                        height: _viewfinder,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.white, width: 3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        color: Colors.black54,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        child: Text(
+                          l10n.scanHelper,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           SafeArea(
             top: false,
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  key: const Key('scan-type-instead'),
-                  onPressed: () => context.pop(),
-                  child: Text(l10n.scanTypeInstead),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (controller != null) _TorchButton(controller: controller),
+                  FilledButton(
+                    key: const Key('scan-type-instead'),
+                    onPressed: () => context.pop(),
+                    child: Text(l10n.scanTypeInstead),
+                  ),
+                ],
               ),
             ),
           ),
@@ -94,4 +153,40 @@ class _PickupScanScreenState extends ConsumerState<PickupScanScreen> {
       ),
     );
   }
+}
+
+/// "Light" / "Light on": hidden when the phone has no torch.
+class _TorchButton extends StatelessWidget {
+  const _TorchButton({required this.controller});
+
+  final MobileScannerController controller;
+
+  @override
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<MobileScannerState>(
+        valueListenable: controller,
+        builder: (context, state, _) {
+          if (state.torchState == TorchState.unavailable) {
+            return const SizedBox.shrink();
+          }
+          final l10n = AppLocalizations.of(context);
+          final on = state.torchState == TorchState.on;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: OutlinedButton.icon(
+              key: const Key('scan-torch'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(
+                  color: Colors.white,
+                  width: RiderColors.borderWidth,
+                ),
+              ),
+              onPressed: controller.toggleTorch,
+              icon: Icon(on ? Icons.flashlight_on : Icons.flashlight_off),
+              label: Text(on ? l10n.scanLightOn : l10n.scanLight),
+            ),
+          );
+        },
+      );
 }

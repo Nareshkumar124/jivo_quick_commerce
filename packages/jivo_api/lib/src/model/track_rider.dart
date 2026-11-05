@@ -36,9 +36,9 @@ class TrackRider {
   @JsonKey(name: r'name', required: true, includeIfNull: false)
   final String name;
 
-  /// E.164. Direct dial in v1 (masked calling is v2).
-  @JsonKey(name: r'phone', required: true, includeIfNull: false)
-  final String phone;
+  /// E.164. Only while the order is OUT_FOR_DELIVERY (and only to the order's owner); null otherwise. Masked/proxy calling is planned.
+  @JsonKey(name: r'phone', required: true, includeIfNull: true)
+  final String? phone;
 
   /// Signed https link to the rider's photo, valid about an hour (re-read `track/` for a fresh one); null without a photo.
   @JsonKey(name: r'photo', required: true, includeIfNull: true)
@@ -69,7 +69,7 @@ class TrackRider {
   @override
   int get hashCode =>
       name.hashCode +
-      phone.hashCode +
+      (phone == null ? 0 : phone.hashCode) +
       (photo == null ? 0 : photo.hashCode) +
       (lat == null ? 0 : lat.hashCode) +
       (lng == null ? 0 : lng.hashCode) +

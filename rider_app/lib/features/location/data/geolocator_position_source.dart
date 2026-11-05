@@ -67,6 +67,7 @@ class GeolocatorPositionSource implements PositionSource {
         speed: p.hasSpeed ? p.speed : null,
         heading: p.hasHeading ? p.heading : null,
         recordedAt: p.timestamp,
+        isMocked: p.isMocked,
       ),
     );
   }

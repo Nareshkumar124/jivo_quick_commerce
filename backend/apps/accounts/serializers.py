@@ -120,7 +120,7 @@ class MeSerializer(serializers.Serializer):
     rider_status = serializers.ChoiceField(
         choices=RiderStatus.choices,
         read_only=True,
-        help_text="Rider profile status; NONE without a rider profile (always NONE until Phase 5).",
+        help_text="Rider profile status; NONE without a rider profile (`POST /rider/register/`).",
     )
     created_at = serializers.DateTimeField(read_only=True)
 
@@ -201,6 +201,10 @@ class DeviceSerializer(serializers.Serializer):
     )
     is_active = serializers.BooleanField(read_only=True)
     last_seen_at = serializers.DateTimeField(read_only=True)
+
+
+class DeviceUnregisterSerializer(serializers.Serializer):
+    fcm_token = serializers.CharField(max_length=512, help_text="The token to stop pushing to.")
 
 
 # --------------------------------------------------------------------------- addresses

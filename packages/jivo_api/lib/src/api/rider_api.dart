@@ -410,7 +410,7 @@ class RiderApi {
   }
 
   /// App alive + status check
-  /// Call every minute or so while online, and on returning to the foreground. Records \&quot;last seen\&quot; for ops and returns whether the server still has the rider online, a pending offer and the active task (polling fallback, 04 §2.4). It does not keep the rider online: only location points do.
+  /// Call every minute or so while online, and on returning to the foreground. Records \&quot;last seen\&quot; for ops and returns whether the server still has the rider online, a pending offer and the active task (polling fallback, 04 §2.4). Auto-offline (api-requests #42, ⚠ PM default): no location point for 10 minutes sets the rider offline, unless a heartbeat came in those 10 minutes and the last point is at most 30 minutes old (e.g. waiting indoors without a GPS fix).
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation

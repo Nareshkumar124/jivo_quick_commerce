@@ -6,6 +6,7 @@ import 'package:jivo_core/jivo_core.dart';
 import 'package:jivo_api/jivo_api.dart' show JivoApi;
 
 import '../shared/platform/url_opener.dart';
+import '../shared/session/store_synced_token_refresher.dart';
 
 /// The `X-App-Name` this app sends.
 const riderAppName = 'rider';
@@ -37,6 +38,10 @@ final appControlSignalsProvider = Provider<AppControlSignals>(
     'appControlSignalsProvider is overridden at startup',
   ),
 );
+
+/// The token store shared with the location service isolate (see
+/// `GuardedTokenStore`). Null in tests that use an in-memory store.
+final sharedTokenStoreProvider = Provider<GuardedTokenStore?>((ref) => null);
 
 /// The Dio instance for every backend call: client-info headers, then the
 /// bearer token / refresh, then 426/503 detection (jivo_core order).

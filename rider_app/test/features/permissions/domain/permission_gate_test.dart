@@ -119,6 +119,18 @@ void main() {
       );
     });
 
+    test('"Approximate" keeps the location step open (04 §2.1)', () {
+      final approximate = allGranted.copyWith(locationPrecise: false);
+      final result = PermissionGate.evaluate(
+        approximate,
+        disclosureAccepted: true,
+      );
+      expect(result.canGoOnline, isFalse);
+      expect(result.next!.step, GateStep.locationWhenInUse);
+      expect(result.next!.approximate, isTrue);
+      expect(result.next!.blocked, isFalse);
+    });
+
     test('OEM auto-start guidance is offered for aggressive OEMs only', () {
       expect(PermissionGate.oemBrandOf('Xiaomi'), OemBrand.xiaomi);
       expect(PermissionGate.oemBrandOf('Redmi'), OemBrand.xiaomi);

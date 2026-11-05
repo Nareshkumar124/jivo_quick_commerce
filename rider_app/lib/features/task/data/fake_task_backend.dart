@@ -85,7 +85,11 @@ class FakeTaskBackend
   // ------------------------------------------------------------- offers
 
   /// Dispatch offers an order to this rider (`offer.new`).
-  DeliveryOffer simulateOffer({bool cod = false, Duration? expiresIn}) {
+  DeliveryOffer simulateOffer({
+    bool cod = false,
+    Duration? expiresIn,
+    bool withoutCodAmount = false,
+  }) {
     final now = _clock().toUtc();
     final offer = DeliveryOffer(
       id: _nextId++,
@@ -93,7 +97,7 @@ class FakeTaskBackend
       dropLocality: 'Sector 21, Noida',
       distanceKm: '2.4',
       paymentType: cod ? PaymentType.cod : PaymentType.prepaid,
-      codAmount: cod ? codAmount : null,
+      codAmount: cod && !withoutCodAmount ? codAmount : null,
       estimatedPayout: '45.00',
       expiresAt: now.add(expiresIn ?? kOfferWindow),
     );
@@ -373,6 +377,20 @@ class FakeTaskBackend
 
   /// Ops unassigned the rider (08 §3 reassignment): the task is gone.
   void unassign() => _task = null;
+
+  /// Ops: the store marked a unit unavailable after the offer (08 T8a), so
+  /// the COD amount drops (RD-03). Keeps the offered amount as
+  /// `codAmountChangedFrom`.
+  static const changedCodAmount = '990.00';
+
+  void changeCodAmount([String amount = changedCodAmount]) {
+    final task = _task;
+    if (task == null || !task.isCod) return;
+    _task = task.copyWith(
+      codAmountDue: amount,
+      codAmountChangedFrom: task.codAmountChangedFrom ?? task.codAmountDue,
+    );
+  }
 
   // ------------------------------------------------------------ helpers
 

@@ -32,7 +32,11 @@ class TestRoles:
         assert set(roles.ROLE_PERMISSIONS) <= names
         support = {p.codename for p in Group.objects.get(name=roles.SUPPORT).permissions.all()}
         assert {"view_customer", "change_customer", "view_product"} <= support
-        assert not any(code.startswith(("add_", "delete_")) for code in support)
+        # P7 PM default: Support edits FAQs (05 §2 Support module); nothing else.
+        assert not any(
+            code.startswith(("add_", "delete_")) and code not in {"add_faq", "delete_faq"}
+            for code in support
+        )
         admin_perms = Group.objects.get(name=roles.SUPER_ADMIN).permissions
         assert admin_perms.filter(codename="change_user").exists()
         assert admin_perms.filter(codename="change_appconfig").exists()

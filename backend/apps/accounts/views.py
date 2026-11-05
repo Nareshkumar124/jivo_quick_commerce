@@ -22,6 +22,7 @@ from apps.accounts.serializers import (
     AddressSerializer,
     AuthSessionSerializer,
     DeviceSerializer,
+    DeviceUnregisterSerializer,
     LogoutSerializer,
     MeSerializer,
     OtpSendSerializer,
@@ -502,6 +503,33 @@ class DeviceRegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         device = profile.register_device(request.user, **serializer.validated_data)
         return Response(DeviceSerializer(device).data)
+
+    @extend_schema(
+        operation_id="me_device_unregister",
+        tags=["account"],
+        summary="Unregister this device's push token",
+        description=(
+            "Stops push to this token (e.g. on logout, api-requests #39). Only the caller's own "
+            "device is affected; an unknown token or another user's is ignored. Always 204. "
+            "`POST /auth/logout/` with `fcm_token` does the same as part of logging out."
+        ),
+        request=DeviceUnregisterSerializer,
+        examples=[_request_example("Unregister", {"fcm_token": ex.DEVICE["fcm_token"]})],
+        responses=app_responses(
+            {
+                204: OpenApiResponse(description="Unregistered (or nothing to do)."),
+                400: error_response(
+                    "Missing token.", validation_error({"fcm_token": ["This field is required."]})
+                ),
+                401: UNAUTHORIZED,
+            }
+        ),
+    )
+    def delete(self, request: Request) -> Response:
+        serializer = DeviceUnregisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile.unregister_device(request.user, **serializer.validated_data)
+        return Response(status=204)
 
 
 # --------------------------------------------------------------------------- addresses
