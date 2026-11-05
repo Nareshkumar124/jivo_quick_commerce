@@ -3283,6 +3283,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Don\'t collect any cash. Nothing is due for this order.'**
   String get taskReturnNoCash;
+
+  /// No description provided for @riderTooManyTries.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many tries. Wait a moment, then try again.'**
+  String get riderTooManyTries;
 }
 
 class _AppLocalizationsDelegate

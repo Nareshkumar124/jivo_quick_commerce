@@ -1130,5 +1130,6 @@
       }
     }
   },
-  "taskReturnNoCash": "Don't collect any cash. Nothing is due for this order."
+  "taskReturnNoCash": "Don't collect any cash. Nothing is due for this order.",
+  "riderTooManyTries": "Too many tries. Wait a moment, then try again."
 }

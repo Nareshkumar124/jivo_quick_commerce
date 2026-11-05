@@ -8,8 +8,11 @@ import 'package:jivo_api/jivo_api.dart'
         RiderDocument,
         RiderDocumentStatusEnum,
         RiderDocumentTypeEnum,
+        RiderHomeStore,
         RiderProfile,
-        RiderStore;
+        RiderRegisterRequest,
+        RiderStore,
+        VehicleTypeEnum;
 import 'package:jivo_core/jivo_core.dart';
 
 import '../domain/image_compression.dart';
@@ -41,28 +44,23 @@ class ApiRiderOnboardingRepository implements RiderOnboardingRepository {
     return [for (final s in list.results) _store(s)];
   });
 
-  /// TODO(jivo_api): the generator serialises the date-only `dob` as a full
-  /// ISO datetime (`1998-04-02T00:00:00.000`), which a DRF `DateField`
-  /// refuses. Until the generator emits dates as `YYYY-MM-DD`, this posts
-  /// the same body through the same Dio, with `dob` as a date, and parses
-  /// the reply with the generated model.
   @override
   Future<RiderProfile> register(RiderRegistration r) => _call(() async {
-    final dob = r.dateOfBirth;
-    String two(int n) => n.toString().padLeft(2, '0');
-    final response = await _api.dio.post<Map<String, dynamic>>(
-      '/api/v1/rider/register/',
-      data: {
-        'full_name': r.fullName,
-        'dob': '${dob.year}-${two(dob.month)}-${two(dob.day)}',
-        'emergency_contact_name': r.emergencyContactName,
-        'emergency_contact_phone': r.emergencyContactPhone,
-        'preferred_store_id': r.preferredStoreId,
-        'vehicle_type': r.vehicleType.wireValue,
-        if (r.vehicleNumber != null) 'vehicle_number': r.vehicleNumber,
-      },
-    );
-    return profileFromApi(api.RiderProfile.fromJson(response.data!));
+    final profile = (await _api.getRiderApi().riderRegister(
+      // `dob` is a date: the generator sends it as YYYY-MM-DD (#38).
+      riderRegisterRequest: api.RiderRegisterRequest(
+        fullName: r.fullName,
+        dob: r.dateOfBirth,
+        emergencyContactName: r.emergencyContactName,
+        emergencyContactPhone: r.emergencyContactPhone,
+        preferredStoreId: r.preferredStoreId,
+        vehicleType: api.VehicleTypeEnum.values.firstWhere(
+          (t) => t.value == r.vehicleType.wireValue,
+        ),
+        vehicleNumber: r.vehicleNumber,
+      ),
+    )).data!;
+    return profileFromApi(profile);
   });
 
   @override
@@ -117,6 +115,9 @@ class ApiRiderOnboardingRepository implements RiderOnboardingRepository {
 StoreOption _store(api.RiderStore s) =>
     StoreOption(id: s.id, name: s.name, city: s.city);
 
+StoreOption _homeStore(api.RiderHomeStore s) =>
+    StoreOption(id: s.id, name: s.name, city: s.city);
+
 BankAccountSummary _bank(api.RiderBankAccount b) => BankAccountSummary(
   holderName: b.holderName,
   accountNumberMasked: b.accountNumberMasked,
@@ -132,7 +133,7 @@ RiderProfile profileFromApi(api.RiderProfile p) => RiderProfile(
   emergencyContactName: p.emergencyContactName,
   emergencyContactPhone: p.emergencyContactPhone,
   preferredStore: _store(p.preferredStore),
-  homeStore: p.homeStore == null ? null : _store(p.homeStore!),
+  homeStore: p.homeStore == null ? null : _homeStore(p.homeStore!),
   vehicleType: VehicleType.fromWire(p.vehicleType.value) ?? VehicleType.bicycle,
   vehicleNumber: p.vehicleNumber,
   rejectionReason: p.rejectionReason.isEmpty ? null : p.rejectionReason,
