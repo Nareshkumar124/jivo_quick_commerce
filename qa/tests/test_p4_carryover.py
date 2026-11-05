@@ -11,7 +11,7 @@ import pytest
 from p3_support import V_SUN_1L, money
 from qa_support import assert_error, db_query, describe
 
-R2 = pytest.mark.skip(reason="awaiting P4 R2 merge (seed variant JV-WG-PW-10S, FAKE_GATEWAY_DOWN)")
+
 
 
 def sachet_variant() -> int | None:
@@ -19,7 +19,6 @@ def sachet_variant() -> int | None:
     return rows[0][0] if rows else None
 
 
-@R2
 def test_p4_tc49_min_order_not_met(shop_a):
     """P4-TC-49 (ex P3-TC-26) One ₹45 sachet: the cart shows the MIN_ORDER_NOT_MET blocker with
     amount_to_min_order = min_order_value - item_total; `POST /orders/` (COD and ONLINE) is 422
@@ -36,7 +35,6 @@ def test_p4_tc49_min_order_not_met(shop_a):
     assert db_query("select count(*) from orders_order")[0][0] == before
 
 
-@R2
 @pytest.mark.profile_gwdown
 def test_p4_tc50_gateway_down(shop_a):
     """P4-TC-50 (ex P3-TC-63) With the fake gateway down: ONLINE placement is 503
@@ -49,3 +47,32 @@ def test_p4_tc50_gateway_down(shop_a):
     r = shop_a.place("COD", address_id=shop_a.address["id"])
     assert r.status_code == 201, describe(r)
     shop_a.cancel(r.json()["order"]["id"])
+
+
+@pytest.mark.profile_gwdown
+def test_p4_tc50b_verify_and_retry_gateway_down(api):
+    """P4-TC-50 (part b) A PAYMENT_PENDING order of QA user D, placed before the instance was
+    restarted with the gateway down: verify is 503 SERVICE_UNAVAILABLE (or the signature check
+    still passes locally and the order is placed: recorded either way), retry-payment is 503;
+    the order is never failed by the outage."""
+    from conftest import login
+    from p3_support import Shop, fake_id, checkout_signature
+    from qa_support import QA_PHONES
+
+    shop = Shop(api, login(QA_PHONES["d"]))
+    pending = [o for o in shop.api.get("/api/v1/orders/", headers=shop.h, params={"status": "active"}).json()["results"]
+               if o["status"] == "PAYMENT_PENDING"]
+    if not pending:
+        pytest.skip("no PAYMENT_PENDING order of user D (create one before starting the gwdown profile)")
+    oid = pending[0]["id"]
+    assert_error(shop.retry(oid), 503, "SERVICE_UNAVAILABLE")
+    rzp = db_query("select gateway_order_id from payments_payment where order_id=%s order by id desc limit 1", (oid,))[0][0]
+    pay = fake_id("pay_")
+    r = shop.api.post("/api/v1/payments/razorpay/verify/", headers=shop.h, json={
+        "order_id": oid, "razorpay_order_id": rzp, "razorpay_payment_id": pay,
+        "razorpay_signature": checkout_signature(rzp, pay)})
+    print("verify while gateway down:", r.status_code, r.text[:200])
+    assert r.status_code in (200, 503), describe(r)
+    if r.status_code == 503:
+        assert shop.order(oid).json()["status"] == "PAYMENT_PENDING"
+    shop.cancel(oid)

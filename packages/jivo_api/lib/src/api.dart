@@ -13,11 +13,14 @@ import 'package:jivo_api/src/api/addresses_api.dart';
 import 'package:jivo_api/src/api/auth_api.dart';
 import 'package:jivo_api/src/api/cart_api.dart';
 import 'package:jivo_api/src/api/catalog_api.dart';
+import 'package:jivo_api/src/api/cms_api.dart';
 import 'package:jivo_api/src/api/config_api.dart';
 import 'package:jivo_api/src/api/health_api.dart';
 import 'package:jivo_api/src/api/orders_api.dart';
 import 'package:jivo_api/src/api/payments_api.dart';
+import 'package:jivo_api/src/api/rider_api.dart';
 import 'package:jivo_api/src/api/serviceability_api.dart';
+import 'package:jivo_api/src/api/support_api.dart';
 
 class JivoApi {
   static const String basePath = r'http://localhost';
@@ -158,6 +161,12 @@ class JivoApi {
     return CatalogApi(dio);
   }
 
+  /// Get CmsApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  CmsApi getCmsApi() {
+    return CmsApi(dio);
+  }
+
   /// Get ConfigApi instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   ConfigApi getConfigApi() {
@@ -182,9 +191,21 @@ class JivoApi {
     return PaymentsApi(dio);
   }
 
+  /// Get RiderApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  RiderApi getRiderApi() {
+    return RiderApi(dio);
+  }
+
   /// Get ServiceabilityApi instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   ServiceabilityApi getServiceabilityApi() {
     return ServiceabilityApi(dio);
+  }
+
+  /// Get SupportApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  SupportApi getSupportApi() {
+    return SupportApi(dio);
   }
 }

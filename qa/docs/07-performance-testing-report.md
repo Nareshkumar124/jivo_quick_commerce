@@ -51,3 +51,9 @@ No dedicated P3 latency baseline yet: re-run `tools/perf_baseline.py` with the P
 - 5-way and 6-way parallel bursts (P3-TC-43/44/52) completed without 5xx, deadlock or lock timeout
 
 Real load (50 orders/min) belongs to Phase 8.
+
+## Phase 4 stage 1 (2026-11-04)
+Not measured: the P4 load-relevant paths are the console polls (TC-60), which are not merged. For reference only: a store action through the QA driver takes ~3 s, almost all of it Django start-up per process against the remote DB (~10 ms/query). That is not representative of the console.
+
+## Phase 4 stage 2 (2026-11-04, `f744508`)
+P4-TC-60, 20 sequential HTMX polls each against :8004 (remote DB): live-board columns (Ops) p50 253 ms, p95 278 ms; packing queues (Store Staff, GGN-01) p50 264 ms, p95 310 ms. Within the 10 s poll budget; not representative of production (remote DB, `runserver`). The fixed-query-count check is white-box (admin tests).

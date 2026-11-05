@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/platform_permissions_service.dart';
@@ -20,6 +21,41 @@ class DisclosureAccepted extends Notifier<bool> {
   bool build() => false;
 
   void accept() => state = true;
+}
+
+/// What the gate tells the rider after a step did not work out.
+@immutable
+class GateNotices {
+  const GateNotices({
+    this.alwaysNotChosen = false,
+    this.disclosureDeclined = false,
+  });
+
+  /// The rider came back from the "Allow all the time" request without
+  /// choosing it (Android 11+ opens the app's location settings page, where
+  /// "Allow only while using the app" is easy to keep). The gate then
+  /// explains what to choose and offers the app settings page.
+  final bool alwaysNotChosen;
+
+  /// The rider tapped "Not now" on the prominent disclosure. Nothing is
+  /// requested; the gate explains that going online needs location.
+  final bool disclosureDeclined;
+}
+
+final gateNoticesProvider = NotifierProvider<GateNoticesNotifier, GateNotices>(
+  GateNoticesNotifier.new,
+);
+
+class GateNoticesNotifier extends Notifier<GateNotices> {
+  @override
+  GateNotices build() => const GateNotices();
+
+  void set({bool? alwaysNotChosen, bool? disclosureDeclined}) {
+    state = GateNotices(
+      alwaysNotChosen: alwaysNotChosen ?? state.alwaysNotChosen,
+      disclosureDeclined: disclosureDeclined ?? state.disclosureDeclined,
+    );
+  }
 }
 
 final permissionsGateControllerProvider =
@@ -57,9 +93,23 @@ class PermissionsGateController extends AsyncNotifier<GateEvaluation> {
   /// next system request, so the disclosure immediately precedes it.
   Future<void> acceptDisclosure() async {
     ref.read(disclosureAcceptedProvider.notifier).accept();
+    ref.read(gateNoticesProvider.notifier).set(disclosureDeclined: false);
     final evaluation = await refresh();
     final next = evaluation.next;
     if (next != null && next.step != GateStep.disclosure) await fix(next);
+  }
+
+  /// The rider declined the disclosure: no location request is made (Play
+  /// policy), and going online stays blocked with an explanation.
+  void declineDisclosure() =>
+      ref.read(gateNoticesProvider.notifier).set(disclosureDeclined: true);
+
+  /// The app's settings page, where the rider picks Permissions › Location ›
+  /// "Allow all the time" by hand (the deep link Android allows; there is no
+  /// public intent for the location permission page itself).
+  Future<void> openLocationAlwaysSettings() async {
+    await _service.openAppSettings();
+    await refresh();
   }
 
   /// Runs the system request (or settings page) for [item]. The disclosure
@@ -79,6 +129,16 @@ class PermissionsGateController extends AsyncNotifier<GateEvaluation> {
           // disclosure was accepted in this session.
           if (!ref.read(disclosureAcceptedProvider)) return;
           await _service.requestLocationAlways();
+          final after = await refresh();
+          final notChosen = after.items.any(
+            (i) => i.step == GateStep.locationAlways && !i.done,
+          );
+          if (ref.mounted) {
+            ref
+                .read(gateNoticesProvider.notifier)
+                .set(alwaysNotChosen: notChosen);
+          }
+          return;
         case GateStep.notifications:
           await _service.requestNotifications();
         case GateStep.batteryOptimisation:

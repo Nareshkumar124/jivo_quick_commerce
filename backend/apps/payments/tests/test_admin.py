@@ -144,8 +144,13 @@ def test_read_only_even_for_superusers(client, data, model):
     assert client.post(change, {"_save": "Save"}).status_code == 403
     assert client.get(reverse(f"admin:payments_{model}_add")).status_code == 403
     assert client.get(reverse(f"admin:payments_{model}_delete", args=[obj.pk])).status_code == 403
-    changelist = client.get(reverse(f"admin:payments_{model}_changelist")).content.decode()
-    assert 'name="action"' not in changelist
+    response = client.get(reverse(f"admin:payments_{model}_changelist"))
+    if model == "refund" and response.context["action_form"] is not None:
+        # Phase 4 (T-401c): the only action is the service-backed retry; no bulk delete.
+        actions = [name for name, _ in response.context["action_form"].fields["action"].choices]
+        assert [name for name in actions if name] == ["retry_failed"]
+    else:
+        assert 'name="action"' not in response.content.decode()
 
 
 class TestGatewayData:

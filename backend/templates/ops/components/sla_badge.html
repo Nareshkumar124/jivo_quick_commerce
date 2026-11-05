@@ -1,0 +1,7 @@
+{# SLA badge + time text (design/system/components/ops-alert-banner-and-sla-badges.md, Part B). Context from the `sla_badge` tag: timer, label, icon, text, aria. The parent element carries data-sla-*; orders.js updates [data-badge] and [data-left] every second with the same rules. #}
+<span class="ops-sla" aria-label="{{ aria }}" data-sla-row>
+    <span class="ops-sla-badge" data-badge data-tone-badge="{{ timer.tone }}">
+        <span class="material-symbols-outlined" aria-hidden="true" data-badge-icon>{{ icon }}</span><span data-badge-label>{{ label }}</span>
+    </span>
+    <span class="ops-sla__time" role="timer" aria-live="off" {% if timer.deadline %}data-left{% else %}data-waiting{% endif %}>{{ text }}</span>
+</span>

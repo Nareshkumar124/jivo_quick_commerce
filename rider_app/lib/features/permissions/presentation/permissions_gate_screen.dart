@@ -44,7 +44,11 @@ class _PermissionsGateScreenState extends ConsumerState<PermissionsGateScreen> {
     }
     if (next.step == GateStep.disclosure) {
       final accepted = await context.push<bool>(Routes.disclosure);
-      if (accepted ?? false) await _controller.acceptDisclosure();
+      if (accepted ?? false) {
+        await _controller.acceptDisclosure();
+      } else {
+        _controller.declineDisclosure();
+      }
       return;
     }
     await _controller.fix(next);
@@ -54,14 +58,17 @@ class _PermissionsGateScreenState extends ConsumerState<PermissionsGateScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final gate = ref.watch(permissionsGateControllerProvider);
+    final notices = ref.watch(gateNoticesProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.permissionsTitle)),
       body: switch (gate) {
         AsyncData(:final value) => _GateBody(
           evaluation: value,
+          notices: notices,
           onPrimary: () => _onPrimary(value),
           onOpenAppSettings: _controller.openAppSettings,
+          onOpenLocationAlwaysSettings: _controller.openLocationAlwaysSettings,
           onOpenFullScreenIntentSettings:
               _controller.openFullScreenIntentSettings,
         ),
@@ -90,14 +97,18 @@ class _PermissionsGateScreenState extends ConsumerState<PermissionsGateScreen> {
 class _GateBody extends StatelessWidget {
   const _GateBody({
     required this.evaluation,
+    required this.notices,
     required this.onPrimary,
     required this.onOpenAppSettings,
+    required this.onOpenLocationAlwaysSettings,
     required this.onOpenFullScreenIntentSettings,
   });
 
   final GateEvaluation evaluation;
+  final GateNotices notices;
   final VoidCallback onPrimary;
   final VoidCallback onOpenAppSettings;
+  final VoidCallback onOpenLocationAlwaysSettings;
   final VoidCallback onOpenFullScreenIntentSettings;
 
   @override
@@ -119,6 +130,26 @@ class _GateBody extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 8),
+                if (next == null)
+                  const SizedBox.shrink()
+                else if (next.step == GateStep.disclosure &&
+                    notices.disclosureDeclined)
+                  _NoticeCard(
+                    key: const Key('gate-disclosure-declined'),
+                    title: l10n.disclosureDeclinedTitle,
+                    body: l10n.disclosureDeclinedBody,
+                  )
+                else if (next.step == GateStep.locationAlways &&
+                    !next.blocked &&
+                    notices.alwaysNotChosen)
+                  _NoticeCard(
+                    key: const Key('gate-always-not-chosen'),
+                    title: l10n.gateAlwaysNotChosenTitle,
+                    body: l10n.gateAlwaysNotChosenBody,
+                    action: l10n.gateOpenAppSettings,
+                    actionKey: const Key('gate-open-app-settings'),
+                    onAction: onOpenLocationAlwaysSettings,
+                  ),
                 for (final item in evaluation.items) _GateRow(item: item),
                 if (evaluation.fullScreenIntentMissing)
                   _AdvisoryCard(
@@ -163,6 +194,7 @@ class _GateBody extends StatelessWidget {
   static String _primaryLabel(AppLocalizations l10n, GateItem? next) {
     if (next == null) return l10n.done;
     if (next.blocked) return l10n.gateActionOpenSettings;
+    if (next.approximate) return l10n.gateActionLocationPrecise;
     return switch (next.step) {
       GateStep.disclosure => l10n.gateActionDisclosure,
       GateStep.locationWhenInUse => l10n.gateActionLocationWhenInUse,
@@ -190,7 +222,9 @@ class _GateRow extends StatelessWidget {
       ),
       GateStep.locationWhenInUse => (
         l10n.gateStepLocationWhenInUse,
-        l10n.gateStepLocationWhenInUseHint,
+        item.approximate
+            ? l10n.gateStepLocationPreciseHint
+            : l10n.gateStepLocationWhenInUseHint,
       ),
       GateStep.locationAlways => (
         l10n.gateStepLocationAlways,
@@ -218,6 +252,56 @@ class _GateRow extends StatelessWidget {
       title: Text(title),
       subtitle: item.done ? null : Text(hint),
       trailing: Text(status, style: TextStyle(color: color)),
+    );
+  }
+}
+
+/// Why the next step is still open, in the rider's terms, with the way out.
+class _NoticeCard extends StatelessWidget {
+  const _NoticeCard({
+    super.key,
+    required this.title,
+    required this.body,
+    this.action,
+    this.actionKey,
+    this.onAction,
+  });
+
+  final String title;
+  final String body;
+  final String? action;
+  final Key? actionKey;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      color: scheme.errorContainer,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(color: scheme.onErrorContainer),
+            ),
+            const SizedBox(height: 8),
+            Text(body, style: TextStyle(color: scheme.onErrorContainer)),
+            if (action != null) ...[
+              const SizedBox(height: 12),
+              OutlinedButton(
+                key: actionKey,
+                onPressed: onAction,
+                child: Text(action!),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

@@ -139,3 +139,18 @@
 | UAT-P4-13 | All | Short questionnaire: what was confusing, what is missing, would you use it on a shift | Feedback logged; the PM triages each item as bug, change request or training |
 
 **Mini-UAT exit:** UAT-P4-01…12 pass, or each failure is filed (bug or change request) and accepted by the PM.
+
+### 8.6 Stage 1 execution note (2026-11-04, `1b3552d`)
+Executed everything that does not need the Ops Console. Store actions were driven through the backend services (`qa/tools/store_ops_driver.py`) because admin P4 is not merged; the stage-2 run repeats the console-facing cases through the real pages. Profiles used: `local`, `gwdown`, `cancelplaced` (environment only). On Windows the instance is controlled by `qa/private/qa_instance.sh` (it kills only the PID on 8004).
+
+### 8.7 QA-only second store QA-02 (created 2026-11-04 for P4 stage 2, user-approved via the PM)
+Created on the shared DB **through the Django admin as Super Admin on :8004** (no direct writes): `qa/private/p4s2/create_qa02.py`, `qa02_pricing_stock.py`.
+- **DarkStore id 2**, code `QA-02`, name "QA-02 (test)", Jaipur (Rajasthan, 302001), location 26.9124, 75.7873; service area a ~4 km × 4.4 km box (75.77–75.81 E, 26.89–26.93 N). It does **not** intersect GGN-01's (Gurugram) area (`ST_Intersects` = false). Active, accepting orders, **auto-accept on** (P4-TC-36), invoice prefix `QA02`, timings 00:00–23:59 every day.
+- PricingConfig: the defaults (min 99, delivery 25 below 299, small cart 15 below 149, COD up to 2000).
+- Stock (admin "Stock inward", reason "QA-02 test stock (QA only)"): 10 each of JV-SUN-1L, JV-CAN-CP-1L, JV-FLAX-250, JV-WG-PW-10S.
+- Staff access: none. The seeded Store Manager / Store Staff stay GGN-01-only, which is what P4-TC-30 needs; global roles (Super, Ops, Support, Finance) see it through `stores_for`.
+- Checked black-box: serviceability at the Jaipur point → store 2, open; GGN-01's point → still store 1; a point outside both → not serviceable. `/products/` with `X-Store-Id: 2` lists 4 products.
+- Rules: only QA customers (+9190000001xx) order there; QA addresses there use Jaipur coordinates.
+
+### 8.8 Stage 2 execution note (2026-11-04, `f744508`)
+Console cases run through the real pages (`qa/tests/test_p4_console.py`, `p4_console.Ops`: HTMX headers + CSRF). QA-02 (store id 2) used for TC-30/36/12. The QA worker is started detached (`nohup`) by `p4_support.start_worker`, because a worker started as a child of pytest dies with the run on Windows.

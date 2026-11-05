@@ -1,15 +1,15 @@
 {# One dialog per page (included by ops/base.html), driven by the Alpine store "confirm" (ops.js). #}
 {# HTMX: hx-confirm="Question?" plus optional data-confirm-title, data-confirm-label, data-confirm-tone="danger". #}
-{# Plain forms: data-ops-confirm="Question?" on the <form>. #}
+{# Plain forms: data-ops-confirm="Question?" on the <form>. A danger confirmation opens with focus on Cancel (UX audit PC-03), so a stray Enter never confirms. #}
 <div class="ops-dialog-backdrop" x-data x-show="$store.confirm.open" x-cloak x-on:click.self="$store.confirm.cancel()"
      x-on:keydown.escape.window="$store.confirm.cancel()">
     <div class="ops-dialog bg-white border border-base-200 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800"
          role="alertdialog" aria-modal="true" aria-labelledby="ops-confirm-title" aria-describedby="ops-confirm-message"
-         x-effect="if ($store.confirm.open) $nextTick(() => $refs.accept.focus())">
+         x-effect="if ($store.confirm.open) $nextTick(() => ($store.confirm.tone === 'danger' ? $refs.cancel : $refs.accept).focus())">
         <h2 id="ops-confirm-title" class="font-semibold text-[15px] text-font-important-light dark:text-font-important-dark" x-text="$store.confirm.title"></h2>
         <p id="ops-confirm-message" class="mt-2" x-text="$store.confirm.message"></p>
         <div class="flex gap-2 justify-end mt-6">
-            <button type="button" class="ops-button ops-button--secondary" x-on:click="$store.confirm.cancel()">Cancel</button>
+            <button type="button" class="ops-button ops-button--secondary" x-ref="cancel" x-on:click="$store.confirm.cancel()">Cancel</button>
             <button type="button" class="ops-button" x-ref="accept" x-bind:class="{ 'ops-button--danger': $store.confirm.tone === 'danger' }"
                     x-on:click="$store.confirm.accept()" x-text="$store.confirm.label"></button>
         </div>

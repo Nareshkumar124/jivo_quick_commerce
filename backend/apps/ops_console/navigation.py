@@ -12,8 +12,8 @@ Showing a link is never the permission check: every target view and ModelAdmin e
 from dataclasses import dataclass
 from functools import partial
 
-from django.urls import reverse, reverse_lazy
-from django.utils.text import format_lazy
+from django.urls import NoReverseMatch, reverse
+from django.utils.functional import lazy
 
 ADMIN = "admin"
 OPS = "ops"
@@ -28,18 +28,40 @@ class NavItem:
     perms: tuple[str, ...] = ()
     query: str = ""
     surface: str = ADMIN  # ADMIN (/admin/) or OPS (/ops/)
+    # A 05 §3 capability (apps.ops_console.capabilities) instead of / on top of `perms`.
+    capability: str = ""
 
     def url(self) -> str:
         base = reverse(self.url_name)
         return f"{base}?{self.query}" if self.query else base
 
     def lazy_url(self):
-        base = reverse_lazy(self.url_name)
-        return format_lazy("{}?{}", base, self.query) if self.query else base
+        """For the unfold sidebar (built at settings time). A target that is not installed
+        resolves to "#"; `allowed()` hides such an item anyway."""
+        return lazy(self._url_or_hash, str)()
+
+    def _url_or_hash(self) -> str:
+        try:
+            return self.url()
+        except NoReverseMatch:
+            return "#"
+
+    def exists(self) -> bool:
+        """The target is installed (a module whose backend model is not merged yet is not)."""
+        try:
+            reverse(self.url_name)
+        except NoReverseMatch:
+            return False
+        return True
 
     def allowed(self, user) -> bool:
-        if not (user.is_active and user.is_staff):
+        if not (user.is_active and user.is_staff) or not self.exists():
             return False
+        if self.capability:
+            from apps.ops_console.capabilities import allowed
+
+            if not allowed(user, self.capability):
+                return False
         return not self.perms or any(user.has_perm(perm) for perm in self.perms)
 
 
@@ -148,6 +170,20 @@ MODULES: tuple[NavSection, ...] = (
         "Orders",
         (
             NavItem(
+                "Live order board",
+                "view_kanban",
+                "ops:live-board",
+                surface=OPS,
+                capability="live_board",
+            ),
+            NavItem(
+                "Packing console",
+                "package_2",
+                "ops:packing-index",
+                surface=OPS,
+                capability="packing",
+            ),
+            NavItem(
                 "Orders",
                 "receipt",
                 "admin:orders_order_changelist",
@@ -239,6 +275,18 @@ MODULES: tuple[NavSection, ...] = (
                 "lock_person",
                 "admin:axes_accessattempt_changelist",
                 ("axes.view_accessattempt",),
+            ),
+            NavItem(
+                "Audit log",
+                "history",
+                "admin:core_auditlog_changelist",
+                ("core.view_auditlog",),
+            ),
+            NavItem(
+                "Admin history",
+                "manage_history",
+                "admin:admin_logentry_changelist",
+                capability="audit_log",
             ),
             NavItem(
                 "Scheduled jobs",

@@ -21,7 +21,7 @@ import pytest
 from p3_support import V_CANOLA_1L, V_MUSTARD_1L, V_PUMPKIN, V_SUN_1L, captured_event, fake_id, send_webhook, stock
 from qa_support import STORE_HEADERS, assert_error, db_query, describe, validate_response
 
-R2 = pytest.mark.skip(reason="awaiting P4 R2 merge")
+
 ORDER_FIELDS_P4 = {"timeline", "cancellation", "amount_refunded", "refunds", "can_download_invoice"}
 CUSTOMER_LABELS = {  # 08 §1
     "PAYMENT_PENDING": "Completing payment",
@@ -101,10 +101,9 @@ def test_p4_tc14a_order_endpoints_need_auth(api):
     assert_error(api.post("/api/v1/orders/1/cancel/", json={"reason": "OTHER"}), 401, "AUTH_REQUIRED")
 
 
-# --------------------------------------------------------------------------- awaiting R2
+# --------------------------------------------------------------------------- P4 R2 (merged in develop 74f47d1)
 
 
-@R2
 @pytest.mark.smoke
 def test_p4_tc01_order_detail_p4_shape(shop_a):
     """P4-TC-01 🔥 Order detail of a fresh ONLINE order and of a paid one: strict P4 schema;
@@ -125,7 +124,6 @@ def test_p4_tc01_order_detail_p4_shape(shop_a):
     assert all(line["quantity_unavailable"] == 0 for line in body["items"])
 
 
-@R2
 @pytest.mark.smoke
 def test_p4_tc02_cancel_cod_placed(shop_a):
     """P4-TC-02 🔥 T11 on a COD order in PLACED: 200 CANCELLED; cancellation {reason, message,
@@ -145,7 +143,6 @@ def test_p4_tc02_cancel_cod_placed(shop_a):
     assert refund_rows(o["id"]) == []
 
 
-@R2
 @pytest.mark.smoke
 def test_p4_tc03_cancel_paid_online_full_refund(shop_a):
     """P4-TC-03 🔥 T11 on a paid ONLINE order: one full refund (reason ORDER_CANCELLED) to the
@@ -167,7 +164,6 @@ def test_p4_tc03_cancel_paid_online_full_refund(shop_a):
     assert len(refund_rows(o["id"])) == 1
 
 
-@R2
 def test_p4_tc06_parallel_cancel_one_refund(shop_a):
     """P4-TC-06 The same paid order cancelled 5× in parallel: exactly one 200, the others 409;
     exactly one Refund row; the reservation released once."""
@@ -180,7 +176,6 @@ def test_p4_tc06_parallel_cancel_one_refund(shop_a):
     assert stock(V_SUN_1L) == before
 
 
-@R2
 @pytest.mark.smoke
 def test_p4_tc07b_cancel_idor_placed(shop_a, shop_b):
     """P4-TC-07 🔥 (part b) User B cancels user A's PLACED COD order: 404; A's order stays
@@ -191,7 +186,6 @@ def test_p4_tc07b_cancel_idor_placed(shop_a, shop_b):
     assert shop_a.cancel(o["id"]).status_code == 200
 
 
-@R2
 @pytest.mark.smoke
 def test_p4_tc11_reorder_idempotent(shop_a):
     """P4-TC-11 🔥 Reorder a past order: 200 ReorderResult; each line raised to the ordered
@@ -204,15 +198,14 @@ def test_p4_tc11_reorder_idempotent(shop_a):
     r1 = shop_a.api.post(f"/api/v1/orders/{o['id']}/reorder/", headers=shop_a.h)
     validate_response(r1, "orders_reorder")
     assert r1.status_code == 200, describe(r1)
-    lines = {line["variant_id"]: line["quantity"] for line in r1.json()["cart"]["items"]}
+    lines = {line["variant"]["id"]: line["quantity"] for line in r1.json()["cart"]["items"]}
     assert lines == {V_SUN_1L: 2, V_CANOLA_1L: 1}
     assert r1.json()["added_count"] == 2 and r1.json()["unavailable"] == []
     r2 = shop_a.api.post(f"/api/v1/orders/{o['id']}/reorder/", headers=shop_a.h)
-    assert {line["variant_id"]: line["quantity"] for line in r2.json()["cart"]["items"]} == lines
+    assert {line["variant"]["id"]: line["quantity"] for line in r2.json()["cart"]["items"]} == lines
     assert stock(V_SUN_1L)[1] == reserved
 
 
-@R2
 def test_p4_tc12_reorder_unavailable_lines(shop_a):
     """P4-TC-12 Reorder of an order whose lines are now out of stock / not sold at the store:
     `unavailable` lists them with OUT_OF_STOCK / NOT_AVAILABLE and added_quantity 0; the
@@ -233,7 +226,6 @@ def test_p4_tc12_reorder_unavailable_lines(shop_a):
     assert reasons.get(V_PUMPKIN, "NOT_AVAILABLE") == "NOT_AVAILABLE"
 
 
-@R2
 @pytest.mark.smoke
 def test_p4_tc14b_reorder_invoice_idor_and_headers(api, shop_a, shop_b):
     """P4-TC-14 🔥 (part b) Reorder and invoice of another user's order: 404; reorder without
@@ -251,7 +243,6 @@ def test_p4_tc14b_reorder_invoice_idor_and_headers(api, shop_a, shop_b):
         shop_a.cancel(o["id"])
 
 
-@R2
 def test_p4_tc15_invoice_not_delivered(shop_a):
     """P4-TC-15 Invoice of an order that is not DELIVERED: 409 INVALID_STATE_TRANSITION
     {status}; can_download_invoice false."""
@@ -264,7 +255,6 @@ def test_p4_tc15_invoice_not_delivered(shop_a):
         shop_a.cancel(o["id"])
 
 
-@R2
 def test_p4_tc18_list_after_cancel(shop_a):
     """P4-TC-18 A cancelled order is in `?status=past`, not `active`; the summary validates
     strictly against the P4 schema."""
@@ -277,7 +267,6 @@ def test_p4_tc18_list_after_cancel(shop_a):
     assert o["id"] not in [x["id"] for x in active]
 
 
-@R2
 def test_p4_tc59_paid_cancel_refund_then_late_webhook(api, shop_a):
     """P4-TC-59 E2E (API part) Paid ONLINE order cancelled by the customer; a `payment.captured`
     webhook for the same capture afterwards adds no second refund; the refund settles once."""
@@ -288,3 +277,144 @@ def test_p4_tc59_paid_cancel_refund_then_late_webhook(api, shop_a):
     send_webhook(api, captured_event(pay[0], pay[1], amount), event_id=fake_id("evt_"))
     assert len(refund_rows(o["id"])) == 1
     assert wait_refunded(shop_a, o["id"])["payment_status"] == "REFUNDED"
+
+
+# --------------------------------------------------------------------------- with store actions
+# Staff steps go through the backend services (p4_support.ops) until the Ops Console merges.
+
+from p4_support import MANAGER, STAFF, op, ops  # noqa: E402
+
+
+@pytest.mark.parametrize("method", ["ONLINE", "COD"])
+def test_p4_tc04_cancel_in_accepted(shop_a, method):
+    """P4-TC-04 The store accepts (T6), then the customer cancels in ACCEPTED (T11): 200
+    CANCELLED, cancelled_by customer; ONLINE: one full refund; COD: nothing due (FAILED)."""
+    before = stock(V_SUN_1L)
+    o = paid_online(shop_a) if method == "ONLINE" else cod_order(shop_a)
+    assert op(op="accept", **{"as": STAFF}, order_id=o["id"])["ok"]
+    r = shop_a.cancel(o["id"])
+    assert r.status_code == 200, describe(r)
+    body = r.json()
+    assert body["status"] == "CANCELLED" and body["cancellation"]["cancelled_by"] == "customer"
+    if method == "ONLINE":
+        assert [x["amount"] for x in body["refunds"]] == [o["bill"]["grand_total"]]
+        assert wait_refunded(shop_a, o["id"])["payment_status"] == "REFUNDED"
+    else:
+        assert body["refunds"] == [] and body["payment_status"] == "FAILED"
+    assert stock(V_SUN_1L) == before
+
+
+@pytest.mark.smoke
+@pytest.mark.parametrize("state", ["PACKING", "PACKED"])
+def test_p4_tc05_cancel_refused_from_packing(shop_a, state):
+    """P4-TC-05 🔥 Customer cancel in PACKING / PACKED: 409 INVALID_STATE_TRANSITION {status};
+    can_cancel false; nothing released or refunded. Cleanup: the Store Manager cancels (T12)."""
+    o = paid_online(shop_a)
+    steps = [{"op": "accept", "as": STAFF, "order_id": o["id"]}, {"op": "start_packing", "as": STAFF, "order_id": o["id"]}]
+    if state == "PACKED":
+        steps.append({"op": "packed", "as": STAFF, "order_id": o["id"]})
+    assert all(x["ok"] for x in ops(*steps))
+    reserved = stock(V_SUN_1L)
+    try:
+        err = assert_error(shop_a.cancel(o["id"]), 409, "INVALID_STATE_TRANSITION")
+        assert err["details"] == {"status": state}
+        body = shop_a.order(o["id"]).json()
+        assert body["status"] == state and body["can_cancel"] is False and body["refunds"] == []
+        assert stock(V_SUN_1L) == reserved
+    finally:
+        assert op(op="cancel", **{"as": MANAGER}, order_id=o["id"], reason="OTHER_STAFF")["ok"]
+
+
+def test_p4_tc09_cancel_vs_start_packing_race(shop_a):
+    """P4-TC-09 Customer cancel and staff Start packing at the same instant, 3 rounds: either
+    CANCELLED (+1 refund, start packing refused) or PACKING (cancel 409, no refund); never both."""
+    import threading
+
+    outcomes = []
+    for _ in range(3):
+        o = paid_online(shop_a)
+        assert op(op="accept", **{"as": STAFF}, order_id=o["id"])["ok"]
+        res = {}
+        # The driver needs ~3 s to boot Django; start it first and fire the cancel when it is up.
+        t = threading.Thread(target=lambda: res.setdefault("pack", op(op="start_packing", **{"as": STAFF}, order_id=o["id"])))
+        t.start()
+        time.sleep(2.6)
+        res["cancel"] = shop_a.cancel(o["id"])
+        t.join()
+        final = shop_a.order(o["id"]).json()
+        n_ref = len(refund_rows(o["id"]))
+        if res["cancel"].status_code == 200:
+            assert not res["pack"]["ok"] and final["status"] == "CANCELLED" and n_ref == 1
+            outcomes.append("cancelled")
+        else:
+            assert res["cancel"].status_code == 409 and res["pack"]["ok"] and final["status"] == "PACKING" and n_ref == 0
+            outcomes.append("packing")
+            op(op="cancel", **{"as": MANAGER}, order_id=o["id"], reason="OTHER_STAFF")
+    print("race outcomes", outcomes)
+
+
+@pytest.mark.profile_cancelplaced
+def test_p4_tc10_cancel_until_placed(shop_a):
+    """P4-TC-10 Instance with CUSTOMER_CANCEL_UNTIL=PLACED: can_cancel true in PLACED, false in
+    ACCEPTED, and the customer cancel in ACCEPTED is 409."""
+    o = cod_order(shop_a)
+    assert shop_a.order(o["id"]).json()["can_cancel"] is True
+    assert op(op="accept", **{"as": STAFF}, order_id=o["id"])["ok"]
+    try:
+        assert shop_a.order(o["id"]).json()["can_cancel"] is False
+        err = assert_error(shop_a.cancel(o["id"]), 409, "INVALID_STATE_TRANSITION")
+        assert err["details"] == {"status": "ACCEPTED"}
+    finally:
+        op(op="cancel", **{"as": MANAGER}, order_id=o["id"], reason="OTHER_STAFF")
+
+
+def test_p4_tc13_reorder_keeps_larger_cart_line(shop_a):
+    """P4-TC-13 Reorder when the cart already holds more units of a line: that line is left as
+    it is (never lowered, never added on top); the other line is raised to the ordered units."""
+    o = cod_order(shop_a, {V_SUN_1L: 1, V_CANOLA_1L: 1})
+    shop_a.cancel(o["id"])
+    shop_a.clear()
+    assert shop_a.set_qty(V_SUN_1L, 3).status_code == 200
+    r = shop_a.api.post(f"/api/v1/orders/{o['id']}/reorder/", headers=shop_a.h)
+    assert r.status_code == 200, describe(r)
+    lines = {line["variant"]["id"]: line["quantity"] for line in r.json()["cart"]["items"]}
+    assert lines == {V_SUN_1L: 3, V_CANOLA_1L: 1}
+    assert r.json()["added_count"] == 2
+
+
+def test_p4_tc12b_reorder_out_of_and_limited_stock(shop_a, shop_b):
+    """P4-TC-12 (b) Without any stock change: Olive 5L (on_hand 2, max 2). A orders 2 (unpaid,
+    then cancelled, T5). B's unpaid order holds 2 → A's reorder: OUT_OF_STOCK, added 0, the
+    other line (Sun) added. B holds 1 → LIMITED_STOCK, added_quantity 1. Reorder never reserves.
+    (NOT_AVAILABLE needs a variant delisted at the store: QA-owned store / staging.)"""
+    V_OLIVE_5L = 6
+    if stock(V_OLIVE_5L)[0] - stock(V_OLIVE_5L)[1] < 2:
+        pytest.skip("Olive 5L not fully available right now")
+    shop_a.fill({V_OLIVE_5L: 2, V_SUN_1L: 1}, address_id=shop_a.address["id"])
+    r = shop_a.place("ONLINE", address_id=shop_a.address["id"])
+    assert r.status_code == 201, describe(r)
+    oid = r.json()["order"]["id"]
+    assert shop_a.cancel(oid).status_code == 200
+    try:
+        for held, reason, added in ((2, "OUT_OF_STOCK", 0), (1, "LIMITED_STOCK", 1)):
+            shop_b.fill({V_OLIVE_5L: held}, address_id=shop_b.address["id"])
+            rb = shop_b.place("ONLINE", address_id=shop_b.address["id"])
+            assert rb.status_code == 201, describe(rb)
+            shop_a.clear()
+            reserved = stock(V_OLIVE_5L)[1]
+            ra = shop_a.api.post(f"/api/v1/orders/{oid}/reorder/", headers=shop_a.h)
+            validate_response(ra, "orders_reorder")
+            assert ra.status_code == 200, describe(ra)
+            body = ra.json()
+            issues = {i["variant_id"]: i for i in body["unavailable"]}
+            assert set(issues) == {V_OLIVE_5L}, body["unavailable"]
+            assert issues[V_OLIVE_5L]["reason"] == reason and issues[V_OLIVE_5L]["added_quantity"] == added
+            assert issues[V_OLIVE_5L]["requested_quantity"] == 2
+            cart = {line["variant"]["id"]: line["quantity"] for line in body["cart"]["items"]}
+            assert cart.get(V_SUN_1L) == 1 and cart.get(V_OLIVE_5L, 0) == added
+            assert body["added_count"] == (2 if added else 1)
+            assert stock(V_OLIVE_5L)[1] == reserved
+            assert shop_b.cancel(rb.json()["order"]["id"]).status_code == 200
+    finally:
+        shop_b.cancel_pending()
+        shop_a.clear()

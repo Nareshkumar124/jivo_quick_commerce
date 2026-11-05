@@ -1,4 +1,9 @@
-from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
+from django.core.validators import (
+    MaxLengthValidator,
+    MaxValueValidator,
+    MinValueValidator,
+    RegexValidator,
+)
 from django.db import models
 
 from apps.accounts.choices import AppName, Platform
@@ -40,8 +45,29 @@ class AppConfig(TimeStampedModel):
             "released (01 §5, 08 T4). Applies to orders placed after a change."
         ),
     )
-    rider_location_active_interval_seconds = models.PositiveSmallIntegerField(default=10)
-    rider_location_idle_interval_seconds = models.PositiveSmallIntegerField(default=30)
+    # Rider location (04 §3, api-requests #2): upload ("interval") and sampling periods while on
+    # a task ("active") and while online and idle, and the largest batch the server accepts.
+    rider_location_active_interval_seconds = models.PositiveSmallIntegerField(
+        default=10, validators=[MinValueValidator(5), MaxValueValidator(60)]
+    )
+    rider_location_idle_interval_seconds = models.PositiveSmallIntegerField(
+        default=30, validators=[MinValueValidator(10), MaxValueValidator(300)]
+    )
+    rider_location_active_sample_seconds = models.PositiveSmallIntegerField(
+        default=5,
+        validators=[MinValueValidator(1), MaxValueValidator(60)],
+        help_text="How often the rider app takes a GPS fix on a task (<= the upload interval).",
+    )
+    rider_location_idle_sample_seconds = models.PositiveSmallIntegerField(
+        default=30,
+        validators=[MinValueValidator(5), MaxValueValidator(300)],
+        help_text="How often the rider app takes a GPS fix while idle (<= the upload interval).",
+    )
+    rider_location_max_batch = models.PositiveSmallIntegerField(
+        default=50,
+        validators=[MinValueValidator(10), MaxValueValidator(200)],
+        help_text="Most points the app may send in one `POST /rider/locations/` request.",
+    )
     feature_flags = models.JSONField(
         default=dict, blank=True, help_text='Name -> true/false, e.g. {"new_home": true}.'
     )
@@ -57,6 +83,22 @@ class AppConfig(TimeStampedModel):
 
     def __str__(self) -> str:
         return "App configuration"
+
+    def clean(self) -> None:
+        super().clean()
+        from django.core.exceptions import ValidationError
+
+        errors = {}
+        if self.rider_location_active_sample_seconds > self.rider_location_active_interval_seconds:
+            errors["rider_location_active_sample_seconds"] = (
+                "Must not be longer than the active upload interval."
+            )
+        if self.rider_location_idle_sample_seconds > self.rider_location_idle_interval_seconds:
+            errors["rider_location_idle_sample_seconds"] = (
+                "Must not be longer than the idle upload interval."
+            )
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs) -> None:
         self.pk = SINGLETON_ID
@@ -105,3 +147,88 @@ class AppVersionPolicy(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.app} / {self.platform}"
+
+
+# --------------------------------------------------------------------------- P7: pages and FAQs
+
+PAGE_SLUGS = ("about", "terms", "privacy", "refund-policy")
+FAQ_ANSWER_MAX_LENGTH = 2000
+
+_html_tag = RegexValidator(
+    regex=r"<\s*[a-zA-Z/!]",
+    inverse_match=True,
+    message="Plain text only: the apps show this as text, so remove the HTML tags.",
+)
+
+
+class Page(TimeStampedModel):
+    """A static page served by `GET /api/v1/pages/{slug}/` (07 §2.9, 03 §2.11).
+
+    `body_html` is sanitised to the allow-list in `apps.cms.html` on every save, so whatever the
+    admin's rich-text editor sends, only safe markup is stored and served.
+    """
+
+    slug = models.SlugField(
+        max_length=60,
+        unique=True,
+        help_text="URL name the apps ask for: about, terms, privacy, refund-policy.",
+    )
+    title = models.CharField(max_length=120)
+    body_html = models.TextField(
+        help_text=(
+            "Headings, paragraphs, lists, quotes, bold/italic and https/mailto/tel links only. "
+            "Anything else is removed when the page is saved."
+        )
+    )
+    is_published = models.BooleanField(
+        default=True, help_text="Unpublished pages answer 404 in the apps."
+    )
+
+    class Meta:
+        ordering = ["slug"]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def save(self, *args, **kwargs) -> None:
+        from apps.cms.html import sanitize_html
+
+        self.body_html = sanitize_html(self.body_html)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "body_html" not in update_fields:
+            kwargs["update_fields"] = [*update_fields, "body_html"]
+        super().save(*args, **kwargs)
+
+
+class FAQ(TimeStampedModel):
+    """One question and answer for an app's help screen (07 §2.9).
+
+    The apps group entries by `category`, in display order: categories by their smallest
+    `sort_order`, entries by `sort_order`.
+    """
+
+    app = models.CharField(max_length=16, choices=AppName.choices)
+    category = models.CharField(
+        max_length=60, help_text='Heading shown in the app, e.g. "Orders", "Payments & refunds".'
+    )
+    question = models.CharField(max_length=300, validators=[_html_tag])
+    answer = models.TextField(
+        validators=[
+            _html_tag,
+            MaxLengthValidator(FAQ_ANSWER_MAX_LENGTH),
+        ],
+        help_text="Plain text (no HTML). Line breaks are kept.",
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "FAQ"
+        verbose_name_plural = "FAQs"
+        ordering = ["app", "sort_order", "id"]
+        indexes = [
+            models.Index(fields=["app", "is_active", "sort_order"], name="cms_faq_app_order")
+        ]
+
+    def __str__(self) -> str:
+        return self.question

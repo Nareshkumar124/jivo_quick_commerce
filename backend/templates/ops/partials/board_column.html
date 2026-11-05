@@ -1,0 +1,42 @@
+{% load ops %}
+{# One live-board column. Context: column (board.Column), board, caps, actions. Cards carry no customer data (05 §1.2). #}
+<section class="ops-board__col bg-base-50 border border-base-200 rounded-default dark:border-base-800"
+         aria-labelledby="col-{{ column.code }}" data-testid="column-{{ column.code }}">
+    <header class="flex items-center gap-2 px-3 py-2 border-b border-base-200 dark:border-base-800">
+        <h3 id="col-{{ column.code }}" class="font-semibold text-font-important-light dark:text-font-important-dark">{{ column.title }}</h3>
+        <span class="ml-auto ops-count-pill" data-testid="count-{{ column.code }}">{{ column.count }}</span>
+        {% if column.late %}<span class="ops-count-pill ops-count-pill--late" data-testid="late-{{ column.code }}"><span class="material-symbols-outlined md-18" aria-hidden="true">alarm</span>{{ column.late }} late</span>{% endif %}
+    </header>
+    <div class="flex flex-col gap-2 p-2">
+        {% for card in column.cards %}
+            {% with order=card.order timer=card.timer %}
+                <article class="ops-order-card bg-white border border-base-200 rounded-default p-3 dark:bg-base-900 dark:border-base-800"
+                         data-tone="{{ timer.tone }}" data-sla-start="{{ timer.start|iso }}"
+                         data-sla-deadline="{{ timer.deadline|iso }}" data-sla-warn="{{ timer.warn_at|iso }}"
+                         data-testid="card-{{ order.order_number }}">
+                    <div class="flex items-center gap-2">
+                        <a class="font-semibold text-primary-600 dark:text-primary-500" href="{% url 'admin:orders_order_change' order.pk %}">{{ order.order_number }}</a>
+                        <span class="ml-auto text-xs" title="{{ order.store.name }}">{{ order.store.code }}</span>
+                    </div>
+                    <div class="mt-1" data-testid="badge-{{ order.order_number }}">{% sla_badge timer board.generated_at %}</div>
+                    <div class="flex flex-wrap items-center gap-2 mt-1 ops-card-body">
+                        <span>{{ card.units }} item{{ card.units|pluralize }}</span>
+                        <span>{% if order.payment_method == "COD" %}Cash on delivery{% else %}Paid online{% endif %}</span>
+                        {% status_badge "order_payment" order.payment_status %}
+                    </div>
+                    {% if caps.cancel_order and actions.cancel and card.cancellable %}
+                        <div class="flex gap-2 mt-2">
+                            <button type="button" class="ops-button ops-button--outline-danger" x-data data-testid="cancel-{{ order.order_number }}"
+                                    x-on:click="$store.cancelOrder.ask('{% url 'ops:board-cancel' order.pk %}', '{{ order.order_number }}')">Cancel</button>
+                        </div>
+                    {% endif %}
+                </article>
+            {% endwith %}
+        {% empty %}
+            <p class="px-1 py-4 text-center text-xs text-font-subtle-light dark:text-font-subtle-dark">No orders</p>
+        {% endfor %}
+        {% if column.hidden %}
+            <p class="px-1 text-xs text-font-subtle-light dark:text-font-subtle-dark" data-testid="hidden-{{ column.code }}">+ {{ column.hidden }} more (oldest first). <a class="text-primary-600 dark:text-primary-500" href="{% url 'admin:orders_order_changelist' %}?status__exact={{ column.code }}">See all</a></p>
+        {% endif %}
+    </div>
+</section>
