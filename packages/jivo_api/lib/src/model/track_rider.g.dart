@@ -9,7 +9,7 @@ part of 'track_rider.dart';
 abstract class _$TrackRiderCWProxy {
   TrackRider name(String name);
 
-  TrackRider phone(String phone);
+  TrackRider phone(String? phone);
 
   TrackRider photo(String? photo);
 
@@ -27,7 +27,7 @@ abstract class _$TrackRiderCWProxy {
   /// ````
   TrackRider call({
     String name,
-    String phone,
+    String? phone,
     String? photo,
     double? lat,
     double? lng,
@@ -45,7 +45,7 @@ class _$TrackRiderCWProxyImpl implements _$TrackRiderCWProxy {
   TrackRider name(String name) => this(name: name);
 
   @override
-  TrackRider phone(String phone) => this(phone: phone);
+  TrackRider phone(String? phone) => this(phone: phone);
 
   @override
   TrackRider photo(String? photo) => this(photo: photo);
@@ -82,7 +82,7 @@ class _$TrackRiderCWProxyImpl implements _$TrackRiderCWProxy {
       phone: phone == const $CopyWithPlaceholder()
           ? _value.phone
           // ignore: cast_nullable_to_non_nullable
-          : phone as String,
+          : phone as String?,
       photo: photo == const $CopyWithPlaceholder()
           ? _value.photo
           // ignore: cast_nullable_to_non_nullable
@@ -128,7 +128,7 @@ TrackRider _$TrackRiderFromJson(Map<String, dynamic> json) =>
       );
       final val = TrackRider(
         name: $checkedConvert('name', (v) => v as String),
-        phone: $checkedConvert('phone', (v) => v as String),
+        phone: $checkedConvert('phone', (v) => v as String?),
         photo: $checkedConvert('photo', (v) => v as String?),
         lat: $checkedConvert('lat', (v) => (v as num?)?.toDouble()),
         lng: $checkedConvert('lng', (v) => (v as num?)?.toDouble()),

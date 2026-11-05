@@ -77,6 +77,8 @@ Future<void> driveAcceptToReturn(
   await tester.tap(_key('fail-CUSTOMER_REFUSED'));
   await pumpFor(tester, const Duration(milliseconds: 300));
   await ride.tap('fail-submit');
+  // Confirm "Return the order to the store?" (fail-and-return.md §1.1).
+  await ride.tap('fail-confirm-yes');
   expect(find.text('Return to store'), findsOneWidget);
   expect(h.tasks.calls, isNot(contains(startsWith('deliver'))));
 
@@ -147,6 +149,7 @@ class _Ride {
       await tap('fake-scan-${FakeTaskBackend.pickupCode}');
     } else {
       await tester.enterText(_key('pickup-code'), FakeTaskBackend.pickupCode);
+      await tester.pump();
       await tap('task-pickup');
     }
     expect(find.text('Deliver to the customer'), findsOneWidget);

@@ -60,10 +60,16 @@ abstract final class Routes {
     profile,
   ].any((root) => location == root || location.startsWith('$root/'));
 
-  // Dev flavor only (Phase 0 spike).
-  /// Permissions gate (04 §2.1). Becomes the go-online guard in P5.
+  /// Permissions gate (04 §2.1, screen 7) and the prominent location
+  /// disclosure: the go-online guard. ACTIVE riders reach it from home (and
+  /// during a task, if a permission was revoked).
   static const permissions = '/permissions';
   static const disclosure = '/permissions/disclosure';
+
+  static bool isPermissionsRoute(String location) =>
+      location == permissions || location.startsWith('$permissions/');
+
+  // Dev flavor only (Phase 0 spike).
   static const locationDebug = '/dev/location';
   static const offerPreview = '/dev/offer-preview';
 

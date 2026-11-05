@@ -135,6 +135,7 @@ class RiderTask {
     this.customer,
     this.dropLocality,
     this.codAmountDue,
+    this.codAmountChangedFrom,
     this.payout,
     this.distanceKm,
     this.arrivedCustomerAt,
@@ -159,6 +160,15 @@ class RiderTask {
   /// COD: the exact amount to collect (`"249.00"`). Never computed here.
   final String? codAmountDue;
 
+  /// COD: the amount the rider was offered, when the store changed the
+  /// order afterwards (an item unavailable, 08 T8a). Shown as "Amount
+  /// changed: collect ₹X (was ₹Y)" (UX audit RD-03). Both values are the
+  /// server's; the app only compares the strings for display.
+  ///
+  /// TODO(api): the backend is adding the previous amount to the task
+  /// (audit "APIs required" #1; name to confirm).
+  final String? codAmountChangedFrom;
+
   /// The rider's pay for this order (estimate before delivery, earned after).
   final String? payout;
   final String? distanceKm;
@@ -182,6 +192,8 @@ class RiderTask {
     int? otpAttemptsRemaining,
     bool? otpLocked,
     CodQr? codQr,
+    String? codAmountDue,
+    String? codAmountChangedFrom,
   }) => RiderTask(
     id: id,
     status: status ?? this.status,
@@ -192,7 +204,8 @@ class RiderTask {
     items: items,
     customer: customer,
     dropLocality: dropLocality,
-    codAmountDue: codAmountDue,
+    codAmountDue: codAmountDue ?? this.codAmountDue,
+    codAmountChangedFrom: codAmountChangedFrom ?? this.codAmountChangedFrom,
     payout: payout,
     distanceKm: distanceKm,
     arrivedCustomerAt: arrivedCustomerAt ?? this.arrivedCustomerAt,

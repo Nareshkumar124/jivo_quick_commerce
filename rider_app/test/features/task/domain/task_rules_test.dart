@@ -9,18 +9,62 @@ void main() {
   final cod = backend.newTask(cod: true, status: TaskStatus.atCustomer);
   final prepaid = backend.newTask(status: TaskStatus.atCustomer);
 
-  group('formatRupees (display only, never parsed)', () {
-    test('Indian grouping, the server\'s decimals unchanged', () {
-      expect(formatRupees('249.00'), '₹249.00');
-      expect(formatRupees('1249.00'), '₹1,249.00');
+  group('formatRupees (03 §4 rule, RD-02; display only)', () {
+    test('en_IN grouping, paise only when not zero', () {
+      expect(formatRupees('249.00'), '₹249');
+      expect(formatRupees('1249.00'), '₹1,249');
       expect(formatRupees('12345.50'), '₹12,345.50');
-      expect(formatRupees('1234567.00'), '₹12,34,567.00');
-      expect(formatRupees('0.5'), '₹0.5');
+      expect(formatRupees('1234567.00'), '₹12,34,567');
+      expect(formatRupees('0.5'), '₹0.50');
       expect(formatRupees('45'), '₹45');
+      expect(formatRupees('-20.00'), '-₹20');
     });
 
-    test('anything unexpected is shown as sent', () {
-      expect(formatRupees('abc'), '₹abc');
+    test('a malformed amount is never shown with a bare ₹', () {
+      expect(formatRupees('abc'), 'abc');
+      expect(formatRupees(''), '');
+      expect(tryFormatRupees(null), isNull);
+      expect(tryFormatRupees(''), isNull);
+      expect(tryFormatRupees('12.345'), isNull);
+      // 20 digits from a broken server value: null, never an overflow.
+      expect(tryFormatRupees('12345678901234567890.00'), isNull);
+      expect(isSameAmount('12345678901234567890', '1'), isFalse);
+      expect(tryFormatRupees('100000000000000.00'), '₹10,00,00,00,00,00,000');
+    });
+
+    test('isSameAmount compares server strings', () {
+      expect(isSameAmount('20', '20.00'), isTrue);
+      expect(isSameAmount('20.5', '20.50'), isTrue);
+      expect(isSameAmount('20.00', '19.99'), isFalse);
+      expect(isSameAmount('x', 'x'), isFalse);
+    });
+  });
+
+  group('COD amount display (RD-02, RD-03)', () {
+    test('codAmountText: the due amount, or null when it is missing', () {
+      expect(codAmountText(cod), formatRupees(FakeTaskBackend.codAmount));
+      expect(codAmountText(prepaid), isNull);
+      final missing = backend.newTask(cod: true, status: TaskStatus.atCustomer);
+      expect(
+        codAmountText(_withoutAmount(missing)),
+        isNull,
+        reason: 'never a bare ₹',
+      );
+    });
+
+    test('codAmountWasText only when the amount really changed', () {
+      expect(codAmountWasText(cod), isNull);
+      final changed = cod.copyWith(
+        codAmountDue: '990.00',
+        codAmountChangedFrom: '1240.00',
+      );
+      expect(codAmountWasText(changed), '₹1,240');
+      expect(codAmountText(changed), '₹990');
+      final same = cod.copyWith(
+        codAmountDue: '990.00',
+        codAmountChangedFrom: '990',
+      );
+      expect(codAmountWasText(same), isNull);
     });
   });
 
@@ -153,3 +197,14 @@ void main() {
     });
   });
 }
+
+RiderTask _withoutAmount(RiderTask t) => RiderTask(
+  id: t.id,
+  status: t.status,
+  orderNumber: t.orderNumber,
+  store: t.store,
+  storeProgress: t.storeProgress,
+  paymentType: t.paymentType,
+  items: t.items,
+  customer: t.customer,
+);

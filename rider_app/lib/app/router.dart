@@ -245,18 +245,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      // The go-online guard (04 §2.1): every flavor.
+      GoRoute(
+        path: Routes.permissions,
+        name: 'permissions',
+        builder: (_, _) => const PermissionsGateScreen(),
+        routes: [
+          GoRoute(
+            path: 'disclosure',
+            name: 'disclosure',
+            builder: (_, _) => const LocationDisclosureScreen(),
+          ),
+        ],
+      ),
       // The Phase 0 spike screens exist in the dev flavor only.
       if (env.showDevTools) ...[
-        GoRoute(
-          path: Routes.permissions,
-          builder: (_, _) => const PermissionsGateScreen(),
-          routes: [
-            GoRoute(
-              path: 'disclosure',
-              builder: (_, _) => const LocationDisclosureScreen(),
-            ),
-          ],
-        ),
         GoRoute(
           path: Routes.locationDebug,
           builder: (_, _) => const LocationDebugScreen(),

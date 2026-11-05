@@ -43,6 +43,7 @@ import 'package:jivo_api/src/model/earnings_adjustment.dart';
 import 'package:jivo_api/src/model/earnings_order.dart';
 import 'package:jivo_api/src/model/error_body.dart';
 import 'package:jivo_api/src/model/error_envelope.dart';
+import 'package:jivo_api/src/model/faq.dart';
 import 'package:jivo_api/src/model/health_checks.dart';
 import 'package:jivo_api/src/model/health_live.dart';
 import 'package:jivo_api/src/model/health_ready.dart';
@@ -77,12 +78,14 @@ import 'package:jivo_api/src/model/otp_send_request.dart';
 import 'package:jivo_api/src/model/otp_sent.dart';
 import 'package:jivo_api/src/model/otp_settings.dart';
 import 'package:jivo_api/src/model/otp_verify_request.dart';
+import 'package:jivo_api/src/model/page.dart';
 import 'package:jivo_api/src/model/paginated_address_list.dart';
 import 'package:jivo_api/src/model/paginated_cash_ledger.dart';
 import 'package:jivo_api/src/model/paginated_order_summary_list.dart';
 import 'package:jivo_api/src/model/paginated_payout_list.dart';
 import 'package:jivo_api/src/model/paginated_product_card_list.dart';
 import 'package:jivo_api/src/model/paginated_task_history.dart';
+import 'package:jivo_api/src/model/paginated_ticket_summary_list.dart';
 import 'package:jivo_api/src/model/patched_address_request.dart';
 import 'package:jivo_api/src/model/patched_cart_update_request.dart';
 import 'package:jivo_api/src/model/patched_me_request.dart';
@@ -105,6 +108,7 @@ import 'package:jivo_api/src/model/rider_bank_account.dart';
 import 'package:jivo_api/src/model/rider_bank_account_update_request.dart';
 import 'package:jivo_api/src/model/rider_cash.dart';
 import 'package:jivo_api/src/model/rider_document.dart';
+import 'package:jivo_api/src/model/rider_home_store.dart';
 import 'package:jivo_api/src/model/rider_location_settings.dart';
 import 'package:jivo_api/src/model/rider_offer.dart';
 import 'package:jivo_api/src/model/rider_profile.dart';
@@ -126,6 +130,11 @@ import 'package:jivo_api/src/model/task_geofence.dart';
 import 'package:jivo_api/src/model/task_history_item.dart';
 import 'package:jivo_api/src/model/task_item.dart';
 import 'package:jivo_api/src/model/task_store.dart';
+import 'package:jivo_api/src/model/ticket.dart';
+import 'package:jivo_api/src/model/ticket_create_request.dart';
+import 'package:jivo_api/src/model/ticket_message.dart';
+import 'package:jivo_api/src/model/ticket_reply_request.dart';
+import 'package:jivo_api/src/model/ticket_summary.dart';
 import 'package:jivo_api/src/model/token_pair.dart';
 import 'package:jivo_api/src/model/token_refresh_request.dart';
 import 'package:jivo_api/src/model/track_point.dart';
@@ -288,6 +297,8 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'ErrorEnvelope':
       return ErrorEnvelope.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'Faq':
+      return Faq.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'HealthCheckStatusEnum':
     case 'HealthChecks':
       return HealthChecks.fromJson(value as Map<String, dynamic>) as ReturnType;
@@ -378,6 +389,8 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'OtpVerifyRequest':
       return OtpVerifyRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'Page':
+      return Page.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'PaginatedAddressList':
       return PaginatedAddressList.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -395,6 +408,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'PaginatedTaskHistory':
       return PaginatedTaskHistory.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'PaginatedTicketSummaryList':
+      return PaginatedTicketSummaryList.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'PatchedAddressRequest':
       return PatchedAddressRequest.fromJson(value as Map<String, dynamic>)
@@ -466,6 +482,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'RiderDocumentStatusEnum':
     case 'RiderDocumentTypeEnum':
+    case 'RiderHomeStore':
+      return RiderHomeStore.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'RiderLocationSettings':
       return RiderLocationSettings.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -522,6 +541,22 @@ ReturnType deserialize<ReturnType, BaseType>(
       return TaskItem.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'TaskStore':
       return TaskStore.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'Ticket':
+      return Ticket.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'TicketCategoryEnum':
+    case 'TicketCreateRequest':
+      return TicketCreateRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'TicketMessage':
+      return TicketMessage.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'TicketReplyRequest':
+      return TicketReplyRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'TicketStatusEnum':
+    case 'TicketSummary':
+      return TicketSummary.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'TokenPair':
       return TokenPair.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'TokenRefreshRequest':
