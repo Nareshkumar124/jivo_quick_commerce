@@ -21,3 +21,9 @@ class RiderLocationsThrottle(FailOpenUserThrottle):
 
 class RiderHeartbeatThrottle(FailOpenUserThrottle):
     scope = "rider_heartbeat"
+
+
+class RiderPickupThrottle(FailOpenUserThrottle):
+    """Per rider, against guessing order codes (code review of slice 5.3)."""
+
+    scope = "rider_pickup"

@@ -65,6 +65,11 @@ Every transition goes through `orders.services.transition()`. Anything not liste
 | T13 | `OUT_FOR_DELIVERY` → `DELIVERY_FAILED` | Rider marks failed (reason; "not reachable" requires call attempts + the 10-min wait timer) or ops marks it | | Task → `RETURNING`; notify the customer and ops; refund policy applies (§6.4) |
 | T14 | `DELIVERY_FAILED` → `RETURNED` | Store staff "Receive return" | Rider is at the store | Good items → `StockMovement(RETURN)`, `on_hand += qty`; damaged → `StockMovement(DAMAGE)` record only; COD → nothing to collect; task `RETURNED`; rider freed |
 
+**Phase 5 implementation notes (slice 5.3):**
+- **T13 refund mapping (D-10 default, ⚠ to confirm):** "customer fault" (delivery fee kept) = CUSTOMER_NOT_REACHABLE and CUSTOMER_REFUSED; WRONG_ADDRESS and OTHER are refunded in full, following the §6.4 table literally.
+- **T14 damaged items:** recorded as a RETURN followed by a DAMAGE of the same units, so `on_hand` is unchanged and both movements exist (the ledger refuses zero-delta rows).
+- **T10:** the COD collection is validated before the OTP, so a wrong amount never uses an OTP attempt. After 5 wrong OTPs only ops can resolve the delivery.
+
 ### 2.1 Dispatch trigger
 Setting `DISPATCH_TRIGGER` = `ACCEPTED` (default) or `PLACED`. Dispatching in parallel with packing keeps the overall time low. The rider usually arrives as packing finishes.
 

@@ -7,6 +7,7 @@ whose body is exactly what the server sends (see ``apps.core.errors.error_payloa
 from collections.abc import Mapping
 from typing import Any
 
+from drf_spectacular.openapi import AutoSchema
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse
 
@@ -141,3 +142,18 @@ def ok_response(serializer, description: str, *examples: tuple[str, dict]) -> Op
 def request_examples(*examples: tuple[str, dict]) -> list[OpenApiExample]:
     """Named request-body examples (`(name, value)` pairs)."""
     return [OpenApiExample(name, value=value, request_only=True) for name, value in examples]
+
+
+class BodyOnDeleteSchema(AutoSchema):
+    """drf-spectacular publishes no request body for DELETE. Views whose DELETE takes a JSON
+    body (e.g. `me_device_unregister {fcm_token}`) use this schema so the declared
+    `extend_schema(request=...)` is published and generated clients can send it."""
+
+    def _get_request_body(self, direction="request"):
+        if self.method != "DELETE":
+            return super()._get_request_body(direction)
+        self.method = "POST"
+        try:
+            return super()._get_request_body(direction)
+        finally:
+            self.method = "DELETE"

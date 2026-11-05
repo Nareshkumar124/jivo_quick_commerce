@@ -21,6 +21,18 @@ def order_event(event: str, order_id: int) -> str:
         logger.info("Order event %s: order %s", event, order_id)
     if event == events.PLACED:
         schedule_acceptance(order_id)
+    # Phase 5 (08 §2.1): dispatch starts at DISPATCH_TRIGGER (ACCEPTED by default, or PLACED).
+    trigger = {"ACCEPTED": events.ACCEPTED, "PLACED": events.PLACED}.get(
+        settings.DISPATCH_TRIGGER, events.ACCEPTED
+    )
+    if event == trigger:
+        from apps.delivery.tasks import dispatch_order
+
+        dispatch_order.delay(order_id)
+    if event == events.PACKED:
+        from apps.delivery.services.dispatch import order_packed
+
+        order_packed(order_id)
     return event
 
 

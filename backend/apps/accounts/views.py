@@ -41,6 +41,7 @@ from apps.core.schema import (
     NOT_FOUND,
     PAGINATION_PARAMETERS,
     UNAUTHORIZED,
+    BodyOnDeleteSchema,
     app_responses,
     error_example,
     error_response,
@@ -464,6 +465,8 @@ class AccountDeleteView(OtpThrottleMixin, APIView):
 
 
 class DeviceRegisterView(APIView):
+    schema = BodyOnDeleteSchema()  # DELETE takes {fcm_token}
+
     @extend_schema(
         operation_id="me_device_register",
         tags=["account"],

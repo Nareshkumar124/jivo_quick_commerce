@@ -1,9 +1,9 @@
 """Rider app endpoints (06 §3, 04). Phase 5 contract (T-511).
 
 Live: stores, register, me, documents, bank account (slice 5.1); shift start/end, locations,
-heartbeat (slice 5.2). The other operations exist with their full schema and request
-validation and answer 503 `SERVICE_UNAVAILABLE` until their slice lands (5.3: offers and the
-task; 5.4: cod-qr, cash, earnings, history, payouts).
+heartbeat (slice 5.2); offers and the delivery task (slice 5.3). The slice 5.4 operations
+(cod-qr, cash, earnings, history, payouts) exist with their full schema and request validation
+and answer 503 `SERVICE_UNAVAILABLE` until it lands.
 
 Every lookup is scoped to the caller's own rider profile: another rider's offer or task id is a
 404, never fetched first and checked after.
@@ -30,12 +30,14 @@ from apps.core.schema import (
 from apps.core.throttling import RATE_LIMITED
 from apps.delivery import examples as ex
 from apps.delivery import serializers as s
-from apps.delivery.services import presenters, riders, shifts
+from apps.delivery.services import dispatch, presenters, riders, shifts
+from apps.delivery.services import tasks as task_actions
 from apps.delivery.stubs import not_available_yet
 from apps.delivery.throttling import (
     RiderDocumentsThrottle,
     RiderHeartbeatThrottle,
     RiderLocationsThrottle,
+    RiderPickupThrottle,
     RiderProfileWriteThrottle,
 )
 
@@ -93,13 +95,16 @@ def task_state_error(message: str, details: dict, *, name: str | None = None):
     return error_example(ErrorCode.INVALID_STATE_TRANSITION, message, details, name=name)
 
 
+def task_response(task) -> dict:
+    return presenters.task_body(presenters.task_queryset().get(pk=task.pk))
+
+
 def task_responses(ok, extra: dict | None = None) -> dict:
     responses = {
         200: ok,
         401: UNAUTHORIZED,
         403: ACTIVE_FORBIDDEN,
         404: TASK_NOT_FOUND,
-        503: NOT_YET_RESPONSE,
         **(extra or {}),
     }
     return app_responses(responses)
@@ -594,13 +599,15 @@ class CurrentOfferView(APIView):
                 ),
                 401: UNAUTHORIZED,
                 403: ACTIVE_FORBIDDEN,
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def get(self, request: Request) -> Response:
-        riders.require_rider(request.user, active=True)
-        not_available_yet("5.3")
+        from django.utils import timezone
+
+        rider = riders.require_rider(request.user, active=True)
+        now = timezone.now()
+        return Response(presenters.current_offer_body(dispatch.current_offer(rider, now), now))
 
 
 class OfferAcceptView(APIView):
@@ -629,8 +636,8 @@ class OfferAcceptView(APIView):
         ),
     )
     def post(self, request: Request, id: int) -> Response:
-        riders.require_rider(request.user, active=True)
-        not_available_yet("5.3")
+        task = dispatch.accept_offer(request.user, id)
+        return Response(task_response(task))
 
 
 class OfferRejectView(APIView):
@@ -657,14 +664,15 @@ class OfferRejectView(APIView):
                     "Already accepted by this rider.",
                     task_state_error("You already accepted this offer.", {"status": "ACCEPTED"}),
                 ),
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.OfferRejectSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.OfferRejectSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        dispatch.reject_offer(request.user, id, data.validated_data.get("reason"))
+        return Response(status=204)
 
 
 # --------------------------------------------------------------------------- task (5.3/5.4)
@@ -692,13 +700,14 @@ class CurrentTaskView(APIView):
                 ),
                 401: UNAUTHORIZED,
                 403: ACTIVE_FORBIDDEN,
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def get(self, request: Request) -> Response:
-        riders.require_rider(request.user, active=True)
-        not_available_yet("5.3")
+        from django.utils import timezone
+
+        rider = riders.require_rider(request.user, active=True)
+        return Response(presenters.current_task_body(rider, timezone.now()))
 
 
 GEOFENCE_ERROR = error_example(
@@ -737,11 +746,15 @@ class ArrivedStoreView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.PositionSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.PositionSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.arrived_store(request.user, id, **data.validated_data)
+        return Response(task_response(task))
 
 
 class PickupView(APIView):
+    throttle_classes = [RiderPickupThrottle]
+
     @extend_schema(
         operation_id="rider_tasks_pickup",
         tags=TAGS,
@@ -750,8 +763,8 @@ class PickupView(APIView):
             "08 T9: AT_STORE and the order PACKED -> task PICKED_UP, order OUT_FOR_DELIVERY "
             "(stock committed, the customer gets the delivery OTP). `order_code` is the "
             "4-character code or the scanned bag QR `JQC1:<order_number>:<code>` (api-requests "
-            "#15). Wrong code: 400 `PICKUP_CODE_INVALID`. Not packed yet: 409 with "
-            "`order_status`."
+            "#15). Wrong code: 400 `PICKUP_CODE_INVALID` with `attempts_remaining`; after 5 "
+            "wrong codes 423 `PICKUP_CODE_LOCKED`. Not packed yet: 409 with `order_status`."
         ),
         parameters=[ID],
         request=s.PickupSerializer,
@@ -762,10 +775,20 @@ class PickupView(APIView):
             ok_response(s.RiderTaskSerializer, "Picked up.", ("Picked up", ex.TASK_PICKED_UP)),
             {
                 400: error_response(
-                    "Wrong code.",
-                    error_example(ErrorCode.PICKUP_CODE_INVALID),
+                    "Wrong code (`details.attempts_remaining`), or not a code at all (non-ASCII, "
+                    "wrong shape: no attempt used).",
+                    error_example(ErrorCode.PICKUP_CODE_INVALID, details={"attempts_remaining": 4}),
+                    error_example(
+                        ErrorCode.PICKUP_CODE_INVALID, name="NOT_A_CODE", summary="Not a code"
+                    ),
                     validation_error({"order_code": ["This field is required."]}),
                 ),
+                423: error_response(
+                    "5 wrong codes: the pickup is locked and ops are alerted. Ask the store or "
+                    "ops (they can reassign the order).",
+                    error_example(ErrorCode.PICKUP_CODE_LOCKED, details={"attempts_remaining": 0}),
+                ),
+                429: RATE_LIMITED,
                 409: error_response(
                     "Not at the store, or the order is not packed yet.",
                     task_state_error(
@@ -784,8 +807,10 @@ class PickupView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.PickupSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.PickupSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.pickup(request.user, id, **data.validated_data)
+        return Response(task_response(task))
 
 
 class ArrivedCustomerView(APIView):
@@ -824,8 +849,10 @@ class ArrivedCustomerView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.ArrivedCustomerSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.ArrivedCustomerSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.arrived_customer(request.user, id, **data.validated_data)
+        return Response(task_response(task))
 
 
 class CodQrView(APIView):
@@ -847,10 +874,11 @@ class CodQrView(APIView):
                 s.CodQrSerializer, "The QR.", ("Waiting", ex.COD_QR), ("Paid", ex.COD_QR_PAID)
             ),
             {
+                503: NOT_YET_RESPONSE,
                 409: error_response(
                     "Not a COD task at the customer.",
                     task_state_error("This order is prepaid.", {"status": "AT_CUSTOMER"}),
-                )
+                ),
             },
         ),
     )
@@ -911,8 +939,12 @@ class DeliverView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.DeliverSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.DeliverSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.deliver(
+            request.user, id, otp=data.validated_data["otp"], cod=data.validated_data.get("cod")
+        )
+        return Response(task_response(task))
 
 
 class FailView(APIView):
@@ -959,8 +991,10 @@ class FailView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.DeliveryFailSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.DeliveryFailSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.fail(request.user, id, **data.validated_data)
+        return Response(task_response(task))
 
 
 # --------------------------------------------------------------------------- records (5.4)

@@ -29,3 +29,10 @@ def publish_offer(rider_id: int, offer: dict) -> None:
     """-> `apps.realtime.publish_offer(...)` (P6): `offer.new` on `/ws/v1/rider/`. Called from
     dispatch (slice 5.3)."""
     logger.info("hooks.publish_offer (stub until P6): rider=%s", rider_id)
+
+
+def ops_alert(kind: str, data: dict) -> None:
+    """-> the P6 ops alert (`alert` on `/ws/ops/live/`, 06 §4). Kinds used in slice 5.3:
+    `DISPATCH_UNASSIGNED`, `DELIVERY_OTP_LOCKED`, `MOCKED_LOCATION`, `RIDER_STALE_ON_TASK`.
+    Until P6 it is logged at WARNING so ops tooling can pick it up from the logs."""
+    logger.warning("Ops alert %s: %s", kind, data)

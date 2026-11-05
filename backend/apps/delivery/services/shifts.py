@@ -57,18 +57,10 @@ def location_cache_key(rider_id: int) -> str:
 
 
 def has_active_task(rider: Rider) -> bool:
-    """True while the rider has a delivery task in progress (slice 5.3 adds tasks)."""
-    from django.apps import apps
+    """True while the rider has a delivery task in progress (including RETURNING)."""
+    from apps.delivery.models import RIDER_BUSY_STATUSES, DeliveryTask
 
-    try:
-        task_model = apps.get_model("delivery", "DeliveryTask")
-    except LookupError:
-        return False
-    from apps.delivery.choices import RIDER_ACTIVE_TASK_STATUSES
-
-    return task_model.objects.filter(
-        rider=rider, status__in=sorted(RIDER_ACTIVE_TASK_STATUSES)
-    ).exists()
+    return DeliveryTask.objects.filter(rider=rider, status__in=RIDER_BUSY_STATUSES).exists()
 
 
 def distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> int:
@@ -188,7 +180,17 @@ def _close(rider: Rider, shift: RiderShift | None, reason: str, now, by=None) ->
 
 
 def end_open_shift(rider: Rider, *, reason: str, by=None, now=None) -> RiderShift | None:
-    """Close the rider's open shift (if any) and set them offline. The caller holds the lock."""
+    """Close the rider's open shift (if any) and set them offline. The caller holds the lock.
+    After commit, the rider's pending offers are withdrawn (in the dispatch lock order) and
+    their orders offered to someone else."""
+    rider_id = rider.pk
+
+    def withdraw() -> None:
+        from apps.delivery.services.dispatch import withdraw_rider_offers
+
+        withdraw_rider_offers(rider_id)
+
+    transaction.on_commit(withdraw)
     return _close(rider, open_shift(rider), reason, now or timezone.now(), by)
 
 
@@ -266,6 +268,9 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
     else:
         fresh = []
     shift = open_shift(rider)
+    from apps.delivery.services.tasks import active_task
+
+    task = active_task(rider)
     RiderLocation.objects.bulk_create(
         [
             RiderLocation(
@@ -277,6 +282,7 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
                 recorded_at=p["recorded_at"],
                 is_mocked=p.get("is_mocked", False),
                 shift=shift,
+                task=task,
             )
             for p in fresh
         ],
@@ -312,20 +318,41 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
                 latest["accuracy"],
             )
         if any(p.get("is_mocked") for p in fresh):
-            logger.warning("Rider %s sent mock locations", rider.pk)
+            _mocked_location_alert(rider.pk, task.pk if task else None)
     return {"accepted": len(fresh), "duplicates": duplicates, "rejected": rejected}
+
+
+MOCKED_ALERT_SECONDS = 30 * 60
+
+
+def _mocked_location_alert(rider_id: int, task_id: int | None) -> None:
+    """Mock locations are flagged to ops (at most once per rider per 30 minutes) and stored
+    with `is_mocked`; nothing is blocked yet (policy to be decided with Jivo)."""
+    from apps.delivery import hooks
+
+    try:
+        first = cache.add(f"delivery:mocked-alert:{rider_id}", "1", MOCKED_ALERT_SECONDS)
+    except Exception:
+        first = True
+    if first:
+        hooks.ops_alert("MOCKED_LOCATION", {"rider_id": rider_id, "task_id": task_id})
 
 
 def heartbeat(user, now=None) -> tuple[Rider, int | None, int | None]:
     """`POST /rider/heartbeat/`: records that the app is alive (ops "last seen") and returns
-    the rider with the pending offer and active task ids (slice 5.3; None until then). It
+    the rider with the pending offer and active task ids. It
     keeps an online rider online only while a location point arrived in the last 30 minutes
     (`stale_riders_filter`)."""
     now = now or timezone.now()
     rider = require_rider(user)
     Rider.objects.filter(pk=rider.pk).update(last_heartbeat_at=now)
     rider.last_heartbeat_at = now
-    return rider, None, None
+    from apps.delivery.services.dispatch import current_offer
+    from apps.delivery.services.tasks import active_task
+
+    offer = current_offer(rider, now)
+    task = active_task(rider)
+    return rider, offer.pk if offer else None, task.pk if task else None
 
 
 # --------------------------------------------------------------------------- auto-offline
@@ -353,13 +380,16 @@ ON_TASK_WARNING_SECONDS = 30 * 60
 
 def _warn_on_task_once(rider_id: int) -> None:
     """A rider on a task with no location: one warning per rider per 30 minutes (the beat job
-    runs every 2 minutes). Ops see the rider on the map; slice 5.3 adds a proper alert."""
+    runs every 2 minutes), as an ops alert."""
+    from apps.delivery import hooks
+
     try:
         first = cache.add(f"delivery:on-task-stale:{rider_id}", "1", ON_TASK_WARNING_SECONDS)
     except Exception:
         first = True
     if first:
         logger.warning("Rider %s is on a task but sent no location for 10 minutes", rider_id)
+        hooks.ops_alert("RIDER_STALE_ON_TASK", {"rider_id": rider_id})
 
 
 def auto_offline_stale(now=None) -> dict:

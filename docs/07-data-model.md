@@ -208,6 +208,14 @@ Phase 5 implementation (slices 5.1/5.2, migration `delivery.0001`):
   - `kyc_purge_after` and `anonymised_at`.
   - `dob` is nullable (blanked on erasure).
 - **RiderShift** adds `ended_by`, with at most one open shift per rider.
+- **DeliveryTask** (slice 5.3, migration `delivery.0002`):
+  - One per order (OneToOne).
+  - Adds `search_started_at`, `unassigned_at`, `next_dispatch_at` (dispatch rounds), `cod_amount_previous`, `arrival_override_reason`, `fail_note`, `fail_call_attempts`, `fail_photo` (private bucket), `cancelled_at` and `ended_at`.
+  - The delivery OTP is per task: `delivery_otp_encrypted` (shown to the order's owner), `otp_attempts` and `otp_locked_at`. `Order.delivery_otp_hash` / `delivery_otp_attempts` are unused.
+  - Partial unique: one active task per rider.
+- **DeliveryOffer:** partial unique PENDING per task and per rider.
+- **RiderCashLedger:** append-only; one COD_COLLECTED per order.
+- **RiderLocation.task** is now linked.
 - **RiderLocation** adds `is_mocked`, `received_at` and `shift`. It is unique on (`rider`, `recorded_at`) and has no spatial index. Its `task` FK arrives with slice 5.3.
 
 **RiderDocument**: `rider`, `doc_type` (PHOTO/AADHAAR_FRONT/AADHAAR_BACK/PAN/DL/RC), `file` (private storage), `doc_number_masked`, `status` (PENDING/APPROVED/REJECTED), `reviewed_by`, `review_note`.

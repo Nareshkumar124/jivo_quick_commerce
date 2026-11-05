@@ -6918,6 +6918,16 @@ paths:
       summary: Unregister this device's push token
       tags:
       - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceUnregisterRequest'
+            examples:
+              Unregister:
+                value:
+                  fcm_token: dQw4w9WgXcQ:APA91bHun4MxP5egoKMwt2KZFBaFUH-1RYqx
+        required: true
       security:
       - jwtAuth: []
       responses:
@@ -13687,27 +13697,6 @@ paths:
                       details: {}
                   summary: NOT_FOUND
           description: The offer does not exist or is not this rider's.
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '409':
           content:
             application/json:
@@ -13748,6 +13737,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/offers/{id}/reject/:
     post:
       operationId: rider_offers_reject
@@ -13872,27 +13876,6 @@ paths:
                         status: ACCEPTED
                   summary: INVALID_STATE_TRANSITION
           description: Already accepted by this rider.
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '426':
           content:
             application/json:
@@ -13912,6 +13895,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/offers/current/:
     get:
       operationId: rider_offers_current
@@ -14000,27 +13998,6 @@ paths:
                   summary: 'Not ACTIVE: route on rider_status'
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
             says which; route on it (04 §1).'
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '426':
           content:
             application/json:
@@ -14040,6 +14017,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/payouts/:
     get:
       operationId: rider_payouts_list
@@ -15020,27 +15012,6 @@ paths:
                   summary: NOT_FOUND
           description: The task does not exist or is not this rider's (e.g. reassigned
             by ops).
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '409':
           content:
             application/json:
@@ -15091,6 +15062,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/tasks/{id}/arrived-store/:
     post:
       operationId: rider_tasks_arrived_store
@@ -15257,27 +15243,6 @@ paths:
                   summary: NOT_FOUND
           description: The task does not exist or is not this rider's (e.g. reassigned
             by ops).
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '409':
           content:
             application/json:
@@ -15328,6 +15293,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/tasks/{id}/cod-qr/:
     post:
       operationId: rider_tasks_cod_qr
@@ -15681,27 +15661,6 @@ paths:
                   summary: NOT_FOUND
           description: The task does not exist or is not this rider's (e.g. reassigned
             by ops).
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '400':
           content:
             application/json:
@@ -15786,6 +15745,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/tasks/{id}/fail/:
     post:
       operationId: rider_tasks_fail
@@ -15949,27 +15923,6 @@ paths:
                   summary: NOT_FOUND
           description: The task does not exist or is not this rider's (e.g. reassigned
             by ops).
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '400':
           content:
             application/json:
@@ -16022,14 +15975,29 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/tasks/{id}/pickup/:
     post:
       operationId: rider_tasks_pickup
       description: '08 T9: AT_STORE and the order PACKED -> task PICKED_UP, order
         OUT_FOR_DELIVERY (stock committed, the customer gets the delivery OTP). `order_code`
         is the 4-character code or the scanned bag QR `JQC1:<order_number>:<code>`
-        (api-requests #15). Wrong code: 400 `PICKUP_CODE_INVALID`. Not packed yet:
-        409 with `order_status`.'
+        (api-requests #15). Wrong code: 400 `PICKUP_CODE_INVALID` with `attempts_remaining`;
+        after 5 wrong codes 423 `PICKUP_CODE_LOCKED`. Not packed yet: 409 with `order_status`.'
       summary: Pick up (order code or bag QR)
       parameters:
       - in: path
@@ -16193,27 +16161,6 @@ paths:
                   summary: NOT_FOUND
           description: The task does not exist or is not this rider's (e.g. reassigned
             by ops).
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '400':
           content:
             application/json:
@@ -16225,8 +16172,16 @@ paths:
                     error:
                       code: PICKUP_CODE_INVALID
                       message: The order code does not match this order.
-                      details: {}
+                      details:
+                        attempts_remaining: 4
                   summary: PICKUP_CODE_INVALID
+                NOTACODE:
+                  value:
+                    error:
+                      code: PICKUP_CODE_INVALID
+                      message: The order code does not match this order.
+                      details: {}
+                  summary: Not a code
                 VALIDATIONERROR:
                   value:
                     error:
@@ -16236,7 +16191,40 @@ paths:
                         order_code:
                         - This field is required.
                   summary: VALIDATION_ERROR
-          description: Wrong code.
+          description: 'Wrong code (`details.attempts_remaining`), or not a code at
+            all (non-ASCII, wrong shape: no attempt used).'
+        '423':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                PICKUPCODELOCKED:
+                  value:
+                    error:
+                      code: PICKUP_CODE_LOCKED
+                      message: Too many wrong order codes. Ask the store or ops.
+                      details:
+                        attempts_remaining: 0
+                  summary: PICKUP_CODE_LOCKED
+          description: '5 wrong codes: the pickup is locked and ops are alerted. Ask
+            the store or ops (they can reassign the order).'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
         '409':
           content:
             application/json:
@@ -16281,6 +16269,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/tasks/current/:
     get:
       operationId: rider_tasks_current
@@ -16433,27 +16436,6 @@ paths:
                   summary: 'Not ACTIVE: route on rider_status'
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
             says which; route on it (04 §1).'
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '426':
           content:
             application/json:
@@ -16473,6 +16455,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/tasks/history/:
     get:
       operationId: rider_tasks_history
@@ -19393,6 +19390,16 @@ components:
       - app_version
       - fcm_token
       - platform
+    DeviceUnregisterRequest:
+      type: object
+      properties:
+        fcm_token:
+          type: string
+          minLength: 1
+          description: The token to stop pushing to.
+          maxLength: 512
+      required:
+      - fcm_token
     EarningLine:
       type: object
       properties:
@@ -19604,6 +19611,7 @@ components:
             * `PAYLOAD_TOO_LARGE` - The request body is too large.
             * `RIDER_OFFLINE` - You are offline. Go online again to continue.
             * `PICKUP_CODE_INVALID` - The order code does not match this order.
+            * `PICKUP_CODE_LOCKED` - Too many wrong order codes. Ask the store or ops.
         message:
           type: string
           description: Human-readable message (English).
@@ -19657,6 +19665,7 @@ components:
       - PAYLOAD_TOO_LARGE
       - RIDER_OFFLINE
       - PICKUP_CODE_INVALID
+      - PICKUP_CODE_LOCKED
       type: string
       description: |-
         * `VALIDATION_ERROR` - Some fields are invalid.
@@ -19698,6 +19707,7 @@ components:
         * `PAYLOAD_TOO_LARGE` - The request body is too large.
         * `RIDER_OFFLINE` - You are offline. Go online again to continue.
         * `PICKUP_CODE_INVALID` - The order code does not match this order.
+        * `PICKUP_CODE_LOCKED` - Too many wrong order codes. Ask the store or ops.
     ErrorEnvelope:
       type: object
       description: Body of every non-2xx API response.
@@ -21338,8 +21348,10 @@ components:
         order_code:
           type: string
           minLength: 1
-          description: The 4-character order code typed by the rider, or the whole
-            bag QR payload `JQC1:<order_number>:<code>` as scanned. Case-insensitive.
+          description: 'The 4-character order code typed by the rider (ASCII letters
+            and digits), or the whole bag QR payload `JQC1:<order_number>:<code>`
+            as scanned. Case-insensitive. Anything else (non-ASCII, wrong shape):
+            400 `PICKUP_CODE_INVALID`.'
           maxLength: 64
       required:
       - order_code
