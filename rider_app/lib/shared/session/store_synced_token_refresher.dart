@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 Future<void> _sleep(Duration d) => Future<void>.delayed(d);
@@ -27,6 +28,18 @@ Future<void> _sleep(Duration d) => Future<void>.delayed(d);
 /// Only when the store still holds nothing newer is the rejection passed on.
 /// Even then, [GuardedTokenStore] keeps the sign-out from wiping a pair the
 /// other isolate wrote meanwhile.
+///
+/// **Never resend a refresh token the server may have seen** (security
+/// check M2: reusing a rotated refresh token revokes every session of the
+/// user). A refresh that may have reached the server (send/receive timeout,
+/// 5xx such as 502/504, an unknown error) may have rotated the token even
+/// though the answer was lost. After such a failure this refresher re-reads
+/// the store for a newer pair and, finding none, reports the session as over
+/// (401 `TOKEN_INVALID`), so jivo_core signs out locally and the token is
+/// never sent again. Only failures where the request never left the phone
+/// (connection error, connection timeout, bad certificate) and plain 4xx
+/// answers (the server refused without rotating, e.g. 429) are passed on as
+/// transient, so the same token may be tried again later.
 class StoreSyncedTokenRefresher implements TokenRefresher {
   StoreSyncedTokenRefresher({
     required this._inner,
@@ -54,17 +67,57 @@ class StoreSyncedTokenRefresher implements TokenRefresher {
     if (before != null) return before;
     try {
       return await _inner.refresh(refreshToken);
-    } on ApiError catch (error) {
+    } on Object catch (e) {
+      final error = ApiError.from(e);
       final rejected =
           error.statusCode == 401 && error.code == ApiErrorCode.tokenInvalid;
-      if (!rejected) rethrow;
+      final ambiguous = !rejected && mayHaveReachedServer(error);
+      if (!rejected && !ambiguous) {
+        // Never left the phone, or the server refused without rotating.
+        throw error;
+      }
       for (final delay in [Duration.zero, ...retryDelays]) {
         if (delay > Duration.zero) await _wait(delay);
         final after = await _newerThan(refreshToken);
         if (after != null) return after;
       }
-      rethrow;
+      if (rejected) throw error;
+      // The token may be rotated server-side and its successor is lost:
+      // end the session here rather than ever resending it.
+      throw ApiError(
+        code: ApiErrorCode.tokenInvalid,
+        statusCode: 401,
+        cause: error,
+      );
     }
+  }
+
+  /// Whether a failed refresh may have been processed by the server.
+  /// Safe (false) only when the request never left the phone, or the
+  /// server answered with a 4xx other than 401.
+  static bool mayHaveReachedServer(ApiError error) {
+    final cause = error.cause;
+    if (cause is DioException) {
+      switch (cause.type) {
+        case DioExceptionType.connectionError ||
+            DioExceptionType.connectionTimeout ||
+            DioExceptionType.badCertificate:
+          return false;
+        case DioExceptionType.badResponse:
+          final status = cause.response?.statusCode ?? 0;
+          return status >= 500;
+        case DioExceptionType.sendTimeout ||
+            DioExceptionType.receiveTimeout ||
+            DioExceptionType.transformTimeout ||
+            DioExceptionType.cancel ||
+            DioExceptionType.unknown:
+          return true;
+      }
+    }
+    final status = error.statusCode;
+    if (status != null) return status >= 500;
+    // No HTTP answer and no transport detail: assume it may have arrived.
+    return true;
   }
 
   /// The stored pair if another isolate rotated [refreshToken], else null.
