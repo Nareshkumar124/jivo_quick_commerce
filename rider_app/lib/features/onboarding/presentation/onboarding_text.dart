@@ -5,6 +5,7 @@ import '../../../l10n/app_localizations.dart';
 import '../domain/kyc_document.dart';
 import '../domain/validators.dart';
 import '../domain/vehicle_type.dart';
+import '../../../shared/errors/rider_error_text.dart';
 
 /// User-facing text for onboarding values. Server messages are never shown.
 
@@ -69,5 +70,5 @@ String onboardingErrorText(BuildContext context, ApiError error) {
   if (error.code == ApiErrorCode.validationError) {
     return AppLocalizations.of(context).onboardingCheckDetails;
   }
-  return apiErrorMessage(JivoCoreLocalizations.of(context), error);
+  return riderApiErrorMessage(context, error);
 }

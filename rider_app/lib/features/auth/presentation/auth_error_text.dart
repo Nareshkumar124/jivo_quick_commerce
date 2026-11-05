@@ -3,6 +3,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../../l10n/app_localizations.dart';
 import 'login_controllers.dart';
+import '../../../shared/errors/rider_error_text.dart';
 
 /// User-facing text for a login error. Adds the details the rider needs
 /// (attempts left, wait time) to the OTP errors; everything else goes through
@@ -23,5 +24,5 @@ String authErrorText(BuildContext context, ApiError error) {
     default:
       break;
   }
-  return apiErrorMessage(JivoCoreLocalizations.of(context), error);
+  return riderApiErrorMessage(context, error);
 }

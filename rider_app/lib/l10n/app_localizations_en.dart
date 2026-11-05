@@ -1906,4 +1906,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get taskReturnNoCash =>
       'Don\'t collect any cash. Nothing is due for this order.';
+
+  @override
+  String get riderTooManyTries =>
+      'Too many tries. Wait a moment, then try again.';
 }

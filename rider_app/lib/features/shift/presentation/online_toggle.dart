@@ -20,6 +20,7 @@ import '../../task/presentation/task_providers.dart';
 import '../domain/today_summary.dart';
 import 'home_providers.dart';
 import 'shift_controller.dart';
+import '../../../shared/errors/rider_error_text.dart';
 
 // Rider home widgets, to `design/screens/rider/home.md` (UX audit RD-01)
 // with the `rider.tokens.json` colours (RD-05).
@@ -304,7 +305,7 @@ class GuardCard extends ConsumerWidget {
             ? l10n.shiftServiceFailed
             : (error == null
                   ? l10n.shiftServerError
-                  : apiErrorMessage(JivoCoreLocalizations.of(context), error)),
+                  : riderApiErrorMessage(context, error)),
         null,
       ),
     };
