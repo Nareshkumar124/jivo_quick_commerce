@@ -248,11 +248,15 @@ class SessionManager extends ChangeNotifier {
   /// Whether a failed refresh call may have been processed by the server
   /// (so its refresh token may be rotated already). False only when the
   /// request surely never arrived (no connection, connect timeout, bad
-  /// certificate) or the server answered with an error status (it rejects
-  /// or rolls back without rotating).
+  /// certificate) or the backend itself answered with an error status (it
+  /// rejects or rolls back without rotating). A 502 or 504 comes from a
+  /// proxy and may follow a refresh the backend already completed, so it
+  /// counts as "may have reached"; 500, 503 (our maintenance response; the
+  /// refresh endpoint is exempt) and 429 stay retryable.
   @visibleForTesting
   static bool mayHaveReachedServer(ApiError error) {
-    if (error.statusCode != null) return false;
+    final status = error.statusCode;
+    if (status != null) return status == 502 || status == 504;
     final cause = error.cause;
     if (cause is DioException) {
       return switch (cause.type) {

@@ -369,11 +369,36 @@ void main() {
         ),
         isFalse,
       );
-      expect(
-        reached(const ApiError(code: ApiErrorCode.serverError, statusCode: 503)),
-        isFalse,
-      );
+      // The backend's own answers: retryable with the same token.
+      for (final status in [500, 503, 429, 400]) {
+        expect(
+          reached(ApiError(code: ApiErrorCode.serverError, statusCode: status)),
+          isFalse,
+          reason: '$status',
+        );
+      }
+      // A proxy's 502/504 may follow a completed rotation.
+      for (final status in [502, 504]) {
+        expect(
+          reached(ApiError(code: ApiErrorCode.serverError, statusCode: status)),
+          isTrue,
+          reason: '$status',
+        );
+      }
       expect(reached(const ApiError(code: ApiErrorCode.unknown)), isTrue);
+    });
+
+    test('a proxy 504 during refresh is never replayed (M2)', () async {
+      final h = Harness(
+        api: meAcceptsNewToken,
+        refresh: (_) => (504, null),
+      );
+      await h.session.restore();
+      await h.getMe().then<Object?>((_) => null, onError: (Object e) => e);
+      expect(h.session.status, SessionStatus.signedIn);
+      await h.getMe().then<Object?>((_) => null, onError: (Object e) => e);
+      expect(h.refreshBackend.requests, hasLength(1));
+      expect(h.session.status, SessionStatus.signedOut);
     });
 
     test('a 5xx during refresh also keeps the session', () async {
