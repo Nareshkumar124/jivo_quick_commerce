@@ -298,3 +298,7 @@
 .ops-consequence { display: flex; gap: 8px; align-items: flex-start; padding: 12px; border-radius: 6px; background: var(--ops-tone-warning-badge-bg); color: var(--ops-tone-warning-badge-fg); }
 .ops-consequence--danger { background: var(--ops-tone-danger-badge-bg); color: #fff; }
 .ops-irreversible { font-size: 14px; font-weight: 600; color: var(--ops-tone-danger-text); }
+
+/* Staff two-step sign-in (templates/ops/mfa) */
+.ops-mfa-qr { width: 12rem; height: 12rem; }
+.ops-mfa-qr svg { width: 100%; height: 100%; }

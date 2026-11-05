@@ -271,3 +271,17 @@ def _register_audit_log() -> None:
 
 
 _register_audit_log()
+
+
+def _unregister_otp_admins() -> None:
+    """django-otp registers admins that show device keys (the TOTP secret, recovery codes).
+    Devices are managed only through the enrolment pages and the Super Admin reset action."""
+    from django_otp.plugins.otp_static.models import StaticDevice
+    from django_otp.plugins.otp_totp.models import TOTPDevice
+
+    for model in (TOTPDevice, StaticDevice):
+        if admin.site.is_registered(model):
+            admin.site.unregister(model)
+
+
+_unregister_otp_admins()

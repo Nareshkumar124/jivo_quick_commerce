@@ -1,0 +1,13 @@
+{% extends "ops/mfa/base.html" %}
+{# The new recovery codes, shown once. Context: codes (list or None), next. #}
+{% block content %}
+    {% if codes %}
+        <p class="mb-4">Two-step sign-in is on. Keep these recovery codes somewhere safe (not on the same phone). Each one works once if you lose your authenticator. <strong>They are shown only now.</strong></p>
+        <ul class="font-mono grid grid-cols-2 gap-2 mb-6 text-base" data-testid="recovery-codes">
+            {% for code in codes %}<li>{{ code }}</li>{% endfor %}
+        </ul>
+    {% else %}
+        <p class="mb-6">Your recovery codes were already shown. If you lost them, ask a Super Admin to reset your two-step sign-in.</p>
+    {% endif %}
+    <a class="ops-button" href="{{ next }}">Continue</a>
+{% endblock %}

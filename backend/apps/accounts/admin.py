@@ -197,6 +197,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     )
 
     inlines = [StaffStoreAccessInline]
+    actions = ["reset_mfa"]
 
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related("groups")
@@ -225,6 +226,26 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
                 grant_store_access(user, store)
                 formset.new_objects.append(StaffStoreAccess.objects.get(user=user, store=store))
         return None
+
+    @action(description="Reset two-factor device (lost phone)", permissions=["change"])
+    def reset_mfa(self, request, queryset):
+        """H2: remove the authenticator and recovery codes of the selected staff; they enrol
+        again at their next sign-in. Audited by `ops_console.mfa.reset_devices`."""
+        from apps.core.net import client_ip
+        from apps.ops_console.mfa import reset_devices
+
+        actor = request.user
+        if not (
+            actor.is_superuser or actor.groups.filter(name=roles.SUPER_ADMIN).exists()
+        ):  # review: Super Admin only, whatever model permissions a custom group holds
+            raise PermissionDenied
+        done = 0
+        for user in queryset.filter(is_staff=True).order_by("pk"):
+            if reset_devices(user, by=request.user, ip=client_ip(request)):
+                done += 1
+        self.message_user(
+            request, f"Reset two-factor sign-in for {done} staff member(s).", messages.SUCCESS
+        )
 
     @display(description="Roles")
     def role_list(self, obj) -> str:

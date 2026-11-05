@@ -60,6 +60,9 @@ class AppConfigAdmin(ModelAdmin):
                 "fields": (
                     "rider_location_active_interval_seconds",
                     "rider_location_idle_interval_seconds",
+                    "rider_location_active_sample_seconds",
+                    "rider_location_idle_sample_seconds",
+                    "rider_location_max_batch",
                 )
             },
         ),
