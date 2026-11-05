@@ -9,6 +9,7 @@ Phase 2: the pin is written to `location` (PostGIS) and to the `lat`/`lng` decim
 `receiver_name`/`receiver_phone` resets it to the user's own.
 """
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
@@ -82,9 +83,20 @@ def _apply(address: Address, data: dict, user: User) -> set[str]:
     return changed
 
 
+MSG_TOO_MANY = "You can save up to {limit} addresses. Delete one to add another."
+
+
 def create_address(user: User, data: dict) -> Address:
+    """T-814 (L10): at most `MAX_ADDRESSES_PER_USER` live addresses (counted under the user
+    lock): 400 `VALIDATION_ERROR` above it."""
     with transaction.atomic():
         _lock_user(user)
+        limit = settings.MAX_ADDRESSES_PER_USER
+        if live_addresses(user).count() >= limit:
+            raise ApiError(
+                ErrorCode.VALIDATION_ERROR,
+                details={"non_field_errors": [MSG_TOO_MANY.format(limit=limit)]},
+            )
         address = Address(user=user)
         _apply(address, data, user)
         address.receiver_name = data.get("receiver_name") or user.name

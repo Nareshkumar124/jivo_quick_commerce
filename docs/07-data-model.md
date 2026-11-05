@@ -263,4 +263,6 @@ Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, 
 | Rider location history | 30 days |
 | OTP requests | 30 days |
 | KYC documents | While the rider is active + period mandated by policy (D-14). Then deleted. P5 default: 365 days after offboarding or account erasure (`KYC_RETENTION_DAYS`, `purge_offboarded_kyc`). |
-| Deleted customer accounts | PII anonymised after a 30-day grace period. Order financial records are kept without PII. |
+| Deleted customer accounts | PII anonymised after a 30-day grace period. Order financial records are kept without PII. T-814 (DL-60): anonymisation also blanks the user's `Order.instructions` and the bodies of the support messages they sent (staff replies and ticket rows stay). **⚠ Jivo:** `Order.address_snapshot` is **kept** on invoiced orders (the invoice's place of supply, GST record-keeping) until Jivo confirms its tax-retention period; files attached to support messages are not yet purged. |
+| Gateway payloads (`Payment.raw`, `PaymentWebhookEvent.payload`) | T-814 (DL-60, ⚠ Jivo): after `PAYMENT_PAYLOAD_RETENTION_DAYS` (default 90) the personal fields (`contact`, `email`, `vpa`, `upi`, `card`, `customer_details`, billing/shipping address, `phone`, `name`, at any depth) are removed by the beat job `scrub_payment_payloads`; ids, amounts, statuses, methods and error codes stay. Each row is stamped `pii_scrubbed_at` (payments migration 0003). |
+| Refresh tokens, staff sessions | T-814: expired ones are deleted daily (`flush_expired_tokens`, `clear_expired_sessions`). |

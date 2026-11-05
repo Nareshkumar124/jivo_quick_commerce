@@ -1,4 +1,5 @@
-"""The real Razorpay gateway's HTTP calls (no network: `urlopen` is patched) and the refund task."""
+"""The real Razorpay gateway's HTTP calls (no network: `gateways._open` is patched) and the
+refund task."""
 
 import base64
 import io
@@ -60,7 +61,7 @@ def calls(monkeypatch, keys):
             raise answer
         return FakeResponse(json.dumps(answer).encode())
 
-    monkeypatch.setattr(gateways.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(gateways, "_open", urlopen)
     return recorded, answers
 
 

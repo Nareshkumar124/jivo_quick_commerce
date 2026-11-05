@@ -82,3 +82,33 @@ def check_twilio_settings(app_configs, **kwargs):
             id="accounts.E004",
         )
     ]
+
+
+@register()
+def check_signing_keys(app_configs, **kwargs):
+    """T-814 (L3): deployed environments sign JWTs with their own `JWT_SIGNING_KEY`, never with
+    `DJANGO_SECRET_KEY` (a leak of one must not forge the other), and an explicit `OTP_HASH_KEY`
+    must differ from both."""
+    if settings.APP_ENVIRONMENT not in ("staging", "production"):
+        return []
+    errors = []
+    secret = settings.SECRET_KEY
+    jwt_key = settings.SIMPLE_JWT.get("SIGNING_KEY") or ""
+    if not jwt_key or jwt_key == secret or len(jwt_key) < 50:
+        errors.append(
+            Error(
+                "JWT_SIGNING_KEY must be set to its own value (at least 50 characters), "
+                "different from DJANGO_SECRET_KEY.",
+                id="accounts.E005",
+            )
+        )
+    otp_key = getattr(settings, "OTP_HASH_KEY", "")
+    if otp_key and (otp_key in (secret, jwt_key) or len(otp_key) < 32):
+        errors.append(
+            Error(
+                "OTP_HASH_KEY, when set, must be at least 32 characters and differ from "
+                "DJANGO_SECRET_KEY and JWT_SIGNING_KEY (leave it empty to derive one).",
+                id="accounts.E006",
+            )
+        )
+    return errors

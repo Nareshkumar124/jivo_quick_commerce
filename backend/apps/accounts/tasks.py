@@ -71,3 +71,22 @@ def anonymise_deleted_accounts() -> int:
 def purge_old_otp_requests() -> int:
     """07 §4, beat daily: OTP requests are kept 30 days."""
     return otp.purge_old_otp_requests()
+
+
+@shared_task(name="accounts.flush_expired_tokens")
+def flush_expired_tokens() -> str:
+    """T-814 (M2), beat daily: deletes expired outstanding/blacklisted refresh tokens
+    (simplejwt's `flushexpiredtokens`). Idempotent."""
+    from django.core.management import call_command
+
+    call_command("flushexpiredtokens", verbosity=0)
+    return "done"
+
+
+@shared_task(name="accounts.clear_expired_sessions")
+def clear_expired_sessions() -> str:
+    """T-814 (M2), beat daily: deletes expired staff sessions (`clearsessions`). Idempotent."""
+    from django.core.management import call_command
+
+    call_command("clearsessions", verbosity=0)
+    return "done"

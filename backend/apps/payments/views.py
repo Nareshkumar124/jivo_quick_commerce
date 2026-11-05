@@ -140,6 +140,8 @@ class RazorpayWebhookView(APIView):
 
     authentication_classes: list = []
     permission_classes = [AllowAny]
+    # T-814 (H3): never throttled; Razorpay's calls are signed and must not be dropped.
+    throttle_classes: list = []
 
     @extend_schema(
         operation_id="payments_razorpay_webhook",

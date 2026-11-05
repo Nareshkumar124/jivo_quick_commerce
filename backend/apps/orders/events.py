@@ -19,7 +19,10 @@ ITEMS_ADJUSTED = "order.items_adjusted"  # T8a: customer push + SMS with the ref
 ACCEPTANCE_SLA_BREACHED = "order.acceptance_sla_breached"  # ops alert, store re-alert
 LATE_CAPTURE = "payment.late_capture"  # T3a: ops alert
 REFUND_FAILED = "payment.refund_failed"  # ops alert: retry with order_refunds.retry_refund()
-OPS_ALERTS = frozenset({LATE_CAPTURE, REFUND_FAILED, ACCEPTANCE_SLA_BREACHED})
+# T-814 (DL-59): one staff member issued more than REFUND_VOLUME_ALERT_PER_HOUR refunds in an hour
+# (the order is the one that crossed the line).
+REFUND_VOLUME_HIGH = "payment.refund_volume_high"
+OPS_ALERTS = frozenset({LATE_CAPTURE, REFUND_FAILED, ACCEPTANCE_SLA_BREACHED, REFUND_VOLUME_HIGH})
 
 
 def emit(event: str, order_id: int) -> None:

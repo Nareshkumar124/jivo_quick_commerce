@@ -102,6 +102,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -153,10 +169,10 @@ paths:
             or not a number. Go back to page 1.'
     post:
       operationId: addresses_create
-      description: '`lat`/`lng` (the map pin) are required. `receiver_name`/`receiver_phone`
-        default to the user''s own. The user''s first address becomes the default.
-        Saving an address outside the service area is allowed; it is flagged from
-        Phase 2 (03 §2.4).'
+      description: |-
+        `lat`/`lng` (the map pin) are required. `receiver_name`/`receiver_phone` default to the user's own. The user's first address becomes the default. Saving an address outside the service area is allowed; it is flagged from Phase 2 (03 §2.4).
+
+        A user can keep up to 20 addresses (a server setting); above it: 400 `VALIDATION_ERROR` with a `non_field_errors` message. Writes are rate limited per user (429).
       summary: Add an address
       tags:
       - addresses
@@ -231,7 +247,16 @@ paths:
                         lng:
                         - This field is required.
                   summary: VALIDATION_ERROR
-          description: Invalid fields.
+                TooManyAddresses:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        non_field_errors:
+                        - You can save up to 20 addresses. Delete one to add another.
+                  summary: Too many addresses
+          description: Invalid fields, or the address limit is reached.
         '401':
           content:
             application/json:
@@ -255,6 +280,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -368,6 +409,22 @@ paths:
                       details: {}
                   summary: NOT_FOUND
           description: The object does not exist or does not belong to the caller.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -516,6 +573,22 @@ paths:
                       details: {}
                   summary: NOT_FOUND
           description: The object does not exist or does not belong to the caller.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -605,6 +678,22 @@ paths:
                       details: {}
                   summary: NOT_FOUND
           description: The object does not exist or does not belong to the caller.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -719,6 +808,22 @@ paths:
                       details: {}
                   summary: NOT_FOUND
           description: The object does not exist or does not belong to the caller.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -818,6 +923,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -2393,6 +2514,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -2720,6 +2857,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -2891,6 +3044,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -3225,6 +3394,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -3441,6 +3626,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -3646,6 +3847,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -3968,6 +4185,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -4296,6 +4529,22 @@ paths:
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated. `NOT_FOUND`: the requested object or page does not
             exist.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -4527,6 +4776,22 @@ paths:
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated. `NOT_FOUND`: the requested object or page does not
             exist.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -4688,6 +4953,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -4979,6 +5260,22 @@ paths:
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated. `NOT_FOUND`: the requested object or page does not
             exist.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -5167,6 +5464,22 @@ paths:
                         - '"shop" is not a valid choice.'
                   summary: Invalid app
           description: '`app` is missing or not customer/rider.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -6362,6 +6675,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -6469,6 +6798,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -6596,6 +6941,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -6875,6 +7236,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -6962,6 +7339,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -7510,6 +7903,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -7715,7 +8124,7 @@ paths:
                         title: Completing payment…
                         at: '2026-11-03T06:30:00Z'
                     razorpay:
-                      key_id: rzp_test_Jv7x2QmP9kLs4T
+                      key_id: rzp_test_EXAMPLEEXAMPLE
                       order_id: order_Nq3uVxY7kL9pQe
                       amount: 75300
                       currency: INR
@@ -8022,7 +8431,7 @@ paths:
                         title: Completing payment…
                         at: '2026-11-03T06:30:00Z'
                     razorpay:
-                      key_id: rzp_test_Jv7x2QmP9kLs4T
+                      key_id: rzp_test_EXAMPLEEXAMPLE
                       order_id: order_Nq3uVxY7kL9pQe
                       amount: 75300
                       currency: INR
@@ -9378,6 +9787,22 @@ paths:
                       details: {}
                   summary: NOT_FOUND
           description: The order does not exist or is not the caller's.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -9738,6 +10163,22 @@ paths:
                   summary: INVALID_STATE_TRANSITION
           description: '`INVALID_STATE_TRANSITION`: the order can no longer be cancelled
             in the app (`details.status`). Show ''Contact support''.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -9880,6 +10321,22 @@ paths:
                   summary: INVOICE_RENDERING_UNAVAILABLE
           description: Maintenance mode, or the PDF cannot be made right now (retry
             later).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -10283,6 +10740,22 @@ paths:
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated. `NOT_FOUND`: the requested object or page does not
             exist.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -10448,7 +10921,7 @@ paths:
                         title: Completing payment…
                         at: '2026-11-03T06:30:00Z'
                     razorpay:
-                      key_id: rzp_test_Jv7x2QmP9kLs4T
+                      key_id: rzp_test_EXAMPLEEXAMPLE
                       order_id: order_Nq4BcD5eF6gH7i
                       amount: 75300
                       currency: INR
@@ -10756,6 +11229,22 @@ paths:
                       details: {}
                   summary: NOT_FOUND
           description: The order does not exist or is not the caller's.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -10838,6 +11327,22 @@ paths:
                       details: {}
                   summary: NOT_FOUND
           description: No published page with this slug.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -11169,7 +11674,7 @@ paths:
               Payment.captured:
                 value:
                   entity: event
-                  account_id: acc_Jv7x2QmP9kLs4T
+                  account_id: acc_EXAMPLEEXAMPLE
                   event: payment.captured
                   contains:
                   - payment
@@ -11191,7 +11696,7 @@ paths:
               Payment.failed:
                 value:
                   entity: event
-                  account_id: acc_Jv7x2QmP9kLs4T
+                  account_id: acc_EXAMPLEEXAMPLE
                   event: payment.failed
                   contains:
                   - payment
@@ -11606,6 +12111,22 @@ paths:
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated. `NOT_FOUND`: the requested object or page does not
             exist.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -12088,6 +12609,22 @@ paths:
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated. `NOT_FOUND`: the requested object or page does not
             exist.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -12384,6 +12921,22 @@ paths:
                   summary: Until the slice lands
           description: Maintenance (`MAINTENANCE`), or, until this operation's slice
             lands, `SERVICE_UNAVAILABLE` (contract only).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -12756,6 +13309,22 @@ paths:
                   summary: Until the slice lands
           description: Maintenance (`MAINTENANCE`), or, until this operation's slice
             lands, `SERVICE_UNAVAILABLE` (contract only).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -13605,6 +14174,22 @@ paths:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
           description: The caller has no rider profile (`details.rider_status` = NONE).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -13813,6 +14398,22 @@ paths:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
           description: The caller has no rider profile (`details.rider_status` = NONE).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -14043,6 +14644,22 @@ paths:
                       details: {}
                   summary: OFFER_TAKEN
           description: Too late.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -14207,6 +14824,22 @@ paths:
                   summary: Until the slice lands
           description: Maintenance (`MAINTENANCE`), or, until this operation's slice
             lands, `SERVICE_UNAVAILABLE` (contract only).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -14335,6 +14968,22 @@ paths:
                   summary: Until the slice lands
           description: Maintenance (`MAINTENANCE`), or, until this operation's slice
             lands, `SERVICE_UNAVAILABLE` (contract only).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -14462,6 +15111,22 @@ paths:
                   summary: Until the slice lands
           description: Maintenance (`MAINTENANCE`), or, until this operation's slice
             lands, `SERVICE_UNAVAILABLE` (contract only).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -14830,6 +15495,22 @@ paths:
                         reason: ACTIVE_TASK
                   summary: INVALID_STATE_TRANSITION
           description: On a delivery.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -15042,6 +15723,22 @@ paths:
                         radius_m: 2000
                   summary: OUTSIDE_GEOFENCE
           description: Too far from the home store.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -15126,6 +15823,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -15386,6 +16099,22 @@ paths:
                         radius_m: 200
                   summary: OUTSIDE_GEOFENCE
           description: Too far (send `override_reason` to continue).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -15623,6 +16352,22 @@ paths:
                         radius_m: 200
                   summary: OUTSIDE_GEOFENCE
           description: Too far.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -15784,6 +16529,22 @@ paths:
                         status: AT_CUSTOMER
                   summary: INVALID_STATE_TRANSITION
           description: Not a COD task at the customer.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -16081,6 +16842,22 @@ paths:
                         attempts_remaining: 0
                   summary: DELIVERY_OTP_LOCKED
           description: Locked after 5 wrong OTPs.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -16317,6 +17094,22 @@ paths:
                         not_reachable_after: '2026-11-10T09:59:30Z'
                   summary: WAIT_NOT_ELAPSED
           description: Too early, or not out for delivery.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -16576,6 +17369,22 @@ paths:
                         order_status: PACKED
                   summary: NOT_AT_STORE
           description: Not at the store, or the order is not packed yet.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -16768,6 +17577,22 @@ paths:
                   summary: Until the slice lands
           description: Maintenance (`MAINTENANCE`), or, until this operation's slice
             lands, `SERVICE_UNAVAILABLE` (contract only).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -16936,6 +17761,22 @@ paths:
                   summary: Until the slice lands
           description: Maintenance (`MAINTENANCE`), or, until this operation's slice
             lands, `SERVICE_UNAVAILABLE` (contract only).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -17219,6 +18060,22 @@ paths:
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated. `NOT_FOUND`: the requested object or page does not
             exist.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -17400,6 +18257,22 @@ paths:
                   summary: 'Unknown or deactivated store: check serviceability again'
           description: '`STORE_NOT_FOUND`: the store in `X-Store-Id` does not exist
             or was deactivated.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -17542,6 +18415,22 @@ paths:
                         - Ensure this value is less than or equal to 90.
                   summary: Latitude out of range
           description: '`lat`/`lng` missing or out of range.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -17794,6 +18683,22 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
@@ -18113,6 +19018,22 @@ paths:
                       details: {}
                   summary: NOT_FOUND
           description: The ticket does not exist or is not the caller's.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
         '426':
           content:
             application/json:
