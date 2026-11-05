@@ -2,13 +2,10 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../domain/support_models.dart';
 
-/// FAQs and support tickets (`06 §2.7`, Phase 7).
-///
-/// TODO(api): `GET /faqs/?app=customer`, `GET/POST /support/tickets/`,
-/// `GET /support/tickets/{id}/` and `POST /support/tickets/{id}/messages/`
-/// are not in jivo_api yet. The screens run on [FakeSupportRepository]
-/// (`FAKE_API=true`, tests); the real-API build shows only the contact
-/// options from `config/app` ([UnavailableSupportRepository]).
+/// FAQs and support tickets (`06 §2.7`, Phase 7): `ApiSupportRepository`
+/// on the API, [FakeSupportRepository] with `FAKE_API` and in tests, and
+/// [UnavailableSupportRepository] where support isn't enabled (only the
+/// contact options from `config/app` show).
 abstract interface class SupportRepository {
   /// Active FAQs for the customer app, in display order. Throws [ApiError].
   Future<List<Faq>> faqs();
@@ -32,7 +29,7 @@ abstract interface class SupportRepository {
   Future<TicketThread> reply(int ticketId, String message);
 }
 
-/// The real-API build until the P7 endpoints exist.
+/// A build without in-app support (see `supportAvailableProvider`).
 class UnavailableSupportRepository implements SupportRepository {
   const UnavailableSupportRepository();
 
@@ -276,10 +273,14 @@ class FakeSupportRepository implements SupportRepository {
     _maybeFail();
     final current = _thread(ticketId);
     final body = message.trim();
-    if (!current.ticket.status.acceptsReplies || body.isEmpty) {
+    if (!current.canReply || body.isEmpty) {
       throw const ApiError(code: ApiErrorCode.validationError, statusCode: 400);
     }
     _addMessage(ticketId, body, fromSupport: false, at: _clock().toUtc());
+    // A reply reopens a resolved ticket (as the server does).
+    if (_tickets[ticketId]!.status == TicketStatus.resolved) {
+      _tickets[ticketId] = _with(_tickets[ticketId]!, status: TicketStatus.open);
+    }
     return _thread(ticketId);
   }
 }

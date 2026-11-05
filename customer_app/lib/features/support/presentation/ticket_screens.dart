@@ -435,7 +435,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
                 ),
               ),
             ),
-            if (value.ticket.status.acceptsReplies)
+            if (value.canReply)
               _ReplyBox(
                 controller: _reply,
                 sending: _sending,
