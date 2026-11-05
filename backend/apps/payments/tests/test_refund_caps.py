@@ -128,3 +128,63 @@ class TestRefundVolumeAlert:
         alerts = [r for r in caplog.records if "payment.refund_volume_high" in r.getMessage()]
         assert len(alerts) == 1  # the ops alert (orders.order_event), once per hour
         assert "Refund volume: staff" in caplog.text
+
+
+def fail(refund):
+    from apps.payments.models import Refund, RefundStatus
+
+    Refund.objects.filter(pk=refund.pk).update(status=RefundStatus.FAILED)
+    return Refund.objects.get(pk=refund.pk)
+
+
+class TestRetriesRespectTheCaps:
+    """PM decision on review of 100f182: retries stay within the retrier's caps, keep the
+    original refunder, and NULL refunders count towards Support's per-order total."""
+
+    def test_retry_keeps_the_original_refunder_and_still_counts(self, make_paid):
+        order = make_paid()
+        agent, retrier = staff(roles.SUPPORT), staff(roles.SUPPORT)
+        failed = fail(order_refunds.manual_refund(order.pk, D("300"), by=agent))
+        retry = order_refunds.retry_refund(failed.pk, by=retrier)
+        assert retry.initiated_by == agent
+        # Still Support's ₹300 on the order (the failed row is replaced, not added).
+        assert order_refunds.support_refunded_on_order(order) == D("300.00")
+        with pytest.raises(RefundCapExceeded):
+            order_refunds.manual_refund(order.pk, D("200.01"), by=retrier)
+
+    def test_capped_retrier_cannot_retry_above_their_per_order_cap(self, make_paid, superuser):
+        """A failed ₹558 refund by a Super Admin: Support may not retry it (above ₹500)."""
+        order = make_paid()
+        failed = fail(order_refunds.manual_refund(order.pk, D("558"), by=superuser))
+        with pytest.raises(RefundCapExceeded):
+            order_refunds.retry_refund(failed.pk, by=staff(roles.SUPPORT))
+        retry = order_refunds.retry_refund(failed.pk, by=staff(roles.FINANCE))  # uncapped
+        assert retry.initiated_by == superuser
+
+    def test_capped_retrier_cannot_retry_above_their_daily_cap(self, make_paid, settings):
+        settings.SUPPORT_REFUND_DAILY_LIMIT = D("150.00")
+        first, second = make_paid(), make_paid()
+        agent, retrier = staff(roles.SUPPORT), staff(roles.SUPPORT)
+        failed = fail(order_refunds.manual_refund(first.pk, D("100"), by=agent))
+        order_refunds.manual_refund(second.pk, D("100"), by=retrier)  # 50 left today
+        with pytest.raises(RefundCapExceeded, match="today"):
+            order_refunds.retry_refund(failed.pk, by=retrier)
+
+    def test_retry_of_own_failed_refund_does_not_count_it_twice(self, make_paid, settings):
+        settings.SUPPORT_REFUND_DAILY_LIMIT = D("100.00")
+        order = make_paid()
+        agent = staff(roles.SUPPORT)
+        failed = fail(order_refunds.manual_refund(order.pk, D("100"), by=agent))
+        retry = order_refunds.retry_refund(failed.pk, by=agent)  # replaces, not adds
+        assert retry.amount == D("100.00")
+        assert order_refunds.refunded_today_by(agent) == D("100.00")
+
+    def test_refunds_of_deleted_staff_count_towards_support(self, make_paid, superuser):
+        from apps.payments.models import Refund
+
+        order = make_paid()
+        refund = order_refunds.manual_refund(order.pk, D("400"), by=superuser)
+        Refund.objects.filter(pk=refund.pk).update(initiated_by=None)  # the staff row is gone
+        assert order_refunds.support_refunded_on_order(order) == D("400.00")
+        with pytest.raises(RefundCapExceeded, match=re.escape("₹100.00 is left")):
+            order_refunds.manual_refund(order.pk, D("100.01"), by=staff(roles.SUPPORT))

@@ -209,7 +209,7 @@ AUTHENTICATION_BACKENDS = [
 # Staff login throttling (09 §3.1, django-axes): lock a username+IP pair after N failures.
 AXES_FAILURE_LIMIT = env_int("AXES_FAILURE_LIMIT", default=5)
 AXES_COOLOFF_TIME = timedelta(minutes=env_int("AXES_COOLOFF_MINUTES", default=15))
-AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+# AXES_LOCKOUT_PARAMETERS: see the security (P8, T-814) block at the end of this file.
 AXES_RESET_ON_SUCCESS = True
 AXES_CLIENT_IP_CALLABLE = "apps.core.net.client_ip"
 # The admin form posts `username` (axes would default to USERNAME_FIELD, "email"); normalised so

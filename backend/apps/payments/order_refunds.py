@@ -311,11 +311,18 @@ def _capped_staff_ids(user_ids) -> set[int]:
     return set(user_ids) - set(uncapped.values_list("pk", flat=True))
 
 
-def support_refunded_on_order(order) -> Decimal:
-    """Manual refunds standing on the order that capped staff (Support) issued (DL-59)."""
+def support_refunded_on_order(order, *, exclude=None) -> Decimal:
+    """Manual refunds standing on the order that capped staff (Support) issued (DL-59). A
+    manual refund whose `initiated_by` is gone (NULL, deleted staff) counts too: nobody can show
+    it was Finance's. `exclude` leaves out one refund (the FAILED one a retry replaces)."""
     manual = live_refunds(list(Refund.objects.filter(order=order, reason=MANUAL)))
+    if exclude is not None:
+        manual = [r for r in manual if r.pk != exclude.pk]
     capped = _capped_staff_ids({r.initiated_by_id for r in manual if r.initiated_by_id})
-    return sum((r.amount for r in manual if r.initiated_by_id in capped), ZERO)
+    return sum(
+        (r.amount for r in manual if r.initiated_by_id is None or r.initiated_by_id in capped),
+        ZERO,
+    )
 
 
 def ist_day_start(now=None):
@@ -325,25 +332,28 @@ def ist_day_start(now=None):
     return local.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def refunded_today_by(user, now=None) -> Decimal:
+def refunded_today_by(user, now=None, *, exclude=None) -> Decimal:
     """Manual refunds standing that `user` issued since the start of the IST day (DL-59)."""
     refunds = Refund.objects.filter(
         reason=MANUAL, initiated_by=user, created_at__gte=ist_day_start(now)
     )
+    if exclude is not None:
+        refunds = refunds.exclude(pk=exclude.pk)
     return _committed(refunds)
 
 
-def _check_caps(order, amount: Decimal, by) -> None:
+def _check_caps(order, amount: Decimal, by, *, replacing: Refund | None = None) -> None:
     """DL-59, under the order lock and the refunder's user-row lock (so two refunds by one agent
-    on two orders cannot both pass the daily cap)."""
+    on two orders cannot both pass the daily cap). `replacing`: the FAILED refund a retry
+    replaces, which is left out of the totals (the retry takes its place)."""
     order_limit = round_money(settings.SUPPORT_REFUND_LIMIT)
-    left = max(order_limit - support_refunded_on_order(order), ZERO)
+    left = max(order_limit - support_refunded_on_order(order, exclude=replacing), ZERO)
     if amount > left:
         raise RefundCapExceeded(
             MSG_ABOVE_LIMIT.format(limit=f"₹{money_str(order_limit)}", left=f"₹{money_str(left)}")
         )
     daily_limit = round_money(settings.SUPPORT_REFUND_DAILY_LIMIT)
-    left = max(daily_limit - refunded_today_by(by), ZERO)
+    left = max(daily_limit - refunded_today_by(by, exclude=replacing), ZERO)
     if amount > left:
         raise RefundCapExceeded(
             MSG_ABOVE_DAILY_LIMIT.format(
@@ -431,7 +441,11 @@ def retry_refund(refund_id: int, *, by) -> Refund:
     """T-401c, the ops retry hook: a FAILED refund gets a new attempt
     (`refunds.retry_failed_refund`, a new row and receipt); a PENDING refund the gateway never
     answered (no gateway id, older than `REFUND_STUCK_MINUTES`) is sent again (the task looks
-    up an earlier refund by receipt first, so it never refunds twice). Audited."""
+    up an earlier refund by receipt first, so it never refunds twice). Audited.
+
+    DL-59: a capped retrier (Support) may retry a FAILED refund only within their caps (the
+    failed refund itself is left out of the totals), and the retry keeps the original
+    `initiated_by`. A stuck PENDING refund is re-sent as it is: no new refund, so no cap check."""
     if not can_refund(by):
         raise PermissionDenied(MSG_NO_PERMISSION)
     from apps.payments.tasks import process_refund
@@ -441,7 +455,7 @@ def retry_refund(refund_id: int, *, by) -> Refund:
         refund = Refund.objects.filter(pk=refund_id, order__in=orders).first()
         if refund is None:
             raise ValidationError(MSG_REFUND_NOT_FOUND)
-        orders.select_for_update().filter(pk=refund.order_id).first()  # lock order: order first
+        order = orders.select_for_update().filter(pk=refund.order_id).first()  # order first
         refund = Refund.objects.select_for_update().get(pk=refund.pk)
         stale = timezone.now() - timedelta(minutes=settings.REFUND_STUCK_MINUTES)
         if refund.status == RefundStatus.FAILED:
@@ -450,7 +464,14 @@ def retry_refund(refund_id: int, *, by) -> Refund:
                 created_at__gt=refund.created_at,
             ).exists():
                 raise ValidationError("This refund has already been retried.")
-            result = retry_failed_refund(refund, initiated_by=by)
+            if _is_capped(by):  # DL-59: a capped retrier stays within their caps
+                from apps.accounts.models import User
+
+                User.objects.select_for_update().filter(pk=by.pk).first()  # Lock: the retrier
+                _check_caps(order, refund.amount, by, replacing=refund)
+            # The retry keeps the original refunder, so it counts where the refund always did
+            # (e.g. towards the original Support agent's per-order total); `by` is audited.
+            result = retry_failed_refund(refund, initiated_by=refund.initiated_by)
         elif (
             refund.status == RefundStatus.PENDING
             and not refund.gateway_refund_id

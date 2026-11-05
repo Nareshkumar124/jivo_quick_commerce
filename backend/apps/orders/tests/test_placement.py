@@ -191,6 +191,47 @@ class TestOnline:
 
 
 class TestIdempotency:
+    def test_stale_replay_makes_no_gateway_call(self, checkout, shop, monkeypatch):
+        """T-814 review: a replay after the payment window, of an order still without an
+        attempt, never calls the gateway; the order is left for expiry."""
+        checkout.fill((shop.canola_1l, 2))
+        key = new_key()
+        expected = checkout.cart()["bill"]["grand_total"]
+        order = Order.objects.get(
+            pk=checkout.place("ONLINE", key=key, expected=expected)["order"]["id"]
+        )
+        order.payments.all().delete()
+        Order.objects.filter(pk=order.pk).update(
+            payment_expires_at=timezone.now() - timedelta(seconds=1)
+        )
+
+        def must_not_be_called(self, **kwargs):
+            raise AssertionError("gateway called for a stale replay")
+
+        monkeypatch.setattr(FakeRazorpayGateway, "create_order", must_not_be_called)
+        again = checkout.place("ONLINE", key=key, expected=expected, status=200)
+        assert again["order"]["id"] == order.pk
+        assert again["razorpay"] is None
+        assert not order.payments.exists()
+
+    def test_expiry_fails_an_order_without_an_attempt(self, checkout, shop):
+        """T-814 review: an order left without a payment attempt (a crash after the placement
+        commit) is failed by `expire_unpaid_orders`: T4, nothing reserved, coupon released."""
+        from apps.orders import services
+
+        coupon()
+        checkout.fill((shop.canola_1l, 2))
+        checkout.client.post("/api/v1/cart/coupon/", {"code": "JIVO50"}, headers=checkout.headers)
+        order = Order.objects.get(pk=checkout.place("ONLINE")["order"]["id"])
+        order.payments.all().delete()
+        assert reserved(shop, shop.canola_1l) == 2
+        assert CouponRedemption.objects.get(order=order).status == RedemptionStatus.HELD
+        services.expire_unpaid_orders(now=order.payment_expires_at + timedelta(seconds=1))
+        order.refresh_from_db()
+        assert (order.status, order.payment_status) == ("PAYMENT_FAILED", "FAILED")
+        assert reserved(shop, shop.canola_1l) == 0
+        assert CouponRedemption.objects.get(order=order).status == RedemptionStatus.RELEASED
+
     def test_replay_returns_the_first_order(self, checkout, shop):
         checkout.fill((shop.canola_1l, 2))
         key = new_key()

@@ -235,6 +235,10 @@ def _start_payment(order: Order, *, end_on_failure: bool = False) -> Order:
     order is ended first (`_end_unstarted`)."""
     if not _awaits_first_attempt(order):
         return order
+    if order.payment_expires_at is None or order.payment_expires_at <= timezone.now():
+        # A stale replay after the payment window: no gateway call; the order is left as it is
+        # for `expire_unpaid_orders` to fail (T4) and the response shows no payment to open.
+        return order
     try:
         gateway = get_gateway()
         gateway_order = gateway.create_order(
