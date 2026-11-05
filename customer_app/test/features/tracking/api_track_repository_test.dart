@@ -44,7 +44,9 @@ void main() {
     final (_, result) = await fetch('200/RiderHeadingToTheStore');
     final track = result as OrderTrack;
     expect(track.rider, isNotNull);
-    expect(track.rider!.name, isNotEmpty);
+    expect(track.rider!.name, 'Ravi K.');
+    // DL-56: the phone is sent only while OUT_FOR_DELIVERY.
+    expect(track.rider!.phone, isNull);
     expect(track.deliveryOtp, isNull);
   });
 

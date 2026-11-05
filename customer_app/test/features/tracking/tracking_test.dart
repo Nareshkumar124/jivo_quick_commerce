@@ -4,6 +4,7 @@ import 'package:customer_app/features/orders/domain/order.dart';
 import 'package:customer_app/features/tracking/data/track_repository.dart';
 import 'package:customer_app/features/tracking/domain/order_track.dart';
 import 'package:customer_app/features/tracking/presentation/tracking_providers.dart';
+import 'package:customer_app/features/tracking/presentation/delivery_cards.dart';
 import 'package:customer_app/features/tracking/presentation/tracking_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -156,5 +157,31 @@ void main() {
       destination: FakeTrackRepository.home,
     );
     expect(track.progress, 0);
+  });
+
+  group('RiderCard', () {
+    testWidgets('no phone (DL-56): the card stays, no call button', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        harness(const RiderCard(rider: TrackRider(name: 'Ravi K.'))),
+      );
+      expect(find.byKey(const Key('rider-card')), findsOneWidget);
+      expect(find.text('Ravi K.'), findsOneWidget);
+      expect(find.byKey(const Key('call-rider')), findsNothing);
+    });
+
+    testWidgets('with a phone: a 48 dp call button', (tester) async {
+      await tester.pumpWidget(
+        harness(
+          const RiderCard(
+            rider: TrackRider(name: 'Ravi K.', phone: '+919811122233'),
+          ),
+        ),
+      );
+      final call = find.byKey(const Key('call-rider'));
+      expect(call, findsOneWidget);
+      expect(tester.getSize(call).height, greaterThanOrEqualTo(48));
+    });
   });
 }
