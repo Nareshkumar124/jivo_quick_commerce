@@ -690,7 +690,10 @@ class RiderSession(Session):
         elif reply.error_code == "RIDER_OFFLINE":
             self.online = False  # the server set the rider offline: go online again next time
             return "set offline"
-        self.call("GET", f"{API}/rider/offers/current/", f"{API}/rider/offers/current/", auth=True)
+        if self.cfg.rider_offer_poll:
+            self.call(
+                "GET", f"{API}/rider/offers/current/", f"{API}/rider/offers/current/", auth=True
+            )
         if self.clock() - self.last_heartbeat >= self.cfg.heartbeat_every_s:
             beat = self.call(
                 "POST", f"{API}/rider/heartbeat/", f"{API}/rider/heartbeat/", auth=True

@@ -321,3 +321,68 @@ def test_cli_check_host_profiles_and_otp_env(monkeypatch, capsys):
     entries = out.strip().splitlines()[-1].split(",")
     assert len(entries) == 100
     assert entries[0] == "+919000000200:123456"
+
+
+# --------------------------------------------------------------------------- safety (review)
+
+
+@pytest.mark.parametrize(
+    "host",
+    [
+        "http://localhost.:8001",
+        "http://LOCALHOST.:8001",
+        "http://127.1:8001",
+        "http://2130706433:8001",
+        "http://0x7f000001:8001",
+        "http://0177.0.0.1:8001",
+        "http://127.0.0.1.:8001",
+    ],
+)
+def test_disguised_loopback_on_shared_ports_is_refused(host):
+    allowed = "localhost:8001,127.0.0.1:8001,127.1:8001,2130706433:8001,localhost.:8001"
+    with pytest.raises(UnsafeTarget, match="shared server"):
+        check_target(host, allowed)
+
+
+@pytest.mark.parametrize(
+    "host",
+    [
+        "http://localtest.me:8005",
+        "http://127.0.0.1.nip.io:8005",
+        "https://mixed.example",
+        "https://anywhere.example",
+        "https://mapped.example",
+    ],
+)
+def test_names_resolving_to_this_machine_are_refused(host):
+    allowed = (
+        "localtest.me:8005,127.0.0.1.nip.io:8005,mixed.example,anywhere.example,mapped.example"
+    )
+    with pytest.raises(UnsafeTarget, match="resolves to this machine"):
+        check_target(host, allowed)
+
+
+@pytest.mark.parametrize("host", ["https://nowhere.invalid", "https://empty.example"])
+def test_names_that_do_not_resolve_are_refused(host):
+    with pytest.raises(UnsafeTarget, match="does not resolve"):
+        check_target(host, "nowhere.invalid,empty.example")
+
+
+def test_normalised_forms_match_the_allow_list():
+    assert check_target("http://127.1:8005", "127.0.0.1:8005") == "127.0.0.1:8005"
+    assert check_target("https://staging.example.com.", "staging.example.com") == (
+        "staging.example.com:443"
+    )
+    assert check_target("https://staging.example.com", "STAGING.example.com.") == (
+        "staging.example.com:443"
+    )
+
+
+def test_ipv6_loopback_target_format():
+    with pytest.raises(UnsafeTarget, match=r"\[::1\]:8001"):
+        check_target("http://[::1]:8001", "[::1]:8001")
+
+
+def test_an_explicit_resolver_is_used():
+    with pytest.raises(UnsafeTarget, match="resolves to this machine"):
+        check_target("https://x.example", "x.example", resolver=lambda name: ["127.0.0.2"])

@@ -21,6 +21,13 @@ uv run jivo-loadtest profiles      # what each profile does, and the thresholds
   `host:port`; a bare host means the scheme's default port). Without that variable, nothing runs.
 - Loopback hosts on ports **8000, 8001 and 8004** are always refused, even when listed. :8001
   is the PM's develop server on the shared dev DB, and :8004 is QA's instance.
+- Host names are normalised before any check:
+  - lower case, with a trailing `.` removed (`localhost.:8001` is `localhost:8001`);
+  - IPv4 shorthand rewritten through `inet_aton` (`127.1`, `2130706433` and `0x7f000001` are
+    all `127.0.0.1`).
+- A host *name* must resolve, and none of its addresses may be loopback. `localtest.me`,
+  `*.nip.io` names pointing at 127.0.0.1 and similar are refused, and so is a name that does not
+  resolve. For a throwaway local server, use the IP address itself (`127.0.0.1:8005`).
 - The same checks run inside `locustfile.py`, so `locust -f locustfile.py ...` is refused too.
   The check happens before any user starts, and the exit code is 2.
 - Distributed Locust (`--processes`, master/worker) is refused: each buyer and rider owns one
@@ -33,9 +40,14 @@ uv run jivo-loadtest profiles      # what each profile does, and the thresholds
 | What | Range / tag | Created by | Removed by |
 |---|---|---|---|
 | Customers (buyers) | `+919000000200` to `+919000000299` (`+9190000002xx`), name `Loadtest 2xx`, address labelled `loadtest` | `manage.py loadtest_seed` | `manage.py loadtest_cleanup` |
-| Riders | `+919000000300` to `+919000000399` (`+9190000003xx`) | not yet: see "Riders" below | - |
+| Riders | `+919000000300` to `+919000000399` (`+9190000003xx`), name `Loadtest 3xx`, ACTIVE bicycle riders with home store `--store` | `loadtest_seed --riders N --approver <staff email>` | `loadtest_cleanup` (ends an open shift, deletes the profile, KYC files and history) |
 | Stock top-ups | ledger reason `loadtest: seed top-up` (INWARD) | `loadtest_seed --stock-floor N` | reversed by `loadtest_cleanup` (AUDIT_ADJUSTMENT, `loadtest: cleanup reversal`) |
 | Orders, payments, refunds, OTP requests | belong to the load-test customers | the run | `loadtest_cleanup` |
+
+**Only tagged accounts are touched.** A load-test account is in one of the two ranges *and* is
+named exactly `Loadtest NNN` (its last three digits). Staff and superusers are never touched.
+Neither is a customer-range account with a rider profile, or any account with another name.
+Seeding refuses such an account. Cleanup leaves it and its orders alone, and lists it as "kept".
 
 Both commands are **refused unless the backend has `LOADTEST_DATA_ALLOWED=true`**, and they are
 always refused in production. Production settings also refuse to start with that variable set,
@@ -54,6 +66,9 @@ you can re-run it:
 ## Running on staging
 
 1. **Backend settings** (staging env file, then restart web and worker):
+   - **Razorpay test keys only**: an `rzp_test_...` `RAZORPAY_KEY_ID` with its test secret and
+     test webhook secret. Never run a load test against live keys. Staging refuses the fake
+     gateway (`payments.E001`), so ONLINE checkouts create real Razorpay test-mode orders.
    - `LOADTEST_DATA_ALLOWED=true`
    - `OTP_TEST_NUMBERS`: add the load-test numbers. Get them with
      `uv run jivo-loadtest otp-env --riders 40` (customers plus riders), or with
@@ -65,8 +80,13 @@ you can re-run it:
    - Check the P5 rider limits (location and heartbeat rates) against the rider cadence below.
 2. **Seed** on the staging backend:
    ```bash
-   uv run python manage.py loadtest_seed --store GGN-01 --stock-floor 5000
+   uv run python manage.py loadtest_seed --store GGN-01 --stock-floor 5000 \
+     --riders 40 --approver ops@jivo.test
    ```
+   The riders are registered, given generated document images, fake numbers and bank details,
+   and approved through the normal KYC services. `--approver` must be an active staff user who
+   may review riders at the store (Ops, for example), and the KYC audit log names them. The
+   document images go to the private bucket, and cleanup deletes them.
    It creates 100 customers with a default address at the store point. Pass `--lat/--lng` for
    another point; the command warns when that point is outside the store's area. It also tops
    every sellable stock row up to 5000 free units. The store must be **open** during the run.
@@ -78,7 +98,11 @@ you can re-run it:
 4. **The gate**: `--profile target` (about 20 minutes) and optionally `--profile ramp` (13 minutes,
    a step ramp that shows where latency starts to climb). Use `--dry-run` first to see the plan.
 5. **Clean up**: wait for the Celery queue to drain, then run `manage.py loadtest_cleanup`, read
-   the dry run, then `manage.py loadtest_cleanup --yes`. Restore the rate limits and set
+   the dry run, then `manage.py loadtest_cleanup --yes`. **Cleanup cancels open orders through
+   the normal order service, so a paid ONLINE order is refunded.** With Razorpay test keys that
+   is a test-mode refund. The harness never pays on staging, but a load-test order someone paid
+   by hand would be refunded. Such orders stay "kept" until the refund settles, and a re-run then
+   removes them. Restore the rate limits and set
    `LOADTEST_DATA_ALLOWED=false`.
 6. **Report**: fill in `RESULTS_TEMPLATE.md` from the run folder, then attach it to the phase gate.
 
@@ -104,14 +128,13 @@ Options: `--online-share`, `--cancel-share`, `--riders N` (0 to disable), `--lat
 and `--app-version`. Each also has a `LOADTEST_*` environment variable (see
 `jivo_loadtest/config.py`).
 
-### Riders: what is still needed
+### Riders
 
 The rider journey uses the Phase 5 contract (`/rider/me/`, `/rider/shift/start/`,
-`/rider/locations/`, `/rider/offers/current/`, `/rider/heartbeat/`, `/rider/shift/end/`) and is
-unit-tested against it. The load-test riders still need to be **seeded**. That means ACTIVE riders
-with approved documents and GGN-01 as their home store, in the `+9190000003xx` range, plus a
-cleanup. This lands in `loadtest_seed` / `loadtest_cleanup` once this branch carries the P5
-`delivery` app. Until then, run with `--riders 0`, or seed riders by hand through the Ops Console.
+`/rider/locations/`, `/rider/offers/current/`, `/rider/heartbeat/` and `/rider/shift/end/`). The
+riders must be seeded ACTIVE (step 2) and listed in `OTP_TEST_NUMBERS`. A rider that is not ACTIVE
+is recorded as a failed `rider shift` journey. Shift start checks the 2 km geofence around the
+home store, so keep `--lat/--lng` near the store. Use `--riders 0` against a server without P5.
 
 ## Pass/fail thresholds
 
@@ -144,12 +167,12 @@ POSTGRES_TEST_DB=test_jivo_quick_commerce_loadtest TEST_REDIS_DB=10 \
 # 2. Point a local-settings server at it, with Redis DB 10 for cache, channels and broker:
 export POSTGRES_DB=test_jivo_quick_commerce_loadtest REDIS_URL=redis://127.0.0.1:6380/10 \
   CHANNELS_REDIS_URL=redis://127.0.0.1:6380/10 CELERY_BROKER_URL=redis://127.0.0.1:6380/10 \
-  LOADTEST_DATA_ALLOWED=true OTP_TEST_NUMBERS="$(cd ../loadtest && uv run jivo-loadtest otp-env)"
-uv run python manage.py seed_demo && uv run python manage.py loadtest_seed --store GGN-01 --stock-floor 2000
+  LOADTEST_DATA_ALLOWED=true OTP_TEST_NUMBERS="$(cd ../loadtest && uv run jivo-loadtest otp-env --riders 3)"
+uv run python manage.py seed_demo && uv run python manage.py loadtest_seed --store GGN-01 \n  --stock-floor 2000 --riders 3 --approver ops@jivo.test
 uv run python manage.py runserver 127.0.0.1:8005 --noreload
 # 3. In another shell:
 cd loadtest && LOADTEST_ALLOWED_HOSTS=127.0.0.1:8005 \
-  uv run jivo-loadtest run --host http://127.0.0.1:8005 --profile smoke --riders 0
+  uv run jivo-loadtest run --host http://127.0.0.1:8005 --profile smoke
 ```
 
 Latencies from such a run (single-process DEBUG `runserver`, remote DB at about 10 ms per query)

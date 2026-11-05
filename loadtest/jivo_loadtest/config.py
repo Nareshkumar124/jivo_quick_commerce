@@ -42,6 +42,9 @@ class RunConfig:
     polls: int = 3  # GET /orders/{id}/ polls per order (the app's fallback polling)
     riders: int | None = None  # overrides the profile's rider sessions when set
     heartbeat_every_s: float = 60.0  # rider app: a heartbeat about every minute while online
+    # GET /rider/offers/current/ each interval. Off until the backend's P5 slice 5.3 ships it
+    # (it answers 503 "not available yet" before that): LOADTEST_RIDER_OFFER_POLL=false.
+    rider_offer_poll: bool = True
     search_terms: tuple[str, ...] = field(
         default=("oil", "olive", "canola", "mustard", "jivo", "seeds", "ghee", "juice")
     )
@@ -63,5 +66,7 @@ class RunConfig:
             if os.environ.get("LOADTEST_RIDERS")
             else None,
             search_terms=terms or cls().search_terms,
+            rider_offer_poll=_env("LOADTEST_RIDER_OFFER_POLL", "true").lower()
+            not in {"0", "false", "no", "off"},
             results_dir=_env("LOADTEST_RESULTS_DIR", cls.results_dir),
         )

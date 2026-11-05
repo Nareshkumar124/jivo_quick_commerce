@@ -233,7 +233,7 @@ class TestSeed:
 
     def test_never_touches_a_staff_user_in_the_range(self, allowed, shop):  # noqa: F811
         StaffUserFactory(phone=services.PHONES[0])
-        with pytest.raises(CommandError, match="staff user"):
+        with pytest.raises(CommandError, match="staff or superuser"):
             run("loadtest_seed", "--store", shop.store_model.code, "--users", "1")
 
 

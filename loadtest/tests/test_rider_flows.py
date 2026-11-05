@@ -166,3 +166,17 @@ def test_cli_riders_option_and_otp_env(monkeypatch, capsys):
     assert last == (
         "+919000000200:123456,+919000000201:123456,+919000000300:123456,+919000000301:123456"
     )
+
+
+def test_offer_poll_can_be_switched_off(monkeypatch):
+    """Until the backend's P5 slice 5.3 ships `GET /rider/offers/current/` (503 before)."""
+    monkeypatch.setenv("LOADTEST_RIDER_OFFER_POLL", "false")
+    cfg = RunConfig.from_env()
+    assert cfg.rider_offer_poll is False
+    api = FakeApi()
+    r = RiderSession(api, cfg, phone=RIDER_PHONES[0], recorder=Recorder())
+    assert r.rider_journey() == "online"
+    assert f"GET {API}/rider/offers/current/" not in api.names()
+    assert f"POST {API}/rider/locations/" in api.names()
+    monkeypatch.delenv("LOADTEST_RIDER_OFFER_POLL")
+    assert RunConfig.from_env().rider_offer_poll is True

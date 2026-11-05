@@ -21,8 +21,9 @@ def _coordinate(value: str) -> Decimal:
 
 class Command(BaseCommand):
     help = (
-        "Create the load-test customers (+9190000002xx) with a default address, and top the "
-        "store's stock up for the run. Staging only (LOADTEST_DATA_ALLOWED)."
+        "Create the load-test customers (+9190000002xx) with a default address, optionally "
+        "ACTIVE load-test riders (+9190000003xx) at the store, and top the store's stock up "
+        "for the run. Staging only (LOADTEST_DATA_ALLOWED)."
     )
 
     def add_arguments(self, parser) -> None:
@@ -42,6 +43,16 @@ class Command(BaseCommand):
             help="Top each sellable stock row up to this many free units (default 5000).",
         )
         parser.add_argument(
+            "--riders",
+            type=int,
+            default=0,
+            help=f"ACTIVE load-test riders, home store --store (0-{services.MAX_RIDERS}).",
+        )
+        parser.add_argument(
+            "--approver",
+            help="Email of the staff user who approves the riders' KYC (needed with --riders).",
+        )
+        parser.add_argument(
             "--print-otp-env",
             action="store_true",
             help="Print the OTP_TEST_NUMBERS value that adds the load-test numbers.",
@@ -58,12 +69,16 @@ class Command(BaseCommand):
         if (options["lat"] is None) != (options["lng"] is None):
             raise CommandError("Give both --lat and --lng, or neither.")
         try:
+            services.rider_phones(options["riders"])  # range first (ValueError)
+            approver = services.resolve_approver(options["approver"]) if options["riders"] else None
             result = services.seed(
                 store=store,
                 users=options["users"],
                 lat=options["lat"],
                 lng=options["lng"],
                 stock_floor=options["stock_floor"],
+                riders=options["riders"],
+                approver=approver,
             )
         except (ValueError, services.LoadtestRefused) as exc:
             raise CommandError(str(exc)) from exc
@@ -77,6 +92,11 @@ class Command(BaseCommand):
             f"loadtest_seed: stock at {store.code}: {result.stock_rows_topped_up} rows topped "
             f"up, {result.units_added} units added (reason {services.REASON_TOPUP!r})"
         )
+        if options["riders"]:
+            out.write(
+                f"loadtest_seed: riders {result.riders_created} approved now, "
+                f"{result.riders_existing} already ACTIVE (home store {store.code})"
+            )
         if not result.point_in_store_area:
             out.write(
                 self.style.WARNING(
@@ -93,5 +113,6 @@ class Command(BaseCommand):
                 )
             )
         if options["print_otp_env"]:
-            out.write(f"OTP_TEST_NUMBERS={services.otp_env_value(options['users'])}")
+            value = services.otp_env_value(options["users"], riders=options["riders"])
+            out.write(f"OTP_TEST_NUMBERS={value}")
         out.write(self.style.SUCCESS("loadtest_seed: done."))

@@ -13,8 +13,8 @@ from apps.loadtest import services
 class Command(BaseCommand):
     help = (
         "Cancel and delete the load-test customers' orders, delete the customers "
-        "(+9190000002xx) and their OTP requests, and reverse the seed's stock top-ups. Dry run "
-        "unless --yes. Staging only (LOADTEST_DATA_ALLOWED)."
+        "(+9190000002xx), the riders (+9190000003xx) and their OTP requests, and reverse the "
+        "seed's stock top-ups. Dry run unless --yes. Staging only (LOADTEST_DATA_ALLOWED)."
     )
 
     def add_arguments(self, parser) -> None:
@@ -44,7 +44,8 @@ class Command(BaseCommand):
         )
         out.write(
             f"loadtest_cleanup: customers {result.users_found} found, {result.users_deleted} "
-            f"{verb}deleted, {len(result.kept_users)} kept; OTP requests "
+            f"{verb}deleted; riders {result.riders_found} found, {result.riders_deleted} "
+            f"{verb}deleted; {len(result.kept_users)} accounts kept; OTP requests "
             f"{result.otp_requests_deleted} {verb}deleted"
         )
         out.write(
@@ -54,5 +55,7 @@ class Command(BaseCommand):
         for number, reason in sorted(result.kept_orders.items()):
             out.write(self.style.WARNING(f"  kept order {number}: {reason}"))
         for phone, reason in sorted(result.kept_users.items()):
-            out.write(self.style.WARNING(f"  kept customer {phone}: {reason}"))
+            out.write(self.style.WARNING(f"  kept account {phone}: {reason}"))
+        for row, reason in sorted(result.kept_stock.items()):
+            out.write(self.style.WARNING(f"  kept stock row {row} (store/variant): {reason}"))
         out.write(self.style.SUCCESS("loadtest_cleanup: done."))
