@@ -19,10 +19,12 @@ class PlatformPermissionsService implements PermissionsService {
       ph.Permission.locationAlways.status,
       ph.Permission.notification.status,
     ]);
+    final whenInUse = _grant(results[0]);
     return PermissionSnapshot(
       sdkInt: info.sdkInt,
       manufacturer: info.manufacturer,
-      locationWhenInUse: _grant(results[0]),
+      locationWhenInUse: whenInUse,
+      locationPrecise: whenInUse != Grant.granted || await _isPrecise(),
       locationAlways: _grant(results[1]),
       notifications: _grant(results[2]),
       batteryOptimisationIgnored:
@@ -30,6 +32,17 @@ class PlatformPermissionsService implements PermissionsService {
       gpsEnabled: await Geolocator.isLocationServiceEnabled(),
       fullScreenIntentAllowed: await _device.canUseFullScreenIntent(),
     );
+  }
+
+  /// Android 12+ "Precise" vs "Approximate". Assumes precise if the check
+  /// fails, so a plugin error never blocks a rider who granted it.
+  static Future<bool> _isPrecise() async {
+    try {
+      return await Geolocator.getLocationAccuracy() !=
+          LocationAccuracyStatus.reduced;
+    } on Object {
+      return true;
+    }
   }
 
   static Grant _grant(ph.PermissionStatus status) => switch (status) {

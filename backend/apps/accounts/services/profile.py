@@ -37,6 +37,14 @@ def update_profile(user: User, data: dict) -> User:
     return user
 
 
+def unregister_device(user: User, *, fcm_token: str) -> None:
+    """Deactivate the caller's device with this token (no push any more). Idempotent; a token
+    of another user, or an unknown one, changes nothing (never revealed)."""
+    Device.objects.filter(user=user, fcm_token=fcm_token).update(
+        is_active=False, updated_at=timezone.now()
+    )
+
+
 def register_device(
     user: User, *, fcm_token: str, app: str, platform: str, app_version: str
 ) -> Device:

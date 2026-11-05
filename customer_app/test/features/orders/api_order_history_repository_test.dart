@@ -181,16 +181,40 @@ void main() {
     expect('${sent.headers['X-Store-Id']}', '7');
     expect(result.addedAll, isFalse);
     expect(result.cart, isNotNull);
-    final out = result.unavailable.first;
+    // The P5 schema's example: one line out of stock, two lines added.
+    final out = result.unavailable.single;
     expect(out.reason, ReorderSkipReason.outOfStock);
     expect(out.productName, 'Jivo Chia Seeds');
+    expect(out.requestedQuantity, 2);
     expect(out.addedQuantity, 0);
-    final limited = result.unavailable.last;
+    expect(result.addedCount, 2);
+    // The server's added_count decides, not the local count.
+    expect(result.addedNothing(1), isFalse);
+  });
+
+  test('reorder: LIMITED_STOCK maps to a reduced quantity; added_count 0 '
+      'means nothing was added', () async {
+    final body = Map<String, Object?>.from(
+      contractExample('orders_reorder/200/SomeItemsUnavailable')! as Map,
+    )
+      ..['added_count'] = 0
+      ..['unavailable'] = [
+        {
+          'variant_id': 1002,
+          'product_name': 'Jivo Cold Pressed Canola Oil',
+          'variant_name': '5 L',
+          'requested_quantity': 3,
+          'added_quantity': 2,
+          'reason': 'LIMITED_STOCK',
+        },
+      ];
+    answer = (_) => body;
+    final result = await repository.reorder(4870);
+    final limited = result.unavailable.single;
     expect(limited.reason, ReorderSkipReason.quantityReduced);
     expect(limited.requestedQuantity, 3);
     expect(limited.addedQuantity, 2);
-    expect(result.addedNothing(3), isFalse);
-    expect(result.addedNothing(1), isTrue);
+    expect(result.addedNothing(5), isTrue);
   });
 
   test('reorder with everything added', () async {

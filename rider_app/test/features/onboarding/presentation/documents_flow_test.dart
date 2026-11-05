@@ -16,7 +16,7 @@ String statusOf(WidgetTester tester, KycDocumentType type) =>
 void main() {
   late RiderTestHarness h;
 
-  setUp(() => h = RiderTestHarness());
+  setUp(() => h = RiderTestHarness()..surface = const Size(1080, 3200));
 
   /// A PENDING_KYC rider with nothing uploaded, on the documents screen.
   Future<void> openDocuments(

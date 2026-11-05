@@ -20,7 +20,9 @@
 #      same-type oneOf such as drf-spectacular's blank-allowed EmailField into
 #      a plain string), then generates a `dart-dio` client with
 #      json_serializable models into a temp dir. `format: decimal` is mapped
-#      to String: money is never a double.
+#      to String: money is never a double. patch_dates.py then makes
+#      `format: date` fields and query parameters serialise as YYYY-MM-DD
+#      (they stay DateTime; responses parse as before).
 #      Enums get an unknown-value fallback, because additive API changes
 #      (new enum values) are allowed in v1 and must not crash older apps.
 #   3. Replaces DIR/lib and DIR/build.yaml with the generated ones and writes
@@ -134,6 +136,9 @@ java -jar "$JAR" generate \
   --global-property=apiTests=false,modelTests=false,apiDocs=false,modelDocs=false \
   > "${TMP_DIR}/generator.log" 2>&1 \
   || { cat "${TMP_DIR}/generator.log" >&2; die "openapi-generator failed"; }
+
+# `format: date` must go out as YYYY-MM-DD, not a full datetime (#38).
+python3 -I "${SCRIPT_DIR}/patch_dates.py"   "${TMP_DIR}/spec/normalized.json" "${GEN_DIR}/lib"   || die "patch_dates.py failed"
 
 # Fail loudly if the generated code needs dependencies this script doesn't add.
 GENERATED_DEPENDENCIES="$(awk '

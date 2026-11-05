@@ -15,7 +15,7 @@ from apps.cms.models import AppConfig
 
 logger = logging.getLogger(__name__)
 
-CACHE_KEY = "cms:app-config:v1"
+CACHE_KEY = "cms:app-config:v2"  # v2: Phase 5 rider location fields
 CACHE_SECONDS = 60
 
 
@@ -46,6 +46,9 @@ class ConfigSnapshot:
     terms_version: str
     rider_location_active_interval_seconds: int
     rider_location_idle_interval_seconds: int
+    rider_location_active_sample_seconds: int = 5
+    rider_location_idle_sample_seconds: int = 30
+    rider_location_max_batch: int = 50
     feature_flags: dict = field(default_factory=dict)
     versions: dict[tuple[str, str], VersionPolicy] = field(default_factory=dict)
 
@@ -68,6 +71,9 @@ def _build_snapshot() -> ConfigSnapshot:
         terms_version=config.terms_version,
         rider_location_active_interval_seconds=config.rider_location_active_interval_seconds,
         rider_location_idle_interval_seconds=config.rider_location_idle_interval_seconds,
+        rider_location_active_sample_seconds=config.rider_location_active_sample_seconds,
+        rider_location_idle_sample_seconds=config.rider_location_idle_sample_seconds,
+        rider_location_max_batch=config.rider_location_max_batch,
         feature_flags={str(k): bool(v) for k, v in (config.feature_flags or {}).items()},
         versions={
             (row.app, row.platform): VersionPolicy(
@@ -76,6 +82,18 @@ def _build_snapshot() -> ConfigSnapshot:
             for row in config.versions.all()
         },
     )
+
+
+def rider_location_settings(config: ConfigSnapshot | None = None) -> dict:
+    """The `RiderLocationSettings` body (config/app and the rider shift/location responses)."""
+    config = config or get_app_config()
+    return {
+        "active_interval_seconds": config.rider_location_active_interval_seconds,
+        "idle_interval_seconds": config.rider_location_idle_interval_seconds,
+        "active_sample_seconds": config.rider_location_active_sample_seconds,
+        "idle_sample_seconds": config.rider_location_idle_sample_seconds,
+        "max_batch": config.rider_location_max_batch,
+    }
 
 
 def get_app_config() -> ConfigSnapshot:
