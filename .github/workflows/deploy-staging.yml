@@ -57,6 +57,16 @@ jobs:
             echo "::error::STAGING_BACKEND_ENV sets JQC_SKIP_STARTUP_CHECK; remove it (the entrypoint refuses it under staging settings)."
             exit 1
           fi
+          # Keys the deploy checks need (accounts.E005 and the OTP hash): present and non-empty.
+          # Their length and distinctness are checked by the entrypoint's `check --deploy` below.
+          missing=""
+          for key in DJANGO_SECRET_KEY JWT_SIGNING_KEY OTP_HASH_KEY; do
+            grep -Eq "^${key}=.+" "$envfile" || missing="$missing $key"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::STAGING_BACKEND_ENV is missing or empty for:$missing (docs/deployment.md §11.1)."
+            exit 1
+          fi
           # The image ENTRYPOINT runs `check --deploy --fail-level ERROR`, then the command (`true`).
           docker run --rm --network none --env-file "$envfile" "$IMAGE" true
 
