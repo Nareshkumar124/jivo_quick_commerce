@@ -110,6 +110,40 @@ void main() {
     expect(h.location.running, isFalse);
   });
 
+  testWidgets('a rejected document blocks going online: guard with '
+      '"See documents" (DOCUMENTS_NOT_APPROVED)', (tester) async {
+    h.shift.nextStartError = const ApiError(
+      code: ApiErrorCode.invalidStateTransition,
+      statusCode: 409,
+      details: {
+        'reason': 'DOCUMENTS_NOT_APPROVED',
+        'doc_types': ['DL'],
+      },
+    );
+    await pumpActiveHome(tester, h);
+    await tapToggle(tester);
+    expect(
+      textOf(tester, 'shift-problem-text'),
+      'Some documents need a new upload',
+    );
+    expect(find.text('See documents'), findsOneWidget);
+    final toggle = tester.widget<FilledButton>(byKey('shift-toggle'));
+    expect(toggle.onPressed, isNull);
+  });
+
+  testWidgets('a throttled go-online (429) reads calmly', (tester) async {
+    h.shift.nextStartError = const ApiError(
+      code: ApiErrorCode.rateLimited,
+      statusCode: 429,
+    );
+    await pumpActiveHome(tester, h);
+    await tapToggle(tester);
+    expect(
+      textOf(tester, 'shift-problem-text'),
+      'Too many tries. Wait a moment, then try again.',
+    );
+  });
+
   testWidgets('auto-offline: "You were set offline" with the reason', (
     tester,
   ) async {

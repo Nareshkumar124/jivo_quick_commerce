@@ -53,7 +53,7 @@ OrderTrack orderTrackFromApi(api.OrderTrack t) {
         ? null
         : TrackRider(
             name: rider.name,
-            phone: rider.phone.trim().isEmpty ? null : rider.phone.trim(),
+            phone: _blankToNull(rider.phone),
             photoUrl:
                 photoUri != null &&
                     photoUri.scheme == 'https' &&
@@ -65,6 +65,14 @@ OrderTrack orderTrackFromApi(api.OrderTrack t) {
           ),
     deliveryOtp: otp == null || otp.isEmpty ? null : otp,
   );
+}
+
+/// Null for a missing or blank value. The rider's phone is sent only while
+/// OUT_FOR_DELIVERY and only to the order's owner (DL-56); without it the
+/// rider card stays and the call button is hidden.
+String? _blankToNull(String? value) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
 }
 
 /// The build without tracking (staging/prod until orders are enabled there,

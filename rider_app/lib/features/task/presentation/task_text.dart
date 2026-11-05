@@ -4,6 +4,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/task_status.dart';
 import 'task_flow_controller.dart';
+import '../../../shared/errors/rider_error_text.dart';
 
 /// User-facing text for an offer or task error (one place, agent rule 10).
 /// Server messages are never shown; codes and details decide the text.
@@ -41,7 +42,7 @@ String taskErrorText(
     case ApiErrorCode.offerTaken:
       return l10n.offerTakenBody;
     default:
-      return apiErrorMessage(JivoCoreLocalizations.of(context), error);
+      return riderApiErrorMessage(context, error);
   }
 }
 

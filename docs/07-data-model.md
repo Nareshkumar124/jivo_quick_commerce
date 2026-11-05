@@ -230,8 +230,8 @@ Phase 5 implementation (slices 5.1/5.2, migration `delivery.0001`):
 
 ### 2.9 Notifications, support, CMS
 
-**NotificationTemplate**: `event` (e.g., `order.out_for_delivery`), `channel` (PUSH/SMS), `app`, `title`, `body` (with `{{placeholders}}`), `dlt_template_id` (SMS), `is_active`.
-**Notification**: `user`, `app`, `title`, `body`, `data` (JSON deep link), `category` (order/promo/system), `sent_at`, `read_at`.
+**NotificationTemplate**: `event` (e.g., `order.out_for_delivery`), `channel` (PUSH/SMS), `app`, `title`, `body` (with `{{placeholders}}`), `dlt_template_id` (SMS), `is_active`. Unique (`event`, `channel`, `app`). Optional: an active row overrides the built-in text in `apps.notifications.catalog` (Phase 6).
+**Notification**: `user`, `app`, `event`, `title`, `body`, `data` (JSON: FCM data payload fields and the `link`), `category` (order/promo/system), `order_id` (nullable, no FK), `dedupe_key` (unique: event + user + order, so an event notifies once), `in_inbox`, `read_at`. Per channel: `push_status` / `sms_status` (NONE, PENDING, SENDING, SENT, SKIPPED, FAILED), `push_title`, `push_body`, `sms_body`, `sms_dlt_template_id`, `push_sent_at` / `sms_sent_at` (07's original `sent_at`). The push and SMS bodies are blanked once their channel is final, because they can hold a delivery OTP; the inbox `body` never does. Indexed by (`user`, `app`, `-created_at`) where `in_inbox`. Retention: `NOTIFICATION_RETENTION_DAYS` (90) (Phase 6).
 **SupportTicket**: `user`, `app`, `order` (nullable), `category`, `subject`, `status` (OPEN/IN_PROGRESS/RESOLVED/CLOSED), `priority`, `assigned_to`.
 **TicketMessage**: `ticket`, `sender` (user), `is_staff`, `body`, `attachments` (JSON of file keys).
 **FAQ**: `app`, `category`, `question`, `answer`, `sort_order`, `is_active`.

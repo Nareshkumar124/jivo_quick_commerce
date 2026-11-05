@@ -134,7 +134,11 @@ jobs:
           DJANGO_ALLOWED_HOSTS: api.example.com
           NUM_PROXIES: "1"
         run: |
+          # Throwaway values, generated per run. Three distinct keys: accounts.E005 requires
+          # JWT_SIGNING_KEY >= 50 chars and different from the secret key; OTP_HASH_KEY >= 32 chars.
           export DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')"
+          export JWT_SIGNING_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')"
+          export OTP_HASH_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
           uv run python manage.py check --deploy --fail-level WARNING
 
   audit:

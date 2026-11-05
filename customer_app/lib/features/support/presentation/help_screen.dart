@@ -12,11 +12,10 @@ import '../../../shared/widgets/state_views.dart';
 import '../domain/support_models.dart';
 import 'support_controllers.dart';
 
-/// Help & support (`03 §2.11`, screen #31; Phase 7 built ahead on fakes):
-/// call support, "Get help with an order", my tickets and the FAQs.
-///
-/// Until the P7 support endpoints exist, the real-API build shows only
-/// the call option ([supportAvailableProvider] false).
+/// Help & support (`03 §2.11`, screen #31; P7 API since T-713): call
+/// support, "Get help with an order", my tickets and the FAQs. Where
+/// [supportAvailableProvider] is false (staging/prod for now) only the
+/// call option shows.
 class HelpScreen extends ConsumerWidget {
   const HelpScreen({super.key});
 

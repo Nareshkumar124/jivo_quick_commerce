@@ -27,7 +27,7 @@ Out-of-scope edits: revert them or ask the user; never silently commit another a
 git -C $W add -A
 git -C $W diff --cached --name-only | grep -E '(^|/)\.env(\.localdb)?$|\.(a|i)\.(olf|conf)$|^qa/private/|incoming/' && echo "STOP: secret file staged"
 git -C $W diff --cached | grep -E '^\+' | grep -nE 'AC[0-9a-f]{32}|POSTGRES_PASSWORD=.+|SEED_DEMO_STAFF_PASSWORD=.+|rzp_live_|-----BEGIN|FIELD_ENCRYPTION_KEYS=.+' \
-  | grep -vE 'AC0{32}|rzp_test_Jv7x2QmP9kLs4T|=unused|=<[a-z-]+>|re\.compile'
+  | grep -vE 'AC0{32}|=unused|=<[a-z-]+>|re\.compile'
 ```
 Any remaining hit: unstage, inspect the line (without echoing a real value to the user), fix, rescan. Only print file:line, never the value.
 
@@ -76,3 +76,10 @@ uv run ruff check . && uv run ruff format --check .
 If the merge brought new migrations, **stop**: they reach the shared DB only via `shared-db-migrate` with user approval. Otherwise restart :8001 and Celery (`local-stack`) and `curl -s http://127.0.0.1:8001/health/ready`.
 
 Then: regenerate `jivo_api` if the schema changed, update `docs/task-tracker.md` (status + merge hash), and tell other active agents' worktrees to `git merge develop` before their next run.
+
+## 8. Drop the merged run's test databases (user decision, 2026-11-05)
+Each run name creates 5 test DBs on the **shared** server: the base DB plus `_gw0`–`_gw3`. Once a run is merged and its agent is done, drop them so they don't pile up:
+- Match **only** `^test_jivo_quick_commerce_<name>(_gw[0-3])?$`, with an `assert` before each `DROP DATABASE`.
+- Skip a DB that still has connections in `pg_stat_activity`.
+- Connect through the Django connection with autocommit, the way the cleanup on 2026-11-05 did.
+- Never touch any other database on that server; it hosts other company databases.

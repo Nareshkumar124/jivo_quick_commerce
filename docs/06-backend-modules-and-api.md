@@ -216,13 +216,16 @@ Contract details for the Phase 4 rows (published in `backend/openapi/schema.yaml
 ### 2.7 Notifications, CMS & support
 | Method | Path | Auth | Purpose | Phase |
 |--------|------|------|---------|-------|
-| GET | `/api/v1/notifications/` | Customer | In-app inbox | P6 |
-| POST | `/api/v1/notifications/mark-read/` | Customer | Mark `{ids}` or all read | P6 |
+| GET | `/api/v1/me/notifications/?page=` | Customer / Rider | In-app inbox of the token's app (`me_notifications_list`): `{id, title, body, category, link (jivo:// or null), read, created_at}`, newest first, paginated | P6 |
+| POST | `/api/v1/me/notifications/{id}/read/` | Owner | Mark one read (`me_notifications_read`); another user's id is 404 | P6 |
+| POST | `/api/v1/me/notifications/read-all/` | Customer / Rider | Mark all read (`me_notifications_read_all`): `{updated}` | P6 |
 | GET | `/api/v1/pages/{slug}/` | Public | CMS page HTML | P7 |
 | GET | `/api/v1/faqs/?app=` | Public | FAQs | P7 |
 | GET / POST | `/api/v1/support/tickets/` | Customer | List / create a ticket (optional `order_id`, attachments) | P7 |
 | GET | `/api/v1/support/tickets/{id}/` | Owner | Ticket with messages | P7 |
 | POST | `/api/v1/support/tickets/{id}/messages/` | Owner | Reply | P7 |
+
+Phase 6 changed the inbox paths from the original `/notifications/` + `mark-read/` to the ones the apps asked for (api-requests #29). The inbox is scoped to the user **and** to the app in the token's `app` claim, so the rider app never shows customer entries. Entries are deleted after `NOTIFICATION_RETENTION_DAYS` (90). Push, SMS and inbox per event follow 08 §9 (`apps.notifications.catalog`; an active `NotificationTemplate` row overrides the text); see §4.3 for the push data payload.
 
 P7 implementation (T-711, built ahead of Phase 7; app proposals api-requests #35-#37):
 - **Pages** `GET /pages/{slug}/` (`pages_retrieve`, public, no auth): `{slug, title, html, updated_at}`. Slugs the apps use: `about`, `terms`, `privacy`, `refund-policy`. `cms.Page.body_html` is sanitised on every save and again when served (`apps.cms.html.sanitize_html`, nh3): only h1-h6, p, br, ul/ol/li, blockquote, strong/em/b/i and `<a href>` with `https:`, `mailto:` or `tel:` survive; scripts/styles/iframes are dropped with their content, other tags keep their text, every other attribute and every other link scheme (incl. relative links) is removed. An unknown or unpublished slug is 404 `NOT_FOUND` (the apps fall back to the policy URLs in `config/app`). Cached per slug in Redis for 5 min, dropped on save/delete; `Cache-Control: public, max-age=300`. Production has no pages until they are entered in the admin: `seed_demo` creates placeholders marked "Placeholder; legal text pending".
@@ -345,6 +348,69 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 | `/ws/v1/rider/` | Rider | `offer.new`, `offer.withdrawn`, `task.updated` (e.g., packed / cancelled) |
 | `/ws/ops/live/` | Staff | `order.created`, `order.status`, `rider.location`, `rider.status`, `alert` (scoped to permitted stores) |
 
+### 4.1 Connecting (Phase 6, `apps.realtime`)
+- **App sockets (`/ws/v1/`):** connect, then send `{"type": "auth", "token": "<access JWT>"}` within `WS_AUTH_TIMEOUT_SECONDS` (10 s). Or offer the subprotocols `["jivo.v1", "jivo.auth.<access JWT>"]`: the server selects `jivo.v1` and never echoes the token. The server answers `auth.ok` with the token's `expires_at`. Before then, send a new auth message with a refreshed token (same user), or the socket closes with 4401. `{"type": "ping"}` is answered with `pong`. There is no Origin check: native apps send none, and the JWT is not ambient, so a cross-site page cannot use it.
+- **`/ws/v1/orders/{id}/`:** the order's owner only. Right after `auth.ok` the server sends one `order.status` snapshot. The delivery OTP is never sent on a socket: when `order.status` is OUT_FOR_DELIVERY, re-read `GET /orders/{id}/track/`.
+- **`/ws/v1/rider/`:** a token issued to the rider app (`app` claim `rider`) and an ACTIVE rider profile (Phase 5 model; until it is installed every rider socket closes with 4403). Checked again at every re-auth and every `WS_RIDER_RECHECK_SECONDS` (60 s): a suspended rider is closed with 4403.
+- **Fail closed:** every auth renewal re-runs the socket's access check. A timer or periodic re-check that raises (database or Redis down) closes the socket (4401 ops, 4403 rider); a socket never stays authorised without a working check.
+- **`/ws/ops/live/`:** the staff session cookie (the same login as `/admin/` and `/ops/`), an Origin from `ALLOWED_HOSTS`, permission `orders.view_order`, and at least one store in `stores_for(user)` (05 §3). The socket joins one group per permitted store, fixed at connect. It re-checks the session, role and stores every `WS_OPS_RECHECK_SECONDS` (300 s) and closes with 4401/4403 when access is gone, or rejoins the new store list. **Session (P8 review M1):** the session is loaded with its `expire_date` (a deleted or expired session is 4401), and the HTTP staff policy applies to the socket too (05 §5, `apps.accounts.middleware`): 8 h after login for everyone, 2 h after the last HTTP request for admin roles. The socket re-checks exactly at that deadline and closes with 4401; activity on the socket itself does not count as activity.
+- **Close codes:**
+  - 4400: the first message is not `auth`
+  - 4401: missing, invalid or expired token, or no staff session
+  - 4403: signed in but not allowed (no role or store, not an active rider, wrong app)
+  - 4404: the order does not exist **or is another user's** (the same code, so ids leak nothing)
+  - 4408: auth timeout
+  - 4429: the user already has `WS_MAX_SOCKETS_PER_USER` (5) sockets open
+  - 1009: an inbound message over `WS_MAX_MESSAGE_BYTES` (4096)
+  - 4400 also after more than `WS_MAX_BAD_MESSAGES` (10) malformed or unknown messages
+
+  On any close the app falls back to polling (`GET /orders/{id}/track/` every 10 s, `GET /rider/offers/current/`) and reconnects with backoff.
+- **Abuse limits (P8 review L5, `apps.realtime.limits`):** sockets per user are counted in Redis as leases (`WS_SOCKET_LEASE_SECONDS`, 1200 s, renewed on auth, ping and re-check), so a socket lost with a crashed server stops counting when its lease ends; the count fails open if Redis is down (the channel layer is down then anyway). **Frame size is capped by the ASGI server before the app sees it (DevOps):** uvicorn `--ws-max-size 65536` (default 16 MiB), daphne `--websocket_max_size 65536`; the app closes anything over 4096 bytes with 1009.
+- **Message shape:** every server message is `{"type", "data", "sent_at"}` and carries the current state, not a diff, so a duplicate or missed message is harmless. On reconnect, re-read the REST endpoint. Each message is published in `openapi/schema.yaml` as a `Ws...Message` component with its `Ws...Data` (`apps.realtime.contract`), so the generated client has the models.
+
+### 4.2 Message examples
+Customer, `/ws/v1/orders/{order_id}/`:
+```json
+{"type": "order.status", "data": {"order_id": 1203, "order_number": "JV-261110-001203", "store_id": 1, "status": "ACCEPTED", "payment_status": "PAID", "eta_at": "2026-11-10T09:58:00Z", "updated_at": "2026-11-10T09:41:04.880000Z"}, "sent_at": "2026-11-10T09:41:05.120000Z"}
+{"type": "rider.location", "data": {"order_id": 1203, "lat": 28.4741, "lng": 77.0489, "heading": 72.5, "recorded_at": "2026-11-10T09:47:12Z"}, "sent_at": "2026-11-10T09:47:12.400000Z"}
+{"type": "order.eta", "data": {"order_id": 1203, "eta_at": "2026-11-10T09:56:00Z", "eta_minutes": 9}, "sent_at": "2026-11-10T09:47:12.400000Z"}
+```
+Rider, `/ws/v1/rider/`. `offer.new` data is exactly the `RiderOffer` of `GET /rider/offers/current/`. On `task.updated`, re-read `GET /rider/tasks/current/`. `offer.withdrawn.reason` is EXPIRED, TAKEN, ORDER_CANCELLED or REASSIGNED. `task.updated.change` is ORDER_PACKED, ORDER_CANCELLED, AMOUNT_CHANGED, REASSIGNED or STATUS_CHANGED.
+```json
+{"type": "offer.new", "data": {"id": 9001, "task_id": 7001, "store_name": "Jivo Sector 14", "drop_locality": "Sector 21, Gurugram", "distance_km": "2.40", "payment_type": "COD", "cod_amount": "498.00", "estimated_payout": "42.00", "item_count": 3, "offered_at": "2026-11-10T09:30:00Z", "expires_at": "2026-11-10T09:30:30Z"}, "sent_at": "2026-11-10T09:30:00.120000Z"}
+{"type": "offer.withdrawn", "data": {"offer_id": 9001, "task_id": 7001, "reason": "ORDER_CANCELLED"}, "sent_at": "2026-11-10T09:30:12Z"}
+{"type": "task.updated", "data": {"task_id": 7001, "order_id": 1203, "status": "ASSIGNED", "order_status": "PACKED", "change": "ORDER_PACKED"}, "sent_at": "2026-11-10T09:41:05.120000Z"}
+```
+Ops, `/ws/ops/live/`. No customer data goes on this socket. `alert.code` is ACCEPTANCE_SLA_BREACHED, LATE_CAPTURE, REFUND_FAILED, DELIVERY_FAILED or DISPATCH_UNASSIGNED; more may be added, so show `message` for unknown codes.
+```json
+{"type": "order.created", "data": {"order_id": 1203, "order_number": "JV-261110-001203", "store_id": 1, "status": "PLACED", "payment_method": "COD", "item_count": 3, "grand_total": "498.00", "placed_at": "2026-11-10T09:40:31Z", "eta_at": "2026-11-10T09:58:00Z"}, "sent_at": "2026-11-10T09:40:31.300000Z"}
+{"type": "order.status", "data": {"order_id": 1203, "order_number": "JV-261110-001203", "store_id": 1, "status": "ACCEPTED", "payment_status": "PAID", "eta_at": "2026-11-10T09:58:00Z", "updated_at": "2026-11-10T09:41:04.880000Z"}, "sent_at": "2026-11-10T09:41:05.120000Z"}
+{"type": "rider.location", "data": {"rider_id": 41, "store_id": 1, "order_id": 1203, "lat": 28.4741, "lng": 77.0489, "heading": 72.5, "recorded_at": "2026-11-10T09:47:12Z"}, "sent_at": "2026-11-10T09:47:12.400000Z"}
+{"type": "rider.status", "data": {"rider_id": 41, "store_id": 1, "is_online": true, "on_task": false, "updated_at": "2026-11-10T09:30:00Z"}, "sent_at": "2026-11-10T09:30:00.200000Z"}
+{"type": "alert", "data": {"code": "ACCEPTANCE_SLA_BREACHED", "message": "Order JV-261110-001203 has not been accepted within 60 seconds.", "store_id": 1, "order_id": 1203, "rider_id": null, "at": "2026-11-10T09:41:31Z"}, "sent_at": "2026-11-10T09:41:31.100000Z"}
+```
+Control messages, on every socket:
+```json
+{"type": "auth", "token": "<access JWT>"}
+{"type": "auth.ok", "data": {"user_id": 812, "expires_at": "2026-11-10T09:55:00Z"}, "sent_at": "2026-11-10T09:40:00Z"}
+{"type": "ping"}
+{"type": "pong", "sent_at": "2026-11-10T09:40:25Z"}
+{"type": "error", "data": {"code": "VALIDATION_ERROR", "message": "Unknown message type."}, "sent_at": "2026-11-10T09:40:26Z"}
+```
+
+### 4.3 Push data payloads (FCM `data`; every value is a string)
+FCM is sent for every important event in 08 §9, even while a socket is open. Until D-19 the push backend is disabled (`PUSH_BACKEND`), but the notification and inbox entry are still recorded. Staging and production refuse the console and locmem push backends (system check `notifications.E001`); the console backend never logs the body. Refund texts quote the stored `Refund.amount` (cancel: the `cancel:<order>` refund; `refund.processed` via `apps.notifications.notify_refund_processed(refund)`, which payments must call when a refund reaches PROCESSED). The `notification` part carries the title and body; the `data` part is what a tap routes on:
+- **Customer app** (api-requests #30): `{"type": "order", "order_id": "1203"}`. Later, `{"type": "product" | "collection" | "category", "slug": "..."}`. Or `{"link": "jivo://..."}` when no type applies.
+- **Rider app** (api-requests #41): `{"type": "offer.new", "offer_id": "9001", "task_id": "7001"}`, `{"type": "offer.withdrawn", "offer_id": "9001", "task_id": "7001"}`, `{"type": "task.updated", "task_id": "7001"}`.
+
+### 4.4 Publishing (server side)
+The order domain events send the order messages (`apps.orders.tasks.order_event` → `realtime.publish_order_event`):
+- every status event sends `order.status` to the order's socket and its store's ops group
+- PLACED also sends `order.created`
+- the ops alert events send `alert`
+
+Phase 5 calls the functions in `apps.realtime`: `publish_rider_location`, `publish_offer`, `publish_offer_withdrawn`, `publish_task_updated`, `publish_rider_status` and `publish_ops_alert` (signatures in the package docstring). Each runs after commit through the `broadcast_ws` task and is best effort.
+
 ## 5. Background jobs (Celery)
 
 | Job | Trigger | What it does | Phase |
@@ -360,13 +426,15 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 | `expire_offer` | Countdown = offer timeout | If still pending: mark EXPIRED and dispatch to the next rider | P5 |
 | `unassigned_order_alert` | After N failed offers or X minutes | Alert ops for manual assignment | P5 |
 | `rider_heartbeat_check` | Beat, every 2 min | Auto-offline riders with no location point for `RIDER_AUTO_OFFLINE_MINUTES` (10). A rider on a task is not set offline; an ops alert is logged instead. Implemented in P5 slice 5.2 (`delivery.rider_heartbeat_check`). | P5 |
-| `send_push` / `send_sms` | Domain events | FCM / SMS delivery with retries | P5/P6 |
-| `broadcast_ws` | Domain events | Push to channel groups | P6 |
+| `send_push` / `send_sms` | Domain events | FCM / SMS delivery with retries (`notifications.send_push` / `notifications.send_sms`, 5 retries with backoff; `notifications.notify_order_event` per order event). Idempotent per (event, user, order): a `Notification` row keyed on `dedupe_key`, each channel claimed once (PENDING → SENDING → SENT/SKIPPED/FAILED). An SMS needs the event's DLT template id (`SMS_DLT_TEMPLATE_IDS`), else it is skipped and logged. An SMS rejected or with an unknown outcome is not retried (no duplicates) | P5/P6 |
+| `broadcast_ws` | Domain events | Push to channel groups (`realtime.broadcast_ws`; `realtime.publish_order_event` per order event). Best effort, retried 3x | P6 |
 | `low_stock_alert` | Stock movement | Notify the store manager when available < threshold. P2: logs a warning (re-checks current stock, so it is idempotent); P7: notification | P2/P7 |
 | `reconcile_payments` | Beat, nightly | Compare Razorpay settlements/payments with local records and flag mismatches | P7 |
 | `daily_reports_email` | Beat, daily | Store-wise daily summary to managers | P7 |
 | `purge_offboarded_kyc` | Beat, daily | Delete KYC documents (rows and bucket files) of riders past `kyc_purge_after` (D-14 default: 1 year after offboarding/erasure). The file is deleted first; on failure the row stays for the next run | P5 |
-| `purge_old_locations` | Beat, daily | Delete `RiderLocation` rows older than 30 days | P6 |
+| `purge_old_locations` | Beat, daily | Delete `RiderLocation` rows older than `RIDER_LOCATION_RETENTION_DAYS` (30), in batches (`realtime.purge_old_locations`) | P6 |
+| `sweep_stuck_sends` | Beat, every 15 min | A push/SMS still SENDING after `NOTIFICATION_STUCK_SEND_MINUTES` (15; a worker died mid-send) is marked FAILED, its text blanked (it can hold an OTP) and logged at ERROR. Never resent | P6 |
+| `purge_old_notifications` | Beat, daily | Delete notifications (inbox) older than `NOTIFICATION_RETENTION_DAYS` (90), in batches | P6 |
 | `anonymise_deleted_accounts` | Beat, daily | Complete account deletions after the grace period | P1 |
 | `purge_old_otp_requests` | Beat, daily | Delete `OTPRequest` rows older than 30 days (07 §4) | P1 |
 | `flush_expired_tokens` / `clear_expired_sessions` | Beat, daily | Delete expired refresh tokens (simplejwt `flushexpiredtokens`) and expired staff sessions (`clearsessions`) | P8 (T-814) |

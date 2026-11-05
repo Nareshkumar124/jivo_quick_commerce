@@ -33,11 +33,28 @@ class ApiDeviceRegistry implements DeviceRegistry {
       throw ApiError.fromDioException(e);
     }
   }
+
+  /// TODO(api): the schema's DELETE has no `requestBody`, so the generated
+  /// `meDeviceUnregister()` cannot send the `fcm_token` the server requires
+  /// (its 400 example). Sent through the same Dio with that body until the
+  /// schema declares it.
+  @override
+  Future<void> unregister(String fcmToken) async {
+    try {
+      await _api.dio.delete<void>(
+        '/api/v1/me/devices/',
+        data: {'fcm_token': fcmToken},
+      );
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
 }
 
 /// `FAKE_API` builds and tests: remembers the tokens it was given.
 class FakeDeviceRegistry implements DeviceRegistry {
   final registered = <String>[];
+  final unregistered = <String>[];
 
   /// Thrown (once) by the next [register].
   ApiError? nextError;
@@ -50,5 +67,15 @@ class FakeDeviceRegistry implements DeviceRegistry {
       throw error;
     }
     registered.add(fcmToken);
+  }
+
+  @override
+  Future<void> unregister(String fcmToken) async {
+    final error = nextError;
+    if (error != null) {
+      nextError = null;
+      throw error;
+    }
+    unregistered.add(fcmToken);
   }
 }

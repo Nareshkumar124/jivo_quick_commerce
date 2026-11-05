@@ -240,6 +240,25 @@ void main() {
     },
   );
 
+  test('ended by ops: its own reason, not the 10-minute one', () async {
+    h = RiderTestHarness();
+    perms = StubbedPermissions(allGranted);
+    h.location.running = true;
+    h.shift
+      ..online = false
+      ..endedBy = ShiftEndedBy.ops;
+    await h.signedInBefore('+919811122231');
+    c = await h.container(
+      extra: [permissionsServiceProvider.overrideWithValue(perms.service)],
+    );
+    await c.read(riderAccountControllerProvider.notifier).load();
+    c.listen(shiftControllerProvider, (_, _) {});
+    await pumpEventQueue();
+    await shift().sync();
+    expect(h.location.running, isFalse);
+    expect(state().problem, ShiftProblem.endedByOps);
+  });
+
   test('prepaid_only from shift/start is kept while online', () async {
     await setUpRider();
     h.shift.startResponse = const ShiftStart(prepaidOnly: true);

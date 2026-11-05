@@ -136,6 +136,36 @@ class PushRegistrationController extends Notifier<PushRegistrationState> {
     }
   }
 
+  /// Logout, before the session ends (while the request still carries the
+  /// token): `DELETE /me/devices/`, best effort, so the next rider on this
+  /// phone gets no pushes meant for this one. Returns the token (also sent
+  /// with `POST /auth/logout/`), or null when push is not set up.
+  Future<String?> unregisterForLogout() async {
+    _retry?.cancel();
+    _retry = null;
+    final push = ref.read(pushMessagingProvider);
+    if (!push.isAvailable) return null;
+    String? token = state.registeredToken;
+    if (token == null) {
+      try {
+        token = await push.token();
+      } on Object catch (error) {
+        debugPrint('PushRegistration: token unavailable: $error');
+      }
+    }
+    if (token == null || !ref.mounted) return token;
+    try {
+      await ref.read(deviceRegistryProvider).unregister(token);
+    } on Object catch (e) {
+      // Best effort: logout goes on; `auth/logout` carries the token too.
+      debugPrint(
+        'PushRegistration: unregister failed (${ApiError.from(e).code})',
+      );
+    }
+    if (ref.mounted) state = const PushRegistrationState();
+    return token;
+  }
+
   static bool _isTransient(ApiError error) {
     final status = error.statusCode;
     return status == null || status >= 500 || status == 429;

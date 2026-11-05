@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../app/launch_state.dart';
 import '../../../app/providers.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
@@ -42,6 +43,20 @@ class CmsPageScreen extends ConsumerWidget {
     await ref.read(urlOpenerProvider).open(link);
   }
 
+  /// The `config/app` policy URL for a page the server doesn't have
+  /// (404: unknown or unpublished slug), or null.
+  Uri? _fallbackUrl(WidgetRef ref, Object error) {
+    if (ApiError.from(error).code != ApiErrorCode.notFound) return null;
+    final policies = ref.read(launchStateProvider).config?.policies;
+    if (policies == null) return null;
+    return switch (slug) {
+      CmsSlugs.terms => policies.terms,
+      CmsSlugs.privacy => policies.privacy,
+      CmsSlugs.refund => policies.refund,
+      _ => null,
+    };
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -79,10 +94,21 @@ class CmsPageScreen extends ConsumerWidget {
             ],
           ),
         ),
-        AsyncError(:final error) => ErrorRetryView(
-          error: error,
-          onRetry: () => ref.invalidate(cmsPageProvider(slug)),
-        ),
+        AsyncError(:final error) => switch (_fallbackUrl(ref, error)) {
+          final url? => EmptyView(
+            key: const Key('cms-fallback'),
+            icon: Icons.open_in_new,
+            message: l10n.cmsPageUnavailable,
+            action: FilledButton(
+              onPressed: () => ref.read(urlOpenerProvider).open(url),
+              child: Text(l10n.openInBrowser),
+            ),
+          ),
+          null => ErrorRetryView(
+            error: error,
+            onRetry: () => ref.invalidate(cmsPageProvider(slug)),
+          ),
+        },
         _ => const SkeletonList(rows: 6),
       },
     );

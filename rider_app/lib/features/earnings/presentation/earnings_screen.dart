@@ -11,6 +11,7 @@ import '../../onboarding/domain/validators.dart';
 import '../../task/domain/task_rules.dart';
 import '../domain/earnings.dart';
 import 'earnings_providers.dart';
+import '../../../shared/errors/rider_error_text.dart';
 
 /// Earnings (04 §2.8, screen 15): today, this week or chosen dates. Every
 /// amount, including all totals, is shown exactly as the server sends it.
@@ -296,7 +297,7 @@ class _Error extends StatelessWidget {
           const Icon(Icons.cloud_off, size: 64),
           const SizedBox(height: 16),
           Text(
-            apiErrorMessage(JivoCoreLocalizations.of(context), error),
+            riderApiErrorMessage(context, error),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),

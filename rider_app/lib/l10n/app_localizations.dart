@@ -3283,6 +3283,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Don\'t collect any cash. Nothing is due for this order.'**
   String get taskReturnNoCash;
+
+  /// No description provided for @riderTooManyTries.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many tries. Wait a moment, then try again.'**
+  String get riderTooManyTries;
+
+  /// No description provided for @shiftEndedByOpsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo operations set you offline. Go online again when you are ready, or call support.'**
+  String get shiftEndedByOpsBody;
 }
 
 class _AppLocalizationsDelegate
