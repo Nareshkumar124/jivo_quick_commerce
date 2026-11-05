@@ -134,3 +134,21 @@ Condition 1 of stage 2 (the refund re-check) is **met**. The refund fixes in dev
 | No unauthorised access, data corruption, duplicate financial transaction or crash | ✅ Role matrix and store scoping hold server-side; CSRF enforced; no double refund (retry token, T8a double post, sync); stock and money invariants hold |
 
 **To reach Ready:** (1) fix BUG-0010 (manual refund form with a one-time token) and re-run TC-32/33/40; BUG-0011 can be accepted as P3 or fixed; (2) device run TC-51–54, 56, 58; (3) the store-staff mini-UAT (01 §8.5); (4) decide whether the invoice cases (TC-16/17/57, TC-55) move to P5 like DL-50 did; (5) CI evidence and staging.
+
+## Phase 5: Riders and delivery. Interim verdict (stage 1, 2026-11-05, `4fdea44`): **Not ready (not executed)**
+Stage 1 was test design only. The plan is `01-test-plan.md` §9 and the 132 cases are P5-TC-01…132 in `02`. **No case has been executed**, so none counts toward the gate.
+
+| §5.2 criterion | Result |
+|---|---|
+| CI green | ⬜ Not verified by QA |
+| Phase cases: 100% of Pri P0/P1 passed, ≥ 95% of all | ⬜ 0/132 executed (127 ⬜, 5 ⏭: device run and P6) |
+| Smoke set (🔥, 27 P5 cases + P0–P4) | ⬜ |
+| No open P0/P1 bugs | No P5 bugs filed (nothing executed) |
+| Unauthorised access / data corruption / crash in major workflows | ⬜ Not tested |
+
+**Blocking entry items:**
+- slice 5.3 (`backend/phase-5` `fd1490c`) is not merged
+- migration `delivery.0002` is not applied to the shared DB
+- slice 5.4 is not built
+- the QA requests in `01` §9.4 are open: extra QA numbers, a QA-02 store manager, a QA-02 stock top-up
+- 23 doc ambiguities (A1–A23, `01` §9.6) need PM/Jivo answers. A3 (how ops resolve a locked delivery OTP) and A4 (the missing 05 §3 rows) affect P0 cases

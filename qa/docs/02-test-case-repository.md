@@ -1,4 +1,4 @@
-# 02: Test Case Repository: Phases 0, 1, 3 and 4
+# 02: Test Case Repository: Phases 0, 1, 3, 4 and 5
 
 This is the first written test case set for P0/P1, because `docs/plan/` does not exist yet. It uses the format from `docs/10-testing-strategy.md` §5.4.
 
@@ -393,3 +393,232 @@ Service-level passes of console cases (TC-19–21, 27, 31, 41) are re-run throug
 | | Cases | ✅ | ◐ | ❌ | ⏭ | ⬜ |
 |---|---|---|---|---|---|---|
 | Phase 4 | 60 | 46 | 1 (TC-60) | 3 (TC-32, 33, 40: BUG-0010/0011) | 4 (TC-16, 17, 55, 57: need DELIVERED, P5) | 6 (TC-51–54, 56, 58: device) |
+
+## Phase 5: Riders and delivery (written 2026-11-05, stage 1: design only)
+**Contract read:**
+- 5.1/5.2: `develop` `4fdea44`, live.
+- 5.3: `backend/phase-5` `fd1490c` (`schema.yaml`, services and the 06/07/08 doc diffs), not merged.
+- 5.4: docs only, being built.
+
+Nothing in this section has been executed: every status is ⬜, or ⏭ with the reason. The plan, environment, dependencies and the doc ambiguities A1–A23 are in `01-test-plan.md` §9.
+
+**Format.** The 10 §5.4 columns, plus **Slice** (5.1–5.4, or P6), **Ref** (the doc section that is the oracle) and **Pre** (preconditions). Automated cases are `test_p5_tcNN_*` in `qa/tests/test_p5_*.py`. Those marked `[auto 5.3]` are scaffolded and skip themselves until slice 5.3 is on develop and `delivery.0002` is applied.
+
+**Precondition shorthands** (all at store QA-02, id 2, pin 26.9124, 75.7873):
+
+| Code | Meaning |
+|---|---|
+| R1, R2 | QA users C and D as riders: ACTIVE, home store QA-02, all documents approved, cash in hand 0.00, limit 5,000.00, offline, no task |
+| ON(R) | Rider online: `shift/start` and a fresh location point at the store (≤ 50 m from the pin) |
+| A, B | QA customers A and B. Each has a Jaipur address at 26.9250, 75.8000 (about 1.9 km from the store) |
+| COD(A) / ONL(A) | A COD order / a paid ONLINE order (fake gateway verify) by A at QA-02, auto-accepted, so dispatch starts (trigger ACCEPTED) |
+| OFR | The task is OFFERED to R1 |
+| ASG | R1 accepted (task ASSIGNED) |
+| ATS | + arrived at the store |
+| PKD | + Ops marked the order PACKED (start packing → packed) |
+| OFD | + pickup with the right code (task PICKED_UP, order OUT_FOR_DELIVERY) |
+| ATC | + arrived at the customer |
+| RET | + failed (task RETURNING, order DELIVERY_FAILED) |
+| Staff | SA Super Admin, OPS, SM Store Manager (GGN-01 only), SMQ QA-only Store Manager of QA-02 (requested, 01 §9.4), SS Store Staff (GGN-01), CAT Catalog Manager, SUP Support, FIN Finance |
+
+### 5.1 KYC and onboarding
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-01 🔥 | BE | P0 | 5.1 | 06 §3 Registration; 04 §2.2 | A logged-in user with no rider profile (spare QA number) | `GET /rider/stores/`; `POST /rider/register/` with a valid body (SCOOTER + vehicle number, preferred store QA-02) | Stores lists active stores only. 201 `RiderProfile`: status PENDING_KYC, `home_store` null, `required_documents` = PHOTO, AADHAAR_FRONT, AADHAAR_BACK, PAN, DL, RC; strict schema | ⬜ |
+| P5-TC-02 | BE | P1 | 5.1 | 06 §3 | TC-01 rider | Register again (same body, then a different one) | 409 `INVALID_STATE_TRANSITION`; profile unchanged | ⬜ |
+| P5-TC-03 | BE | P1 | 5.1 | 06 §3; 04 §2.2 | User with no profile | Validation: dob exactly 18 years ago (IST) and one day short; emergency contact = own phone, non-+91, a landline; SCOOTER without a vehicle number; BICYCLE with and without one; unknown and inactive `preferred_store_id`; 121-char name; `<script>` in the name | 18th birthday accepted, a day short → 400; bad contacts → 400; motorised without a number → 400; bicycle fine either way; bad store → 400; long name → 400; markup stored as text and shown escaped in the admin | ⬜ |
+| P5-TC-04 | BE | P0 | 5.1 | 06 §3 KYC; 09 §3.6 | PENDING_KYC rider | Upload PHOTO (JPEG 900 KB with EXIF GPS and camera tags) and AADHAAR_FRONT (PNG); SA downloads both through the admin's signed link | 201 `RiderDocument` PENDING. The stored files are JPEG with no EXIF/GPS, under random keys in the private bucket | ⬜ |
+| P5-TC-05 | BE | P0 | 5.1 | 06 §3; 09 §3.6; 06 §6 PAYLOAD_TOO_LARGE | PENDING_KYC rider | Upload 1,000,001 bytes; GIF; PDF; HTML renamed `.jpg`; a JPEG header followed by a script payload; 0 bytes; 3 MB body; unknown `doc_type`; PAN without `number` | 400 `VALIDATION_ERROR` (or 413 `PAYLOAD_TOO_LARGE` over 2.5 MB), never 500; nothing stored | ⬜ |
+| P5-TC-06 | BE | P1 | 5.1 | 04 §5 note; 09 §4 Rider KYC | PENDING_KYC rider | Numbers: Aadhaar failing the Verhoeff check, PAN/DL/RC in the wrong format, then valid ones; `GET /rider/me/` | Invalid → 400. Valid → only the masked form (`XXXX XXXX 1234`) in every response; the full number is never returned to the rider | ⬜ |
+| P5-TC-07 | BE | P0 | 5.1 | 09 §3.3 | Rider with documents and bank details | Read-only SQL on the document-number and bank-account columns | No plaintext Aadhaar, PAN or account number in any column (field-level encryption); the masked column agrees with the last 4 digits | ⬜ |
+| P5-TC-08 | BE | P1 | 5.1 | 06 §3 (D-14 default) | PENDING_KYC rider | BICYCLE, then E_BIKE, then MOTORBIKE (PATCH `/rider/me/`); read `missing_documents` and `ready_for_review` | DL and RC required only for MOTORBIKE/SCOOTER; the lists recompute on every change | ⬜ |
+| P5-TC-09 | BE | P1 | 5.1 | 04 §2.2, §5 note | PENDING_KYC rider | `PUT /rider/bank-account/`: 8- and 19-digit accounts, letters, lowercase or bad IFSC, then a valid one with and without a UPI ID | Invalid → 400. Valid → 200, account masked (last 4) in the response and in `/rider/me/` | ⬜ |
+| P5-TC-10 | BE | P1 | 5.1 | 06 §3 | Rider with one PENDING and one APPROVED document | Upload a new copy of each | PENDING replaced (status PENDING, one current copy); APPROVED → 409, original kept | ⬜ |
+| P5-TC-11 | BE | P0 | 5.1 | 06 §3; 09 §3.2 | PENDING_KYC rider, then ACTIVE R1 | PATCH `/rider/me/` with `status`, `home_store`, `cash_limit`, `cash_in_hand`, `is_online`, `rating_avg`; as ACTIVE, PATCH `full_name` and `vehicle_number` | Protected fields are never changed (SQL check). ACTIVE/SUSPENDED: only the emergency contact can change; other fields refused (400) or ignored, never stored (A: 06 does not say which) | ⬜ |
+| P5-TC-12 🔥 | ADM | P0 | 5.1 | 05 §2 Riders; 04 §2.2 | Rider with every required document and bank details | OPS in the Riders admin: approve each document, then approve the rider with home store QA-02. Also try approving a rider with one document missing or PENDING | ACTIVE, `home_store` QA-02, `cash_limit` 5,000.00 (`RIDER_DEFAULT_CASH_LIMIT`). One audit row per action (actor, IP, no free text). The incomplete rider is refused with the reason | ⬜ |
+| P5-TC-13 | ADM | P1 | 5.1 | 06 §3 (#9); 04 §2.2 | PENDING_KYC rider | OPS rejects the rider with a reason (and once with an empty reason); the rider reads `/rider/me/`, then re-uploads the rejected document | Empty reason refused. REJECTED with `rejection_reason` shown; back to PENDING_KYC by itself once nothing required is missing or rejected | ⬜ |
+| P5-TC-14 | ADM | P1 | 5.1 | 06 §3 (#25) | R2 offline; then R2 ON | OPS rejects R2's DL; R2 calls `shift/start`; R2 re-uploads, OPS approves; repeat with R2 online when the DL is rejected | Stays ACTIVE; `shift/start` → 409 `DOCUMENTS_NOT_APPROVED` with `doc_types` [DL]; online again after approval. Online variant: behaviour recorded against A18 (no new offers expected) | ⬜ |
+| P5-TC-15 | ADM | P0 | 5.1 | 05 §2 Riders; 06 §3 (5.3 notes "Going offline") | ON(R1) with OFR, ON(R2) | OPS suspends R1 with a reason; R1 calls `shift/start` and the records endpoints; OPS reinstates R1 | R1 offline (shift `end_reason` ADMIN, `ended_by` ops); offer withdrawn and R2 offered; `shift/start` → 403 `RIDER_NOT_ACTIVE`; records 200; reinstated rider can go online | ⬜ |
+| P5-TC-16 | BE | P0 | 5.1–5.4 | 06 §3 Access | Users with no profile, PENDING_KYC, REJECTED, ACTIVE, SUSPENDED | Call me, documents, bank, shift, locations, heartbeat, offers, tasks, history, earnings, ledger and payouts as each | No profile → 403 `PERMISSION_DENIED` `details.rider_status` NONE (including `/rider/me/`). Not ACTIVE on shift/location/offer/task → 403 `details.reason` `RIDER_NOT_ACTIVE`. Records open in any status | ⬜ |
+| P5-TC-17 | BE | P2 | 5.1 | 06 §3 Rate limits | PENDING_KYC rider; QA Redis counters cleared | 31 document uploads in an hour; 21 register/bank writes | The 31st and 21st → 429 `RATE_LIMITED` with `retry_after_seconds` and `Retry-After` | ⬜ |
+| P5-TC-18 | BE | P1 | 5.1 | 06 §3 Erasure; DL-57; 07 §4 | Spare-number rider with documents, bank and location history | Delete the account (grace period by driver), anonymise; then run `purge_offboarded_kyc` with `kyc_purge_after` in the past (driver) | Name, dob, emergency contact, vehicle number and bank blanked; location history and history rows deleted; `kyc_purge_after` = today + 365. After the purge the document rows and files are gone (old signed link fails) | ⬜ (needs a spare QA number, 01 §9.4) |
+| P5-TC-19 | RID | P1 | 5.1 | 04 §2.2, §5 | Rider dev build against :8001, user's phone | Register → documents (camera, compressed ≤ 1 MB) → bank → status; ops rejects one document → re-upload | Screens bound to the real API; masked numbers only; no crash after Android kills the app while the camera is open | ⏭ device run (PM) |
+| P5-TC-20 | BE | P1 | 5.1 | 09 §3.3; 06 §3 `/rider/me/` | R1 with a PHOTO document | Read `photo_url` and `photo_url_expires_at`; fetch the URL; fetch after expiry (profile with a short expiry, or a tampered signature) | Signed link valid ≤ 1 h; tampered or expired → denied. No rider response contains a public or permanent link to any KYC file | ⬜ |
+
+### 5.2 Shifts, location and heartbeat
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-21 🔥 | BE | P0 | 5.2 | 06 §3 Shift; 04 §2.3 | R1 offline | `shift/start` at the store; again | 200 `ShiftState` `is_online` true, `location` intervals; the repeat returns the same shift; one open shift in the DB | ⬜ [auto 5.3] |
+| P5-TC-22 | BE | P1 | 5.2 | 06 §3 Shift | R1 offline | `shift/start` at 1,990 m and 2,010 m from the pin; lat/lng missing, out of range, or strings | ≤ 2,000 m → 200; beyond → 422 `OUTSIDE_GEOFENCE` with `distance_m`, `radius_m` 2000; bad input → 400 | ⬜ [auto 5.3] |
+| P5-TC-23 | BE | P1 | 5.2 | 04 §2.3/§2.7; 06 §3 | R1 with `cash_in_hand` ≥ `cash_limit` (OPS lowers the limit, or after COD) | `shift/start`; `GET /rider/me/` | 200 with `prepaid_only` true; `cash.limit_reached` true | ⬜ |
+| P5-TC-24 | BE | P0 | 5.2/5.3 | 06 §3 Shift; 5.3 notes | ON(R1) idle; then OFR; then ASG | `shift/end` in each state; a location batch after going offline | Idle → offline, shift `end_reason` MANUAL, `ended_by` rider; then locations → 409 `RIDER_OFFLINE`. OFR → offline and the offer withdrawn. ASG → 409 `ACTIVE_TASK`, still online | ⬜ [auto 5.3] |
+| P5-TC-25 | BE | P1 | 5.2 | 06 §3 Location | ON(R1) | Batches of 1, 50, 51 and 0 points; a repeated `recorded_at` in the same batch and across batches; `recorded_at` −25 h, +3 min and +1 min; negative accuracy; lat 91 | `accepted`/`duplicates`/`rejected` exact; 0 or 51 points → 400; points outside −24 h/+2 min rejected and not stored; invalid values → 400 | ⬜ [auto 5.3] |
+| P5-TC-26 | BE | P1 | 5.3 | 06 §3 (5.3 notes, `MOCKED_LOCATION`) | ON(R1) | A point with `is_mocked` true | Stored with `is_mocked`; ops alert `MOCKED_LOCATION` logged; rider not blocked (⚠ Jivo) | ⬜ |
+| P5-TC-27 | BE | P1 | 5.2/5.3 | 06 §3 (heartbeat) | R1 offline / ON idle / OFR / ASG | `POST /rider/heartbeat/` in each state | `is_online`, `pending_offer_id`, `active_task_id` and `shift` match the state | ⬜ [auto 5.3] |
+| P5-TC-28 | BE | P1 | 5.2 | 06 §3 Auto-offline (#42); 06 §5 | ON(R1); `rider_heartbeat_check` triggered by the driver with a shifted clock | (a) no point for 10+ min, no heartbeat; (b) a heartbeat within 10 min and the last point ≤ 30 min old; (c) a heartbeat but the last point > 30 min old; (d) R1 on an active task | (a) offline, AUTO_OFFLINE, `ended_by` system, pending offer withdrawn; (b) stays online; (c) offline; (d) stays online + ops alert `RIDER_STALE_ON_TASK` | ⬜ |
+| P5-TC-29 | BE | P1 | 5.2/5.3 | 06 §3 Presence | ON(R1) | Send one point with `recorded_at` = now + 110 s, then nothing; dispatch an order 130 s later | Presence counts from the server's receipt time: R1 is not a candidate after 120 s (`DISPATCH_PING_MAX_AGE_SECONDS`) | ⬜ |
+| P5-TC-30 | BE | P2 | 5.2 | 06 §3 Rate limits | ON(R1) | 7 location batches and 7 heartbeats in one minute | The 7th of each → 429 `RATE_LIMITED`, `Retry-After` | ⬜ |
+| P5-TC-31 | ADM | P1 | 5.2 | 05 §1.4; 06 §3 (`shifts.force_offline`) | ON(R1) idle | OPS forces R1 offline; R1 sends a point | Shift ended ADMIN by ops; 409 `RIDER_OFFLINE`; audit row | ⬜ |
+| P5-TC-32 | BE | P1 | 5.2 | 04 §3; 09 §4 DPDP | R1 offline | Send points while offline; count R1's location rows (read-only SQL) | 409 and no rows stored: tracking only while online | ⬜ [auto 5.3] |
+| P5-TC-33 | RID | P1 | 5.2 | 04 §2.1, §2.3, §3 | Rider dev build, phone | Permissions gate order (disclosure before the first prompt), online toggle, the "You're online" notification, going offline stops tracking, the auto-offline message | As 04 §2.1/§3 | ⏭ device run (PM) |
+
+### 5.3 Dispatch and offers
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-34 🔥 | E2E | P0 | 5.3 | 08 §5.3; 04 §2.4; 09 §1 | ON(R1) | A places COD(A); poll `GET /rider/offers/current/` every 0.5 s | Task SEARCHING → OFFERED. Offer fields: `store_name`, `drop_locality` only (no house, street, phone or coordinates), `distance_km`, `payment_type` COD, `cod_amount` = the order's `grand_total` (2-dp string), `estimated_payout`, `item_count`, `expires_at − offered_at` = 30 s, `server_time`. Seen within 3 s of ACCEPTED (local, remote DB noted) | ⬜ [auto 5.3] |
+| P5-TC-35 | BE | P0 | 5.3 | 08 §5.1 | ON(R1) as a control; R2 in one variant per run | R2 variants: offline; home store GGN-01; last point 130 s old; on another active task; holding a pending offer for another order; SUSPENDED. Then place COD(A) | R2 is never offered; R1 (or nobody → SEARCHING) is | ⬜ [auto 5.3] (offline and stale variants) |
+| P5-TC-36 | BE | P0 | 5.3 | 08 §5.1; 04 §2.7 | ON(R1) with `cash_in_hand` + order total above, equal to and below `cash_limit` (OPS sets the limit) | Place a COD order each time, then an ONLINE order | Above → R1 not offered (task SEARCHING); equal → offered; ONLINE → offered whatever the cash | ⬜ |
+| P5-TC-37 | BE | P1 | 5.3 | 08 §5.2 | R1 and R2 online at chosen offsets | (a) R1 150 m, R2 1.2 km; (b) both ≤ 200 m, R2 idle longer (its last task ended earlier); (c) R1 900 m, R2 600 m | (a) R1; (b) R2 (longest idle; A6); (c) R2 (nearest) | ⬜ [auto 5.3] (a, c) |
+| P5-TC-38 | BE | P1 | 5.3 | 08 §2.1 | ON(R1); `triggerplaced` profile for part 2 | 1: a COD order is PLACED and not yet accepted (auto-accept delay): no task. 2: profile `DISPATCH_TRIGGER=PLACED` | 1: task created only at ACCEPTED. 2: task and offer at PLACED | ⬜ |
+| P5-TC-39 🔥 | BE | P0 | 5.3 | 08 §5.4; 04 §2.4; 09 §3.2 | OFR | R1 accepts; accepts again; reads `tasks/current/` and `offers/current/` | 200 `RiderTask` ASSIGNED with `assigned_at`; full `customer_address` (with the receiver's phone), instructions and items revealed only now; the offer is gone; the repeat → 200, same task; the order's status is not changed by the accept | ⬜ [auto 5.3] |
+| P5-TC-40 | BE | P0 | 5.3 | 08 §5.5; 04 §2.4 | OFR; ON(R2) | R1 rejects with `TOO_FAR`; reject with an unknown reason; reject with no body | 204, offer REJECTED with the reason; R2 offered; R1 never re-offered this task; unknown reason → 400; no body → 204 | ⬜ [auto 5.3] |
+| P5-TC-41 | BE | P0 | 5.3 | 08 §5.4–5; 06 §3 (5.3 notes) | OFR; ON(R2); QA worker running | Wait for expiry (30 s + up to 15 s sweep), then R1 accepts, then rejects | Offer EXPIRED and R2 offered; late accept → 409 `OFFER_EXPIRED`; late reject → 409 | ⬜ [auto 5.3] |
+| P5-TC-42 | BE | P0 | 5.3 | 08 §5.4 | OFR | 10 trials: R1's accept sent in parallel with the driver's `expire_offer` at the expiry instant | Exactly one outcome per trial: (accept 200, offer ACCEPTED, task ASSIGNED) or (409 `OFFER_EXPIRED`, offer EXPIRED). Never ASSIGNED with an EXPIRED offer; ≤ 1 PENDING offer per task | ⬜ |
+| P5-TC-43 | BE | P0 | 5.3 | 08 §5.4; 07 (5.3 constraints) | OFR | 10 parallel accepts by R1 | Every answer 200 (same task) or 409, never 500; one assignment; one active task for R1 | ⬜ [auto 5.3] |
+| P5-TC-44 | BE | P0 | 5.3 | 08 T11, §5.4 | OFR | A cancels (T11) in parallel with R1's accept | Either (cancel 200, accept 409 `OFFER_TAKEN`, task CANCELLED) or (accept 200, then task CANCELLED, R1 freed, `recent_task` CANCELLED). Never an ASSIGNED task on a CANCELLED order | ⬜ [auto 5.3] |
+| P5-TC-45 | BE | P0 | 5.3 | 08 §5.7; 06 §3 (5.3 notes) | OFR; ON(R2) | OPS manual-assigns R2 in parallel with R1's accept | One rider bound; the loser gets 409 (`OFFER_TAKEN` or `INVALID_STATE_TRANSITION`); no PENDING offer left | ⬜ |
+| P5-TC-46 | BE | P1 | 5.3 | 06 §3 (5.3 notes) | OFR; ON(R2) | R1 goes offline, then accepts | Offer withdrawn when going offline; accept → 409 `OFFER_TAKEN` (or `RIDER_OFFLINE`); R2 offered | ⬜ [auto 5.3] |
+| P5-TC-47 | BE | P1 | 5.3 | 08 §5.6 | `dispatchfast` profile; ON(R1) only | R1 lets every offer expire; watch the task through the give-up and the pause | After `MAX_OFFER_ATTEMPTS` (5) offers or `DISPATCH_TIMEOUT_SECONDS`: UNASSIGNED with `unassigned_at`, ops alert `DISPATCH_UNASSIGNED`; after the pause a new round (SEARCHING). R1 is not re-offered (already offered this task): behaviour recorded against A15 | ⬜ |
+| P5-TC-48 | BE | P1 | 5.3 | 08 §5.1; 06 §5 `dispatch_sweep` | No rider online | Place COD(A); 20 s later R1 goes online | Task SEARCHING; offered to R1 within `DISPATCH_RETRY_SECONDS` (15) + the sweep | ⬜ [auto 5.3] |
+| P5-TC-49 | BE | P1 | 5.3 | 08 T11/T12, §9; 04 §2.4 | (a) OFR; (b) ASG (order ACCEPTED); (c) ATS + PKD | (a) A cancels; (b) A cancels; (c) OPS cancels (T12) | Offer WITHDRAWN (`offers/current` empty) or task CANCELLED with `cancelled_at`; `recent_task` shows CANCELLED for `RIDER_RECENT_TASK_SECONDS`; R1 freed (gets the next offer); notifications `rider.offer_withdrawn` / `rider.task_cancelled` recorded | ⬜ [auto 5.3] (a, b) |
+| P5-TC-50 | BE | P1 | 5.3 | 08 T8 | (a) ASG; (b) a task SEARCHING with its next retry in the future | OPS: start packing, mark packed | (a) `ready_for_pickup` true, notification `rider.order_ready`; (b) dispatch runs at once (offer without waiting for the retry) | ⬜ |
+| P5-TC-51 | BE | P0 | 5.3 | 08 T8a, §6.3 | COD(A) of 2 × JV-SUN-1L, ASG | OPS marks 1 unit unavailable; R1 reads the task; later delivers with the old amount | `cod_amount_due` = the new `grand_total` (QA oracle), `cod_amount_previous` = the old one; notification `rider.cod_amount_changed`; delivering with the old amount → 400 | ⬜ |
+| P5-TC-52 | BE | P1 | 5.3 | D-16 default; 06 §3 (5.3 notes) | OFR | Read `estimated_payout` and `distance_km` on the offer and the task | `estimated_payout` = 30.00 + 5.00 × `distance_km` (QA oracle, 2 dp, half-up); both 2-dp strings, never floats; `distance_km` = store-to-drop distance, not the GPS trail | ⬜ [auto 5.3] |
+| P5-TC-53 | BE | P0 | 5.3 | 08 §5.1 (v1 one order at a time) | ON(R1) only | Place two COD orders (A, B) a second apart | R1 offered one; the other stays SEARCHING until R1 is free; never two PENDING offers or two active tasks for R1 (SQL) | ⬜ [auto 5.3] |
+| P5-TC-54 🔥 | ADM | P0 | 5.3/5.4 | 08 §5.7; 05 §1.4 | A task SEARCHING or UNASSIGNED; ON(R2) idle | OPS manual-assigns R2 (console in 5.4; service until then) | ASSIGNED at once, `assignment_mode` MANUAL; R2's `tasks/current` shows it; notification `rider.task_assigned`; any pending offer of R2 withdrawn; audit `delivery.manual_assign` with IP | ⬜ |
+| P5-TC-55 | ADM | P0 | 5.3/5.4 | 06 §3 (5.3 notes); 08 §5.1 | As TC-54 | Manual assign of: an offline rider; a busy rider; a GGN-01 rider; R2 whose cash + COD total > limit; an order that already has a rider; a DELIVERED or CANCELLED order | Refused ("offline", "on another delivery", "active rider of this store"); 422 `CASH_LIMIT_EXCEEDED`; 409 `INVALID_STATE_TRANSITION`; nothing changes | ⬜ |
+| P5-TC-56 | ADM | P0 | 5.3/5.4 | 08 §3 Reassignment | (a) ASG; (b) ATS with 3 wrong pickup codes; (c) OFD | OPS unassigns | (a, b) task SEARCHING, rider cleared, R1 freed (`tasks/current` empty), pickup attempts reset, offered to others (not R1); notification `rider.task_cancelled` to R1; audit. (c) 409, nothing changes | ⬜ |
+| P5-TC-57 | ADM | P1 | 5.3/5.4 | 08 §5.6 | (a) UNASSIGNED; (b) ASG | OPS retries dispatch | (a) SEARCHING, new round, audit; (b) 409 | ⬜ |
+| P5-TC-58 | BE | P2 | 5.3 | 09 §1 (A21) | ON(R1) | 10 runs: ACCEPTED time (history) → offer `offered_at` → first successful poll | p95 of dispatch decision → offer < 3 s (server side); poll latency recorded; FCM/WS end to end in P6 | ⬜ |
+
+### 5.3 Pickup and T9 (stock commit)
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-59 | BE | P1 | 5.3 | 04 §2.5; 06 §3 (A20) | ASG | `arrived-store` at 150 m; at 240 m with accuracy 50; at 260 m with accuracy 50; at 400 m; repeat after success; from OFR and from OFD | ≤ 200 m + min(accuracy, 50) → AT_STORE, `arrived_store_at` set; outside → 422 `OUTSIDE_GEOFENCE` with `distance_m`, `radius_m`; repeat → 200; wrong state → 409 | ⬜ [auto 5.3] |
+| P5-TC-60 🔥 | BE | P0 | 5.3 | 08 T9, §6.1 | ATS + PKD; stock and reservations read before (SQL) | Pickup with the 4-character code | 200 PICKED_UP, order OUT_FOR_DELIVERY, `picked_up_at`. Per line: `on_hand` −q and `reserved` −q; one `StockMovement` SALE linked to the order; reservations COMMITTED. History PACKED → OUT_FOR_DELIVERY, actor rider. A 4-digit OTP appears on the customer's `track`; notification `order.out_for_delivery` | ⬜ [auto 5.3] |
+| P5-TC-61 | BE | P0 | 5.3 | 06 §3 (bag QR); A11 | ATS + PKD | Pickup with `JQC1:<order_number>:<code>`; the QR of another QA order; the right code with the wrong number; the lower-case code; the code with spaces around it | Correct QR, lower case and trimmed → 200 (case-insensitive). Mismatches → 400 `PICKUP_CODE_INVALID` with `attempts_remaining` counting down | ⬜ [auto 5.3] |
+| P5-TC-62 | BE | P0 | 5.3 | 08 T9 guards; 06 §6 | (a) ATS, order ACCEPTED or PACKING; (b) ASG + PKD; (c) ATS + PKD | (a, b) pickup with the right code; (c) pickup with `ＡＢＣＤ`, `١٢٣٤`, a 3-character code and a 50-character code | (a) 409 `INVALID_STATE_TRANSITION`, `ready_for_pickup` false; (b) 409; (c) 400 `PICKUP_CODE_INVALID` with no attempt used. Stock unchanged in every case | ⬜ [auto 5.3] |
+| P5-TC-63 | BE | P0 | 5.3/5.4 | 06 §6 `PICKUP_CODE_LOCKED` | ATS + PKD | 5 wrong codes, then the right one; OPS unassigns and re-assigns R1 (5.3) or unlocks (5.4) | `attempts_remaining` 4, 3, 2, 1, then 423 `PICKUP_CODE_LOCKED` (0) + ops alert; the right code → 423; after reassignment or unlock the right code → 200 | ⬜ [auto 5.3] (lock part) |
+| P5-TC-64 | BE | P1 | 5.3 | 06 §3 Rate limits (`RIDER_PICKUP_RATE`) | ATS | 11 pickup calls in one minute (wrong-shape codes, so the lock is not reached) | The 11th → 429 `RATE_LIMITED`, `Retry-After` | ⬜ |
+| P5-TC-65 | BE | P0 | 5.3 | 08 T9, §6.1 | ATS + PKD | 5 parallel pickups with the right code | Each 200 (idempotent) or 409, never 500; exactly one SALE movement per line, one T9 history row; `on_hand` decremented once | ⬜ [auto 5.3] |
+| P5-TC-66 🔥 | BE | P0 | 5.3 | 08 §6.1; 07 §3 | After every 5.3 run (read-only SQL) | Stock invariants on QA-02 | `on_hand` ≥ 0, `reserved` ≥ 0; `reserved` = Σ ACTIVE reservations per (store, variant); Σ SALE per OUT_FOR_DELIVERY/DELIVERED order = the units delivered; no SALE for CANCELLED orders | ⬜ [auto 5.3] |
+
+### 5.3 Arrival, delivery OTP and T10
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-67 | BE | P1 | 5.3 | 04 §2.6; 06 §3 | OFD | `arrived-customer` at 150 m from the drop; at 600 m with no override; at 600 m with override "gate locked"; override of spaces only; from ATS | AT_CUSTOMER + notification `order.rider_arrived`; 600 m without override → 422; with override → 200 and the reason stored; spaces only → 422; wrong state → 409 | ⬜ [auto 5.3] |
+| P5-TC-68 🔥 | BE | P0 | 5.3 | 08 T10 | ONL(A), ATC | Deliver with the right OTP (read from A's `track`) | 200 DELIVERED with `delivered_at`; order DELIVERED, history T10 actor rider; `can_download_invoice` true and the invoice generated (`GET /invoice/` 200, or 503 when WeasyPrint is missing here); R1 freed; `recent_task` DELIVERED | ⬜ [auto 5.3] |
+| P5-TC-69 🔥 | BE | P0 | 5.3 | 08 T10; 04 §2.6/§2.7 | COD(A), ATC | Deliver with the OTP and `cod: {mode: cash, amount: <cod_amount_due>}` | 200; `payment_status` COD_COLLECTED; one `RiderCashLedger` COD_COLLECTED row of +due with `balance_after` = previous + due; `/rider/me` `cash.cash_in_hand` updated | ⬜ [auto 5.3] |
+| P5-TC-70 | BE | P0 | 5.3 | 06 §3 deliver; 08 T10 note | COD(A), ATC | Deliver with the right OTP and: due − 0.01; due + 0.01; `"249"` for `"249.00"`; the number 249; `"249.000"`; `"-249.00"`; `"1e2"`; no `cod`; `mode: upi` (before 5.4). Also a prepaid task with `cod` | Mismatch → 400 `VALIDATION_ERROR` (`details.cod`) and `attempts_remaining` **unchanged**. Equal value in another format: accepted or 400, recorded (exact-match rule). UPI before 5.4 → 400. Prepaid with `cod` → 400 | ⬜ [auto 5.3] |
+| P5-TC-71 🔥 | BE | P0 | 5.3 | 04 §2.6; 06 §3 (5.3 notes); A12 | ATC | 4 wrong OTPs, a 5th wrong one, then the right one; re-read the task; repeat `arrived-customer` | 400 `DELIVERY_OTP_INVALID` with `attempts_remaining` 4, 3, 2, 1; the 5th → 423 `DELIVERY_OTP_LOCKED` (0) + ops alert `DELIVERY_OTP_LOCKED`; the right OTP → 423; `delivery_otp.locked` true; nothing the rider does resets it | ⬜ [auto 5.3] |
+| P5-TC-72 | BE | P0 | 5.3 | 09 §3.1 spirit; 08 T10 | ATC (fresh task) | 20 parallel wrong OTPs, then the right one | At most 4 × 400 and the rest 423; `otp_attempts` never above 5 (SQL); the right OTP afterwards → 423. No race gives extra guesses | ⬜ [auto 5.3] |
+| P5-TC-73 | BE | P1 | 5.3 | 06 §3; A12 | ATC | OTP `""`, `"123"`, `"12345"`, `"abcd"`, `"١٢٣٤"`, `" 1234 "` | 400 `VALIDATION_ERROR` or counted as a wrong OTP (A12), recorded; never 500 | ⬜ [auto 5.3] |
+| P5-TC-74 | BE | P1 | 5.3 | 08 T10 | (a) OFD, not arrived; (b) ATS; (c) DELIVERED | Deliver with the right OTP | (a, b) 409; (c) 200 (idempotent), no second ledger row or earning | ⬜ [auto 5.3] |
+| P5-TC-75 | BE | P0 | 5.3 | 08 T10; 07 (one COD_COLLECTED per order) | COD(A), ATC | 5 parallel delivers with the right OTP and amount | One DELIVERED history row; one ledger row; `cash_in_hand` + due once | ⬜ [auto 5.3] |
+| P5-TC-76 | BE | P0 | 5.3 | DL-56; 06 track | After TC-68/69 | A reads `track` | `rider.phone` null, `delivery_otp` null, `eta_at` null, status DELIVERED | ⬜ [auto 5.3] |
+| P5-TC-77 | E2E | P1 | 5.3 | 06 §2.6 invoice; carries P4-TC-16/17/57 | A DELIVERED order of A | A reads the invoice; waits past `INVOICE_URL_EXPIRY_SECONDS`; B asks for it | `invoice_number` `<prefix>/<FY>/<6 digits>`; signed link valid 600 s, then refused; B → 404. (503 here if WeasyPrint is missing: render check on staging) | ⬜ |
+
+### 5.3 Failed and returned deliveries (T13, T14)
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-78 🔥 | BE | P0 | 5.3 | 08 T13, §6.4; 08 5.3 notes | ONL(A), ATC | Fail with `CUSTOMER_REFUSED`; then R1 tries `shift/end` | 200: task RETURNING, `failed_at`, `fail_reason`; order DELIVERY_FAILED, history T13 actor rider. One refund, reason DELIVERY_FAILED, key `failed:<order>`, amount = refundable − delivery fee (QA oracle); customer notification; ops alert. `shift/end` → 409 `ACTIVE_TASK` | ⬜ [auto 5.3] |
+| P5-TC-79 | BE | P0 | 5.3 | 08 T13; 06 §3 fail; A13 | ONL(A); `riderclock` profile for the last step | `CUSTOMER_NOT_REACHABLE` with `call_attempts` 1; with 2 inside the wait; from OFD (not arrived); with 2 after the wait | 400 (`call_attempts`); 409 `WAIT_NOT_ELAPSED` with `not_reachable_after`; 409; 200, and the refund keeps the delivery fee | ⬜ [auto 5.3] (first three) |
+| P5-TC-80 | BE | P0 | 5.3 | 08 §6.4; A14 | ONL(A), ATC | Fail with `WRONG_ADDRESS`; another order with `OTHER` and a note; `OTHER` without a note | Full refund (everything refundable). `OTHER` without a note: 400, or accepted (04 says the app requires a note), recorded | ⬜ |
+| P5-TC-81 | BE | P0 | 5.3 | 08 §6.4; 5.3 notes | COD(A), ATC | Fail with `CUSTOMER_REFUSED` | `payment_status` FAILED; no ledger row; no refund | ⬜ [auto 5.3] |
+| P5-TC-82 | BE | P1 | 5.3 | 08 §6.4; `COD_BLOCK_AFTER_REFUSALS` (2); A14 | A spare QA customer with 1 refused COD order | Second refused COD delivery; then the customer places COD; OPS unblocks (`set_cod_blocked`) | COD-blocked: 422 `COD_NOT_AVAILABLE`; after unblocking, COD works again | ⬜ (needs a spare QA number, 01 §9.4) |
+| P5-TC-83 | BE | P0 | 5.3 | 08 §6.4; 06 §2.6 refunds | ONL(A), ATC | Fail, then fail again; on another order, 3 parallel fails | Repeats → 200, same task; exactly one refund row (`failed:<order>`) and one T13 history row | ⬜ [auto 5.3] |
+| P5-TC-84 | BE | P1 | 5.3 | 04 §2.6; 09 §3.6 | ATC | Fail with a photo: JPEG 800 KB with EXIF; PNG; PDF; 6 MB | Image stored in the private bucket, re-encoded without EXIF (staff view); PDF → 400; 6 MB → 400/413; no public link | ⬜ |
+| P5-TC-85 🔥 | ADM | P0 | 5.3 | 08 T14, §6.1 | RET (2 lines); stock read before | OPS (packing console in 5.4, service until then) receives the return with no damage | Order RETURNED, task RETURNED with `returned_at`; history T14; per line a RETURN movement and `on_hand` += q; R1 freed (`tasks/current` empty, `shift/end` 200); audit | ⬜ [auto 5.3] |
+| P5-TC-86 | ADM | P0 | 5.3 | 08 T14; 08 5.3 note | RET | Receive with `damaged {line: 1}`; then attempts with damaged > units, an unknown line, −1, `true` | That line: RETURN q + DAMAGE 1 (net `on_hand` += q − 1). Invalid inputs refused and nothing changes | ⬜ |
+| P5-TC-87 | ADM | P1 | 5.3 | 08 T14 guards | OFD; RET received once | Receive while OFD; receive the same return twice | Refused (state message); the second call adds no movement | ⬜ [auto 5.3] |
+
+### 5.4 COD UPI QR, cash, earnings, payouts, history and ops actions
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-88 | BE | P0 | 5.4 | 04 §2.6; 06 §3 cod-qr; A17 | COD(A), ATC; also a prepaid ATC and a COD OFD | `POST /tasks/{id}/cod-qr/`; repeat | 200 `CodQr {qr_id, image_url (https), amount = cod_amount_due, status PENDING, expires_at}`; the repeat returns the open QR (A17). Prepaid → 409; not yet arrived → 409 (A17) | ⬜ 5.4 |
+| P5-TC-89 | BE | P0 | 5.4 | 04 §2.6; 08 T10 | TC-88 QR | Simulate the QR payment (fake gateway, signed); poll `tasks/current`; deliver with `mode: upi` and the amount | `cod_qr.status` PAID; deliver → DELIVERED; **no** cash-ledger row; one payment recorded; `payment_status` as the 5.4 contract (A17) | ⬜ 5.4 |
+| P5-TC-90 | BE | P0 | 5.4 | 08 §4 rule 2; 09 §3.4 | TC-88 QR | Replay the QR-payment event 3 times and 3 in parallel; a payment of a different amount | One payment (duplicates answered `duplicate`); a wrong amount does not mark the QR PAID and is refunded | ⬜ 5.4 |
+| P5-TC-91 | BE | P0 | 5.4 | 06 §3 ("A QR paid after cash was taken is refunded automatically") | COD(A) with an open QR | Deliver with cash; then the QR payment arrives | The QR payment is refunded in full; the ledger has only the cash row; the customer pays once | ⬜ 5.4 |
+| P5-TC-92 | BE | P1 | 5.4 | 08 T8a; 04 §2.6; A17 | COD(A) of 2 units reduced by T8a before pickup (as TC-51), then OFD and ATC; a second order whose QR is left unpaid past `expires_at`, and one whose task is then failed | Generate the QR on the first; wait out the second's expiry and pay it late; fail the third and pay its QR | First: QR amount = the new due (not the offer's `cod_amount`). Expired or failed-task QR: status EXPIRED/CANCELLED, and a late payment to it is refunded, never counted as collected | ⬜ 5.4 |
+| P5-TC-93 🔥 | ADM | P0 | 5.4 | 06 §6 `PICKUP_CODE_LOCKED`; 08 5.3 note (T10); A3 | OTP locked (TC-71); pickup locked (TC-63) | OPS unlocks each | Attempts reset, `locked` false; R1 completes with the right code or OTP; audit; roles per TC-117 | ⬜ 5.4 |
+| P5-TC-94 | BE | P0 | 5.4 | 04 §2.7; 06 §3 (#21, #24) | R1 after 2 COD deliveries and 1 deposit | `GET /rider/cash/ledger/` with `before_id` paging; `GET /rider/me/` | COD_COLLECTED rows (order number) and DEPOSIT rows (negative) with running `balance_after`; `next` carries `before_id`, `previous` null; `cash.cash_in_hand` = the latest balance; `limit_reached` at ≥ limit; 2-dp strings | ⬜ 5.4 |
+| P5-TC-95 🔥 | ADM | P0 | 5.4 | 05 §1.5; 04 §2.7 | R1 with cash 498.00 | SMQ records a deposit of 498.00 at `/ops/cash/` | Ledger DEPOSIT −498.00, balance 0.00; R1 sees it at once; audit | ⬜ 5.4 (needs SMQ, 01 §9.4) |
+| P5-TC-96 | ADM | P0 | 5.4 | 05 §1.5; 08 §6 money rules | R1 with cash 498.00 | Deposits of 498.01, 0, −5, 1.005, "abc"; a GGN-01 rider; the same form posted twice | All refused except the valid one; the balance never goes negative; a double post → one entry | ⬜ 5.4 |
+| P5-TC-97 | ADM | P1 | 5.4 | 05 §1.5 | Several COD deliveries and deposits today | Day-end report for QA-02 | Collected, deposited and the difference per rider agree with a SQL oracle | ⬜ 5.4 |
+| P5-TC-98 🔥 | BE | P0 | 5.3/5.4 | 07 (RiderCashLedger append-only; one COD_COLLECTED per order) | After every run (read-only SQL) | Ledger invariants | No row ever updated (balance chain consistent in id order); one COD_COLLECTED per order; `cash_in_hand` = the last `balance_after` = Σ amount; never negative | ⬜ [auto 5.3] |
+| P5-TC-99 | BE | P1 | 5.4 | 04 §2.8; 06 §3 Earnings (#19); D-16 | R1 with deliveries today, one with a tip | `GET /rider/earnings/` for today, this week and a range; `from` > `to`; a range over 366 days; bad dates | One line per delivered task: 30.00 + 5.00 × km + tip (QA oracle; A16); totals = Σ lines; IST dates inclusive; invalid ranges → 400; > 200 orders → `orders_truncated` | ⬜ 5.4 |
+| P5-TC-100 | BE | P1 | 5.4 | A16; A22 | A failed+returned task and a task cancelled after ASSIGNED | Earnings for that day | Behaviour recorded against A16/A22 (expected: no earnings) | ⬜ 5.4 |
+| P5-TC-101 | BE | P1 | 5.4 | 04 §2.8; 09 §3.2; A8 | R1 with delivered, failed, returned and cancelled tasks | `GET /rider/tasks/history/` with `before_id` paging | Newest first; a task cancelled before pickup has no distance or payout; **no customer phone or full address** (locality at most) | ⬜ 5.4 |
+| P5-TC-102 | ADM | P1 | 5.4 | 05 §2 (Rider earnings & payouts); 04 §2.8 | Earnings for R1 | FIN creates a payout batch and marks it paid with a reference; R1 reads `/rider/payouts/` (page numbers) | Period, amount, status and reference shown; amounts agree with the earnings | ⬜ 5.4 |
+| P5-TC-103 | BE | P1 | 5.4 | 06 §3 Access | R1 SUSPENDED; a PENDING_KYC rider | Read history, earnings, ledger and payouts | 200 in any status | ⬜ 5.4 |
+
+### IDOR (every rider object, plus tracking)
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-104 🔥 | BE | P0 | 5.3 | 09 §3.2; 06 §3 Access | OFR (offer O1 to R1); R2 ACTIVE | R2 accepts and rejects O1 | 404 `NOT_FOUND`; O1 still PENDING | ⬜ [auto 5.3] |
+| P5-TC-105 🔥 | BE | P0 | 5.3/5.4 | 09 §3.2 | R1's task T1 in ASG, ATS + PKD, OFD and ATC | R2 calls arrived-store, pickup (right code), arrived-customer, cod-qr, deliver (right OTP) and fail on T1 | 404 each; T1 unchanged; R2's calls do not count against T1's pickup or OTP limits | ⬜ [auto 5.3] |
+| P5-TC-106 | BE | P0 | 5.3 | 09 §3.2 | R1 with an offer and a task; R2 | R2 sweeps offer and task ids ±50 around R1's | Only R2's own ids answer non-404; the 404 body is identical for missing ids and other riders' ids; R2's `tasks/current` never shows R1's task | ⬜ [auto 5.3] |
+| P5-TC-107 | BE | P0 | 5.3 | 06 §3 Access | OFR; customer A (no rider profile) | A calls the rider endpoints, including accept on O1 | 403 `PERMISSION_DENIED` `rider_status` NONE; O1 unchanged | ⬜ [auto 5.3] |
+| P5-TC-108 🔥 | BE | P0 | 5.3 | 06 track; DL-56; 09 §3.2 | ONL(A) at OFD with R1 | B reads A's `track`; R1 (the delivering rider, not the owner) reads it | 404 for both; no rider phone or OTP leaks | ⬜ [auto 5.3] |
+| P5-TC-109 | BE | P0 | 5.4 | 09 §3.2 | R1 and R2 with records | R2 reads history, ledger, earnings and payouts with `rider_id=<R1>` and with `before_id` taken from R1's rows | Only R2's rows; a foreign `before_id` reveals nothing of R1's | ⬜ 5.4 |
+| P5-TC-110 | BE | P0 | 5.1/5.3 | 09 §3.3 | R1's `photo_url`, a document link and a failure photo | R2 and customer A use them; change the key in the link | Signed links work only as issued and expire; no endpoint returns another rider's documents or photos | ⬜ |
+
+### Role matrix for the ops actions (05 §3)
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-111 🔥 | ADM | P0 | 5.1 | 05 §3 "Rider approval / suspend"; 06 §3 staff services | A PENDING_KYC rider; R2 | Each role: approve/reject a document, approve/reject the rider, suspend/reinstate, set home store, set cash limit (admin pages and POSTs) | SA ✔, OPS ✔. SM: views its own store's riders only, no actions; another store's rider → 404. SS, CAT, SUP, FIN: no access (403 or not listed). Every ✔ audited | ⬜ |
+| P5-TC-112 | ADM | P0 | 5.1 | 09 §3.3; 06 §3 (`document_file_url`, `document_number`) | Rider with documents | Each role opens a KYC file and reveals a full number | SA and OPS only, each view audited; everyone else refused | ⬜ |
+| P5-TC-113 🔥 | ADM | P0 | 5.3/5.4 | 05 §3 "Manual dispatch"; 06 §3 (5.3 ops services) | A QA-02 task SEARCHING; ON(R2) | Each role: manual assign, unassign, retry dispatch | SA ✔, OPS ✔, SMQ ✔ (own store); SM (GGN-01) → not found; SS, CAT, SUP, FIN refused. Audited | ⬜ (SMQ needed, 01 §9.4) |
+| P5-TC-114 🔥 | ADM | P0 | 5.4 | 05 §3 "Cash deposit entry"; A4 | R1 with cash | Each role: record a deposit; open the day-end report | Record: SA ✔, SMQ ✔ (own store); SM (GGN-01) refused for a QA-02 rider; OPS refused (A4); FIN view only; SS, CAT, SUP refused | ⬜ 5.4 |
+| P5-TC-115 | ADM | P0 | 5.4 | 05 §3 "Payouts" | Earnings exist | Each role: create a payout batch, mark it paid | SA ✔, FIN ✔; everyone else refused | ⬜ 5.4 |
+| P5-TC-116 | ADM | P1 | 5.3/5.4 | 08 T14; 05 §1.3 "Returns"; A2 | RET at QA-02 | Each role receives the return | SA, OPS, SMQ ✔; SS of GGN-01 and SM of GGN-01 → not found (other store); CAT, SUP, FIN refused | ⬜ |
+| P5-TC-117 | ADM | P1 | 5.2/5.4 | A4 | R1 online; OTP-locked task | Each role: force offline; unlock OTP/pickup; set cash limit | Recorded per role and compared with the A4 working assumption (SA/OPS for force offline and cash limit; the Manual dispatch roles for unlock) | ⬜ 5.4 |
+| P5-TC-118 | ADM | P1 | 5.4 | 05 §1.4; 05 §3 Customers (PII); 05 §5 | Riders online | Each role opens `/ops/riders/map/` and the rider list; a POST without the CSRF token | SA and OPS: all stores; SMQ: QA-02 only; others refused. Customer phones masked for store roles; no POST works without CSRF (403); audit rows carry actor and IP, no free text | ⬜ 5.4 |
+
+### Customer tracking and OTP visibility
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-119 🔥 | BE | P0 | 5.3 | DL-56; 06 §3 track (#28, #33); 08 §9 | ONL(A) through every state | A reads `track` at SEARCHING, OFR, ASG, ATS, OFD and ATC | `rider` null until ASG. ASG/ATS: `rider {name "First L.", phone null, photo https or null, lat, lng, updated_at}`, `delivery_otp` null. OFD/ATC: `rider.phone` = R1's phone, `delivery_otp` = the 4-digit OTP that `deliver` accepts. Strict schema | ⬜ [auto 5.3] |
+| P5-TC-120 | BE | P0 | 5.3 | DL-56 | Orders ending DELIVERED, DELIVERY_FAILED, RETURNED and CANCELLED (after ASG) | A reads `track` | `rider.phone` null and `delivery_otp` null in all four; `eta_at` null once finished | ⬜ [auto 5.3] |
+| P5-TC-121 | BE | P0 | 5.3 | DL-56; 09 §3.3 (PII in logs); A7 | OFD | Look for the OTP value in: order detail and list; R1's task, offers and heartbeat; the ops-alert log lines and the instance log; A's notification inbox after DELIVERED | The OTP value appears only in A's `track` (OFD) and A's T9 notification. R1's task has only `{length, attempts_remaining, locked}`; nothing in the logs. Inbox after delivery recorded (A7) | ⬜ [auto 5.3] (API part) |
+| P5-TC-122 | BE | P1 | 5.3 | 09 §1 (< 5 s); A9 | OFD | R1 sends a point; A polls `track` | `rider.lat/lng/updated_at` reflect the new point within 5 s (local indication); after DELIVERED no rider location is returned | ⬜ [auto 5.3] |
+| P5-TC-123 | BE | P1 | 5.3 | 04 §2.4; 06 track | OFR, ASG | Compare what each side sees | Before accept the rider sees only the locality; the customer never sees the rider's full surname | ⬜ [auto 5.3] |
+| P5-TC-124 | CUS | P1 | 5.3 | 03 tracking; DL-56 | Customer dev build, phone | Tracking screen through ASG → OFD → DELIVERED with the socket down | Rider name, call button and OTP card only while OUT_FOR_DELIVERY; polling fallback; no crash | ⏭ device run (PM) |
+
+### End to end, data integrity and non-functional
+| ID | Area | Pri | Slice | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P5-TC-125 🔥 | E2E | P0 | 5.3 | 08 §1–§3, §6.1 | ON(R1) | ONLINE: place → pay → auto-accept → offer → accept → arrive at store → OPS pack → pickup → arrive → deliver, all through the API | Statuses and history T3, T6, T7, T8, T9, T10 in order; bill unchanged (oracle); stock reserved, then committed; invoice; R1 free again | ⬜ [auto 5.3] |
+| P5-TC-126 🔥 | E2E | P0 | 5.3/5.4 | 08 T10; 05 §1.5 | ON(R1) | COD end to end with cash; then a deposit of the whole balance | COD_COLLECTED; ledger back to 0.00 after the deposit | ⬜ [auto 5.3] (to T10) |
+| P5-TC-127 | E2E | P1 | 5.3 | 08 T13, T14, §6.4 | ON(R1); QA worker | ONLINE → fail (refused) → return received; the worker settles the refund | `payment_status` PARTIALLY_REFUNDED (delivery fee kept) after `refund.processed`; stock restored; R1 freed | ⬜ [auto 5.3] |
+| P5-TC-128 🔥 | BE | P0 | 5.3 | 08 §1, §3; 07 (5.3 constraints) | After every run (read-only SQL) | Delivery invariants | ≤ 1 active task per rider; ≤ 1 PENDING offer per task and per rider; DELIVERED order ⇔ DELIVERED task; OUT_FOR_DELIVERY ⇔ PICKED_UP/AT_CUSTOMER; DELIVERY_FAILED ⇔ RETURNING; RETURNED ⇔ RETURNED; a CANCELLED order has no task or a CANCELLED one; every task from ASSIGNED on has a rider | ⬜ [auto 5.3] |
+| P5-TC-129 | BE | P1 | 5.3 | 10 §2 (API tests) | Rider token | Schemathesis on the rider operations (low example count) | No 500; responses schema-valid | ⬜ |
+| P5-TC-130 | BE | P1 | 5.3 | 06 §6 | — | Every rider endpoint with no token, a bad token, `X-App-Version` below the minimum (read-only check of the current minimum) and a wrong method | 401 `AUTH_REQUIRED` / `TOKEN_INVALID`; 405 envelope; codes in `ErrorCodeEnum` | ⬜ [auto 5.3] |
+| P5-TC-131 🔥 | RID | P0 | 5.3/5.4 | 04 §1, §2.4–§2.7 | Rider dev build on the user's phone against :8001 (PM), GPX route | Prepaid, COD cash, COD UPI and failed → return, with the app killed and restored mid-task | Every step matches the server; restored to the right step; no crash | ⏭ device run (PM) |
+| P5-TC-132 | E2E | P1 | P6 | 06 §4; 08 §9; 09 §1 | Firebase project (D-19); rider socket | Offer by FCM and `/ws/v1/rider/`; `offer.withdrawn`; `task.updated` | Delivered < 3 s; the app follows the payload keys of 06 §4.3 | ⏭ P6 / D-19 |
+
+### Totals (Phase 5, stage 1 design, 2026-11-05)
+| By section | Cases | 🔥 | Pri P0 | Pri P1 | Pri P2 | `[auto 5.3]` | ⏭ |
+|---|---|---|---|---|---|---|---|
+| 5.1 KYC and onboarding | 20 | 2 | 8 | 11 | 1 | 0 | 1 |
+| 5.2 Shifts, location and heartbeat | 13 | 1 | 2 | 10 | 1 | 6 | 1 |
+| 5.3 Dispatch and offers | 25 | 3 | 15 | 9 | 1 | 13 | 0 |
+| 5.3 Pickup and T9 (stock commit) | 8 | 2 | 6 | 2 | 0 | 7 | 0 |
+| 5.3 Arrival, delivery OTP and T10 | 11 | 3 | 7 | 4 | 0 | 10 | 0 |
+| 5.3 Failed and returned deliveries (T13, T14) | 10 | 2 | 7 | 3 | 0 | 6 | 0 |
+| 5.4 COD UPI QR, cash, earnings, payouts, history and ops actions | 16 | 3 | 9 | 7 | 0 | 1 | 0 |
+| IDOR (every rider object, plus tracking) | 7 | 3 | 7 | 0 | 0 | 5 | 0 |
+| Role matrix for the ops actions (05 §3) | 8 | 3 | 5 | 3 | 0 | 0 | 0 |
+| Customer tracking and OTP visibility | 6 | 1 | 3 | 3 | 0 | 5 | 1 |
+| End to end, data integrity and non-functional | 8 | 4 | 4 | 4 | 0 | 5 | 2 |
+| **Total** | **132** | **27** | **73** | **56** | **3** | **58** | **5** |
+
+| By area | Cases | 🔥 | Pri P0 | Pri P1 | Pri P2 |
+|---|---|---|---|---|---|
+| BE | 97 | 15 | 54 | 40 | 3 |
+| ADM | 25 | 8 | 15 | 10 | 0 |
+| RID | 3 | 1 | 1 | 2 | 0 |
+| E2E | 6 | 3 | 3 | 3 | 0 |
+| CUS | 1 | 0 | 0 | 1 | 0 |
+
+None executed: 127 ⬜ and 5 ⏭ (TC-19, TC-33, TC-124, TC-131, TC-132: device run or P6/D-19). Slice split: 5.4-only cases are marked `⬜ 5.4`.
