@@ -378,7 +378,7 @@ List<TimelineStep> timelineFor(
 /// wasn't.
 @immutable
 class ReorderResult {
-  const ReorderResult({this.unavailable = const [], this.cart});
+  const ReorderResult({this.unavailable = const [], this.cart, this.addedCount});
 
   /// Lines that couldn't be added as ordered.
   final List<ReorderSkippedItem> unavailable;
@@ -386,11 +386,19 @@ class ReorderResult {
   /// The cart after the reorder, when the server returns it.
   final CartSnapshot? cart;
 
+  /// The server's count of order lines now in the cart (`added_count`);
+  /// null from a source that doesn't send it.
+  final int? addedCount;
+
   bool get addedAll => unavailable.isEmpty;
 
-  /// Nothing at all was added from an order of [orderLines] lines.
-  bool addedNothing(int orderLines) =>
-      unavailable.where((i) => i.addedQuantity == 0).length >= orderLines;
+  /// Nothing at all was added from an order of [orderLines] lines: the
+  /// server's `added_count` when sent, else counted from [unavailable].
+  bool addedNothing(int orderLines) {
+    final added = addedCount;
+    if (added != null) return added == 0;
+    return unavailable.where((i) => i.addedQuantity == 0).length >= orderLines;
+  }
 }
 
 /// Why a line couldn't be reordered as it was.

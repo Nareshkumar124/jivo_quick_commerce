@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import 'package:jivo_api/jivo_api.dart' as api show JivoApi, OrderTrack;
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../orders/domain/order.dart';
@@ -9,9 +11,72 @@ abstract interface class TrackRepository {
   Future<OrderTrack> fetch(int orderId);
 }
 
-/// TODO(api): `GET /orders/{id}/track/` is a Phase 5 endpoint, not in
-/// jivo_api yet. Until then the real-API build has no tracking (the order
-/// detail hides "Track order").
+/// `GET /orders/{id}/track/` (`orders_track`, P5 slice 5.3). Another
+/// user's order is 404. `rider` is null until a rider is assigned and
+/// `delivery_otp` is sent only while `OUT_FOR_DELIVERY`; both stay null
+/// until the backend's slice 5.3 lands, and the cards stay hidden.
+class ApiTrackRepository implements TrackRepository {
+  const ApiTrackRepository(this._api);
+
+  final api.JivoApi _api;
+
+  @override
+  Future<OrderTrack> fetch(int orderId) async {
+    try {
+      final track = (await _api.getOrdersApi().ordersTrack(id: orderId)).data!;
+      return orderTrackFromApi(track);
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+}
+
+/// Maps the generated `OrderTrack`. A rider photo is kept only when it is
+/// an `https` URL (the server sends a short-lived signed link); a blank
+/// OTP or phone counts as none.
+OrderTrack orderTrackFromApi(api.OrderTrack t) {
+  final rider = t.rider;
+  final lat = rider?.lat;
+  final lng = rider?.lng;
+  final photo = rider?.photo;
+  final photoUri = photo == null ? null : Uri.tryParse(photo);
+  final otp = t.deliveryOtp?.trim();
+  return OrderTrack(
+    orderId: t.orderId,
+    orderNumber: t.orderNumber,
+    status: OrderStatus.fromWire(t.status.value),
+    storeName: t.store.name,
+    store: TrackPoint(t.store.lat, t.store.lng),
+    destination: TrackPoint(t.destination.lat, t.destination.lng),
+    etaAt: t.etaAt,
+    rider: rider == null
+        ? null
+        : TrackRider(
+            name: rider.name,
+            phone: _blankToNull(rider.phone),
+            photoUrl:
+                photoUri != null &&
+                    photoUri.scheme == 'https' &&
+                    photoUri.host.isNotEmpty
+                ? photo
+                : null,
+            location: lat == null || lng == null ? null : TrackPoint(lat, lng),
+            updatedAt: rider.updatedAt,
+          ),
+    deliveryOtp: otp == null || otp.isEmpty ? null : otp,
+  );
+}
+
+/// Null for a missing or blank value. The rider's phone is sent only while
+/// OUT_FOR_DELIVERY and only to the order's owner (DL-56); without it the
+/// rider card stays and the call button is hidden.
+String? _blankToNull(String? value) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
+/// The build without tracking (staging/prod until orders are enabled there,
+/// see `trackingAvailableProvider`).
 class UnavailableTrackRepository implements TrackRepository {
   const UnavailableTrackRepository();
 

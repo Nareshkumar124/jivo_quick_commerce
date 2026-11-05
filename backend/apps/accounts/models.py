@@ -98,8 +98,13 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     @property
     def rider_status(self) -> str:
-        """NONE until Phase 5 adds the Rider profile (07 §2.8); then the profile's status."""
-        return RiderStatus.NONE
+        """The rider profile's status (07 §2.8, Phase 5); NONE without a profile."""
+        from django.core.exceptions import ObjectDoesNotExist
+
+        try:
+            return self.rider_profile.status
+        except ObjectDoesNotExist:
+            return RiderStatus.NONE
 
     def clean(self) -> None:
         super().clean()

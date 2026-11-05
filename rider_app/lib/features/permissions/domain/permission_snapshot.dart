@@ -25,6 +25,7 @@ class PermissionSnapshot {
     required this.batteryOptimisationIgnored,
     required this.gpsEnabled,
     required this.fullScreenIntentAllowed,
+    this.locationPrecise = true,
   });
 
   /// Android API level (`Build.VERSION.SDK_INT`).
@@ -35,6 +36,11 @@ class PermissionSnapshot {
 
   /// Fine location while the app is in use.
   final Grant locationWhenInUse;
+
+  /// Whether the location grant is precise. Android 12+ lets the rider pick
+  /// "Approximate" (about 2 km), which cannot guide a delivery; the gate then
+  /// keeps the location step open (04 §2.1). Always true below Android 12.
+  final bool locationPrecise;
 
   /// Background location ("Allow all the time"), Android 10+.
   final Grant locationAlways;
@@ -59,6 +65,7 @@ class PermissionSnapshot {
     bool? batteryOptimisationIgnored,
     bool? gpsEnabled,
     bool? fullScreenIntentAllowed,
+    bool? locationPrecise,
   }) => PermissionSnapshot(
     sdkInt: sdkInt ?? this.sdkInt,
     manufacturer: manufacturer ?? this.manufacturer,
@@ -70,5 +77,6 @@ class PermissionSnapshot {
     gpsEnabled: gpsEnabled ?? this.gpsEnabled,
     fullScreenIntentAllowed:
         fullScreenIntentAllowed ?? this.fullScreenIntentAllowed,
+    locationPrecise: locationPrecise ?? this.locationPrecise,
   );
 }

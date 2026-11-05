@@ -61,3 +61,6 @@ The smoke set was unaffected.
 
 ## Phase 4 stage 1 (2026-11-04, `1b3552d`)
 `uv run pytest -m smoke` (P0–P4 🔥): `1 failed, 89 passed, 2 skipped, 406 deselected in 876.95s` (skips: P0 staging profile, P4-TC-30 second store). The failure, P3-TC-50, was a **stale QA oracle**: it counted any payment with more than one refund as a double refund, which P4 makes legitimate (T8a difference + cancel of the rest, manual partials, FAILED + retry). All 12 such payments were inspected: their standing refunds sum exactly to the payment amount. The oracle now checks Σ standing refunds ≤ amount and no two P3 capture refunds per payment; the case is kept. After the update: `8 passed` (P3 + P4 SQL). Smoke run 1 was cut off by the pause and is not counted.
+
+## Phase 4 stage 2 (2026-11-04, `f744508`)
+`uv run pytest -m smoke` (P0–P4 🔥, now including the console and QA-02 cases): `98 passed, 2 skipped, 418 deselected in 807.71s`. P3 + P4 SQL invariants after cleanup: `8 passed`.

@@ -28,7 +28,20 @@ void main() {
 
   Future<void> openPage(WidgetTester tester, String slug) async {
     final row = find.byKey(Key('legal-$slug'));
-    await tester.scrollUntilVisible(row, 100);
+    // The Account list (other tabs' lists are offstage in the shell).
+    await tester.scrollUntilVisible(
+      row,
+      100,
+      scrollable: find
+          .ancestor(
+            of: find.byKey(const Key('account-help')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    // Centre it: at the bottom edge the tab bar would take the tap.
+    await Scrollable.ensureVisible(tester.element(row), alignment: 0.5);
+    await tester.pumpAndSettle();
     await tester.tap(row);
     await tester.pumpAndSettle();
   }
@@ -56,11 +69,36 @@ void main() {
     expect(a.urls.opened, [Uri.parse('https://jivo.in/terms')]);
   });
 
-  testWidgets('a missing page shows the error with retry', (tester) async {
+  testWidgets('a policy page the server lacks (404) offers the config/app '
+      'policy URL', (tester) async {
     cms.pages.remove(CmsSlugs.privacy);
-    await openAccount(tester, app());
+    final a = app();
+    await openAccount(tester, a);
     await openPage(tester, CmsSlugs.privacy);
+    expect(find.byKey(const Key('cms-fallback')), findsOneWidget);
+    await tester.tap(find.text('Open in browser'));
+    await tester.pumpAndSettle();
+    expect(a.urls.opened.single.scheme, 'https');
+    expect(a.urls.opened.single.path, contains('privacy'));
+  });
+
+  testWidgets('About missing (no fallback) or a network error: retry', (
+    tester,
+  ) async {
+    cms.pages.remove(CmsSlugs.about);
+    await openAccount(tester, app());
+    await openPage(tester, CmsSlugs.about);
     expect(find.text('Retry'), findsOneWidget);
+    expect(find.byKey(const Key('cms-fallback')), findsNothing);
+
+    cms.pages[CmsSlugs.about] = const CmsPage(
+      slug: CmsSlugs.about,
+      title: 'About Jivo',
+      html: '<p>Back again</p>',
+    );
+    await tester.tap(find.text('Retry'));
+    await tester.pumpAndSettle();
+    expect(find.text('Back again'), findsOneWidget);
   });
 
   testWidgets('real-API build keeps the browser policy links', (tester) async {

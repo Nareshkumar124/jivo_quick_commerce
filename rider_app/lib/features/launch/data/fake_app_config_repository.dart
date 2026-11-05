@@ -75,6 +75,9 @@ class FakeAppConfigRepository implements AppConfigRepository {
     'rider_location': {
       'active_interval_seconds': 10,
       'idle_interval_seconds': 30,
+      'active_sample_seconds': 5,
+      'idle_sample_seconds': 30,
+      'max_batch': 50,
     },
     'feature_flags': <String, bool>{},
   };

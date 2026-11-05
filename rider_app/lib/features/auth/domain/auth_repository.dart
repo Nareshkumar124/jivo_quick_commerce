@@ -14,6 +14,7 @@ abstract interface class AuthRepository {
     required String termsVersion,
   });
 
-  /// `POST /api/v1/auth/logout/`: blacklists [refreshToken].
-  Future<void> logout({required String refreshToken});
+  /// `POST /api/v1/auth/logout/`: blacklists [refreshToken]; with
+  /// [fcmToken] the server also stops push to this phone.
+  Future<void> logout({required String refreshToken, String? fcmToken});
 }

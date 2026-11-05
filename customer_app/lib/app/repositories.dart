@@ -34,6 +34,7 @@ import '../features/orders/data/order_history_repository.dart';
 import '../features/orders/data/order_repository.dart';
 import '../features/profile/data/profile_repository.dart';
 import '../features/rating/data/rating_repository.dart';
+import '../features/support/data/api_support_repository.dart';
 import '../features/support/data/support_repository.dart';
 import '../features/tracking/data/track_repository.dart';
 import 'providers.dart';
@@ -152,15 +153,22 @@ final orderHistoryRepositoryProvider = Provider<OrderHistoryRepository>((ref) {
   );
 });
 
-/// Whether this build can show live tracking. TODO(api): true only on
-/// fakes until `GET /orders/{id}/track/` (Phase 5) is bound.
-final trackingAvailableProvider = Provider<bool>((ref) => _fake(ref));
-
-/// Live tracking data (Phase 6 lookahead on fakes).
-final trackRepositoryProvider = Provider<TrackRepository>(
-  (ref) =>
-      _fake(ref) ? FakeTrackRepository() : const UnavailableTrackRepository(),
+/// Whether this build can show live tracking: wherever orders exist (the
+/// dev flavor today, like [cartAvailableProvider]); `GET /orders/{id}/track/`
+/// is bound since P5.
+final trackingAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(cartAvailableProvider),
 );
+
+/// Live tracking (`GET /orders/{id}/track/`, polled every 10 s): the API,
+/// the fake with `FAKE_API`, nothing where there are no orders.
+final trackRepositoryProvider = Provider<TrackRepository>((ref) {
+  if (!ref.watch(trackingAvailableProvider)) {
+    return const UnavailableTrackRepository();
+  }
+  if (_fake(ref)) return FakeTrackRepository();
+  return ApiTrackRepository(ref.watch(jivoApiProvider));
+});
 
 /// The notification inbox (Phase 6 lookahead on fakes). TODO(api): bind the
 /// inbox endpoints when the Phase 6 contract lands.
@@ -180,26 +188,34 @@ final ratingRepositoryProvider = Provider<RatingRepository>(
       _fake(ref) ? FakeRatingRepository() : const UnavailableRatingRepository(),
 );
 
-/// Whether FAQs and support tickets are shown. TODO(api): true only on
-/// fakes until the Phase 7 support endpoints are bound.
-final supportAvailableProvider = Provider<bool>((ref) => _fake(ref));
-
-/// FAQs and tickets (Phase 7 lookahead on fakes).
-final supportRepositoryProvider = Provider<SupportRepository>(
-  (ref) => _fake(ref)
-      ? FakeSupportRepository()
-      : const UnavailableSupportRepository(),
+/// Whether FAQs and support tickets are shown: the dev flavor (API or
+/// fakes) since the P7 support API (T-713); staging and prod show only
+/// "Call support" until it is enabled there.
+final supportAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
 );
 
-/// Whether Legal and About open in the in-app CMS viewer. TODO(api): true
-/// only on fakes until `GET /pages/{slug}/` (Phase 7); otherwise the
-/// policy URLs from `config/app` open in the browser.
-final cmsAvailableProvider = Provider<bool>((ref) => _fake(ref));
+/// FAQs and tickets: the API, the fake with `FAKE_API`.
+final supportRepositoryProvider = Provider<SupportRepository>((ref) {
+  if (!ref.watch(supportAvailableProvider)) {
+    return const UnavailableSupportRepository();
+  }
+  if (_fake(ref)) return FakeSupportRepository();
+  return ApiSupportRepository(ref.watch(jivoApiProvider));
+});
 
-/// CMS pages (Phase 7 lookahead on fakes).
-final cmsRepositoryProvider = Provider<CmsRepository>(
-  (ref) => _fake(ref) ? FakeCmsRepository() : const UnavailableCmsRepository(),
+/// Whether Legal and About open in the in-app CMS viewer (dev flavor since
+/// T-713); otherwise the policy URLs from `config/app` open in the browser.
+final cmsAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
 );
+
+/// CMS pages: the API, the fake with `FAKE_API`.
+final cmsRepositoryProvider = Provider<CmsRepository>((ref) {
+  if (!ref.watch(cmsAvailableProvider)) return const UnavailableCmsRepository();
+  if (_fake(ref)) return FakeCmsRepository();
+  return ApiCmsRepository(ref.watch(jivoApiProvider));
+});
 
 /// The root navigator, for sheets opened outside a widget (the dev fake
 /// payment sheet).

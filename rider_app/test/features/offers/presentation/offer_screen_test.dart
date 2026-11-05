@@ -13,11 +13,18 @@ void main() {
   setUp(() => h = RiderTestHarness());
 
   /// An ACTIVE rider at home; dispatch then offers an order.
-  Future<int> openOffer(WidgetTester tester, {bool cod = false}) async {
+  Future<int> openOffer(
+    WidgetTester tester, {
+    bool cod = false,
+    bool withoutAmount = false,
+  }) async {
     await h.signedInBefore('+919811122231');
     await h.pump(tester);
     expect(byKey('home-flavor'), findsOneWidget);
-    final offer = h.tasks.simulateOffer(cod: cod);
+    final offer = h.tasks.simulateOffer(
+      cod: cod,
+      withoutCodAmount: withoutAmount,
+    );
     await pumpFor(tester, const Duration(milliseconds: 300));
     expect(find.byType(OfferScreen), findsOneWidget);
     return offer.id;
@@ -35,24 +42,70 @@ void main() {
 
     expect(find.text('New order'), findsOneWidget);
     expect(find.text('Jivo Sector 18'), findsOneWidget);
-    expect(find.text('Sector 21, Noida'), findsOneWidget);
-    expect(find.text('2.4 km'), findsOneWidget);
-    expect(find.text('Cash on delivery: collect ₹1,249.00'), findsOneWidget);
-    expect(find.text('You earn about ₹45.00'), findsOneWidget);
+    expect(find.text('Sector 21, Noida · 2.4 km'), findsOneWidget);
+    expect(find.text('Cash ₹1,249 to collect'), findsOneWidget);
+    expect(find.text('You earn about ₹45'), findsOneWidget);
     expect(tester.widget<Text>(byKey('offer-countdown')).data, '30');
     expect(h.alerter.rings.single.$1, id);
     expect(h.alerter.rings.single.$2, greaterThan(const Duration(seconds: 29)));
+    // RD-04: Accept is the bottom-most target at 64 dp, Reject 16 dp above.
+    expect(tester.getSize(byKey('offer-accept')).height, 64);
+    final accept = tester.getRect(byKey('offer-accept'));
+    final reject = tester.getRect(byKey('offer-reject'));
+    expect(reject.bottom, lessThan(accept.top));
+    expect(accept.top - reject.bottom, 16);
+  });
+
+  testWidgets('the last 10 s turn urgent: "s", then "Expiring" (RD-04)', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await openOffer(tester);
+    expect(byKey('offer-expiring'), findsNothing);
+
+    await advance(tester, const Duration(seconds: 21));
+    expect(tester.widget<Text>(byKey('offer-countdown')).data, '9 s');
+    expect(byKey('offer-expiring'), findsNothing);
+
+    await advance(tester, const Duration(seconds: 5));
+    expect(tester.widget<Text>(byKey('offer-countdown')).data, '4 s');
+    expect(find.text('Expiring'), findsOneWidget);
     expect(
-      tester.getSize(byKey('offer-accept')).height,
-      greaterThanOrEqualTo(56),
+      find.bySemanticsLabel('Time left to accept: 4 seconds'),
+      findsOneWidget,
     );
+    semantics.dispose();
+  });
+
+  testWidgets('a COD offer without an amount never shows a bare ₹ (RD-02)', (
+    tester,
+  ) async {
+    await openOffer(tester, cod: true, withoutAmount: true);
+    expect(
+      find.text('Cash on delivery: amount shown after you accept.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining(RegExp(r'₹\s|₹$')), findsNothing);
+  });
+
+  testWidgets('the reject sheet closes when the offer expires', (tester) async {
+    await openOffer(tester);
+    await tester.tap(byKey('offer-reject'));
+    await tester.pumpAndSettle();
+    expect(find.text('Why are you rejecting? (optional)'), findsOneWidget);
+
+    await advance(tester, const Duration(seconds: 30));
+    await tester.pumpAndSettle();
+    expect(find.text('Why are you rejecting? (optional)'), findsNothing);
+    expect(find.text('Offer expired'), findsOneWidget);
+    expect(h.tasks.calls, isNot(contains(startsWith('reject'))));
   });
 
   testWidgets('the countdown follows the clock, then the offer expires', (
     tester,
   ) async {
     await openOffer(tester);
-    expect(find.text('Prepaid: nothing to collect'), findsOneWidget);
+    expect(find.text('Prepaid · nothing to collect'), findsOneWidget);
 
     await advance(tester, const Duration(seconds: 12));
     expect(tester.widget<Text>(byKey('offer-countdown')).data, '18');

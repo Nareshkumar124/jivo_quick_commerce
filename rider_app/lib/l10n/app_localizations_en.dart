@@ -149,11 +149,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get oemAction => 'Open app settings';
 
   @override
-  String get disclosureTitle => 'Your location while you\'re online';
+  String get disclosureTitle =>
+      'Jivo Rider uses your location in the background';
 
   @override
   String get disclosureBody =>
-      'Jivo Rider collects location data to send you delivery offers near your store, show customers where their order is, and calculate your distance pay, even when the app is closed or not in use.';
+      'Jivo Rider collects location data to send you delivery offers near your store, guide you to customers, and show customers where their order is, even when the app is closed or not in use.';
 
   @override
   String get disclosureOnlineOnly =>
@@ -168,7 +169,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Next, allow location and then choose \"Allow all the time\".';
 
   @override
-  String get disclosureAccept => 'Continue';
+  String get disclosureAccept => 'I agree, turn on location';
 
   @override
   String get disclosureDecline => 'Not now';
@@ -874,11 +875,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get offerPrepaid => 'Prepaid: nothing to collect';
+  String get offerPrepaid => 'Prepaid · nothing to collect';
 
   @override
   String offerCod(String amount) {
-    return 'Cash on delivery: collect $amount';
+    return 'Cash $amount to collect';
   }
 
   @override
@@ -892,7 +893,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get offerAccept => 'Accept';
+  String get offerAccept => 'Accept order';
 
   @override
   String get offerReject => 'Reject';
@@ -954,7 +955,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'No maps app found. Install Mappls or another maps app.';
 
   @override
-  String get taskCallCustomer => 'Call customer';
+  String get taskCallCustomer => 'Call';
 
   @override
   String get taskStateChanged =>
@@ -981,7 +982,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskGoToStoreTitle => 'Go to the store';
 
   @override
-  String get taskOrderPacking => 'Packing…';
+  String get taskOrderPacking => 'Store is packing: wait here';
 
   @override
   String get taskOrderReady => 'Ready for pickup';
@@ -997,7 +998,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pickupCodeHelp =>
-      'Scan the QR code on the bag, or type the 4-character code printed on it.';
+      'Scan the QR on the bag, or type the 4-character code printed on it.';
 
   @override
   String get pickupCodeLabel => 'Order code';
@@ -1014,10 +1015,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'The order isn\'t packed yet. Wait until the store marks it ready.';
 
   @override
-  String get taskPickup => 'Picked up';
+  String get taskPickup => 'Confirm pickup';
 
   @override
-  String get pickupScan => 'Scan QR code';
+  String get pickupScan => 'Scan bag QR';
 
   @override
   String get scanTitle => 'Scan the bag QR code';
@@ -1054,10 +1055,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskArrivedCustomer => 'Arrived at customer';
 
   @override
-  String get taskCantDeliver => 'Can\'t deliver';
+  String get taskCantDeliver => 'Can\'t deliver…';
 
   @override
-  String get arrivedOverride => 'I\'m at the address: the pin is wrong';
+  String get arrivedOverride => 'Not at the pin? Arrive anyway';
 
   @override
   String get arrivedOverrideTitle => 'Why are you outside the pin area?';
@@ -1096,15 +1097,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get deliveryOtpWrong => 'That code is wrong. Ask the customer again.';
+  String get deliveryOtpWrong =>
+      'Wrong code. Ask the customer to read it again from their app or SMS.';
 
   @override
   String deliveryOtpWrongLeft(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Wrong code. $count attempts left.',
-      one: 'Wrong code. 1 attempt left.',
+      other:
+          'Wrong code. $count tries left. Ask the customer to read it again from their app or SMS.',
+      one: 'Wrong code. 1 try left. Ask the customer to read it again from their app or SMS.',
     );
     return '$_temp0';
   }
@@ -1123,7 +1126,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codAmountDueLabel => 'Amount to collect';
 
   @override
-  String get codExactAmount => 'Collect exactly this amount.';
+  String get codExactAmount =>
+      'Collect exactly this amount. Don\'t accept more or less.';
 
   @override
   String codCashCollected(String amount) {
@@ -1131,18 +1135,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get codConfirmTitle => 'Confirm cash';
-
-  @override
-  String codConfirmBody(String amount) {
-    return 'Did you collect exactly $amount in cash?';
+  String codConfirmTitle(String amount) {
+    return 'Collected $amount?';
   }
 
   @override
-  String get codConfirmYes => 'Yes, collected';
+  String get codConfirmBody =>
+      'Count the cash before confirming. You can\'t change this after delivery.';
 
   @override
-  String get codConfirmNo => 'No';
+  String codConfirmYes(String amount) {
+    return 'Yes, $amount collected';
+  }
+
+  @override
+  String get codConfirmNo => 'Not yet';
 
   @override
   String codCashDone(String amount) {
@@ -1287,8 +1294,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Finish your current order before logging out.';
 
   @override
-  String get offlineBlockedDuringTask =>
-      'Finish your current order before going offline.';
+  String get offlineBlockedDuringTask => 'Finish your current order first.';
 
   @override
   String get devOfferPrepaid => 'Test offer (dev)';
@@ -1537,4 +1543,375 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get devRejectDocument => 'Ops: reject the driving licence (dev)';
+
+  @override
+  String get debugSimulateServerOffline => 'Server has auto-offlined me (fake)';
+
+  @override
+  String debugStatsLink(int failures, int heartbeats) {
+    return 'Failed in a row $failures · Heartbeats $heartbeats';
+  }
+
+  @override
+  String get dismiss => 'Dismiss';
+
+  @override
+  String homeGreeting(String name) {
+    return 'Hi, $name';
+  }
+
+  @override
+  String get homeYourStore => 'your store';
+
+  @override
+  String get shiftOfflineTitle => 'You\'re offline';
+
+  @override
+  String get shiftOfflineBody => 'You won\'t get orders.';
+
+  @override
+  String get shiftOnlineTitle => 'You\'re online';
+
+  @override
+  String get shiftOnlineBody => 'Waiting for orders near your store.';
+
+  @override
+  String shiftOnlineBodyStore(String store) {
+    return 'Waiting for orders near $store.';
+  }
+
+  @override
+  String get shiftOnlinePrepaidTitle => 'You\'re online: prepaid orders only';
+
+  @override
+  String get shiftOnlinePrepaidBody =>
+      'Deposit cash at the store to get cash orders again.';
+
+  @override
+  String get shiftAutoOfflineTitle => 'You were set offline';
+
+  @override
+  String get shiftAutoOfflineBody =>
+      'We didn\'t get your location for 10 minutes. Check GPS and your connection, then go online again.';
+
+  @override
+  String get shiftGoOnline => 'Go online';
+
+  @override
+  String get shiftGoOffline => 'Go offline';
+
+  @override
+  String get shiftGoingOnline => 'Going online…';
+
+  @override
+  String get shiftGoingOffline => 'Going offline…';
+
+  @override
+  String get shiftFixPermissions => 'Fix permissions';
+
+  @override
+  String get shiftSeeStatus => 'See status';
+
+  @override
+  String get shiftServiceFailed =>
+      'Location tracking couldn\'t start. Try again; if it keeps failing, restart the phone.';
+
+  @override
+  String get shiftServerError => 'Couldn\'t go online. Try again.';
+
+  @override
+  String get guardBlockedHint => 'Fix the problem shown above first';
+
+  @override
+  String get guardNotActiveTitle => 'Your account isn\'t active';
+
+  @override
+  String get guardNotActiveBody =>
+      'We\'ll let you know when Jivo approves your documents.';
+
+  @override
+  String get guardPermissionsTitle => 'Allow location and notifications';
+
+  @override
+  String get guardPermissionsBody => 'You need them to get orders.';
+
+  @override
+  String get guardGpsTitle => 'Turn on location (GPS)';
+
+  @override
+  String get guardGpsBody => 'Jivo Rider can\'t find you with GPS off.';
+
+  @override
+  String get guardGpsAction => 'Turn on GPS';
+
+  @override
+  String get guardTooFarTitle => 'You\'re too far from your store';
+
+  @override
+  String guardTooFarBody(String distance, String store, String radius) {
+    return 'You\'re $distance km from $store. Go within $radius km to go online.';
+  }
+
+  @override
+  String guardTooFarBodyNoDistance(String store) {
+    return 'Move closer to $store and try again.';
+  }
+
+  @override
+  String get guardNavigateToStore => 'Navigate to store';
+
+  @override
+  String get guardTaskActiveTitle => 'Finish your current order first';
+
+  @override
+  String get guardNetworkTitle => 'No internet';
+
+  @override
+  String get guardNetworkBody => 'Check your connection and try again.';
+
+  @override
+  String get currentTaskContinue => 'Continue';
+
+  @override
+  String get currentTaskContinueOrder => 'Continue order';
+
+  @override
+  String currentTaskSemantics(String order, String step) {
+    return 'Current order $order, $step. Continue.';
+  }
+
+  @override
+  String get taskStepGoToStore => 'Go to the store';
+
+  @override
+  String get taskStepPickup => 'Pick up the order';
+
+  @override
+  String get taskStepGoToCustomer => 'Deliver to the customer';
+
+  @override
+  String get taskStepDeliver => 'Enter the delivery code';
+
+  @override
+  String get taskStepReturn => 'Return to store';
+
+  @override
+  String get taskStepOther => 'Open the order';
+
+  @override
+  String get chipCod => 'COD';
+
+  @override
+  String chipCodAmount(String amount) {
+    return 'COD $amount';
+  }
+
+  @override
+  String get chipPrepaid => 'Prepaid';
+
+  @override
+  String get todayTitle => 'Today';
+
+  @override
+  String get todayDelivered => 'Delivered';
+
+  @override
+  String get todayEarned => 'Earned';
+
+  @override
+  String get todayOnline => 'Online time';
+
+  @override
+  String get todayCash => 'Cash in hand';
+
+  @override
+  String get todayOpensEarnings => 'opens earnings';
+
+  @override
+  String get todayOpensCash => 'opens cash';
+
+  @override
+  String get todayNotAvailable => 'not available';
+
+  @override
+  String get homeHowToDeposit => 'How to deposit';
+
+  @override
+  String get homeHowToDepositBody =>
+      'Hand the cash to your store manager. It shows in your cash ledger once they record it.';
+
+  @override
+  String get homeSeeCashLedger => 'See cash ledger';
+
+  @override
+  String get gateActionLocationPrecise => 'Use precise location';
+
+  @override
+  String get gateStepLocationPreciseHint =>
+      'Choose \"Precise\". Approximate location can\'t guide deliveries.';
+
+  @override
+  String get gateAlwaysNotChosenTitle =>
+      '\"Allow all the time\" wasn\'t chosen';
+
+  @override
+  String get gateAlwaysNotChosenBody =>
+      'Without it Jivo can\'t send you orders or track your delivery when the screen is off, so you can\'t go online. Open settings, tap Permissions › Location and choose \"Allow all the time\".';
+
+  @override
+  String get gateOpenAppSettings => 'Open app settings';
+
+  @override
+  String get disclosureDeclinedTitle => 'Location is needed to go online';
+
+  @override
+  String get disclosureDeclinedBody =>
+      'You can still use the app, but you can\'t go online and get orders until you allow location.';
+
+  @override
+  String get disclosureNotification =>
+      'While you\'re online you\'ll see a \"You\'re online\" notification.';
+
+  @override
+  String get offerCodAmountMissing =>
+      'Cash on delivery: amount shown after you accept.';
+
+  @override
+  String offerTimeLeft(int seconds) {
+    return 'Time left to accept: $seconds seconds';
+  }
+
+  @override
+  String offerSecondsShort(int seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String get offerExpiring => 'Expiring';
+
+  @override
+  String offerDrop(String locality, String distance) {
+    return '$locality · $distance';
+  }
+
+  @override
+  String get codAmountMissing =>
+      'Can\'t load the amount to collect. Pull down to refresh, or call support.';
+
+  @override
+  String get codRefresh => 'Refresh';
+
+  @override
+  String codAmountChangedTitle(String amount) {
+    return 'Amount changed: collect $amount';
+  }
+
+  @override
+  String codAmountChangedBody(String was) {
+    return 'Was $was. The store couldn\'t supply some items.';
+  }
+
+  @override
+  String codAmountPreviously(String amount) {
+    return 'previously $amount';
+  }
+
+  @override
+  String codAmountSemantics(String amount) {
+    return 'Amount to collect: $amount';
+  }
+
+  @override
+  String get devCodAmountChanged => 'Store: an item is unavailable (dev)';
+
+  @override
+  String get taskOfflineBanner =>
+      'No internet. Your progress is saved on Jivo\'s server; tap the button again when you\'re back online.';
+
+  @override
+  String taskTryAgain(String label) {
+    return 'Try again: $label';
+  }
+
+  @override
+  String get taskWorking => 'Working';
+
+  @override
+  String get guardDocumentsTitle => 'Some documents need a new upload';
+
+  @override
+  String get guardDocumentsBody =>
+      'Upload the documents marked in your profile, then go online.';
+
+  @override
+  String get guardDocumentsAction => 'See documents';
+
+  @override
+  String get pickupTypeCode => 'Type the code';
+
+  @override
+  String get pickupEnterAll => 'Enter all 4 characters.';
+
+  @override
+  String pickupCheckBag(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Check the bag: $count items',
+      one: 'Check the bag: 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get scanHelper => 'Point at the QR on the bag label';
+
+  @override
+  String get scanLight => 'Light';
+
+  @override
+  String get scanLightOn => 'Light on';
+
+  @override
+  String get otpLockedHeading => 'Delivery code locked';
+
+  @override
+  String get deliveryOtpLockedNoPhone =>
+      'Too many wrong codes. Jivo support has been alerted. Wait at the door for a call from support, or choose Can\'t deliver.';
+
+  @override
+  String get failConfirmTitle => 'Return the order to the store?';
+
+  @override
+  String failConfirmBody(String reason) {
+    return 'Reason: $reason. The customer will be told. You can\'t undo this.';
+  }
+
+  @override
+  String failConfirmNote(String note) {
+    return 'Note: $note';
+  }
+
+  @override
+  String get failConfirmBack => 'Go back';
+
+  @override
+  String get failConfirmYes => 'Yes, return to store';
+
+  @override
+  String failWaitSemantics(int minutes, int seconds) {
+    return 'Wait time left: $minutes minutes $seconds seconds';
+  }
+
+  @override
+  String get taskReturnNoCash =>
+      'Don\'t collect any cash. Nothing is due for this order.';
+
+  @override
+  String get riderTooManyTries =>
+      'Too many tries. Wait a moment, then try again.';
+
+  @override
+  String get shiftEndedByOpsBody =>
+      'Jivo operations set you offline. Go online again when you are ready, or call support.';
 }

@@ -75,7 +75,9 @@ INSTALLED_APPS = [
     "apps.cart",
     "apps.orders",
     "apps.payments",
+    "apps.delivery",
     "apps.support",
+    "apps.realtime",  # Phase 6: WebSockets (06 §4)
     "apps.loadtest",  # P8 T-812: load-test data commands (no models, no API)
     "apps.ops_console",
 ]
@@ -323,6 +325,26 @@ CELERY_BEAT_SCHEDULE = {
     # alert on acceptance SLA breaches missed by their countdown tasks.
     "sync-refund-status": {"task": "payments.sync_refund_status", "schedule": 30 * 60.0},
     "auto-accept-orders": {"task": "orders.auto_accept_orders", "schedule": 60.0},
+    # Phase 5 (06 §5): auto-offline riders with no location for RIDER_AUTO_OFFLINE_MINUTES.
+    "rider-heartbeat-check": {"task": "delivery.rider_heartbeat_check", "schedule": 120.0},
+    # Phase 5 (D-14 default): KYC documents deleted 1 year after offboarding/erasure. 04:15 IST.
+    "purge-offboarded-kyc": {
+        "task": "delivery.purge_offboarded_kyc",
+        "schedule": crontab(hour=22, minute=45),
+    },
+    # Phase 6 (06 §5): retention purges (03:20 and 03:25 IST).
+    "purge-old-rider-locations": {
+        "task": "realtime.purge_old_locations",
+        "schedule": crontab(hour=21, minute=55),
+    },
+    "sweep-stuck-notification-sends": {
+        "task": "notifications.sweep_stuck_sends",
+        "schedule": 15 * 60.0,
+    },
+    "purge-old-notifications": {
+        "task": "notifications.purge_old_notifications",
+        "schedule": crontab(hour=21, minute=50),
+    },
 }
 
 # --------------------------------------------------------------------------- email
@@ -414,6 +436,35 @@ SMS_RETRIEVER_APP_HASHES = {
 # --------------------------------------------------------------------------- account deletion
 ACCOUNT_DELETION_GRACE_DAYS = env_int("ACCOUNT_DELETION_GRACE_DAYS", default=30)  # 07 §4
 
+# --------------------------------------------------------------------------- notifications (P6)
+# Push (08 §9) behind apps.notifications.push. FCM waits for D-19: until then the default sends
+# nothing (DisabledPushBackend: notifications are recorded, push is SKIPPED). local.py logs them.
+PUSH_BACKEND = env_str("PUSH_BACKEND", default="apps.notifications.push.DisabledPushBackend")
+# TRAI DLT template id per notification event with SMS ("order.placed:1007...,order.cancelled:
+# 1007..."). An event without one sends no SMS (logged). OTP keeps SMS_OTP_DLT_TEMPLATE_ID.
+SMS_DLT_TEMPLATE_IDS: dict[str, str] = env_dict("SMS_DLT_TEMPLATE_IDS", default={})
+NOTIFICATION_RETENTION_DAYS = env_int("NOTIFICATION_RETENTION_DAYS", default=90)
+# A push/SMS still SENDING after this long is marked FAILED and its text blanked (sweeper).
+NOTIFICATION_STUCK_SEND_MINUTES = env_int("NOTIFICATION_STUCK_SEND_MINUTES", default=15)
+RIDER_LOCATION_RETENTION_DAYS = env_int("RIDER_LOCATION_RETENTION_DAYS", default=30)  # 07 §2.8
+
+# --------------------------------------------------------------------------- WebSockets (P6)
+# /ws/v1/ sockets close with 4408 when no auth message arrives in time (06 §4).
+WS_AUTH_TIMEOUT_SECONDS = env_float("WS_AUTH_TIMEOUT_SECONDS", default=10.0)
+# /ws/ops/live/ re-checks the staff session, role and stores this often (revoked access ends).
+WS_OPS_RECHECK_SECONDS = env_float("WS_OPS_RECHECK_SECONDS", default=300.0)
+# Abuse limits (P8 OWASP review L5): sockets per user (4429), each slot a lease renewed on
+# auth/ping/re-check; malformed or unknown messages before 4400; inbound message size (1009).
+# The ASGI server must also cap frames (uvicorn --ws-max-size, daphne --websocket_max_size).
+WS_MAX_SOCKETS_PER_USER = env_int("WS_MAX_SOCKETS_PER_USER", default=5)
+WS_SOCKET_LEASE_SECONDS = env_int("WS_SOCKET_LEASE_SECONDS", default=1200)
+WS_MAX_BAD_MESSAGES = env_int("WS_MAX_BAD_MESSAGES", default=10)
+WS_MAX_MESSAGE_BYTES = env_int("WS_MAX_MESSAGE_BYTES", default=4096)
+# /ws/v1/rider/ re-checks that the rider is still ACTIVE this often (a suspension ends offers).
+WS_RIDER_RECHECK_SECONDS = env_float("WS_RIDER_RECHECK_SECONDS", default=60.0)
+# `order.eta` while out for delivery is recomputed from rider pings at most this often per order.
+WS_ETA_MIN_INTERVAL_SECONDS = env_int("WS_ETA_MIN_INTERVAL_SECONDS", default=30)
+
 # --------------------------------------------------------------------------- OpenAPI
 # /api/schema/ and /api/docs/ are public only where API_DOCS_PUBLIC is true (local); staff-only
 # elsewhere (02 §5). The committed contract is backend/openapi/schema.yaml.
@@ -430,6 +481,11 @@ SPECTACULAR_SETTINGS = {
         "Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`."
     ),
     "VERSION": "0.1.0",
+    # Phase 6: the WebSocket messages (06 §4) as `Ws...` components (apps.realtime.contract).
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "apps.realtime.schema.add_websocket_components",
+    ],
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVE_PERMISSIONS": ["apps.core.permissions.ApiDocsPermission"],
     # JWT first so anonymous requests get 401 (with WWW-Authenticate), not 403.
@@ -475,6 +531,21 @@ SPECTACULAR_SETTINGS = {
         "OrderRefundReasonEnum": "apps.orders.choices.OrderRefundReason",
         "OrderRefundStatusEnum": "apps.orders.choices.OrderRefundStatus",
         "ReorderIssueReasonEnum": "apps.orders.choices.ReorderIssueReason",
+        # Phase 5: riders and delivery
+        "VehicleTypeEnum": "apps.delivery.choices.VehicleType",
+        "RiderDocumentTypeEnum": "apps.delivery.choices.DocumentType",
+        "RiderDocumentStatusEnum": "apps.delivery.choices.DocumentStatus",
+        "ShiftEndReasonEnum": "apps.delivery.choices.ShiftEndReason",
+        "ShiftEndedByEnum": "apps.delivery.choices.ShiftEndedBy",
+        "DeliveryTaskStatusEnum": "apps.delivery.choices.DeliveryTaskStatus",
+        "OfferRejectReasonEnum": "apps.delivery.choices.OfferRejectReason",
+        "DeliveryFailReasonEnum": "apps.delivery.choices.DeliveryFailReason",
+        "RiderPaymentTypeEnum": "apps.delivery.choices.PaymentType",
+        "CodModeEnum": "apps.delivery.choices.CodMode",
+        "CodQrStatusEnum": "apps.delivery.choices.CodQrStatus",
+        "CashEntryTypeEnum": "apps.delivery.choices.CashEntryType",
+        "EarningTypeEnum": "apps.delivery.choices.EarningType",
+        "PayoutStatusEnum": "apps.delivery.choices.PayoutStatus",
     },
     "TAGS": [
         {"name": "health", "description": "Liveness and readiness probes. No authentication."},
@@ -507,6 +578,22 @@ SPECTACULAR_SETTINGS = {
         {
             "name": "payments",
             "description": "Online payment confirmation and the gateway webhook (06 §2.6, 08 §4).",
+        },
+        {
+            "name": "rider",
+            "description": (
+                "The rider app (06 §3, 04): registration and KYC, shifts and location, offers, "
+                "the delivery task, cash, earnings, history and payouts. Every operation except "
+                "`rider_stores_list` and `rider_register` needs a rider profile (else 403 "
+                "`PERMISSION_DENIED` with `details.rider_status`)."
+            ),
+        },
+        {
+            "name": "notifications",
+            "description": (
+                "The in-app inbox (06 §2.7). Live updates use WebSockets (06 §4): their messages "
+                "are the `Ws...` schemas."
+            ),
         },
     ],
     "SWAGGER_UI_SETTINGS": {"persistAuthorization": True, "displayOperationId": True},
@@ -603,6 +690,62 @@ INVOICE_FEE_GST_RATE = Decimal(env_str("INVOICE_FEE_GST_RATE", default="18.00"))
 # Signed invoice links expire after this (the private bucket).
 INVOICE_URL_EXPIRY_SECONDS = env_int("INVOICE_URL_EXPIRY_SECONDS", default=600)
 
+# --------------------------------------------------------------------------- riders & delivery (P5)
+# Field-level encryption keys (09 §3: bank and KYC numbers), comma-separated Fernet keys, the
+# first one encrypts (apps.core.crypto). Required in staging/production (delivery.E001); local
+# and tests derive a key from SECRET_KEY when empty.
+FIELD_ENCRYPTION_KEYS = env_list("FIELD_ENCRYPTION_KEYS", default=[])
+# KYC uploads (04 §2.2): JPEG or PNG, at most this many bytes (the app compresses to <= 1 MB).
+RIDER_DOCUMENT_MAX_BYTES = env_int("RIDER_DOCUMENT_MAX_BYTES", default=1024 * 1024)
+# Signed links: the rider's own photo (`photo_url`, `GET /rider/me/`, track) and KYC files
+# opened by staff in the panel (short, 09 §3).
+RIDER_PHOTO_URL_EXPIRY_SECONDS = env_int("RIDER_PHOTO_URL_EXPIRY_SECONDS", default=3600)
+KYC_FILE_URL_EXPIRY_SECONDS = env_int("KYC_FILE_URL_EXPIRY_SECONDS", default=300)
+# D-14 default (to confirm with Jivo HR/Ops): KYC documents are kept this long after a rider is
+# offboarded or erased, then deleted (`purge_offboarded_kyc`).
+KYC_RETENTION_DAYS = env_int("KYC_RETENTION_DAYS", default=365)
+# Per-user rate limits on rider endpoints (fail open, apps.core.throttling).
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
+    {
+        "rider_documents": env_str("RIDER_DOCUMENTS_RATE", default="30/hour"),
+        "rider_profile_write": env_str("RIDER_PROFILE_WRITE_RATE", default="20/hour"),
+        "rider_locations": env_str("RIDER_LOCATIONS_RATE", default="6/min"),
+        "rider_heartbeat": env_str("RIDER_HEARTBEAT_RATE", default="6/min"),
+    }
+)
+RIDER_MIN_AGE_YEARS = env_int("RIDER_MIN_AGE_YEARS", default=18)
+# 04 §2.7: cash-in-hand limit of a new rider (ops can change it per rider).
+RIDER_DEFAULT_CASH_LIMIT = Decimal(env_str("RIDER_DEFAULT_CASH_LIMIT", default="5000.00"))
+# 04 §2.3: going online needs the rider within this distance of the home store.
+RIDER_SHIFT_START_RADIUS_M = env_int("RIDER_SHIFT_START_RADIUS_M", default=2000)
+# 04 §2.3: auto-offline after this long without a location point (rider_heartbeat_check).
+RIDER_AUTO_OFFLINE_MINUTES = env_int("RIDER_AUTO_OFFLINE_MINUTES", default=10)
+# api-requests #42 (PM default, ⚠ to confirm with Jivo): a heartbeat within
+# RIDER_AUTO_OFFLINE_MINUTES also keeps a rider online (e.g. waiting indoors without a GPS fix),
+# but only while the last location point is at most this old; after that, auto-offline.
+RIDER_HEARTBEAT_PRESENCE_MAX_LOCATION_AGE_MINUTES = env_int(
+    "RIDER_HEARTBEAT_PRESENCE_MAX_LOCATION_AGE_MINUTES", default=30
+)
+# Location points (api-requests #3): a point recorded more than this long ago, or more than
+# RIDER_LOCATION_MAX_FUTURE_SECONDS ahead of the server clock, is not stored.
+RIDER_LOCATION_MAX_AGE_HOURS = env_int("RIDER_LOCATION_MAX_AGE_HOURS", default=24)
+RIDER_LOCATION_MAX_FUTURE_SECONDS = env_int("RIDER_LOCATION_MAX_FUTURE_SECONDS", default=120)
+# 08 §5 / 04 §2.5-2.6 geofences (slice 5.3); a reported accuracy widens them by at most
+# RIDER_GEOFENCE_MAX_ACCURACY_SLACK_M.
+RIDER_STORE_GEOFENCE_M = env_int("RIDER_STORE_GEOFENCE_M", default=200)
+RIDER_CUSTOMER_GEOFENCE_M = env_int("RIDER_CUSTOMER_GEOFENCE_M", default=200)
+RIDER_GEOFENCE_MAX_ACCURACY_SLACK_M = env_int("RIDER_GEOFENCE_MAX_ACCURACY_SLACK_M", default=50)
+# 04 §2.6: "customer not reachable" needs this many calls and this wait after arrival.
+RIDER_NOT_REACHABLE_MIN_CALLS = env_int("RIDER_NOT_REACHABLE_MIN_CALLS", default=2)
+RIDER_NOT_REACHABLE_WAIT_SECONDS = env_int("RIDER_NOT_REACHABLE_WAIT_SECONDS", default=600)
+# 08 §5 dispatch (slice 5.3).
+OFFER_TIMEOUT_SECONDS = env_int("OFFER_TIMEOUT_SECONDS", default=30)
+MAX_OFFER_ATTEMPTS = env_int("MAX_OFFER_ATTEMPTS", default=5)
+DISPATCH_TIMEOUT_SECONDS = env_int("DISPATCH_TIMEOUT_SECONDS", default=180)
+DELIVERY_OTP_LENGTH = 4  # 04 §2.6 (the contract publishes it as `delivery_otp.length`)
+DELIVERY_OTP_MAX_ATTEMPTS = env_int("DELIVERY_OTP_MAX_ATTEMPTS", default=5)
+# `GET /rider/tasks/current/` returns the rider's last ended task as `recent_task` this long.
+RIDER_RECENT_TASK_SECONDS = env_int("RIDER_RECENT_TASK_SECONDS", default=600)
 # --------------------------------------------------------------------------- support (P7)
 # Per user, fail open (apps.core.throttling). A customer raises a few tickets at most; these
 # only stop scripted abuse of the support inbox.

@@ -54,12 +54,12 @@
   "oemRealme": "realme: open App settings > Battery, then allow background activity and auto launch.",
   "oemOneplus": "OnePlus: open App settings > Battery, choose Unrestricted, and allow auto launch.",
   "oemAction": "Open app settings",
-  "disclosureTitle": "Your location while you're online",
-  "disclosureBody": "Jivo Rider collects location data to send you delivery offers near your store, show customers where their order is, and calculate your distance pay, even when the app is closed or not in use.",
+  "disclosureTitle": "Jivo Rider uses your location in the background",
+  "disclosureBody": "Jivo Rider collects location data to send you delivery offers near your store, guide you to customers, and show customers where their order is, even when the app is closed or not in use.",
   "disclosureOnlineOnly": "Location is collected only while you are online. It stops as soon as you go offline.",
   "disclosureSharing": "Your live location is shared with Jivo operations and with the customer whose order you are delivering.",
   "disclosureNextSteps": "Next, allow location and then choose \"Allow all the time\".",
-  "disclosureAccept": "Continue",
+  "disclosureAccept": "I agree, turn on location",
   "disclosureDecline": "Not now",
   "onlineNotificationTitle": "You're online",
   "onlineNotificationText": "Jivo Rider is using your location for deliveries.",
@@ -481,8 +481,8 @@
       }
     }
   },
-  "offerPrepaid": "Prepaid: nothing to collect",
-  "offerCod": "Cash on delivery: collect {amount}",
+  "offerPrepaid": "Prepaid · nothing to collect",
+  "offerCod": "Cash {amount} to collect",
   "@offerCod": {
     "placeholders": {
       "amount": {
@@ -507,7 +507,7 @@
       }
     }
   },
-  "offerAccept": "Accept",
+  "offerAccept": "Accept order",
   "offerReject": "Reject",
   "offerRejectTitle": "Why are you rejecting? (optional)",
   "offerRejectTooFar": "Too far",
@@ -533,7 +533,7 @@
   "taskRefresh": "Refresh",
   "taskNavigate": "Navigate",
   "taskNoMapsApp": "No maps app found. Install Mappls or another maps app.",
-  "taskCallCustomer": "Call customer",
+  "taskCallCustomer": "Call",
   "taskStateChanged": "This order changed. The screen now shows its latest step.",
   "taskLocationUnavailable": "Couldn't get your location. Turn on GPS and try again.",
   "taskOutsideGeofence": "You're not close enough yet. Move closer and try again.",
@@ -547,18 +547,18 @@
   },
   "cashLimitExceeded": "Your cash in hand has reached the limit. Deposit cash at the store to get cash orders again.",
   "taskGoToStoreTitle": "Go to the store",
-  "taskOrderPacking": "Packing…",
+  "taskOrderPacking": "Store is packing: wait here",
   "taskOrderReady": "Ready for pickup",
   "taskArrivedStore": "Arrived at store",
   "taskPickupTitle": "Pick up the order",
   "taskItemsTitle": "Check the items in the bag",
-  "pickupCodeHelp": "Scan the QR code on the bag, or type the 4-character code printed on it.",
+  "pickupCodeHelp": "Scan the QR on the bag, or type the 4-character code printed on it.",
   "pickupCodeLabel": "Order code",
   "pickupCodeFormat": "Enter the 4-character code from the bag.",
   "pickupCodeWrong": "That code doesn't match this order. Check the bag and try again.",
   "pickupNotPacked": "The order isn't packed yet. Wait until the store marks it ready.",
-  "taskPickup": "Picked up",
-  "pickupScan": "Scan QR code",
+  "taskPickup": "Confirm pickup",
+  "pickupScan": "Scan bag QR",
   "scanTitle": "Scan the bag QR code",
   "scanTypeInstead": "Type the code instead",
   "scanNotJivoCode": "This QR isn't a Jivo order code.",
@@ -589,8 +589,8 @@
     }
   },
   "taskArrivedCustomer": "Arrived at customer",
-  "taskCantDeliver": "Can't deliver",
-  "arrivedOverride": "I'm at the address: the pin is wrong",
+  "taskCantDeliver": "Can't deliver…",
+  "arrivedOverride": "Not at the pin? Arrive anyway",
   "arrivedOverrideTitle": "Why are you outside the pin area?",
   "arrivedOverridePinWrong": "The map pin is in the wrong place",
   "arrivedOverrideGate": "I'm at the gate or lobby",
@@ -607,8 +607,8 @@
       }
     }
   },
-  "deliveryOtpWrong": "That code is wrong. Ask the customer again.",
-  "deliveryOtpWrongLeft": "{count, plural, =1{Wrong code. 1 attempt left.} other{Wrong code. {count} attempts left.}}",
+  "deliveryOtpWrong": "Wrong code. Ask the customer to read it again from their app or SMS.",
+  "deliveryOtpWrongLeft": "{count, plural, =1{Wrong code. 1 try left. Ask the customer to read it again from their app or SMS.} other{Wrong code. {count} tries left. Ask the customer to read it again from their app or SMS.}}",
   "@deliveryOtpWrongLeft": {
     "placeholders": {
       "count": {
@@ -620,7 +620,7 @@
   "otpLockedTitle": "Delivery code locked",
   "codTitle": "Collect payment",
   "codAmountDueLabel": "Amount to collect",
-  "codExactAmount": "Collect exactly this amount.",
+  "codExactAmount": "Collect exactly this amount. Don't accept more or less.",
   "codCashCollected": "Cash collected {amount}",
   "@codCashCollected": {
     "placeholders": {
@@ -629,17 +629,24 @@
       }
     }
   },
-  "codConfirmTitle": "Confirm cash",
-  "codConfirmBody": "Did you collect exactly {amount} in cash?",
-  "@codConfirmBody": {
+  "codConfirmTitle": "Collected {amount}?",
+  "@codConfirmTitle": {
     "placeholders": {
       "amount": {
         "type": "String"
       }
     }
   },
-  "codConfirmYes": "Yes, collected",
-  "codConfirmNo": "No",
+  "codConfirmBody": "Count the cash before confirming. You can't change this after delivery.",
+  "codConfirmYes": "Yes, {amount} collected",
+  "@codConfirmYes": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codConfirmNo": "Not yet",
   "codCashDone": "Cash collected: {amount}",
   "@codCashDone": {
     "placeholders": {
@@ -713,7 +720,7 @@
   "failNotYet": "You can choose this after the calls and the 10-minute wait.",
   "failSubmit": "Return to store",
   "logoutBlockedDuringTask": "Finish your current order before logging out.",
-  "offlineBlockedDuringTask": "Finish your current order before going offline.",
+  "offlineBlockedDuringTask": "Finish your current order first.",
   "devOfferPrepaid": "Test offer (dev)",
   "devOfferCod": "Test COD offer (dev)",
   "devMarkPacked": "Store: packed (dev)",
@@ -871,5 +878,259 @@
   "profileDocumentsInReview": "In review",
   "profileSupport": "Support",
   "profileSupportBody": "Problems with an order, a payout or the app? Call Jivo rider support.",
-  "devRejectDocument": "Ops: reject the driving licence (dev)"
+  "devRejectDocument": "Ops: reject the driving licence (dev)",
+  "debugSimulateServerOffline": "Server has auto-offlined me (fake)",
+  "debugStatsLink": "Failed in a row {failures} · Heartbeats {heartbeats}",
+  "@debugStatsLink": {
+    "placeholders": {
+      "failures": {
+        "type": "int"
+      },
+      "heartbeats": {
+        "type": "int"
+      }
+    }
+  },
+  "dismiss": "Dismiss",
+  "homeGreeting": "Hi, {name}",
+  "@homeGreeting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeYourStore": "your store",
+  "shiftOfflineTitle": "You're offline",
+  "shiftOfflineBody": "You won't get orders.",
+  "shiftOnlineTitle": "You're online",
+  "shiftOnlineBody": "Waiting for orders near your store.",
+  "shiftOnlineBodyStore": "Waiting for orders near {store}.",
+  "@shiftOnlineBodyStore": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "shiftOnlinePrepaidTitle": "You're online: prepaid orders only",
+  "shiftOnlinePrepaidBody": "Deposit cash at the store to get cash orders again.",
+  "shiftAutoOfflineTitle": "You were set offline",
+  "shiftAutoOfflineBody": "We didn't get your location for 10 minutes. Check GPS and your connection, then go online again.",
+  "shiftGoOnline": "Go online",
+  "shiftGoOffline": "Go offline",
+  "shiftGoingOnline": "Going online…",
+  "shiftGoingOffline": "Going offline…",
+  "shiftFixPermissions": "Fix permissions",
+  "shiftSeeStatus": "See status",
+  "shiftServiceFailed": "Location tracking couldn't start. Try again; if it keeps failing, restart the phone.",
+  "shiftServerError": "Couldn't go online. Try again.",
+  "guardBlockedHint": "Fix the problem shown above first",
+  "guardNotActiveTitle": "Your account isn't active",
+  "guardNotActiveBody": "We'll let you know when Jivo approves your documents.",
+  "guardPermissionsTitle": "Allow location and notifications",
+  "guardPermissionsBody": "You need them to get orders.",
+  "guardGpsTitle": "Turn on location (GPS)",
+  "guardGpsBody": "Jivo Rider can't find you with GPS off.",
+  "guardGpsAction": "Turn on GPS",
+  "guardTooFarTitle": "You're too far from your store",
+  "guardTooFarBody": "You're {distance} km from {store}. Go within {radius} km to go online.",
+  "@guardTooFarBody": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      },
+      "store": {
+        "type": "String"
+      },
+      "radius": {
+        "type": "String"
+      }
+    }
+  },
+  "guardTooFarBodyNoDistance": "Move closer to {store} and try again.",
+  "@guardTooFarBodyNoDistance": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "guardNavigateToStore": "Navigate to store",
+  "guardTaskActiveTitle": "Finish your current order first",
+  "guardNetworkTitle": "No internet",
+  "guardNetworkBody": "Check your connection and try again.",
+  "currentTaskContinue": "Continue",
+  "currentTaskContinueOrder": "Continue order",
+  "currentTaskSemantics": "Current order {order}, {step}. Continue.",
+  "@currentTaskSemantics": {
+    "placeholders": {
+      "order": {
+        "type": "String"
+      },
+      "step": {
+        "type": "String"
+      }
+    }
+  },
+  "taskStepGoToStore": "Go to the store",
+  "taskStepPickup": "Pick up the order",
+  "taskStepGoToCustomer": "Deliver to the customer",
+  "taskStepDeliver": "Enter the delivery code",
+  "taskStepReturn": "Return to store",
+  "taskStepOther": "Open the order",
+  "chipCod": "COD",
+  "chipCodAmount": "COD {amount}",
+  "@chipCodAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "chipPrepaid": "Prepaid",
+  "todayTitle": "Today",
+  "todayDelivered": "Delivered",
+  "todayEarned": "Earned",
+  "todayOnline": "Online time",
+  "todayCash": "Cash in hand",
+  "todayOpensEarnings": "opens earnings",
+  "todayOpensCash": "opens cash",
+  "todayNotAvailable": "not available",
+  "homeHowToDeposit": "How to deposit",
+  "homeHowToDepositBody": "Hand the cash to your store manager. It shows in your cash ledger once they record it.",
+  "homeSeeCashLedger": "See cash ledger",
+  "gateActionLocationPrecise": "Use precise location",
+  "gateStepLocationPreciseHint": "Choose \"Precise\". Approximate location can't guide deliveries.",
+  "gateAlwaysNotChosenTitle": "\"Allow all the time\" wasn't chosen",
+  "gateAlwaysNotChosenBody": "Without it Jivo can't send you orders or track your delivery when the screen is off, so you can't go online. Open settings, tap Permissions › Location and choose \"Allow all the time\".",
+  "gateOpenAppSettings": "Open app settings",
+  "disclosureDeclinedTitle": "Location is needed to go online",
+  "disclosureDeclinedBody": "You can still use the app, but you can't go online and get orders until you allow location.",
+  "disclosureNotification": "While you're online you'll see a \"You're online\" notification.",
+  "offerCodAmountMissing": "Cash on delivery: amount shown after you accept.",
+  "offerTimeLeft": "Time left to accept: {seconds} seconds",
+  "@offerTimeLeft": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "offerSecondsShort": "{seconds} s",
+  "@offerSecondsShort": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "offerExpiring": "Expiring",
+  "offerDrop": "{locality} · {distance}",
+  "@offerDrop": {
+    "placeholders": {
+      "locality": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "codAmountMissing": "Can't load the amount to collect. Pull down to refresh, or call support.",
+  "codRefresh": "Refresh",
+  "codAmountChangedTitle": "Amount changed: collect {amount}",
+  "@codAmountChangedTitle": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codAmountChangedBody": "Was {was}. The store couldn't supply some items.",
+  "@codAmountChangedBody": {
+    "placeholders": {
+      "was": {
+        "type": "String"
+      }
+    }
+  },
+  "codAmountPreviously": "previously {amount}",
+  "@codAmountPreviously": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codAmountSemantics": "Amount to collect: {amount}",
+  "@codAmountSemantics": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "devCodAmountChanged": "Store: an item is unavailable (dev)",
+  "taskOfflineBanner": "No internet. Your progress is saved on Jivo's server; tap the button again when you're back online.",
+  "taskTryAgain": "Try again: {label}",
+  "@taskTryAgain": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "taskWorking": "Working",
+  "guardDocumentsTitle": "Some documents need a new upload",
+  "guardDocumentsBody": "Upload the documents marked in your profile, then go online.",
+  "guardDocumentsAction": "See documents",
+  "pickupTypeCode": "Type the code",
+  "pickupEnterAll": "Enter all 4 characters.",
+  "pickupCheckBag": "{count, plural, =1{Check the bag: 1 item} other{Check the bag: {count} items}}",
+  "@pickupCheckBag": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanHelper": "Point at the QR on the bag label",
+  "scanLight": "Light",
+  "scanLightOn": "Light on",
+  "otpLockedHeading": "Delivery code locked",
+  "deliveryOtpLockedNoPhone": "Too many wrong codes. Jivo support has been alerted. Wait at the door for a call from support, or choose Can't deliver.",
+  "failConfirmTitle": "Return the order to the store?",
+  "failConfirmBody": "Reason: {reason}. The customer will be told. You can't undo this.",
+  "@failConfirmBody": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "failConfirmNote": "Note: {note}",
+  "@failConfirmNote": {
+    "placeholders": {
+      "note": {
+        "type": "String"
+      }
+    }
+  },
+  "failConfirmBack": "Go back",
+  "failConfirmYes": "Yes, return to store",
+  "failWaitSemantics": "Wait time left: {minutes} minutes {seconds} seconds",
+  "@failWaitSemantics": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "taskReturnNoCash": "Don't collect any cash. Nothing is due for this order.",
+  "riderTooManyTries": "Too many tries. Wait a moment, then try again.",
+  "shiftEndedByOpsBody": "Jivo operations set you offline. Go online again when you are ready, or call support."
 }

@@ -153,17 +153,16 @@ def stop_worker() -> None:
 
 
 def start_worker(log_name: str) -> None:
+    """Start the QA worker detached through Git Bash `nohup` (a child of pytest would die with
+    the test run on Windows and leave refunds queued)."""
     import time as _t
 
     if _qa_worker_pids():
         return
-    env = {k: v for k, v in os.environ.items() if not k.startswith("POSTGRES_")}
-    env.update(_ENV)
-    log = open(QA_DIR / "private" / "logs" / log_name, "a", encoding="utf-8")
-    subprocess.Popen(
-        ["uv", "run", "celery", "-A", "config", "worker", "--pool=solo", "--without-heartbeat",
-         "--without-mingle", "--without-gossip", "--loglevel", "INFO"],
-        cwd=BACKEND, env=env, stdout=log, stderr=subprocess.STDOUT,
-        creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0),
-    )
-    _t.sleep(10)
+    envs = " ".join(f"{k}={v!r}" if " " in v else f"{k}='{v}'" for k, v in _ENV.items())
+    log = (QA_DIR / "private" / "logs" / log_name).as_posix()
+    cmd = (f"cd '{BACKEND.as_posix()}' && unset POSTGRES_HOST POSTGRES_PORT POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD VIRTUAL_ENV; "
+           f"{envs} nohup uv run celery -A config worker --pool=solo --without-heartbeat --without-mingle "
+           f"--without-gossip --loglevel INFO >> '{log}' 2>&1 &")
+    subprocess.run(["C:/Program Files/Git/bin/bash.exe", "-c", cmd], timeout=30)
+    _t.sleep(12)
