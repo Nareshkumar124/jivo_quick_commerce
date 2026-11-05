@@ -51,7 +51,13 @@ class TestConfigEndpoint:
             },
             "terms_version": "2026-11-01",
             "otp": {"length": 6, "resend_after_seconds": 30},
-            "rider_location": {"active_interval_seconds": 10, "idle_interval_seconds": 30},
+            "rider_location": {
+                "active_interval_seconds": 10,
+                "idle_interval_seconds": 30,
+                "active_sample_seconds": 5,
+                "idle_sample_seconds": 30,
+                "max_batch": 50,
+            },
             "feature_flags": {},
         }
 

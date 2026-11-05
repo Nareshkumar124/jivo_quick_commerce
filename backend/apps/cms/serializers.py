@@ -20,11 +20,27 @@ class OtpSettingsSerializer(serializers.Serializer):
 
 
 class RiderLocationSettingsSerializer(serializers.Serializer):
+    """Rider location tracking periods (04 §3, api-requests #2). Also returned by
+    `rider_shift_start`, `rider_locations_create` and `rider_heartbeat`, so a change in the
+    panel reaches riders already online; use the latest one received."""
+
     active_interval_seconds = serializers.IntegerField(
-        help_text="Location upload interval on an active task (5-10 s, 04 §3)."
+        help_text="Upload a batch this often while on a task (default 10 s, 04 §3)."
     )
     idle_interval_seconds = serializers.IntegerField(
-        help_text="Location upload interval while online and idle (30 s)."
+        help_text="Upload a batch this often while online and idle (default 30 s)."
+    )
+    active_sample_seconds = serializers.IntegerField(
+        help_text="Take a GPS fix this often while on a task (default 5 s; <= the upload interval)."
+    )
+    idle_sample_seconds = serializers.IntegerField(
+        help_text="Take a GPS fix this often while idle (default 30 s; <= the upload interval)."
+    )
+    max_batch = serializers.IntegerField(
+        help_text=(
+            "Most points per `POST /rider/locations/` (default 50). Buffered points beyond it go "
+            "in the next request, oldest first."
+        )
     )
 
 
