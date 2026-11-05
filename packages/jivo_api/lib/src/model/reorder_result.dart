@@ -20,11 +20,22 @@ part 'reorder_result.g.dart';
 )
 class ReorderResult {
   /// Returns a new [ReorderResult] instance.
-  ReorderResult({required this.cart, required this.unavailable});
+  ReorderResult({
+    required this.cart,
+
+    required this.addedCount,
+
+    required this.unavailable,
+  });
 
   /// The whole cart after the items were added.
   @JsonKey(name: r'cart', required: true, includeIfNull: false)
   final Cart cart;
+
+  /// How many of the order's lines now have at least one unit in the cart (e.g. for \"3 items added\"). 0: nothing could be added.
+  // minimum: 0
+  @JsonKey(name: r'added_count', required: true, includeIfNull: false)
+  final int addedCount;
 
   /// Lines that could not be added in full; [] when everything was added.
   @JsonKey(name: r'unavailable', required: true, includeIfNull: false)
@@ -35,10 +46,12 @@ class ReorderResult {
       identical(this, other) ||
       other is ReorderResult &&
           other.cart == cart &&
+          other.addedCount == addedCount &&
           other.unavailable == unavailable;
 
   @override
-  int get hashCode => cart.hashCode + unavailable.hashCode;
+  int get hashCode =>
+      cart.hashCode + addedCount.hashCode + unavailable.hashCode;
 
   factory ReorderResult.fromJson(Map<String, dynamic> json) =>
       _$ReorderResultFromJson(json);

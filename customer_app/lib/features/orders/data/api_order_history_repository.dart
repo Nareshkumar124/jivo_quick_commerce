@@ -83,6 +83,7 @@ class ApiOrderHistoryRepository implements OrderHistoryRepository {
     return ReorderResult(
       unavailable: unavailable,
       cart: cartFromApi(result.cart),
+      addedCount: result.addedCount,
     );
   });
 

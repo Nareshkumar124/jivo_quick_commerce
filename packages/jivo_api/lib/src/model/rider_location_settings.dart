@@ -22,9 +22,15 @@ class RiderLocationSettings {
     required this.activeIntervalSeconds,
 
     required this.idleIntervalSeconds,
+
+    required this.activeSampleSeconds,
+
+    required this.idleSampleSeconds,
+
+    required this.maxBatch,
   });
 
-  /// Location upload interval on an active task (5-10 s, 04 §3).
+  /// Upload a batch this often while on a task (default 10 s, 04 §3).
   @JsonKey(
     name: r'active_interval_seconds',
     required: true,
@@ -32,20 +38,39 @@ class RiderLocationSettings {
   )
   final int activeIntervalSeconds;
 
-  /// Location upload interval while online and idle (30 s).
+  /// Upload a batch this often while online and idle (default 30 s).
   @JsonKey(name: r'idle_interval_seconds', required: true, includeIfNull: false)
   final int idleIntervalSeconds;
+
+  /// Take a GPS fix this often while on a task (default 5 s; <= the upload interval).
+  @JsonKey(name: r'active_sample_seconds', required: true, includeIfNull: false)
+  final int activeSampleSeconds;
+
+  /// Take a GPS fix this often while idle (default 30 s; <= the upload interval).
+  @JsonKey(name: r'idle_sample_seconds', required: true, includeIfNull: false)
+  final int idleSampleSeconds;
+
+  /// Most points per `POST /rider/locations/` (default 50). Buffered points beyond it go in the next request, oldest first.
+  @JsonKey(name: r'max_batch', required: true, includeIfNull: false)
+  final int maxBatch;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is RiderLocationSettings &&
           other.activeIntervalSeconds == activeIntervalSeconds &&
-          other.idleIntervalSeconds == idleIntervalSeconds;
+          other.idleIntervalSeconds == idleIntervalSeconds &&
+          other.activeSampleSeconds == activeSampleSeconds &&
+          other.idleSampleSeconds == idleSampleSeconds &&
+          other.maxBatch == maxBatch;
 
   @override
   int get hashCode =>
-      activeIntervalSeconds.hashCode + idleIntervalSeconds.hashCode;
+      activeIntervalSeconds.hashCode +
+      idleIntervalSeconds.hashCode +
+      activeSampleSeconds.hashCode +
+      idleSampleSeconds.hashCode +
+      maxBatch.hashCode;
 
   factory RiderLocationSettings.fromJson(Map<String, dynamic> json) =>
       _$RiderLocationSettingsFromJson(json);
