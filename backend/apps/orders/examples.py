@@ -388,3 +388,44 @@ MIN_ORDER_DETAILS = {
 }
 COD_ABOVE_LIMIT_DETAILS = {"reason": "ABOVE_LIMIT", "cod_max_order_value": "2000.00"}
 STORE_CLOSED_DETAILS = {"store_id": 1, "opens_at": "2026-11-03T01:30:00Z"}
+
+
+# --------------------------------------------------------------------------- tracking (Phase 5)
+
+_TRACK = {
+    "order_id": 1203,
+    "order_number": "JV-261110-001203",
+    "store": {"id": 1, "name": "Jivo Sector 14", "lat": 28.4718, "lng": 77.0436},
+    "destination": {"lat": 28.5012, "lng": 77.0688},
+    "server_time": "2026-11-10T09:45:00.000000Z",
+}
+TRACK_PACKING = {
+    **_TRACK,
+    "status": "PACKING",
+    "eta_at": "2026-11-10T09:58:00Z",
+    "rider": {
+        "name": "Ravi K.",
+        "phone": None,
+        "photo": (
+            "https://jivo-media.s3.ap-south-1.amazonaws.com/kyc/42/photo-5f1c2a9be03d47a1.jpg"
+            "?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=3b1f0c"
+        ),
+        "lat": 28.4702,
+        "lng": 77.0411,
+        "updated_at": "2026-11-10T09:44:55Z",
+    },
+    "delivery_otp": None,
+}
+TRACK_NO_RIDER = {**TRACK_PACKING, "status": "ACCEPTED", "rider": None}
+TRACK_OUT_FOR_DELIVERY = {
+    **TRACK_PACKING,
+    "status": "OUT_FOR_DELIVERY",
+    "rider": {
+        **TRACK_PACKING["rider"],
+        "phone": "+919811122233",
+        "lat": 28.4890,
+        "lng": 77.0570,
+    },
+    "delivery_otp": "4821",
+}
+TRACK_DELIVERED = {**TRACK_PACKING, "status": "DELIVERED", "eta_at": None, "rider": None}

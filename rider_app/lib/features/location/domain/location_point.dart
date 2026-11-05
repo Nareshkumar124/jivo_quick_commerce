@@ -18,6 +18,7 @@ class LocationPoint {
     this.accuracy,
     this.speed,
     this.heading,
+    this.isMocked,
   }) : recordedAt = recordedAt.toUtc();
 
   factory LocationPoint.fromJson(Map<String, dynamic> json) => LocationPoint(
@@ -27,6 +28,7 @@ class LocationPoint {
     speed: (json['speed'] as num?)?.toDouble(),
     heading: (json['heading'] as num?)?.toDouble(),
     recordedAt: DateTime.parse(json['recorded_at'] as String),
+    isMocked: json['is_mocked'] as bool?,
   );
 
   final double lat;
@@ -41,6 +43,10 @@ class LocationPoint {
   /// Degrees clockwise from north.
   final double? heading;
 
+  /// Android reported a mock location (fraud signal for the server,
+  /// api-requests #5). Null when unknown.
+  final bool? isMocked;
+
   /// When the fix was taken on the device, always UTC. The server orders and
   /// de-duplicates points by this, not by upload time, so buffered points keep
   /// their original time.
@@ -53,6 +59,7 @@ class LocationPoint {
     'speed': speed,
     'heading': heading,
     'recorded_at': recordedAt.toIso8601String(),
+    if (isMocked != null) 'is_mocked': isMocked,
   };
 
   @override

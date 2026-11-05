@@ -190,6 +190,26 @@ Phase 3 R2a additions to Order: `payment_expires_at` (PAYMENT_PENDING only: the 
 
 **Rider** (1:1 User): `home_store`, `status` (PENDING_KYC / ACTIVE / REJECTED / SUSPENDED), `rejection_reason`, `vehicle_type`, `vehicle_number`, `dob`, `emergency_contact`, `photo`, `is_online`, `current_location` (Point, mirrored in Redis), `last_location_at`, `cash_in_hand`, `cash_limit`, `rating_avg`, `bank_account_name`, `bank_account_number` (encrypted), `ifsc`, `upi_id`.
 
+Phase 5 implementation (slices 5.1/5.2, migration `delivery.0001`):
+- **Rider:**
+  - `full_name` is the legal name.
+  - The emergency contact is split into `emergency_contact_name` and `emergency_contact_phone`.
+  - `preferred_store` is the store chosen at registration; `home_store` is set by ops on approval.
+  - Added: `suspension_reason`, `last_heartbeat_at`, `submitted_at`, `approved_at` and `approved_by`.
+  - Bank fields are `bank_account_name`, `bank_account_number_encrypted` (Fernet, `FIELD_ENCRYPTION_KEYS`), `bank_account_last4`, `ifsc`, `upi_id` and `bank_updated_at`.
+  - There is no `photo` field: the photo is the PHOTO document.
+  - The rider has simple_history, without the location fields.
+  - Check constraints: an ACTIVE rider has a home store; only an ACTIVE rider can be online; `cash_limit` >= 0.
+- **RiderDocument:**
+  - One row per (rider, `doc_type`). Adds `number_encrypted`, `reviewed_at` and `uploaded_at`.
+  - Aadhaar is stored masked only (never the full number); PAN, DL and RC are encrypted plus masked.
+- **Rider, review additions:**
+  - `last_location_received_at`: server time, used for presence.
+  - `kyc_purge_after` and `anonymised_at`.
+  - `dob` is nullable (blanked on erasure).
+- **RiderShift** adds `ended_by`, with at most one open shift per rider.
+- **RiderLocation** adds `is_mocked`, `received_at` and `shift`. It is unique on (`rider`, `recorded_at`) and has no spatial index. Its `task` FK arrives with slice 5.3.
+
 **RiderDocument**: `rider`, `doc_type` (PHOTO/AADHAAR_FRONT/AADHAAR_BACK/PAN/DL/RC), `file` (private storage), `doc_number_masked`, `status` (PENDING/APPROVED/REJECTED), `reviewed_by`, `review_note`.
 
 **RiderShift**: `rider`, `started_at`, `ended_at`, `start_location`, `end_reason` (manual/auto_offline/admin).
@@ -242,5 +262,5 @@ Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, 
 | Orders, invoices, payments | 8 years (GST record-keeping) |
 | Rider location history | 30 days |
 | OTP requests | 30 days |
-| KYC documents | While the rider is active + period mandated by policy (D-14). Then deleted. |
+| KYC documents | While the rider is active + period mandated by policy (D-14). Then deleted. P5 default: 365 days after offboarding or account erasure (`KYC_RETENTION_DAYS`, `purge_offboarded_kyc`). |
 | Deleted customer accounts | PII anonymised after a 30-day grace period. Order financial records are kept without PII. |

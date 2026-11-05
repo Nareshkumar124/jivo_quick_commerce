@@ -5,14 +5,26 @@ import 'package:go_router/go_router.dart';
 import '../../../app/env.dart';
 import '../../../app/providers.dart';
 import '../../../app/routes.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/dev_tools_button.dart';
+import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/logout_button.dart';
+import '../../auth/presentation/rider_account_controller.dart';
 import '../../task/data/fake_task_backend.dart';
+import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
+import 'home_providers.dart';
+import 'online_toggle.dart';
+import 'shift_controller.dart';
 
-/// Home for `ACTIVE` riders. Placeholder until P5 (online toggle, today
-/// summary, current task); shows which flavor is running.
+/// Home for `ACTIVE` riders (04 §2.3, screen 8), to
+/// `design/screens/rider/home.md` (UX audit RD-01): status card, guard card,
+/// deposit banner, today tiles and the records, with the 72 dp online
+/// control (or the current-task card) pinned at the bottom.
+///
+/// Builds without the rider work screens (staging and prod until the rider
+/// API lands) keep the Phase 1 placeholder.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -21,40 +33,117 @@ class HomeScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final env = ref.watch(appEnvProvider);
     final theme = Theme.of(context);
+    final work = ref.watch(riderWorkActiveProvider);
+
+    final buildLabel = Text(
+      l10n.homeBuildLabel(env.flavor.name),
+      key: const Key('home-flavor'),
+      textAlign: TextAlign.center,
+      style: theme.textTheme.bodySmall,
+    );
+
+    if (!work) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.appTitle),
+          actions: const [LogoutButton()],
+        ),
+        body: SafeArea(
+          child: ListView(
+            key: const Key('home-list'),
+            padding: const EdgeInsets.all(24),
+            children: [
+              buildLabel,
+              const SizedBox(height: 12),
+              Icon(
+                Icons.delivery_dining,
+                size: 96,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                l10n.homePlaceholderBody,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 24),
+              const _RecordsMenu(),
+              const DevToolsButton(),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final account = ref.watch(riderAccountControllerProvider);
+    final name = account is AccountLoaded ? account.user.name : null;
+    final hasTask = ref.watch(
+      taskFlowControllerProvider.select((s) => s.task != null),
+    );
+
+    Future<void> refresh() async {
+      ref.invalidate(todaySummaryProvider);
+      await Future.wait([
+        ref.read(shiftControllerProvider.notifier).sync(),
+        ref.read(todaySummaryProvider.future).then((_) {}, onError: (_) {}),
+      ]);
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.appTitle),
-        actions: const [LogoutButton()],
+        title: Text(
+          homeGreeting(l10n, name),
+          key: const Key('home-greeting'),
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          IconButton(
+            key: const Key('home-appbar-profile'),
+            tooltip: l10n.profileTitle,
+            iconSize: 28,
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            onPressed: () => context.push(Routes.profile),
+            icon: const Icon(Icons.person),
+          ),
+          const LogoutButton(),
+        ],
       ),
       body: SafeArea(
-        child: ListView(
-          key: const Key('home-list'),
-          padding: const EdgeInsets.all(24),
-          children: [
-            Icon(
-              Icons.delivery_dining,
-              size: 96,
-              color: theme.colorScheme.primary,
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: refresh,
+          child: SingleChildScrollView(
+            key: const Key('home-list'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const ShiftStatusCard(),
+                const GuardCard(),
+                const CashLimitBanner(),
+                const SizedBox(height: 16),
+                const TodaySummaryTiles(),
+                const SizedBox(height: 16),
+                const _RecordsMenu(),
+                const _DevOfferButtons(),
+                const DevToolsButton(),
+                const SizedBox(height: 8),
+                buildLabel,
+              ],
             ),
-            const SizedBox(height: 24),
-            Text(
-              l10n.homeBuildLabel(env.flavor.name),
-              key: const Key('home-flavor'),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              l10n.homePlaceholderBody,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 24),
-            const _RecordsMenu(),
-            const _DevOfferButtons(),
-            const DevToolsButton(),
-          ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.4,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: hasTask ? const CurrentTaskCard() : const OnlineControl(),
+          ),
         ),
       ),
     );
@@ -110,15 +199,14 @@ class _RecordsMenu extends ConsumerWidget {
     if (!ref.watch(riderWorkActiveProvider)) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context);
     Widget item(String key, IconData icon, String label, String route) =>
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: OutlinedButton.icon(
-            key: Key(key),
-            style: OutlinedButton.styleFrom(alignment: Alignment.centerLeft),
-            onPressed: () => context.push(route),
-            icon: Icon(icon),
-            label: Text(label),
-          ),
+        ListTile(
+          key: Key(key),
+          minTileHeight: kRiderListRowMin,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          leading: Icon(icon, size: 28),
+          title: Text(label, style: Theme.of(context).textTheme.titleMedium),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push(route),
         );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

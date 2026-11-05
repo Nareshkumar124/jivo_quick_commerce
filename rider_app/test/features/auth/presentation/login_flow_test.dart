@@ -278,6 +278,8 @@ void main() {
       await h.pump(tester);
       expect(find.byKey(const Key('dev-tools')), findsOneWidget);
 
+      await tester.ensureVisible(find.byKey(const Key('dev-tools')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('dev-tools')));
       await tester.pumpAndSettle();
       expect(find.text('Location spike (dev)'), findsOneWidget);

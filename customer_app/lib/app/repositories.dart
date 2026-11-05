@@ -152,15 +152,22 @@ final orderHistoryRepositoryProvider = Provider<OrderHistoryRepository>((ref) {
   );
 });
 
-/// Whether this build can show live tracking. TODO(api): true only on
-/// fakes until `GET /orders/{id}/track/` (Phase 5) is bound.
-final trackingAvailableProvider = Provider<bool>((ref) => _fake(ref));
-
-/// Live tracking data (Phase 6 lookahead on fakes).
-final trackRepositoryProvider = Provider<TrackRepository>(
-  (ref) =>
-      _fake(ref) ? FakeTrackRepository() : const UnavailableTrackRepository(),
+/// Whether this build can show live tracking: wherever orders exist (the
+/// dev flavor today, like [cartAvailableProvider]); `GET /orders/{id}/track/`
+/// is bound since P5.
+final trackingAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(cartAvailableProvider),
 );
+
+/// Live tracking (`GET /orders/{id}/track/`, polled every 10 s): the API,
+/// the fake with `FAKE_API`, nothing where there are no orders.
+final trackRepositoryProvider = Provider<TrackRepository>((ref) {
+  if (!ref.watch(trackingAvailableProvider)) {
+    return const UnavailableTrackRepository();
+  }
+  if (_fake(ref)) return FakeTrackRepository();
+  return ApiTrackRepository(ref.watch(jivoApiProvider));
+});
 
 /// The notification inbox (Phase 6 lookahead on fakes). TODO(api): bind the
 /// inbox endpoints when the Phase 6 contract lands.

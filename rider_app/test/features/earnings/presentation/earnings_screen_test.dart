@@ -23,14 +23,14 @@ void main() {
 
       expect(h.earnings.calls, ['fetchEarnings 2026-11-02..2026-11-02']);
       // The fake's total is deliberately not the sum of what is listed.
-      expect(textOf(tester, 'earnings-total'), '₹135.00');
+      expect(textOf(tester, 'earnings-total'), '₹135');
       expect(find.text('2 orders'), findsOneWidget);
       for (final (type, amount) in [
-        ('BASE', '₹60.00'),
-        ('DISTANCE', '₹25.00'),
-        ('TIP', '₹20.00'),
-        ('INCENTIVE', '₹50.00'),
-        ('PENALTY', '-₹20.00'),
+        ('BASE', '₹60'),
+        ('DISTANCE', '₹25'),
+        ('TIP', '₹20'),
+        ('INCENTIVE', '₹50'),
+        ('PENALTY', '-₹20'),
       ]) {
         expect(
           find.descendant(
@@ -44,7 +44,7 @@ void main() {
       expect(
         find.descendant(
           of: byKey('earnings-order-JQ-10501'),
-          matching: find.text('₹65.00'),
+          matching: find.text('₹65'),
         ),
         findsOneWidget,
       );
@@ -103,14 +103,14 @@ void main() {
         'period\'s money', (tester) async {
       h.now = DateTime.utc(2026, 11, 4, 6); // Wednesday: week ≠ today
       await openFromHome(tester, h, 'home-earnings');
-      expect(textOf(tester, 'earnings-total'), '₹135.00');
+      expect(textOf(tester, 'earnings-total'), '₹135');
 
       h.earnings.failNext = const ApiError(code: ApiErrorCode.network);
       await tester.tap(byKey('period-week'));
       await tester.pumpAndSettle();
 
       expect(byKey('earnings-retry'), findsOneWidget);
-      expect(find.text('₹135.00'), findsNothing);
+      expect(find.text('₹135'), findsNothing);
 
       await tester.tap(byKey('earnings-retry'));
       await tester.pumpAndSettle();
@@ -124,7 +124,7 @@ void main() {
 
       await tester.tap(byKey('earnings-retry'));
       await tester.pumpAndSettle();
-      expect(textOf(tester, 'earnings-total'), '₹135.00');
+      expect(textOf(tester, 'earnings-total'), '₹135');
     });
   });
 
@@ -137,7 +137,7 @@ void main() {
       expect(textOf(tester, 'payout-12-status'), 'Pending');
       expect(textOf(tester, 'payout-11-status'), 'Paid');
       expect(find.text('Reference UTR45001200'), findsOneWidget);
-      expect(find.text('₹3,120.00'), findsOneWidget);
+      expect(find.text('₹3,120'), findsOneWidget);
       // Paid at 19:00 UTC on 26 Oct = 00:30 IST on 27 Oct.
       expect(
         find.descendant(

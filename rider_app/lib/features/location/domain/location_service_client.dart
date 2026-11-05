@@ -48,10 +48,23 @@ abstract interface class LocationServiceClient {
   /// Dev only: make the fake uploader fail like a dropped network.
   void setSimulateOffline(bool value);
 
+  /// Dev only: make the fake uploader answer like a server that already
+  /// auto-offlined the rider.
+  void setSimulateServerOffline(bool value);
+
   void flush();
 
   void requestStats();
 
   /// Stats pushed by the service isolate.
   Stream<TrackerStats> get stats;
+
+  /// Error codes with which the server stopped tracking (for example
+  /// `RIDER_OFFLINE` after an auto-offline). The service has already stopped
+  /// itself when one arrives.
+  Stream<String> get serverStops;
+
+  /// A server stop that happened while the app was not running, or null.
+  /// Clears it.
+  Future<String?> takeServerStop();
 }

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/primary_action_bar.dart';
 import '../../onboarding/domain/image_compression.dart';
@@ -78,9 +79,64 @@ class _FailedDeliveryScreenState extends ConsumerState<FailedDeliveryScreen> {
     }
   }
 
+  /// "Return the order to the store?" (fail-and-return.md §1.1): names the
+  /// reason; focus starts on "Go back".
+  Future<bool> _confirm(AppLocalizations l10n, FailReason reason) async {
+    final note = _note.text.trim();
+    final colors = RiderColors.of(context);
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: Text(
+          l10n.failConfirmTitle,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.failConfirmBody(_reasonText(l10n, reason)),
+              style: const TextStyle(fontSize: 18),
+            ),
+            if (note.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                l10n.failConfirmNote(note),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 18),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            key: const Key('fail-confirm-back'),
+            autofocus: true,
+            onPressed: () => Navigator.of(dialog).pop(false),
+            child: Text(l10n.failConfirmBack),
+          ),
+          FilledButton(
+            key: const Key('fail-confirm-yes'),
+            style: FilledButton.styleFrom(
+              backgroundColor: colors.danger,
+              foregroundColor: colors.onDanger,
+            ),
+            onPressed: () => Navigator.of(dialog).pop(true),
+            child: Text(l10n.failConfirmYes),
+          ),
+        ],
+      ),
+    );
+    return yes ?? false;
+  }
+
   Future<void> _submit() async {
     final reason = _reason;
     if (reason == null) return;
+    final l10n = AppLocalizations.of(context);
+    if (!await _confirm(l10n, reason) || !mounted) return;
     final ok = await ref
         .read(taskFlowControllerProvider.notifier)
         .fail(
@@ -143,11 +199,22 @@ class _FailedDeliveryScreenState extends ConsumerState<FailedDeliveryScreen> {
                   },
                   child: Column(
                     children: [
+                      // 64 dp rows; the whole row is the target.
                       for (final r in FailReason.values)
-                        RadioListTile<FailReason>(
-                          key: Key('fail-${r.wireValue}'),
-                          value: r,
-                          title: Text(_reasonText(l10n, r)),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minHeight: kRiderListRowMin,
+                          ),
+                          child: Center(
+                            child: RadioListTile<FailReason>(
+                              key: Key('fail-${r.wireValue}'),
+                              value: r,
+                              title: Text(
+                                _reasonText(l10n, r),
+                                style: const TextStyle(fontSize: 18),
+                              ),
+                            ),
+                          ),
                         ),
                     ],
                   ),
@@ -170,6 +237,14 @@ class _FailedDeliveryScreenState extends ConsumerState<FailedDeliveryScreen> {
                   _Requirement(
                     key: const Key('fail-wait'),
                     done: waitLeft == Duration.zero,
+                    // The running timer is 22 sp / 700, tabular (§1).
+                    timer: waitLeft != null && waitLeft > Duration.zero,
+                    semanticsLabel: waitLeft != null && waitLeft > Duration.zero
+                        ? l10n.failWaitSemantics(
+                            waitLeft.inMinutes,
+                            waitLeft.inSeconds % 60,
+                          )
+                        : null,
                     text: waitLeft == null
                         ? l10n.failWaitNotArrived
                         : waitLeft == Duration.zero
@@ -230,21 +305,27 @@ class _FailedDeliveryScreenState extends ConsumerState<FailedDeliveryScreen> {
   }
 }
 
+/// A rule for "not reachable": the state in words with a 28 dp icon, never
+/// colour alone (fail-and-return.md §1).
 class _Requirement extends StatelessWidget {
   const _Requirement({
     required this.done,
     required this.text,
     this.action,
+    this.timer = false,
+    this.semanticsLabel,
     super.key,
   });
 
   final bool done;
   final String text;
   final Widget? action;
+  final bool timer;
+  final String? semanticsLabel;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final colors = RiderColors.of(context);
     // The action sits under the text: as a ListTile trailing it squeezed the
     // text into a narrow, very tall column on phone widths.
     return Padding(
@@ -256,11 +337,22 @@ class _Requirement extends StatelessWidget {
             children: [
               Icon(
                 done ? Icons.check_circle : Icons.schedule,
-                color: done ? scheme.primary : scheme.outline,
+                size: 28,
+                color: done ? colors.onlineBg : colors.textSecondary,
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Text(text, style: Theme.of(context).textTheme.bodyLarge),
+                child: Text(
+                  text,
+                  semanticsLabel: semanticsLabel,
+                  style: timer
+                      ? const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        )
+                      : const TextStyle(fontSize: 18),
+                ),
               ),
             ],
           ),
