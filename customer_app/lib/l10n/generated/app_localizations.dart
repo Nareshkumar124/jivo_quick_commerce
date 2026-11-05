@@ -3003,6 +3003,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last updated {date}'**
   String cmsUpdatedOn(String date);
+
+  /// CMS page missing on the server (404): fall back to the policy URL.
+  ///
+  /// In en, this message translates to:
+  /// **'This page isn\'t available in the app right now. You can read it in your browser.'**
+  String get cmsPageUnavailable;
+
+  /// Button: open a page in the browser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get openInBrowser;
 }
 
 class _AppLocalizationsDelegate

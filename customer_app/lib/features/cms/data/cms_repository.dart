@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:jivo_api/jivo_api.dart' as api show JivoApi;
 import 'package:jivo_core/jivo_core.dart';
 
 /// A CMS page (`06 §2.7` `GET /pages/{slug}/`, Phase 7): About, Terms,
@@ -20,7 +22,7 @@ class CmsPage {
   final DateTime? updatedAt;
 }
 
-/// The page slugs the app links to. TODO(api): confirm with the backend.
+/// The page slugs the app links to (`pages_retrieve`).
 abstract final class CmsSlugs {
   static const about = 'about';
   static const terms = 'terms';
@@ -28,12 +30,35 @@ abstract final class CmsSlugs {
   static const refund = 'refund-policy';
 }
 
-/// TODO(api): `GET /pages/{slug}/` is not in jivo_api yet. The viewer runs
-/// on [FakeCmsRepository] (`FAKE_API=true`, tests); the real-API build
-/// keeps opening the policy URLs from `config/app` in the browser.
+/// CMS pages: [ApiCmsRepository] on the API, [FakeCmsRepository] with
+/// `FAKE_API` and in tests. An unknown or unpublished slug is 404; the
+/// viewer then offers the policy URL from `config/app`.
 abstract interface class CmsRepository {
   /// Throws [ApiError] (`NOT_FOUND` for an unknown or unpublished slug).
   Future<CmsPage> page(String slug);
+}
+
+/// `GET /pages/{slug}/` (public). The server sanitises the HTML too; the
+/// app still renders it only through `parseSafeHtml`.
+class ApiCmsRepository implements CmsRepository {
+  const ApiCmsRepository(this._api);
+
+  final api.JivoApi _api;
+
+  @override
+  Future<CmsPage> page(String slug) async {
+    try {
+      final page = (await _api.getCmsApi().pagesRetrieve(slug: slug)).data!;
+      return CmsPage(
+        slug: page.slug,
+        title: page.title,
+        html: page.html,
+        updatedAt: page.updatedAt,
+      );
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
 }
 
 class UnavailableCmsRepository implements CmsRepository {

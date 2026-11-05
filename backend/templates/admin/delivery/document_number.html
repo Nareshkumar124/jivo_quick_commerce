@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}
+{# The full KYC document number, shown once on request (kyc.document_number: permission, store scope and an audit entry). Never cached (Cache-Control: no-store). Context: object, number, back. #}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% endblock %}
+
+{% block content %}
+    <section class="bg-white border border-base-200 max-w-2xl rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" data-testid="document-number">
+        <div class="border-b border-base-200 px-4 py-3 dark:border-base-800">
+            <h2 class="font-semibold text-font-important-light dark:text-font-important-dark">{{ title }}</h2>
+            <p class="text-sm text-font-subtle-light dark:text-font-subtle-dark">This view was recorded in the audit log. Do not copy the number anywhere else.</p>
+        </div>
+        <p class="p-4 font-mono text-lg">{{ number }}</p>
+        <p class="px-4 pb-4"><a href="{{ back }}" class="text-primary-600 dark:text-primary-500">Back to the document</a></p>
+    </section>
+{% endblock %}

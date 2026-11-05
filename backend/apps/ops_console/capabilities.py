@@ -3,8 +3,8 @@
 The backend's Phase 4 roles (`apps.accounts.roles`) grant:
 - `orders.process_order`: packing console (Super Admin, Ops, Store Manager own, Store Staff own);
 - `orders.cancel_order`: 08 T12 (Super Admin, Ops, Store Manager own, Support);
-- `payments.issue_refund`: manual refund / retry (Super Admin, Finance; Support up to
-  `SUPPORT_REFUND_LIMIT`, enforced by the service);
+- `payments.issue_refund`: manual refund (capability `issue_refund`) and retry (Super
+  Admin, Finance; Support up to `SUPPORT_REFUND_LIMIT`, enforced by the service);
 - `core.view_auditlog`: audit log (Super Admin, Finance).
 
 Capabilities map onto them (`DEDICATED`):
@@ -23,6 +23,7 @@ LIVE_BOARD = "live_board"
 PACKING = "packing"
 CANCEL_ORDER = "cancel_order"
 RETRY_REFUND = "retry_refund"
+ISSUE_REFUND = "issue_refund"
 TOGGLE_STORE = "toggle_store"
 AUDIT_LOG = "audit_log"
 
@@ -38,6 +39,7 @@ DEDICATED: dict[str, Rule] = {
     PACKING: (("orders.process_order",),),
     CANCEL_ORDER: (("orders.cancel_order",),),
     RETRY_REFUND: (("payments.issue_refund",),),
+    ISSUE_REFUND: (("payments.issue_refund",),),
     TOGGLE_STORE: _TOGGLE,
     AUDIT_LOG: (("core.view_auditlog",),),
 }
@@ -53,6 +55,7 @@ INTERIM: dict[str, Rule] = {
         ("orders.view_order", "accounts.view_customer"),
     ),
     RETRY_REFUND: (("payments.view_refund", "payments.view_paymentwebhookevent"),),
+    ISSUE_REFUND: (("payments.view_refund", "payments.view_paymentwebhookevent"),),
     TOGGLE_STORE: _TOGGLE,
     AUDIT_LOG: (("payments.view_paymentwebhookevent",),),
 }

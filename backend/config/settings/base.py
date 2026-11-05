@@ -63,6 +63,10 @@ INSTALLED_APPS = [
     "import_export",
     "simple_history",
     "axes",
+    # Staff TOTP MFA (H2, DL-59; interim until Jivo SSO, D-04): devices + recovery codes.
+    "django_otp",
+    "django_otp.plugins.otp_totp",
+    "django_otp.plugins.otp_static",
     # Project apps
     "apps.core",
     "apps.accounts",
@@ -77,6 +81,8 @@ INSTALLED_APPS = [
     "apps.payments",
     "apps.delivery",
     "apps.support",
+    "apps.realtime",  # Phase 6: WebSockets (06 §4)
+    "apps.loadtest",  # P8 T-812: load-test data commands (no models, no API)
     "apps.ops_console",
 ]
 
@@ -87,6 +93,9 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "apps.accounts.middleware.staff_session_policy_middleware",  # 05 §5 staff session limits
+    "django_otp.middleware.OTPMiddleware",  # request.user.is_verified() (staff MFA, H2)
+    "apps.ops_console.mfa.staff_mfa_middleware",  # privileged staff: MFA on /admin/ and /ops/
+    "apps.ops_console.csp.report_only_csp_middleware",  # L7: CSP report-only on the panel
     "apps.core.middleware.staff_timezone_middleware",  # staff panel in IST, storage UTC
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -96,6 +105,20 @@ MIDDLEWARE = [
     # Last, per django-axes: locks out repeated failed staff logins.
     "axes.middleware.AxesMiddleware",
 ]
+
+# Staff MFA (H2, DL-59): TOTP for Super Admin, Finance and Support (and Ops when set) on /admin/
+# and /ops/. apps/ops_console/mfa.py. Interim until Jivo SSO (D-04).
+STAFF_MFA_ENFORCED = env_bool("STAFF_MFA_ENFORCED", default=True)
+# Ops / Dispatch is in by default: it has the broadest customer PII and rider KYC access.
+STAFF_MFA_INCLUDE_OPS = env_bool("STAFF_MFA_INCLUDE_OPS", default=True)
+OTP_TOTP_ISSUER = "Jivo Ops"
+# django-otp throttling: after each wrong code the device waits 5 s, then 10, 20, ... seconds.
+OTP_TOTP_THROTTLE_FACTOR = 5
+OTP_STATIC_THROTTLE_FACTOR = 5
+# Orders admin export (05 §2): at most this many rows per file; larger exports are a P7 report.
+ORDERS_EXPORT_MAX_ROWS = env_int("ORDERS_EXPORT_MAX_ROWS", default=5000)
+# L7: Content-Security-Policy on /admin/ and /ops/, report-only until a week of clean reports.
+CSP_REPORT_ONLY = env_bool("CSP_REPORT_ONLY", default=True)
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
@@ -330,6 +353,19 @@ CELERY_BEAT_SCHEDULE = {
         "task": "delivery.purge_offboarded_kyc",
         "schedule": crontab(hour=22, minute=45),
     },
+    # Phase 6 (06 §5): retention purges (03:20 and 03:25 IST).
+    "purge-old-rider-locations": {
+        "task": "realtime.purge_old_locations",
+        "schedule": crontab(hour=21, minute=55),
+    },
+    "sweep-stuck-notification-sends": {
+        "task": "notifications.sweep_stuck_sends",
+        "schedule": 15 * 60.0,
+    },
+    "purge-old-notifications": {
+        "task": "notifications.purge_old_notifications",
+        "schedule": crontab(hour=21, minute=50),
+    },
 }
 
 # --------------------------------------------------------------------------- email
@@ -421,6 +457,35 @@ SMS_RETRIEVER_APP_HASHES = {
 # --------------------------------------------------------------------------- account deletion
 ACCOUNT_DELETION_GRACE_DAYS = env_int("ACCOUNT_DELETION_GRACE_DAYS", default=30)  # 07 §4
 
+# --------------------------------------------------------------------------- notifications (P6)
+# Push (08 §9) behind apps.notifications.push. FCM waits for D-19: until then the default sends
+# nothing (DisabledPushBackend: notifications are recorded, push is SKIPPED). local.py logs them.
+PUSH_BACKEND = env_str("PUSH_BACKEND", default="apps.notifications.push.DisabledPushBackend")
+# TRAI DLT template id per notification event with SMS ("order.placed:1007...,order.cancelled:
+# 1007..."). An event without one sends no SMS (logged). OTP keeps SMS_OTP_DLT_TEMPLATE_ID.
+SMS_DLT_TEMPLATE_IDS: dict[str, str] = env_dict("SMS_DLT_TEMPLATE_IDS", default={})
+NOTIFICATION_RETENTION_DAYS = env_int("NOTIFICATION_RETENTION_DAYS", default=90)
+# A push/SMS still SENDING after this long is marked FAILED and its text blanked (sweeper).
+NOTIFICATION_STUCK_SEND_MINUTES = env_int("NOTIFICATION_STUCK_SEND_MINUTES", default=15)
+RIDER_LOCATION_RETENTION_DAYS = env_int("RIDER_LOCATION_RETENTION_DAYS", default=30)  # 07 §2.8
+
+# --------------------------------------------------------------------------- WebSockets (P6)
+# /ws/v1/ sockets close with 4408 when no auth message arrives in time (06 §4).
+WS_AUTH_TIMEOUT_SECONDS = env_float("WS_AUTH_TIMEOUT_SECONDS", default=10.0)
+# /ws/ops/live/ re-checks the staff session, role and stores this often (revoked access ends).
+WS_OPS_RECHECK_SECONDS = env_float("WS_OPS_RECHECK_SECONDS", default=300.0)
+# Abuse limits (P8 OWASP review L5): sockets per user (4429), each slot a lease renewed on
+# auth/ping/re-check; malformed or unknown messages before 4400; inbound message size (1009).
+# The ASGI server must also cap frames (uvicorn --ws-max-size, daphne --websocket_max_size).
+WS_MAX_SOCKETS_PER_USER = env_int("WS_MAX_SOCKETS_PER_USER", default=5)
+WS_SOCKET_LEASE_SECONDS = env_int("WS_SOCKET_LEASE_SECONDS", default=1200)
+WS_MAX_BAD_MESSAGES = env_int("WS_MAX_BAD_MESSAGES", default=10)
+WS_MAX_MESSAGE_BYTES = env_int("WS_MAX_MESSAGE_BYTES", default=4096)
+# /ws/v1/rider/ re-checks that the rider is still ACTIVE this often (a suspension ends offers).
+WS_RIDER_RECHECK_SECONDS = env_float("WS_RIDER_RECHECK_SECONDS", default=60.0)
+# `order.eta` while out for delivery is recomputed from rider pings at most this often per order.
+WS_ETA_MIN_INTERVAL_SECONDS = env_int("WS_ETA_MIN_INTERVAL_SECONDS", default=30)
+
 # --------------------------------------------------------------------------- OpenAPI
 # /api/schema/ and /api/docs/ are public only where API_DOCS_PUBLIC is true (local); staff-only
 # elsewhere (02 §5). The committed contract is backend/openapi/schema.yaml.
@@ -437,6 +502,11 @@ SPECTACULAR_SETTINGS = {
         "Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`."
     ),
     "VERSION": "0.1.0",
+    # Phase 6: the WebSocket messages (06 §4) as `Ws...` components (apps.realtime.contract).
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "apps.realtime.schema.add_websocket_components",
+    ],
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVE_PERMISSIONS": ["apps.core.permissions.ApiDocsPermission"],
     # JWT first so anonymous requests get 401 (with WWW-Authenticate), not 403.
@@ -537,6 +607,13 @@ SPECTACULAR_SETTINGS = {
                 "the delivery task, cash, earnings, history and payouts. Every operation except "
                 "`rider_stores_list` and `rider_register` needs a rider profile (else 403 "
                 "`PERMISSION_DENIED` with `details.rider_status`)."
+            ),
+        },
+        {
+            "name": "notifications",
+            "description": (
+                "The in-app inbox (06 §2.7). Live updates use WebSockets (06 §4): their messages "
+                "are the `Ws...` schemas."
             ),
         },
     ],
@@ -716,6 +793,10 @@ from config.admin_ui import UNFOLD  # noqa: E402, F401  (owned by the admin pane
 # --------------------------------------------------------------------------- project flags
 # `manage.py seed_demo` is refused where this is False (production).
 SEED_DEMO_ALLOWED = env_bool("SEED_DEMO_ALLOWED", default=True)
+# P8 T-812: `manage.py loadtest_seed` / `loadtest_cleanup` (create and delete the +9190000002xx
+# load-test customers, their orders and stock top-ups). Off unless explicitly enabled; staging
+# only. Production refuses it at startup and with the system check loadtest.E001.
+LOADTEST_DATA_ALLOWED = env_bool("LOADTEST_DATA_ALLOWED", default=False)
 
 # --------------------------------------------------------------------------- logging
 LOG_LEVEL = env_str("LOG_LEVEL", default="INFO")

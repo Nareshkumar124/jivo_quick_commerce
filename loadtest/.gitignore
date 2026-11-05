@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+# Run outputs (CSV, HTML, JSON); copy the filled results template into docs when reporting
+results/

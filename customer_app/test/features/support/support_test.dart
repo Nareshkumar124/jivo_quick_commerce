@@ -230,6 +230,45 @@ void main() {
       expect(find.byKey(const Key('ticket-reply')), findsNothing);
     });
 
+    testWidgets('a rate-limited new ticket (429) says when to retry and '
+        'keeps the form', (tester) async {
+      await openHelp(tester, app());
+      await tester.tap(find.byKey(const Key('help-new-ticket')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('category-ACCOUNT')));
+      await tester.enterText(
+        find.byKey(const Key('ticket-message')),
+        'I cannot change my email address',
+      );
+      support.failNext = const ApiError(
+        code: ApiErrorCode.rateLimited,
+        statusCode: 429,
+        details: {'retry_after_seconds': 120},
+      );
+      await showIn(tester, 'new-ticket', find.byKey(const Key('ticket-submit')));
+      await tester.tap(find.byKey(const Key('ticket-submit')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Too many attempts. Please try again in 2 minutes.'),
+        findsOneWidget,
+      );
+      expect(find.text('I cannot change my email address'), findsOneWidget);
+      expect(find.byKey(const Key('ticket-thread')), findsNothing);
+    });
+
+    testWidgets('a reply to a resolved ticket reopens it', (tester) async {
+      await openHelp(tester, app());
+      await tester.tap(find.byKey(const Key('help-tickets')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ticket-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Resolved'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('ticket-reply')), 'Again');
+      await tester.tap(find.byKey(const Key('ticket-send')));
+      await tester.pumpAndSettle();
+      expect(find.text('Open'), findsOneWidget);
+    });
+
     testWidgets('no tickets: empty state', (tester) async {
       support = FakeSupportRepository(seed: false);
       await openHelp(tester, app());

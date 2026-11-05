@@ -24,6 +24,8 @@ from config.testing import worker_redis_namespace
 from .base import *
 
 APP_ENVIRONMENT = "test"
+# Staff MFA is off for the suite (tests log staff in with force_login); the MFA tests turn it on.
+STAFF_MFA_ENFORCED = False
 DEBUG = False
 SECRET_KEY = "test-only-secret-key-not-used-anywhere-else-0123456789abcdefghij"  # noqa: S105
 ALLOWED_HOSTS = ["testserver", "localhost"]
@@ -100,6 +102,15 @@ SEED_DEMO_ALLOWED = True
 
 SMS_BACKEND = "apps.notifications.sms.LocmemSmsBackend"
 SMS_OTP_DLT_TEMPLATE_ID = "1007000000000000001"
+# Phase 6: push into a list, DLT ids for every notification event with SMS, fast auth timeout.
+PUSH_BACKEND = "apps.notifications.push.LocmemPushBackend"
+SMS_DLT_TEMPLATE_IDS = {
+    "order.placed": "1007000000000000101",
+    "order.items_adjusted": "1007000000000000102",
+    "order.out_for_delivery": "1007000000000000103",
+    "order.cancelled": "1007000000000000104",
+    "refund.processed": "1007000000000000105",
+}
 # Same numbers as local.py, so the documented test numbers are exercised by the suite.
 OTP_TEST_NUMBERS = {
     "+919000000001": "123456",

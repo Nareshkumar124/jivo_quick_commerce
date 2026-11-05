@@ -1723,4 +1723,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String cmsUpdatedOn(String date) {
     return 'Last updated $date';
   }
+
+  @override
+  String get cmsPageUnavailable =>
+      'This page isn\'t available in the app right now. You can read it in your browser.';
+
+  @override
+  String get openInBrowser => 'Open in browser';
 }

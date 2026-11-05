@@ -58,16 +58,20 @@ def _rate_limit_keys_in_the_worker_namespace():
 @pytest.fixture(autouse=True)
 def _isolated_redis_and_outbox(_rate_limit_keys_in_the_worker_namespace):
     """Each test starts with an empty Redis namespace (cached app config, catalog pages,
-    rate-limit counters, channel groups) and an empty SMS outbox. Only ever this worker's keys in
-    the dedicated test DB (config/settings/test.py); never FLUSHDB."""
-    from apps.notifications import sms
+    rate-limit counters, channel groups) and empty SMS and push outboxes. Only ever this worker's
+    keys in the dedicated test DB (config/settings/test.py); never FLUSHDB."""
+    from apps.notifications import push, sms
 
     expected = f"/{settings.TEST_REDIS_DB}"
     assert urlparse(settings.REDIS_URL).path == expected, "tests must use the test Redis DB"
     cache.clear()
     sms.outbox.clear()
+    push.outbox.clear()
+    push.invalid_tokens.clear()
     yield
     sms.outbox.clear()
+    push.outbox.clear()
+    push.invalid_tokens.clear()
 
 
 @pytest.fixture
