@@ -478,6 +478,27 @@ def test_track_shows_the_rider_and_the_otp_only_out_for_delivery(flow, make_auth
     assert body["delivery_otp"] is None
 
 
+def test_track_task_status(flow, make_auth_client):
+    """Customer track `task_status` (api-requests, customer app): null with no task, then the
+    task's status through to DELIVERED; scoped to the order's owner (another customer: 404)."""
+    f = flow()
+    customer = make_auth_client(User.objects.get(pk=f.order.user_id))
+    url = f"/api/v1/orders/{f.order.pk}/track/"
+    DeliveryTask.objects.filter(order=f.order).delete()
+    assert customer.get(url).json()["task_status"] is None
+    f.accept()
+    assert customer.get(url).json()["task_status"] == "ASSIGNED"
+    f.at_store()
+    f.steps.pack(f.order)
+    f.pickup()
+    assert customer.get(url).json()["task_status"] == "PICKED_UP"
+    f.at_customer()
+    assert customer.get(url).json()["task_status"] == "AT_CUSTOMER"
+    assert f.deliver().status_code == 200
+    assert customer.get(url).json()["task_status"] == "DELIVERED"
+    assert make_auth_client(UserFactory()).get(url).status_code == 404
+
+
 # --------------------------------------------------------------------------- location link
 
 

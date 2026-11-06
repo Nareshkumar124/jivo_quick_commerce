@@ -59,6 +59,16 @@ def _task(order: Order):
     )
 
 
+def _task_status(order: Order, task) -> str | None:
+    """The order's delivery task status (any state, also once it ended), or None without a
+    task (api-requests: customer track `task_status`)."""
+    if task is not None:
+        return task.status
+    from apps.delivery.models import DeliveryTask
+
+    return DeliveryTask.objects.filter(order=order).values_list("status", flat=True).first()
+
+
 def track_body(order: Order, now=None) -> dict:
     from apps.delivery.services.shifts import latest_location
     from apps.delivery.services.tasks import delivery_otp
@@ -83,5 +93,6 @@ def track_body(order: Order, now=None) -> dict:
         "destination": {"lat": order.delivery_location.y, "lng": order.delivery_location.x},
         "rider": rider,
         "delivery_otp": delivery_otp(task, order),
+        "task_status": _task_status(order, task),
         "server_time": now or timezone.now(),
     }

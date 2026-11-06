@@ -16,6 +16,7 @@ from apps.cart.serializers import (
     DeliveryInstructionsSerializer,
 )
 from apps.catalog.serializers import ImageSetSerializer, money
+from apps.delivery.choices import DeliveryTaskStatus
 from apps.orders.choices import (
     ActorType,
     CancelReason,
@@ -435,6 +436,15 @@ class OrderTrackSerializer(serializers.Serializer):
         help_text=(
             "The 4-digit OTP to give the rider, only while OUT_FOR_DELIVERY; null otherwise. "
             "Never share it before the rider arrives."
+        ),
+    )
+    task_status = serializers.ChoiceField(
+        choices=DeliveryTaskStatus.choices,
+        allow_null=True,
+        help_text=(
+            "The order's delivery task status (SEARCHING, OFFERED, ASSIGNED, AT_STORE, "
+            "PICKED_UP, AT_CUSTOMER, DELIVERED, FAILED, ...); null while no task exists "
+            "(before dispatch starts)."
         ),
     )
     server_time = serializers.DateTimeField()

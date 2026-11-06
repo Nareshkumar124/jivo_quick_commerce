@@ -59,6 +59,13 @@ class TestRoles:
             "view_invoice",
             "issue_refund",
             "view_auditlog",
+            # Phase 5 slice 5.4 (05 §3 Payouts ✔; DL-61 a: Finance records cash deposits)
+            "record_cash_deposit",
+            "view_ridercashledger",
+            "manage_payouts",
+            "view_payout",
+            "view_riderearning",
+            "view_earningrule",
         }
 
     @pytest.mark.parametrize(

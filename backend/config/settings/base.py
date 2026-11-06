@@ -782,12 +782,16 @@ DISPATCH_RETRY_SECONDS = env_int("DISPATCH_RETRY_SECONDS", default=15)
 DISPATCH_UNASSIGNED_PAUSE_SECONDS = env_int("DISPATCH_UNASSIGNED_PAUSE_SECONDS", default=60)
 # D-16 default (doc 11, to confirm with Jivo Ops/HR): rider pay per order = base + per km of the
 # server-computed store-to-drop route distance. Shown as `estimated_payout` on offers and tasks;
-# earnings are recorded from slice 5.4.
+# earnings are recorded on delivery (slice 5.4). An `EarningRule` row in force overrides them.
 RIDER_PAY_BASE_PER_ORDER = Decimal(env_str("RIDER_PAY_BASE_PER_ORDER", default="30.00"))
 RIDER_PAY_PER_KM = Decimal(env_str("RIDER_PAY_PER_KM", default="5.00"))
 # 08 §6.4 (D-10 default, to confirm): a customer whose COD orders were refused this many times
 # is COD-blocked automatically (0 = never).
 COD_BLOCK_AFTER_REFUSALS = env_int("COD_BLOCK_AFTER_REFUSALS", default=2)
+# Slice 5.4: the COD UPI QR (06 §3 `cod-qr`; Razorpay QR Codes, single use, fixed amount). Off,
+# or with the real gateway and no Razorpay keys, `cod-qr` answers 503 and the rider takes cash.
+COD_UPI_QR_ENABLED = env_bool("COD_UPI_QR_ENABLED", default=True)
+COD_QR_EXPIRY_SECONDS = env_int("COD_QR_EXPIRY_SECONDS", default=900)
 # --------------------------------------------------------------------------- support (P7)
 # Per user, fail open (apps.core.throttling). A customer raises a few tickets at most; these
 # only stop scripted abuse of the support inbox.

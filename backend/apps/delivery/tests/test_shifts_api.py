@@ -80,6 +80,7 @@ def test_cash_over_limit_is_prepaid_only(client, rider):
         "cash_in_hand": "5000.00",
         "cash_limit": "5000.00",
         "limit_reached": True,
+        "deposit_required": True,
     }
 
 

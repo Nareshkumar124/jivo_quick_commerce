@@ -112,6 +112,17 @@ class GatewayRefund:
     receipt: str = ""
 
 
+@dataclass(frozen=True)
+class GatewayQr:
+    """A UPI QR code at the gateway (Razorpay QR Codes: single use, fixed amount), for a COD
+    order's amount due (06 §3 `cod-qr`)."""
+
+    id: str  # e.g. "qr_Nq7aB2cD3eF4gH"
+    image_url: str  # https PNG
+    amount_paise: int
+    status: str  # Razorpay: active / closed
+
+
 def refund_receipt(key: str) -> str:
     """The refund `receipt` (at most 40 characters): how `process_refund` recognises its own
     refund among the payment's refunds at the gateway. Razorpay's docs also say a repeated
@@ -171,6 +182,26 @@ class PaymentGateway(ABC):
     @abstractmethod
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
         """Every refund of a payment, to find one made before (a repeated receipt)."""
+
+    @property
+    def qr_available(self) -> bool:
+        """True when this gateway can make UPI QR codes now (keys configured)."""
+        return True
+
+    @abstractmethod
+    def create_qr_code(
+        self, *, amount_paise: int, close_by: int, description: str, notes: dict
+    ) -> GatewayQr:
+        """A single-use UPI QR for exactly `amount_paise` (from the server-side order), closing
+        by `close_by` (Unix seconds)."""
+
+    @abstractmethod
+    def close_qr_code(self, qr_id: str) -> None:
+        """Close a QR so it takes no more payments. Closing a closed QR is not an error."""
+
+    @abstractmethod
+    def fetch_qr_payments(self, qr_id: str) -> list[GatewayPayment]:
+        """Payments made on a QR (missed-webhook lookup before refusing a UPI delivery)."""
 
     @abstractmethod
     def _key_secret(self) -> str: ...
@@ -282,6 +313,59 @@ class RazorpayGateway(PaymentGateway):
         )
         return _gateway_refund(data, payment_id)
 
+    @property
+    def qr_available(self) -> bool:
+        return all(
+            getattr(settings, name, "")
+            for name in ("RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "RAZORPAY_WEBHOOK_SECRET")
+        )
+
+    def create_qr_code(
+        self, *, amount_paise: int, close_by: int, description: str, notes: dict
+    ) -> GatewayQr:
+        data = self._call(
+            "POST",
+            "/payments/qr_codes",
+            {
+                "type": "upi_qr",
+                "name": "Jivo",
+                "usage": "single_use",
+                "fixed_amount": True,
+                "payment_amount": amount_paise,
+                "description": description[:100],
+                "close_by": close_by,
+                "notes": notes,
+            },
+        )
+        return GatewayQr(
+            id=data["id"],
+            image_url=data["image_url"],
+            amount_paise=int(data.get("payment_amount") or amount_paise),
+            status=data.get("status", "active"),
+        )
+
+    def close_qr_code(self, qr_id: str) -> None:
+        try:
+            self._call("POST", f"/payments/qr_codes/{urllib.parse.quote(qr_id)}/close")
+        except PaymentGatewayRejected as exc:
+            # Razorpay refuses to close a QR that is already closed (paid or expired).
+            if "closed" not in exc.description.lower():
+                raise
+
+    def fetch_qr_payments(self, qr_id: str) -> list[GatewayPayment]:
+        data = self._call("GET", f"/payments/qr_codes/{urllib.parse.quote(qr_id)}/payments")
+        return [
+            GatewayPayment(
+                id=item["id"],
+                order_id="",
+                amount_paise=item["amount"],
+                status=item["status"],
+                method=item.get("method") or "",
+                raw=item,
+            )
+            for item in data.get("items", [])
+        ]
+
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
         # Razorpay pages 10 by default; 100 is its maximum per request.
         data = self._call("GET", f"/payments/{urllib.parse.quote(payment_id)}/refunds?count=100")
@@ -374,6 +458,41 @@ class FakeRazorpayGateway(PaymentGateway):
             )
             for payment in Payment.objects.filter(
                 gateway_order_id=gateway_order_id, status=PaymentAttemptStatus.CAPTURED
+            ).exclude(gateway_payment_id=None)
+        ]
+
+    def create_qr_code(
+        self, *, amount_paise: int, close_by: int, description: str, notes: dict
+    ) -> GatewayQr:
+        """A QR id and a placeholder image URL (the fake draws no QR; local development pays it
+        with `manage.py fake_cod_qr_payment`, which posts a signed `qr_code.credited` event)."""
+        self._check_up()
+        qr_id = _fake_id("qr_")
+        return GatewayQr(
+            id=qr_id,
+            image_url=f"https://fake-razorpay.invalid/qr/{qr_id}.png",
+            amount_paise=amount_paise,
+            status="active",
+        )
+
+    def close_qr_code(self, qr_id: str) -> None:
+        self._check_up()
+
+    def fetch_qr_payments(self, qr_id: str) -> list[GatewayPayment]:
+        """The QR payments the server itself learnt (signed webhooks); the fake keeps no state."""
+        from apps.payments.models import Payment, PaymentAttemptStatus
+
+        self._check_up()
+        return [
+            GatewayPayment(
+                id=payment.gateway_payment_id,
+                order_id="",
+                amount_paise=to_paise(payment.amount),
+                status="captured",
+                method=payment.method,
+            )
+            for payment in Payment.objects.filter(
+                gateway_order_id=qr_id, status=PaymentAttemptStatus.CAPTURED
             ).exclude(gateway_payment_id=None)
         ]
 

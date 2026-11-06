@@ -22,6 +22,11 @@ urlpatterns = [
     path("rider/tasks/current/", views.CurrentTaskView.as_view(), name="rider-task-current"),
     path("rider/tasks/history/", views.TaskHistoryView.as_view(), name="rider-task-history"),
     path(
+        "rider/tasks/history/<int:id>/",
+        views.TaskHistoryDetailView.as_view(),
+        name="rider-task-history-detail",
+    ),
+    path(
         "rider/tasks/<int:id>/arrived-store/",
         views.ArrivedStoreView.as_view(),
         name="rider-task-arrived-store",

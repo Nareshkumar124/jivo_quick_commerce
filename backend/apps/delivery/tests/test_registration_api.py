@@ -88,7 +88,12 @@ def test_register_creates_a_pending_profile(client_for, store):
         "RC",
     ]
     assert body["ready_for_review"] is False
-    assert body["cash"] == {"cash_in_hand": "0.00", "cash_limit": "5000.00", "limit_reached": False}
+    assert body["cash"] == {
+        "cash_in_hand": "0.00",
+        "cash_limit": "5000.00",
+        "limit_reached": False,
+        "deposit_required": False,
+    }
     assert body["today"]["online_seconds"] == 0
     user.refresh_from_db()
     assert user.name == "Ravi Kumar"

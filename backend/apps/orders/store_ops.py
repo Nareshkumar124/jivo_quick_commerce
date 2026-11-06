@@ -460,14 +460,15 @@ def receive_return(
     units that came back damaged (default none). Good units go back on the shelf
     (`StockMovement(RETURN)`, `on_hand += qty`); damaged units are recorded (RETURN then DAMAGE,
     `on_hand` unchanged). The order RETURNED, the task RETURNED, the rider freed. COD: nothing
-    to collect. Permission `orders.process_order` in the store scope; audited."""
+    to collect. DL-61 (a): `delivery.dispatch_order` (Super Admin, Ops, Store Manager own
+    stores; not Store Staff or Support) in the store scope; audited."""
     from apps.delivery.choices import DeliveryTaskStatus
     from apps.delivery.models import DeliveryTask
 
     damaged = dict(damaged or {})
     now = timezone.now()
     with transaction.atomic():
-        order = _locked(by, order_id, roles.ORDER_PROCESS)
+        order = _locked(by, order_id, roles.RIDER_DISPATCH[0])
         task = DeliveryTask.objects.select_for_update(of=("self",)).filter(order=order).first()
         if (
             order.status != OrderStatus.DELIVERY_FAILED

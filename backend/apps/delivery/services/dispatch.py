@@ -80,7 +80,8 @@ def _soon(order_id: int) -> None:
 
 def estimate(order: Order) -> tuple[Decimal, Decimal]:
     """`(distance_km, payout)`: store-to-drop straight line x the road factor (08 §8; the route
-    distance used for distance pay, never the GPS trail) and the D-16 default pay."""
+    distance used for distance pay, never the GPS trail) and the pay estimate (the earning rule
+    in force, `earnings.estimate`)."""
     store = order.store
     km = haversine_km(
         store.location.y, store.location.x, order.delivery_location.y, order.delivery_location.x
@@ -88,10 +89,9 @@ def estimate(order: Order) -> tuple[Decimal, Decimal]:
     distance = Decimal(str(km * settings.ETA_ROAD_FACTOR)).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
-    payout = (settings.RIDER_PAY_BASE_PER_ORDER + settings.RIDER_PAY_PER_KM * distance).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-    return distance, payout
+    from apps.delivery.services.earnings import estimate as pay_estimate
+
+    return distance, pay_estimate(distance)
 
 
 def _locked_order(order_id: int) -> Order | None:
@@ -174,8 +174,13 @@ def candidates(task: DeliveryTask, order: Order, now) -> list[Rider]:
         .select_related("user")
     )
     if order.payment_method == PaymentMethod.COD:
-        # cash_in_hand + this order's amount must stay within the limit (08 §5 step 1).
-        riders = riders.filter(cash_limit__gte=F("cash_in_hand") + order.grand_total)
+        # cash_in_hand + this order's amount must stay within the limit (08 §5 step 1, DL-61 b;
+        # no ops override). Riders left out only for cash get the "deposit cash" banner.
+        over = F("cash_in_hand") + order.grand_total
+        Rider.objects.filter(
+            pk__in=riders.filter(cash_limit__lt=over).values("pk"), cash_skipped_at__isnull=True
+        ).update(cash_skipped_at=now)
+        riders = riders.filter(cash_limit__gte=over)
     at_store_m = settings.DISPATCH_AT_STORE_RADIUS_M
 
     def rank(rider):

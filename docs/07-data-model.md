@@ -216,6 +216,13 @@ Phase 5 implementation (slices 5.1/5.2, migration `delivery.0001`):
 - **DeliveryOffer:** partial unique PENDING per task and per rider.
 - **RiderCashLedger:** append-only; one COD_COLLECTED per order.
 - **RiderLocation.task** is now linked.
+- **Slice 5.4** (migration `delivery.0003_cod_qr_earnings_payouts_cash_deposits`, additive):
+  - **Rider:** check `cash_in_hand >= 0`.
+  - **RiderCashLedger** adds `store` (nullable; COD: the order's store, DEPOSIT: where handed in) and `idempotency_key` (unique per rider when set), an index (`store`, `entry_type`, `recorded_at`) for the day-end report, and the permissions `record_cash_deposit` and `adjust_cash`.
+  - **CodQr** (new): `task`, `order`, `gateway_qr_id` (unique), `image_url`, `amount` (> 0), `status` (PENDING/PAID/EXPIRED/CANCELLED), `expires_at`, `paid_at`, `closed_at`, `payment` (1:1 `payments.Payment`, gateway `RAZORPAY_QR`). At most one PENDING or PAID per task.
+  - **EarningRule** as specified, without `peak_hour_bonus` (no peak windows are defined: ⚠ D-16), plus `note`, `created_by`; `effective_from` unique.
+  - **RiderEarning** adds `earned_at` (the delivery time; ranges and payout periods use it), `recorded_by`; one line per (`task`, `type`); PENALTY < 0, every other type > 0.
+  - **Payout** adds `created_by`, `paid_by`, `created_at`; `amount` > 0; a PAID payout has `paid_at` and a `reference`; permission `manage_payouts`.
 - **RiderLocation** adds `is_mocked`, `received_at` and `shift`. It is unique on (`rider`, `recorded_at`) and has no spatial index. Its `task` FK arrives with slice 5.3.
 
 **RiderDocument**: `rider`, `doc_type` (PHOTO/AADHAAR_FRONT/AADHAAR_BACK/PAN/DL/RC), `file` (private storage), `doc_number_masked`, `status` (PENDING/APPROVED/REJECTED), `reviewed_by`, `review_note`.

@@ -42,6 +42,7 @@ from apps.core.money import money_str, round_money
 from apps.payments.models import Payment, PaymentAttemptStatus, Refund, RefundStatus
 from apps.payments.refunds import (
     AMOUNT_MISMATCH,
+    COD_QR_UNUSED,
     DUPLICATE_CAPTURE,
     LATE_CAPTURE,
     record_refund_status,
@@ -73,6 +74,7 @@ PUBLIC_REASON = {
     LATE_CAPTURE: "PAYMENT_ISSUE",
     DUPLICATE_CAPTURE: "PAYMENT_ISSUE",
     AMOUNT_MISMATCH: "PAYMENT_ISSUE",
+    COD_QR_UNUSED: "PAYMENT_ISSUE",
 }
 
 RETRY_SUFFIX = re.compile(r":retry-\d+$")
