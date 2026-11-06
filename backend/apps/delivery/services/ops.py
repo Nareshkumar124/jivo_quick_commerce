@@ -33,6 +33,7 @@ from apps.accounts.choices import RiderStatus
 from apps.core import audit
 from apps.core.crypto import decrypt
 from apps.core.money import money_str
+from apps.delivery import hooks
 from apps.delivery.choices import CodMode, DeliveryFailReason
 from apps.delivery.choices import DeliveryTaskStatus as TS
 from apps.delivery.models import RIDER_BUSY_STATUSES, DeliveryTask, Rider
@@ -57,6 +58,21 @@ def _locked(by, order_id: int):
     return order, task
 
 
+def _tell_rider(task: DeliveryTask, order) -> None:
+    """Ops changed the rider's task: `task.updated` (STATUS_CHANGED) and the push."""
+    hooks.task_updated(
+        task,
+        order,
+        "STATUS_CHANGED",
+        push_event="rider.task_updated",
+        push_data={
+            "task_id": task.pk,
+            "order_number": order.order_number,
+            "ref": f"{task.pk}:{task.status}:{timezone.now().isoformat()}",
+        },
+    )
+
+
 def unlock_pickup(order_id: int, *, by, ip: str | None = None) -> DeliveryTask:
     with transaction.atomic():
         order, task = _locked(by, order_id)
@@ -68,6 +84,7 @@ def unlock_pickup(order_id: int, *, by, ip: str | None = None) -> DeliveryTask:
         task.pickup_locked_at = None
         task.save(update_fields=["pickup_attempts", "pickup_locked_at", "updated_at"])
         audit.record(by, "delivery.unlock_pickup", order, {"task": task.pk}, ip=ip)
+        _tell_rider(task, order)
     return task
 
 
@@ -82,6 +99,7 @@ def unlock_delivery_otp(order_id: int, *, by, ip: str | None = None) -> Delivery
         task.otp_locked_at = None
         task.save(update_fields=["otp_attempts", "otp_locked_at", "updated_at"])
         audit.record(by, "delivery.unlock_delivery_otp", order, {"task": task.pk}, ip=ip)
+        _tell_rider(task, order)
     return task
 
 
@@ -128,6 +146,7 @@ def confirm_delivery(
                 {"task": task.pk, "cod": cod_mode},
                 ip=ip,
             )
+            _tell_rider(task, order)
     if wrong:  # raised after commit, so the audit entry stays
         raise ValidationError(MSG_OTP)
     return task
@@ -156,6 +175,17 @@ def fail_delivery(
             actor=by,
             actor_type=ActorType.OPS,
             now=now,
+        )
+        hooks.task_updated(
+            task,
+            order,
+            "STATUS_CHANGED",
+            push_event="rider.return_to_store",
+            push_data={
+                "task_id": task.pk,
+                "order_number": order.order_number,
+                "store_name": order.store.name,
+            },
         )
         audit.record(
             by,

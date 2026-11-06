@@ -499,6 +499,10 @@ def receive_return(
         task.returned_at = now
         task.ended_at = now
         task.save(update_fields=["status", "returned_at", "ended_at", "updated_at"])
+        if task.rider_id:
+            from apps.delivery import hooks
+
+            hooks.task_updated(task, order, "STATUS_CHANGED")  # T-612: the return is closed
         audit.record(
             by,
             "order.return_received",

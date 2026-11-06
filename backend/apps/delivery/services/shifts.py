@@ -163,6 +163,9 @@ def start_shift(user, *, lat: float, lng: float, accuracy: float | None = None):
         rider.is_online = True
         rider.current_location = point
         rider.last_location_at = now
+        from apps.delivery import hooks
+
+        hooks.rider_presence(rider.pk)  # T-612: `rider.status` to ops
     _remember_location(rider.pk, lat, lng, now, accuracy)
     logger.info("Rider %s online (shift %s)", rider.pk, shift.pk)
     return rider, shift
@@ -176,6 +179,9 @@ def _close(rider: Rider, shift: RiderShift | None, reason: str, now, by=None) ->
         shift.save(update_fields=["ended_at", "end_reason", "ended_by"])
     Rider.objects.filter(pk=rider.pk).update(is_online=False, updated_at=now)
     rider.is_online = False
+    from apps.delivery import hooks
+
+    hooks.rider_presence(rider.pk)  # T-612: `rider.status` to ops
     return shift
 
 

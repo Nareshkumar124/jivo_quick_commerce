@@ -205,6 +205,7 @@ eta_minutes = store.avg_prep_minutes
 - `avg_speed_kmph` is configurable (default 20). Distance is a straight line × a road factor (1.3).
 - The serviceability ETA uses the same formula with the typical rider wait.
 - Recomputed on status changes and on each rider location update while out for delivery. Displayed as a range if confidence is low (v2).
+- Terms (T-612, `apps.delivery.services.eta`): prep left = `avg_prep_minutes` minus the time since acceptance (or placement), 0 once PACKED; rider-to-store = the typical rider wait (`ETA_RIDER_WAIT_MINUTES`) while no rider is assigned, the rider's latest point to the store while ASSIGNED, 0 at the store; once picked up, rider's latest point to the drop + buffer (buffer only at the door). The live ETA is published (`order.eta`) and returned by `track/` (`live_eta_*`); `Order.eta_at` keeps the promise made at placement.
 
 ## 9. Notifications per transition
 

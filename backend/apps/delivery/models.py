@@ -427,6 +427,15 @@ class DeliveryTask(TimeStampedModel):
     def __str__(self) -> str:
         return f"Task {self.pk} ({self.status}) for order {self.order_id}"
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        """Remember the loaded status and rider, so `apps.delivery.live` publishes only real
+        changes."""
+        instance = super().from_db(db, field_names, values)
+        instance._live_status = instance.__dict__.get("status")
+        instance._live_rider_id = instance.__dict__.get("rider_id")
+        return instance
+
 
 class DeliveryOffer(models.Model):
     """One offer of a task to a rider (07 §2.8, 08 §5). At most one PENDING per task and per

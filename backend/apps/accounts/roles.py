@@ -36,6 +36,7 @@ SUPER_ADMIN_APPS = (
     "delivery",
     "core",  # audit log: view only (see _permissions_for)
     "support",
+    "notifications",  # T-612 PM default (admin request): sent notifications, read-only UI
 )
 
 CUSTOMER_CARE = ["accounts.view_customer", "accounts.change_customer"]
@@ -116,6 +117,9 @@ SUPPORT_TICKETS = [
     "support.view_ticketmessage",
     "support.handle_ticket",
 ]
+# T-612 PM default (admin agent request, for a decision-log entry): Ops and Support may view
+# sent notifications (delivery status, no OTP: bodies are cleared once sent).
+NOTIFICATION_VIEW = ["notifications.view_notification"]
 FAQ_MANAGE = [f"cms.{action}_faq" for action in ("add", "change", "delete", "view")]
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
@@ -136,6 +140,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         *CASH_DEPOSIT,
         COD_BLOCK_LIFT,
         *SUPPORT_TICKETS,
+        *NOTIFICATION_VIEW,
     ],
     STORE_MANAGER: [
         *STORE_VIEW,
@@ -162,6 +167,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         REFUND_ISSUE,
         *SUPPORT_TICKETS,
         *FAQ_MANAGE,
+        *NOTIFICATION_VIEW,
     ],
     FINANCE: [
         *INVENTORY_VIEW,

@@ -11,6 +11,11 @@ def rider_group(rider_id: int) -> str:
     return f"rider.{int(rider_id)}"
 
 
+def user_group(user_id: int, app: str) -> str:
+    """Every app socket of one user for one app (`notification.new`, api-requests #47)."""
+    return f"user.{int(user_id)}.{app}"
+
+
 def store_group(store_id: int) -> str:
     """The ops sockets permitted for one store."""
     return f"ops.store.{int(store_id)}"

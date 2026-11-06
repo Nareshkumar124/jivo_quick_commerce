@@ -177,9 +177,21 @@ def candidates(task: DeliveryTask, order: Order, now) -> list[Rider]:
         # cash_in_hand + this order's amount must stay within the limit (08 §5 step 1, DL-61 b;
         # no ops override). Riders left out only for cash get the "deposit cash" banner.
         over = F("cash_in_hand") + order.grand_total
-        Rider.objects.filter(
-            pk__in=riders.filter(cash_limit__lt=over).values("pk"), cash_skipped_at__isnull=True
-        ).update(cash_skipped_at=now)
+        flagged = list(
+            Rider.objects.filter(
+                pk__in=riders.filter(cash_limit__lt=over).values("pk"),
+                cash_skipped_at__isnull=True,
+            ).values_list("pk", flat=True)
+        )
+        if flagged:
+            Rider.objects.filter(pk__in=flagged, cash_skipped_at__isnull=True).update(
+                cash_skipped_at=now
+            )
+            for skipped in Rider.objects.filter(pk__in=flagged).select_related("user"):
+                # The "deposit cash" banner turns on (T-612 `cash.updated`, with a push).
+                hooks.cash_updated(
+                    skipped, "DEPOSIT_REQUIRED", push_ref=f"deposit:{now.isoformat()}"
+                )
         riders = riders.filter(cash_limit__gte=over)
     at_store_m = settings.DISPATCH_AT_STORE_RADIUS_M
 
@@ -308,14 +320,8 @@ def expire_offer(offer_id: int, now=None) -> str:
             task.status = TS.SEARCHING
             task.save(update_fields=["status", "updated_at"])
             _soon(order.pk)
-        _tell_rider_offer_closed(offer, order)
+        hooks.offer_closed(offer, order, "EXPIRED")
     return "expired"
-
-
-def _tell_rider_offer_closed(offer: DeliveryOffer, order: Order) -> None:
-    user = offer.rider.user
-    data = {"offer_id": offer.pk, "order_number": order.order_number, "status": offer.status}
-    transaction.on_commit(lambda: hooks.send_push(user, "rider.offer_withdrawn", data))
 
 
 def dispatch_sweep(now=None) -> dict:
@@ -451,9 +457,10 @@ def reject_offer(user, offer_id: int, reason: str | None, now=None) -> None:
             _soon(order.pk)
 
 
-def withdraw_rider_offers(rider_id: int) -> int:
-    """The rider went offline (or was suspended): their pending offers are withdrawn and each
-    task goes back to the search. Runs in its own transactions, in the normal lock order."""
+def withdraw_rider_offers(rider_id: int, reason: str = "RIDER_OFFLINE") -> int:
+    """The rider went offline (or was suspended), or ops assigned them another order
+    (`reason` REASSIGNED): their pending offers are withdrawn (`offer.withdrawn`) and each task
+    goes back to the search. Runs in its own transactions, in the normal lock order."""
     count = 0
     for offer_id, order_id in DeliveryOffer.objects.filter(
         rider_id=rider_id, status=OfferStatus.PENDING
@@ -470,6 +477,7 @@ def withdraw_rider_offers(rider_id: int) -> int:
                 task.status = TS.SEARCHING
                 task.save(update_fields=["status", "updated_at"])
                 _soon(order.pk)
+            hooks.offer_closed(offer, order, reason)
             count += 1
     return count
 
@@ -489,16 +497,17 @@ def withdraw_for_order(order: Order, now=None) -> None:
     if offer is not None:
         offer.status = OfferStatus.WITHDRAWN
         offer.save(update_fields=["status"])
-        _tell_rider_offer_closed(offer, order)
-    if task.rider_id:
-        user = task.rider.user
-        data = {"task_id": task.pk, "order_number": order.order_number}
-        transaction.on_commit(lambda: hooks.send_push(user, "rider.task_cancelled", data))
+        hooks.offer_closed(offer, order, "ORDER_CANCELLED")
     task.status = TS.CANCELLED
     task.cancelled_at = now
     task.ended_at = now
     task.next_dispatch_at = None
     task.save()
+    if task.rider_id:
+        data = {"task_id": task.pk, "order_number": order.order_number}
+        hooks.task_updated(
+            task, order, "ORDER_CANCELLED", push_event="rider.task_cancelled", push_data=data
+        )
 
 
 def order_packed(order_id: int) -> None:
@@ -512,10 +521,12 @@ def order_packed(order_id: int) -> None:
     if task is None:
         return
     if task.status in (TS.ASSIGNED, TS.AT_STORE) and task.rider_id:
-        hooks.send_push(
-            task.rider.user,
-            "rider.order_ready",
-            {
+        hooks.task_updated(
+            task,
+            task.order,
+            "ORDER_PACKED",
+            push_event="rider.order_ready",
+            push_data={
                 "task_id": task.pk,
                 "order_number": task.order.order_number,
                 "store_name": task.store.name,
@@ -536,7 +547,6 @@ def cod_amount_changed(order: Order, old_amount: Decimal) -> None:
     task.cod_amount_previous = old_amount
     task.save(update_fields=["cod_amount_previous", "updated_at"])
     if task.rider_id:
-        user = task.rider.user
         data = {
             "task_id": task.pk,
             "order_number": order.order_number,
@@ -545,7 +555,9 @@ def cod_amount_changed(order: Order, old_amount: Decimal) -> None:
             "cod_amount_previous": str(old_amount),
             "ref": f"{task.pk}:{order.grand_total}",  # one push per new amount
         }
-        transaction.on_commit(lambda: hooks.send_push(user, "rider.cod_amount_changed", data))
+        hooks.task_updated(
+            task, order, "AMOUNT_CHANGED", push_event="rider.cod_amount_changed", push_data=data
+        )
 
 
 # --------------------------------------------------------------------------- ops (05 §1.4)
@@ -616,20 +628,21 @@ def manual_assign(order_id: int, rider_id: int, *, by, ip: str | None = None) ->
         if offer is not None:
             offer.status = OfferStatus.WITHDRAWN
             offer.save(update_fields=["status"])
-            _tell_rider_offer_closed(offer, order)
+            hooks.offer_closed(offer, order, "TAKEN")
         _assign(task, rider, AssignmentMode.MANUAL, now)
         # The rider may hold a pending offer for another order: withdraw it after commit, in
         # the normal lock order (an accept racing this one gets OFFER_TAKEN under the rider lock).
         rider_id = rider.pk
-        transaction.on_commit(lambda: withdraw_rider_offers(rider_id))
+        transaction.on_commit(lambda: withdraw_rider_offers(rider_id, "REASSIGNED"))
         audit.record(by, "delivery.manual_assign", order, {"rider": rider.pk}, ip=ip)
-        user = rider.user
         data = {
             "task_id": task.pk,
             "order_number": order.order_number,
             "store_name": order.store.name,
         }
-        transaction.on_commit(lambda: hooks.send_push(user, "rider.task_assigned", data))
+        hooks.task_updated(
+            task, order, "ASSIGNED", push_event="rider.task_assigned", push_data=data
+        )
     return task
 
 
@@ -655,9 +668,15 @@ def unassign(order_id: int, *, by, ip: str | None = None) -> DeliveryTask:
         _new_round(task, now)
         task.save()
         audit.record(by, "delivery.unassign", order, {"rider": previous.pk}, ip=ip)
-        user = previous.user
         data = {"task_id": task.pk, "order_number": order.order_number}
-        transaction.on_commit(lambda: hooks.send_push(user, "rider.task_cancelled", data))
+        hooks.task_updated(
+            task,
+            order,
+            "REASSIGNED",
+            rider=previous,
+            push_event="rider.task_cancelled",
+            push_data=data,
+        )
         _soon(order.pk)
     return task
 

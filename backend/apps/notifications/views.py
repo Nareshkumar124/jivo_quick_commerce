@@ -24,6 +24,7 @@ from apps.notifications import services
 from apps.notifications.serializers import (
     InboxNotificationSerializer,
     ReadAllResultSerializer,
+    UnreadCountSerializer,
 )
 
 TAGS = ["notifications"]
@@ -36,6 +37,9 @@ class PaginatedInboxNotificationListSerializer(serializers.Serializer):
     next = serializers.URLField(allow_null=True)
     previous = serializers.URLField(allow_null=True)
     results = InboxNotificationSerializer(many=True)
+    unread_count = serializers.IntegerField(
+        help_text="Unread entries for this app (all pages; api-requests #45)."
+    )
 
 
 def _app(request: Request) -> str:
@@ -69,10 +73,34 @@ class InboxListView(APIView):
     )
     def get(self, request: Request) -> Response:
         paginator = StandardPagination()
-        page = paginator.paginate_queryset(
-            services.inbox(request.user, _app(request)), request, view=self
+        app = _app(request)
+        page = paginator.paginate_queryset(services.inbox(request.user, app), request, view=self)
+        response = paginator.get_paginated_response(
+            InboxNotificationSerializer(page, many=True).data
         )
-        return paginator.get_paginated_response(InboxNotificationSerializer(page, many=True).data)
+        response.data["unread_count"] = services.unread_count(request.user, app)
+        return response
+
+
+class InboxUnreadCountView(APIView):
+    @extend_schema(
+        operation_id="me_notifications_unread_count",
+        tags=TAGS,
+        summary="Unread inbox count (badge)",
+        description=(
+            "Unread inbox entries for the app the token was issued to (api-requests #45). The "
+            "same number comes with every page of `GET /me/notifications/` (`unread_count`) "
+            "and with `notification.new` on the app sockets."
+        ),
+        responses=app_responses(
+            {
+                200: ok_response(UnreadCountSerializer, "The count.", ("Badge", ex.UNREAD)),
+                401: UNAUTHORIZED,
+            }
+        ),
+    )
+    def get(self, request: Request) -> Response:
+        return Response({"unread": services.unread_count(request.user, _app(request))})
 
 
 class InboxReadView(APIView):
