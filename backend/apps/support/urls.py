@@ -14,4 +14,9 @@ urlpatterns = [
         views.TicketMessageCreateView.as_view(),
         name="support-ticket-messages",
     ),
+    path(
+        "support/tickets/<int:id>/attachments/",
+        views.TicketAttachmentCreateView.as_view(),
+        name="support-ticket-attachments",
+    ),
 ]

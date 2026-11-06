@@ -1,24 +1,37 @@
 """OpenAPI examples for the support endpoints (the apps build their fakes from these)."""
 
-_ORDER = {"order_id": 1002, "order_number": "JV-261104-001002"}
+_ORDER = {
+    "order_id": 1002,
+    "order_number": "JV-261104-001002",
+    "task_id": None,
+    "payout_id": None,
+}
 
 _FIRST = {
     "id": 31,
     "body": "The oil bottle cap was broken when it arrived.",
     "from_support": False,
     "created_at": "2026-11-04T05:10:00Z",
+    "attachments": [],
 }
 _SUPPORT = {
     "id": 32,
     "body": "Sorry about that! We have started a refund for the bottle.",
     "from_support": True,
     "created_at": "2026-11-04T05:25:00Z",
+    "attachments": [],
+}
+ATTACHMENT = {
+    "key": "9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19",
+    "url": "https://storage.example.com/private/support/12/9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19.webp"
+    "?X-Amz-Expires=600&X-Amz-Signature=abc123",
 }
 _REPLY = {
     "id": 33,
-    "body": "Thank you, I can see the refund now.",
+    "body": "Here is a photo of the bottle.",
     "from_support": False,
     "created_at": "2026-11-04T06:02:00Z",
+    "attachments": [ATTACHMENT],
 }
 
 
@@ -61,6 +74,8 @@ TICKETS_PAGE = {
             "status": "RESOLVED",
             "order_id": None,
             "order_number": None,
+            "task_id": None,
+            "payout_id": None,
             "last_message": "Your phone number is updated. Anything else we can help with?",
             "created_at": "2026-11-01T09:00:00Z",
             "updated_at": "2026-11-01T10:30:00Z",
@@ -79,3 +94,35 @@ CREATE_WITHOUT_ORDER = {
     "message": "How do I change the phone number on my account?",
 }
 REPLY = {"message": "Thank you, I can see the refund now."}
+REPLY_WITH_PHOTO = {
+    "message": "Here is a photo of the bottle.",
+    "attachment_keys": ["9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19"],
+}
+RIDER_TICKET = {
+    "id": 14,
+    "number": "TK-000014",
+    "category": "TASK",
+    "status": "OPEN",
+    "order_id": None,
+    "order_number": "JV-261104-001010",
+    "task_id": 310,
+    "payout_id": None,
+    "last_message": "The customer's gate was locked and nobody answered.",
+    "created_at": "2026-11-04T08:00:00Z",
+    "updated_at": "2026-11-04T08:00:00Z",
+    "can_reply": True,
+    "messages": [
+        {
+            "id": 40,
+            "body": "The customer's gate was locked and nobody answered.",
+            "from_support": False,
+            "created_at": "2026-11-04T08:00:00Z",
+            "attachments": [],
+        }
+    ],
+}
+CREATE_RIDER_TASK = {
+    "category": "TASK",
+    "message": "The customer's gate was locked and nobody answered.",
+    "task_id": 310,
+}

@@ -1,10 +1,21 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.support.choices import TicketCategory, TicketStatus
 from apps.support.services import (
     CUSTOMER_MESSAGE_MAX_LENGTH,
     CUSTOMER_MESSAGE_MIN_LENGTH,
+    MAX_ATTACHMENTS_PER_MESSAGE,
+    attachment_body,
 )
+
+
+class TicketAttachmentSerializer(serializers.Serializer):
+    """An attached photo (Phase 7). `url` is signed and short-lived (about 10 minutes):
+    re-fetch the ticket for a fresh one; never cache it."""
+
+    key = serializers.CharField()
+    url = serializers.URLField()
 
 
 class TicketSummarySerializer(serializers.Serializer):
@@ -18,7 +29,15 @@ class TicketSummarySerializer(serializers.Serializer):
         help_text="The customer can reply unless CLOSED; a reply to RESOLVED reopens it (OPEN).",
     )
     order_id = serializers.IntegerField(allow_null=True)
-    order_number = serializers.CharField(allow_null=True, source="order.order_number")
+    order_number = serializers.SerializerMethodField(
+        help_text="The order's number; for a rider ticket about a task, that task's order."
+    )
+    task_id = serializers.IntegerField(
+        allow_null=True, help_text="Rider tickets: the task it is about (Phase 7)."
+    )
+    payout_id = serializers.IntegerField(
+        allow_null=True, help_text="Rider tickets: the payout it is about (Phase 7)."
+    )
     last_message = serializers.CharField(
         allow_null=True,
         source="last_message_preview",
@@ -30,6 +49,13 @@ class TicketSummarySerializer(serializers.Serializer):
         help_text="Last message or status change; the list is sorted by it, newest first.",
     )
 
+    def get_order_number(self, ticket) -> str | None:
+        if ticket.order_id:
+            return ticket.order.order_number
+        if ticket.task_id:
+            return ticket.task.order.order_number
+        return None
+
 
 class TicketMessageSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -38,6 +64,13 @@ class TicketMessageSerializer(serializers.Serializer):
         source="is_staff", help_text="Sent by Jivo support, not the customer."
     )
     created_at = serializers.DateTimeField()
+    attachments = serializers.SerializerMethodField(
+        help_text="Photos attached to this message (Phase 7); [] when none."
+    )
+
+    @extend_schema_field(TicketAttachmentSerializer(many=True))
+    def get_attachments(self, message) -> list[dict]:
+        return [attachment_body(item) for item in message.attachment_files.all()]
 
 
 class TicketSerializer(TicketSummarySerializer):
@@ -72,7 +105,10 @@ def _message_field(min_length: int) -> serializers.CharField:
 class TicketCreateSerializer(serializers.Serializer):
     category = serializers.ChoiceField(
         choices=TicketCategory.choices,
-        help_text="MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY need `order_id`.",
+        help_text=(
+            "MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY need `order_id`. TASK, "
+            "PAYOUT and CASH are for the rider app only (a rider session)."
+        ),
     )
     message = _message_field(CUSTOMER_MESSAGE_MIN_LENGTH)
     order_id = serializers.IntegerField(
@@ -81,7 +117,35 @@ class TicketCreateSerializer(serializers.Serializer):
         min_value=1,
         help_text="One of the caller's orders (another user's order is refused as not found).",
     )
+    task_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=1,
+        help_text="Rider app: a task the caller was assigned (else 400 not found).",
+    )
+    payout_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=1,
+        help_text="Rider app: one of the caller's payouts (else 400 not found).",
+    )
 
 
 class TicketReplySerializer(serializers.Serializer):
     message = _message_field(1)
+    attachment_keys = serializers.ListField(
+        child=serializers.CharField(max_length=32),
+        required=False,
+        max_length=MAX_ATTACHMENTS_PER_MESSAGE,
+        help_text=(
+            f"Optional, at most {MAX_ATTACHMENTS_PER_MESSAGE}: keys returned by "
+            "`POST /support/tickets/{id}/attachments/` for this ticket by the caller in the last "
+            "hour, not yet used by another message (Phase 7)."
+        ),
+    )
+
+
+class TicketAttachmentUploadSerializer(serializers.Serializer):
+    file = serializers.ImageField(
+        help_text="JPEG, PNG or WebP, at most 5 MB. Stored re-encoded, without EXIF data."
+    )

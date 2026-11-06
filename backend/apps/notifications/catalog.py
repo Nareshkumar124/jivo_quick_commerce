@@ -88,7 +88,7 @@ SPECS: dict[str, EventSpec] = {
             "order.delivered",
             "Delivered",
             "Order {{order_number}} has been delivered. How was it? Rate your order.",
-            link="jivo://orders/{{order_id}}/detail",
+            link="jivo://orders/{{order_id}}/rate",  # P7: opens the rating screen
         ),
         EventSpec(
             "order.cancelled",
@@ -136,7 +136,7 @@ SPECS: dict[str, EventSpec] = {
             "Order assigned to you",
             "Order {{order_number}} has been assigned to you. Pick it up at {{store_name}}.",
             app=AppName.RIDER,
-            link="",
+            link="jivo://rider/task",
             data_type="task.updated",
         ),
         EventSpec(
@@ -144,7 +144,7 @@ SPECS: dict[str, EventSpec] = {
             "Order ready for pickup",
             "Order {{order_number}} is packed and ready at {{store_name}}.",
             app=AppName.RIDER,
-            link="",
+            link="jivo://rider/task",
             data_type="task.updated",
         ),
         EventSpec(
@@ -153,7 +153,7 @@ SPECS: dict[str, EventSpec] = {
             "Collect ₹{{cod_amount_due}} for order {{order_number}} "
             "(was ₹{{cod_amount_previous}}).",
             app=AppName.RIDER,
-            link="",
+            link="jivo://rider/task",
             data_type="task.updated",
         ),
         EventSpec(
@@ -169,11 +169,31 @@ SPECS: dict[str, EventSpec] = {
             "Return the order to the store",
             "Take order {{order_number}} back to {{store_name}}.",
             app=AppName.RIDER,
-            link="",
+            link="jivo://rider/task",
             data_type="task.updated",
         ),
     ]
 }
+
+
+# Phase 7 support replies (apps.support.notifications sends them; the text never quotes the reply).
+SPECS["support.ticket_replied"] = EventSpec(
+    "support.ticket_replied",
+    "Support replied",
+    "We have replied to your ticket {{ticket_number}}. Tap to read it.",
+    category=NotificationCategory.SUPPORT,
+    link="jivo://support/tickets/{{ticket_id}}",
+    data_type="ticket",
+)
+SPECS["support.ticket_replied_rider"] = EventSpec(
+    "support.ticket_replied_rider",
+    "Support replied",
+    "We have replied to your ticket {{ticket_number}}.",
+    app=AppName.RIDER,
+    category=NotificationCategory.SUPPORT,
+    link="jivo://rider/help/tickets/{{ticket_id}}",
+    data_type="ticket",
+)
 
 
 def get_spec(event: str) -> EventSpec | None:

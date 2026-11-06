@@ -156,9 +156,9 @@ def _texts(spec: EventSpec, context: Mapping[str, Any]) -> dict[str, str]:
 
 FCM_KEYS = {
     # api-requests #30: {type: order|product|collection|category, order_id | slug}
-    AppName.CUSTOMER: ("order_id", "slug"),
+    AppName.CUSTOMER: ("order_id", "slug", "ticket_id"),  # ticket_id: P7 support replies
     # api-requests #41: {type: offer.new|offer.withdrawn|task.updated, offer_id?, task_id?}
-    AppName.RIDER: ("offer_id", "task_id"),
+    AppName.RIDER: ("offer_id", "task_id", "ticket_id"),  # ticket_id: P7 support replies
 }
 
 

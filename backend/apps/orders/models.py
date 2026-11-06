@@ -25,6 +25,7 @@ from apps.orders.choices import (
     OrderStatus,
     PaymentMethod,
     PaymentStatus,
+    RatingTarget,
 )
 
 MONEY = {"max_digits": 12, "decimal_places": 2}
@@ -338,3 +339,48 @@ class InvoiceSequence(models.Model):
 
     def __str__(self) -> str:
         return f"{self.store_id} {self.financial_year}: {self.last_number}"
+
+
+class Rating(TimeStampedModel):
+    """A customer's rating of a delivered order (07 §2.6, 06 §2.6 `POST /orders/{id}/rating/`,
+    Phase 7): one ORDER row and, when the rider was rated, one RIDER row. Written once (not
+    editable); only through `apps.orders.ratings.rate_order`. `comment` is personal data: never
+    logged or audited."""
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="ratings")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="ratings"
+    )
+    target = models.CharField(max_length=5, choices=RatingTarget.choices)
+    rider = models.ForeignKey(
+        "delivery.Rider",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ratings",
+        help_text="The rider who delivered the order (RIDER ratings only).",
+    )
+    stars = models.PositiveSmallIntegerField()
+    tags = models.JSONField(default=list, blank=True)
+    comment = models.TextField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["order", "target"], name="rating_unique_order_target"),
+            models.CheckConstraint(
+                condition=Q(stars__gte=1) & Q(stars__lte=5), name="rating_stars_1_to_5"
+            ),
+            models.CheckConstraint(
+                condition=Q(target=RatingTarget.ORDER, rider__isnull=True)
+                | Q(target=RatingTarget.RIDER, rider__isnull=False),
+                name="rating_rider_iff_rider_target",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["rider", "-created_at"], name="rating_rider_created"),
+            models.Index(fields=["target", "stars", "-created_at"], name="rating_target_stars"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.target} rating {self.stars} for order {self.order_id}"

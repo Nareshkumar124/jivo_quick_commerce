@@ -170,7 +170,8 @@ class PageView(APIView):
         tags=["cms"],
         summary="Static page (About, Terms, Privacy, Refund policy)",
         description=(
-            "Public. Slugs the apps use: `about`, `terms`, `privacy`, `refund-policy`. The HTML "
+            "Public. Slugs the apps use: `about`, `terms`, `privacy`, `refund-policy` and, in the "
+            "rider app, `rider-agreement` and `rider-location-disclosure`. The HTML "
             "is sanitised server-side to a small allow-list (see `html`). An unknown or "
             "unpublished slug is 404 `NOT_FOUND`: fall back to the policy URL from "
             "`GET /config/app/`. Cached for up to 5 minutes."

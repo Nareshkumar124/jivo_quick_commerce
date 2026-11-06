@@ -42,3 +42,35 @@ def seed_tickets(stdout, options) -> None:
         body="You can log in with the new number and we will move your orders. Anything else?",
     )
     stdout.write(f"  demo ticket {ticket.number}")
+
+
+CANNED_REPLIES = (
+    (
+        "Refund started",
+        "PAYMENT_REFUND",
+        "We have started the refund for order {{order_number}}. It reaches your original "
+        "payment method in 5-7 working days.",
+    ),
+    (
+        "Sorry about damaged items",
+        "DAMAGED_ITEMS",
+        "Sorry that items in order {{order_number}} arrived damaged. Could you share a photo? "
+        "We will refund or replace them.",
+    ),
+    (
+        "Anything else?",
+        "",
+        "Is there anything else we can help you with on ticket {{ticket_number}}?",
+    ),
+)
+
+
+def seed_canned_replies(stdout, options) -> None:
+    """Phase 7: a few canned replies for the support console (idempotent by title)."""
+    from apps.support.models import CannedReply
+
+    for order, (title, category, body) in enumerate(CANNED_REPLIES):
+        CannedReply.objects.get_or_create(
+            title=title, defaults={"category": category, "body": body, "sort_order": order}
+        )
+    stdout.write(f"  canned replies: {CannedReply.objects.count()}")

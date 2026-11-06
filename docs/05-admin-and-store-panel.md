@@ -116,11 +116,15 @@ Import/export (P2 R3): CSV and Excel (`.xlsx`) only (`apps.core.export_formats`)
 
 Phase 7 permissions (T-711, ⚠ PM default): `support.handle_ticket` plus view on tickets and messages for Super Admin, Ops and Support (the "Support tickets" row). The admin calls `apps.support.services` (`staff_reply`, `change_status`, `assign`, `set_priority`), which re-check the permission; support is not store scoped. FAQs belong to the Support module, so Support also adds/changes/deletes FAQs; CMS pages stay Super Admin only.
 
+Phase 7 permissions (backend P7, ⚠ PM default): `reports.view_reports` for Ops, Store Manager (own stores) and Finance; `reports.view_catalog_reports` for Ops, Store Manager, Catalog Manager and Finance; `reports.view_finance_reports` (GST, rider earnings and payouts) for Finance only (the "Payouts" row); Super Admin has all. `orders.view_rating` (Ratings module) for Ops, Support and Store Manager (own stores).
+
 Phase 1 implementation: the seven roles are Django Groups (`Super Admin`, `Ops / Dispatch`, `Store Manager`, `Store Staff`, `Catalog Manager`, `Support`, `Finance`), synced idempotently after every `migrate` (`apps.accounts.roles.sync_roles`). Each phase adds the permissions for its models. Store scoping (`StaffStoreAccess`) arrives in Phase 2 with stores. In Phase 1, Super Admin manages staff users, roles and app config; Ops and Support can view customers and block/unblock them (Customers admin, a proxy model so they cannot edit staff accounts).
 
 ## 4. Reports [P7]
 
 All reports filter by date range and store, and export to CSV/Excel.
+
+**Built in P7 (backend, `apps.reports`):** reports `sales_summary`, `orders`, `cancellations`, `refunds`, `cod_reconciliation` (`reports.view_reports`), `product_sales`, `inventory_stock`, `inventory_movements` (`reports.view_catalog_reports`), `gst_invoices`, `gst_hsn_summary`, `rider_earnings`, `payouts` (`reports.view_finance_reports`). Services: `available_reports(user)`, `run_report(user, key, *, start, end, store_id, limit)`, `report_csv(...)` (≤ `REPORT_SYNC_MAX_ROWS`), `request_export(...)` → Celery CSV in the private bucket, `user_exports`, `export_download_url`. Rows are scoped with `stores_for`. Definitions (⚠ PM default): an order counts on the IST day of `placed_at`; GMV = `grand_total` of counted orders not CANCELLED; AOV = GMV / those orders; net revenue = GMV − refunded − tips; product sales use DELIVERED orders by `delivered_at`; GST follows the invoice maths per invoice, HSN/SAC and rate. Not built yet: Order SLA percentiles, Payments success rates, Rider performance, Coupons, Customers cohort. Dashboard (§1.1): `apps.reports.dashboard.kpis / charts / alerts` (`reports.view_reports`, store-scoped).
 
 | Report | Contents |
 |--------|----------|
