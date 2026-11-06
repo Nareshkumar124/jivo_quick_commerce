@@ -2060,4 +2060,186 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taskChipAvoidCalling => 'Avoid calling';
+
+  @override
+  String get helpTitle => 'Help and support';
+
+  @override
+  String get helpProfileSubtitle => 'FAQs, tickets and legal pages';
+
+  @override
+  String get helpRaiseTicket => 'Raise a ticket';
+
+  @override
+  String get helpFaqTitle => 'Questions riders ask';
+
+  @override
+  String get helpFaqEmpty =>
+      'No questions here yet. Raise a ticket and our team will help.';
+
+  @override
+  String get legalTitle => 'Legal';
+
+  @override
+  String get legalRiderAgreement => 'Rider agreement';
+
+  @override
+  String get legalPrivacy => 'Privacy policy';
+
+  @override
+  String get legalLocationDisclosure => 'How we use your location';
+
+  @override
+  String get legalEmpty => 'This page is empty.';
+
+  @override
+  String get legalNotPublished => 'This page is not available yet.';
+
+  @override
+  String get legalOpenInBrowser => 'Open in browser';
+
+  @override
+  String legalUpdatedOn(String date) {
+    return 'Updated $date';
+  }
+
+  @override
+  String get ticketsTitle => 'My tickets';
+
+  @override
+  String get ticketsEmpty => 'You have not raised any tickets.';
+
+  @override
+  String get newTicketTitle => 'Raise a ticket';
+
+  @override
+  String get newTicketTopic => 'What do you need help with?';
+
+  @override
+  String get ticketTopicTask => 'An order';
+
+  @override
+  String get ticketTopicPayout => 'A payout';
+
+  @override
+  String get ticketTopicCash => 'Cash deposit';
+
+  @override
+  String get ticketTopicAccount => 'My account';
+
+  @override
+  String get ticketTopicApp => 'App problem';
+
+  @override
+  String get ticketTopicOther => 'Something else';
+
+  @override
+  String get ticketReferenceOrder => 'Order number';
+
+  @override
+  String get ticketReferencePayout => 'Payout dates or reference';
+
+  @override
+  String get ticketReferenceOptional => 'Optional';
+
+  @override
+  String get ticketDescribe => 'Tell us what happened';
+
+  @override
+  String ticketTooShort(int count) {
+    return 'Write at least $count characters.';
+  }
+
+  @override
+  String get ticketTooLong => 'This is too long. Shorten it a little.';
+
+  @override
+  String get ticketSend => 'Send';
+
+  @override
+  String ticketSent(String number) {
+    return 'Ticket $number sent. We will reply here.';
+  }
+
+  @override
+  String ticketUpdated(String when) {
+    return 'Last update $when';
+  }
+
+  @override
+  String get ticketStatusOpen => 'Open';
+
+  @override
+  String get ticketStatusInProgress => 'In progress';
+
+  @override
+  String get ticketStatusResolved => 'Resolved';
+
+  @override
+  String get ticketStatusClosed => 'Closed';
+
+  @override
+  String get ticketReplyHint => 'Write a reply';
+
+  @override
+  String get ticketClosedNote =>
+      'This ticket is closed. Raise a new ticket if you still need help.';
+
+  @override
+  String get ticketFromYou => 'You';
+
+  @override
+  String get ticketFromSupport => 'Jivo support';
+
+  @override
+  String get historyGetHelp => 'Get help with this order';
+
+  @override
+  String get ratingTitle => 'My rating';
+
+  @override
+  String get ratingUnavailable =>
+      'Your rating details are not available yet. Your average shows on your profile.';
+
+  @override
+  String get ratingNoneYet =>
+      'No ratings yet. Customers can rate you after each delivery.';
+
+  @override
+  String ratingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'From $count ratings',
+      one: 'From 1 rating',
+      zero: 'No ratings yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String ratingStars(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count stars',
+      one: '1 star',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get ratingTagOnTime => 'On time';
+
+  @override
+  String get ratingTagPolite => 'Polite';
+
+  @override
+  String get ratingTagLate => 'Late';
+
+  @override
+  String get ratingTagRude => 'Rude';
+
+  @override
+  String get ratingTagOther => 'Other';
 }

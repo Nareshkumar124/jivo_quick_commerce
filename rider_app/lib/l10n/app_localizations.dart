@@ -3505,6 +3505,312 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Avoid calling'**
   String get taskChipAvoidCalling;
+
+  /// No description provided for @helpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help and support'**
+  String get helpTitle;
+
+  /// No description provided for @helpProfileSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FAQs, tickets and legal pages'**
+  String get helpProfileSubtitle;
+
+  /// No description provided for @helpRaiseTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise a ticket'**
+  String get helpRaiseTicket;
+
+  /// No description provided for @helpFaqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions riders ask'**
+  String get helpFaqTitle;
+
+  /// No description provided for @helpFaqEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No questions here yet. Raise a ticket and our team will help.'**
+  String get helpFaqEmpty;
+
+  /// No description provided for @legalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal'**
+  String get legalTitle;
+
+  /// No description provided for @legalRiderAgreement.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider agreement'**
+  String get legalRiderAgreement;
+
+  /// No description provided for @legalPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get legalPrivacy;
+
+  /// No description provided for @legalLocationDisclosure.
+  ///
+  /// In en, this message translates to:
+  /// **'How we use your location'**
+  String get legalLocationDisclosure;
+
+  /// No description provided for @legalEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This page is empty.'**
+  String get legalEmpty;
+
+  /// No description provided for @legalNotPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'This page is not available yet.'**
+  String get legalNotPublished;
+
+  /// No description provided for @legalOpenInBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get legalOpenInBrowser;
+
+  /// No description provided for @legalUpdatedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {date}'**
+  String legalUpdatedOn(String date);
+
+  /// No description provided for @ticketsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My tickets'**
+  String get ticketsTitle;
+
+  /// No description provided for @ticketsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not raised any tickets.'**
+  String get ticketsEmpty;
+
+  /// No description provided for @newTicketTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise a ticket'**
+  String get newTicketTitle;
+
+  /// No description provided for @newTicketTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'What do you need help with?'**
+  String get newTicketTopic;
+
+  /// No description provided for @ticketTopicTask.
+  ///
+  /// In en, this message translates to:
+  /// **'An order'**
+  String get ticketTopicTask;
+
+  /// No description provided for @ticketTopicPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'A payout'**
+  String get ticketTopicPayout;
+
+  /// No description provided for @ticketTopicCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash deposit'**
+  String get ticketTopicCash;
+
+  /// No description provided for @ticketTopicAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'My account'**
+  String get ticketTopicAccount;
+
+  /// No description provided for @ticketTopicApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App problem'**
+  String get ticketTopicApp;
+
+  /// No description provided for @ticketTopicOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get ticketTopicOther;
+
+  /// No description provided for @ticketReferenceOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Order number'**
+  String get ticketReferenceOrder;
+
+  /// No description provided for @ticketReferencePayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout dates or reference'**
+  String get ticketReferencePayout;
+
+  /// No description provided for @ticketReferenceOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get ticketReferenceOptional;
+
+  /// No description provided for @ticketDescribe.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us what happened'**
+  String get ticketDescribe;
+
+  /// No description provided for @ticketTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Write at least {count} characters.'**
+  String ticketTooShort(int count);
+
+  /// No description provided for @ticketTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'This is too long. Shorten it a little.'**
+  String get ticketTooLong;
+
+  /// No description provided for @ticketSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get ticketSend;
+
+  /// No description provided for @ticketSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket {number} sent. We will reply here.'**
+  String ticketSent(String number);
+
+  /// No description provided for @ticketUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last update {when}'**
+  String ticketUpdated(String when);
+
+  /// No description provided for @ticketStatusOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get ticketStatusOpen;
+
+  /// No description provided for @ticketStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get ticketStatusInProgress;
+
+  /// No description provided for @ticketStatusResolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get ticketStatusResolved;
+
+  /// No description provided for @ticketStatusClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get ticketStatusClosed;
+
+  /// No description provided for @ticketReplyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a reply'**
+  String get ticketReplyHint;
+
+  /// No description provided for @ticketClosedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This ticket is closed. Raise a new ticket if you still need help.'**
+  String get ticketClosedNote;
+
+  /// No description provided for @ticketFromYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get ticketFromYou;
+
+  /// No description provided for @ticketFromSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo support'**
+  String get ticketFromSupport;
+
+  /// No description provided for @historyGetHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Get help with this order'**
+  String get historyGetHelp;
+
+  /// No description provided for @ratingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My rating'**
+  String get ratingTitle;
+
+  /// No description provided for @ratingUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rating details are not available yet. Your average shows on your profile.'**
+  String get ratingUnavailable;
+
+  /// No description provided for @ratingNoneYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No ratings yet. Customers can rate you after each delivery.'**
+  String get ratingNoneYet;
+
+  /// No description provided for @ratingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No ratings yet} =1{From 1 rating} other{From {count} ratings}}'**
+  String ratingCount(int count);
+
+  /// No description provided for @ratingStars.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 star} other{{count} stars}}'**
+  String ratingStars(int count);
+
+  /// No description provided for @ratingTagOnTime.
+  ///
+  /// In en, this message translates to:
+  /// **'On time'**
+  String get ratingTagOnTime;
+
+  /// No description provided for @ratingTagPolite.
+  ///
+  /// In en, this message translates to:
+  /// **'Polite'**
+  String get ratingTagPolite;
+
+  /// No description provided for @ratingTagLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late'**
+  String get ratingTagLate;
+
+  /// No description provided for @ratingTagRude.
+  ///
+  /// In en, this message translates to:
+  /// **'Rude'**
+  String get ratingTagRude;
+
+  /// No description provided for @ratingTagOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get ratingTagOther;
 }
 
 class _AppLocalizationsDelegate

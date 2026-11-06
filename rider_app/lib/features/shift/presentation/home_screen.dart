@@ -231,6 +231,7 @@ class _RecordsMenu extends ConsumerWidget {
           Routes.payouts,
         ),
         item('home-profile', Icons.person, l10n.profileTitle, Routes.profile),
+        item('home-help', Icons.support_agent, l10n.helpTitle, Routes.help),
         const SizedBox(height: 8),
       ],
     );

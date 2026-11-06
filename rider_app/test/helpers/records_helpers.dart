@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'onboarding_fixtures.dart';
 import 'rider_app_harness.dart';
@@ -29,5 +32,17 @@ Future<void> openFromHome(
   await pumpActiveHome(tester, h);
   await scrollTo(tester, byKey(menuKey), listKey: const Key('home-list'));
   await tester.tap(byKey(menuKey));
+  await tester.pumpAndSettle();
+}
+
+/// Starts on home as an ACTIVE rider, then pushes [location] (a launch
+/// always passes the splash, so an initial location is not kept).
+Future<void> pushFromHome(
+  WidgetTester tester,
+  RiderTestHarness h,
+  String location,
+) async {
+  await pumpActiveHome(tester, h);
+  unawaited(GoRouter.of(tester.element(byKey('home-flavor'))).push(location));
   await tester.pumpAndSettle();
 }
