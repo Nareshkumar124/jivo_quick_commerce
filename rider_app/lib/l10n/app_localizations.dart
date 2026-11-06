@@ -3295,6 +3295,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Jivo operations set you offline. Go online again when you are ready, or call support.'**
   String get shiftEndedByOpsBody;
+
+  /// No description provided for @pickupCodeWrongLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'That code doesn\'t match this order. {count, plural, =1{1 try left.} other{{count} tries left.}}'**
+  String pickupCodeWrongLeft(int count);
+
+  /// No description provided for @pickupCodeLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong codes. Ask the store staff or call support to hand over this order.'**
+  String get pickupCodeLocked;
+
+  /// No description provided for @pickupLockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Code entry locked'**
+  String get pickupLockedTitle;
+
+  /// No description provided for @pickupCallStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Call store'**
+  String get pickupCallStore;
+
+  /// No description provided for @riderOfflineError.
+  ///
+  /// In en, this message translates to:
+  /// **'You are offline. Go online again to continue.'**
+  String get riderOfflineError;
+
+  /// No description provided for @failWaitNotElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait 10 minutes at the drop location before choosing this.'**
+  String get failWaitNotElapsed;
+
+  /// No description provided for @failNeedsCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Call the customer at least 2 times first.'**
+  String get failNeedsCalls;
+
+  /// No description provided for @codAmountChangedCollect.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount changed. Collect exactly {amount}.'**
+  String codAmountChangedCollect(String amount);
+
+  /// No description provided for @codUpiNotConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'The UPI payment isn\'t confirmed yet. Wait for it, or collect cash.'**
+  String get codUpiNotConfirmed;
+
+  /// No description provided for @scanOtherOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'This bag is for order {orderNumber}, not this one.'**
+  String scanOtherOrder(String orderNumber);
+
+  /// No description provided for @taskReturnWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking with the store every few seconds…'**
+  String get taskReturnWaiting;
+
+  /// No description provided for @offerItemCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String offerItemCount(int count);
+
+  /// No description provided for @cashDepositSkippedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A cash order was not sent to you because it would take your cash over the limit of {limit}. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.'**
+  String cashDepositSkippedBody(String limit);
+
+  /// No description provided for @cashDepositWhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit cash with the store manager at {store}. It shows here once they record it.'**
+  String cashDepositWhere(String store);
+
+  /// No description provided for @earningsOrdersTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the latest 200 orders. The totals above include all orders in these dates.'**
+  String get earningsOrdersTruncated;
+
+  /// No description provided for @historyDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order details'**
+  String get historyDetailTitle;
+
+  /// No description provided for @historyAssignedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted'**
+  String get historyAssignedAt;
+
+  /// No description provided for @historyPickedUpAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Picked up'**
+  String get historyPickedUpAt;
+
+  /// No description provided for @historyDeliveredAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get historyDeliveredAt;
+
+  /// No description provided for @historyFailedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery failed'**
+  String get historyFailedAt;
+
+  /// No description provided for @historyReturnedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned to store'**
+  String get historyReturnedAt;
+
+  /// No description provided for @historyCancelledAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get historyCancelledAt;
+
+  /// No description provided for @historyItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String historyItems(int count);
+
+  /// No description provided for @historyPaymentCod.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery'**
+  String get historyPaymentCod;
+
+  /// No description provided for @historyPaymentPrepaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepaid'**
+  String get historyPaymentPrepaid;
+
+  /// No description provided for @historyCodCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected {amount}'**
+  String historyCodCollected(String amount);
+
+  /// No description provided for @historyEarned.
+  ///
+  /// In en, this message translates to:
+  /// **'You earned'**
+  String get historyEarned;
+
+  /// No description provided for @taskChipDontRingBell.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t ring the bell'**
+  String get taskChipDontRingBell;
+
+  /// No description provided for @taskChipLeaveAtDoor.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave at the door'**
+  String get taskChipLeaveAtDoor;
+
+  /// No description provided for @taskChipAvoidCalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Avoid calling'**
+  String get taskChipAvoidCalling;
 }
 
 class _AppLocalizationsDelegate

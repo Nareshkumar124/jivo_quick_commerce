@@ -1132,5 +1132,67 @@
   },
   "taskReturnNoCash": "Don't collect any cash. Nothing is due for this order.",
   "riderTooManyTries": "Too many tries. Wait a moment, then try again.",
-  "shiftEndedByOpsBody": "Jivo operations set you offline. Go online again when you are ready, or call support."
+  "shiftEndedByOpsBody": "Jivo operations set you offline. Go online again when you are ready, or call support.",
+  "pickupCodeWrongLeft": "That code doesn't match this order. {count, plural, =1{1 try left.} other{{count} tries left.}}",
+  "@pickupCodeWrongLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pickupCodeLocked": "Too many wrong codes. Ask the store staff or call support to hand over this order.",
+  "pickupLockedTitle": "Code entry locked",
+  "pickupCallStore": "Call store",
+  "riderOfflineError": "You are offline. Go online again to continue.",
+  "failWaitNotElapsed": "Wait 10 minutes at the drop location before choosing this.",
+  "failNeedsCalls": "Call the customer at least 2 times first.",
+  "codAmountChangedCollect": "The amount changed. Collect exactly {amount}.",
+  "@codAmountChangedCollect": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codUpiNotConfirmed": "The UPI payment isn't confirmed yet. Wait for it, or collect cash.",
+  "scanOtherOrder": "This bag is for order {orderNumber}, not this one.",
+  "@scanOtherOrder": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "taskReturnWaiting": "Checking with the store every few seconds…",
+  "offerItemCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "@offerItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cashDepositSkippedBody": "A cash order was not sent to you because it would take your cash over the limit of {limit}. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.",
+  "@cashDepositSkippedBody": {"placeholders": {"limit": {"type": "String"}}},
+  "cashDepositWhere": "Deposit cash with the store manager at {store}. It shows here once they record it.",
+  "@cashDepositWhere": {"placeholders": {"store": {"type": "String"}}},
+  "earningsOrdersTruncated": "Showing the latest 200 orders. The totals above include all orders in these dates.",
+  "historyDetailTitle": "Order details",
+  "historyAssignedAt": "Accepted",
+  "historyPickedUpAt": "Picked up",
+  "historyDeliveredAt": "Delivered",
+  "historyFailedAt": "Delivery failed",
+  "historyReturnedAt": "Returned to store",
+  "historyCancelledAt": "Cancelled",
+  "historyItems": "{count, plural, =1{1 item} other{{count} items}}",
+  "@historyItems": {"placeholders": {"count": {"type": "int"}}},
+  "historyPaymentCod": "Cash on delivery",
+  "historyPaymentPrepaid": "Prepaid",
+  "historyCodCollected": "Collected {amount}",
+  "@historyCodCollected": {"placeholders": {"amount": {"type": "String"}}},
+  "historyEarned": "You earned",
+  "taskChipDontRingBell": "Don't ring the bell",
+  "taskChipLeaveAtDoor": "Leave at the door",
+  "taskChipAvoidCalling": "Avoid calling"
 }

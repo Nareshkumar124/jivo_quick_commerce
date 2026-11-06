@@ -2,8 +2,8 @@ import '../../../shared/fake_api_endpoint.dart';
 import '../../../shared/paging.dart';
 import '../domain/earnings.dart';
 
-/// TODO(api): stands in for `GET /rider/earnings/` and `GET /rider/payouts/`
-/// (06 §3) until the rider contract lands (end of P4).
+/// Stands in for `GET /rider/earnings/` and `GET /rider/payouts/` (06 §3)
+/// in `FAKE_API` builds and tests.
 ///
 /// Every total here is a fixed string, as the server would send it: the app
 /// must display them, never add the lines up.
@@ -87,7 +87,8 @@ class FakeEarningsBackend extends FakeApiEndpoint
   }
 
   @override
-  Future<Page<Payout>> fetchPayouts({int page = 1}) async {
+  Future<Page<Payout>> fetchPayouts({int? cursor}) async {
+    final page = cursor ?? 1;
     await recordCall('fetchPayouts $page');
     final all = [
       Payout(

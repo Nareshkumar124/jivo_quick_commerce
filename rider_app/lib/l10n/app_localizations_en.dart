@@ -1914,4 +1914,133 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get shiftEndedByOpsBody =>
       'Jivo operations set you offline. Go online again when you are ready, or call support.';
+
+  @override
+  String pickupCodeWrongLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tries left.',
+      one: '1 try left.',
+    );
+    return 'That code doesn\'t match this order. $_temp0';
+  }
+
+  @override
+  String get pickupCodeLocked =>
+      'Too many wrong codes. Ask the store staff or call support to hand over this order.';
+
+  @override
+  String get pickupLockedTitle => 'Code entry locked';
+
+  @override
+  String get pickupCallStore => 'Call store';
+
+  @override
+  String get riderOfflineError =>
+      'You are offline. Go online again to continue.';
+
+  @override
+  String get failWaitNotElapsed =>
+      'Wait 10 minutes at the drop location before choosing this.';
+
+  @override
+  String get failNeedsCalls => 'Call the customer at least 2 times first.';
+
+  @override
+  String codAmountChangedCollect(String amount) {
+    return 'The amount changed. Collect exactly $amount.';
+  }
+
+  @override
+  String get codUpiNotConfirmed =>
+      'The UPI payment isn\'t confirmed yet. Wait for it, or collect cash.';
+
+  @override
+  String scanOtherOrder(String orderNumber) {
+    return 'This bag is for order $orderNumber, not this one.';
+  }
+
+  @override
+  String get taskReturnWaiting => 'Checking with the store every few seconds…';
+
+  @override
+  String offerItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String cashDepositSkippedBody(String limit) {
+    return 'A cash order was not sent to you because it would take your cash over the limit of $limit. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.';
+  }
+
+  @override
+  String cashDepositWhere(String store) {
+    return 'Deposit cash with the store manager at $store. It shows here once they record it.';
+  }
+
+  @override
+  String get earningsOrdersTruncated =>
+      'Showing the latest 200 orders. The totals above include all orders in these dates.';
+
+  @override
+  String get historyDetailTitle => 'Order details';
+
+  @override
+  String get historyAssignedAt => 'Accepted';
+
+  @override
+  String get historyPickedUpAt => 'Picked up';
+
+  @override
+  String get historyDeliveredAt => 'Delivered';
+
+  @override
+  String get historyFailedAt => 'Delivery failed';
+
+  @override
+  String get historyReturnedAt => 'Returned to store';
+
+  @override
+  String get historyCancelledAt => 'Cancelled';
+
+  @override
+  String historyItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get historyPaymentCod => 'Cash on delivery';
+
+  @override
+  String get historyPaymentPrepaid => 'Prepaid';
+
+  @override
+  String historyCodCollected(String amount) {
+    return 'Collected $amount';
+  }
+
+  @override
+  String get historyEarned => 'You earned';
+
+  @override
+  String get taskChipDontRingBell => 'Don\'t ring the bell';
+
+  @override
+  String get taskChipLeaveAtDoor => 'Leave at the door';
+
+  @override
+  String get taskChipAvoidCalling => 'Avoid calling';
 }

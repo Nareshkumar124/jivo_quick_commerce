@@ -209,6 +209,12 @@ class _OfferScreenState extends ConsumerState<OfferScreen> {
                   distanceText(l10n, offer.distanceKm),
                 ),
               ),
+              if (offer.itemCount case final count?)
+                _OfferRow(
+                  key: const Key('offer-items'),
+                  icon: Icons.shopping_bag_outlined,
+                  text: l10n.offerItemCount(count),
+                ),
               if (offer.paymentType == PaymentType.cod)
                 Container(
                   key: const Key('offer-payment'),

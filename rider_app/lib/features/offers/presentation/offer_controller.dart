@@ -6,6 +6,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../auth/presentation/rider_account_controller.dart';
+import '../../shift/presentation/shift_controller.dart';
 import '../../task/domain/task_repositories.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
@@ -55,6 +56,13 @@ class OfferState {
       phase == OfferPhase.withdrawn;
 }
 
+/// `GET /rider/offers/current/` every 5 s while online, idle and in the
+/// foreground (the contract's polling fallback for a lost FCM push).
+const kOfferPollInterval = Duration(seconds: 5);
+
+/// Tests that do not exercise the offer poll may turn it off.
+final offerPollingEnabledProvider = Provider<bool>((ref) => true);
+
 final offerControllerProvider = NotifierProvider<OfferController, OfferState>(
   OfferController.new,
 );
@@ -75,16 +83,41 @@ class OfferController extends Notifier<OfferState> {
         .events
         .listen(_onEvent);
     final lifecycle = AppLifecycleListener(
-      onResume: () => unawaited(refresh()),
+      onResume: () {
+        _startPolling();
+        unawaited(refresh());
+      },
+      onHide: _stopPolling,
+      onPause: _stopPolling,
     );
     ref.onDispose(() {
       subscription.cancel();
       lifecycle.dispose();
+      _stopPolling();
     });
+    _startPolling();
     // Polls once when the rider becomes active (app start, including a
     // start from an offer notification).
     Future.microtask(refresh);
     return const OfferState();
+  }
+
+  Timer? _poll;
+
+  void _startPolling() {
+    _poll?.cancel();
+    if (!ref.read(offerPollingEnabledProvider)) return;
+    _poll = Timer.periodic(kOfferPollInterval, (_) {
+      if (!ref.mounted) return;
+      // Online only: an offline rider gets no offers (and is not tracked).
+      if (!ref.read(shiftControllerProvider).isOnline) return;
+      unawaited(refresh());
+    });
+  }
+
+  void _stopPolling() {
+    _poll?.cancel();
+    _poll = null;
   }
 
   void _onEvent(OfferEvent event) {

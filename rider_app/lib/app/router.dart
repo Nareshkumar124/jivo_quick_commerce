@@ -10,6 +10,7 @@ import '../features/auth/presentation/rider_account_controller.dart';
 import '../features/cash/presentation/cash_screen.dart';
 import '../features/earnings/presentation/earnings_screen.dart';
 import '../features/earnings/presentation/payouts_screen.dart';
+import '../features/history/presentation/history_detail_screen.dart';
 import '../features/history/presentation/history_screen.dart';
 import '../features/launch/presentation/launch_controller.dart';
 import '../features/launch/presentation/maintenance_screen.dart';
@@ -193,6 +194,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           path: Routes.history,
           name: 'history',
           builder: (_, _) => const HistoryScreen(),
+          routes: [
+            GoRoute(
+              path: ':taskId',
+              name: 'history-detail',
+              builder: (_, state) => HistoryDetailScreen(
+                taskId: int.tryParse(state.pathParameters['taskId']!) ?? 0,
+              ),
+            ),
+          ],
         ),
         GoRoute(
           path: Routes.profile,

@@ -19,6 +19,7 @@ import '../data/fake_task_backend.dart';
 import '../domain/rider_task.dart';
 import '../domain/task_rules.dart';
 import '../domain/task_status.dart';
+import '../../../shared/errors/rider_error_codes.dart';
 import 'at_customer_step.dart';
 import 'cod_amount_changed_notice.dart';
 import 'task_flow_controller.dart';
@@ -62,9 +63,11 @@ class TaskScreen extends ConsumerWidget {
       TaskStatus.delivered => _EndScreen(
         icon: Icons.check_circle,
         title: l10n.taskDeliveredTitle,
-        body: task.payout == null
-            ? l10n.taskDeliveredBody
-            : l10n.taskDeliveredEarned(formatRupees(task.payout!)),
+        // Earned (`earnings.total`) once DELIVERED; else the estimate.
+        body: switch (task.earningsTotal ?? task.payout) {
+          null => l10n.taskDeliveredBody,
+          final amount => l10n.taskDeliveredEarned(formatRupees(amount)),
+        },
         onDone: controller.finish,
       ),
       TaskStatus.failed || TaskStatus.returning => _ReturnStep(task: task),
@@ -312,7 +315,7 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
     ref.read(taskFlowControllerProvider.notifier).clearError();
     final code = await context.push<String>(Routes.taskScan);
     if (code == null || !mounted) return;
-    setState(() => _code.text = code);
+    setState(() => _code.text = pickupCodeFromPayload(code) ?? '');
     await _confirm(code);
   }
 
@@ -321,7 +324,9 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
     await controller.pickup(code);
     if (!mounted) return;
     final error = ref.read(taskFlowControllerProvider).error;
-    if (error != null && error.code == ApiErrorCode.validationError) {
+    if (error != null &&
+        (error.riderCode == RiderErrorCode.pickupCodeInvalid ||
+            error.code == ApiErrorCode.validationError)) {
       // Wrong code: select it all so typing replaces it (pickup.md §2).
       unawaited(HapticFeedback.mediumImpact());
       _code.selection = TextSelection(
@@ -343,6 +348,8 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
     final busy = state.busy != null;
     final length = _code.text.length;
     final complete = length == kPickupCodeLength;
+
+    if (state.pickupLocked) return _PickupLocked(task: task);
 
     final scanButtonLabel = Text(l10n.pickupScan);
     const scanIcon = Icon(Icons.qr_code_scanner);
@@ -399,6 +406,20 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
         const SizedBox(height: 16),
         Text(l10n.pickupCodeHelp, style: theme.textTheme.bodyLarge),
         const SizedBox(height: 8),
+        if (state.pickupAttemptsRemaining case final left?
+            when left < kMaxPickupAttempts)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              l10n.pickupCodeWrongLeft(left),
+              key: const Key('pickup-attempts-left'),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
         SizedBox(
           height: 64,
           child: TextField(
@@ -476,6 +497,67 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
   }
 }
 
+/// `PICKUP_CODE_LOCKED`: 5 wrong codes. No more tries from the phone; the
+/// store staff or ops hand the order over (the task then moves on by
+/// polling). Call the store, or check again.
+class _PickupLocked extends ConsumerWidget {
+  const _PickupLocked({required this.task});
+
+  final RiderTask task;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final state = ref.watch(taskFlowControllerProvider);
+    final controller = ref.read(taskFlowControllerProvider.notifier);
+    final phone = task.store.phone;
+    return TaskStepScaffold(
+      task: task,
+      title: l10n.pickupLockedTitle,
+      content: [
+        Container(
+          key: const Key('pickup-locked'),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.lock_outline, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  l10n.pickupCodeLocked,
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      actions: PrimaryActionBar(
+        buttonKey: const Key('task-check'),
+        label: l10n.taskCheckStatus,
+        busy: state.refreshing,
+        onPressed: controller.load,
+        secondary: [
+          if (phone != null && phone.trim().isNotEmpty)
+            OutlinedButton.icon(
+              key: const Key('pickup-call-store'),
+              onPressed: () => ref
+                  .read(urlOpenerProvider)
+                  .open(Uri(scheme: 'tel', path: phone)),
+              icon: const Icon(Icons.call),
+              label: Text(l10n.pickupCallStore),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _GoToCustomerStep extends ConsumerWidget {
   const _GoToCustomerStep({required this.task});
 
@@ -529,6 +611,12 @@ class _GoToCustomerStep extends ConsumerWidget {
               customer.address,
               if (customer.landmark != null)
                 l10n.taskLandmark(customer.landmark!),
+              for (final chip in customer.chips)
+                switch (chip) {
+                  DeliveryChip.dontRingBell => l10n.taskChipDontRingBell,
+                  DeliveryChip.leaveAtDoor => l10n.taskChipLeaveAtDoor,
+                  DeliveryChip.avoidCalling => l10n.taskChipAvoidCalling,
+                },
               if (customer.instructions != null)
                 l10n.taskInstructions(customer.instructions!),
             ],
@@ -658,6 +746,12 @@ class _ReturnStep extends ConsumerWidget {
           icon: Icons.store,
           title: task.store.name,
           lines: [task.store.address],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          l10n.taskReturnWaiting,
+          key: const Key('return-waiting'),
+          style: const TextStyle(fontSize: 16),
         ),
       ],
       actions: PrimaryActionBar(

@@ -1,8 +1,6 @@
 import 'task_status.dart';
 
-/// Prepaid or cash on delivery.
-///
-/// TODO(api): wire values assumed (`PREPAID`/`COD`).
+/// Prepaid or cash on delivery (`RiderPaymentTypeEnum`).
 enum PaymentType {
   prepaid('PREPAID'),
   cod('COD');
@@ -59,6 +57,9 @@ class TaskStore {
   final String? phone;
 }
 
+/// The customer's delivery chips (`DeliveryInstructionChipEnum`).
+enum DeliveryChip { dontRingBell, leaveAtDoor, avoidCalling }
+
 /// The drop: revealed after the rider accepts (04 §2.4), hidden again by
 /// the server 1 h after completion (09 §3.2).
 class TaskCustomer {
@@ -69,6 +70,7 @@ class TaskCustomer {
     required this.location,
     this.landmark,
     this.instructions,
+    this.chips = const [],
   });
 
   final String name;
@@ -79,6 +81,9 @@ class TaskCustomer {
   final GeoPoint location;
   final String? landmark;
   final String? instructions;
+
+  /// "Don't ring the bell", "Leave at door", "Avoid calling".
+  final List<DeliveryChip> chips;
 
   @override
   String toString() => 'TaskCustomer';
@@ -94,25 +99,49 @@ class TaskItem {
   final int quantity;
 }
 
-/// Server state of the UPI QR for a COD order (`POST .../cod-qr/`).
-enum UpiQrStatus { pending, paid, expired }
+/// Server state of the UPI QR for a COD order (`CodQrStatusEnum`).
+enum UpiQrStatus {
+  pending('PENDING'),
+  paid('PAID'),
+  expired('EXPIRED'),
+
+  /// Closed because the rider took cash instead.
+  cancelled('CANCELLED');
+
+  const UpiQrStatus(this.wireValue);
+
+  final String wireValue;
+
+  static UpiQrStatus fromWire(String? value) => values.firstWhere(
+    (status) => status.wireValue == value,
+    orElse: () => pending,
+  );
+}
 
 class CodQr {
   const CodQr({
     required this.imageUrl,
     required this.amount,
     required this.status,
+    this.expiresAt,
   });
 
-  /// The QR image (Razorpay QR). Null in the fake.
+  /// The QR image (Razorpay QR, https PNG). Null in the fake.
   final String? imageUrl;
 
   /// The amount the QR collects, exactly as the server sends it.
   final String amount;
   final UpiQrStatus status;
 
-  CodQr withStatus(UpiQrStatus next) =>
-      CodQr(imageUrl: imageUrl, amount: amount, status: next);
+  /// When the QR stops accepting payments (server time).
+  final DateTime? expiresAt;
+
+  CodQr withStatus(UpiQrStatus next) => CodQr(
+    imageUrl: imageUrl,
+    amount: amount,
+    status: next,
+    expiresAt: expiresAt,
+  );
 }
 
 /// The rider's active task, as `GET /rider/tasks/current/` returns it (06 §3
@@ -122,7 +151,8 @@ class CodQr {
 /// step ([status]), the OTP attempts left and lock, the UPI QR state and
 /// [arrivedCustomerAt] (the start of the 10-minute wait).
 ///
-/// TODO(api): hand-written until the rider contract lands (end of P4).
+/// Mirrors the `RiderTask` schema of the slice 5.3 contract; the API
+/// repository maps the generated type onto this (binding step).
 class RiderTask {
   const RiderTask({
     required this.id,
@@ -139,6 +169,9 @@ class RiderTask {
     this.payout,
     this.distanceKm,
     this.arrivedCustomerAt,
+    this.notReachableAfter,
+    this.itemCount,
+    this.earningsTotal,
     this.otpLength = 4,
     this.otpAttemptsRemaining,
     this.otpLocked = false,
@@ -165,8 +198,7 @@ class RiderTask {
   /// changed: collect ₹X (was ₹Y)" (UX audit RD-03). Both values are the
   /// server's; the app only compares the strings for display.
   ///
-  /// TODO(api): the backend is adding the previous amount to the task
-  /// (audit "APIs required" #1; name to confirm).
+  /// Wire name `cod_amount_previous`.
   final String? codAmountChangedFrom;
 
   /// The rider's pay for this order (estimate before delivery, earned after).
@@ -176,6 +208,16 @@ class RiderTask {
   /// Server time the rider arrived at the customer: the 10-minute
   /// "not reachable" wait counts from here.
   final DateTime? arrivedCustomerAt;
+
+  /// `not_reachable_after`: from then on the server accepts
+  /// CUSTOMER_NOT_REACHABLE. Null before arriving (or in an older fake).
+  final DateTime? notReachableAfter;
+
+  /// Units in the bag (`item_count`).
+  final int? itemCount;
+
+  /// `earnings.total`, set once DELIVERED.
+  final String? earningsTotal;
   final int otpLength;
   final int? otpAttemptsRemaining;
 
@@ -189,6 +231,8 @@ class RiderTask {
     TaskStatus? status,
     StoreOrderProgress? storeProgress,
     DateTime? arrivedCustomerAt,
+    DateTime? notReachableAfter,
+    String? earningsTotal,
     int? otpAttemptsRemaining,
     bool? otpLocked,
     CodQr? codQr,
@@ -209,6 +253,9 @@ class RiderTask {
     payout: payout,
     distanceKm: distanceKm,
     arrivedCustomerAt: arrivedCustomerAt ?? this.arrivedCustomerAt,
+    notReachableAfter: notReachableAfter ?? this.notReachableAfter,
+    itemCount: itemCount,
+    earningsTotal: earningsTotal ?? this.earningsTotal,
     otpLength: otpLength,
     otpAttemptsRemaining: otpAttemptsRemaining ?? this.otpAttemptsRemaining,
     otpLocked: otpLocked ?? this.otpLocked,
@@ -217,4 +264,32 @@ class RiderTask {
 
   @override
   String toString() => 'RiderTask($id, ${status.wireValue})';
+}
+
+/// A task that ended in the last 10 minutes (`recent_task`): explains a
+/// lost answer (delivered, returned, cancelled) when `task` is null.
+class RecentTask {
+  const RecentTask({
+    required this.id,
+    required this.orderNumber,
+    required this.status,
+    this.endedAt,
+  });
+
+  final int id;
+  final String orderNumber;
+  final TaskStatus status;
+  final DateTime? endedAt;
+}
+
+/// `GET /rider/tasks/current/`: the active task (also RETURNING, until the
+/// store receives the items) or null, plus the task that just ended.
+class CurrentTask {
+  const CurrentTask({this.task, this.recentTask, this.serverTime});
+
+  static const none = CurrentTask();
+
+  final RiderTask? task;
+  final RecentTask? recentTask;
+  final DateTime? serverTime;
 }

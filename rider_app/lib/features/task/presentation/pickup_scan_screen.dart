@@ -6,6 +6,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/task_rules.dart';
+import 'task_flow_controller.dart';
 
 /// Builds the camera view that reports each scanned QR value. A provider, so
 /// widget tests never start the camera.
@@ -50,8 +51,9 @@ final qrScannerBuilderProvider = Provider<QrScannerBuilder>(
 /// Scan the QR on the packed bag (04 §2.5, `design/screens/rider/pickup.md`
 /// §4): a 240 dp viewfinder, a helper line, a torch toggle that says its
 /// state in words, and "Type the code instead" bottom-most. Returns the
-/// 4-character code to the pickup step, which sends it; the server checks
-/// it.
+/// `order_code` to send (the bag QR payload `JQC1:<order>:<code>` or a bare
+/// code) to the pickup step; the server checks it. A label for another
+/// order is refused here, so a mixed-up bag never uses an attempt.
 class PickupScanScreen extends ConsumerStatefulWidget {
   const PickupScanScreen({super.key});
 
@@ -67,18 +69,24 @@ class _PickupScanScreenState extends ConsumerState<PickupScanScreen> {
 
   void _onScan(String raw) {
     if (_done || !mounted) return;
-    final code = pickupCodeFromQr(raw);
-    if (code == null) {
-      // Each unusable QR is reported once, not on every camera frame.
-      if (_lastRejected == raw) return;
-      _lastRejected = raw;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).scanNotJivoCode)),
-      );
+    final orderNumber =
+        ref.read(taskFlowControllerProvider).task?.orderNumber ?? '';
+    final scanned = parseScannedPickup(raw, orderNumber: orderNumber);
+    if (scanned is ScannedCode) {
+      _done = true;
+      context.pop(scanned.orderCode);
       return;
     }
-    _done = true;
-    context.pop(code);
+    // Each unusable QR is reported once, not on every camera frame.
+    if (_lastRejected == raw) return;
+    _lastRejected = raw;
+    final l10n = AppLocalizations.of(context);
+    final message = switch (scanned) {
+      ScannedOtherOrder(:final orderNumber) => l10n.scanOtherOrder(orderNumber),
+      _ => l10n.scanNotJivoCode,
+    };
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override

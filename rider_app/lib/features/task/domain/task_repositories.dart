@@ -11,19 +11,22 @@ class ReceivedOffer {
   final DateTime? serverNow;
 }
 
-/// Offers (06 §3). Every method throws jivo_core's `ApiError` on failure.
+/// Offers (06 §3; slice 5.3 contract). Every method throws jivo_core's
+/// `ApiError` on failure.
 ///
-/// TODO(api): no rider contract yet; the fake stands in (DL-30 gating).
+/// TODO(api): bind to the generated `RiderApi` once the PM regenerates
+/// `jivo_api` from the slice 5.3 schema; the fake stands in until then.
 abstract interface class OfferRepository {
   /// `GET /rider/offers/current/`: the pending offer, or null (polling
   /// fallback, and the app start from an offer notification).
   Future<ReceivedOffer?> fetchCurrentOffer();
 
-  /// `POST /rider/offers/{id}/accept/`. Fails with `OFFER_EXPIRED` or
-  /// `OFFER_TAKEN`. Assumed to return the assigned task.
+  /// `POST /rider/offers/{id}/accept/` → the ASSIGNED `RiderTask` (safe to
+  /// repeat). 409 `OFFER_EXPIRED` or `OFFER_TAKEN`.
   Future<RiderTask> accept(int offerId);
 
-  /// `POST /rider/offers/{id}/reject/` with an optional reason.
+  /// `POST /rider/offers/{id}/reject/ {reason?}` → 204 (a no-op once the
+  /// offer expired or was withdrawn).
   Future<void> reject(int offerId, {OfferRejectReason? reason});
 }
 
@@ -51,28 +54,42 @@ abstract interface class OfferEventSource {
 
 /// What the rider sends with `fail`.
 class FailReport {
-  const FailReport({required this.reason, this.note = '', this.photo});
+  const FailReport({
+    required this.reason,
+    this.note = '',
+    this.callAttempts = 0,
+    this.photo,
+  });
 
   final FailReason reason;
+
+  /// Required (non-blank) for OTHER; at most 300 characters.
   final String note;
 
-  /// Optional compressed JPEG.
+  /// `call_attempts`: CUSTOMER_NOT_REACHABLE needs at least 2.
+  final int callAttempts;
+
+  /// Optional compressed JPEG, at most 1 MB (multipart `photo`).
   final List<int>? photo;
 }
 
 /// The rider's task (06 §3). Every method throws `ApiError` on failure and
 /// returns the task as the server now has it (the app renders that).
 abstract interface class TaskRepository {
-  /// `GET /rider/tasks/current/`: the active task, or null.
-  Future<RiderTask?> fetchCurrentTask();
+  /// `GET /rider/tasks/current/`: the active task (RETURNING included) or
+  /// none, and the task that ended in the last 10 minutes.
+  Future<CurrentTask> fetchCurrentTask();
 
-  /// `POST .../arrived-store/ {lat, lng}`. `OUTSIDE_GEOFENCE` when too far.
+  /// `POST .../arrived-store/ {lat, lng, accuracy?}`. 422 `OUTSIDE_GEOFENCE`
+  /// with `distance_m` / `radius_m`.
   Future<RiderTask> arrivedAtStore(int taskId, GeoPoint at);
 
-  /// `POST .../pickup/ {order_code}`. Order must be PACKED.
+  /// `POST .../pickup/ {order_code}`: the 4-character code or the whole bag
+  /// QR payload. 400 `PICKUP_CODE_INVALID` (`attempts_remaining`), 423
+  /// `PICKUP_CODE_LOCKED`, 409 when the order is not PACKED.
   Future<RiderTask> pickup(int taskId, String orderCode);
 
-  /// `POST .../arrived-customer/ {lat, lng, override_reason?}`.
+  /// `POST .../arrived-customer/ {lat, lng, accuracy?, override_reason?}`.
   Future<RiderTask> arrivedAtCustomer(
     int taskId,
     GeoPoint at, {
@@ -91,7 +108,9 @@ abstract interface class TaskRepository {
     String? codAmount,
   });
 
-  /// `POST .../fail/ {reason, note, photo?}` → FAILED, then RETURNING.
+  /// `POST .../fail/` (multipart: reason, note, call_attempts, photo?) →
+  /// RETURNING in one call. 409 `INVALID_STATE_TRANSITION` with
+  /// `details.reason` = `WAIT_NOT_ELAPSED` before `not_reachable_after`.
   Future<RiderTask> fail(int taskId, FailReport report);
 }
 

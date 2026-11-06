@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
+import '../../../shared/errors/rider_error_codes.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../../location/domain/tracking_config.dart';
 import '../../location/presentation/location_debug_controller.dart';
@@ -25,6 +26,10 @@ enum TaskLocalError {
 
   /// The typed or scanned pickup code is not 4 letters or digits.
   invalidPickupCode,
+
+  /// `PICKUP_CODE_LOCKED` was answered for this task: no more tries from
+  /// the phone (the store or ops hand the order over).
+  pickupLocked,
 
   /// COD not collected or not confirmed ([CodProblem]).
   codIncomplete,
@@ -57,6 +62,8 @@ class TaskFlowState {
     this.localError,
     this.notice,
     this.callAttempts = 0,
+    this.pickupAttemptsRemaining,
+    this.pickupLocked = false,
   });
 
   /// `GET /rider/tasks/current/` answered at least once.
@@ -75,6 +82,16 @@ class TaskFlowState {
   /// "Call customer" taps on this task. Kept on the phone only: a restart
   /// resets it (the wait timer comes from the server and does not reset).
   final int callAttempts;
+
+  /// From the last `PICKUP_CODE_INVALID` (`attempts_remaining`) for this
+  /// task; null before any wrong code.
+  ///
+  /// TODO(api): `RiderTask` does not carry the pickup-code attempts, so a
+  /// restart forgets them until the next answer (reported as an API gap).
+  final int? pickupAttemptsRemaining;
+
+  /// `PICKUP_CODE_LOCKED` answered for this task.
+  final bool pickupLocked;
 
   /// The task screen is the rider's screen (a task, or a notice to read).
   bool get hasTask => task != null || notice != null;
@@ -95,6 +112,9 @@ class TaskFlowState {
     TaskNotice? notice,
     bool clearNotice = false,
     int? callAttempts,
+    int? pickupAttemptsRemaining,
+    bool? pickupLocked,
+    bool resetPickup = false,
   }) => TaskFlowState(
     loaded: loaded ?? this.loaded,
     task: clearTask ? null : task ?? this.task,
@@ -105,8 +125,17 @@ class TaskFlowState {
     localError: localError ?? (clearErrors ? null : this.localError),
     notice: clearNotice ? null : notice ?? this.notice,
     callAttempts: callAttempts ?? this.callAttempts,
+    pickupAttemptsRemaining: resetPickup
+        ? null
+        : pickupAttemptsRemaining ?? this.pickupAttemptsRemaining,
+    pickupLocked: resetPickup ? false : pickupLocked ?? this.pickupLocked,
   );
 }
+
+/// Whether the task screen polls `GET /rider/tasks/current/` while in the
+/// foreground ([taskPollInterval]). Tests that do not exercise polling may
+/// turn it off.
+final taskPollingEnabledProvider = Provider<bool>((ref) => true);
 
 final taskFlowControllerProvider =
     NotifierProvider<TaskFlowController, TaskFlowState>(TaskFlowController.new);
@@ -117,6 +146,9 @@ final taskFlowControllerProvider =
 ///   rider opens the app and every time it comes back to the foreground, so
 ///   a crash or restart mid-delivery resumes instead of resetting.
 /// - Calls an endpoint only from a state where 08 §3 allows the action.
+/// - Polls the current task while the app is in the foreground
+///   ([taskPollInterval]): the fallback for pushes that never came (store
+///   packed, UPI paid, items received back, ops cancelled).
 /// - Renders whatever the server answers. After an uncertain failure (no
 ///   network, timeout, server error, `INVALID_STATE_TRANSITION`) it asks the
 ///   server for the current task, because the action may have gone through
@@ -136,10 +168,51 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       });
       return const TaskFlowState();
     }
-    final lifecycle = AppLifecycleListener(onResume: () => unawaited(load()));
-    ref.onDispose(lifecycle.dispose);
+    _foreground = true;
+    final lifecycle = AppLifecycleListener(
+      onResume: () {
+        _foreground = true;
+        unawaited(load());
+      },
+      onHide: _stopPolling,
+      onPause: _stopPolling,
+    );
+    ref.onDispose(() {
+      lifecycle.dispose();
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    });
     Future.microtask(load);
     return const TaskFlowState();
+  }
+
+  Timer? _pollTimer;
+  bool _foreground = true;
+
+  void _stopPolling() {
+    _foreground = false;
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
+  /// Re-arms the poll for the task now on screen (one timer at a time).
+  void _armPoll() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (!ref.mounted || !_foreground) return;
+    if (!ref.read(taskPollingEnabledProvider)) return;
+    final interval = taskPollInterval(state.task);
+    if (interval == null) return;
+    _pollTimer = Timer(interval, () {
+      _pollTimer = null;
+      if (!ref.mounted) return;
+      // An action in flight answers for itself.
+      if (state.busy != null) {
+        _armPoll();
+        return;
+      }
+      unawaited(load());
+    });
   }
 
   bool get _active => ref.mounted && ref.read(riderWorkActiveProvider);
@@ -151,9 +224,9 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     if (!_active || (state.refreshing && !force)) return;
     state = state.copyWith(refreshing: true);
     try {
-      final task = await _repo.fetchCurrentTask();
+      final current = await _repo.fetchCurrentTask();
       if (!ref.mounted) return;
-      _applyFetched(task);
+      _applyFetched(current);
     } on Object catch (e) {
       final error = ApiError.from(e);
       if (!ref.mounted) return;
@@ -161,14 +234,37 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       // Keep what is on screen; the next resume or Retry tries again.
       state = state.copyWith(refreshing: false, loaded: true);
       debugPrint('TaskFlowController.load: ${error.code}');
+    } finally {
+      _armPoll();
     }
   }
 
   /// Shows [fetched]. [afterUncertain] is the step-changing action whose
   /// answer was lost, when this fetch is its reconcile.
-  void _applyFetched(RiderTask? fetched, {TaskAction? afterUncertain}) {
+  void _applyFetched(CurrentTask answer, {TaskAction? afterUncertain}) {
     final current = state.task;
+    final fetched = answer.task;
     final visible = fetched != null && fetched.status.isRiderTask;
+    final recent = answer.recentTask;
+    if (!visible &&
+        current != null &&
+        !current.status.isTerminal &&
+        recent != null &&
+        recent.id == current.id &&
+        recent.status.isTerminal) {
+      // The task just ended (delivered, items received back, cancelled):
+      // show how, instead of a guess.
+      final ended = current.copyWith(status: recent.status);
+      _setTask(ended);
+      state = state.copyWith(
+        task: ended,
+        refreshing: false,
+        loaded: true,
+        clearNotice: true,
+        clearErrors: true,
+      );
+      return;
+    }
     if (!visible) {
       if (current != null && !current.status.isTerminal) {
         // The task is gone. After a lost answer to a step-changing action
@@ -197,6 +293,7 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       loaded: true,
       clearNotice: true,
       callAttempts: sameTask ? state.callAttempts : 0,
+      resetPickup: !sameTask,
     );
   }
 
@@ -204,6 +301,7 @@ class TaskFlowController extends Notifier<TaskFlowState> {
   void assigned(RiderTask task) {
     _setTask(task);
     state = TaskFlowState(loaded: true, task: task);
+    _armPoll();
   }
 
   /// Arrived at the store: sends where the rider is; the server checks the
@@ -213,18 +311,32 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     (task, at) => _repo.arrivedAtStore(task.id, at),
   );
 
-  /// Picked up with the code typed or scanned from the bag.
+  /// Picked up with the code typed, or the bag QR payload scanned
+  /// (`JQC1:<order>:<code>`). The server checks it: 5 wrong codes lock it.
   Future<bool> pickup(String code) async {
-    final normalised = normalisePickupCode(code);
-    if (normalised == null) {
-      if (state.busy != null) return false;
+    if (state.busy != null) return false;
+    if (state.pickupLocked) {
+      state = state.copyWith(
+        clearErrors: true,
+        localError: TaskLocalError.pickupLocked,
+      );
+      return false;
+    }
+    final scanned = parseScannedPickup(
+      code,
+      orderNumber: state.task?.orderNumber ?? '',
+    );
+    if (scanned is! ScannedCode) {
       state = state.copyWith(
         clearErrors: true,
         localError: TaskLocalError.invalidPickupCode,
       );
       return false;
     }
-    return _run(TaskAction.pickup, (task) => _repo.pickup(task.id, normalised));
+    return _run(
+      TaskAction.pickup,
+      (task) => _repo.pickup(task.id, scanned.orderCode),
+    );
   }
 
   /// Arrived at the customer. [overrideReason] when the pin is wrong and
@@ -284,7 +396,13 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       );
       return Future.value(false);
     }
-    return _run(TaskAction.fail, (task) => _repo.fail(task.id, report));
+    final sent = FailReport(
+      reason: report.reason,
+      note: report.note.trim(),
+      callAttempts: state.callAttempts,
+      photo: report.photo,
+    );
+    return _run(TaskAction.fail, (task) => _repo.fail(task.id, sent));
   }
 
   /// Dials the customer (`tel:`; masked calling is v2) and counts the try.
@@ -302,6 +420,7 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     if (task != null && !task.status.isTerminal) return;
     _setTask(null);
     state = const TaskFlowState(loaded: true);
+    _armPoll();
   }
 
   void clearError() {
@@ -359,6 +478,7 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       if (!ref.mounted) return false;
       _setTask(updated);
       state = state.copyWith(task: updated, clearBusy: true);
+      _armPoll();
       return true;
     } on Object catch (e) {
       final error = ApiError.from(e);
@@ -368,6 +488,21 @@ class TaskFlowController extends Notifier<TaskFlowState> {
         return false;
       }
       var latest = state.task ?? task;
+      int? pickupLeft;
+      var pickupLocked = false;
+      switch (error.riderCode) {
+        case RiderErrorCode.pickupCodeInvalid:
+          pickupLeft = error.attemptsRemaining;
+        case RiderErrorCode.pickupCodeLocked:
+          pickupLeft = 0;
+          pickupLocked = true;
+        case RiderErrorCode.riderOffline || null:
+          break;
+      }
+      final notReachableAfter = error.notReachableAfter;
+      if (error.isWaitNotElapsed && notReachableAfter != null) {
+        latest = latest.copyWith(notReachableAfter: notReachableAfter);
+      }
       switch (error.code) {
         case ApiErrorCode.deliveryOtpInvalid:
           final left = error.attemptsRemaining;
@@ -379,19 +514,39 @@ class TaskFlowController extends Notifier<TaskFlowState> {
         default:
           break;
       }
-      state = state.copyWith(task: latest, clearBusy: true, error: error);
-      if (_isUncertain(error)) await _reconcile(task.status, action);
+      state = state.copyWith(
+        task: latest,
+        clearBusy: true,
+        error: error,
+        pickupAttemptsRemaining: pickupLeft,
+        pickupLocked: pickupLocked ? true : null,
+      );
+      // The COD amount changed under the rider (400 with `amount_due`):
+      // show the server's amount now; the error text says to collect it.
+      final amountChanged = error.codAmountDueNow != null;
+      if (_isUncertain(error) || amountChanged) {
+        await _reconcile(task.status, action, keepError: amountChanged);
+      }
+      _armPoll();
       return false;
     }
   }
 
   /// The action may have gone through: show what the server has now. If
   /// the task moved on, the error no longer applies.
-  Future<void> _reconcile(TaskStatus before, TaskAction action) async {
+  Future<void> _reconcile(
+    TaskStatus before,
+    TaskAction action, {
+    bool keepError = false,
+  }) async {
+    final error = state.error;
     try {
       final fetched = await _repo.fetchCurrentTask();
       if (!ref.mounted) return;
       _applyFetched(fetched, afterUncertain: action);
+      if (keepError && state.task?.status == before && error != null) {
+        state = state.copyWith(error: error);
+      }
       if (state.task?.status != before) {
         state = state.copyWith(clearErrors: true);
       }
@@ -400,14 +555,20 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     }
   }
 
-  static bool _isUncertain(ApiError error) => switch (error.code) {
-    ApiErrorCode.network ||
-    ApiErrorCode.timeout ||
-    ApiErrorCode.serverError ||
-    ApiErrorCode.unknown ||
-    ApiErrorCode.invalidStateTransition => true,
-    _ => false,
-  };
+  static bool _isUncertain(ApiError error) {
+    // Rider codes the server answered on purpose are certain.
+    if (error.riderCode != null) return false;
+    // WAIT_NOT_ELAPSED: the task did not move; nothing to reconcile.
+    if (error.isWaitNotElapsed) return false;
+    return switch (error.code) {
+      ApiErrorCode.network ||
+      ApiErrorCode.timeout ||
+      ApiErrorCode.serverError ||
+      ApiErrorCode.unknown ||
+      ApiErrorCode.invalidStateTransition => true,
+      _ => false,
+    };
+  }
 
   bool _notAllowed() {
     if (state.busy == null) {
