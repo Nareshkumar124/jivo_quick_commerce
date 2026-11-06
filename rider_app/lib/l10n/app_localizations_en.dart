@@ -1974,4 +1974,73 @@ class AppLocalizationsEn extends AppLocalizations {
     );
     return '$_temp0';
   }
+
+  @override
+  String cashDepositSkippedBody(String limit) {
+    return 'A cash order was not sent to you because it would take your cash over the limit of $limit. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.';
+  }
+
+  @override
+  String cashDepositWhere(String store) {
+    return 'Deposit cash with the store manager at $store. It shows here once they record it.';
+  }
+
+  @override
+  String get earningsOrdersTruncated =>
+      'Showing the latest 200 orders. The totals above include all orders in these dates.';
+
+  @override
+  String get historyDetailTitle => 'Order details';
+
+  @override
+  String get historyAssignedAt => 'Accepted';
+
+  @override
+  String get historyPickedUpAt => 'Picked up';
+
+  @override
+  String get historyDeliveredAt => 'Delivered';
+
+  @override
+  String get historyFailedAt => 'Delivery failed';
+
+  @override
+  String get historyReturnedAt => 'Returned to store';
+
+  @override
+  String get historyCancelledAt => 'Cancelled';
+
+  @override
+  String historyItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get historyPaymentCod => 'Cash on delivery';
+
+  @override
+  String get historyPaymentPrepaid => 'Prepaid';
+
+  @override
+  String historyCodCollected(String amount) {
+    return 'Collected $amount';
+  }
+
+  @override
+  String get historyEarned => 'You earned';
+
+  @override
+  String get taskChipDontRingBell => 'Don\'t ring the bell';
+
+  @override
+  String get taskChipLeaveAtDoor => 'Leave at the door';
+
+  @override
+  String get taskChipAvoidCalling => 'Avoid calling';
 }

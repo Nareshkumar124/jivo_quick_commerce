@@ -57,6 +57,9 @@ class TaskStore {
   final String? phone;
 }
 
+/// The customer's delivery chips (`DeliveryInstructionChipEnum`).
+enum DeliveryChip { dontRingBell, leaveAtDoor, avoidCalling }
+
 /// The drop: revealed after the rider accepts (04 §2.4), hidden again by
 /// the server 1 h after completion (09 §3.2).
 class TaskCustomer {
@@ -67,6 +70,7 @@ class TaskCustomer {
     required this.location,
     this.landmark,
     this.instructions,
+    this.chips = const [],
   });
 
   final String name;
@@ -77,6 +81,9 @@ class TaskCustomer {
   final GeoPoint location;
   final String? landmark;
   final String? instructions;
+
+  /// "Don't ring the bell", "Leave at door", "Avoid calling".
+  final List<DeliveryChip> chips;
 
   @override
   String toString() => 'TaskCustomer';

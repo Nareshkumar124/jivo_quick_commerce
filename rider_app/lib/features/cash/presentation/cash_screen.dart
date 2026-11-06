@@ -11,8 +11,11 @@ import 'cash_providers.dart';
 
 /// Cash in hand and the ledger (04 §2.7, screen 16): COD collected per
 /// order, deposits recorded by the store manager, adjustments, by date.
-/// At the limit (the server's verdict) a "Deposit cash" banner explains
-/// that only prepaid orders come until the rider deposits.
+/// When the server says `deposit_required` (at the limit, or a COD order
+/// was skipped as it would have gone over it; DL-61 b) a "Deposit cash"
+/// banner explains that only prepaid orders come until the rider deposits
+/// at the home store. Deposits are recorded by the store manager (ops
+/// console) and show here as ledger entries.
 class CashScreen extends ConsumerWidget {
   const CashScreen({super.key});
 
@@ -50,7 +53,7 @@ class CashScreen extends ConsumerWidget {
         emptyText: l10n.cashEmpty,
         header: [
           if (summary != null) ...[
-            if (summary.limitReached)
+            if (summary.depositRequired)
               Card(
                 key: const Key('cash-limit-banner'),
                 color: theme.colorScheme.errorContainer,
@@ -65,7 +68,14 @@ class CashScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        l10n.cashDepositBody(formatRupees(summary.cashLimit)),
+                        summary.limitReached
+                            ? l10n.cashDepositBody(
+                                formatRupees(summary.cashLimit),
+                              )
+                            : l10n.cashDepositSkippedBody(
+                                formatRupees(summary.cashLimit),
+                              ),
+                        key: const Key('cash-limit-body'),
                       ),
                     ],
                   ),
@@ -86,6 +96,13 @@ class CashScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(l10n.cashLimit(formatRupees(summary.cashLimit))),
+                    if (summary.homeStoreName case final store?) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        l10n.cashDepositWhere(store),
+                        key: const Key('cash-deposit-where'),
+                      ),
+                    ],
                   ],
                 ),
               ),

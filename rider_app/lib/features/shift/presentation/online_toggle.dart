@@ -803,15 +803,17 @@ class _Tile extends StatelessWidget {
 
 // ------------------------------------------------------ §6 deposit banner
 
-/// "Deposit cash" when the server sends `limit_reached` (§6). The cash
-/// limit never blocks going online (04 §2.3): prepaid orders only.
+/// "Deposit cash" when the server sends `deposit_required` (§6, DL-61 b):
+/// at the limit, or after a COD order was skipped because it would have
+/// taken cash in hand over the limit. The cash limit never blocks going
+/// online (04 §2.3): prepaid orders only.
 class CashLimitBanner extends ConsumerWidget {
   const CashLimitBanner({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(todaySummaryProvider).value;
-    if (summary == null || !summary.limitReached) {
+    if (summary == null || !summary.depositRequired) {
       return const SizedBox.shrink();
     }
     final l10n = AppLocalizations.of(context);
@@ -841,7 +843,10 @@ class CashLimitBanner extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            l10n.cashDepositBody(limit),
+            summary.limitReached
+                ? l10n.cashDepositBody(limit)
+                : l10n.cashDepositSkippedBody(limit),
+            key: const Key('cash-limit-body'),
             style: TextStyle(fontSize: 16, color: colors.codText),
           ),
           const SizedBox(height: 12),

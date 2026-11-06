@@ -44,6 +44,9 @@ abstract final class Routes {
   static const payouts = '/payouts';
   static const cash = '/cash';
   static const history = '/history';
+
+  /// One past task, e.g. `/history/7001`.
+  static String historyDetail(int taskId) => '$history/$taskId';
   static const profile = '/profile';
   static const profileDocuments = '/profile/documents';
 

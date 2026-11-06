@@ -195,6 +195,15 @@ class _Summary extends ConsumerWidget {
                   ),
                 ),
               ),
+            if (summary.ordersTruncated)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  l10n.earningsOrdersTruncated,
+                  key: const Key('earnings-orders-truncated'),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
           ],
           if (summary.adjustments.isNotEmpty) ...[
             const SizedBox(height: 16),

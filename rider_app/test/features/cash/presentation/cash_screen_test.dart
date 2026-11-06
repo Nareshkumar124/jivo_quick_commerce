@@ -53,6 +53,20 @@ void main() {
     expect(textOf(tester, 'cash-in-hand'), '₹5,249');
   });
 
+  testWidgets('a COD order skipped below the limit (DL-61 b): "Deposit '
+      'cash" with the skipped wording, and where to deposit', (tester) async {
+    h.cash.codSkipped = true;
+    await openFromHome(tester, h, 'home-cash');
+
+    expect(byKey('cash-limit-banner'), findsOneWidget);
+    expect(
+      textOf(tester, 'cash-limit-body'),
+      startsWith('A cash order was not sent to you'),
+    );
+    expect(textOf(tester, 'cash-in-hand'), '₹2,149');
+    expect(textOf(tester, 'cash-deposit-where'), contains('Jivo Sector 18'));
+  });
+
   testWidgets('load more fetches the next page', (tester) async {
     await openFromHome(tester, h, 'home-cash');
     await scrollTo(

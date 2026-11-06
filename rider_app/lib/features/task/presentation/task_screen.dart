@@ -611,6 +611,12 @@ class _GoToCustomerStep extends ConsumerWidget {
               customer.address,
               if (customer.landmark != null)
                 l10n.taskLandmark(customer.landmark!),
+              for (final chip in customer.chips)
+                switch (chip) {
+                  DeliveryChip.dontRingBell => l10n.taskChipDontRingBell,
+                  DeliveryChip.leaveAtDoor => l10n.taskChipLeaveAtDoor,
+                  DeliveryChip.avoidCalling => l10n.taskChipAvoidCalling,
+                },
               if (customer.instructions != null)
                 l10n.taskInstructions(customer.instructions!),
             ],

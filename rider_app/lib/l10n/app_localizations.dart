@@ -3367,6 +3367,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 item} other{{count} items}}'**
   String offerItemCount(int count);
+
+  /// No description provided for @cashDepositSkippedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A cash order was not sent to you because it would take your cash over the limit of {limit}. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.'**
+  String cashDepositSkippedBody(String limit);
+
+  /// No description provided for @cashDepositWhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit cash with the store manager at {store}. It shows here once they record it.'**
+  String cashDepositWhere(String store);
+
+  /// No description provided for @earningsOrdersTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the latest 200 orders. The totals above include all orders in these dates.'**
+  String get earningsOrdersTruncated;
+
+  /// No description provided for @historyDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order details'**
+  String get historyDetailTitle;
+
+  /// No description provided for @historyAssignedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted'**
+  String get historyAssignedAt;
+
+  /// No description provided for @historyPickedUpAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Picked up'**
+  String get historyPickedUpAt;
+
+  /// No description provided for @historyDeliveredAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get historyDeliveredAt;
+
+  /// No description provided for @historyFailedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery failed'**
+  String get historyFailedAt;
+
+  /// No description provided for @historyReturnedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned to store'**
+  String get historyReturnedAt;
+
+  /// No description provided for @historyCancelledAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get historyCancelledAt;
+
+  /// No description provided for @historyItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String historyItems(int count);
+
+  /// No description provided for @historyPaymentCod.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery'**
+  String get historyPaymentCod;
+
+  /// No description provided for @historyPaymentPrepaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepaid'**
+  String get historyPaymentPrepaid;
+
+  /// No description provided for @historyCodCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected {amount}'**
+  String historyCodCollected(String amount);
+
+  /// No description provided for @historyEarned.
+  ///
+  /// In en, this message translates to:
+  /// **'You earned'**
+  String get historyEarned;
+
+  /// No description provided for @taskChipDontRingBell.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t ring the bell'**
+  String get taskChipDontRingBell;
+
+  /// No description provided for @taskChipLeaveAtDoor.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave at the door'**
+  String get taskChipLeaveAtDoor;
+
+  /// No description provided for @taskChipAvoidCalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Avoid calling'**
+  String get taskChipAvoidCalling;
 }
 
 class _AppLocalizationsDelegate

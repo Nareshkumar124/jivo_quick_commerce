@@ -227,6 +227,28 @@ void main() {
     );
   });
 
+  testWidgets('a COD order skipped below the limit (DL-61 b): deposit '
+      'banner with the skipped wording; not prepaid-only', (tester) async {
+    h.today.summary = const TodaySummary(
+      deliveredCount: 9,
+      earnedToday: '900.00',
+      onlineSeconds: 3600,
+      cashInHand: '4800.00',
+      cashLimit: '5000.00',
+      depositRequired: true,
+      homeStoreName: 'Sector 18',
+    );
+    await pumpActiveHome(tester, h);
+    expect(byKey('cash-limit-banner'), findsOneWidget);
+    expect(
+      textOf(tester, 'cash-limit-body'),
+      startsWith('A cash order was not sent to you'),
+    );
+
+    await tapToggle(tester);
+    expect(textOf(tester, 'shift-status'), isNot(contains('prepaid only')));
+  });
+
   testWidgets('no text below 14 sp on home (RD-05)', (tester) async {
     await pumpActiveHome(tester, h);
     for (final text in tester.widgetList<Text>(find.byType(Text))) {

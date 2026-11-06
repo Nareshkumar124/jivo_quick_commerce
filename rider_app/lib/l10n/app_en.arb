@@ -1172,5 +1172,27 @@
         "type": "int"
       }
     }
-  }
+  },
+  "cashDepositSkippedBody": "A cash order was not sent to you because it would take your cash over the limit of {limit}. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.",
+  "@cashDepositSkippedBody": {"placeholders": {"limit": {"type": "String"}}},
+  "cashDepositWhere": "Deposit cash with the store manager at {store}. It shows here once they record it.",
+  "@cashDepositWhere": {"placeholders": {"store": {"type": "String"}}},
+  "earningsOrdersTruncated": "Showing the latest 200 orders. The totals above include all orders in these dates.",
+  "historyDetailTitle": "Order details",
+  "historyAssignedAt": "Accepted",
+  "historyPickedUpAt": "Picked up",
+  "historyDeliveredAt": "Delivered",
+  "historyFailedAt": "Delivery failed",
+  "historyReturnedAt": "Returned to store",
+  "historyCancelledAt": "Cancelled",
+  "historyItems": "{count, plural, =1{1 item} other{{count} items}}",
+  "@historyItems": {"placeholders": {"count": {"type": "int"}}},
+  "historyPaymentCod": "Cash on delivery",
+  "historyPaymentPrepaid": "Prepaid",
+  "historyCodCollected": "Collected {amount}",
+  "@historyCodCollected": {"placeholders": {"amount": {"type": "String"}}},
+  "historyEarned": "You earned",
+  "taskChipDontRingBell": "Don't ring the bell",
+  "taskChipLeaveAtDoor": "Leave at the door",
+  "taskChipAvoidCalling": "Avoid calling"
 }
