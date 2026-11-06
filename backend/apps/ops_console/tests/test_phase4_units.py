@@ -13,9 +13,13 @@ from apps.ops_console import capabilities, order_actions
 from apps.ops_console.tests.helpers import (
     AUDIT_LOG_ROLES,
     CANCEL_ORDER_ROLES,
+    CASH_ROLES,
+    DISPATCH_ROLES,
     LIVE_BOARD_ROLES,
     PACKING_ROLES,
+    PAYOUT_ROLES,
     PRINCIPALS,
+    RECEIVE_RETURN_ROLES,
     RETRY_REFUND_ROLES,
     TOGGLE_STORE_ROLES,
     make_principal,
@@ -37,6 +41,10 @@ EXPECTED = {
     capabilities.ISSUE_REFUND: RETRY_REFUND_ROLES,  # same permission: payments.issue_refund
     capabilities.TOGGLE_STORE: TOGGLE_STORE_ROLES,
     capabilities.AUDIT_LOG: AUDIT_LOG_ROLES,
+    capabilities.DISPATCH: DISPATCH_ROLES,
+    capabilities.RECEIVE_RETURN: RECEIVE_RETURN_ROLES,
+    capabilities.CASH_DEPOSIT: CASH_ROLES,
+    capabilities.PAYOUTS: PAYOUT_ROLES,
 }
 
 

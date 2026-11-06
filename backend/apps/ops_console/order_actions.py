@@ -20,6 +20,14 @@ Services (Phase 4, final names; `tests/test_phase4_units.py` checks their signat
     stores.services.set_accepting_orders(store, accepting, *, actor) -> bool
     accounts.services.customers.set_cod_blocked(user_id, blocked, *, by) -> bool
 
+Phase 5 (slice 5.3; 08 §5 step 7, §3, T14):
+
+    delivery.services.dispatch.manual_assign(order_id, rider_id, *, by, ip=None) -> DeliveryTask
+    delivery.services.dispatch.unassign(order_id, *, by, ip=None) -> DeliveryTask
+    delivery.services.dispatch.retry_dispatch(order_id, *, by, ip=None) -> DeliveryTask
+    orders.store_ops.receive_return(order_id, *, by, damaged=None, ip=None) -> Order       T14
+        damaged: {order line id: damaged units}
+
 The services check the role, scope the order to the caller's stores, lock, transition and
 audit. The panel still scopes first (another store's order is a 404 before any call). A service
 not on this branch makes `available(action)` False (button hidden or disabled) and a crafted
@@ -50,8 +58,13 @@ RETRY_REFUND = "retry_refund"
 MANUAL_REFUND = "manual_refund"
 SET_ACCEPTING = "set_accepting"
 SET_COD_BLOCKED = "set_cod_blocked"
+MANUAL_ASSIGN = "manual_assign"
+UNASSIGN = "unassign"
+RETRY_DISPATCH = "retry_dispatch"
+RECEIVE_RETURN = "receive_return"
 
 STORE_OPS = "apps.orders.store_ops"
+DISPATCH_SERVICES = "apps.delivery.services.dispatch"
 SERVICES: dict[str, tuple[str, str]] = {
     ACCEPT: (STORE_OPS, "accept_order"),
     START_PACKING: (STORE_OPS, "start_packing"),
@@ -62,6 +75,10 @@ SERVICES: dict[str, tuple[str, str]] = {
     MANUAL_REFUND: ("apps.payments.order_refunds", "manual_refund"),
     SET_ACCEPTING: ("apps.stores.services", "set_accepting_orders"),
     SET_COD_BLOCKED: ("apps.accounts.services.customers", "set_cod_blocked"),
+    MANUAL_ASSIGN: (DISPATCH_SERVICES, "manual_assign"),
+    UNASSIGN: (DISPATCH_SERVICES, "unassign"),
+    RETRY_DISPATCH: (DISPATCH_SERVICES, "retry_dispatch"),
+    RECEIVE_RETURN: (STORE_OPS, "receive_return"),
 }
 
 # Staff cancellation reasons (T12 "reason required"): an enum the backend owns.
@@ -221,3 +238,22 @@ def set_accepting(store, accepting: bool, *, actor) -> bool:
 
 def set_cod_blocked(user_id: int, blocked: bool, *, actor) -> bool:
     return _call(SET_COD_BLOCKED, user_id, blocked, by=actor)
+
+
+# --------------------------------------------------------------------------- dispatch, returns
+
+
+def manual_assign(order_id: int, rider_id: int, *, actor, ip: str | None = None):
+    return _call(MANUAL_ASSIGN, order_id, rider_id, by=actor, ip=ip)
+
+
+def unassign(order_id: int, *, actor, ip: str | None = None):
+    return _call(UNASSIGN, order_id, by=actor, ip=ip)
+
+
+def retry_dispatch(order_id: int, *, actor, ip: str | None = None):
+    return _call(RETRY_DISPATCH, order_id, by=actor, ip=ip)
+
+
+def receive_return(order, damaged: dict[int, int], *, actor, ip: str | None = None):
+    return _call(RECEIVE_RETURN, order.pk, by=actor, damaged=damaged, ip=ip)

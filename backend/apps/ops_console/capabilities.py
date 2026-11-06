@@ -26,8 +26,34 @@ RETRY_REFUND = "retry_refund"
 ISSUE_REFUND = "issue_refund"
 TOGGLE_STORE = "toggle_store"
 AUDIT_LOG = "audit_log"
+# Phase 5 (05 §3 "Manual dispatch": Super Admin, Ops, Store Manager own): dispatch board, task
+# detail and the assign / unassign / retry buttons. DL-61 (user, 2026-11-05): every ops delivery
+# action (force offline, unlock codes, retry / assign / unassign, ops-marked failed delivery,
+# receive return, cash deposit, cash limit) is Super Admin, Ops and Store Manager (own store);
+# Finance also records cash deposits; Support and Store Staff none.
+DISPATCH = "dispatch"
+# T14 receive return (DL-61): the dispatch roles, and the service's own orders.process_order.
+RECEIVE_RETURN = "receive_return"
+# SLICE 5.4 (DL-61 a; 05 §3 "Cash deposit entry", "Payouts"): `/ops/cash/` and `/ops/payouts/`.
+# Both also need their 5.4 service module on the branch (`SERVICE_GATED`), so before the merge
+# nobody sees them (not even a superuser).
+CASH_DEPOSIT = "cash_deposit"
+PAYOUTS = "payouts"
 
 Rule = tuple[tuple[str, ...], ...]  # any of (all of (...))
+
+_DISPATCH: Rule = (("delivery.dispatch_order", "delivery.view_deliverytask"),)
+
+_RECEIVE_RETURN: Rule = (("orders.process_order", "delivery.dispatch_order"),)
+
+# Cash: record (Super Admin, Ops, Store Manager own, Finance) or view the ledger (Finance "view").
+_CASH: Rule = (("delivery.record_cash_deposit",), ("delivery.view_ridercashledger",))
+_PAYOUTS: Rule = (("delivery.manage_payouts",),)
+
+SERVICE_GATED: dict[str, tuple[str, str]] = {
+    CASH_DEPOSIT: ("apps.delivery.services.cash", "staff_cash_riders"),
+    PAYOUTS: ("apps.delivery.services.payouts", "create_payouts_for_period"),
+}
 
 _TOGGLE: Rule = (
     ("stores.change_darkstore",),
@@ -42,6 +68,10 @@ DEDICATED: dict[str, Rule] = {
     ISSUE_REFUND: (("payments.issue_refund",),),
     TOGGLE_STORE: _TOGGLE,
     AUDIT_LOG: (("core.view_auditlog",),),
+    DISPATCH: _DISPATCH,
+    RECEIVE_RETURN: _RECEIVE_RETURN,
+    CASH_DEPOSIT: _CASH,
+    PAYOUTS: _PAYOUTS,
 }
 
 INTERIM: dict[str, Rule] = {
@@ -58,6 +88,10 @@ INTERIM: dict[str, Rule] = {
     ISSUE_REFUND: (("payments.view_refund", "payments.view_paymentwebhookevent"),),
     TOGGLE_STORE: _TOGGLE,
     AUDIT_LOG: (("payments.view_paymentwebhookevent",),),
+    DISPATCH: _DISPATCH,
+    RECEIVE_RETURN: _RECEIVE_RETURN,
+    CASH_DEPOSIT: _CASH,
+    PAYOUTS: _PAYOUTS,
 }
 
 
@@ -68,6 +102,13 @@ def dedicated_active() -> bool:
     return hasattr(roles, "ORDER_PROCESS")
 
 
+def service_present(capability: str) -> bool:
+    """SLICE 5.4: is the backend service behind a `SERVICE_GATED` capability on this branch?"""
+    from apps.ops_console.order_actions import _lookup
+
+    return callable(_lookup(*SERVICE_GATED[capability]))
+
+
 def rules() -> dict[str, Rule]:
     return DEDICATED if dedicated_active() else INTERIM
 
@@ -75,6 +116,8 @@ def rules() -> dict[str, Rule]:
 def allowed(user, capability: str) -> bool:
     """True when the active staff `user` holds `capability` (05 §3)."""
     if not (user.is_authenticated and user.is_active and user.is_staff):
+        return False
+    if capability in SERVICE_GATED and not service_present(capability):
         return False
     return any(user.has_perms(perms) for perms in rules()[capability])
 

@@ -107,3 +107,33 @@ class ManualRefundForm(forms.Form):
                 f"At most ₹{self.refundable:.2f} can still be refunded on this order."
             )
         return amount
+
+
+class AssignRiderForm(forms.Form):
+    """08 §5 step 7: the rider to assign. Which riders are allowed is the service's decision."""
+
+    rider = forms.IntegerField(min_value=1)
+
+
+class ReceiveReturnForm(forms.Form):
+    """08 T14: damaged units per order line (`damaged_<line id>`, 0..units sent out). Lines of
+    other orders do not exist here; the service re-checks the ranges."""
+
+    def __init__(self, *args, lines=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.lines = list(lines)
+        for line in self.lines:
+            self.fields[f"damaged_{line.item.pk}"] = forms.IntegerField(
+                label=f"{line.item.product_name} {line.item.variant_name}".strip(),
+                min_value=0,
+                max_value=line.units,
+                initial=0,
+                required=False,
+                widget=UnfoldAdminIntegerFieldWidget(attrs={"min": 0, "max": line.units}),
+            )
+
+    def damaged(self) -> dict[int, int]:
+        return {
+            line.item.pk: self.cleaned_data.get(f"damaged_{line.item.pk}") or 0
+            for line in self.lines
+        }
