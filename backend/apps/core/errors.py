@@ -62,6 +62,7 @@ class ErrorCode(models.TextChoices):
     # --- Added in Phase 5 (rider contract, api-requests #4 and #15) ---------------------------
     RIDER_OFFLINE = "RIDER_OFFLINE", "You are offline. Go online again to continue."
     PICKUP_CODE_INVALID = "PICKUP_CODE_INVALID", "The order code does not match this order."
+    PICKUP_CODE_LOCKED = "PICKUP_CODE_LOCKED", "Too many wrong order codes. Ask the store or ops."
 
 
 ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
@@ -104,6 +105,7 @@ ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.PAYLOAD_TOO_LARGE: 413,
     ErrorCode.RIDER_OFFLINE: 409,
     ErrorCode.PICKUP_CODE_INVALID: 400,
+    ErrorCode.PICKUP_CODE_LOCKED: 423,
 }
 
 

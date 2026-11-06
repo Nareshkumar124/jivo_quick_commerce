@@ -88,6 +88,12 @@ AUDIT_VIEW = "core.view_auditlog"
 # changes go through apps.delivery.services.kyc, which re-checks these and the store scope.
 RIDER_VIEW = ["delivery.view_rider", "delivery.view_riderdocument", "delivery.view_ridershift"]
 RIDER_REVIEW = ["delivery.review_rider", "delivery.view_kyc_document_file"]
+# 05 §3 "Manual dispatch": Super Admin, Ops, Store Manager (own stores). Plus seeing tasks.
+RIDER_DISPATCH = [
+    "delivery.dispatch_order",
+    "delivery.view_deliverytask",
+    "delivery.view_deliveryoffer",
+]
 # Phase 7 (05 §3 "Support tickets": Super Admin, Ops, Support). Ticket changes go through
 # apps.support.services, which re-check `support.handle_ticket`. FAQs are part of the Support
 # module (05 §2), so Support also edits them (PM default); pages stay Super Admin (CMS).
@@ -112,6 +118,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         ORDER_CANCEL,
         *RIDER_VIEW,
         *RIDER_REVIEW,
+        *RIDER_DISPATCH,
         *SUPPORT_TICKETS,
     ],
     STORE_MANAGER: [
@@ -123,6 +130,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         ORDER_PROCESS,
         ORDER_CANCEL,
         *RIDER_VIEW,
+        *RIDER_DISPATCH,
     ],
     STORE_STAFF: [*CATALOG_VIEW, *INVENTORY_VIEW, *ORDER_VIEW, ORDER_PROCESS],
     CATALOG_MANAGER: [*CATALOG_MANAGE, *INVENTORY_VIEW, *COUPON_MANAGE],

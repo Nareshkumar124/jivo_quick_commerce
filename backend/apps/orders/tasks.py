@@ -12,16 +12,31 @@ logger = logging.getLogger(__name__)
 def order_event(event: str, order_id: int) -> str:
     """Domain event handler (`apps.orders.events`). Phase 4: a PLACED order schedules its
     auto-accept (stores with auto-accept) and its acceptance SLA check; ops alerts are logged
-    at ERROR. Phase 6 adds push, SMS and WebSocket notifications here."""
+    at ERROR. Phase 5 starts dispatch (DISPATCH_TRIGGER) and tells the rider an order is packed;
+    Phase 6 fans every event out to the sockets and the customer notification (`fan_out`)."""
     from apps.orders import events
 
     if event in events.OPS_ALERTS:
         logger.error("Ops alert: %s on order %s", event, order_id)
     else:
         logger.info("Order event %s: order %s", event, order_id)
+    # Sockets and the customer notification first: each is its own queued task, so an error in
+    # the Phase 4/5 work below never holds them back.
+    fan_out(event, order_id)
     if event == events.PLACED:
         schedule_acceptance(order_id)
-    fan_out(event, order_id)
+    # Phase 5 (08 §2.1): dispatch starts at DISPATCH_TRIGGER (ACCEPTED by default, or PLACED).
+    trigger = {"ACCEPTED": events.ACCEPTED, "PLACED": events.PLACED}.get(
+        settings.DISPATCH_TRIGGER, events.ACCEPTED
+    )
+    if event == trigger:
+        from apps.delivery.tasks import dispatch_order
+
+        dispatch_order.delay(order_id)
+    if event == events.PACKED:
+        from apps.delivery.services.dispatch import order_packed
+
+        order_packed(order_id)
     return event
 
 
