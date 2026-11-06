@@ -66,7 +66,7 @@ DISPATCH_PERMISSION = "delivery.dispatch_order"
 
 def _later(task, args: tuple, seconds: float) -> None:
     """A countdown task after commit; skipped under eager Celery (see the module doc)."""
-    if settings.CELERY_TASK_ALWAYS_EAGER:
+    if getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
         return
     transaction.on_commit(lambda: task.apply_async(args, countdown=max(seconds, 0)))
 
