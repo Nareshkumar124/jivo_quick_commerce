@@ -23,7 +23,9 @@ INBOX_PAGE = {
     "next": None,
     "previous": None,
     "results": [ORDER_PLACED, ORDER_CONFIRMED_READ],
+    "unread_count": 1,
 }
-INBOX_EMPTY = {"count": 0, "next": None, "previous": None, "results": []}
+INBOX_EMPTY = {"count": 0, "next": None, "previous": None, "results": [], "unread_count": 0}
 READ = {**ORDER_PLACED, "read": True}
 READ_ALL = {"updated": 3}
+UNREAD = {"unread": 2}

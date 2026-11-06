@@ -7452,12 +7452,14 @@ paths:
                       link: jivo://orders/1188
                       read: true
                       created_at: '2026-11-09T18:02:10Z'
+                    unread_count: 1
                 Empty:
                   value:
                     count: 0
                     next: null
                     previous: null
                     results: []
+                    unread_count: 0
           description: One page of inbox entries.
         '401':
           content:
@@ -7688,6 +7690,101 @@ paths:
                     updated: 3
                   summary: Read all
           description: How many changed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/me/notifications/unread-count/:
+    get:
+      operationId: me_notifications_unread_count
+      description: 'Unread inbox entries for the app the token was issued to (api-requests
+        #45). The same number comes with every page of `GET /me/notifications/` (`unread_count`)
+        and with `notification.new` on the app sockets.'
+      summary: Unread inbox count (badge)
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnreadCount'
+              examples:
+                Badge:
+                  value:
+                    unread: 2
+          description: The count.
         '401':
           content:
             application/json:
@@ -11181,6 +11278,8 @@ paths:
                     server_time: '2026-11-10T09:45:00.000000Z'
                     status: ACCEPTED
                     eta_at: '2026-11-10T09:58:00Z'
+                    live_eta_at: '2026-11-10T10:00:00Z'
+                    live_eta_minutes: 15
                     rider: null
                     delivery_otp: null
                     task_status: SEARCHING
@@ -11200,6 +11299,8 @@ paths:
                     server_time: '2026-11-10T09:45:00.000000Z'
                     status: PACKING
                     eta_at: '2026-11-10T09:58:00Z'
+                    live_eta_at: '2026-11-10T09:57:00Z'
+                    live_eta_minutes: 12
                     rider:
                       name: Ravi K.
                       phone: null
@@ -11225,6 +11326,8 @@ paths:
                     server_time: '2026-11-10T09:45:00.000000Z'
                     status: OUT_FOR_DELIVERY
                     eta_at: '2026-11-10T09:58:00Z'
+                    live_eta_at: '2026-11-10T09:52:00Z'
+                    live_eta_minutes: 7
                     rider:
                       name: Ravi K.
                       phone: '+919811122233'
@@ -11250,6 +11353,8 @@ paths:
                     server_time: '2026-11-10T09:45:00.000000Z'
                     status: DELIVERED
                     eta_at: null
+                    live_eta_at: null
+                    live_eta_minutes: null
                     rider: null
                     delivery_otp: null
                     task_status: DELIVERED
@@ -22257,6 +22362,17 @@ components:
           format: date-time
           nullable: true
           description: Promised delivery time (08 §8); null once the order ended.
+        live_eta_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: The live ETA (08 §8), recomputed now from the order and task
+            status and the rider's latest position; the same value `order.eta` pushes
+            on the order socket. Null once the order ended.
+        live_eta_minutes:
+          type: integer
+          nullable: true
+          description: Minutes from `server_time` to `live_eta_at`, at least 1.
         store:
           $ref: '#/components/schemas/TrackStore'
         destination:
@@ -22299,6 +22415,8 @@ components:
       - delivery_otp
       - destination
       - eta_at
+      - live_eta_at
+      - live_eta_minutes
       - order_id
       - order_number
       - rider
@@ -22490,11 +22608,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InboxNotification'
+        unread_count:
+          type: integer
+          description: 'Unread entries for this app (all pages; api-requests #45).'
       required:
       - count
       - next
       - previous
       - results
+      - unread_count
     PaginatedOrderSummaryList:
       type: object
       description: 'Standard page (02 §5): `?page=&page_size=`, default 20, max 100.'
@@ -24799,6 +24921,14 @@ components:
       required:
       - amount
       - per
+    UnreadCount:
+      type: object
+      properties:
+        unread:
+          type: integer
+          description: Unread inbox entries for this app.
+      required:
+      - unread
     VariantDetail:
       type: object
       description: A sellable variant (SKU) with its price and stock at the store.
@@ -25262,10 +25392,158 @@ components:
           - TAKEN
           - ORDER_CANCELLED
           - REASSIGNED
+          - RIDER_OFFLINE
       required:
       - offer_id
       - task_id
       - reason
+    WsCashUpdatedData:
+      type: object
+      description: The rider's cash in hand changed (COD collected, deposit, adjustment),
+        or COD offers now need a deposit first. Same values as `GET /rider/cash/`
+        (`cash`).
+      properties:
+        rider_id:
+          type: integer
+        cash_in_hand:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        cash_limit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        limit_reached:
+          type: boolean
+        deposit_required:
+          type: boolean
+          description: Show the "deposit cash" banner (08 §5, DL-61 b).
+        reason:
+          type: string
+          enum:
+          - COD_COLLECTED
+          - DEPOSIT
+          - ADJUSTMENT
+          - DEPOSIT_REQUIRED
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - rider_id
+      - cash_in_hand
+      - cash_limit
+      - limit_reached
+      - deposit_required
+      - reason
+      - updated_at
+    WsNotificationNewData:
+      type: object
+      description: A new inbox entry for this app (the `InboxNotification` of `GET
+        /me/notifications/`) and the new unread count. Sent to every open app socket
+        of the user.
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        body:
+          type: string
+        category:
+          type: string
+        link:
+          type: string
+          nullable: true
+        read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        unread_count:
+          type: integer
+          description: Unread inbox entries for this app now.
+      required:
+      - id
+      - title
+      - body
+      - category
+      - link
+      - read
+      - created_at
+      - unread_count
+    WsOpsTaskStatusData:
+      type: object
+      description: A delivery task was created or changed state (dispatch board, 05
+        §1.4). No customer data.
+      properties:
+        task_id:
+          type: integer
+        order_id:
+          type: integer
+        order_number:
+          type: string
+        store_id:
+          type: integer
+        status:
+          type: string
+          enum:
+          - SEARCHING
+          - OFFERED
+          - ASSIGNED
+          - AT_STORE
+          - PICKED_UP
+          - AT_CUSTOMER
+          - DELIVERED
+          - FAILED
+          - RETURNING
+          - RETURNED
+          - UNASSIGNED
+          - CANCELLED
+        previous_status:
+          type: string
+          enum:
+          - SEARCHING
+          - OFFERED
+          - ASSIGNED
+          - AT_STORE
+          - PICKED_UP
+          - AT_CUSTOMER
+          - DELIVERED
+          - FAILED
+          - RETURNING
+          - RETURNED
+          - UNASSIGNED
+          - CANCELLED
+          - null
+          nullable: true
+          description: 'null when unknown: just created, or changed twice in one transaction.'
+        rider_id:
+          type: integer
+          nullable: true
+        assignment_mode:
+          type: string
+          enum:
+          - AUTO
+          - MANUAL
+          - null
+          nullable: true
+          description: null before a rider is assigned.
+        attempt_count:
+          type: integer
+          description: Offers made in the current search round.
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - task_id
+      - order_id
+      - order_number
+      - store_id
+      - status
+      - previous_status
+      - rider_id
+      - assignment_mode
+      - attempt_count
+      - updated_at
     WsTaskUpdatedData:
       type: object
       description: 'The rider''s task changed: re-read `GET /rider/tasks/current/`.'
@@ -25287,6 +25565,7 @@ components:
           - AMOUNT_CHANGED
           - REASSIGNED
           - STATUS_CHANGED
+          - ASSIGNED
       required:
       - task_id
       - order_id
@@ -25563,6 +25842,122 @@ components:
           offer_id: 9001
           task_id: 7001
           reason: ORDER_CANCELLED
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsOfferExpiredMessage:
+      type: object
+      description: '`/ws/v1/rider/`: the offer timed out (`reason` is EXPIRED). Close
+        the offer screen.'
+      properties:
+        type:
+          type: string
+          description: Always "offer.expired".
+        data:
+          $ref: '#/components/schemas/WsOfferWithdrawnData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: offer.expired
+        data:
+          offer_id: 9001
+          task_id: 7001
+          reason: EXPIRED
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsCashUpdatedMessage:
+      type: object
+      description: '`/ws/v1/rider/`.'
+      properties:
+        type:
+          type: string
+          description: Always "cash.updated".
+        data:
+          $ref: '#/components/schemas/WsCashUpdatedData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: cash.updated
+        data:
+          rider_id: 41
+          cash_in_hand: '1498.00'
+          cash_limit: '2000.00'
+          limit_reached: false
+          deposit_required: false
+          reason: COD_COLLECTED
+          updated_at: '2026-11-10T09:58:10Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsNotificationNewMessage:
+      type: object
+      description: '`/ws/v1/orders/{order_id}/` and `/ws/v1/rider/`: a new inbox entry
+        (api-requests #47). Without an open socket the app re-reads the inbox on the
+        FCM message.'
+      properties:
+        type:
+          type: string
+          description: Always "notification.new".
+        data:
+          $ref: '#/components/schemas/WsNotificationNewData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: notification.new
+        data:
+          id: 5512
+          title: Order confirmed
+          body: The store has confirmed order JV-261110-001203 and will pack it now.
+          category: order
+          link: jivo://orders/1203
+          read: false
+          created_at: '2026-11-10T09:41:05Z'
+          unread_count: 3
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsOpsTaskStatusMessage:
+      type: object
+      description: '`/ws/ops/live/`: the dispatch board (task created, offered, accepted,
+        failed, ...).'
+      properties:
+        type:
+          type: string
+          description: Always "task.status".
+        data:
+          $ref: '#/components/schemas/WsOpsTaskStatusData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: task.status
+        data:
+          task_id: 7001
+          order_id: 1203
+          order_number: JV-261110-001203
+          store_id: 1
+          status: ASSIGNED
+          previous_status: OFFERED
+          rider_id: 41
+          assignment_mode: AUTO
+          attempt_count: 1
+          updated_at: '2026-11-10T09:30:08Z'
         sent_at: '2026-11-10T09:41:05.120000Z'
     WsTaskUpdatedMessage:
       type: object

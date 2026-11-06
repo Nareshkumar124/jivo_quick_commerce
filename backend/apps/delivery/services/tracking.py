@@ -70,20 +70,28 @@ def _task_status(order: Order, task) -> str | None:
 
 
 def track_body(order: Order, now=None) -> dict:
+    from apps.delivery.services import eta as eta_service
     from apps.delivery.services.shifts import latest_location
     from apps.delivery.services.tasks import delivery_otp
 
+    now = now or timezone.now()
     store = order.store
     finished = order.status in TERMINAL_STATUSES
     task = None if finished else _task(order)
     rider = None
+    point = None
     if task is not None and task.rider_id:
-        rider = rider_body(order, task.rider, latest_location(task.rider), _photo_url(task.rider))
+        location = latest_location(task.rider)
+        rider = rider_body(order, task.rider, location, _photo_url(task.rider))
+        point = (location["lat"], location["lng"]) if location else None
+    live = None if finished else eta_service.compute(order, task, point, now=now)
     return {
         "order_id": order.pk,
         "order_number": order.order_number,
         "status": order.status,
         "eta_at": None if finished else order.eta_at,
+        "live_eta_at": live.eta_at if live else None,
+        "live_eta_minutes": live.minutes if live else None,
         "store": {
             "id": store.pk,
             "name": store.name,
@@ -94,5 +102,5 @@ def track_body(order: Order, now=None) -> dict:
         "rider": rider,
         "delivery_otp": delivery_otp(task, order),
         "task_status": _task_status(order, task),
-        "server_time": now or timezone.now(),
+        "server_time": now,
     }

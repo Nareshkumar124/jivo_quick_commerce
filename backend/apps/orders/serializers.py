@@ -425,6 +425,17 @@ class OrderTrackSerializer(serializers.Serializer):
     eta_at = serializers.DateTimeField(
         allow_null=True, help_text="Promised delivery time (08 §8); null once the order ended."
     )
+    live_eta_at = serializers.DateTimeField(
+        allow_null=True,
+        help_text=(
+            "The live ETA (08 §8), recomputed now from the order and task status and the "
+            "rider's latest position; the same value `order.eta` pushes on the order socket. "
+            "Null once the order ended."
+        ),
+    )
+    live_eta_minutes = serializers.IntegerField(
+        allow_null=True, help_text="Minutes from `server_time` to `live_eta_at`, at least 1."
+    )
     store = TrackStoreSerializer()
     destination = TrackPointSerializer(help_text="The delivery pin.")
     rider = TrackRiderSerializer(

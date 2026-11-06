@@ -427,6 +427,34 @@ class DeliveryTask(TimeStampedModel):
     def __str__(self) -> str:
         return f"Task {self.pk} ({self.status}) for order {self.order_id}"
 
+    # `apps.delivery.live`: the (status, rider_id) last read from or committed to the DB, or
+    # None when unknown (a deferred field, a new instance). Unknown means "publish".
+    _live_snapshot: tuple | None = None
+
+    def _live_remember(self) -> None:
+        loaded = self.__dict__
+        if "status" in loaded and "rider_id" in loaded:
+            self._live_snapshot = (loaded["status"], loaded["rider_id"])
+        else:
+            self._live_snapshot = None
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._live_remember()
+        return instance
+
+    def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+        """Also refresh the live snapshot when status or rider were re-read; a partial refresh
+        of other fields keeps it (the in-memory status may be an unsaved change)."""
+        super().refresh_from_db(using=using, fields=fields, from_queryset=from_queryset)
+        names = None if fields is None else set(fields)
+        if names is None or {"status", "rider", "rider_id"} & names:
+            if names is None or ({"status"} <= names and names & {"rider", "rider_id"}):
+                self._live_remember()
+            else:
+                self._live_snapshot = None  # only half of it re-read: unknown
+
 
 class DeliveryOffer(models.Model):
     """One offer of a task to a rider (07 §2.8, 08 §5). At most one PENDING per task and per

@@ -7,4 +7,7 @@ class DeliveryConfig(AppConfig):
     verbose_name = "Riders & delivery"
 
     def ready(self) -> None:
-        from apps.delivery import checks  # noqa: F401 - registers the system checks
+        from apps.delivery import (
+            checks,  # noqa: F401 - registers the system checks
+            live,  # noqa: F401 - task changes to the live sockets (T-612)
+        )

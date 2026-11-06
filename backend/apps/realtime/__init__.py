@@ -12,6 +12,11 @@ Phase 5 (delivery) calls:
   ASSIGNED .. AT_CUSTOMER). While that order is OUT_FOR_DELIVERY an `order.eta` follows (08 §8).
 - `publish_offer(rider_id, offer)`: `offer.new`; `offer` is the `RiderOffer` body.
 - `publish_offer_withdrawn(rider_id, *, offer_id, task_id, reason)`: `offer.withdrawn`.
+- `publish_offer_expired(rider_id, *, offer_id, task_id)`: `offer.expired` (T-612).
+- `publish_cash_updated(rider_id, *, reason)`: `cash.updated`, the rider's cash as it is then.
+- `publish_task_status(store_id, data)`: `task.status` to ops (dispatch board).
+- `publish_rider_presence(rider_id)`: `rider.status` to ops, read from the DB when sent.
+- `publish_order_eta(order_id)`: `order.eta` to the customer, recomputed (08 §8).
 - `publish_task_updated(rider_id, *, task_id, order_id, status, order_status, change)`:
   `task.updated`.
 - `publish_rider_status(rider_id, *, store_id, is_online, on_task)`: `rider.status` (ops).
@@ -57,3 +62,33 @@ def publish_ops_alert(**kwargs) -> None:
     from apps.realtime import services
 
     services.publish_ops_alert(**kwargs)
+
+
+def publish_offer_expired(rider_id, **kwargs) -> None:
+    from apps.realtime import services
+
+    services.publish_offer_expired(rider_id, **kwargs)
+
+
+def publish_cash_updated(rider_id, **kwargs) -> None:
+    from apps.realtime import services
+
+    services.publish_cash_updated(rider_id, **kwargs)
+
+
+def publish_task_status(store_id, data) -> None:
+    from apps.realtime import services
+
+    services.publish_task_status(store_id, data)
+
+
+def publish_rider_presence(rider_id) -> None:
+    from apps.realtime import services
+
+    services.publish_rider_presence(rider_id)
+
+
+def publish_order_eta(order_id) -> None:
+    from apps.realtime import services
+
+    services.publish_order_eta(order_id)

@@ -67,7 +67,7 @@ def record_cash(
             rider.cash_skipped_at = None
         Rider.objects.filter(pk=rider.pk).update(**changes)
         rider.cash_in_hand = balance
-        return RiderCashLedger.objects.create(
+        entry = RiderCashLedger.objects.create(
             rider=locked,
             entry_type=entry_type,
             amount=amount,
@@ -78,6 +78,13 @@ def record_cash(
             note=note,
             idempotency_key=idempotency_key,
         )
+        # T-612: `cash.updated` on the rider socket; a push for staff entries (the rider made
+        # the COD collection themselves and sees it in the delivery response).
+        from apps.delivery import hooks
+
+        push_ref = None if entry_type == CashEntryType.COD_COLLECTED else f"cash:{entry.pk}"
+        hooks.cash_updated(locked, entry_type, push_ref=push_ref)
+        return entry
 
 
 # --------------------------------------------------------------------------- staff (05 §1.5)

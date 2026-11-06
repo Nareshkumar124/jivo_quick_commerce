@@ -26,7 +26,7 @@ from django.utils import timezone
 
 from apps.realtime import contract, limits
 from apps.realtime.auth import SocketIdentity, authenticate_token, token_from_subprotocols
-from apps.realtime.groups import order_group, rider_group, store_group
+from apps.realtime.groups import order_group, rider_group, store_group, user_group
 
 logger = logging.getLogger(__name__)
 
@@ -299,7 +299,7 @@ class OrderConsumer(JwtSocketConsumer):
         if await database_sync_to_async(own_order_status)(identity.user, self.order_id) is None:
             return contract.CLOSE_NOT_FOUND
         # Join before the snapshot, so nothing that changes in between is missed.
-        await self.join([order_group(self.order_id)])
+        await self.join([order_group(self.order_id), user_group(identity.user.pk, "customer")])
         return None
 
     async def after_auth(self) -> None:
@@ -348,7 +348,7 @@ class RiderConsumer(JwtSocketConsumer):
         rider_id = await database_sync_to_async(active_rider_id)(identity.user)
         if rider_id is None:
             return contract.CLOSE_FORBIDDEN
-        wanted = {rider_group(rider_id)}
+        wanted = {rider_group(rider_id), user_group(identity.user.pk, AppName.RIDER)}
         await self.leave(self.joined - wanted)
         await self.join(sorted(wanted))
         return None
