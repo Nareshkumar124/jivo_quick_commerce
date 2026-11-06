@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:jivo_api/jivo_api.dart' as api show InboxNotification, JivoApi;
 import 'package:jivo_core/jivo_core.dart';
 
 /// An inbox entry (`03 §2.11`, `§2.12`; the Phase 6 inbox endpoints).
@@ -41,16 +43,74 @@ class InboxPage {
   final int? nextPage;
 }
 
-/// The notification inbox. TODO(api): the inbox endpoints are Phase 6
-/// (`06 §2`, not in jivo_api yet); the screen runs on
-/// [FakeNotificationRepository] until then.
+/// The notification inbox (`GET /me/notifications/`, `06 §2.2`), scoped
+/// by the server to this user and the customer app.
 abstract interface class NotificationRepository {
   Future<InboxPage> list({int page = 1});
 
   Future<void> markRead(int id);
+
+  /// Marks every entry read; returns how many changed.
+  Future<int> markAllRead();
 }
 
-/// The real-API build until the Phase 6 inbox exists: an empty inbox.
+/// `me_notifications_list`, `me_notifications_read`,
+/// `me_notifications_read_all`. Another user's id is 404.
+class ApiNotificationRepository implements NotificationRepository {
+  const ApiNotificationRepository(this._api);
+
+  final api.JivoApi _api;
+
+  @override
+  Future<InboxPage> list({int page = 1}) async {
+    try {
+      final result = (await _api.getNotificationsApi().meNotificationsList(
+        page: page,
+      )).data!;
+      return InboxPage(
+        items: [for (final n in result.results) inboxNotificationFromApi(n)],
+        nextPage: result.next == null ? null : page + 1,
+      );
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  @override
+  Future<void> markRead(int id) async {
+    try {
+      await _api.getNotificationsApi().meNotificationsRead(id: id);
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+
+  @override
+  Future<int> markAllRead() async {
+    try {
+      final result = await _api.getNotificationsApi().meNotificationsReadAll();
+      return result.data?.updated ?? 0;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
+}
+
+/// Maps the generated entry. Only a `jivo://` link is kept (anything else
+/// is never followed).
+InboxNotification inboxNotificationFromApi(api.InboxNotification n) {
+  final link = n.link == null ? null : Uri.tryParse(n.link!.trim());
+  return InboxNotification(
+    id: n.id,
+    title: n.title,
+    body: n.body,
+    createdAt: n.createdAt,
+    read: n.read,
+    link: link != null && link.scheme == 'jivo' ? link : null,
+  );
+}
+
+/// The build without an inbox: empty.
 class UnavailableNotificationRepository implements NotificationRepository {
   const UnavailableNotificationRepository();
 
@@ -59,6 +119,9 @@ class UnavailableNotificationRepository implements NotificationRepository {
 
   @override
   Future<void> markRead(int id) async {}
+
+  @override
+  Future<int> markAllRead() async => 0;
 }
 
 /// Demo inbox (`FAKE_API=true` and tests).
@@ -104,6 +167,19 @@ class FakeNotificationRepository implements NotificationRepository {
     readCalls.add(id);
     final i = _items.indexWhere((n) => n.id == id);
     if (i >= 0) _items[i] = _items[i].markedRead();
+  }
+
+  @override
+  Future<int> markAllRead() async {
+    _maybeFail();
+    var updated = 0;
+    for (var i = 0; i < _items.length; i++) {
+      if (!_items[i].read) {
+        _items[i] = _items[i].markedRead();
+        updated++;
+      }
+    }
+    return updated;
   }
 
   static List<InboxNotification> _demo(DateTime now) => [

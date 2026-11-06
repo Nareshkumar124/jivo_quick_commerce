@@ -15,13 +15,14 @@ import '../../orders/presentation/order_texts.dart';
 import '../../orders/presentation/order_timeline.dart';
 import '../domain/order_track.dart';
 import 'delivery_cards.dart';
+import 'tracking_map.dart';
 import 'tracking_providers.dart';
 
-/// Live tracking (`03 §2.10`, screen #28; Phase 6, built ahead on fake
-/// data): status timeline, ETA countdown, a route sketch with the store,
-/// the customer and the rider, the rider card with a call button, and the
-/// delivery OTP. The Mappls map replaces the sketch when tracking is bound
-/// (Phase 6).
+/// Live tracking (`03 §2.10`, screen #28): status timeline, ETA
+/// countdown, the Mappls map (or the route sketch without Mappls) with the
+/// store, the customer and the rider, the rider card with a call button,
+/// and the delivery OTP. Updates arrive over the order socket (`06 §4`),
+/// with `track/` polling while it is down.
 class TrackingScreen extends ConsumerWidget {
   const TrackingScreen({required this.orderId, super.key});
 
@@ -106,7 +107,7 @@ class _TrackBody extends ConsumerWidget {
           ),
         ],
         const SizedBox(height: JivoSpacing.lg),
-        RouteSketch(progress: track.progress),
+        TrackMap(track: track),
         const SizedBox(height: JivoSpacing.lg),
         if (otp != null) ...[
           DeliveryOtpCard(otp: otp),

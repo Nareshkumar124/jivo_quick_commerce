@@ -13,6 +13,7 @@ import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../auth/presentation/auth_flow.dart';
 import '../../cms/data/cms_repository.dart';
+import '../../notifications/presentation/inbox_screen.dart';
 import 'profile_controllers.dart';
 import 'profile_form.dart';
 
@@ -82,6 +83,7 @@ class AccountScreen extends ConsumerWidget {
               key: const Key('account-notifications'),
               leading: const Icon(Icons.notifications_none),
               title: Text(l10n.notificationsTitle),
+              trailing: const InboxUnreadBadge(),
               onTap: () => context.push(Routes.notifications),
             ),
             ListTile(

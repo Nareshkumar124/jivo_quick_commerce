@@ -2620,6 +2620,24 @@ abstract class AppLocalizations {
   /// **'Unread'**
   String get notificationUnread;
 
+  /// Inbox app-bar action.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all as read'**
+  String get notificationsMarkAllRead;
+
+  /// Screen reader: the unread badge on the account row.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unread notification} other{{count} unread notifications}}'**
+  String notificationsUnreadCount(int count);
+
+  /// Inbox footer when the next page fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load more notifications.'**
+  String get notificationsLoadMoreFailed;
+
   /// Order line: units the store marked unavailable (08 T8a).
   ///
   /// In en, this message translates to:
