@@ -23,6 +23,8 @@ abstract class _$OrderTrackCWProxy {
 
   OrderTrack deliveryOtp(String? deliveryOtp);
 
+  OrderTrack taskStatus(DeliveryTaskStatusEnum? taskStatus);
+
   OrderTrack serverTime(DateTime serverTime);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `OrderTrack(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -40,6 +42,7 @@ abstract class _$OrderTrackCWProxy {
     TrackPoint destination,
     TrackRider? rider,
     String? deliveryOtp,
+    DeliveryTaskStatusEnum? taskStatus,
     DateTime serverTime,
   });
 }
@@ -76,6 +79,10 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
   OrderTrack deliveryOtp(String? deliveryOtp) => this(deliveryOtp: deliveryOtp);
 
   @override
+  OrderTrack taskStatus(DeliveryTaskStatusEnum? taskStatus) =>
+      this(taskStatus: taskStatus);
+
+  @override
   OrderTrack serverTime(DateTime serverTime) => this(serverTime: serverTime);
 
   @override
@@ -94,6 +101,7 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
     Object? destination = const $CopyWithPlaceholder(),
     Object? rider = const $CopyWithPlaceholder(),
     Object? deliveryOtp = const $CopyWithPlaceholder(),
+    Object? taskStatus = const $CopyWithPlaceholder(),
     Object? serverTime = const $CopyWithPlaceholder(),
   }) {
     return OrderTrack(
@@ -129,6 +137,10 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
           ? _value.deliveryOtp
           // ignore: cast_nullable_to_non_nullable
           : deliveryOtp as String?,
+      taskStatus: taskStatus == const $CopyWithPlaceholder()
+          ? _value.taskStatus
+          // ignore: cast_nullable_to_non_nullable
+          : taskStatus as DeliveryTaskStatusEnum?,
       serverTime: serverTime == const $CopyWithPlaceholder()
           ? _value.serverTime
           // ignore: cast_nullable_to_non_nullable
@@ -162,6 +174,7 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
         'destination',
         'rider',
         'delivery_otp',
+        'task_status',
         'server_time',
       ],
     );
@@ -194,6 +207,14 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
             v == null ? null : TrackRider.fromJson(v as Map<String, dynamic>),
       ),
       deliveryOtp: $checkedConvert('delivery_otp', (v) => v as String?),
+      taskStatus: $checkedConvert(
+        'task_status',
+        (v) => $enumDecodeNullable(
+          _$DeliveryTaskStatusEnumEnumMap,
+          v,
+          unknownValue: DeliveryTaskStatusEnum.unknownDefaultOpenApi,
+        ),
+      ),
       serverTime: $checkedConvert(
         'server_time',
         (v) => DateTime.parse(v as String),
@@ -206,6 +227,7 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
     'orderNumber': 'order_number',
     'etaAt': 'eta_at',
     'deliveryOtp': 'delivery_otp',
+    'taskStatus': 'task_status',
     'serverTime': 'server_time',
   },
 );
@@ -220,6 +242,7 @@ Map<String, dynamic> _$OrderTrackToJson(OrderTrack instance) =>
       'destination': instance.destination.toJson(),
       'rider': instance.rider?.toJson(),
       'delivery_otp': instance.deliveryOtp,
+      'task_status': _$DeliveryTaskStatusEnumEnumMap[instance.taskStatus],
       'server_time': instance.serverTime.toIso8601String(),
     };
 
@@ -236,4 +259,20 @@ const _$OrderStatusEnumEnumMap = {
   OrderStatusEnum.DELIVERY_FAILED: 'DELIVERY_FAILED',
   OrderStatusEnum.RETURNED: 'RETURNED',
   OrderStatusEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$DeliveryTaskStatusEnumEnumMap = {
+  DeliveryTaskStatusEnum.SEARCHING: 'SEARCHING',
+  DeliveryTaskStatusEnum.OFFERED: 'OFFERED',
+  DeliveryTaskStatusEnum.ASSIGNED: 'ASSIGNED',
+  DeliveryTaskStatusEnum.AT_STORE: 'AT_STORE',
+  DeliveryTaskStatusEnum.PICKED_UP: 'PICKED_UP',
+  DeliveryTaskStatusEnum.AT_CUSTOMER: 'AT_CUSTOMER',
+  DeliveryTaskStatusEnum.DELIVERED: 'DELIVERED',
+  DeliveryTaskStatusEnum.FAILED: 'FAILED',
+  DeliveryTaskStatusEnum.RETURNING: 'RETURNING',
+  DeliveryTaskStatusEnum.RETURNED: 'RETURNED',
+  DeliveryTaskStatusEnum.UNASSIGNED: 'UNASSIGNED',
+  DeliveryTaskStatusEnum.CANCELLED: 'CANCELLED',
+  DeliveryTaskStatusEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

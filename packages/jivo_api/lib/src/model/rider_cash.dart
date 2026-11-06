@@ -24,6 +24,8 @@ class RiderCash {
     required this.cashLimit,
 
     required this.limitReached,
+
+    required this.depositRequired,
   });
 
   /// COD cash collected and not yet deposited.
@@ -38,17 +40,25 @@ class RiderCash {
   @JsonKey(name: r'limit_reached', required: true, includeIfNull: false)
   final bool limitReached;
 
+  /// Show the \"Deposit cash\" banner (DL-61): at the limit, or a COD order was not offered to you because cash in hand + its amount was over the limit. Cleared by a deposit at the store. Ops cannot override the limit.
+  @JsonKey(name: r'deposit_required', required: true, includeIfNull: false)
+  final bool depositRequired;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is RiderCash &&
           other.cashInHand == cashInHand &&
           other.cashLimit == cashLimit &&
-          other.limitReached == limitReached;
+          other.limitReached == limitReached &&
+          other.depositRequired == depositRequired;
 
   @override
   int get hashCode =>
-      cashInHand.hashCode + cashLimit.hashCode + limitReached.hashCode;
+      cashInHand.hashCode +
+      cashLimit.hashCode +
+      limitReached.hashCode +
+      depositRequired.hashCode;
 
   factory RiderCash.fromJson(Map<String, dynamic> json) =>
       _$RiderCashFromJson(json);

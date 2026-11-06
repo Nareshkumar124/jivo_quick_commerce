@@ -23,7 +23,7 @@ class AddressesApi {
   const AddressesApi(this._dio);
 
   /// Add an address
-  /// &#x60;lat&#x60;/&#x60;lng&#x60; (the map pin) are required. &#x60;receiver_name&#x60;/&#x60;receiver_phone&#x60; default to the user&#39;s own. The user&#39;s first address becomes the default. Saving an address outside the service area is allowed; it is flagged from Phase 2 (03 §2.4).
+  /// &#x60;lat&#x60;/&#x60;lng&#x60; (the map pin) are required. &#x60;receiver_name&#x60;/&#x60;receiver_phone&#x60; default to the user&#39;s own. The user&#39;s first address becomes the default. Saving an address outside the service area is allowed; it is flagged from Phase 2 (03 §2.4).  A user can keep up to 20 addresses (a server setting); above it: 400 &#x60;VALIDATION_ERROR&#x60; with a &#x60;non_field_errors&#x60; message. Writes are rate limited per user (429).
   ///
   /// Parameters:
   /// * [addressRequest]

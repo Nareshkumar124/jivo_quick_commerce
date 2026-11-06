@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/model/delivery_task_status_enum.dart';
 import 'package:jivo_api/src/model/order_status_enum.dart';
 import 'package:jivo_api/src/model/track_point.dart';
 import 'package:jivo_api/src/model/track_rider.dart';
@@ -38,6 +39,8 @@ class OrderTrack {
     required this.rider,
 
     required this.deliveryOtp,
+
+    required this.taskStatus,
 
     required this.serverTime,
   });
@@ -76,6 +79,15 @@ class OrderTrack {
   @JsonKey(name: r'delivery_otp', required: true, includeIfNull: true)
   final String? deliveryOtp;
 
+  /// The order's delivery task status (SEARCHING, OFFERED, ASSIGNED, AT_STORE, PICKED_UP, AT_CUSTOMER, DELIVERED, FAILED, ...); null while no task exists (before dispatch starts).  * `SEARCHING` - Looking for a rider * `OFFERED` - Offered to a rider * `ASSIGNED` - Rider heading to the store * `AT_STORE` - Rider at the store * `PICKED_UP` - Picked up * `AT_CUSTOMER` - Rider at the drop location * `DELIVERED` - Delivered * `FAILED` - Delivery failed * `RETURNING` - Returning items to the store * `RETURNED` - Items returned to the store * `UNASSIGNED` - No rider found: ops to assign * `CANCELLED` - Cancelled
+  @JsonKey(
+    name: r'task_status',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: DeliveryTaskStatusEnum.unknownDefaultOpenApi,
+  )
+  final DeliveryTaskStatusEnum? taskStatus;
+
   @JsonKey(name: r'server_time', required: true, includeIfNull: false)
   final DateTime serverTime;
 
@@ -91,6 +103,7 @@ class OrderTrack {
           other.destination == destination &&
           other.rider == rider &&
           other.deliveryOtp == deliveryOtp &&
+          other.taskStatus == taskStatus &&
           other.serverTime == serverTime;
 
   @override
@@ -103,6 +116,7 @@ class OrderTrack {
       destination.hashCode +
       (rider == null ? 0 : rider.hashCode) +
       (deliveryOtp == null ? 0 : deliveryOtp.hashCode) +
+      (taskStatus == null ? 0 : taskStatus.hashCode) +
       serverTime.hashCode;
 
   factory OrderTrack.fromJson(Map<String, dynamic> json) =>

@@ -16,6 +16,7 @@ import 'package:jivo_api/src/api/catalog_api.dart';
 import 'package:jivo_api/src/api/cms_api.dart';
 import 'package:jivo_api/src/api/config_api.dart';
 import 'package:jivo_api/src/api/health_api.dart';
+import 'package:jivo_api/src/api/notifications_api.dart';
 import 'package:jivo_api/src/api/orders_api.dart';
 import 'package:jivo_api/src/api/payments_api.dart';
 import 'package:jivo_api/src/api/rider_api.dart';
@@ -177,6 +178,12 @@ class JivoApi {
   /// by doing that all interceptors will not be executed
   HealthApi getHealthApi() {
     return HealthApi(dio);
+  }
+
+  /// Get NotificationsApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  NotificationsApi getNotificationsApi() {
+    return NotificationsApi(dio);
   }
 
   /// Get OrdersApi instance, base route and serializer can be overridden by a given but be careful,

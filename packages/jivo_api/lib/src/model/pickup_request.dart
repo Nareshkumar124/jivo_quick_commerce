@@ -20,7 +20,7 @@ class PickupRequest {
   /// Returns a new [PickupRequest] instance.
   PickupRequest({required this.orderCode});
 
-  /// The 4-character order code typed by the rider, or the whole bag QR payload `JQC1:<order_number>:<code>` as scanned. Case-insensitive.
+  /// The 4-character order code typed by the rider (ASCII letters and digits), or the whole bag QR payload `JQC1:<order_number>:<code>` as scanned. Case-insensitive. Anything else (non-ASCII, wrong shape): 400 `PICKUP_CODE_INVALID`.
   @JsonKey(name: r'order_code', required: true, includeIfNull: false)
   final String orderCode;
 
