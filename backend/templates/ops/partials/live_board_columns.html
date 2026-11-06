@@ -1,11 +1,11 @@
 {# Live board columns (05 §1.2). Context: board (board.Board), caps, actions, poll_seconds. Polls itself with the filters of #board-filters; pauses while a dialog is open. #}
 <div id="board-columns" hx-get="{% url 'ops:live-board-columns' %}" hx-include="#board-filters" hx-swap="outerHTML"
-     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('board-columns')], ops:refresh from:body"
+     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('board-columns')], ops:live from:body[opsLiveAllowed('board-columns')], ops:refresh from:body"
      data-breached="{{ board.breached }}" data-testid="board-columns">
     <p class="mb-3 ops-board-summary" data-testid="board-summary">
         {{ board.total }} active order{{ board.total|pluralize }}{% if board.breached %}, <strong class="ops-tone-danger">{{ board.breached }} past the SLA</strong>{% endif %}.
         {% if board.scoped %}Your assigned stores only.{% else %}All stores.{% endif %}
-        Updated {{ board.generated_at|date:"H:i:s" }} IST; refreshes every {{ poll_seconds }} s.
+        Updated {{ board.generated_at|date:"H:i:s" }} IST; updates live, or every {{ poll_seconds }} s while the live feed is off.
     </p>
 
     <div class="ops-board">

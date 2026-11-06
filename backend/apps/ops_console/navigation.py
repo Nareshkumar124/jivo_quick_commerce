@@ -332,6 +332,23 @@ MODULES: tuple[NavSection, ...] = (
         ),
     ),
     NavSection(
+        "Notifications",
+        (
+            NavItem(
+                "Sent notifications",
+                "notifications",
+                "admin:notifications_notification_changelist",
+                ("notifications.view_notification",),
+            ),
+            NavItem(
+                "Notification templates",
+                "edit_notifications",
+                "admin:notifications_notificationtemplate_changelist",
+                ("notifications.view_notificationtemplate",),
+            ),
+        ),
+    ),
+    NavSection(
         "Admin settings",
         (
             NavItem(
