@@ -3,15 +3,24 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../permissions/presentation/permissions_gate_controller.dart';
-import '../../task/presentation/task_block.dart';
+import '../../../app/providers.dart';
+import '../../shift/presentation/shift_controller.dart';
+import '../../task/presentation/task_providers.dart';
+import '../data/service_isolate_api.dart';
 import '../data/foreground_location_service.dart';
 import '../domain/location_service_client.dart';
 import '../domain/tracker_stats.dart';
 import '../domain/tracking_config.dart';
 
+/// The foreground location service. It uploads to the real API where the
+/// shift API is bound (dev without `FAKE_API`), else to the fake.
 final locationServiceClientProvider = Provider<LocationServiceClient>(
-  (ref) => ForegroundLocationService(),
+  (ref) => ForegroundLocationService(
+    api: ServiceApiSettings.fromEnv(
+      ref.watch(appEnvProvider),
+      live: ref.watch(riderWorkEnabledProvider),
+    ),
+  ),
 );
 
 enum LocationDebugError {
@@ -29,6 +38,7 @@ class LocationDebugState {
     this.busy = false,
     this.mode = TrackingMode.idle,
     this.simulateOffline = false,
+    this.simulateServerOffline = false,
     this.stats,
     this.error,
     this.errorDetail,
@@ -38,6 +48,7 @@ class LocationDebugState {
   final bool busy;
   final TrackingMode mode;
   final bool simulateOffline;
+  final bool simulateServerOffline;
   final TrackerStats? stats;
   final LocationDebugError? error;
   final String? errorDetail;
@@ -47,6 +58,7 @@ class LocationDebugState {
     bool? busy,
     TrackingMode? mode,
     bool? simulateOffline,
+    bool? simulateServerOffline,
     TrackerStats? stats,
     LocationDebugError? error,
     String? errorDetail,
@@ -56,6 +68,7 @@ class LocationDebugState {
     busy: busy ?? this.busy,
     mode: mode ?? this.mode,
     simulateOffline: simulateOffline ?? this.simulateOffline,
+    simulateServerOffline: simulateServerOffline ?? this.simulateServerOffline,
     stats: stats ?? this.stats,
     error: clearError ? null : (error ?? this.error),
     errorDetail: clearError ? null : (errorDetail ?? this.errorDetail),
@@ -67,8 +80,9 @@ final locationDebugControllerProvider =
       LocationDebugController.new,
     );
 
-/// Stand-in for the P5 online/offline toggle: starts and stops the location
-/// service, behind the permissions gate.
+/// Dev diagnostics for the location service (Phase 0 spike screen). Going
+/// online and offline goes through the real [ShiftController], so this
+/// screen and home always agree.
 class LocationDebugController extends Notifier<LocationDebugState> {
   LocationServiceClient get _client => ref.read(locationServiceClientProvider);
 
@@ -102,52 +116,46 @@ class LocationDebugController extends Notifier<LocationDebugState> {
   Future<bool> goOnline(OnlineNotificationText text) async {
     if (state.busy) return false;
     state = state.copyWith(busy: true, clearError: true);
-    try {
-      final gate = await ref
-          .read(permissionsGateControllerProvider.notifier)
-          .refresh();
-      if (!gate.canGoOnline) {
-        state = state.copyWith(
-          busy: false,
-          error: LocationDebugError.permissionsMissing,
-        );
-        return false;
-      }
-      await _client.start(
-        config: const TrackingConfig(),
-        mode: state.mode,
-        simulateOffline: state.simulateOffline,
-        text: text,
-      );
-      state = state.copyWith(online: true, busy: false);
-      return true;
-    } on Object catch (error) {
-      state = state.copyWith(
-        busy: false,
-        error: LocationDebugError.startFailed,
-        errorDetail: '$error',
-      );
-      return false;
+    final shift = ref.read(shiftControllerProvider.notifier);
+    final ok = await shift.goOnline(text);
+    if (!ref.mounted) return ok;
+    final after = ref.read(shiftControllerProvider);
+    state = state.copyWith(
+      busy: false,
+      online: ok,
+      error: ok ? null : _errorOf(after.problem),
+      errorDetail: after.error?.rawCode ?? after.error?.code.name,
+    );
+    if (ok) {
+      if (state.simulateOffline) _client.setSimulateOffline(true);
+      if (state.mode != TrackingMode.idle) _client.setMode(state.mode);
     }
+    return ok;
   }
+
+  static LocationDebugError _errorOf(ShiftProblem? problem) =>
+      switch (problem) {
+        ShiftProblem.permissionsMissing =>
+          LocationDebugError.permissionsMissing,
+        ShiftProblem.taskActive => LocationDebugError.taskActive,
+        _ => LocationDebugError.startFailed,
+      };
 
   Future<void> goOffline() async {
     if (state.busy) return;
-    if (ref.read(taskBlocksGoingOfflineProvider)) {
-      state = state.copyWith(error: LocationDebugError.taskActive);
-      return;
-    }
     state = state.copyWith(busy: true, clearError: true);
-    try {
-      await _client.stop();
-      state = state.copyWith(online: false, busy: false);
-    } on Object catch (error) {
-      state = state.copyWith(
-        busy: false,
-        error: LocationDebugError.startFailed,
-        errorDetail: '$error',
-      );
-    }
+    await ref.read(shiftControllerProvider.notifier).goOffline();
+    if (!ref.mounted) return;
+    final after = ref.read(shiftControllerProvider);
+    state = state.copyWith(
+      busy: false,
+      online: after.isOnline,
+      error:
+          after.problem == ShiftProblem.taskActive ||
+              after.problem == ShiftProblem.serviceFailed
+          ? _errorOf(after.problem)
+          : null,
+    );
   }
 
   void setMode(TrackingMode mode) {
@@ -158,6 +166,11 @@ class LocationDebugController extends Notifier<LocationDebugState> {
   void setSimulateOffline(bool value) {
     state = state.copyWith(simulateOffline: value);
     if (state.online) _client.setSimulateOffline(value);
+  }
+
+  void setSimulateServerOffline(bool value) {
+    state = state.copyWith(simulateServerOffline: value);
+    if (state.online) _client.setSimulateServerOffline(value);
   }
 
   void flush() {

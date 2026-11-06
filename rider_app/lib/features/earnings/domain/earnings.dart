@@ -50,8 +50,6 @@ class EarningAdjustment {
 
 /// `GET /rider/earnings/?from=&to=` (06 §3, 04 §2.8): the totals per kind
 /// and overall, all computed by the server, plus the per-order breakdown.
-///
-/// TODO(api): hand-written until the rider contract lands (end of P4).
 class EarningsSummary {
   const EarningsSummary({
     required this.from,
@@ -61,7 +59,12 @@ class EarningsSummary {
     required this.totalsByType,
     required this.orders,
     this.adjustments = const [],
+    this.ordersTruncated = false,
   });
+
+  /// More than 200 orders in the range: [orders] lists the newest 200, the
+  /// totals still cover all of them.
+  final bool ordersTruncated;
 
   /// The IST dates the summary covers (inclusive).
   final DateTime from;
@@ -145,12 +148,10 @@ DateRange rangeFor(EarningsPeriod period, DateTime now) {
 }
 
 /// Earnings and payouts (06 §3). Every method throws jivo_core's `ApiError`.
-///
-/// TODO(api): no rider contract yet; the fake stands in (DL-30 gating).
 abstract interface class EarningsRepository {
   /// `GET /rider/earnings/?from=YYYY-MM-DD&to=YYYY-MM-DD` (IST dates).
   Future<EarningsSummary> fetchEarnings(DateRange range);
 
-  /// `GET /rider/payouts/?page=`.
-  Future<Page<Payout>> fetchPayouts({int page = 1});
+  /// `GET /rider/payouts/?page=`: [cursor] is the page number (null: 1).
+  Future<Page<Payout>> fetchPayouts({int? cursor});
 }

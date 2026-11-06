@@ -28,12 +28,16 @@
     <script src="{% static 'ops/vendor/htmx-2.0.4.min.js' %}" defer></script>
     <script src="{% static 'unfold/js/chart/chart.js' %}" defer></script>
     <script src="{% static 'ops/js/ops.js' %}" defer></script>
+    {% if ops_live_url %}<script src="{% static 'ops/js/live.js' %}" defer></script>{% endif %}
+    {# Page scripts that register Alpine components must load before Alpine starts. #}
+    {% block page_scripts %}{% endblock %}
     <script src="{% static 'ops/vendor/alpinejs-3.16.1.min.js' %}" defer></script>
     {% block extrahead %}{% endblock %}
 </head>
 <body class="antialiased bg-base-50 font-sans text-font-default-light text-sm dark:bg-base-900 dark:text-font-default-dark"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
       data-login-url="{% url 'admin:login' %}"
+      {% if ops_live_url %}data-ops-live-url="{{ ops_live_url }}" data-ops-order-url="{% url 'admin:orders_order_change' 0 %}"{% endif %}
       x-data="{ sidebarOpen: false }"
       x-on:keydown.escape.window="sidebarOpen = false">
     <a href="#ops-main" class="ops-skip-link">Skip to content</a>

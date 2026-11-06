@@ -3,17 +3,17 @@ Support). Permissions follow 05 §3 through the Groups synced by `apps.accounts.
 
 from django.contrib import admin, messages
 from django.contrib.admin import helpers
-from django.contrib.admin.models import CHANGE, LogEntry
+from django.contrib.admin.models import LogEntry
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
 from django.db.models import Count, Q
 from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import format_html_join
+from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action, display
 from unfold.forms import AdminPasswordChangeForm
@@ -23,14 +23,13 @@ from apps.accounts.forms import UserChangeForm, UserCreationForm
 from apps.accounts.models import Address, Customer, Device, User
 from apps.accounts.services.auth import anonymise_user
 from apps.accounts.services.customers import (
-    MSG_NOT_FOUND,
-    MSG_STAFF,
     block_customer,
-    customer_log_repr,
     unblock_customer,
 )
-from apps.ops_console import status
+from apps.ops_console import order_actions, status
+from apps.ops_console.money import inr
 from apps.ops_console.pii import can_view_full_phone
+from apps.ops_console.scoping import scope_to_stores
 from apps.ops_console.selectors import CUSTOMER_STATUS_FILTERS
 from apps.stores.models import StaffStoreAccess
 from apps.stores.services import grant_store_access, revoke_store_access
@@ -198,6 +197,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     )
 
     inlines = [StaffStoreAccessInline]
+    actions = ["reset_mfa"]
 
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related("groups")
@@ -226,6 +226,26 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
                 grant_store_access(user, store)
                 formset.new_objects.append(StaffStoreAccess.objects.get(user=user, store=store))
         return None
+
+    @action(description="Reset two-factor device (lost phone)", permissions=["change"])
+    def reset_mfa(self, request, queryset):
+        """H2: remove the authenticator and recovery codes of the selected staff; they enrol
+        again at their next sign-in. Audited by `ops_console.mfa.reset_devices`."""
+        from apps.core.net import client_ip
+        from apps.ops_console.mfa import reset_devices
+
+        actor = request.user
+        if not (
+            actor.is_superuser or actor.groups.filter(name=roles.SUPER_ADMIN).exists()
+        ):  # review: Super Admin only, whatever model permissions a custom group holds
+            raise PermissionDenied
+        done = 0
+        for user in queryset.filter(is_staff=True).order_by("pk"):
+            if reset_devices(user, by=request.user, ip=client_ip(request)):
+                done += 1
+        self.message_user(
+            request, f"Reset two-factor sign-in for {done} staff member(s).", messages.SUCCESS
+        )
 
     @display(description="Roles")
     def role_list(self, obj) -> str:
@@ -300,43 +320,106 @@ def can_anonymise(user) -> bool:
 
 
 # --------------------------------------------------------------------------- COD block (DL-43)
-
-LOG_COD_BLOCKED = "Cash on delivery blocked: COD is not offered at checkout."
-LOG_COD_ALLOWED = "Cash on delivery allowed again."
-MSG_COD_ANONYMISED = "This account has been anonymised; its COD setting cannot change."
+# `accounts.services.customers.set_cod_blocked(user_id, blocked, *, by)` (T-405c), called
+# through `ops_console.order_actions`. Its admin LogEntry messages feed "Last COD change".
 
 
-def set_cod_blocked(user_id: int, blocked: bool, *, by) -> bool:
-    """INTERIM, until the backend ships `accounts.services.customers.set_cod_blocked` (reported
-    gap, same signature): set `User.cod_blocked` (08 T2: COD is not offered to the customer).
+def _cod_messages() -> tuple[str, ...]:
+    from apps.accounts.services import customers as customer_services
 
-    Mirrors `block_customer`: one transaction with the row locked, staff / anonymised / unknown
-    accounts refused with a `ValidationError`, True only when the flag changed, and the actor
-    recorded as an admin `LogEntry` on the Customer whose `object_repr` holds no personal data
-    ("Customer 42"; `anonymise_user()` scrubs these entries too). No side effects: carts and
-    orders already placed are not touched; the next cart read hides COD."""
-    if by is None or by.pk is None:
-        raise ValueError("set_cod_blocked needs the acting staff user (`by`).")
-    with transaction.atomic():
-        user = User.objects.select_for_update().filter(pk=user_id).first()
-        if user is None:
-            raise ValidationError(MSG_NOT_FOUND, code="not_found")
-        if user.is_staff or user.is_superuser:
-            raise ValidationError(MSG_STAFF, code="staff")
-        if user.anonymised_at is not None:
-            raise ValidationError(MSG_COD_ANONYMISED, code="anonymised")
-        if user.cod_blocked == blocked:
-            return False
-        User.objects.filter(pk=user.pk).update(cod_blocked=blocked, updated_at=timezone.now())
-        LogEntry.objects.create(
-            user_id=by.pk,
-            content_type=ContentType.objects.get_for_model(Customer, for_concrete_model=False),
-            object_id=str(user.pk),
-            object_repr=customer_log_repr(user.pk),
-            action_flag=CHANGE,
-            change_message=LOG_COD_BLOCKED if blocked else LOG_COD_ALLOWED,
+    names = ("LOG_COD_BLOCKED", "LOG_COD_ALLOWED")
+    return tuple(
+        getattr(customer_services, name) for name in names if hasattr(customer_services, name)
+    )
+
+
+# --------------------------------------------------------------------------- customer detail (P4)
+
+RECENT_ROWS = 20
+_TH = '<th class="pr-4 py-1 text-left font-semibold">{}</th>'
+_TD = '<td class="pr-4 py-1">{}</td>'
+
+
+def _table(headers: tuple[str, ...], rows: list[tuple], testid: str) -> str:
+    head = format_html_join("", _TH, ((header,) for header in headers))
+    row_format = "<tr>" + _TD * len(headers) + "</tr>"
+    body = format_html_join("", row_format, rows)
+    return format_html(
+        '<table class="text-sm" data-testid="{}"><thead><tr>{}</tr></thead><tbody>{}</tbody>'
+        "</table>",
+        testid,
+        head,
+        body,
+    )
+
+
+def customer_orders_table(customer, viewer) -> str:
+    """The customer's newest orders, limited to the viewer's stores (`stores_for`)."""
+    from apps.orders.models import Order
+
+    if viewer is None or customer.pk is None:
+        return "-"
+    orders = scope_to_stores(Order.objects.filter(user_id=customer.pk), viewer)
+    total = orders.count()
+    if not total:
+        return "No orders yet."
+    rows = []
+    for order in orders.select_related("store").order_by("-created_at", "-id")[:RECENT_ROWS]:
+        link = format_html(
+            '<a class="text-primary-600 dark:text-primary-500" href="{}">{}</a>',
+            reverse("admin:orders_order_change", args=[order.pk]),
+            order.order_number,
         )
-    return True
+        rows.append(
+            (
+                link,
+                timezone.localtime(order.created_at).strftime("%d %b %Y %H:%M"),
+                order.store.code,
+                status.badge_for(status.ORDER, order.status).label,
+                order.get_payment_method_display(),
+                status.badge_for(status.ORDER_PAYMENT, order.payment_status).label,
+                inr(order.grand_total),
+            )
+        )
+    table = _table(
+        ("Order", "Placed (IST)", "Store", "Status", "Payment", "Payment status", "Total"),
+        rows,
+        "customer-orders",
+    )
+    url = f"{reverse('admin:orders_order_changelist')}?customer={customer.pk}"
+    return format_html(
+        '{}<p class="mt-2">{} order(s) in all. <a class="text-primary-600 dark:text-primary-500" '
+        'href="{}">See all orders</a></p>',
+        table,
+        total,
+        url,
+    )
+
+
+def customer_refunds_table(customer, viewer) -> str:
+    """The customer's refunds (viewers with `payments.view_refund`), limited to their stores."""
+    from apps.payments.models import Refund
+
+    if viewer is None or customer.pk is None or not viewer.has_perm("payments.view_refund"):
+        return "-"
+    refunds = scope_to_stores(
+        Refund.objects.filter(order__user_id=customer.pk), viewer, "order__store"
+    ).select_related("order")
+    rows = [
+        (
+            timezone.localtime(refund.created_at).strftime("%d %b %Y %H:%M"),
+            refund.order.order_number,
+            inr(refund.amount),
+            status.badge_for(status.REFUND, refund.status).label,
+            refund.reason or "-",
+        )
+        for refund in refunds.order_by("-created_at", "-id")[:RECENT_ROWS]
+    ]
+    if not rows:
+        return "No refunds."
+    return _table(
+        ("Created (IST)", "Order", "Amount", "Status", "Reason"), rows, "customer-refunds"
+    )
 
 
 @admin.register(Customer)
@@ -344,7 +427,8 @@ class CustomerAdmin(ModelAdmin):
     """05 §2 Customers: list/search by phone or name, addresses, block/unblock, anonymise on
     deletion request. Read-only except through the actions (no edit of staff fields).
 
-    Orders (Phase 4) and tickets (Phase 7) are added to the detail page with their phases.
+    Phase 4 adds the customer's recent orders (scoped to the viewer's stores, linked to the
+    order pages) and, for roles that view refunds, their refunds. Tickets arrive in Phase 7.
     """
 
     list_display = (
@@ -398,6 +482,8 @@ class CustomerAdmin(ModelAdmin):
             },
         ),
         ("Consent", {"fields": ("marketing_opt_in", "terms_version", "terms_accepted_at")}),
+        ("Orders", {"fields": ("recent_orders",)}),
+        ("Refunds", {"fields": ("customer_refunds",)}),
     )
 
     def get_queryset(self, request):
@@ -406,6 +492,18 @@ class CustomerAdmin(ModelAdmin):
             .get_queryset(request)
             .annotate(live_addresses=Count("addresses", filter=Q(addresses__is_deleted=False)))
         )
+
+    def get_object(self, request, object_id, from_field=None):
+        obj = super().get_object(request, object_id, from_field)
+        if obj is not None:
+            obj.panel_viewer = request.user  # for the order and refund sections (scoping)
+        return obj
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = list(super().get_fieldsets(request, obj))
+        if not request.user.has_perm("payments.view_refund"):
+            fieldsets = [item for item in fieldsets if item[0] != "Refunds"]
+        return fieldsets
 
     # 05 §3 "Customers (PII)": this screen shows customers in full (phone in the title,
     # breadcrumbs and search), so only roles with full PII access open it, even if a "limited"
@@ -438,7 +536,7 @@ class CustomerAdmin(ModelAdmin):
             LogEntry.objects.filter(
                 content_type=ContentType.objects.get_for_model(Customer, for_concrete_model=False),
                 object_id=str(obj.pk),
-                change_message__in=(LOG_COD_BLOCKED, LOG_COD_ALLOWED),
+                change_message__in=_cod_messages(),
             )
             .select_related("user")
             .order_by("-action_time", "-id")
@@ -449,6 +547,14 @@ class CustomerAdmin(ModelAdmin):
         actor = entry.user.name or entry.user.email or f"User {entry.user_id}"
         when = timezone.localtime(entry.action_time).strftime("%d %b %Y %H:%M")
         return f"{entry.change_message} By {actor}, {when} IST."
+
+    @display(description="Recent orders")
+    def recent_orders(self, obj) -> str:
+        return customer_orders_table(obj, getattr(obj, "panel_viewer", None))
+
+    @display(description="Refunds")
+    def customer_refunds(self, obj) -> str:
+        return customer_refunds_table(obj, getattr(obj, "panel_viewer", None))
 
     @display(description="Addresses", ordering="live_addresses")
     def address_count(self, obj) -> int:
@@ -498,13 +604,15 @@ class CustomerAdmin(ModelAdmin):
         refused: dict[str, int] = {}
         for pk in queryset.order_by("pk").values_list("pk", flat=True):
             try:
-                if set_cod_blocked(pk, blocked, by=request.user):
+                if order_actions.set_cod_blocked(pk, blocked, actor=request.user):
                     changed += 1
                 else:
                     unchanged += 1
-            except ValidationError as error:
-                for message in error.messages:
-                    refused[message] = refused.get(message, 0) + 1
+            except order_actions.ActionUnavailable:
+                self.message_user(request, order_actions.MSG_UNAVAILABLE, messages.ERROR)
+                return
+            except order_actions.ActionRefused as refusal:
+                refused[refusal.message] = refused.get(refusal.message, 0) + 1
         verb = "Blocked cash on delivery for" if blocked else "Allowed cash on delivery for"
         self.message_user(request, f"{verb} {changed} customer(s).", messages.SUCCESS)
         if unchanged:

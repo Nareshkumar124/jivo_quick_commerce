@@ -7,6 +7,8 @@ import '../features/addresses/presentation/address_controllers.dart';
 import '../features/auth/presentation/auth_flow.dart';
 import '../features/cart/presentation/cart_controller.dart';
 import '../features/checkout/presentation/checkout_controller.dart';
+import '../features/notifications/presentation/notification_tap_router.dart';
+import '../features/notifications/presentation/push_registration.dart';
 import '../features/orders/presentation/pending_payment.dart';
 import '../features/profile/presentation/profile_controllers.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -45,7 +47,9 @@ class JivoCustomerApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref
       ..watch(signOutCleanupProvider)
-      ..watch(cartStoreSyncProvider);
+      ..watch(cartStoreSyncProvider)
+      ..watch(pushRegistrarProvider)
+      ..watch(notificationTapRouterProvider);
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       theme: JivoTheme.light(),

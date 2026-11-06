@@ -43,7 +43,7 @@ class RecordingOfferAlerter implements OfferAlerter {
 
 /// A stand-in for the camera: buttons that "scan" a value.
 QrScannerBuilder fakeScanner(List<String> values) =>
-    (context, onScan) => Column(
+    (context, onScan, _) => Column(
       children: [
         for (final value in values)
           TextButton(

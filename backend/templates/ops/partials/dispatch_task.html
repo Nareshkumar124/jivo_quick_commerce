@@ -1,0 +1,137 @@
+{% load ops %}
+{# Task detail panel. Context: detail, actions, poll_seconds. Pickup code and delivery OTP appear only as "locked" / attempts left, never the codes. Buttons post to the services through order_actions; the service re-checks the role, the store and the state. #}
+{% with task=detail.task order=detail.order %}
+<div id="dispatch-task" hx-get="{% url 'ops:dispatch-task-panel' task.pk %}" hx-swap="outerHTML"
+     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('dispatch-task')], ops:live from:body[opsLiveAllowed('dispatch-task')], ops:refresh from:body" data-testid="dispatch-task">
+    <section class="bg-white border border-base-200 flex flex-wrap gap-3 items-center mb-4 ops-card p-3 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-label="Task">
+        <div class="flex flex-col">
+            <span class="font-semibold text-font-important-light dark:text-font-important-dark">
+                <a class="text-primary-600 dark:text-primary-500" href="{% url 'admin:orders_order_change' order.pk %}">{{ order.order_number }}</a>
+                <span class="ops-text-secondary">{{ task.store.code }} {{ task.store.name }}</span>
+            </span>
+            <span class="ops-text-secondary">{% if order.payment_method == "COD" %}Cash on delivery: {{ order.grand_total|inr }}{% else %}Paid online{% endif %} &middot; {{ task.distance_km }} km &middot; order {% status_badge "order" order.status %}</span>
+        </div>
+        <div class="flex gap-2 items-center" data-testid="task-status">{% status_badge "task" task.status %}</div>
+        <div class="flex flex-col ml-auto">
+            <span>Rider: <strong data-testid="task-rider">{{ task.rider.full_name|default:"none yet" }}</strong>{% if task.assignment_mode %} <span class="ops-text-secondary">({{ task.get_assignment_mode_display }})</span>{% endif %}</span>
+            {% if task.status == "SEARCHING" or task.status == "OFFERED" %}<span class="ops-text-secondary">Offers made this round: {{ task.attempt_count }}</span>{% endif %}
+        </div>
+    </section>
+
+    <div class="ops-dispatch-grid">
+        <section aria-labelledby="sec-locks" data-testid="section-locks">
+            <h2 id="sec-locks" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Codes</h2>
+            <ul class="ops-timeline">
+                <li data-testid="pickup-lock">
+                    <span>Pickup code</span>
+                    {% if detail.pickup_locked %}{% include "unfold/helpers/label.html" with text="Locked" variant="danger" %} <span class="ops-text-secondary">since {{ task.pickup_locked_at|date:"H:i" }}</span>
+                    {% else %}{% include "unfold/helpers/label.html" with text="Not locked" variant="success" %}{% if detail.pickup_attempts_left is not None %} <span class="ops-text-secondary">{{ detail.pickup_attempts_left }} attempt{{ detail.pickup_attempts_left|pluralize }} left</span>{% endif %}{% endif %}
+                </li>
+                <li data-testid="otp-lock">
+                    <span>Delivery OTP</span>
+                    {% if detail.otp_locked %}{% include "unfold/helpers/label.html" with text="Locked" variant="danger" %} <span class="ops-text-secondary">since {{ task.otp_locked_at|date:"H:i" }}</span>
+                    {% else %}{% include "unfold/helpers/label.html" with text="Not locked" variant="success" %}{% if detail.otp_attempts_left is not None %} <span class="ops-text-secondary">{{ detail.otp_attempts_left }} attempt{{ detail.otp_attempts_left|pluralize }} left</span>{% endif %}{% endif %}
+                </li>
+            </ul>
+            {% if task.fail_reason %}<p class="mt-2">Failed: <strong>{{ task.get_fail_reason_display }}</strong>{% if task.fail_note %} &middot; {{ task.fail_note }}{% endif %}</p>{% endif %}
+
+            <h2 class="font-semibold mb-2 mt-4 text-font-important-light dark:text-font-important-dark">Timeline</h2>
+            <ol class="ops-timeline" data-testid="task-timeline">
+                {% for label, moment in detail.timeline %}<li><time datetime="{{ moment|iso }}">{{ moment|date:"H:i:s" }}</time><span>{{ label }}</span></li>{% endfor %}
+            </ol>
+        </section>
+
+        <section aria-labelledby="sec-actions" data-testid="section-actions">
+            <h2 id="sec-actions" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Dispatch</h2>
+            <div class="flex flex-wrap gap-2 mb-3">
+                {% if detail.can_unassign %}
+                    <form hx-post="{% url 'ops:dispatch-unassign' task.pk %}" hx-swap="none" method="post" action="{% url 'ops:dispatch-unassign' task.pk %}"
+                          hx-confirm="The rider is taken off this order and told; the order goes back to searching." data-confirm-title="Take the rider off?" data-confirm-label="Take off" data-confirm-tone="danger">
+                        {% csrf_token %}
+                        <button type="submit" class="ops-button ops-button--outline-danger" data-testid="unassign"{% if not actions.unassign %} disabled title="Not available yet"{% endif %}>Take rider off</button>
+                    </form>
+                {% endif %}
+                {% if detail.can_retry %}
+                    <form hx-post="{% url 'ops:dispatch-retry' task.pk %}" hx-swap="none" method="post" action="{% url 'ops:dispatch-retry' task.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="ops-button" data-testid="retry"{% if not actions.retry_dispatch %} disabled title="Not available yet"{% endif %}>Search again</button>
+                    </form>
+                {% endif %}
+            </div>
+            {# Slice 5.4 (DL-61 a): delivery_ops_views. Shown in the states the service accepts; disabled while the service is not on the branch. #}
+            {% if ops54_state.unlock_pickup or ops54_state.unlock_otp %}
+                <div class="flex flex-wrap gap-2 mb-3" data-testid="ops-unlocks">
+                    {% if ops54_state.unlock_pickup %}
+                        <form hx-post="{% url 'ops:dispatch-unlock-pickup' task.pk %}" hx-swap="none" method="post" action="{% url 'ops:dispatch-unlock-pickup' task.pk %}"
+                              hx-confirm="Give the rider new tries for the pickup code? The code itself does not change." data-confirm-title="Unlock pickup code?" data-confirm-label="Unlock">
+                            {% csrf_token %}
+                            <button type="submit" class="ops-button ops-button--secondary" data-testid="unlock-pickup"{% if not ops54.unlock_pickup %} disabled title="Available after the slice 5.4 merge"{% endif %}>Unlock pickup code</button>
+                        </form>
+                    {% endif %}
+                    {% if ops54_state.unlock_otp %}
+                        <form hx-post="{% url 'ops:dispatch-unlock-otp' task.pk %}" hx-swap="none" method="post" action="{% url 'ops:dispatch-unlock-otp' task.pk %}"
+                              hx-confirm="Give the rider new tries for the delivery OTP? The customer's OTP does not change." data-confirm-title="Unlock delivery OTP?" data-confirm-label="Unlock">
+                            {% csrf_token %}
+                            <button type="submit" class="ops-button ops-button--secondary" data-testid="unlock-otp"{% if not ops54.unlock_otp %} disabled title="Available after the slice 5.4 merge"{% endif %}>Unlock delivery OTP</button>
+                        </form>
+                    {% endif %}
+                </div>
+            {% endif %}
+            {% if ops54_state.fail %}
+                <details class="mb-3" data-testid="mark-failed-panel">
+                    <summary class="cursor-pointer font-semibold">Mark delivery failed</summary>
+                    <form class="flex flex-col gap-2 mt-2" hx-post="{% url 'ops:dispatch-fail' task.pk %}" hx-swap="none" method="post" action="{% url 'ops:dispatch-fail' task.pk %}"
+                          hx-confirm="Mark this delivery failed? The rider brings the items back to the store; refunds follow the failed-delivery rules." data-confirm-title="Mark delivery failed?" data-confirm-label="Mark failed" data-confirm-tone="danger">
+                        {% csrf_token %}
+                        {% include "ops/components/form_field.html" with field=fail_form.reason %}
+                        {% include "ops/components/form_field.html" with field=fail_form.note %}
+                        <div><button type="submit" class="ops-button ops-button--outline-danger" data-testid="mark-failed"{% if not ops54.fail_delivery %} disabled title="Available after the slice 5.4 merge"{% endif %}>Mark failed</button></div>
+                    </form>
+                </details>
+            {% endif %}
+
+            {% if detail.can_assign %}
+                <h3 class="font-semibold mb-2">Assign a rider</h3>
+                {% if detail.candidates %}
+                    <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                        <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                            <thead><tr class="bg-base-50 dark:bg-base-900"><th scope="col">Rider</th><th scope="col">From store</th><th scope="col">Last ping</th><th scope="col">Cash in hand</th><th scope="col"><span class="sr-only">Assign</span></th></tr></thead>
+                            <tbody>
+                                {% for row in detail.candidates %}
+                                    <tr data-testid="candidate-{{ row.rider.pk }}">
+                                        <td>{{ row.rider.full_name }}{% if row.pending_offer %} {% include "unfold/helpers/label.html" with text="Has an offer" variant="warning" %}{% endif %}</td>
+                                        <td>{% if row.km is not None %}{{ row.km }} km{% else %}<span class="ops-text-secondary">no location</span>{% endif %}</td>
+                                        <td>{% if row.ping_age is not None %}{{ row.ping_age }} s ago{% else %}<span class="ops-text-secondary">never</span>{% endif %}</td>
+                                        <td>{{ row.rider.cash_in_hand|inr }} / {{ row.rider.cash_limit|inr }}{% if not row.within_cash_limit %} {% include "unfold/helpers/label.html" with text="Over cash limit" variant="danger" %}{% endif %}</td>
+                                        <td>
+                                            <form hx-post="{% url 'ops:dispatch-assign' task.pk %}" hx-swap="none" method="post" action="{% url 'ops:dispatch-assign' task.pk %}"
+                                                  hx-confirm="Assign {{ row.rider.full_name }} to {{ order.order_number }}? The rider is told at once (no offer)." data-confirm-title="Assign rider?" data-confirm-label="Assign">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="rider" value="{{ row.rider.pk }}">
+                                                <button type="submit" class="ops-button ops-button--secondary" data-testid="assign-{{ row.rider.pk }}"{% if not actions.manual_assign or not row.within_cash_limit %} disabled{% endif %}>Assign</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    {% include "ops/components/empty_state.html" with title="No free rider of this store is online" icon="two_wheeler" compact=1 %}
+                {% endif %}
+            {% elif not detail.can_unassign and not detail.can_retry and not ops54_state.unlock_pickup and not ops54_state.unlock_otp and not ops54_state.fail %}
+                <p class="ops-text-secondary" data-testid="no-actions">No dispatch action applies in this state.</p>
+            {% endif %}
+
+            <h2 class="font-semibold mb-2 mt-4 text-font-important-light dark:text-font-important-dark">Offers</h2>
+            {% if detail.offers %}
+                <ul class="ops-timeline" data-testid="task-offers">
+                    {% for offer in detail.offers %}<li><time datetime="{{ offer.offered_at|iso }}">{{ offer.offered_at|date:"H:i:s" }}</time><span>{{ offer.rider.full_name }}: {{ offer.get_status_display }}{% if offer.reject_reason %} ({{ offer.get_reject_reason_display }}){% endif %}</span></li>{% endfor %}
+                </ul>
+            {% else %}
+                <p class="ops-text-secondary">No offer made yet.</p>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endwith %}

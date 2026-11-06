@@ -1,0 +1,33 @@
+{% extends "ops/base.html" %}
+{% load static %}
+
+{% block page_scripts %}<script src="{% static 'ops/js/orders.js' %}" defer></script>{% endblock %}
+
+{% block content %}
+    {# Rider payouts (05 §2 "Rider earnings & payouts", §3 "Payouts": Super Admin, Finance; D-16 weekly bank transfers made offline; slice 5.4). Context: page, status, status_choices, create_form. Amounts are the server's sums. #}
+    <section class="bg-white border border-base-200 mb-4 ops-card p-3 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-labelledby="sec-batch">
+        <h2 id="sec-batch" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">New payout batch</h2>
+        <p class="mb-2 ops-text-secondary">One payout per rider with unpaid earnings in the period. Pay them by bank transfer, then record each transfer reference below.</p>
+        <form class="flex flex-wrap gap-3 items-end" hx-post="{% url 'ops:payouts-create' %}" hx-swap="none" method="post" action="{% url 'ops:payouts-create' %}"
+              hx-confirm="Create payouts for every rider with unpaid earnings in this period?" data-confirm-title="Create payout batch?" data-confirm-label="Create" data-testid="payouts-create">
+            {% csrf_token %}
+            {% include "ops/components/form_field.html" with field=create_form.period_start %}
+            {% include "ops/components/form_field.html" with field=create_form.period_end %}
+            <div><button type="submit" class="ops-button">Create payouts</button></div>
+        </form>
+    </section>
+
+    <form id="payout-filters" class="ops-table__filters" method="get" action="{% url 'ops:payouts' %}"
+          hx-get="{% url 'ops:payouts-list' %}" hx-target="#payouts-list" hx-swap="outerHTML" hx-trigger="change">
+        <div class="ops-field">
+            <label class="block font-semibold mb-2 text-font-important-light dark:text-font-important-dark" for="payout-status">Status</label>
+            <select id="payout-status" name="status" class="bg-white border border-base-200 px-3 py-2 rounded-default w-full dark:bg-base-900 dark:border-base-700">
+                <option value="">All</option>
+                {% for value, label in status_choices %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+        </div>
+        <noscript><button type="submit" class="ops-button ops-button--secondary">Apply</button></noscript>
+    </form>
+
+    {% include "ops/partials/payouts_list.html" %}
+{% endblock %}

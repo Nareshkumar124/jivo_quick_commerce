@@ -43,3 +43,4 @@ qa/private/
 # Raw inputs from Jivo: product sheets/SAP exports/photos (catalog-data) and brand assets (ui-designer). Never commit.
 data/incoming/
 design/incoming/
+/apk/

@@ -209,6 +209,28 @@ class FakeRiderOnboardingBackend implements RiderOnboardingRepository {
         .copyWith(status: RiderStatusEnum.REJECTED, rejectionReason: reason);
   }
 
+  /// Ops asks an ACTIVE rider for a new copy of [document] (e.g. an expired
+  /// driving licence): the document is rejected with [note], the rider's
+  /// status is unchanged. Assumed: whether ops can do this, and whether it
+  /// affects dispatch, is an open question (api-requests, P4 rider report).
+  void rejectDocument(KycDocumentType document, {String note = expiredDlNote}) {
+    final rider = _rider();
+    final profile = _profile();
+    final existing = profile.documentOf(document);
+    _profiles[rider.key] = profile.withDocument(
+      RiderDocument(
+        type: document,
+        status: DocumentReviewStatus.rejected,
+        numberMasked: existing?.numberMasked,
+        reviewNote: note,
+        uploadedAt: existing?.uploadedAt,
+      ),
+    );
+  }
+
+  static const expiredDlNote =
+      'Your driving licence has expired. Upload the renewed licence.';
+
   /// Assumed: once a `REJECTED` rider has replaced every rejected document
   /// and everything required is in, the application goes back to review
   /// (`PENDING_KYC`). Whether the server does this, or needs an explicit

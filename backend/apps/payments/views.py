@@ -47,6 +47,19 @@ HEADER_REQUIRED = "This header is required."
 INVALID_WEBHOOK_SIGNATURE = "The webhook signature is invalid."
 
 
+# Local development only: the fake gateway's FAKE_GATEWAY_DOWN switch (P3-TC-63).
+VERIFY_UNAVAILABLE = error_response(
+    "Maintenance mode (`MAINTENANCE`), or the payment gateway could not be reached "
+    "(`SERVICE_UNAVAILABLE`): nothing changed; call verify again.",
+    *app_responses({})[503].examples,
+    error_example(
+        ErrorCode.SERVICE_UNAVAILABLE,
+        "Online payment is temporarily unavailable. Try again, or choose cash on delivery.",
+        name="PAYMENT_GATEWAY_UNAVAILABLE",
+    ),
+)
+
+
 class RazorpayVerifyView(APIView):
     throttle_classes = [PaymentThrottle]
 
@@ -102,6 +115,7 @@ class RazorpayVerifyView(APIView):
                     ),
                 ),
                 429: RATE_LIMITED,
+                503: VERIFY_UNAVAILABLE,
             }
         ),
     )
@@ -126,6 +140,8 @@ class RazorpayWebhookView(APIView):
 
     authentication_classes: list = []
     permission_classes = [AllowAny]
+    # T-814 (H3): never throttled; Razorpay's calls are signed and must not be dropped.
+    throttle_classes: list = []
 
     @extend_schema(
         operation_id="payments_razorpay_webhook",
@@ -138,7 +154,7 @@ class RazorpayWebhookView(APIView):
             "keyed with the webhook secret; anything else is a 400 and nothing is stored. "
             "Events are processed once per `X-Razorpay-Event-Id` (a repeat answers "
             "`duplicate`) and in any order relative to verify (08 §4). Unhandled event types "
-            "answer `ignored`. A 2xx tells Razorpay not to retry."
+            "answer `ignored`. A 2xx tells Razorpay not to retry; a 503 asks it to."
         ),
         auth=[],
         parameters=[
@@ -176,6 +192,11 @@ class RazorpayWebhookView(APIView):
                 error_example(ErrorCode.PAYMENT_VERIFICATION_FAILED, INVALID_WEBHOOK_SIGNATURE),
                 validation_error({EVENT_ID_HEADER: [HEADER_REQUIRED]}, name="No event id"),
             ),
+            503: error_response(
+                "`SERVICE_UNAVAILABLE`: the event cannot be applied yet (a refund whose gateway "
+                "id is still being recorded). Nothing is stored; Razorpay retries it.",
+                error_example(ErrorCode.SERVICE_UNAVAILABLE),
+            ),
         },
     )
     def post(self, request: Request) -> Response:
@@ -187,4 +208,9 @@ class RazorpayWebhookView(APIView):
         if not event_id or len(event_id) > 64:
             raise ValidationError({EVENT_ID_HEADER: [HEADER_REQUIRED]})
         RazorpayWebhookEventSerializer(data=request.data).is_valid(raise_exception=True)
-        return Response({"status": services.handle_webhook(event_id, request.data)})
+        try:
+            result = services.handle_webhook(event_id, request.data)
+        except services.WebhookRetryLater:
+            # Nothing stored: the gateway retries the event (refund id not recorded yet).
+            raise ApiError(ErrorCode.SERVICE_UNAVAILABLE) from None
+        return Response({"status": result})

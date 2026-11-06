@@ -34,6 +34,8 @@ dependencies = [
     "gunicorn==26.2.0",
     "uvicorn[standard]==0.54.0",
     "uvicorn-worker==0.4.0",
+    "nh3==0.3.7",                           # P7: CMS page HTML allow-list (bleach is deprecated)
+    "django-otp==1.7.5",
 ]
 
 [dependency-groups]
@@ -45,6 +47,7 @@ dev = [
     "freezegun==1.5.5",
     "ruff==0.17.3",
     "pip-audit==2.10.1",
+    "pytest-xdist==3.8.0",                  # T-408c: parallel runs (`pytest -n 4`)
 ]
 
 [tool.uv]

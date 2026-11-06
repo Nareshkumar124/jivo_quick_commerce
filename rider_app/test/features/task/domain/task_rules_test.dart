@@ -9,18 +9,62 @@ void main() {
   final cod = backend.newTask(cod: true, status: TaskStatus.atCustomer);
   final prepaid = backend.newTask(status: TaskStatus.atCustomer);
 
-  group('formatRupees (display only, never parsed)', () {
-    test('Indian grouping, the server\'s decimals unchanged', () {
-      expect(formatRupees('249.00'), '₹249.00');
-      expect(formatRupees('1249.00'), '₹1,249.00');
+  group('formatRupees (03 §4 rule, RD-02; display only)', () {
+    test('en_IN grouping, paise only when not zero', () {
+      expect(formatRupees('249.00'), '₹249');
+      expect(formatRupees('1249.00'), '₹1,249');
       expect(formatRupees('12345.50'), '₹12,345.50');
-      expect(formatRupees('1234567.00'), '₹12,34,567.00');
-      expect(formatRupees('0.5'), '₹0.5');
+      expect(formatRupees('1234567.00'), '₹12,34,567');
+      expect(formatRupees('0.5'), '₹0.50');
       expect(formatRupees('45'), '₹45');
+      expect(formatRupees('-20.00'), '-₹20');
     });
 
-    test('anything unexpected is shown as sent', () {
-      expect(formatRupees('abc'), '₹abc');
+    test('a malformed amount is never shown with a bare ₹', () {
+      expect(formatRupees('abc'), 'abc');
+      expect(formatRupees(''), '');
+      expect(tryFormatRupees(null), isNull);
+      expect(tryFormatRupees(''), isNull);
+      expect(tryFormatRupees('12.345'), isNull);
+      // 20 digits from a broken server value: null, never an overflow.
+      expect(tryFormatRupees('12345678901234567890.00'), isNull);
+      expect(isSameAmount('12345678901234567890', '1'), isFalse);
+      expect(tryFormatRupees('100000000000000.00'), '₹10,00,00,00,00,00,000');
+    });
+
+    test('isSameAmount compares server strings', () {
+      expect(isSameAmount('20', '20.00'), isTrue);
+      expect(isSameAmount('20.5', '20.50'), isTrue);
+      expect(isSameAmount('20.00', '19.99'), isFalse);
+      expect(isSameAmount('x', 'x'), isFalse);
+    });
+  });
+
+  group('COD amount display (RD-02, RD-03)', () {
+    test('codAmountText: the due amount, or null when it is missing', () {
+      expect(codAmountText(cod), formatRupees(FakeTaskBackend.codAmount));
+      expect(codAmountText(prepaid), isNull);
+      final missing = backend.newTask(cod: true, status: TaskStatus.atCustomer);
+      expect(
+        codAmountText(_withoutAmount(missing)),
+        isNull,
+        reason: 'never a bare ₹',
+      );
+    });
+
+    test('codAmountWasText only when the amount really changed', () {
+      expect(codAmountWasText(cod), isNull);
+      final changed = cod.copyWith(
+        codAmountDue: '990.00',
+        codAmountChangedFrom: '1240.00',
+      );
+      expect(codAmountWasText(changed), '₹1,240');
+      expect(codAmountText(changed), '₹990');
+      final same = cod.copyWith(
+        codAmountDue: '990.00',
+        codAmountChangedFrom: '990',
+      );
+      expect(codAmountWasText(same), isNull);
     });
   });
 
@@ -86,10 +130,90 @@ void main() {
       expect(normalisePickupCode('7K-P'), isNull);
     });
 
-    test('QR content is accepted only when it is exactly the code', () {
-      expect(pickupCodeFromQr('7K2P'), '7K2P');
-      expect(pickupCodeFromQr('https://example.com/7K2P'), isNull);
-      expect(pickupCodeFromQr(null), isNull);
+    test('bag QR JQC1:<order>:<code> is sent whole (api-requests #15)', () {
+      final scanned = parseScannedPickup(
+        'jqc1:JV-261110-001203:k7qx',
+        orderNumber: 'JV-261110-001203',
+      );
+      expect(scanned, isA<ScannedCode>());
+      expect((scanned as ScannedCode).orderCode, 'JQC1:JV-261110-001203:K7QX');
+      expect(pickupCodeFromPayload(scanned.orderCode), 'K7QX');
+    });
+
+    test('a bare 4-character QR is the code', () {
+      final scanned = parseScannedPickup(' 7k2p ', orderNumber: 'JQ-1');
+      expect((scanned as ScannedCode).orderCode, '7K2P');
+      expect(pickupCodeFromPayload('7K2P'), '7K2P');
+    });
+
+    test('a label for another order is caught without a call', () {
+      final scanned = parseScannedPickup(
+        'JQC1:JV-OTHER:K7QX',
+        orderNumber: 'JV-261110-001203',
+      );
+      expect((scanned as ScannedOtherOrder).orderNumber, 'JV-OTHER');
+    });
+
+    test('anything else is unreadable', () {
+      for (final raw in [
+        null,
+        'https://example.com/7K2P',
+        'JQC1:JV-1:K7',
+        'JQC1::K7QX',
+        'JQC2:JV-1:K7QX',
+      ]) {
+        expect(
+          parseScannedPickup(raw, orderNumber: 'JV-1'),
+          isA<ScannedUnreadable>(),
+          reason: '$raw',
+        );
+      }
+    });
+  });
+
+  group('taskPollInterval (polling fallback)', () {
+    test('no task, or an ended one: no polling', () {
+      expect(taskPollInterval(null), isNull);
+      expect(
+        taskPollInterval(prepaid.copyWith(status: TaskStatus.delivered)),
+        isNull,
+      );
+    });
+
+    test('3 s while a UPI QR is open, as the contract says', () {
+      final qr = cod.copyWith(
+        codQr: const CodQr(
+          imageUrl: null,
+          amount: '1249.00',
+          status: UpiQrStatus.pending,
+        ),
+      );
+      expect(taskPollInterval(qr), const Duration(seconds: 3));
+      expect(
+        taskPollInterval(
+          qr.copyWith(codQr: qr.codQr!.withStatus(UpiQrStatus.paid)),
+        ),
+        const Duration(seconds: 15),
+      );
+    });
+
+    test('5 s at the store while packing, 10 s returning, else 15 s', () {
+      final atStore = prepaid.copyWith(status: TaskStatus.atStore);
+      expect(taskPollInterval(atStore), const Duration(seconds: 5));
+      expect(
+        taskPollInterval(
+          atStore.copyWith(storeProgress: StoreOrderProgress.ready),
+        ),
+        const Duration(seconds: 15),
+      );
+      expect(
+        taskPollInterval(prepaid.copyWith(status: TaskStatus.returning)),
+        const Duration(seconds: 10),
+      );
+      expect(
+        taskPollInterval(prepaid.copyWith(status: TaskStatus.assigned)),
+        const Duration(seconds: 15),
+      );
     });
   });
 
@@ -142,6 +266,16 @@ void main() {
       expect(notReachableWaitLeft(prepaid, arrived), isNull);
     });
 
+    test('the server not_reachable_after wins over the local 10 min', () {
+      final later = atDrop.copyWith(
+        notReachableAfter: arrived.add(const Duration(minutes: 12)),
+      );
+      expect(
+        notReachableWaitLeft(later, arrived.add(const Duration(minutes: 10))),
+        const Duration(minutes: 2),
+      );
+    });
+
     test('other needs a note; refused and wrong address need nothing', () {
       expect(block(FailReason.other), FailBlock.noteRequired);
       expect(block(FailReason.other, note: 'Gate locked'), isNull);
@@ -153,3 +287,14 @@ void main() {
     });
   });
 }
+
+RiderTask _withoutAmount(RiderTask t) => RiderTask(
+  id: t.id,
+  status: t.status,
+  orderNumber: t.orderNumber,
+  store: t.store,
+  storeProgress: t.storeProgress,
+  paymentType: t.paymentType,
+  items: t.items,
+  customer: t.customer,
+);

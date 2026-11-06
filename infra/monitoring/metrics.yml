@@ -1,0 +1,146 @@
+# Metrics catalog (09 §5, docs/deployment.md §10). Provider-neutral: Prometheus names, which any
+# Prometheus-compatible backend (Amazon Managed Prometheus, Grafana Cloud, a self-hosted
+# Prometheus) or a CloudWatch/OpenTelemetry bridge can ingest.
+#
+# status:
+#   available     - exported today by the named source once it is deployed
+#   needs-backend - needs a backend change first (owner: django-backend-dev, see deployment.md §10.3)
+#   phase-6       - its table/feature arrives with the Phase 6 merge
+#
+# check_monitoring.py fails CI if alerts.yml uses a metric that is not listed here.
+metrics:
+  # ---------------------------------------------------------------- web (backend /metrics)
+  - name: jqc_http_request_duration_seconds
+    type: histogram
+    labels: [route, method, status_class]
+    source: backend
+    status: needs-backend
+    description: >-
+      Request latency per Django URL pattern (route = the resolver's route, e.g.
+      "api/v1/orders/<int:id>/", never the raw path: no ids or PII in labels). Buckets 0.05, 0.1,
+      0.15, 0.3, 0.5, 0.8, 1, 2, 5 s, matching the 09 §1 targets. p95 =
+      histogram_quantile(0.95, sum by (le, route) (rate(..._bucket[5m]))).
+  - name: jqc_http_requests_total
+    type: counter
+    labels: [route, method, status, status_class]
+    source: backend
+    status: needs-backend
+    description: Requests per route and status (5xx rate, webhook 400/503 rate).
+  - name: jqc_ws_connections
+    type: gauge
+    labels: [consumer]
+    source: backend
+    status: needs-backend
+    description: Open WebSocket connections per consumer (order tracking, rider, ops live board).
+
+  # ---------------------------------------------------------------- probes
+  - name: probe_success
+    type: gauge
+    labels: [job, instance]
+    source: blackbox-exporter (or the load balancer's health check)
+    status: available
+    description: 1 when GET /health/ready answers 200 (DB + Redis reachable), job="jqc-health-ready".
+
+  # ---------------------------------------------------------------- Celery (celery-exporter sidecar)
+  - name: celery_queue_length
+    type: gauge
+    labels: [queue_name]
+    source: celery-exporter
+    status: available
+    description: Messages waiting in each broker queue (default queue "celery").
+  - name: celery_task_failed_total
+    type: counter
+    labels: [name, hostname, exception]
+    source: celery-exporter
+    status: needs-backend
+    description: >-
+      Task failures. Needs task events (CELERY_WORKER_SEND_TASK_EVENTS=True and
+      CELERY_TASK_SEND_SENT_EVENT=True in settings).
+  - name: celery_worker_up
+    type: gauge
+    labels: [hostname]
+    source: celery-exporter
+    status: needs-backend
+    description: 1 per live worker (from worker heartbeats; needs task events as above).
+
+  # ---------------------------------------------------------------- business / jobs (sql_exporter)
+  - name: jqc_beat_task_last_run_age_seconds
+    type: gauge
+    labels: [task]
+    source: sql-exporter
+    status: available
+    description: Seconds since each enabled periodic task last ran (beat liveness).
+  - name: jqc_orders_active
+    type: gauge
+    labels: [status]
+    source: sql-exporter
+    status: available
+    description: Orders per non-terminal status.
+  - name: jqc_orders_awaiting_acceptance_over_sla
+    type: gauge
+    labels: [store_id]
+    source: sql-exporter
+    status: available
+    description: PLACED orders past the store acceptance SLA (order SLA breach).
+  - name: jqc_orders_past_eta
+    type: gauge
+    labels: [store_id]
+    source: sql-exporter
+    status: available
+    description: Active orders past their promised delivery time (order SLA breach).
+  - name: jqc_orders_payment_window_overdue
+    type: gauge
+    labels: []
+    source: sql-exporter
+    status: available
+    description: PAYMENT_PENDING orders 5+ minutes past their payment window (stock held by a stuck job).
+  - name: jqc_orders_placed_last_30m
+    type: gauge
+    labels: []
+    source: sql-exporter
+    status: available
+    description: Orders placed in the last 30 minutes.
+  - name: jqc_refunds
+    type: gauge
+    labels: [status]
+    source: sql-exporter
+    status: available
+    description: Refunds by status (the FAILED count is the refund-failure signal).
+  - name: jqc_refund_pending_oldest_age_seconds
+    type: gauge
+    labels: []
+    source: sql-exporter
+    status: available
+    description: Age of the oldest PENDING refund.
+  - name: jqc_webhook_events_errored_last_hour
+    type: gauge
+    labels: []
+    source: sql-exporter
+    status: available
+    description: Stored payment webhook events with an error in the last hour.
+  - name: jqc_notifications_stuck_sending
+    type: gauge
+    labels: [channel]
+    source: sql-exporter
+    status: phase-6
+    description: Push/SMS channels SENDING for 15+ minutes (what the stuck-send sweeper will fail).
+  - name: jqc_notifications_failed_last_hour
+    type: gauge
+    labels: [channel]
+    source: sql-exporter
+    status: phase-6
+    description: Push/SMS channels that ended FAILED in the last hour.
+
+  # ---------------------------------------------------------------- data stores
+  - name: redis_up
+    type: gauge
+    labels: [instance]
+    source: redis-exporter (or the managed Redis provider metric)
+    status: available
+    description: 1 when Redis answers.
+  - name: pg_up
+    type: gauge
+    labels: [instance]
+    source: postgres-exporter (or the managed DB provider metric)
+    status: available
+    description: 1 when PostgreSQL answers.

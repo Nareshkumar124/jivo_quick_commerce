@@ -43,6 +43,16 @@ abstract class _$OrderCWProxy {
 
   Order canRetryPayment(bool canRetryPayment);
 
+  Order timeline(List<OrderTimelineEntry> timeline);
+
+  Order cancellation(OrderCancellation? cancellation);
+
+  Order amountRefunded(String amountRefunded);
+
+  Order refunds(List<OrderRefund> refunds);
+
+  Order canDownloadInvoice(bool canDownloadInvoice);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `Order(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -68,6 +78,11 @@ abstract class _$OrderCWProxy {
     DateTime? etaAt,
     bool canCancel,
     bool canRetryPayment,
+    List<OrderTimelineEntry> timeline,
+    OrderCancellation? cancellation,
+    String amountRefunded,
+    List<OrderRefund> refunds,
+    bool canDownloadInvoice,
   });
 }
 
@@ -137,6 +152,24 @@ class _$OrderCWProxyImpl implements _$OrderCWProxy {
       this(canRetryPayment: canRetryPayment);
 
   @override
+  Order timeline(List<OrderTimelineEntry> timeline) => this(timeline: timeline);
+
+  @override
+  Order cancellation(OrderCancellation? cancellation) =>
+      this(cancellation: cancellation);
+
+  @override
+  Order amountRefunded(String amountRefunded) =>
+      this(amountRefunded: amountRefunded);
+
+  @override
+  Order refunds(List<OrderRefund> refunds) => this(refunds: refunds);
+
+  @override
+  Order canDownloadInvoice(bool canDownloadInvoice) =>
+      this(canDownloadInvoice: canDownloadInvoice);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `Order(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -162,6 +195,11 @@ class _$OrderCWProxyImpl implements _$OrderCWProxy {
     Object? etaAt = const $CopyWithPlaceholder(),
     Object? canCancel = const $CopyWithPlaceholder(),
     Object? canRetryPayment = const $CopyWithPlaceholder(),
+    Object? timeline = const $CopyWithPlaceholder(),
+    Object? cancellation = const $CopyWithPlaceholder(),
+    Object? amountRefunded = const $CopyWithPlaceholder(),
+    Object? refunds = const $CopyWithPlaceholder(),
+    Object? canDownloadInvoice = const $CopyWithPlaceholder(),
   }) {
     return Order(
       id: id == const $CopyWithPlaceholder()
@@ -236,6 +274,26 @@ class _$OrderCWProxyImpl implements _$OrderCWProxy {
           ? _value.canRetryPayment
           // ignore: cast_nullable_to_non_nullable
           : canRetryPayment as bool,
+      timeline: timeline == const $CopyWithPlaceholder()
+          ? _value.timeline
+          // ignore: cast_nullable_to_non_nullable
+          : timeline as List<OrderTimelineEntry>,
+      cancellation: cancellation == const $CopyWithPlaceholder()
+          ? _value.cancellation
+          // ignore: cast_nullable_to_non_nullable
+          : cancellation as OrderCancellation?,
+      amountRefunded: amountRefunded == const $CopyWithPlaceholder()
+          ? _value.amountRefunded
+          // ignore: cast_nullable_to_non_nullable
+          : amountRefunded as String,
+      refunds: refunds == const $CopyWithPlaceholder()
+          ? _value.refunds
+          // ignore: cast_nullable_to_non_nullable
+          : refunds as List<OrderRefund>,
+      canDownloadInvoice: canDownloadInvoice == const $CopyWithPlaceholder()
+          ? _value.canDownloadInvoice
+          // ignore: cast_nullable_to_non_nullable
+          : canDownloadInvoice as bool,
     );
   }
 }
@@ -275,6 +333,11 @@ Order _$OrderFromJson(Map<String, dynamic> json) => $checkedCreate(
         'eta_at',
         'can_cancel',
         'can_retry_payment',
+        'timeline',
+        'cancellation',
+        'amount_refunded',
+        'refunds',
+        'can_download_invoice',
       ],
     );
     final val = Order(
@@ -346,6 +409,29 @@ Order _$OrderFromJson(Map<String, dynamic> json) => $checkedCreate(
       ),
       canCancel: $checkedConvert('can_cancel', (v) => v as bool),
       canRetryPayment: $checkedConvert('can_retry_payment', (v) => v as bool),
+      timeline: $checkedConvert(
+        'timeline',
+        (v) => (v as List<dynamic>)
+            .map((e) => OrderTimelineEntry.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      ),
+      cancellation: $checkedConvert(
+        'cancellation',
+        (v) => v == null
+            ? null
+            : OrderCancellation.fromJson(v as Map<String, dynamic>),
+      ),
+      amountRefunded: $checkedConvert('amount_refunded', (v) => v as String),
+      refunds: $checkedConvert(
+        'refunds',
+        (v) => (v as List<dynamic>)
+            .map((e) => OrderRefund.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      ),
+      canDownloadInvoice: $checkedConvert(
+        'can_download_invoice',
+        (v) => v as bool,
+      ),
     );
     return val;
   },
@@ -361,6 +447,8 @@ Order _$OrderFromJson(Map<String, dynamic> json) => $checkedCreate(
     'etaAt': 'eta_at',
     'canCancel': 'can_cancel',
     'canRetryPayment': 'can_retry_payment',
+    'amountRefunded': 'amount_refunded',
+    'canDownloadInvoice': 'can_download_invoice',
   },
 );
 
@@ -383,6 +471,11 @@ Map<String, dynamic> _$OrderToJson(Order instance) => <String, dynamic>{
   'eta_at': instance.etaAt?.toIso8601String(),
   'can_cancel': instance.canCancel,
   'can_retry_payment': instance.canRetryPayment,
+  'timeline': instance.timeline.map((e) => e.toJson()).toList(),
+  'cancellation': instance.cancellation?.toJson(),
+  'amount_refunded': instance.amountRefunded,
+  'refunds': instance.refunds.map((e) => e.toJson()).toList(),
+  'can_download_invoice': instance.canDownloadInvoice,
 };
 
 const _$OrderStatusEnumEnumMap = {

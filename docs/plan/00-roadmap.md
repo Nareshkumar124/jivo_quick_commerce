@@ -11,12 +11,12 @@ Status: ⬜ not started · 🔄 in progress · ⛔ blocked · ✅ built (automat
 | **P0** Foundation | Repo, skeletons, local stack, CI, the schema → `jivo_api` pipeline | ✅ 2026-11-02 | ⬜ | Pushed in `4960527`. Phase 0 test cases live in `qa/docs/02-test-case-repository.md`. |
 | **P1** Auth & users | OTP login, JWT, profile, devices, addresses, account deletion, app config (426/503), staff roles | ✅ 2026-11-02 | 🔄 | Pushed in `4960527`; CI green. QA's independent verification is running. The human gate steps (staging QA, demo, sign-off) are still open. |
 | **P2** Stores, catalog, inventory, home | Serviceability, catalog, inventory, home and search; admin for stores, catalog and inventory; the rider KYC lookahead | ✅ 2026-11-03 | ⬜ | Code merged to `main` (`3b5066e`, includes the Mappls crash fix). QA run 2 was stopped part-way at the user's request (no verdict); BUG-0008 open, BUG-0006 awaiting re-verification; demo and sign-off open. |
-| **P3** Cart, checkout, payments | Cart, `compute_bill`, coupons, orders T1–T5, Razorpay (Cashfree is the alternative, D-01), COD | 🔄 | ⬜ | Started 2026-11-03 at the user's request, before the P2 gate (DL-42). Backend R1 contract, customer Start items and rider T-225/T-211 running. Fake payment gateway until Razorpay test keys arrive (D-01). |
-| **P4** Order processing & store ops | Transitions T6–T8a/T11/T12, packing console, live board, refunds, invoices | ⬜ | ⬜ | Needs D-10 refund policy and D-12 GST data. Mini-UAT with store staff. |
-| **P5** Rider & delivery | Rider KYC, shifts, dispatch, offers, pickup, delivery OTP, COD cash, earnings | ⬜ | ⬜ | Needs D-11 Play Console, D-14 KYC policy and D-16 rider pay. Mini-UAT with riders. |
-| **P6** Real-time & notifications | WebSockets, live tracking, ETA, FCM push, SMS, inbox | ⬜ | ⬜ | Needs FCM projects (D-19) and the Apple account (D-11). |
-| **P7** Dashboard, promotions, support, reports | Ops dashboard, reports, ratings, support, CMS, Jivo Auth SSO | ⬜ | ⬜ | Needs D-20 support contacts and the legal pages. |
-| **P8** Hardening & launch | Security review, load test, backup restore, store releases, pilot, UAT, go-live | ⬜ | ⬜ | Uses [`../release-checklist.md`](../release-checklist.md). |
+| **P3** Cart, checkout, payments | Cart, `compute_bill`, coupons, orders T1–T5, Razorpay (Cashfree is the alternative, D-01), COD | ✅ 2026-11-04 | 🔄 | All runs merged to `develop`; P3-TC-64 passed on the user's phone; gate checks green. Open: refund fix run, QA stage 2, PR to `main`. Fake payment gateway until Razorpay test keys arrive (D-01). |
+| **P4** Order processing & store ops | Transitions T6–T8a/T11/T12, packing console, live board, refunds, invoices | 🔄 | ⬜ | Started 2026-11-04 (DL-47). Backend, customer, rider, DevOps merged; migrations applied (DL-53). Open: admin merge, QA run, phone test, store-staff mini-UAT. |
+| **P5** Rider & delivery | Rider KYC, shifts, dispatch, offers, pickup, delivery OTP, COD cash, earnings | 🔄 | ⬜ | Needs D-11 Play Console, D-14 KYC policy and D-16 rider pay. Mini-UAT with riders. |
+| **P6** Real-time & notifications | WebSockets, live tracking, ETA, FCM push, SMS, inbox | 🔄 | ⬜ | Needs FCM projects (D-19) and the Apple account (D-11). |
+| **P7** Dashboard, promotions, support, reports | Ops dashboard, reports, ratings, support, CMS, Jivo Auth SSO | 🔄 | ⬜ | Needs D-20 support contacts and the legal pages. |
+| **P8** Hardening & launch | Security review, load test, backup restore, store releases, pilot, UAT, go-live | 🔄 | ⬜ | Uses [`../release-checklist.md`](../release-checklist.md). |
 
 ## Per-phase files
 The detailed per-phase files (`phase-N-*.md`: task checklist, test cases, exit criteria, demo script, sign-off) are **not written yet**. Until they exist:

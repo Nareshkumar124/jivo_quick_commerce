@@ -48,10 +48,10 @@ class ApiAuthRepository implements AuthRepository, AccountRepository {
   );
 
   @override
-  Future<void> logout({required String refreshToken}) async {
+  Future<void> logout({required String refreshToken, String? fcmToken}) async {
     try {
       await _api.getAuthApi().authLogout(
-        logoutRequest: LogoutRequest(refresh: refreshToken),
+        logoutRequest: LogoutRequest(refresh: refreshToken, fcmToken: fcmToken),
       );
     } on Object catch (error) {
       throw ApiError.from(error);

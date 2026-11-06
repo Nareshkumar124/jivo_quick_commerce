@@ -1,0 +1,469 @@
+"""Channels consumers (06 §4). Contract, messages and close codes: `apps.realtime.contract`.
+
+- `/ws/v1/orders/{order_id}/` (`OrderConsumer`): the order's owner only.
+- `/ws/v1/rider/` (`RiderConsumer`): an active rider, with a token issued to the rider app.
+- `/ws/ops/live/` (`OpsLiveConsumer`): staff session, `orders.view_order`, permitted stores.
+
+App sockets are accepted first (so the close code reaches the app), then must authenticate
+within WS_AUTH_TIMEOUT_SECONDS. Nothing is sent to a socket before it is authorised.
+
+Abuse limits (P8 OWASP review L5, `apps.realtime.limits`): at most WS_MAX_SOCKETS_PER_USER
+sockets per user (4429), at most WS_MAX_BAD_MESSAGES malformed or unknown messages (4400), and
+inbound messages up to WS_MAX_MESSAGE_BYTES (1009); the ASGI server caps frames before that.
+"""
+
+import asyncio
+import json
+import logging
+import time
+from dataclasses import dataclass
+
+from asgiref.sync import sync_to_async
+from channels.db import database_sync_to_async
+from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from django.conf import settings
+from django.utils import timezone
+
+from apps.realtime import contract, limits
+from apps.realtime.auth import SocketIdentity, authenticate_token, token_from_subprotocols
+from apps.realtime.groups import order_group, rider_group, store_group, user_group
+
+logger = logging.getLogger(__name__)
+
+
+class BaseSocketConsumer(AsyncJsonWebsocketConsumer):
+    """Group bookkeeping, control messages and the forwarder of group messages."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.joined: set[str] = set()
+        self.tasks: list[asyncio.Task] = []
+        self.authorised = False
+        self.closing = False
+        self.bad_messages = 0
+        self.slot_user_id: int | None = None
+
+    # ------------------------------------------------------------------ socket slots (L5)
+
+    async def take_slot(self, user_id: int) -> bool:
+        """Count this socket against the user's limit; False (and closed 4429) when full."""
+        if self.slot_user_id is not None:
+            return True
+        if not await sync_to_async(limits.acquire, thread_sensitive=False)(
+            user_id, self.channel_name
+        ):
+            await self.close_with(contract.CLOSE_TOO_MANY_SOCKETS)
+            return False
+        self.slot_user_id = user_id
+        return True
+
+    async def renew_slot(self) -> None:
+        if self.slot_user_id is not None:
+            await sync_to_async(limits.renew, thread_sensitive=False)(
+                self.slot_user_id, self.channel_name
+            )
+
+    async def release_slot(self) -> None:
+        user_id, self.slot_user_id = self.slot_user_id, None
+        if user_id is not None:
+            await sync_to_async(limits.release, thread_sensitive=False)(user_id, self.channel_name)
+
+    async def join(self, groups) -> None:
+        for group in groups:
+            if group not in self.joined:
+                await self.channel_layer.group_add(group, self.channel_name)
+                self.joined.add(group)
+
+    async def leave(self, groups) -> None:
+        for group in list(groups):
+            if group in self.joined:
+                await self.channel_layer.group_discard(group, self.channel_name)
+                self.joined.discard(group)
+
+    async def close_with(self, code: int) -> None:
+        if self.closing:
+            return
+        # Stop forwarding first: whatever fails below, this socket gets nothing more.
+        self.closing = True
+        self.authorised = False
+        try:
+            await self.leave(self.joined)
+            await self.release_slot()
+        except Exception:
+            logger.exception("Socket close: leaving groups failed (%s)", self.channel_name)
+        await self.close(code=code)
+
+    async def fail_closed(self, code: int) -> None:
+        """A check could not run: never stay authorised without it (fail closed)."""
+        self.authorised = False
+        try:
+            await self.close_with(code)
+        except Exception:
+            logger.exception("Socket close failed (%s)", self.channel_name)
+
+    async def disconnect(self, code) -> None:
+        for task in self.tasks:
+            task.cancel()
+        await self.release_slot()
+        await self.leave(self.joined)
+
+    def later(
+        self, delay: float, coro_fn, fail_code: int = contract.CLOSE_UNAUTHENTICATED
+    ) -> asyncio.Task:
+        """Run `coro_fn` after `delay`. If it raises (DB or Redis down), log it and close the
+        socket with `fail_code`: a timer or re-check that cannot run never leaves it open."""
+
+        async def run():
+            await asyncio.sleep(max(0.0, delay))
+            try:
+                await coro_fn()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception(
+                    "Socket timer %s failed: closing %s with %s",
+                    getattr(coro_fn, "__name__", coro_fn),
+                    self.channel_name,
+                    fail_code,
+                )
+                await self.fail_closed(fail_code)
+
+        task = asyncio.ensure_future(run())
+        self.tasks.append(task)
+        return task
+
+    async def send_message(self, type_: str, data: dict | None = None) -> None:
+        from apps.realtime.services import message
+
+        await self.send_json(message(type_, data))
+
+    async def receive(self, text_data=None, bytes_data=None, **kwargs) -> None:
+        if self.closing:
+            return
+        raw = text_data if text_data is not None else bytes_data
+        size = len(raw.encode()) if isinstance(raw, str) else len(raw or b"")
+        if size > settings.WS_MAX_MESSAGE_BYTES:
+            await self.close_with(contract.CLOSE_MESSAGE_TOO_BIG)
+            return
+        try:
+            content = json.loads(raw)
+        except (TypeError, ValueError):
+            content = None
+        if not isinstance(content, dict):
+            await self.on_bad_message()
+            return
+        await self.receive_json(content)
+
+    async def on_bad_message(self) -> None:
+        await self.send_error("Messages must be JSON objects.")
+
+    async def send_error(self, text: str) -> None:
+        """Answer a malformed or unknown message; too many of them close the socket (4400)."""
+        self.bad_messages += 1
+        if self.bad_messages > settings.WS_MAX_BAD_MESSAGES:
+            await self.close_with(contract.CLOSE_BAD_MESSAGE)
+            return
+        await self.send_message(contract.ERROR, {"code": "VALIDATION_ERROR", "message": text})
+
+    async def ws_message(self, event) -> None:
+        """A group message (`apps.realtime.services.send_now`): forward it if authorised."""
+        if self.authorised and not self.closing:
+            await self.send_json(event["message"])
+
+
+class JwtSocketConsumer(BaseSocketConsumer):
+    """App sockets: JWT from the subprotocol or the first message, then `authorize()`."""
+
+    identity: SocketIdentity | None = None
+
+    async def connect(self) -> None:
+        token, offered = token_from_subprotocols(self.scope.get("subprotocols"))
+        await self.accept(subprotocol=contract.SUBPROTOCOL if offered else None)
+        if token is not None:
+            await self.authenticate(token)
+        else:
+            self.auth_deadline = self.later(settings.WS_AUTH_TIMEOUT_SECONDS, self._auth_timeout)
+
+    async def _auth_timeout(self) -> None:
+        if self.identity is None:
+            await self.close_with(contract.CLOSE_AUTH_TIMEOUT)
+
+    async def on_bad_message(self) -> None:
+        if self.identity is None:
+            await self.close_with(contract.CLOSE_BAD_MESSAGE)
+        else:
+            await super().on_bad_message()
+
+    async def receive_json(self, content, **kwargs) -> None:
+        if self.closing:
+            return
+        type_ = content.get("type")
+        if type_ == contract.AUTH:
+            await self.authenticate(content.get("token"))
+        elif self.identity is None:
+            await self.close_with(contract.CLOSE_BAD_MESSAGE)
+        elif type_ == contract.PING:
+            await self.renew_slot()
+            await self.send_message(contract.PONG)
+        else:
+            await self.send_error("Unknown message type.")
+
+    async def authenticate(self, raw) -> None:
+        identity = await database_sync_to_async(authenticate_token)(raw)
+        if identity is None or (
+            self.identity is not None and identity.user.pk != self.identity.user.pk
+        ):
+            await self.close_with(contract.CLOSE_UNAUTHENTICATED)
+            return
+        first = self.identity is None
+        # Every auth, first or renewal, re-runs the access check (rider status, token app,
+        # order owner): a renewed token never extends access that is gone.
+        code = await self.authorize(identity)
+        if code is not None:
+            await self.close_with(code)
+            return
+        if first:
+            if not await self.take_slot(identity.user.pk):
+                return
+        else:
+            await self.renew_slot()
+        self.identity = identity
+        self.authorised = True
+        if hasattr(self, "auth_deadline"):
+            self.auth_deadline.cancel()
+        if getattr(self, "expiry", None) is not None:
+            self.expiry.cancel()
+        if identity.expires_at is not None:
+            remaining = (identity.expires_at - timezone.now()).total_seconds()
+            self.expiry = self.later(remaining, self._expired)
+        await self.send_message(
+            contract.AUTH_OK,
+            {
+                "user_id": identity.user.pk,
+                "expires_at": identity.expires_at.isoformat().replace("+00:00", "Z")
+                if identity.expires_at
+                else None,
+            },
+        )
+        if first:
+            self.schedule_recheck()
+            await self.after_auth()
+
+    async def _expired(self) -> None:
+        await self.close_with(contract.CLOSE_UNAUTHENTICATED)
+
+    def recheck_seconds(self) -> float | None:
+        """How often to re-run `authorize()` while connected (None: never)."""
+        return None
+
+    def schedule_recheck(self) -> None:
+        interval = self.recheck_seconds()
+        if not interval:
+            return
+
+        async def recheck():
+            if self.closing or self.identity is None:
+                return
+            code = await self.authorize(self.identity)
+            if code is not None:
+                await self.close_with(code)
+            else:
+                await self.renew_slot()
+                self.schedule_recheck()
+
+        self.later(interval, recheck, fail_code=contract.CLOSE_FORBIDDEN)
+
+    async def authorize(self, identity: SocketIdentity) -> int | None:
+        """Join this socket's groups; return a close code to refuse."""
+        raise NotImplementedError
+
+    async def after_auth(self) -> None:
+        """Send the initial snapshot, if any."""
+
+
+# --------------------------------------------------------------------------- customer
+
+
+def own_order_status(user, order_id: int) -> dict | None:
+    """The order's `order.status` data, only if it is the user's own (IDOR: None otherwise)."""
+    from apps.orders.models import Order
+    from apps.realtime.services import order_status_data
+
+    order = Order.objects.filter(pk=order_id, user=user).first()
+    return order_status_data(order) if order is not None else None
+
+
+class OrderConsumer(JwtSocketConsumer):
+    async def authorize(self, identity: SocketIdentity) -> int | None:
+        self.order_id = int(self.scope["url_route"]["kwargs"]["order_id"])
+        if await database_sync_to_async(own_order_status)(identity.user, self.order_id) is None:
+            return contract.CLOSE_NOT_FOUND
+        # Join before the snapshot, so nothing that changes in between is missed.
+        await self.join([order_group(self.order_id), user_group(identity.user.pk, "customer")])
+        return None
+
+    async def after_auth(self) -> None:
+        data = await database_sync_to_async(own_order_status)(self.identity.user, self.order_id)
+        if data is not None:
+            await self.send_message(contract.ORDER_STATUS, data)
+
+
+# --------------------------------------------------------------------------- rider
+
+
+def active_rider_id(user) -> int | None:
+    """The user's ACTIVE `delivery.Rider` pk (Phase 5); None without one or before Phase 5."""
+    from django.apps import apps
+
+    from apps.accounts.choices import RiderStatus
+
+    try:
+        Rider = apps.get_model("delivery", "Rider")
+    except LookupError:
+        return None
+    return (
+        Rider.objects.filter(
+            user=user,
+            user__is_active=True,
+            user__deleted_at__isnull=True,
+            status=RiderStatus.ACTIVE,
+        )
+        .values_list("pk", flat=True)
+        .first()
+    )
+
+
+class RiderConsumer(JwtSocketConsumer):
+    """An ACTIVE rider with a rider-app token, checked at every auth and every
+    WS_RIDER_RECHECK_SECONDS, so a suspended rider stops getting offers."""
+
+    def recheck_seconds(self) -> float | None:
+        return settings.WS_RIDER_RECHECK_SECONDS
+
+    async def authorize(self, identity: SocketIdentity) -> int | None:
+        from apps.accounts.choices import AppName
+
+        if identity.app != AppName.RIDER:
+            return contract.CLOSE_FORBIDDEN
+        rider_id = await database_sync_to_async(active_rider_id)(identity.user)
+        if rider_id is None:
+            return contract.CLOSE_FORBIDDEN
+        wanted = {rider_group(rider_id), user_group(identity.user.pk, AppName.RIDER)}
+        await self.leave(self.joined - wanted)
+        await self.join(sorted(wanted))
+        return None
+
+
+# --------------------------------------------------------------------------- ops
+
+LIVE_BOARD_PERMISSION = "orders.view_order"
+
+
+@dataclass(frozen=True)
+class OpsAccess:
+    store_ids: list[int]
+    session_deadline: float  # epoch seconds: the staff session ends then (05 §5)
+
+
+def staff_session_deadline(session_data: dict, user) -> float | None:
+    """When this staff session ends under the HTTP policy (`apps.accounts.middleware`): 8 h
+    after login for everyone, 2 h after the last request for admin roles. None when the
+    session has no login stamp (fail closed: the HTTP pages stamp it before the socket)."""
+    from apps.accounts import middleware
+
+    login_at = session_data.get(middleware.LOGIN_AT_KEY)
+    if login_at is None:
+        return None
+    last_seen = session_data.get(middleware.LAST_SEEN_KEY, login_at)
+    return middleware._deadline(
+        float(login_at), float(last_seen), idle=middleware.has_idle_timeout(user)
+    )
+
+
+def ops_store_ids(user_id, session_key: str | None) -> OpsAccess | int:
+    """The stores the staff user may watch and when their session ends, or the close code that
+    refuses them (05 §3, §5):
+    - 4401: no session, a deleted or expired one (`expire_date`), a session of another user, the
+      8 h absolute or 2 h idle staff limit reached (P8 review M1), not active staff;
+    - 4403: no `orders.view_order`, or no store."""
+    from django.contrib.auth import SESSION_KEY, get_user_model
+    from django.contrib.sessions.backends.base import SessionBase
+    from django.utils.module_loading import import_string
+
+    from apps.stores.services import stores_for
+
+    if user_id is None or not session_key:
+        return contract.CLOSE_UNAUTHENTICATED
+    store_class: type[SessionBase] = import_string(f"{settings.SESSION_ENGINE}.SessionStore")
+    # `load()` honours the session's expiry (`exists()` does not): missing or expired -> {}.
+    data = store_class(session_key).load()
+    if not data or str(data.get(SESSION_KEY)) != str(user_id):
+        return contract.CLOSE_UNAUTHENTICATED
+    user = get_user_model().objects.filter(pk=user_id).first()
+    if user is None or not (user.is_active and user.is_staff):
+        return contract.CLOSE_UNAUTHENTICATED
+    deadline = staff_session_deadline(data, user)
+    if deadline is None or time.time() >= deadline:
+        return contract.CLOSE_UNAUTHENTICATED
+    if not user.has_perm(LIVE_BOARD_PERMISSION):
+        return contract.CLOSE_FORBIDDEN
+    store_ids = sorted(stores_for(user).values_list("pk", flat=True))
+    if not store_ids:
+        return contract.CLOSE_FORBIDDEN
+    return OpsAccess(store_ids=store_ids, session_deadline=deadline)
+
+
+class OpsLiveConsumer(BaseSocketConsumer):
+    """Staff session (AuthMiddlewareStack). Joins one group per permitted store at connect and
+    re-checks access every WS_OPS_RECHECK_SECONDS, and exactly when the staff session reaches
+    its absolute or idle limit (requests on the HTTP pages move the idle limit)."""
+
+    session_deadline: float | None = None
+
+    async def connect(self) -> None:
+        await self.accept()
+        if await self.check_access():
+            user_id = self.scope["user"].pk
+            if not await self.take_slot(user_id):
+                return
+            self.authorised = True
+            self.schedule_recheck()
+
+    def _session_key(self) -> str | None:
+        session = self.scope.get("session")
+        return getattr(session, "session_key", None)
+
+    async def check_access(self) -> bool:
+        user = self.scope.get("user")
+        user_id = user.pk if user is not None and user.is_authenticated else None
+        result = await database_sync_to_async(ops_store_ids)(user_id, self._session_key())
+        if isinstance(result, int):
+            await self.close_with(result)
+            return False
+        self.session_deadline = result.session_deadline
+        wanted = {store_group(pk) for pk in result.store_ids}
+        await self.leave(self.joined - wanted)
+        await self.join(sorted(wanted))
+        await self.renew_slot()
+        return True
+
+    def schedule_recheck(self) -> None:
+        async def recheck():
+            if await self.check_access():
+                self.schedule_recheck()
+
+        delay = settings.WS_OPS_RECHECK_SECONDS
+        if self.session_deadline is not None:
+            # Re-check right when the session would end (it may have been extended meanwhile).
+            delay = min(delay, max(0.0, self.session_deadline - time.time()) + 0.05)
+        # A re-check that raises closes the socket (4401: sign in again), never leaves it open.
+        self.later(delay, recheck)
+
+    async def receive_json(self, content, **kwargs) -> None:
+        if self.closing:
+            return
+        if content.get("type") == contract.PING:
+            await self.renew_slot()
+            await self.send_message(contract.PONG)
+        else:
+            await self.send_error("Unknown message type.")

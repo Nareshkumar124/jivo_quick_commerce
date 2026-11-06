@@ -194,6 +194,39 @@ class TestWebhook:
         assert Payment.objects.get().status == "CAPTURED"
         assert Order.objects.get().status == "PLACED"
 
+    @pytest.mark.parametrize(
+        ("payment_id", "order_id"),
+        [
+            ("pay_" + "A" * 61, None),  # 65 chars: would overflow gateway_payment_id (64)
+            (
+                "pay_" + "B" * 53,
+                None,
+            ),  # 57: too long for the refund key `capture:<id>`
+            ("pay_Short", None),  # too short for a Razorpay id
+            (
+                "pay_WebhookPay0001",
+                "order_" + "C" * 59,
+            ),  # 65: too long for gateway_order_id
+        ],
+    )
+    def test_bug_0009_oversized_ids_are_ignored_not_a_500(
+        self, checkout, pending, api_client, payment_id, order_id
+    ):
+        """BUG-0009: every id is checked against the verify endpoint's Razorpay id patterns
+        (`pay_`/`order_` + 10-40 characters, so at most 46 and always within the stored fields and
+        the refund key). One that does not match is stored as malformed and answered `ignored`,
+        never a 500."""
+        order = Order.objects.get()
+        services.cancel_order(order.user, order.pk, reason="OTHER")  # a capture now needs a refund
+        event = captured_event(order_id or pending["razorpay"]["order_id"], payment_id)
+        response = webhook(api_client, event, "evt_bug_0009")
+        assert (response.status_code, response.json()) == (200, {"status": "ignored"})
+        stored = PaymentWebhookEvent.objects.get(event_id="evt_bug_0009")
+        assert stored.error == "malformed: ValueError"
+        assert Refund.objects.count() == 0
+        failed = captured_event("order_" + "D" * 59, kind="payment.failed")
+        assert webhook(api_client, failed, "evt_bug_0009b").json() == {"status": "ignored"}
+
     def test_payment_failed_keeps_the_window_open(self, checkout, pending, api_client):
         event = captured_event(pending["razorpay"]["order_id"], kind="payment.failed")
         assert webhook(api_client, event, "evt_0003").json() == {"status": "processed"}
@@ -427,14 +460,15 @@ class TestCancel:
         assert checkout.cart()["items"]
         assert checkout.place("COD")["order"]["status"] == "PLACED"
 
-    def test_only_unpaid_orders_in_phase_3(self, checkout, shop):
+    def test_placed_orders_too_from_phase_4(self, checkout, shop):
+        """08 §7 / T11 (Phase 4): a PLACED order is cancellable; a second cancel is a 409."""
         checkout.fill((shop.canola_1l, 2))
         cod = checkout.place("COD")
-        response = checkout.client.post(
-            f"{ORDERS}{cod['order']['id']}/cancel/", {"reason": "OTHER"}
-        )
+        url = f"{ORDERS}{cod['order']['id']}/cancel/"
+        assert checkout.client.post(url, {"reason": "OTHER"}).status_code == 200
+        response = checkout.client.post(url, {"reason": "OTHER"})
         assert response.status_code == 409
-        assert response.json()["error"]["details"] == {"status": "PLACED"}
+        assert response.json()["error"]["details"] == {"status": "CANCELLED"}
 
     def test_another_users_order_is_404(self, pending, make_auth_client):
         other = make_auth_client(UserFactory())
@@ -598,7 +632,7 @@ class TestTransition:
             ("PLACED", "PAYMENT_FAILED"),
             ("PAYMENT_FAILED", "PLACED"),  # T3a: never revived
             ("CANCELLED", "PLACED"),
-            ("PLACED", "ACCEPTED"),  # Phase 4
+            ("PLACED", "PACKED"),  # Phase 4: T6/T7 first
             ("PAYMENT_PENDING", "DELIVERED"),
         ],
     )

@@ -34,6 +34,18 @@ abstract final class Routes {
 
   static String editAddress(int id) => '/account/addresses/$id';
 
+  /// "My orders" (`03 §2.10`).
+  static const orders = '/account/orders';
+
+  /// The notification inbox (`03 §2.11`, Phase 6 lookahead).
+  static const notifications = '/account/notifications';
+
+  /// Order detail (`03 §2.10`).
+  static String order(int orderId) => '/orders/$orderId';
+
+  /// Live tracking (`03 §2.10`, Phase 6 lookahead).
+  static String orderTracking(int orderId) => '/orders/$orderId/track';
+
   /// Product list of a category; [sub] preselects a sub-category.
   static String category(String slug, {String? sub}) => Uri(
     path: '/category/$slug',
@@ -43,6 +55,28 @@ abstract final class Routes {
   static String product(String slug) => '/product/$slug';
 
   static String collection(String slug) => '/collection/$slug';
+
+  /// Rate a delivered order (P7 lookahead).
+  /// [stars] preselects the order's stars (tapped on the order detail).
+  static String rateOrder(int orderId, {int? stars}) => Uri(
+    path: '/orders/$orderId/rate',
+    queryParameters: stars == null ? null : {'stars': '$stars'},
+  ).toString();
+
+  /// Help & support: FAQs, tickets, call support (P7 lookahead).
+  static const help = '/account/help';
+  static const tickets = '/account/help/tickets';
+
+  static String ticket(int id) => '/account/help/tickets/$id';
+
+  /// A new ticket, about [orderId] when given.
+  static String newTicket({int? orderId}) => Uri(
+    path: '/account/help/new',
+    queryParameters: orderId == null ? null : {'order': '$orderId'},
+  ).toString();
+
+  /// A CMS page (About, Terms, Privacy, Refund policy).
+  static String page(String slug) => '/pages/$slug';
 
   /// Screens that only make sense before the user is in the app.
   static const _entry = {

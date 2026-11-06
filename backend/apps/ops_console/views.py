@@ -22,9 +22,21 @@ def ops_context(request, **extra) -> dict:
     context.update(
         ops_nav=visible_sections(request.user),
         user_roles=selectors.role_names(request.user),
+        ops_live_url=live_feed_url(request.user),
         **extra,
     )
     return context
+
+
+def live_feed_url(user) -> str:
+    """The ops socket path for users the socket accepts (`orders.view_order`; the consumer also
+    needs a store and re-checks everything itself), else "" (no live client, polling only)."""
+    from apps.realtime import contract
+    from apps.realtime.consumers import LIVE_BOARD_PERMISSION
+
+    if user.is_active and user.is_staff and user.has_perm(LIVE_BOARD_PERMISSION):
+        return contract.OPS_SOCKET
+    return ""
 
 
 @ops_view()

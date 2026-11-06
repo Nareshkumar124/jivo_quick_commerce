@@ -127,8 +127,27 @@ class TestNavigation:
         }
 
     def test_every_link_resolves(self):
+        """Every link resolves; only the audit log waits for its backend model (core.AuditLog,
+        Phase 4 merge), and until then it is hidden, never a broken link."""
+        from django.apps import apps
+
+        pending = set()
+        try:
+            apps.get_model("core", "AuditLog")
+        except LookupError:
+            pending.add("admin:core_auditlog_changelist")
+        # SLICE 5.4: these admin lists register with the Payout model (delivery/admin_54.py).
+        try:
+            apps.get_model("delivery", "Payout")
+        except LookupError:
+            for model in ("ridercashledger", "riderearning", "earningrule"):
+                pending.add(f"admin:delivery_{model}_changelist")
         for section in navigation.MODULES:
             for item in section.items:
+                if item.url_name in pending:
+                    assert not item.exists()
+                    assert str(item.lazy_url()) == "#"
+                    continue
                 assert item.url().startswith(("/admin/", "/ops/"))
 
     @pytest.mark.parametrize("principal", [*ROLES, SUPERUSER])

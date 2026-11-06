@@ -1,0 +1,26 @@
+{% extends "ops/base.html" %}
+{% load static %}
+
+{% block page_scripts %}<script src="{% static 'ops/js/orders.js' %}" defer></script>{% endblock %}
+
+{% block content %}
+    {# Cash deposits (05 §1.5; slice 5.4, DL-61 a). Context: riders, truncated, stores, store_id, day, report, report_error, can_record, deposit_key, poll_seconds. Amounts are the server's; nothing is computed here. #}
+    <form id="cash-filters" class="ops-table__filters" method="get" action="{% url 'ops:cash' %}"
+          hx-get="{% url 'ops:cash-riders' %}" hx-target="#cash-riders" hx-swap="outerHTML" hx-trigger="change"
+          data-testid="cash-filters">
+        <div class="ops-field">
+            <label class="block font-semibold mb-2 text-font-important-light dark:text-font-important-dark" for="cash-store">Store</label>
+            <select id="cash-store" name="store" class="bg-white border border-base-200 px-3 py-2 rounded-default w-full dark:bg-base-900 dark:border-base-700">
+                {% if stores|length > 1 %}<option value="">All my stores</option>{% endif %}
+                {% for store in stores %}<option value="{{ store.pk }}"{% if store.pk == store_id %} selected{% endif %}>{{ store.code }} {{ store.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="ops-field">
+            <label class="block font-semibold mb-2 text-font-important-light dark:text-font-important-dark" for="cash-day">Day-end report for (IST)</label>
+            <input id="cash-day" type="date" name="day" value="{{ day|date:'Y-m-d' }}" class="bg-white border border-base-200 px-3 py-2 rounded-default w-full dark:bg-base-900 dark:border-base-700">
+        </div>
+        <noscript><button type="submit" class="ops-button ops-button--secondary">Apply</button></noscript>
+    </form>
+
+    {% include "ops/partials/cash_riders.html" %}
+{% endblock %}

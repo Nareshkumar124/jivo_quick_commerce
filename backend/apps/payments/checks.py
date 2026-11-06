@@ -35,6 +35,14 @@ def check_payment_gateway(app_configs, **kwargs):
                 id="payments.E001",
             )
         )
+    if environment in DEPLOYED_ENVIRONMENTS and getattr(settings, "FAKE_GATEWAY_DOWN", False):
+        errors.append(
+            Error(
+                "FAKE_GATEWAY_DOWN is a local-development switch of the fake gateway.",
+                hint="Remove FAKE_GATEWAY_DOWN from this environment.",
+                id="payments.E004",
+            )
+        )
     return errors
 
 

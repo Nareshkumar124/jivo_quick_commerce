@@ -60,7 +60,7 @@ class Me {
   @JsonKey(name: r'is_profile_complete', required: true, includeIfNull: false)
   final bool isProfileComplete;
 
-  /// Rider profile status; NONE without a rider profile (always NONE until Phase 5).  * `NONE` - No rider profile: show registration * `PENDING_KYC` - Registered, waiting for KYC approval * `ACTIVE` - Approved: can go online * `REJECTED` - KYC rejected: see the reason, re-submit * `SUSPENDED` - Suspended by ops
+  /// Rider profile status; NONE without a rider profile (`POST /rider/register/`).  * `NONE` - No rider profile: show registration * `PENDING_KYC` - Registered, waiting for KYC approval * `ACTIVE` - Approved: can go online * `REJECTED` - KYC rejected: see the reason, re-submit * `SUSPENDED` - Suspended by ops
   @JsonKey(
     name: r'rider_status',
     required: true,
