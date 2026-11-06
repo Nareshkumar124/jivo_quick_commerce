@@ -2,7 +2,7 @@
 {# Task detail panel. Context: detail, actions, poll_seconds. Pickup code and delivery OTP appear only as "locked" / attempts left, never the codes. Buttons post to the services through order_actions; the service re-checks the role, the store and the state. #}
 {% with task=detail.task order=detail.order %}
 <div id="dispatch-task" hx-get="{% url 'ops:dispatch-task-panel' task.pk %}" hx-swap="outerHTML"
-     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('dispatch-task')], ops:refresh from:body" data-testid="dispatch-task">
+     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('dispatch-task')], ops:live from:body[opsLiveAllowed('dispatch-task')], ops:refresh from:body" data-testid="dispatch-task">
     <section class="bg-white border border-base-200 flex flex-wrap gap-3 items-center mb-4 ops-card p-3 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-label="Task">
         <div class="flex flex-col">
             <span class="font-semibold text-font-important-light dark:text-font-important-dark">
