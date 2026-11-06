@@ -38,6 +38,7 @@ def cash_body(rider: Rider) -> dict:
         "cash_in_hand": money_str(rider.cash_in_hand),
         "cash_limit": money_str(rider.cash_limit),
         "limit_reached": rider.cash_limit_reached,
+        "deposit_required": rider.cash_limit_reached or rider.cash_skipped_at is not None,
     }
 
 
@@ -175,7 +176,11 @@ def current_offer_body(offer, now) -> dict:
 def task_body(task) -> dict:
     """`RiderTask` (06 §3, api-requests #13). The full address and phone are revealed only
     here, i.e. after accepting."""
-    from apps.delivery.services.tasks import not_reachable_after, otp_attempts_remaining
+    from apps.delivery.services.tasks import (
+        not_reachable_after,
+        otp_attempts_remaining,
+        pickup_attempts_remaining,
+    )
     from apps.orders.choices import OrderStatus
 
     order = task.order
@@ -231,7 +236,11 @@ def task_body(task) -> dict:
             "attempts_remaining": otp_attempts_remaining(task),
             "locked": task.otp_locked_at is not None,
         },
-        "cod_qr": None,  # slice 5.4
+        "pickup_code": {
+            "attempts_remaining": pickup_attempts_remaining(task),
+            "locked": task.pickup_locked_at is not None,
+        },
+        "cod_qr": _cod_qr(task),
         "assigned_at": task.assigned_at,
         "arrived_store_at": task.arrived_store_at,
         "picked_up_at": task.picked_up_at,
@@ -241,15 +250,31 @@ def task_body(task) -> dict:
         "failed_at": task.failed_at,
         "fail_reason": task.fail_reason or None,
         "returned_at": task.returned_at,
-        "earnings": None,  # slice 5.4 (RiderEarning)
+        "earnings": _earnings(task),
     }
+
+
+def _cod_qr(task) -> dict | None:
+    """The open QR (PENDING/PAID), else the newest; from the prefetched `cod_qrs`."""
+    from apps.delivery.services import cod_qr
+
+    qrs = sorted(task.cod_qrs.all(), key=lambda qr: (qr.created_at, qr.pk), reverse=True)
+    chosen = next((qr for qr in qrs if qr.status in cod_qr.OPEN), qrs[0] if qrs else None)
+    return cod_qr.body(chosen)
+
+
+def _earnings(task) -> dict | None:
+    """The task's pay lines (DL-61 c: from pickup), or null before pickup."""
+    from apps.delivery.services.earnings import task_earnings_body
+
+    return task_earnings_body(list(task.earnings.all()))
 
 
 def task_queryset():
     from apps.delivery.models import DeliveryTask
 
     return DeliveryTask.objects.select_related("order__store", "store", "rider").prefetch_related(
-        "order__items"
+        "order__items", "cod_qrs", "earnings"
     )
 
 

@@ -94,6 +94,20 @@ RIDER_DISPATCH = [
     "delivery.view_deliverytask",
     "delivery.view_deliveryoffer",
 ]
+# Slice 5.4 (05 §3 / DL-61 (a): "Cash deposit entry": Super Admin, Ops, Store Manager own, Finance;
+# the other ops delivery actions are `delivery.dispatch_order`; "Payouts": Super Admin,
+# Finance). Changes go through apps.delivery.services.cash / .payouts / .earnings,
+# which re-check these and the store scope. Cash adjustments and earning rules are Super Admin only
+# (PM default ⚠: no row in 05 §3; Finance views the rules, like pricing config).
+CASH_DEPOSIT = ["delivery.record_cash_deposit", "delivery.view_ridercashledger"]
+# DL-61 (d): lifting a customer's automatic COD block (Super Admin, Ops).
+COD_BLOCK_LIFT = "delivery.lift_cod_block"
+PAYOUTS_MANAGE = [
+    "delivery.manage_payouts",
+    "delivery.view_payout",
+    "delivery.view_riderearning",
+    "delivery.view_earningrule",
+]
 # Phase 7 (05 §3 "Support tickets": Super Admin, Ops, Support). Ticket changes go through
 # apps.support.services, which re-check `support.handle_ticket`. FAQs are part of the Support
 # module (05 §2), so Support also edits them (PM default); pages stay Super Admin (CMS).
@@ -119,6 +133,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         *RIDER_VIEW,
         *RIDER_REVIEW,
         *RIDER_DISPATCH,
+        *CASH_DEPOSIT,
+        COD_BLOCK_LIFT,
         *SUPPORT_TICKETS,
     ],
     STORE_MANAGER: [
@@ -131,6 +147,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         ORDER_CANCEL,
         *RIDER_VIEW,
         *RIDER_DISPATCH,
+        *CASH_DEPOSIT,
     ],
     STORE_STAFF: [*CATALOG_VIEW, *INVENTORY_VIEW, *ORDER_VIEW, ORDER_PROCESS],
     CATALOG_MANAGER: [*CATALOG_MANAGE, *INVENTORY_VIEW, *COUPON_MANAGE],
@@ -155,6 +172,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         "payments.view_paymentwebhookevent",
         REFUND_ISSUE,
         AUDIT_VIEW,
+        *CASH_DEPOSIT,
+        *PAYOUTS_MANAGE,
     ],
 }
 # Roles limited to the stores in StaffStoreAccess.

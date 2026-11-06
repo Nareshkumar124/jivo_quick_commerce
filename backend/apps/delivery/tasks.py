@@ -52,3 +52,27 @@ def dispatch_sweep() -> dict:
     from apps.delivery.services.dispatch import dispatch_sweep as run
 
     return run()
+
+
+# --------------------------------------------------------------------------- COD UPI QR (5.4)
+
+
+@shared_task(
+    name="delivery.close_cod_qr",
+    bind=True,
+    max_retries=6,
+    default_retry_delay=30,
+)
+def close_cod_qr(self, gateway_qr_id: str) -> str:
+    """Close a COD UPI QR at the gateway (cash taken, expired, delivery failed). Idempotent:
+    closing a closed QR is a no-op. A payment that still reaches it is refunded on its webhook."""
+    from apps.payments.gateways import GatewayUnavailable, PaymentGatewayError, get_gateway
+
+    try:
+        get_gateway().close_qr_code(gateway_qr_id)
+    except GatewayUnavailable as exc:
+        raise self.retry(exc=exc) from exc
+    except PaymentGatewayError:
+        logger.warning("close_cod_qr %s refused by the gateway", gateway_qr_id, exc_info=True)
+        return "refused"
+    return "closed"

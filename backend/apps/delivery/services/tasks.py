@@ -35,7 +35,9 @@ from apps.core.exceptions import ApiError
 from apps.delivery import hooks
 from apps.delivery.choices import CashEntryType, CodMode, DeliveryFailReason
 from apps.delivery.choices import DeliveryTaskStatus as TS
-from apps.delivery.models import RIDER_BUSY_STATUSES, DeliveryTask, Rider, RiderCashLedger
+from apps.delivery.models import RIDER_BUSY_STATUSES, DeliveryTask, Rider
+from apps.delivery.services import cod_qr, earnings
+from apps.delivery.services.cash import record_cash
 from apps.delivery.services.riders import require_rider
 from apps.delivery.services.shifts import distance_m
 from apps.inventory import services as inventory
@@ -57,6 +59,7 @@ MSG_WAIT = "Wait 10 minutes at the drop location first."
 MSG_UPI_NOT_PAID = "The UPI payment is not confirmed yet."
 MSG_COD_REQUIRED = "Collect the payment: send `cod` for this cash-on-delivery order."
 MSG_PREPAID = "This order is prepaid: there is nothing to collect."
+MSG_PAID_BY_UPI = "The customer has already paid by UPI: deliver with `cod.mode` = upi."
 QR_PATTERN = re.compile(r"^JQC1:(?P<number>[A-Z0-9-]{1,40}):(?P<code>[A-Z0-9]{4})$")
 CODE_PATTERN = re.compile(r"^[A-Za-z0-9]{4}$")
 CUSTOMER_FAULT_REASONS = frozenset(
@@ -105,6 +108,9 @@ def _locked(user, task_id: int) -> tuple[Rider, Order, DeliveryTask]:
     if task.rider_id != rider.pk:  # reassigned between the lookup and the lock
         raise ApiError(ErrorCode.NOT_FOUND, MSG_TASK_NOT_FOUND)
     return rider, order, task
+
+
+lock_task = _locked  # for the other delivery services (cod_qr)
 
 
 def _state(message: str, task: DeliveryTask, order: Order, **extra) -> ApiError:
@@ -244,6 +250,7 @@ def _commit_pickup(rider: Rider, order: Order, task: DeliveryTask, now) -> None:
     task.status = TS.PICKED_UP
     task.picked_up_at = now
     task.save()
+    earnings.record_trip_earnings(task, now)  # DL-61 (c): earned at pickup
     # 08 §9 T9: push (+SMS) with the OTP, through the P6 notifications (deduplicated per order).
     extra = {"rider_name": rider.user.name or "Your rider", "otp": otp}
     transaction.on_commit(lambda: hooks.notify_order(order, "order.out_for_delivery", **extra))
@@ -309,17 +316,16 @@ def otp_attempts_remaining(task: DeliveryTask) -> int:
     return max(settings.DELIVERY_OTP_MAX_ATTEMPTS - task.otp_attempts, 0)
 
 
-def _check_collection(order: Order, cod: dict | None) -> None:
-    """The COD collection, before the OTP (a mismatch uses no OTP attempt)."""
+def _check_collection(order: Order, task: DeliveryTask, cod: dict | None) -> None:
+    """The COD collection, before the OTP (a mismatch uses no OTP attempt). The amount always
+    comes from the order: `cod.amount` must equal it; UPI needs the task's QR PAID (confirmed by
+    the server) for that amount; cash is refused once the customer paid the QR."""
     if order.payment_method != PaymentMethod.COD:
         if cod:
             raise ApiError(ErrorCode.VALIDATION_ERROR, details={"cod": [MSG_PREPAID]})
         return
     if not cod:
         raise ApiError(ErrorCode.VALIDATION_ERROR, details={"cod": [MSG_COD_REQUIRED]})
-    if cod["mode"] == CodMode.UPI:
-        # The UPI QR (cod-qr) arrives in slice 5.4; until then no UPI payment can be confirmed.
-        raise ApiError(ErrorCode.VALIDATION_ERROR, details={"cod": [MSG_UPI_NOT_PAID]})
     if Decimal(cod["amount"]) != order.grand_total:
         raise ApiError(
             ErrorCode.VALIDATION_ERROR,
@@ -328,12 +334,21 @@ def _check_collection(order: Order, cod: dict | None) -> None:
                 "amount_due": str(order.grand_total),
             },
         )
+    paid = cod_qr.paid_qr(task)
+    if cod["mode"] == CodMode.UPI:
+        if paid is None or paid.amount != order.grand_total:
+            raise ApiError(ErrorCode.VALIDATION_ERROR, details={"cod": [MSG_UPI_NOT_PAID]})
+    elif paid is not None:
+        raise ApiError(ErrorCode.VALIDATION_ERROR, details={"cod": [MSG_PAID_BY_UPI]})
 
 
 def deliver(user, task_id: int, *, otp: str, cod: dict | None = None, now=None) -> DeliveryTask:
     """08 T10."""
     now = now or timezone.now()
     failure = None
+    if cod and cod.get("mode") == CodMode.UPI:
+        # A missed webhook: ask the gateway first (outside the row locks).
+        cod_qr.refresh_for_rider(require_rider(user, active=True), task_id)
     with transaction.atomic():
         rider, order, task = _locked(user, task_id)
         if task.status == TS.DELIVERED:
@@ -342,7 +357,7 @@ def deliver(user, task_id: int, *, otp: str, cod: dict | None = None, now=None) 
             raise _state(MSG_NOT_AT_CUSTOMER, task, order)
         if task.otp_locked_at is not None:
             raise ApiError(ErrorCode.DELIVERY_OTP_LOCKED, details={"attempts_remaining": 0})
-        _check_collection(order, cod)
+        _check_collection(order, task, cod)
         if not secrets.compare_digest(otp, decrypt(task.delivery_otp_encrypted)):
             task.otp_attempts += 1
             if task.otp_attempts >= settings.DELIVERY_OTP_MAX_ATTEMPTS:
@@ -366,16 +381,29 @@ def deliver(user, task_id: int, *, otp: str, cod: dict | None = None, now=None) 
     return task
 
 
-def _complete(rider: Rider, order: Order, task: DeliveryTask, cod: dict | None, now) -> None:
+def _complete(
+    rider: Rider,
+    order: Order,
+    task: DeliveryTask,
+    cod: dict | None,
+    now,
+    *,
+    actor=None,
+    actor_type: str = ActorType.RIDER,
+    note: str = "T10: delivered (OTP)",
+) -> None:
+    """T10 under the order and task locks: order DELIVERED (COD: COD_COLLECTED), task DELIVERED,
+    cash in hand (+), the tip (the per-delivery fee was earned at pickup), the invoice (after
+    commit)."""
     changes = {}
     if order.payment_method == PaymentMethod.COD:
         changes["payment_status"] = PaymentStatus.COD_COLLECTED
     transition(
         order,
         OrderStatus.DELIVERED,
-        actor=rider.user,
-        actor_type=ActorType.RIDER,
-        note="T10: delivered (OTP)",
+        actor=actor or rider.user,
+        actor_type=actor_type,
+        note=note,
         now=now,
         **changes,
     )
@@ -384,7 +412,9 @@ def _complete(rider: Rider, order: Order, task: DeliveryTask, cod: dict | None, 
     task.ended_at = now
     task.save()
     if order.payment_method == PaymentMethod.COD and cod and cod["mode"] == CodMode.CASH:
+        cod_qr.close_open(task, now)
         record_cash(rider, order.grand_total, CashEntryType.COD_COLLECTED, order=order)
+    earnings.record_tip(task, order, now)
     events.emit(events.DELIVERED, order.pk)
 
     def invoice() -> None:
@@ -393,26 +423,6 @@ def _complete(rider: Rider, order: Order, task: DeliveryTask, cod: dict | None, 
         generate_invoice.delay(order.pk)
 
     transaction.on_commit(invoice)
-
-
-def record_cash(
-    rider: Rider, amount: Decimal, entry_type: str, *, order=None, by=None, note: str = ""
-) -> RiderCashLedger:
-    """One cash-ledger entry and the new `cash_in_hand`, under the rider row lock (taken last,
-    after the order and task)."""
-    locked = Rider.objects.select_for_update().get(pk=rider.pk)
-    balance = locked.cash_in_hand + amount
-    Rider.objects.filter(pk=rider.pk).update(cash_in_hand=balance, updated_at=timezone.now())
-    rider.cash_in_hand = balance
-    return RiderCashLedger.objects.create(
-        rider=locked,
-        entry_type=entry_type,
-        amount=amount,
-        balance_after=balance,
-        order=order,
-        recorded_by=by,
-        note=note,
-    )
 
 
 # --------------------------------------------------------------------------- failure (T13)
@@ -432,8 +442,6 @@ def fail(
     Refunds (08 §6.4, D-10 defaults): ONLINE refunds what is still refundable, keeping the
     delivery fee when the customer was at fault (not reachable, refused); COD: nothing due
     (`payment_status` FAILED). Repeated refused COD orders block COD for the customer."""
-    from apps.payments import order_refunds
-
     now = now or timezone.now()
     with transaction.atomic():
         rider, order, task = _locked(user, task_id)
@@ -451,41 +459,72 @@ def fail(
                     reason="WAIT_NOT_ELAPSED",
                     not_reachable_after=ready_at.isoformat() if ready_at else None,
                 )
-        changes = {}
-        if order.payment_method == PaymentMethod.COD:
-            changes["payment_status"] = PaymentStatus.FAILED
-        transition(
+        fail_locked(
             order,
-            OrderStatus.DELIVERY_FAILED,
+            task,
+            reason=reason,
+            note=note,
+            call_attempts=call_attempts,
+            photo=photo,
             actor=rider.user,
             actor_type=ActorType.RIDER,
-            note=f"T13: delivery failed ({reason})",
             now=now,
-            **changes,
         )
-        task.status = TS.RETURNING
-        task.failed_at = now
-        task.fail_reason = reason
-        task.fail_note = (note or "").strip()[:300]
-        task.fail_call_attempts = call_attempts
-        if photo is not None:
-            task.fail_photo.save(
-                f"task-{task.pk}-{secrets.token_hex(8)}.jpg", _image(photo), save=False
-            )
-        task.save()
-        if order.payment_method == PaymentMethod.ONLINE:
-            amount = order_refunds.failed_delivery_refund(
-                order, customer_fault=reason in CUSTOMER_FAULT_REASONS
-            )
-            refund = order_refunds.refund_order(
-                order, amount, reason=order_refunds.DELIVERY_FAILED, key=f"failed:{order.pk}"
-            )
-            order_refunds.alert_if_not_refunded(order, refund, context="T13")
-        elif reason == DeliveryFailReason.CUSTOMER_REFUSED:
-            _maybe_block_cod(order)
-        events.emit(events.DELIVERY_FAILED, order.pk)
     logger.warning("Order %s delivery failed (%s), rider %s returning", order.pk, reason, rider.pk)
     return task
+
+
+def fail_locked(
+    order: Order,
+    task: DeliveryTask,
+    *,
+    reason: str,
+    note: str = "",
+    call_attempts: int | None = None,
+    photo=None,
+    actor,
+    actor_type: str,
+    now,
+) -> None:
+    """T13 under the order and task locks (the rider's `fail`, or ops). Refunds per 08 §6.4;
+    COD: nothing due, a PENDING UPI QR is closed and a PAID one refunded."""
+    from apps.payments import order_refunds
+
+    changes = {}
+    if order.payment_method == PaymentMethod.COD:
+        changes["payment_status"] = PaymentStatus.FAILED
+    transition(
+        order,
+        OrderStatus.DELIVERY_FAILED,
+        actor=actor,
+        actor_type=actor_type,
+        note=f"T13: delivery failed ({reason})",
+        now=now,
+        **changes,
+    )
+    task.status = TS.RETURNING
+    task.failed_at = now
+    task.fail_reason = reason
+    task.fail_note = (note or "").strip()[:300]
+    task.fail_call_attempts = call_attempts
+    if photo is not None:
+        task.fail_photo.save(
+            f"task-{task.pk}-{secrets.token_hex(8)}.jpg", _image(photo), save=False
+        )
+    task.save()
+    if order.payment_method == PaymentMethod.ONLINE:
+        amount = order_refunds.failed_delivery_refund(
+            order, customer_fault=reason in CUSTOMER_FAULT_REASONS
+        )
+        refund = order_refunds.refund_order(
+            order, amount, reason=order_refunds.DELIVERY_FAILED, key=f"failed:{order.pk}"
+        )
+        order_refunds.alert_if_not_refunded(order, refund, context="T13")
+    else:
+        cod_qr.on_delivery_failed(task, order, now)
+        if reason == DeliveryFailReason.CUSTOMER_REFUSED:
+            _maybe_block_cod(order)
+    events.emit(events.DELIVERY_FAILED, order.pk)
 
 
 def _image(photo) -> ContentFile:
@@ -496,8 +535,9 @@ def _image(photo) -> ContentFile:
 
 
 def _maybe_block_cod(order: Order) -> None:
-    """08 §6.4: "repeated refusals flag the user for COD block" (COD_BLOCK_AFTER_REFUSALS, D-10
-    default ⚠). Counted over the customer's refused COD deliveries, this one included."""
+    """08 §6.4 / DL-61 (d): after `COD_BLOCK_AFTER_REFUSALS` (2) refused COD deliveries the
+    customer may pay online only. Counted over the customer's refused COD deliveries since ops
+    last lifted the block (`User.cod_block_lifted_at`), this one included."""
     limit = settings.COD_BLOCK_AFTER_REFUSALS
     if limit <= 0:
         return
@@ -505,7 +545,12 @@ def _maybe_block_cod(order: Order) -> None:
         order__user_id=order.user_id,
         order__payment_method=PaymentMethod.COD,
         fail_reason=DeliveryFailReason.CUSTOMER_REFUSED,
-    ).count()
+    )
+    lifted_at = User.objects.filter(pk=order.user_id).values_list("cod_block_lifted_at", flat=True)
+    lifted_at = lifted_at.first()
+    if lifted_at is not None:
+        refused = refused.filter(failed_at__gt=lifted_at)
+    refused = refused.count()
     if refused >= limit:
         changed = User.objects.filter(pk=order.user_id, cod_blocked=False).update(
             cod_blocked=True, updated_at=timezone.now()

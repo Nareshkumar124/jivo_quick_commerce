@@ -11183,6 +11183,7 @@ paths:
                     eta_at: '2026-11-10T09:58:00Z'
                     rider: null
                     delivery_otp: null
+                    task_status: SEARCHING
                   summary: Accepted, no rider yet
                 RiderHeadingToTheStore:
                   value:
@@ -11207,6 +11208,7 @@ paths:
                       lng: 77.0411
                       updated_at: '2026-11-10T09:44:55Z'
                     delivery_otp: null
+                    task_status: ASSIGNED
                   summary: Rider heading to the store
                 OutForDelivery(OTPShown):
                   value:
@@ -11231,6 +11233,7 @@ paths:
                       lng: 77.057
                       updated_at: '2026-11-10T09:44:55Z'
                     delivery_otp: '4821'
+                    task_status: PICKED_UP
                   summary: Out for delivery (OTP shown)
                 Delivered:
                   value:
@@ -11249,6 +11252,7 @@ paths:
                     eta_at: null
                     rider: null
                     delivery_otp: null
+                    task_status: DELIVERED
           description: Tracking.
         '401':
           content:
@@ -12958,27 +12962,6 @@ paths:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
           description: The caller has no rider profile (`details.rider_status` = NONE).
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '429':
           content:
             application/json:
@@ -13014,6 +12997,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/documents/:
     post:
       operationId: rider_documents_create
@@ -13208,9 +13206,10 @@ paths:
     get:
       operationId: rider_earnings
       description: 'IST dates, inclusive, at most 366 days (api-requests #19). Every
-        total is computed by the server. Distance pay uses the store-to-drop route
-        distance computed by the server (`distance_km`), never the GPS trail. D-16
-        rates are settings until Jivo decides.'
+        total is computed by the server. Pay per delivered order (D-16 default): base
+        + distance pay on the store-to-drop route distance computed by the server
+        (`distance_km`), never the GPS trail, + the customer''s tip; incentives and
+        penalties are `adjustments`.'
       summary: Earnings for a date range
       parameters:
       - in: query
@@ -13346,27 +13345,6 @@ paths:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
           description: The caller has no rider profile (`details.rider_status` = NONE).
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '429':
           content:
             application/json:
@@ -13402,6 +13380,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/heartbeat/:
     post:
       operationId: rider_heartbeat
@@ -13837,6 +13830,7 @@ paths:
                       cash_in_hand: '0.00'
                       cash_limit: '5000.00'
                       limit_reached: false
+                      deposit_required: false
                   summary: Just registered
                 InReview:
                   value:
@@ -13923,6 +13917,7 @@ paths:
                       cash_in_hand: '0.00'
                       cash_limit: '5000.00'
                       limit_reached: false
+                      deposit_required: false
                   summary: In review
                 Rejected:
                   value:
@@ -14011,6 +14006,7 @@ paths:
                       cash_in_hand: '0.00'
                       cash_limit: '5000.00'
                       limit_reached: false
+                      deposit_required: false
                 Active:
                   value:
                     today:
@@ -14101,6 +14097,7 @@ paths:
                       cash_in_hand: '1250.00'
                       cash_limit: '5000.00'
                       limit_reached: false
+                      deposit_required: false
                 Active,DLRejectedByOps:
                   value:
                     today:
@@ -14192,6 +14189,7 @@ paths:
                       cash_in_hand: '1250.00'
                       cash_limit: '5000.00'
                       limit_reached: false
+                      deposit_required: false
                   summary: Active, DL rejected by ops
           description: The profile.
         '401':
@@ -14401,6 +14399,7 @@ paths:
                       cash_in_hand: '1250.00'
                       cash_limit: '5000.00'
                       limit_reached: false
+                      deposit_required: false
           description: Updated.
         '400':
           content:
@@ -14581,6 +14580,9 @@ paths:
                       customer_radius_m: 200
                     delivery_otp:
                       length: 4
+                      attempts_remaining: 5
+                      locked: false
+                    pickup_code:
                       attempts_remaining: 5
                       locked: false
                     cod_qr: null
@@ -15130,27 +15132,6 @@ paths:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
           description: The caller has no rider profile (`details.rider_status` = NONE).
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '429':
           content:
             application/json:
@@ -15186,6 +15167,21 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
         '404':
           content:
             application/json:
@@ -15297,6 +15293,7 @@ paths:
                       cash_in_hand: '0.00'
                       cash_limit: '5000.00'
                       limit_reached: false
+                      deposit_required: false
           description: Registered (PENDING_KYC).
         '400':
           content:
@@ -15474,6 +15471,7 @@ paths:
                       cash_in_hand: '1250.00'
                       cash_limit: '5000.00'
                       limit_reached: false
+                      deposit_required: false
                     location:
                       active_interval_seconds: 10
                       idle_interval_seconds: 30
@@ -15634,6 +15632,7 @@ paths:
                       cash_in_hand: '1250.00'
                       cash_limit: '5000.00'
                       limit_reached: false
+                      deposit_required: false
                     location:
                       active_interval_seconds: 10
                       idle_interval_seconds: 30
@@ -15655,6 +15654,7 @@ paths:
                       cash_in_hand: '5120.00'
                       cash_limit: '5000.00'
                       limit_reached: true
+                      deposit_required: true
                     location:
                       active_interval_seconds: 10
                       idle_interval_seconds: 30
@@ -16009,6 +16009,9 @@ paths:
                       length: 4
                       attempts_remaining: 5
                       locked: false
+                    pickup_code:
+                      attempts_remaining: 5
+                      locked: false
                     cod_qr: null
                     assigned_at: '2026-11-10T09:30:12.000000Z'
                     arrived_store_at: '2026-11-10T09:36:40.000000Z'
@@ -16255,6 +16258,9 @@ paths:
                       length: 4
                       attempts_remaining: 5
                       locked: false
+                    pickup_code:
+                      attempts_remaining: 5
+                      locked: false
                     cod_qr: null
                     assigned_at: '2026-11-10T09:30:12.000000Z'
                     arrived_store_at: '2026-11-10T09:36:40.000000Z'
@@ -16419,11 +16425,14 @@ paths:
     post:
       operationId: rider_tasks_cod_qr
       description: 'COD tasks at the customer (api-requests #16). Returns the open
-        QR for exactly `cod_amount_due` (a repeat returns the same QR). The server
-        confirms payment by the gateway webhook: poll `tasks/current/` (`cod_qr.status`)
-        every 3 s, then `deliver` with `cod.mode` = upi. Delivering with cash closes
-        the QR; a payment that still arrives on a closed QR is refunded automatically
-        (the cash stands).'
+        QR for exactly `cod_amount_due` (the server''s amount; a repeat returns the
+        same QR, an expired one is replaced; a repeat also checks the gateway for
+        a payment whose webhook was missed). The server confirms payment by the gateway
+        webhook: poll `tasks/current/` (`cod_qr.status`) every 3 s, then `deliver`
+        with `cod.mode` = upi. Delivering with cash closes the QR; a payment that
+        still arrives on a closed or expired QR is refunded automatically (the cash
+        stands). Once the QR is PAID, cash is refused. 503 when UPI QR is switched
+        off or the gateway is unreachable: take cash.'
       summary: UPI QR for the COD amount
       parameters:
       - in: path
@@ -16527,21 +16536,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
               examples:
+                QRUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: 'UPI QR is not available right now: collect cash.'
+                      details: {}
+                  summary: QR_UNAVAILABLE
                 MAINTENANCE:
                   value:
                     error:
                       code: MAINTENANCE
                       message: Jivo is down for scheduled maintenance.
                       details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
+          description: 'UPI QR unavailable (switched off, no gateway keys, gateway
+            down), or maintenance: collect cash.'
         '409':
           content:
             application/json:
@@ -16693,6 +16702,9 @@ paths:
                       customer_radius_m: 200
                     delivery_otp:
                       length: 4
+                      attempts_remaining: 5
+                      locked: false
+                    pickup_code:
                       attempts_remaining: 5
                       locked: false
                     cod_qr: null
@@ -16984,6 +16996,9 @@ paths:
                       length: 4
                       attempts_remaining: 5
                       locked: false
+                    pickup_code:
+                      attempts_remaining: 5
+                      locked: false
                     cod_qr: null
                     assigned_at: '2026-11-10T09:30:12.000000Z'
                     arrived_store_at: '2026-11-10T09:36:40.000000Z'
@@ -17235,6 +17250,9 @@ paths:
                       customer_radius_m: 200
                     delivery_otp:
                       length: 4
+                      attempts_remaining: 5
+                      locked: false
+                    pickup_code:
                       attempts_remaining: 5
                       locked: false
                     cod_qr: null
@@ -17509,6 +17527,9 @@ paths:
                         length: 4
                         attempts_remaining: 5
                         locked: false
+                      pickup_code:
+                        attempts_remaining: 5
+                        locked: false
                       cod_qr: null
                       assigned_at: '2026-11-10T09:30:12.000000Z'
                       arrived_store_at: '2026-11-10T09:36:40.000000Z'
@@ -17644,8 +17665,9 @@ paths:
   /api/v1/rider/tasks/history/:
     get:
       operationId: rider_tasks_history
-      description: 'Ended tasks, newest first (04 §2.8). Paged by `before_id` (api-requests
-        #24): follow `next`. Any rider status.'
+      description: 'The caller''s ended tasks (DELIVERED, RETURNED, CANCELLED), newest
+        first (04 §2.8). Paged by `before_id` (api-requests #24): follow `next`. `from`/`to`
+        filter on the IST day the task ended. Any rider status.'
       summary: Past tasks
       parameters:
       - in: query
@@ -17769,27 +17791,6 @@ paths:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
           description: The caller has no rider profile (`details.rider_status` = NONE).
-        '503':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-              examples:
-                MAINTENANCE:
-                  value:
-                    error:
-                      code: MAINTENANCE
-                      message: Jivo is down for scheduled maintenance.
-                      details: {}
-                NOTAVAILABLEYET:
-                  value:
-                    error:
-                      code: SERVICE_UNAVAILABLE
-                      message: This feature is not available yet (Phase 5 slice 5.3).
-                      details: {}
-                  summary: Until the slice lands
-          description: Maintenance (`MAINTENANCE`), or, until this operation's slice
-            lands, `SERVICE_UNAVAILABLE` (contract only).
         '429':
           content:
             application/json:
@@ -17825,6 +17826,186 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/rider/tasks/history/{id}/:
+    get:
+      operationId: rider_tasks_history_detail
+      description: An ended task of the caller with its items and pay lines (04 §2.8).
+        No customer personal data (the drop locality only). Another rider's task,
+        or one still active, is 404. Any rider status.
+      summary: One past task
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: The offer or task id.
+        required: true
+      tags:
+      - rider
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskHistoryDetail'
+              examples:
+                Delivered:
+                  value:
+                    task_id: 7001
+                    order_number: JV-261110-001203
+                    status: DELIVERED
+                    store_name: Jivo Sector 14
+                    drop_locality: Sector 21, Gurugram
+                    distance_km: '2.40'
+                    payout: '62.00'
+                    completed_at: '2026-11-10T09:51:02.000000Z'
+                    payment_type: COD
+                    cod_collected: '349.00'
+                    items:
+                    - name: Jivo Canola Oil
+                      variant: 1 L
+                      quantity: 2
+                    item_count: 2
+                    assigned_at: '2026-11-10T09:31:10.000000Z'
+                    picked_up_at: '2026-11-10T09:38:40.000000Z'
+                    delivered_at: '2026-11-10T09:51:02.000000Z'
+                    failed_at: null
+                    fail_reason: null
+                    returned_at: null
+                    cancelled_at: null
+                    earnings:
+                      total: '62.00'
+                      lines:
+                      - type: BASE
+                        amount: '30.00'
+                        note: ''
+                      - type: DISTANCE
+                        amount: '12.00'
+                        note: 2.40 km
+                      - type: TIP
+                        amount: '20.00'
+                        note: ''
+          description: The task.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTARIDER:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Register as a rider first.
+                      details:
+                        rider_status: NONE
+                  summary: 'No rider profile: show registration'
+          description: The caller has no rider profile (`details.rider_status` = NONE).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Task not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The task does not exist or is not this rider's (e.g. reassigned
+            by ops).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/search/:
     get:
       operationId: search_products
@@ -22092,6 +22273,25 @@ components:
           nullable: true
           description: The 4-digit OTP to give the rider, only while OUT_FOR_DELIVERY;
             null otherwise. Never share it before the rider arrives.
+        task_status:
+          allOf:
+          - $ref: '#/components/schemas/DeliveryTaskStatusEnum'
+          nullable: true
+          description: |-
+            The order's delivery task status (SEARCHING, OFFERED, ASSIGNED, AT_STORE, PICKED_UP, AT_CUSTOMER, DELIVERED, FAILED, ...); null while no task exists (before dispatch starts).
+
+            * `SEARCHING` - Looking for a rider
+            * `OFFERED` - Offered to a rider
+            * `ASSIGNED` - Rider heading to the store
+            * `AT_STORE` - Rider at the store
+            * `PICKED_UP` - Picked up
+            * `AT_CUSTOMER` - Rider at the drop location
+            * `DELIVERED` - Delivered
+            * `FAILED` - Delivery failed
+            * `RETURNING` - Returning items to the store
+            * `RETURNED` - Items returned to the store
+            * `UNASSIGNED` - No rider found: ops to assign
+            * `CANCELLED` - Cancelled
         server_time:
           type: string
           format: date-time
@@ -22105,6 +22305,7 @@ components:
       - server_time
       - status
       - store
+      - task_status
     OtpPurposeEnum:
       enum:
       - login
@@ -22679,6 +22880,19 @@ components:
       description: |-
         * `PENDING` - Pending
         * `PAID` - Paid
+    PickupCodeState:
+      type: object
+      properties:
+        attempts_remaining:
+          type: integer
+          description: Wrong order codes left before pickup locks (`PICKUP_CODE_MAX_ATTEMPTS`).
+        locked:
+          type: boolean
+          description: 'True after too many wrong order codes: ops are alerted and
+            can unlock it.'
+      required:
+      - attempts_remaining
+      - locked
     PickupRequest:
       type: object
       properties:
@@ -23156,9 +23370,16 @@ components:
           type: boolean
           description: 'True at or above the limit: only prepaid offers are sent (08
             §5).'
+        deposit_required:
+          type: boolean
+          description: 'Show the "Deposit cash" banner (DL-61): at the limit, or a
+            COD order was not offered to you because cash in hand + its amount was
+            over the limit. Cleared by a deposit at the store. Ops cannot override
+            the limit.'
       required:
       - cash_in_hand
       - cash_limit
+      - deposit_required
       - limit_reached
     RiderDocument:
       type: object
@@ -23692,6 +23913,10 @@ components:
           $ref: '#/components/schemas/TaskGeofence'
         delivery_otp:
           $ref: '#/components/schemas/DeliveryOtpState'
+        pickup_code:
+          allOf:
+          - $ref: '#/components/schemas/PickupCodeState'
+          description: The order-code check at pickup (T9).
         cod_qr:
           allOf:
           - $ref: '#/components/schemas/CodQr'
@@ -23738,7 +23963,9 @@ components:
           allOf:
           - $ref: '#/components/schemas/TaskEarnings'
           nullable: true
-          description: Set once DELIVERED (base, distance, tip...).
+          description: 'The pay for this task: base + distance from pickup (DL-61:
+            paid even if the delivery then fails), plus the tip once DELIVERED. Null
+            before pickup.'
       required:
       - arrived_customer_at
       - arrived_store_at
@@ -23765,6 +23992,7 @@ components:
       - order_status
       - payment_type
       - picked_up_at
+      - pickup_code
       - ready_for_pickup
       - returned_at
       - status
@@ -24047,6 +24275,122 @@ components:
       required:
       - customer_radius_m
       - store_radius_m
+    TaskHistoryDetail:
+      type: object
+      description: 'One past task (04 §2.8 detail). No customer personal data: the
+        drop locality only.'
+      properties:
+        task_id:
+          type: integer
+        order_number:
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/DeliveryTaskStatusEnum'
+          description: |-
+            DELIVERED, RETURNED or CANCELLED.
+
+            * `SEARCHING` - Looking for a rider
+            * `OFFERED` - Offered to a rider
+            * `ASSIGNED` - Rider heading to the store
+            * `AT_STORE` - Rider at the store
+            * `PICKED_UP` - Picked up
+            * `AT_CUSTOMER` - Rider at the drop location
+            * `DELIVERED` - Delivered
+            * `FAILED` - Delivery failed
+            * `RETURNING` - Returning items to the store
+            * `RETURNED` - Items returned to the store
+            * `UNASSIGNED` - No rider found: ops to assign
+            * `CANCELLED` - Cancelled
+        store_name:
+          type: string
+        drop_locality:
+          type: string
+        distance_km:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          nullable: true
+          description: Null for a task cancelled before pickup.
+        payout:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          description: Earned for this task (all lines); null if nothing was earned.
+        completed_at:
+          type: string
+          format: date-time
+          description: When it ended.
+        payment_type:
+          $ref: '#/components/schemas/RiderPaymentTypeEnum'
+        cod_collected:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          description: 'COD delivered: the amount collected (cash or UPI); else null.'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskItem'
+        item_count:
+          type: integer
+          description: Units delivered or returned.
+        assigned_at:
+          type: string
+          format: date-time
+          nullable: true
+        picked_up_at:
+          type: string
+          format: date-time
+          nullable: true
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        failed_at:
+          type: string
+          format: date-time
+          nullable: true
+        fail_reason:
+          allOf:
+          - $ref: '#/components/schemas/DeliveryFailReasonEnum'
+          nullable: true
+        returned_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        earnings:
+          allOf:
+          - $ref: '#/components/schemas/TaskEarnings'
+          nullable: true
+          description: The pay lines for this task (from pickup); null if none.
+      required:
+      - assigned_at
+      - cancelled_at
+      - cod_collected
+      - completed_at
+      - delivered_at
+      - distance_km
+      - drop_locality
+      - earnings
+      - fail_reason
+      - failed_at
+      - item_count
+      - items
+      - order_number
+      - payment_type
+      - payout
+      - picked_up_at
+      - returned_at
+      - status
+      - store_name
+      - task_id
     TaskHistoryItem:
       type: object
       properties:

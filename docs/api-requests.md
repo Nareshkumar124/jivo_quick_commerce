@@ -45,3 +45,5 @@ App agents raise API gaps in their reports (`development-phase.md` §4). This fi
 | 40 | rider (T-515) | P5 contract | `home_store` on `GET /rider/me/` needs `lat`/`lng`, for the "Navigate to store" action on the too-far guard. | sent to BE P5 |
 | 41 | rider (T-515) | P6 | Rider FCM data payload: `type` = offer.new\|offer.withdrawn\|task.updated, with `offer_id`/`task_id` as strings (the app's assumption). | sent to BE P6 |
 | 42 | rider (T-515) | P5 decision | **Heartbeat semantics:** only location points keep a rider online, so a rider indoors without a GPS fix is auto-offlined after 10 min. Should a heartbeat count as presence? | ⚠ needs Jivo/PM decision |
+| 43 | customer (T-516) | P5 contract | `task_status` (delivery task status, nullable before dispatch) on `GET /orders/{id}/track/` (`OrderTrack`), for the delivery stages. | done (BE P5 slice 5.4, backend/phase-5) |
+| 44 | rider (T-515 review) | P5 contract | `RiderTask.pickup_code {attempts_remaining, locked}` (pickup order-code lock state, like `delivery_otp`). | done (BE P5 slice 5.4, backend/phase-5) |

@@ -69,6 +69,9 @@ Every transition goes through `orders.services.transition()`. Anything not liste
 - **T13 refund mapping (D-10 default, ⚠ to confirm):** "customer fault" (delivery fee kept) = CUSTOMER_NOT_REACHABLE and CUSTOMER_REFUSED; WRONG_ADDRESS and OTHER are refunded in full, following the §6.4 table literally.
 - **T14 damaged items:** recorded as a RETURN followed by a DAMAGE of the same units, so `on_hand` is unchanged and both movements exist (the ledger refuses zero-delta rows).
 - **T10:** the COD collection is validated before the OTP, so a wrong amount never uses an OTP attempt. After 5 wrong OTPs only ops can resolve the delivery.
+- **T10 COD by UPI QR (Phase 5 slice 5.4):** the QR is for exactly `grand_total` and only the server marks it paid (webhook or gateway lookup). Cash taken while the QR is open closes it; cash is refused once the QR is paid (no double collection). Any QR payment that is not needed (QR closed or expired, wrong amount, delivery failed) is refunded in full to the UPI payment automatically. UPI collections do not enter the rider's cash ledger. Ops resolve a locked OTP by unlocking it (same OTP) or by checking the OTP with the customer and completing T10 themselves (actor `ops`).
+- **Rider earnings (D-16 default ⚠, DL-61 c):** the per-delivery fee (base + distance pay on the server's route distance) is earned at pickup (T9) and kept for failed, returned and cancelled-after-pickup deliveries; nothing is earned before pickup. The tip is added on delivery (T10) only.
+- **T13 by ops:** ops may mark a delivery failed without the rider's 10-minute wait; refunds as in §6.4. COD with a paid UPI QR: the QR payment is refunded (nothing is due).
 
 ### 2.1 Dispatch trigger
 Setting `DISPATCH_TRIGGER` = `ACCEPTED` (default) or `PLACED`. Dispatching in parallel with packing keeps the overall time low. The rider usually arrives as packing finishes.
@@ -132,7 +135,7 @@ Rules:
 
 When dispatch starts for an order:
 
-1. **Candidate riders** = riders where: `status=ACTIVE`, `is_online=true`, `home_store = order.store`, no active task (v1: one order at a time), last ping ≤ 2 min old, not already offered this task in the current dispatch round (offers since the round's `search_started_at`; a re-dispatch after UNASSIGNED or an unassign starts a new round), and **for COD orders** `cash_in_hand + order.grand_total ≤ cash_limit`.
+1. **Candidate riders** = riders where: `status=ACTIVE`, `is_online=true`, `home_store = order.store`, no active task (v1: one order at a time), last ping ≤ 2 min old, not already offered this task in the current dispatch round (offers since the round's `search_started_at`; a re-dispatch after UNASSIGNED or an unassign starts a new round), and **for COD orders** `cash_in_hand + order.grand_total ≤ cash_limit` (DL-61 b: no ops override; a rider left out for cash gets a "deposit cash" flag, `deposit_required`, until a deposit).
 2. **Rank** by: (a) riders *at the store* (within 200 m) first, ordered by longest idle time (fairness); then (b) others by distance to the store (PostGIS), nearest first.
 3. **Offer** to the top candidate: create `DeliveryOffer(PENDING, expires_at=now+30s)`, task `OFFERED`, send FCM high-priority + WebSocket. Schedule `expire_offer` at expiry.
 4. **Accept** (inside a transaction with a row lock on the task): task `ASSIGNED`, rider bound, all other pending offers withdrawn. A late accept after expiry returns `OFFER_EXPIRED`.
@@ -183,7 +186,7 @@ grand_total      = item_total − coupon_discount + delivery_fee + small_cart_fe
 | Customer cancels before packing | Full refund | Nothing due |
 | Store/ops cancels | Full refund | Nothing due |
 | Item unavailable | Refund difference | Reduced due |
-| Delivery failed: customer not reachable / refused | Refund item value; delivery fee kept (configurable) | Nothing due; repeated refusals flag the user for COD block |
+| Delivery failed: customer not reachable / refused | Refund item value; delivery fee kept (configurable) | Nothing due; after 2 refused COD deliveries the user is blocked from COD (online only; DL-61 d; ops can lift it, and the count restarts) |
 | Delivery failed: Jivo's fault (wrong address resolved by ops, rider issue) | Full refund | Nothing due |
 | Late capture on a failed/cancelled order (T3a) | Full auto-refund | n/a |
 

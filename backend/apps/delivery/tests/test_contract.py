@@ -59,20 +59,17 @@ def test_non_rider_is_403(make_auth_client, method, path):
 LIVE_STATUS = {
     "/api/v1/rider/offers/current/": 200,
     "/api/v1/rider/tasks/current/": 200,
-    "/api/v1/rider/tasks/1/cod-qr/": 503,  # slice 5.4
 }
 
 
 @pytest.mark.parametrize(("method", "path", "body", "multipart"), STUBS)
-def test_slice_5_3_is_live_and_5_4_answers_503(make_auth_client, method, path, body, multipart):
-    """Slice 5.3 operations are live: an offer or task id that is not the rider's is 404; the
-    slice 5.4 cod-qr still answers 503."""
+def test_task_operations_are_live(make_auth_client, method, path, body, multipart):
+    """Slices 5.3 and 5.4 are live: an offer or task id that is not the rider's is 404 (cod-qr
+    included since slice 5.4)."""
     client = make_auth_client(active_rider().user, "rider")
     response = getattr(client, method)(path, body, format="multipart" if multipart else "json")
     expected = LIVE_STATUS.get(path, 404)
     assert response.status_code == expected, response.json()
-    if expected == 503:
-        assert response.json()["error"]["code"] == "SERVICE_UNAVAILABLE"
 
 
 @pytest.mark.parametrize("path", [p for m, p, _, _ in STUBS])
@@ -85,8 +82,11 @@ def test_pending_rider_cannot_use_task_endpoints(make_auth_client, path):
 
 @pytest.mark.parametrize("path", RECORDS)
 def test_records_are_open_to_any_rider_status(make_auth_client, path):
+    """Slice 5.4: history, earnings, cash ledger and payouts answer any rider status (empty)."""
     response = make_auth_client(RiderFactory().user, "rider").get(path)
-    assert response.status_code == 503
+    assert response.status_code == 200, response.json()
+    body = response.json()
+    assert body.get("count", 0) == 0
 
 
 @pytest.mark.parametrize(

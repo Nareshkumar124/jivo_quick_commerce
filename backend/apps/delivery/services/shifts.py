@@ -213,12 +213,12 @@ def end_shift(user):
 
 
 def force_offline(rider_id: int, *, by, ip: str | None = None) -> Rider:
-    """Ops "force a rider offline" (05 §1.4): needs `delivery.review_rider` and the rider in
-    scope; refused during a task. Audited."""
+    """Ops "force a rider offline" (05 §1.4): DL-61 (a) Super Admin, Ops, Store Manager for
+    riders of their own stores (`delivery.dispatch_order`); refused during a task. Audited."""
     from apps.delivery.services import kyc
 
     with transaction.atomic():
-        rider = kyc._locked(by, rider_id)
+        rider = kyc._locked(by, rider_id, kyc.OPS_DELIVERY)
         if not rider.is_online:
             return rider
         if has_active_task(rider):

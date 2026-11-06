@@ -415,8 +415,9 @@ TRACK_PACKING = {
         "updated_at": "2026-11-10T09:44:55Z",
     },
     "delivery_otp": None,
+    "task_status": "ASSIGNED",
 }
-TRACK_NO_RIDER = {**TRACK_PACKING, "status": "ACCEPTED", "rider": None}
+TRACK_NO_RIDER = {**TRACK_PACKING, "status": "ACCEPTED", "rider": None, "task_status": "SEARCHING"}
 TRACK_OUT_FOR_DELIVERY = {
     **TRACK_PACKING,
     "status": "OUT_FOR_DELIVERY",
@@ -427,5 +428,12 @@ TRACK_OUT_FOR_DELIVERY = {
         "lng": 77.0570,
     },
     "delivery_otp": "4821",
+    "task_status": "PICKED_UP",
 }
-TRACK_DELIVERED = {**TRACK_PACKING, "status": "DELIVERED", "eta_at": None, "rider": None}
+TRACK_DELIVERED = {
+    **TRACK_PACKING,
+    "status": "DELIVERED",
+    "eta_at": None,
+    "rider": None,
+    "task_status": "DELIVERED",
+}

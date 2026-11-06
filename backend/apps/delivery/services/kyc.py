@@ -36,6 +36,9 @@ from apps.stores.services import stores_for
 
 REVIEW = "delivery.review_rider"
 VIEW = "delivery.view_rider"
+# DL-61 (a): the ops delivery actions on a rider (force offline, set the cash limit): Super Admin,
+# Ops/Dispatch, Store Manager for riders whose home store is theirs.
+OPS_DELIVERY = "delivery.dispatch_order"
 OPEN_FILES = "delivery.view_kyc_document_file"
 
 MSG_NO_PERMISSION = "You do not have permission to do this."
@@ -69,10 +72,16 @@ def staff_riders(user):
     return Rider.objects.filter(Q(home_store__in=stores) | Q(preferred_store__in=stores))
 
 
-def _locked(user, rider_id: int) -> Rider:
-    if not can_review(user):
+def _locked(user, rider_id: int, perm: str = REVIEW) -> Rider:
+    """The rider, row-locked, if `user` has `perm` and the rider is in scope. The KYC actions
+    (`REVIEW`) see the home or preferred store; the ops delivery actions (`OPS_DELIVERY`, DL-61)
+    only riders whose home store is one of the user's stores."""
+    if not _has(user, perm):
         raise PermissionDenied(MSG_NO_PERMISSION)
-    ids = staff_riders(user).filter(pk=rider_id).values("pk")
+    if perm == REVIEW:
+        ids = staff_riders(user).filter(pk=rider_id).values("pk")
+    else:
+        ids = Rider.objects.filter(pk=rider_id, home_store__in=stores_for(user)).values("pk")
     rider = (
         Rider.objects.select_for_update(of=("self",))
         .select_related("preferred_store", "home_store")
@@ -329,10 +338,11 @@ def set_home_store(rider_id: int, store_id: int, *, by, ip: str | None = None) -
 
 
 def set_cash_limit(rider_id: int, amount, *, by, ip: str | None = None) -> Rider:
-    """Change a rider's cash-in-hand limit (04 §2.7). Money: a 2-decimal amount, 0 or more."""
+    """Change a rider's cash-in-hand limit (04 §2.7). Money: a 2-decimal amount, 0 or more.
+    DL-61 (a): Super Admin, Ops, Store Manager (riders of their own stores)."""
     limit = _cash_limit(amount)
     with transaction.atomic():
-        rider = _locked(by, rider_id)
+        rider = _locked(by, rider_id, OPS_DELIVERY)
         before = rider.cash_limit
         rider.cash_limit = limit
         rider.save(update_fields=["cash_limit", "updated_at"])

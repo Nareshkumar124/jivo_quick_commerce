@@ -18,9 +18,24 @@ STORES = {
     ]
 }
 
-CASH_OK = {"cash_in_hand": "1250.00", "cash_limit": "5000.00", "limit_reached": False}
-CASH_ZERO = {"cash_in_hand": "0.00", "cash_limit": "5000.00", "limit_reached": False}
-CASH_LIMIT = {"cash_in_hand": "5120.00", "cash_limit": "5000.00", "limit_reached": True}
+CASH_OK = {
+    "cash_in_hand": "1250.00",
+    "cash_limit": "5000.00",
+    "limit_reached": False,
+    "deposit_required": False,
+}
+CASH_ZERO = {
+    "cash_in_hand": "0.00",
+    "cash_limit": "5000.00",
+    "limit_reached": False,
+    "deposit_required": False,
+}
+CASH_LIMIT = {
+    "cash_in_hand": "5120.00",
+    "cash_limit": "5000.00",
+    "limit_reached": True,
+    "deposit_required": True,
+}
 TODAY_ZERO = {
     "date": "2026-11-05",
     "orders_delivered": 0,
@@ -341,6 +356,7 @@ _TASK_BASE = {
     "estimated_payout": "42.00",
     "geofence": {"store_radius_m": 200, "customer_radius_m": 200},
     "delivery_otp": {"length": 4, "attempts_remaining": 5, "locked": False},
+    "pickup_code": {"attempts_remaining": 5, "locked": False},
     "cod_qr": None,
     "assigned_at": "2026-11-10T09:30:12.000000Z",
     "arrived_store_at": None,
@@ -588,4 +604,27 @@ PAYOUTS = {
             "paid_at": "2026-11-04T19:00:00.000000Z",
         },
     ],
+}
+
+HISTORY_DETAIL = {
+    **HISTORY["results"][0],
+    "payment_type": "COD",
+    "cod_collected": "349.00",
+    "items": [{"name": "Jivo Canola Oil", "variant": "1 L", "quantity": 2}],
+    "item_count": 2,
+    "assigned_at": "2026-11-10T09:31:10.000000Z",
+    "picked_up_at": "2026-11-10T09:38:40.000000Z",
+    "delivered_at": "2026-11-10T09:51:02.000000Z",
+    "failed_at": None,
+    "fail_reason": None,
+    "returned_at": None,
+    "cancelled_at": None,
+    "earnings": {
+        "total": "62.00",
+        "lines": [
+            {"type": "BASE", "amount": "30.00", "note": ""},
+            {"type": "DISTANCE", "amount": "12.00", "note": "2.40 km"},
+            {"type": "TIP", "amount": "20.00", "note": ""},
+        ],
+    },
 }
