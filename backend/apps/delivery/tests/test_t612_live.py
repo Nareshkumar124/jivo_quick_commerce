@@ -209,7 +209,7 @@ def test_dispatch_events_reach_the_store_ops_group(flow, sent, commit, component
     board = sent.to(store, "task.status")
     assert [(m["data"]["previous_status"], m["data"]["status"]) for m in board] == [
         (None, "SEARCHING"),
-        ("SEARCHING", "OFFERED"),
+        (None, "OFFERED"),  # created and offered in one transaction: previous unknown
         ("OFFERED", "ASSIGNED"),
     ]
     assigned = board[-1]["data"]
@@ -549,3 +549,108 @@ def test_order_eta_payload(flow, sent, components):
     assert message["data"]["eta_minutes"] >= 1
     sent.validate(components)
     assert AT_DROP  # fixture module imported for `flow`
+
+
+# --------------------------------------------------------------------------- review fixes
+
+
+def _offered_task(f):
+    dispatch.dispatch_order(f.order.pk)
+    return DeliveryTask.objects.get(order=f.order)  # status OFFERED, snapshot from the DB
+
+
+def test_refresh_from_db_refreshes_the_snapshot(flow, sent, commit):
+    """Another process changed the task; after `refresh_from_db` the snapshot follows the DB:
+    re-saving the DB state publishes nothing, a real change still publishes."""
+    f = flow()
+    task = _offered_task(f)
+    DeliveryTask.objects.filter(pk=task.pk).update(status=TS.SEARCHING)
+    task.refresh_from_db()
+    with commit():
+        task.save()
+    assert sent.items == []
+    task.status = TS.UNASSIGNED
+    with commit():
+        task.save()
+    [board] = sent.to(store_group(f.order.store_id), "task.status")
+    assert (board["data"]["previous_status"], board["data"]["status"]) == (
+        "SEARCHING",
+        "UNASSIGNED",
+    )
+
+
+def test_partial_refresh_keeps_an_unsaved_change(flow, sent, commit):
+    f = flow()
+    task = _offered_task(f)
+    task.status = TS.SEARCHING
+    task.refresh_from_db(fields=["attempt_count"])
+    with commit():
+        task.save()
+    assert sent.to(store_group(f.order.store_id), "task.status")
+
+
+def test_a_rolled_back_save_does_not_move_the_snapshot(flow, sent, commit):
+    """The change is rolled back; saving it again later must still publish."""
+    from django.db import transaction
+
+    f = flow()
+    task = _offered_task(f)
+    task.status = TS.SEARCHING
+
+    def save_then_fail():
+        with transaction.atomic():
+            task.save()
+            raise RuntimeError("rollback")
+
+    with pytest.raises(RuntimeError, match="rollback"):
+        save_then_fail()
+    assert task._live_snapshot == (TS.OFFERED, None)
+    with commit():
+        task.save()
+    [board] = sent.to(store_group(f.order.store_id), "task.status")
+    assert (board["data"]["previous_status"], board["data"]["status"]) == ("OFFERED", "SEARCHING")
+    assert task._live_snapshot == (TS.SEARCHING, None)  # moved on commit
+
+
+def test_deferred_status_publishes_rather_than_skips(flow, sent, commit):
+    f = flow()
+    task = _offered_task(f)
+    deferred = DeliveryTask.objects.select_related("order").only("id", "order").get(pk=task.pk)
+    assert deferred._live_snapshot is None
+    deferred.status = TS.SEARCHING
+    with commit():
+        deferred.save(update_fields=["status"])
+    [board] = sent.to(store_group(f.order.store_id), "task.status")
+    assert board["data"]["previous_status"] is None
+
+
+def test_task_save_path_query_count(flow, sent):
+    """With the order cached (`select_related("order")` / the locked order), a status change
+    costs only the UPDATE before commit: the observer adds no query."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    f = flow()
+    _offered_task(f)
+    task = DeliveryTask.objects.select_related("order").get(order=f.order)
+    task.status = TS.SEARCHING
+    with CaptureQueriesContext(connection) as queries:
+        task.save(update_fields=["status", "updated_at"])
+    assert len(queries) == 1, [q["sql"] for q in queries.captured_queries]
+
+
+def test_cash_flag_pushes_once_per_rider_with_a_stable_ref(
+    place, store_steps, make_rider, sent, pushes, commit
+):
+    rider = make_rider()
+    Rider.objects.filter(pk=rider.pk).update(
+        cash_in_hand=Decimal("90.00"), cash_limit=Decimal("100.00")
+    )
+    order = place()
+    store_steps.accept(order)
+    with commit():
+        dispatch.dispatch_order(order.pk)
+    flagged_at = Rider.objects.get(pk=rider.pk).cash_skipped_at
+    assert pushes == [] or all(p[1] == "rider.cash_updated" for p in pushes)
+    refs = [p[2]["ref"] for p in pushes if p[1] == "rider.cash_updated"]
+    assert refs == [f"deposit:{rider.pk}:{flagged_at.isoformat()}"]

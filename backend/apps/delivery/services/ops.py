@@ -55,6 +55,7 @@ def _locked(by, order_id: int):
     task = DeliveryTask.objects.select_for_update(of=("self",)).filter(order=order).first()
     if task is None:
         raise ValidationError(MSG_TASK)
+    task.order = order  # cached: the live publish needs no extra query (T-612)
     return order, task
 
 

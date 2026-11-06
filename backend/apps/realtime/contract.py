@@ -416,7 +416,7 @@ DATA_COMPONENTS: dict[str, dict] = {
         status=_enum(*TASK_STATUSES),
         previous_status={
             **_enum(*TASK_STATUSES, nullable=True),
-            "description": "null when the task was just created.",
+            "description": "null when unknown: just created, or changed twice in one transaction.",
         },
         rider_id=INT_NULL,
         assignment_mode={

@@ -51,7 +51,7 @@ class Eta:
 
 def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     km = haversine_km(lat1, lng1, lat2, lng2) * settings.ETA_ROAD_FACTOR
-    return km / settings.ETA_AVG_SPEED_KMPH * 60
+    return km / max(settings.ETA_AVG_SPEED_KMPH, 1) * 60  # a 0 setting never divides
 
 
 def prep_left_minutes(order, now: datetime) -> float:

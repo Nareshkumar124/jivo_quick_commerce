@@ -436,7 +436,7 @@ Rider, `/ws/v1/rider/`. `offer.new` data is exactly the `RiderOffer` of `GET /ri
 {"type": "offer.expired", "data": {"offer_id": 9001, "task_id": 7001, "reason": "EXPIRED"}, "sent_at": "2026-11-10T09:30:30.200000Z"}
 {"type": "cash.updated", "data": {"rider_id": 41, "cash_in_hand": "1498.00", "cash_limit": "2000.00", "limit_reached": false, "deposit_required": false, "reason": "COD_COLLECTED", "updated_at": "2026-11-10T09:58:10Z"}, "sent_at": "2026-11-10T09:58:10.300000Z"}
 ```
-Every app socket (customer order sockets and the rider socket), api-requests #47: a new inbox entry for that app, with the unread count. Without an open socket, re-read the inbox on the FCM message.
+Every app socket (customer order sockets and the rider socket), api-requests #47: a new inbox entry for that app, with the unread count. **The customer app has no account-level socket: a customer gets `notification.new` only while one of their order sockets is open** (the rider gets it whenever the rider socket is open). Otherwise re-read the inbox (or `GET /me/notifications/unread-count/`) on the FCM message and when the app resumes.
 ```json
 {"type": "notification.new", "data": {"id": 5512, "title": "Order confirmed", "body": "The store has confirmed order JV-261110-001203 and will pack it now.", "category": "order", "link": "jivo://orders/1203", "read": false, "created_at": "2026-11-10T09:41:05Z", "unread_count": 3}, "sent_at": "2026-11-10T09:41:05.300000Z"}
 ```

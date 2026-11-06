@@ -7,30 +7,35 @@ ops actions, T14 at the store) can skip the dispatch board.
 States still change only in `apps.delivery.services` (and T14 in `orders.store_ops`); this only
 observes them. Rider-facing messages (`task.updated`, `offer.*`) carry a reason the save does
 not know, so the services send those themselves.
+
+Change detection (`DeliveryTask._live_snapshot`): the (status, rider) last read from the DB
+(`from_db`, `refresh_from_db`) or committed by a save (set in the `on_commit` callback, so a
+rolled-back save never moves it). Unknown (a deferred field, a new instance, a partial refresh)
+publishes rather than skips: messages carry current state, so an extra one is harmless and a
+missed one is not. `previous_status` is therefore null when unknown, including a task saved
+twice in one transaction.
 """
 
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from apps.delivery import hooks
 from apps.delivery.models import DeliveryTask
 
-UNKNOWN = object()
-
 
 @receiver(post_save, sender=DeliveryTask, dispatch_uid="delivery.live.task_saved")
 def task_saved(sender, instance: DeliveryTask, created: bool, raw: bool = False, **kwargs):
     if raw:  # fixtures
         return
-    if created:
-        previous_status, previous_rider_id = None, None
-    else:
-        previous_status = getattr(instance, "_live_status", UNKNOWN)
-        previous_rider_id = getattr(instance, "_live_rider_id", None)
-        if previous_status is UNKNOWN:
-            previous_status = None
-        elif previous_status == instance.status and previous_rider_id == instance.rider_id:
-            return
+    current = (instance.status, instance.rider_id)
+    snapshot = None if created else instance._live_snapshot
+    if snapshot == current:
+        return
+    previous_status, previous_rider_id = snapshot if snapshot is not None else (None, None)
     hooks.task_changed(instance, previous_status, previous_rider_id)
-    instance._live_status = instance.status
-    instance._live_rider_id = instance.rider_id
+
+    def remember() -> None:
+        instance._live_snapshot = current
+
+    transaction.on_commit(remember)

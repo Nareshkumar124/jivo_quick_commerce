@@ -25515,7 +25515,7 @@ components:
           - CANCELLED
           - null
           nullable: true
-          description: null when the task was just created.
+          description: 'null when unknown: just created, or changed twice in one transaction.'
         rider_id:
           type: integer
           nullable: true

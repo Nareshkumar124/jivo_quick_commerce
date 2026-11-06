@@ -52,3 +52,16 @@ def test_new_inbox_entry_is_announced_to_the_user_app_group(
     assert body["data"]["unread_count"] == 1
     assert "otp" not in str(body).lower()
     assert realtime.send_notification_new(999_999) is False
+
+
+def test_a_token_never_sees_another_users_or_apps_count(make_auth_client):
+    """IDOR: user A's token counts only A's entries of A's token app."""
+    a, b = UserFactory(), UserFactory()
+    for _ in range(3):
+        entry(b)
+    entry(b, app="rider")
+    entry(a, app="rider")
+    assert make_auth_client(a, "customer").get(UNREAD).json() == {"unread": 0}
+    assert make_auth_client(a, "customer").get(LIST).json()["unread_count"] == 0
+    assert make_auth_client(a, "rider").get(UNREAD).json() == {"unread": 1}
+    assert make_auth_client(b, "rider").get(UNREAD).json() == {"unread": 1}

@@ -470,6 +470,8 @@ def receive_return(
     with transaction.atomic():
         order = _locked(by, order_id, roles.RIDER_DISPATCH[0])
         task = DeliveryTask.objects.select_for_update(of=("self",)).filter(order=order).first()
+        if task is not None:
+            task.order = order  # cached for the live publish (T-612)
         if (
             order.status != OrderStatus.DELIVERY_FAILED
             or task is None

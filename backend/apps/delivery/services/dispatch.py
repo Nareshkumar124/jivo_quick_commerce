@@ -104,7 +104,10 @@ def _locked_order(order_id: int) -> Order | None:
 
 
 def _locked_task(order: Order) -> DeliveryTask | None:
-    return DeliveryTask.objects.select_for_update(of=("self",)).filter(order=order).first()
+    task = DeliveryTask.objects.select_for_update(of=("self",)).filter(order=order).first()
+    if task is not None:
+        task.order = order  # cached: the live publish needs no extra query (T-612)
+    return task
 
 
 def _pending_offer(task: DeliveryTask) -> DeliveryOffer | None:
@@ -183,14 +186,17 @@ def candidates(task: DeliveryTask, order: Order, now) -> list[Rider]:
                 cash_skipped_at__isnull=True,
             ).values_list("pk", flat=True)
         )
-        if flagged:
-            Rider.objects.filter(pk__in=flagged, cash_skipped_at__isnull=True).update(
+        for skipped in Rider.objects.filter(pk__in=flagged).select_related("user"):
+            # Only the riders this call flagged (a concurrent dispatch may have won the update):
+            # the "deposit cash" banner turns on (T-612 `cash.updated`, with one push per flag).
+            won = Rider.objects.filter(pk=skipped.pk, cash_skipped_at__isnull=True).update(
                 cash_skipped_at=now
             )
-            for skipped in Rider.objects.filter(pk__in=flagged).select_related("user"):
-                # The "deposit cash" banner turns on (T-612 `cash.updated`, with a push).
+            if won:
                 hooks.cash_updated(
-                    skipped, "DEPOSIT_REQUIRED", push_ref=f"deposit:{now.isoformat()}"
+                    skipped,
+                    "DEPOSIT_REQUIRED",
+                    push_ref=f"deposit:{skipped.pk}:{now.isoformat()}",
                 )
         riders = riders.filter(cash_limit__gte=over)
     at_store_m = settings.DISPATCH_AT_STORE_RADIUS_M
@@ -514,7 +520,7 @@ def order_packed(order_id: int) -> None:
     """08 T8 ("notify the assigned rider 'Order ready'; if no rider yet, raise dispatch
     priority"): runs after commit from the `order.packed` event."""
     task = (
-        DeliveryTask.objects.select_related("rider__user", "order")
+        DeliveryTask.objects.select_related("rider__user", "order", "store")
         .filter(order_id=order_id)
         .first()
     )
