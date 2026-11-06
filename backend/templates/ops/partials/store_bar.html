@@ -30,6 +30,12 @@
             </a>
         {% endif %}
 
+        {% if caps.receive_return %}
+            <a class="ops-link-button" href="{% url 'ops:store-returns' store.code %}" data-testid="returns-link">
+                <span class="material-symbols-outlined md-18" aria-hidden="true">assignment_return</span>Returns
+            </a>
+        {% endif %}
+
         <div class="flex flex-wrap items-center gap-2 ml-auto" x-data>
             <button type="button" class="ops-button ops-button--secondary" x-show="$store.alerts.notifications === 'default'" x-cloak
                     x-on:click="$store.alerts.askNotifications()">

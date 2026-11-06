@@ -1,0 +1,132 @@
+{% load ops %}
+{# Dispatch board sections (05 §1.4). Context: board, poll_seconds. Polls with the store filter of #dispatch-filters and reloads at once on ops:refresh. No customer data; riders by name only. #}
+<div id="dispatch-board" hx-get="{% url 'ops:dispatch-board' %}" hx-include="#dispatch-filters" hx-swap="outerHTML"
+     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('dispatch-board')], ops:refresh from:body" data-testid="dispatch-board">
+    <p class="mb-3 ops-board-summary" data-testid="dispatch-summary">
+        {{ board.waiting|length }} waiting for a rider{% if board.unassigned %}, <strong class="ops-tone-danger">{{ board.unassigned }} unassigned</strong>{% endif %};
+        {{ board.offers|length }} offer{{ board.offers|length|pluralize }} in flight; {{ board.riders|length }} rider{{ board.riders|length|pluralize }} online.
+        Updated {{ board.generated_at|date:"H:i:s" }} IST; refreshes every {{ poll_seconds }} s.
+    </p>
+
+    <div class="ops-dispatch-grid">
+        <section aria-labelledby="sec-waiting" data-testid="section-waiting">
+            <h2 id="sec-waiting" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Waiting for a rider</h2>
+            {% if board.waiting %}
+                <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                    <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                        <thead><tr class="bg-base-50 dark:bg-base-900">
+                            <th scope="col">Order</th><th scope="col">Store</th><th scope="col">State</th><th scope="col">Searching</th><th scope="col">Offered to</th>
+                        </tr></thead>
+                        <tbody>
+                            {% for task in board.waiting %}
+                                <tr data-testid="waiting-{{ task.order.order_number }}">
+                                    <td><a class="font-semibold text-primary-600 dark:text-primary-500" href="{% url 'ops:dispatch-task' task.pk %}">{{ task.order.order_number }}</a></td>
+                                    <td title="{{ task.store.name }}">{{ task.store.code }}</td>
+                                    <td>{% status_badge "task" task.status %}</td>
+                                    <td>{{ task.search_started_at|minutes_since:board.generated_at }} min</td>
+                                    <td>{% for offer in task.pending_offers %}{{ offer.rider.full_name }}{% empty %}<span class="ops-text-secondary">-</span>{% endfor %}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if board.truncated.waiting %}<p class="mt-1 ops-text-secondary">Oldest 100 shown. <a class="text-primary-600 dark:text-primary-500" href="{% url 'admin:delivery_deliverytask_changelist' %}">See all tasks</a></p>{% endif %}
+            {% else %}
+                {% include "ops/components/empty_state.html" with title="No order is waiting for a rider" icon="check_circle" compact=1 %}
+            {% endif %}
+        </section>
+
+        <section aria-labelledby="sec-offers" data-testid="section-offers">
+            <h2 id="sec-offers" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Offers in flight</h2>
+            {% if board.offers %}
+                <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                    <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                        <thead><tr class="bg-base-50 dark:bg-base-900">
+                            <th scope="col">Order</th><th scope="col">Rider</th><th scope="col">Offered</th><th scope="col">Expires</th>
+                        </tr></thead>
+                        <tbody>
+                            {% for offer in board.offers %}
+                                <tr data-testid="offer-{{ offer.pk }}">
+                                    <td><a class="font-semibold text-primary-600 dark:text-primary-500" href="{% url 'ops:dispatch-task' offer.task_id %}">{{ offer.task.order.order_number }}</a> <span class="ops-text-secondary">{{ offer.task.store.code }}</span></td>
+                                    <td>{{ offer.rider.full_name }}</td>
+                                    <td>{{ offer.offered_at|date:"H:i:s" }}</td>
+                                    <td>{{ offer.expires_at|date:"H:i:s" }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                {% include "ops/components/empty_state.html" with title="No offer is waiting for an answer" icon="hourglass_empty" compact=1 %}
+            {% endif %}
+        </section>
+
+        <section aria-labelledby="sec-road" data-testid="section-on-road">
+            <h2 id="sec-road" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">With a rider</h2>
+            {% if board.on_road %}
+                <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                    <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                        <thead><tr class="bg-base-50 dark:bg-base-900">
+                            <th scope="col">Order</th><th scope="col">Rider</th><th scope="col">State</th><th scope="col">Locks</th>
+                        </tr></thead>
+                        <tbody>
+                            {% for task in board.on_road %}
+                                <tr data-testid="road-{{ task.order.order_number }}">
+                                    <td><a class="font-semibold text-primary-600 dark:text-primary-500" href="{% url 'ops:dispatch-task' task.pk %}">{{ task.order.order_number }}</a> <span class="ops-text-secondary">{{ task.store.code }}</span></td>
+                                    <td>{{ task.rider.full_name|default:"-" }}</td>
+                                    <td>{% status_badge "task" task.status %}</td>
+                                    <td>
+                                        {% if task.pickup_locked_at %}{% include "unfold/helpers/label.html" with text="Pickup code locked" variant="danger" %}{% endif %}
+                                        {% if task.otp_locked_at %}{% include "unfold/helpers/label.html" with text="Delivery OTP locked" variant="danger" %}{% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                {% include "ops/components/empty_state.html" with title="No delivery is with a rider" compact=1 %}
+            {% endif %}
+        </section>
+
+        <section aria-labelledby="sec-riders" data-testid="section-riders">
+            <h2 id="sec-riders" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Riders online</h2>
+            {% if board.riders %}
+                <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                    <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                        <thead><tr class="bg-base-50 dark:bg-base-900">
+                            <th scope="col">Rider</th><th scope="col">Store</th><th scope="col">From store</th><th scope="col">Last ping</th><th scope="col">Cash in hand</th><th scope="col">Doing</th><th scope="col"><span class="sr-only">Actions</span></th>
+                        </tr></thead>
+                        <tbody>
+                            {% for row in board.riders %}
+                                <tr data-testid="rider-{{ row.rider.pk }}">
+                                    <td>{{ row.rider.full_name }}</td>
+                                    <td>{{ row.rider.home_store.code }}</td>
+                                    <td data-testid="rider-km-{{ row.rider.pk }}">{% if row.km is not None %}{{ row.km }} km{% else %}<span class="ops-text-secondary">no location</span>{% endif %}</td>
+                                    <td>{% if row.ping_age is not None %}{{ row.ping_age }} s ago{% else %}<span class="ops-text-secondary">never</span>{% endif %}</td>
+                                    <td>{{ row.rider.cash_in_hand|inr }}</td>
+                                    <td>
+                                        {% if row.task %}<a class="text-primary-600 dark:text-primary-500" href="{% url 'ops:dispatch-task' row.task.pk %}">{{ row.task.order.order_number }}</a> {% status_badge "task" row.task.status %}
+                                        {% elif row.pending_offer %}{% include "unfold/helpers/label.html" with text="Offer pending" variant="warning" %}
+                                        {% else %}{% include "unfold/helpers/label.html" with text="Idle" variant="success" %}{% endif %}
+                                    </td>
+                                    <td>
+                                        {% if not row.task %}
+                                            <form hx-post="{% url 'ops:dispatch-force-offline' row.rider.pk %}" hx-swap="none" method="post" action="{% url 'ops:dispatch-force-offline' row.rider.pk %}"
+                                                  hx-confirm="Take {{ row.rider.full_name }} offline? Their shift ends and they get no more offers." data-confirm-title="Force offline?" data-confirm-label="Take offline" data-confirm-tone="danger">
+                                                {% csrf_token %}
+                                                <button type="submit" class="ops-button ops-button--secondary" data-testid="force-offline-{{ row.rider.pk }}"{% if not can_force_offline %} disabled{% endif %}>Force offline</button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                {% include "ops/components/empty_state.html" with title="No rider is online" icon="two_wheeler" compact=1 %}
+            {% endif %}
+        </section>
+    </div>
+</div>

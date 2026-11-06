@@ -1,0 +1,78 @@
+{% load ops %}
+{# Riders' cash in hand and the store's day-end report (05 §1.5). Reloads on ops:refresh after a deposit. Riders come from cash.staff_cash_riders (the user's stores only). Amounts are the server's. #}
+<div id="cash-riders" hx-get="{% url 'ops:cash-riders' %}" hx-include="#cash-filters" hx-swap="outerHTML"
+     hx-trigger="ops:refresh from:body" data-testid="cash-riders">
+    <div class="ops-dispatch-grid">
+        <section aria-labelledby="sec-cash-riders">
+            <h2 id="sec-cash-riders" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Cash with riders</h2>
+            {% if riders %}
+                <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                    <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                        <thead><tr class="bg-base-50 dark:bg-base-900">
+                            <th scope="col">Rider</th><th scope="col">Store</th><th scope="col">Cash in hand</th>{% if can_record %}<th scope="col">Record deposit</th>{% endif %}
+                        </tr></thead>
+                        <tbody>
+                            {% for rider in riders %}
+                                <tr data-testid="cash-rider-{{ rider.pk }}">
+                                    <td>{{ rider.full_name }}</td>
+                                    <td>{{ rider.home_store.code|default:"-" }}</td>
+                                    <td>
+                                        <span data-testid="cash-in-hand-{{ rider.pk }}">{{ rider.cash_in_hand|inr }}</span> <span class="ops-text-secondary">of {{ rider.cash_limit|inr }}</span>
+                                        {% if rider.cash_in_hand > rider.cash_limit %}{% include "unfold/helpers/label.html" with text="Over limit" variant="danger" %}{% endif %}
+                                    </td>
+                                    {% if can_record %}
+                                        <td>
+                                            {% if rider.cash_in_hand > 0 %}
+                                                <form class="flex flex-wrap gap-2 items-end" hx-post="{% url 'ops:cash-deposit' rider.pk %}" hx-swap="none" method="post" action="{% url 'ops:cash-deposit' rider.pk %}"
+                                                      hx-confirm="Record the cash received from {{ rider.full_name }}? Count it first; the balance goes down at once." data-confirm-title="Record deposit?" data-confirm-label="Record">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="key" value="{{ deposit_key }}-{{ rider.pk }}">
+                                                    <input type="hidden" name="store" value="{{ rider.home_store_id }}">
+                                                    <label class="sr-only" for="amount-{{ rider.pk }}">Amount received (₹)</label>
+                                                    <input id="amount-{{ rider.pk }}" name="amount" type="number" step="0.01" min="0.01" max="{{ rider.cash_in_hand }}" required inputmode="decimal"
+                                                           class="bg-white border border-base-200 px-3 py-2 rounded-default w-32 dark:bg-base-900 dark:border-base-700" placeholder="₹">
+                                                    <label class="sr-only" for="note-{{ rider.pk }}">Note</label>
+                                                    <input id="note-{{ rider.pk }}" name="note" maxlength="200" placeholder="Note (optional)"
+                                                           class="bg-white border border-base-200 px-3 py-2 rounded-default w-40 dark:bg-base-900 dark:border-base-700">
+                                                    <button type="submit" class="ops-button" data-testid="deposit-{{ rider.pk }}">Record</button>
+                                                </form>
+                                            {% else %}<span class="ops-text-secondary">Nothing to deposit</span>{% endif %}
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if truncated %}<p class="mt-1 ops-text-secondary">The 100 riders with the most cash are shown. Choose a store to narrow the list.</p>{% endif %}
+            {% else %}
+                {% include "ops/components/empty_state.html" with title="No rider of your stores" icon="two_wheeler" compact=1 %}
+            {% endif %}
+        </section>
+
+        <section aria-labelledby="sec-cash-report" data-testid="cash-report">
+            <h2 id="sec-cash-report" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Day-end report{% if report %}: {{ report.store_name }}, {{ report.date|date:"d M Y" }}{% endif %}</h2>
+            {% if report_error %}
+                {% include "ops/components/error_state.html" with title="Report not available" message=report_error %}
+            {% elif not report %}
+                <p class="ops-text-secondary">Choose a store to see COD collected against cash deposited.</p>
+            {% else %}
+                <p class="mb-2" data-testid="cash-report-totals">COD collected <strong>{{ report.collected|inr }}</strong>; deposited <strong>{{ report.deposited|inr }}</strong>; difference <strong>{{ report.difference|inr }}</strong>.</p>
+                {% if report.riders %}
+                    <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                        <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                            <thead><tr class="bg-base-50 dark:bg-base-900"><th scope="col">Rider</th><th scope="col">Collected</th><th scope="col">Deposited</th><th scope="col">Difference</th><th scope="col">In hand now</th></tr></thead>
+                            <tbody>
+                                {% for row in report.riders %}
+                                    <tr data-testid="report-rider-{{ row.rider_id }}"><td>{{ row.name }}</td><td>{{ row.collected|inr }}</td><td>{{ row.deposited|inr }}</td><td>{{ row.difference|inr }}</td><td>{{ row.cash_in_hand|inr }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    {% include "ops/components/empty_state.html" with title="No COD collected or deposited that day" icon="payments" compact=1 %}
+                {% endif %}
+            {% endif %}
+        </section>
+    </div>
+</div>

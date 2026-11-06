@@ -195,6 +195,13 @@ MODULES: tuple[NavSection, ...] = (
         "Riders",
         (
             NavItem(
+                "Dispatch",
+                "route",
+                "ops:dispatch",
+                surface=OPS,
+                capability="dispatch",
+            ),
+            NavItem(
                 "Riders",
                 "two_wheeler",
                 "admin:delivery_rider_changelist",
@@ -214,10 +221,56 @@ MODULES: tuple[NavSection, ...] = (
                 ("delivery.view_ridershift",),
             ),
             NavItem(
+                "Delivery tasks",
+                "local_shipping",
+                "admin:delivery_deliverytask_changelist",
+                ("delivery.view_deliverytask",),
+            ),
+            NavItem(
+                "Rider offers",
+                "notifications",
+                "admin:delivery_deliveryoffer_changelist",
+                ("delivery.view_deliveryoffer",),
+            ),
+            NavItem(
                 "Location history",
                 "location_on",
                 "admin:delivery_riderlocation_changelist",
                 ("delivery.view_riderlocation",),
+            ),
+            # Slice 5.4 (hidden until its services / models are merged: capability service gate,
+            # admin URL not installed).
+            NavItem(
+                "Cash deposits",
+                "account_balance_wallet",
+                "ops:cash",
+                surface=OPS,
+                capability="cash_deposit",
+            ),
+            NavItem(
+                "Cash ledger",
+                "receipt_long",
+                "admin:delivery_ridercashledger_changelist",
+                ("delivery.view_ridercashledger",),
+            ),
+            NavItem(
+                "Payouts",
+                "payments",
+                "ops:payouts",
+                surface=OPS,
+                capability="payouts",
+            ),
+            NavItem(
+                "Rider earnings",
+                "savings",
+                "admin:delivery_riderearning_changelist",
+                ("delivery.view_riderearning",),
+            ),
+            NavItem(
+                "Earning rules",
+                "rule",
+                "admin:delivery_earningrule_changelist",
+                ("delivery.view_earningrule",),
             ),
         ),
     ),
