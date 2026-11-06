@@ -132,7 +132,7 @@ Rules:
 
 When dispatch starts for an order:
 
-1. **Candidate riders** = riders where: `status=ACTIVE`, `is_online=true`, `home_store = order.store`, no active task (v1: one order at a time), last ping ≤ 2 min old, not already offered this task, and **for COD orders** `cash_in_hand + order.grand_total ≤ cash_limit`.
+1. **Candidate riders** = riders where: `status=ACTIVE`, `is_online=true`, `home_store = order.store`, no active task (v1: one order at a time), last ping ≤ 2 min old, not already offered this task in the current dispatch round (offers since the round's `search_started_at`; a re-dispatch after UNASSIGNED or an unassign starts a new round), and **for COD orders** `cash_in_hand + order.grand_total ≤ cash_limit`.
 2. **Rank** by: (a) riders *at the store* (within 200 m) first, ordered by longest idle time (fairness); then (b) others by distance to the store (PostGIS), nearest first.
 3. **Offer** to the top candidate: create `DeliveryOffer(PENDING, expires_at=now+30s)`, task `OFFERED`, send FCM high-priority + WebSocket. Schedule `expire_offer` at expiry.
 4. **Accept** (inside a transaction with a row lock on the task): task `ASSIGNED`, rider bound, all other pending offers withdrawn. A late accept after expiry returns `OFFER_EXPIRED`.

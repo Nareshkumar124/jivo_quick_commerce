@@ -54,7 +54,18 @@ class CheckoutScreen extends ConsumerWidget {
       })
       ..listen(checkoutProvider.select((s) => s.error), (_, error) {
         if (error == null) return;
+        final online = ref.read(checkoutProvider).method == PaymentMethod.online;
         controller.acknowledge();
+        // M6: the payment gateway is down at placement. The server created
+        // the order and ended it PAYMENT_FAILED (it shows in My orders);
+        // the cart is kept, so the customer can retry or pick COD.
+        if (online && error.code == ApiErrorCode.serviceUnavailable) {
+          showMessage(
+            context,
+            AppLocalizations.of(context).onlinePaymentUnavailable,
+          );
+          return;
+        }
         // What changed, from the error's details; the cart was reloaded.
         showMessage(context, cartErrorText(context, error, cart: snapshot));
         // Flagged lines are fixed on the cart screen.

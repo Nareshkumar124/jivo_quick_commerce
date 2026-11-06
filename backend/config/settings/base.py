@@ -63,6 +63,10 @@ INSTALLED_APPS = [
     "import_export",
     "simple_history",
     "axes",
+    # Staff TOTP MFA (H2, DL-59; interim until Jivo SSO, D-04): devices + recovery codes.
+    "django_otp",
+    "django_otp.plugins.otp_totp",
+    "django_otp.plugins.otp_static",
     # Project apps
     "apps.core",
     "apps.accounts",
@@ -77,6 +81,8 @@ INSTALLED_APPS = [
     "apps.payments",
     "apps.delivery",
     "apps.support",
+    "apps.realtime",  # Phase 6: WebSockets (06 §4)
+    "apps.loadtest",  # P8 T-812: load-test data commands (no models, no API)
     "apps.ops_console",
 ]
 
@@ -87,6 +93,9 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "apps.accounts.middleware.staff_session_policy_middleware",  # 05 §5 staff session limits
+    "django_otp.middleware.OTPMiddleware",  # request.user.is_verified() (staff MFA, H2)
+    "apps.ops_console.mfa.staff_mfa_middleware",  # privileged staff: MFA on /admin/ and /ops/
+    "apps.ops_console.csp.report_only_csp_middleware",  # L7: CSP report-only on the panel
     "apps.core.middleware.staff_timezone_middleware",  # staff panel in IST, storage UTC
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -96,6 +105,20 @@ MIDDLEWARE = [
     # Last, per django-axes: locks out repeated failed staff logins.
     "axes.middleware.AxesMiddleware",
 ]
+
+# Staff MFA (H2, DL-59): TOTP for Super Admin, Finance and Support (and Ops when set) on /admin/
+# and /ops/. apps/ops_console/mfa.py. Interim until Jivo SSO (D-04).
+STAFF_MFA_ENFORCED = env_bool("STAFF_MFA_ENFORCED", default=True)
+# Ops / Dispatch is in by default: it has the broadest customer PII and rider KYC access.
+STAFF_MFA_INCLUDE_OPS = env_bool("STAFF_MFA_INCLUDE_OPS", default=True)
+OTP_TOTP_ISSUER = "Jivo Ops"
+# django-otp throttling: after each wrong code the device waits 5 s, then 10, 20, ... seconds.
+OTP_TOTP_THROTTLE_FACTOR = 5
+OTP_STATIC_THROTTLE_FACTOR = 5
+# Orders admin export (05 §2): at most this many rows per file; larger exports are a P7 report.
+ORDERS_EXPORT_MAX_ROWS = env_int("ORDERS_EXPORT_MAX_ROWS", default=5000)
+# L7: Content-Security-Policy on /admin/ and /ops/, report-only until a week of clean reports.
+CSP_REPORT_ONLY = env_bool("CSP_REPORT_ONLY", default=True)
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
@@ -207,7 +230,7 @@ AUTHENTICATION_BACKENDS = [
 # Staff login throttling (09 §3.1, django-axes): lock a username+IP pair after N failures.
 AXES_FAILURE_LIMIT = env_int("AXES_FAILURE_LIMIT", default=5)
 AXES_COOLOFF_TIME = timedelta(minutes=env_int("AXES_COOLOFF_MINUTES", default=15))
-AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+# AXES_LOCKOUT_PARAMETERS: see the security (P8, T-814) block at the end of this file.
 AXES_RESET_ON_SUCCESS = True
 AXES_CLIENT_IP_CALLABLE = "apps.core.net.client_ip"
 # The admin form posts `username` (axes would default to USERNAME_FIELD, "email"); normalised so
@@ -332,6 +355,19 @@ CELERY_BEAT_SCHEDULE = {
         "task": "delivery.purge_offboarded_kyc",
         "schedule": crontab(hour=22, minute=45),
     },
+    # Phase 6 (06 §5): retention purges (03:20 and 03:25 IST).
+    "purge-old-rider-locations": {
+        "task": "realtime.purge_old_locations",
+        "schedule": crontab(hour=21, minute=55),
+    },
+    "sweep-stuck-notification-sends": {
+        "task": "notifications.sweep_stuck_sends",
+        "schedule": 15 * 60.0,
+    },
+    "purge-old-notifications": {
+        "task": "notifications.purge_old_notifications",
+        "schedule": crontab(hour=21, minute=50),
+    },
 }
 
 # --------------------------------------------------------------------------- email
@@ -423,6 +459,35 @@ SMS_RETRIEVER_APP_HASHES = {
 # --------------------------------------------------------------------------- account deletion
 ACCOUNT_DELETION_GRACE_DAYS = env_int("ACCOUNT_DELETION_GRACE_DAYS", default=30)  # 07 §4
 
+# --------------------------------------------------------------------------- notifications (P6)
+# Push (08 §9) behind apps.notifications.push. FCM waits for D-19: until then the default sends
+# nothing (DisabledPushBackend: notifications are recorded, push is SKIPPED). local.py logs them.
+PUSH_BACKEND = env_str("PUSH_BACKEND", default="apps.notifications.push.DisabledPushBackend")
+# TRAI DLT template id per notification event with SMS ("order.placed:1007...,order.cancelled:
+# 1007..."). An event without one sends no SMS (logged). OTP keeps SMS_OTP_DLT_TEMPLATE_ID.
+SMS_DLT_TEMPLATE_IDS: dict[str, str] = env_dict("SMS_DLT_TEMPLATE_IDS", default={})
+NOTIFICATION_RETENTION_DAYS = env_int("NOTIFICATION_RETENTION_DAYS", default=90)
+# A push/SMS still SENDING after this long is marked FAILED and its text blanked (sweeper).
+NOTIFICATION_STUCK_SEND_MINUTES = env_int("NOTIFICATION_STUCK_SEND_MINUTES", default=15)
+RIDER_LOCATION_RETENTION_DAYS = env_int("RIDER_LOCATION_RETENTION_DAYS", default=30)  # 07 §2.8
+
+# --------------------------------------------------------------------------- WebSockets (P6)
+# /ws/v1/ sockets close with 4408 when no auth message arrives in time (06 §4).
+WS_AUTH_TIMEOUT_SECONDS = env_float("WS_AUTH_TIMEOUT_SECONDS", default=10.0)
+# /ws/ops/live/ re-checks the staff session, role and stores this often (revoked access ends).
+WS_OPS_RECHECK_SECONDS = env_float("WS_OPS_RECHECK_SECONDS", default=300.0)
+# Abuse limits (P8 OWASP review L5): sockets per user (4429), each slot a lease renewed on
+# auth/ping/re-check; malformed or unknown messages before 4400; inbound message size (1009).
+# The ASGI server must also cap frames (uvicorn --ws-max-size, daphne --websocket_max_size).
+WS_MAX_SOCKETS_PER_USER = env_int("WS_MAX_SOCKETS_PER_USER", default=5)
+WS_SOCKET_LEASE_SECONDS = env_int("WS_SOCKET_LEASE_SECONDS", default=1200)
+WS_MAX_BAD_MESSAGES = env_int("WS_MAX_BAD_MESSAGES", default=10)
+WS_MAX_MESSAGE_BYTES = env_int("WS_MAX_MESSAGE_BYTES", default=4096)
+# /ws/v1/rider/ re-checks that the rider is still ACTIVE this often (a suspension ends offers).
+WS_RIDER_RECHECK_SECONDS = env_float("WS_RIDER_RECHECK_SECONDS", default=60.0)
+# `order.eta` while out for delivery is recomputed from rider pings at most this often per order.
+WS_ETA_MIN_INTERVAL_SECONDS = env_int("WS_ETA_MIN_INTERVAL_SECONDS", default=30)
+
 # --------------------------------------------------------------------------- OpenAPI
 # /api/schema/ and /api/docs/ are public only where API_DOCS_PUBLIC is true (local); staff-only
 # elsewhere (02 §5). The committed contract is backend/openapi/schema.yaml.
@@ -439,6 +504,11 @@ SPECTACULAR_SETTINGS = {
         "Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`."
     ),
     "VERSION": "0.1.0",
+    # Phase 6: the WebSocket messages (06 §4) as `Ws...` components (apps.realtime.contract).
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "apps.realtime.schema.add_websocket_components",
+    ],
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVE_PERMISSIONS": ["apps.core.permissions.ApiDocsPermission"],
     # JWT first so anonymous requests get 401 (with WWW-Authenticate), not 403.
@@ -541,6 +611,13 @@ SPECTACULAR_SETTINGS = {
                 "`PERMISSION_DENIED` with `details.rider_status`)."
             ),
         },
+        {
+            "name": "notifications",
+            "description": (
+                "The in-app inbox (06 §2.7). Live updates use WebSockets (06 §4): their messages "
+                "are the `Ws...` schemas."
+            ),
+        },
     ],
     "SWAGGER_UI_SETTINGS": {"persistAuthorization": True, "displayOperationId": True},
 }
@@ -621,7 +698,7 @@ DISPATCH_TRIGGER = env_str("DISPATCH_TRIGGER", default="ACCEPTED")
 REFUND_KEEP_DELIVERY_FEE_ON_CUSTOMER_FAULT = env_bool(
     "REFUND_KEEP_DELIVERY_FEE_ON_CUSTOMER_FAULT", default=True
 )
-# 05 §3: Support may refund up to this per refund (Super Admin and Finance: no limit).
+# 05 §3, DL-59: Support may refund up to this in total per order (Super Admin, Finance: no cap).
 SUPPORT_REFUND_LIMIT = Decimal(env_str("SUPPORT_REFUND_LIMIT", default="500.00"))
 # A PENDING refund with no gateway answer after this long is sent again (sync, ops retry).
 REFUND_STUCK_MINUTES = env_int("REFUND_STUCK_MINUTES", default=10)
@@ -737,6 +814,10 @@ from config.admin_ui import UNFOLD  # noqa: E402, F401  (owned by the admin pane
 # --------------------------------------------------------------------------- project flags
 # `manage.py seed_demo` is refused where this is False (production).
 SEED_DEMO_ALLOWED = env_bool("SEED_DEMO_ALLOWED", default=True)
+# P8 T-812: `manage.py loadtest_seed` / `loadtest_cleanup` (create and delete the +9190000002xx
+# load-test customers, their orders and stock top-ups). Off unless explicitly enabled; staging
+# only. Production refuses it at startup and with the system check loadtest.E001.
+LOADTEST_DATA_ALLOWED = env_bool("LOADTEST_DATA_ALLOWED", default=False)
 
 # --------------------------------------------------------------------------- logging
 LOG_LEVEL = env_str("LOG_LEVEL", default="INFO")
@@ -754,3 +835,61 @@ LOGGING = {
         "django.db.backends": {"level": "WARNING"},
     },
 }
+# --------------------------------------------------------------------------- security (P8, T-814)
+# OWASP review fixes. Kept as one appended block (parallel branches merge more easily).
+# H3: baseline throttles on every DRF view (fail open, apps.core.throttling). A view with its own
+# `throttle_classes` (stricter scopes: orders, payments, rider endpoints, ...) replaces them, so
+# nothing is throttled twice; `throttle_classes = []` exempts a view (health, gateway webhook).
+# Generous on purpose: many customers can share one carrier IP (CGNAT).
+REST_FRAMEWORK["DEFAULT_THROTTLE_CLASSES"] = [
+    "apps.core.throttling.BaselineAnonThrottle",
+    "apps.core.throttling.BaselineUserThrottle",
+]
+REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
+    {
+        "anon": env_str("API_ANON_RATE", default="300/min"),
+        "user": env_str("API_USER_RATE", default="300/min"),
+        "search": env_str("SEARCH_RATE", default="60/min"),
+        "serviceability": env_str("SERVICEABILITY_RATE", default="60/min"),
+        "coupon_apply": env_str("COUPON_APPLY_RATE", default="20/hour"),
+        "address_write": env_str("ADDRESS_WRITE_RATE", default="30/hour"),
+        "invoice": env_str("INVOICE_RATE", default="30/hour"),
+    }
+)
+# H2 (DL-59): staff lockout per username (whatever the IP: rotating IPs cannot brute-force one
+# account) and per username+IP. Staff TOTP is the admin track's part of DL-59.
+AXES_LOCKOUT_PARAMETERS = ["username", ["ip_address", "username"]]
+# M2: expired refresh tokens and sessions are deleted daily (UTC; 22:00 / 22:15 = 03:30 / 03:45
+# IST). M4 (DL-60): payment payloads are scrubbed of personal data after the retention period.
+CELERY_BEAT_SCHEDULE.update(
+    {
+        "flush-expired-tokens": {
+            "task": "accounts.flush_expired_tokens",
+            "schedule": crontab(hour=22, minute=0),
+        },
+        "clear-expired-sessions": {
+            "task": "accounts.clear_expired_sessions",
+            "schedule": crontab(hour=22, minute=15),
+        },
+        "scrub-payment-payloads": {
+            "task": "payments.scrub_payment_payloads",
+            "schedule": crontab(hour=22, minute=30),
+        },
+    }
+)
+# M3 (DL-59): Support refunds. SUPPORT_REFUND_LIMIT (order processing block above) caps Support's
+# refunds in total per order; this caps each Support agent's refunds per IST day. Super Admin and
+# Finance have no cap.
+SUPPORT_REFUND_DAILY_LIMIT = Decimal(env_str("SUPPORT_REFUND_DAILY_LIMIT", default="5000.00"))
+# Ops alert `payment.refund_volume_high` when one staff member issues more refunds than this in
+# an hour (any role; at most one alert per member per hour).
+REFUND_VOLUME_ALERT_PER_HOUR = env_int("REFUND_VOLUME_ALERT_PER_HOUR", default=10)
+# M4 (DL-60, ⚠ Jivo): days after which Payment.raw and webhook payloads lose contact, email, VPA
+# and card fields (ids, amounts and statuses are kept).
+PAYMENT_PAYLOAD_RETENTION_DAYS = env_int("PAYMENT_PAYLOAD_RETENTION_DAYS", default=90)
+PAYMENT_PAYLOAD_SCRUB_BATCH = env_int("PAYMENT_PAYLOAD_SCRUB_BATCH", default=500)
+# L3: the key that hashes OTP codes. Empty: derived from SECRET_KEY with its own label (never the
+# raw SECRET_KEY). Deployed environments may set it; it must then differ from the other keys.
+OTP_HASH_KEY = env_str("OTP_HASH_KEY", default="")
+# L10: saved addresses per user.
+MAX_ADDRESSES_PER_USER = env_int("MAX_ADDRESSES_PER_USER", default=20)

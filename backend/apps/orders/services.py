@@ -5,7 +5,8 @@ cancellation of an unpaid order (T5), payment-window expiry (T4) and payment ret
 1. the `Order` row, 2. the customer's `Cart` row, 3. the `Coupon` row,
 4. `StoreInventory` rows in variant-id order.
 A path takes the locks it needs in this order and never goes back up:
-- placement: cart, then (the gateway call), coupon, stock;
+- placement: cart, coupon, stock (then commit); the gateway call holds no lock (T-814, M6);
+  then the order again, to attach the payment attempt;
 - capture (T3): order, then cart (to remove the ordered lines);
 - cancel (T5) and expiry (T4): order, then stock.
 
@@ -189,11 +190,19 @@ def place_order(
 
     Only a successful placement is remembered under its Idempotency-Key: a repeat returns that
     order. Two concurrent requests with one key race on the unique (user, key) constraint and
-    the loser returns the winner's order."""
+    the loser returns the winner's order.
+
+    T-814 (M6): an ONLINE order is created, its stock reserved and its coupon held in one
+    transaction that commits **before** the gateway is called, so a slow gateway holds no cart,
+    coupon or stock lock. The payment attempt is attached afterwards under the order lock
+    (`_start_payment`). If the gateway call fails, the order is ended (T4: reservation and
+    coupon hold released) and its Idempotency-Key is freed, so the app's retry starts afresh.
+    An order left without an attempt (a crash in between) is completed by a replay of its key
+    or failed by `expire_unpaid_orders` when its payment window ends, never left reserved."""
     fingerprint = request_fingerprint(store.pk, address_id, payment_method, expected_grand_total)
     order = _replay(user, idempotency_key, fingerprint)
     if order is not None:
-        return Placement(order, created=False)
+        return Placement(_start_payment(order), created=False)
     try:
         with transaction.atomic():
             order, created = _place(
@@ -210,8 +219,76 @@ def place_order(
         order = _replay(user, idempotency_key, fingerprint)
         if order is None:
             raise
-        return Placement(order, created=False)
-    return Placement(order, created=created)
+        created = False
+    return Placement(_start_payment(order, end_on_failure=created), created=created)
+
+
+def _awaits_first_attempt(order: Order) -> bool:
+    return (
+        order.payment_method == PaymentMethod.ONLINE
+        and order.status == OrderStatus.PAYMENT_PENDING
+        and not order.payments.exists()
+    )
+
+
+def _start_payment(order: Order, *, end_on_failure: bool = False) -> Order:
+    """T-814 (M6): the gateway order of an ONLINE order placed without one yet, created outside
+    any row lock and attached under the order lock (a capture, cancel, expiry or concurrent
+    replay in between wins; its extra gateway order is never paid and simply lapses). No-op
+    for COD and for orders that already have an attempt. On a gateway failure: 503
+    `SERVICE_UNAVAILABLE`; with `end_on_failure` (the request that created the order) the
+    order is ended first (`_end_unstarted`)."""
+    if not _awaits_first_attempt(order):
+        return order
+    if order.payment_expires_at is None or order.payment_expires_at <= timezone.now():
+        # A stale replay after the payment window: no gateway call; the order is left as it is
+        # for `expire_unpaid_orders` to fail (T4) and the response shows no payment to open.
+        return order
+    try:
+        gateway = get_gateway()
+        gateway_order = gateway.create_order(
+            amount_paise=to_paise(order.grand_total),
+            receipt=order.order_number,
+            notes={"order_number": order.order_number},
+        )
+    except PaymentGatewayError as exc:
+        logger.warning("Gateway order for %s failed: %s", order.order_number, exc)
+        if end_on_failure and not _end_unstarted(order.pk):
+            return Order.objects.get(pk=order.pk)  # a concurrent replay attached an attempt
+        raise ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG_GATEWAY_DOWN) from exc
+    with transaction.atomic():
+        order = _locked_order(order.pk)
+        if not _awaits_first_attempt(order):
+            return order
+        Payment.objects.create(
+            order=order,
+            gateway=gateway.code,
+            gateway_order_id=gateway_order.id,
+            amount=order.grand_total,
+            status=PaymentAttemptStatus.CREATED,
+        )
+        events.emit(events.PAYMENT_PENDING, order.pk)
+    return order
+
+
+def _end_unstarted(order_id: int) -> bool:
+    """The gateway could not start the payment of a new ONLINE order: T4 by the system, which
+    releases its reservation and coupon hold, and its Idempotency-Key is freed (renamed to a
+    value no client key can take) so the app's retry with the same key places afresh. False
+    when the order got an attempt (or moved on) meanwhile and is left as it is."""
+    with transaction.atomic():
+        order = _locked_order(order_id)
+        if not _awaits_first_attempt(order):
+            return False
+        _end_unpaid(
+            order,
+            OrderStatus.PAYMENT_FAILED,
+            actor=None,
+            actor_type=ActorType.SYSTEM,
+            note="T4: the payment could not be started (gateway unavailable)",
+            idempotency_key=f"gateway-down:{order.pk}",
+        )
+    return True
 
 
 def _next_order_id() -> int:
@@ -352,18 +429,6 @@ def _place(
     bill, online = state.bill, payment_method == PaymentMethod.ONLINE
     order_id = _next_order_id()
     number = order_number(order_id, now)
-    gateway_order = None
-    if online:
-        try:
-            gateway = get_gateway()
-            gateway_order = gateway.create_order(
-                amount_paise=to_paise(bill.grand_total),
-                receipt=number,
-                notes={"order_number": number},
-            )
-        except PaymentGatewayError as exc:
-            logger.warning("Gateway order for %s failed: %s", number, exc)
-            raise ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG_GATEWAY_DOWN) from exc
     expires_at = now + timedelta(minutes=AppConfig.load().payment_window_minutes)
     coupon = state.coupon_check.coupon if state.coupon_check is not None else None
     lat, lng = float(address.lat), float(address.lng)
@@ -406,14 +471,6 @@ def _place(
         note="T1: awaiting online payment" if online else "T2: cash on delivery",
     )
     OrderItem.objects.bulk_create(_order_items(order, state.lines))
-    if online:
-        Payment.objects.create(
-            order=order,
-            gateway=gateway.code,
-            gateway_order_id=gateway_order.id,
-            amount=bill.grand_total,
-            status=PaymentAttemptStatus.CREATED,
-        )
     if coupon is not None:  # Lock 2: the coupon row (re-checks its limits)
         use = promotions.hold_coupon if online else promotions.apply_coupon_now
         use(order, coupon, bill.coupon_discount)
@@ -428,9 +485,7 @@ def _place(
         ],
         expires_at=expires_at if online else None,
     )
-    if online:
-        events.emit(events.PAYMENT_PENDING, order.pk)
-    else:
+    if not online:  # ONLINE: the payment attempt and its event follow commit (_start_payment)
         _clear_ordered_lines(cart, order)
         events.emit(events.PLACED, order.pk)
     return order, True

@@ -35,6 +35,7 @@ dependencies = [
     "uvicorn[standard]==0.54.0",
     "uvicorn-worker==0.4.0",
     "nh3==0.3.7",                           # P7: CMS page HTML allow-list (bleach is deprecated)
+    "django-otp==1.7.5",
 ]
 
 [dependency-groups]

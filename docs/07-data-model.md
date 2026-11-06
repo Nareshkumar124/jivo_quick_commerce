@@ -238,8 +238,8 @@ Phase 5 implementation (slices 5.1/5.2, migration `delivery.0001`):
 
 ### 2.9 Notifications, support, CMS
 
-**NotificationTemplate**: `event` (e.g., `order.out_for_delivery`), `channel` (PUSH/SMS), `app`, `title`, `body` (with `{{placeholders}}`), `dlt_template_id` (SMS), `is_active`.
-**Notification**: `user`, `app`, `title`, `body`, `data` (JSON deep link), `category` (order/promo/system), `sent_at`, `read_at`.
+**NotificationTemplate**: `event` (e.g., `order.out_for_delivery`), `channel` (PUSH/SMS), `app`, `title`, `body` (with `{{placeholders}}`), `dlt_template_id` (SMS), `is_active`. Unique (`event`, `channel`, `app`). Optional: an active row overrides the built-in text in `apps.notifications.catalog` (Phase 6).
+**Notification**: `user`, `app`, `event`, `title`, `body`, `data` (JSON: FCM data payload fields and the `link`), `category` (order/promo/system), `order_id` (nullable, no FK), `dedupe_key` (unique: event + user + order, so an event notifies once), `in_inbox`, `read_at`. Per channel: `push_status` / `sms_status` (NONE, PENDING, SENDING, SENT, SKIPPED, FAILED), `push_title`, `push_body`, `sms_body`, `sms_dlt_template_id`, `push_sent_at` / `sms_sent_at` (07's original `sent_at`). The push and SMS bodies are blanked once their channel is final, because they can hold a delivery OTP; the inbox `body` never does. Indexed by (`user`, `app`, `-created_at`) where `in_inbox`. Retention: `NOTIFICATION_RETENTION_DAYS` (90) (Phase 6).
 **SupportTicket**: `user`, `app`, `order` (nullable), `category`, `subject`, `status` (OPEN/IN_PROGRESS/RESOLVED/CLOSED), `priority`, `assigned_to`.
 **TicketMessage**: `ticket`, `sender` (user), `is_staff`, `body`, `attachments` (JSON of file keys).
 **FAQ**: `app`, `category`, `question`, `answer`, `sort_order`, `is_active`.
@@ -271,4 +271,6 @@ Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, 
 | Rider location history | 30 days |
 | OTP requests | 30 days |
 | KYC documents | While the rider is active + period mandated by policy (D-14). Then deleted. P5 default: 365 days after offboarding or account erasure (`KYC_RETENTION_DAYS`, `purge_offboarded_kyc`). |
-| Deleted customer accounts | PII anonymised after a 30-day grace period. Order financial records are kept without PII. |
+| Deleted customer accounts | PII anonymised after a 30-day grace period. Order financial records are kept without PII. T-814 (DL-60): anonymisation also blanks the user's `Order.instructions` and the bodies of the support messages they sent (staff replies and ticket rows stay). **⚠ Jivo:** `Order.address_snapshot` is **kept** on invoiced orders (the invoice's place of supply, GST record-keeping) until Jivo confirms its tax-retention period; files attached to support messages are not yet purged. |
+| Gateway payloads (`Payment.raw`, `PaymentWebhookEvent.payload`) | T-814 (DL-60, ⚠ Jivo): after `PAYMENT_PAYLOAD_RETENTION_DAYS` (default 90) the personal fields (`contact`, `email`, `vpa`, `upi`, `card`, `customer_details`, billing/shipping address, `phone`, `name`, at any depth) are removed by the beat job `scrub_payment_payloads`; ids, amounts, statuses, methods and error codes stay. Each row is stamped `pii_scrubbed_at` (payments migration 0003). |
+| Refresh tokens, staff sessions | T-814: expired ones are deleted daily (`flush_expired_tokens`, `clear_expired_sessions`). |

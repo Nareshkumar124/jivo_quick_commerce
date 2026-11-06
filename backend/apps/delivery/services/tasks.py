@@ -244,8 +244,9 @@ def _commit_pickup(rider: Rider, order: Order, task: DeliveryTask, now) -> None:
     task.status = TS.PICKED_UP
     task.picked_up_at = now
     task.save()
-    data = {"order_id": order.pk, "order_number": order.order_number}
-    _after_commit(hooks.send_push, order.user, "order.out_for_delivery", data)
+    # 08 §9 T9: push (+SMS) with the OTP, through the P6 notifications (deduplicated per order).
+    extra = {"rider_name": rider.user.name or "Your rider", "otp": otp}
+    transaction.on_commit(lambda: hooks.notify_order(order, "order.out_for_delivery", **extra))
 
 
 # --------------------------------------------------------------------------- customer
@@ -281,8 +282,20 @@ def arrived_customer(
                 distance,
                 order.pk,
             )
-        data = {"order_id": order.pk, "order_number": order.order_number}
-        _after_commit(hooks.send_push, order.user, "order.rider_arrived", data)
+            alert = {
+                "order_id": order.pk,
+                "order_number": order.order_number,
+                "task_id": task.pk,
+                "rider_id": rider.pk,
+                "store_id": order.store_id,
+                "distance_m": round(distance),
+                "reason": task.arrival_override_reason,
+            }
+            _after_commit(hooks.ops_alert, "ARRIVAL_GEOFENCE_OVERRIDE", alert)
+        rider_name = rider.user.name or "Your rider"
+        transaction.on_commit(
+            lambda: hooks.notify_order(order, "order.rider_arrived", rider_name=rider_name)
+        )
     return task
 
 

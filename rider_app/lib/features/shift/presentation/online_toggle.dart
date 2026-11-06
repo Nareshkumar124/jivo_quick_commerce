@@ -20,6 +20,7 @@ import '../../task/presentation/task_providers.dart';
 import '../domain/today_summary.dart';
 import 'home_providers.dart';
 import 'shift_controller.dart';
+import '../../../shared/errors/rider_error_text.dart';
 
 // Rider home widgets, to `design/screens/rider/home.md` (UX audit RD-01)
 // with the `rider.tokens.json` colours (RD-05).
@@ -79,7 +80,9 @@ class ShiftStatusCard extends ConsumerWidget {
     }
 
     final online = state.isOnline || state.phase == ShiftPhase.goingOffline;
-    final autoOffline = !online && state.problem == ShiftProblem.autoOffline;
+    final byOps = !online && state.problem == ShiftProblem.endedByOps;
+    final autoOffline =
+        !online && (state.problem == ShiftProblem.autoOffline || byOps);
     final prepaidOnly =
         online && (state.prepaidOnly || (summary?.limitReached ?? false));
     final store = summary?.homeStoreName;
@@ -92,7 +95,7 @@ class ShiftStatusCard extends ConsumerWidget {
       decoration = colors.codDecoration();
       leading = Icon(Icons.location_off, color: colors.codBorder, size: 24);
       title = l10n.shiftAutoOfflineTitle;
-      body = l10n.shiftAutoOfflineBody;
+      body = byOps ? l10n.shiftEndedByOpsBody : l10n.shiftAutoOfflineBody;
     } else if (prepaidOnly) {
       decoration = colors.codDecoration();
       leading = _Dot(color: colors.codBorder, filled: true);
@@ -217,7 +220,7 @@ HomeGuard? homeGuardOf(ShiftState state) {
   final code = state.error?.code;
   final reason = ShiftRefusal.of(state.error);
   return switch (problem) {
-    null || ShiftProblem.autoOffline => null,
+    null || ShiftProblem.autoOffline || ShiftProblem.endedByOps => null,
     ShiftProblem.permissionsMissing when state.missingStep == GateStep.gps =>
       HomeGuard.gps,
     ShiftProblem.permissionsMissing => HomeGuard.permissions,
@@ -304,7 +307,7 @@ class GuardCard extends ConsumerWidget {
             ? l10n.shiftServiceFailed
             : (error == null
                   ? l10n.shiftServerError
-                  : apiErrorMessage(JivoCoreLocalizations.of(context), error)),
+                  : riderApiErrorMessage(context, error)),
         null,
       ),
     };

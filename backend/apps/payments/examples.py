@@ -18,7 +18,7 @@ VERIFY_REQUEST = {
 
 WEBHOOK_PAYMENT_CAPTURED = {
     "entity": "event",
-    "account_id": "acc_Jv7x2QmP9kLs4T",
+    "account_id": "acc_EXAMPLEEXAMPLE",
     "event": "payment.captured",
     "contains": ["payment"],
     "payload": {

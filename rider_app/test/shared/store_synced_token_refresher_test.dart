@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/shared/session/store_synced_token_refresher.dart';
@@ -192,27 +193,112 @@ void main() {
     expect(store.value, isNull);
   });
 
-  test('a transient failure is passed on unchanged, without waiting', () async {
-    final store = _SlowStore(Duration.zero);
-    await store.write(start);
-    var waited = false;
-    final refresher = StoreSyncedTokenRefresher(
-      inner: _Failing(),
-      store: store,
-      sleep: (_) async => waited = true,
+  group('never resend a refresh token the server may have seen (M2)', () {
+    DioException dio(DioExceptionType type, {int? status}) => DioException(
+      requestOptions: RequestOptions(path: '/api/v1/auth/token/refresh/'),
+      type: type,
+      response: status == null
+          ? null
+          : Response<void>(
+              requestOptions: RequestOptions(
+                path: '/api/v1/auth/token/refresh/',
+              ),
+              statusCode: status,
+            ),
     );
-    await expectLater(
-      refresher.refresh('r-0'),
-      throwsA(
-        isA<ApiError>().having((e) => e.code, 'code', ApiErrorCode.network),
-      ),
+
+    Future<(SessionManager, _Scripted)> session(List<Object> failures) async {
+      final store = _SlowStore(Duration.zero);
+      await store.write(start);
+      final inner = _Scripted(failures);
+      final s = SessionManager(
+        store: GuardedTokenStore(store),
+        refresher: StoreSyncedTokenRefresher(
+          inner: inner,
+          store: store,
+          retryDelays: const [Duration(milliseconds: 1)],
+        ),
+      );
+      await s.restore();
+      return (s, inner);
+    }
+
+    for (final (name, failure) in [
+      ('receive timeout', dio(DioExceptionType.receiveTimeout)),
+      ('send timeout', dio(DioExceptionType.sendTimeout)),
+      ('502', dio(DioExceptionType.badResponse, status: 502)),
+      ('504', dio(DioExceptionType.badResponse, status: 504)),
+      ('unknown error', dio(DioExceptionType.unknown)),
+    ]) {
+      test('$name: the session ends locally; the same token is never sent '
+          'again', () async {
+        final (s, inner) = await session([ApiError.from(failure)]);
+
+        final first = await s.refreshAfterUnauthorized(s.tokenGeneration);
+        expect(first, isA<SessionEnded>());
+        expect(s.isSignedIn, isFalse);
+
+        // Any later 401 finds no session: nothing is sent.
+        final second = await s.refreshAfterUnauthorized(s.tokenGeneration);
+        expect(second, isA<SessionEnded>());
+        expect(inner.sent, ['r-0'], reason: 'r-0 sent exactly once');
+      });
+    }
+
+    test(
+      'a timed-out refresh adopts a newer pair the other isolate stored',
+      () async {
+        final store = _SlowStore(Duration.zero);
+        await store.write(start);
+        final refresher = StoreSyncedTokenRefresher(
+          inner: _Scripted(
+            [ApiError.from(dio(DioExceptionType.receiveTimeout))],
+            onCall: () =>
+                store.write(const AuthTokens(access: 'a-s', refresh: 'r-s')),
+          ),
+          store: store,
+          retryDelays: const [Duration(milliseconds: 1)],
+        );
+        final tokens = await refresher.refresh('r-0');
+        expect(tokens.refresh, 'r-s');
+      },
     );
-    expect(waited, isFalse);
+
+    for (final (name, failure) in [
+      ('connection error', dio(DioExceptionType.connectionError)),
+      ('connection timeout', dio(DioExceptionType.connectionTimeout)),
+      ('bad certificate', dio(DioExceptionType.badCertificate)),
+      ('429', dio(DioExceptionType.badResponse, status: 429)),
+    ]) {
+      test('$name never reached (or was refused by) the server: transient, '
+          'the same token may be tried again', () async {
+        final (s, inner) = await session([ApiError.from(failure)]);
+
+        final first = await s.refreshAfterUnauthorized(s.tokenGeneration);
+        expect(first, isA<RefreshFailed>());
+        expect(s.isSignedIn, isTrue);
+
+        final second = await s.refreshAfterUnauthorized(s.tokenGeneration);
+        expect(second, isA<RefreshSucceeded>());
+        expect(inner.sent, ['r-0', 'r-0']);
+      });
+    }
   });
 }
 
-class _Failing implements TokenRefresher {
+/// Fails with [failures] in order, then rotates. Records every token sent.
+class _Scripted implements TokenRefresher {
+  _Scripted(this.failures, {this.onCall});
+
+  final List<Object> failures;
+  final Future<void> Function()? onCall;
+  final sent = <String>[];
+
   @override
-  Future<AuthTokens> refresh(String refreshToken) async =>
-      throw const ApiError(code: ApiErrorCode.network);
+  Future<AuthTokens> refresh(String refreshToken) async {
+    sent.add(refreshToken);
+    await onCall?.call();
+    if (failures.isNotEmpty) throw failures.removeAt(0);
+    return AuthTokens(access: 'a-new', refresh: 'r-new-${sent.length}');
+  }
 }

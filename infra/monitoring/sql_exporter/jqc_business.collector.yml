@@ -1,0 +1,129 @@
+# Business and job-health metrics read straight from PostgreSQL (docs/deployment.md §10).
+#
+# Format: burningalchemist/sql_exporter collector file. Any SQL-to-metrics exporter (or a small
+# cron that pushes these counts) works the same way: every query is a cheap, read-only aggregate.
+# Run it with a dedicated READ-ONLY role (docs/deployment.md §10.4), never the app's own login,
+# and point it at a read replica when one exists.
+#
+# Queries on tables that a later phase adds (notifications_notification: Phase 6) simply fail
+# until that migration is applied; the exporter keeps serving the other metrics.
+collector_name: jqc_business
+min_interval: 30s
+
+metrics:
+  # --- Celery beat liveness (09 §2, deployment.md §4) ----------------------------------------
+  - metric_name: jqc_beat_task_last_run_age_seconds
+    type: gauge
+    help: Seconds since each enabled periodic task last ran (django_celery_beat last_run_at).
+    key_labels: [task]
+    values: [age_seconds]
+    query: |
+      select name as task,
+             extract(epoch from now() - coalesce(last_run_at, date_changed))::float8 as age_seconds
+      from django_celery_beat_periodictask
+      where enabled and name not like 'celery.%'
+
+  # --- Orders and SLA (09 §5, 08 §1) ---------------------------------------------------------
+  - metric_name: jqc_orders_active
+    type: gauge
+    help: Orders currently in each non-terminal status.
+    key_labels: [status]
+    values: [n]
+    query: |
+      select status, count(*)::float8 as n
+      from orders_order
+      where status in ('PAYMENT_PENDING', 'PLACED', 'ACCEPTED', 'PACKING', 'PACKED',
+                       'OUT_FOR_DELIVERY', 'DELIVERY_FAILED')
+      group by status
+
+  - metric_name: jqc_orders_awaiting_acceptance_over_sla
+    type: gauge
+    help: PLACED orders not accepted within the store acceptance SLA (STORE_ACCEPTANCE_SLA_SECONDS, default 60 s).
+    key_labels: [store_id]
+    values: [n]
+    query: |
+      select store_id::text as store_id, count(*)::float8 as n
+      from orders_order
+      where status = 'PLACED' and placed_at < now() - interval '60 seconds'
+      group by store_id
+
+  - metric_name: jqc_orders_past_eta
+    type: gauge
+    help: Active orders past their promised delivery time (eta_at).
+    key_labels: [store_id]
+    values: [n]
+    query: |
+      select store_id::text as store_id, count(*)::float8 as n
+      from orders_order
+      where status in ('PLACED', 'ACCEPTED', 'PACKING', 'PACKED', 'OUT_FOR_DELIVERY')
+        and eta_at is not null and eta_at < now()
+      group by store_id
+
+  - metric_name: jqc_orders_payment_window_overdue
+    type: gauge
+    help: PAYMENT_PENDING orders more than 5 minutes past payment_expires_at (expire_unpaid_orders is not running).
+    values: [n]
+    query: |
+      select count(*)::float8 as n
+      from orders_order
+      where status = 'PAYMENT_PENDING' and payment_expires_at < now() - interval '5 minutes'
+
+  - metric_name: jqc_orders_placed_last_30m
+    type: gauge
+    help: Orders placed in the last 30 minutes (all stores).
+    values: [n]
+    query: |
+      select count(*)::float8 as n
+      from orders_order
+      where placed_at >= now() - interval '30 minutes'
+
+  # --- Payments and refunds (08 §4, §6.4) ----------------------------------------------------
+  - metric_name: jqc_refunds
+    type: gauge
+    help: Refunds by status (FAILED needs an ops retry; PENDING should settle within sync_refund_status runs).
+    key_labels: [status]
+    values: [n]
+    query: |
+      select status, count(*)::float8 as n from payments_refund group by status
+
+  - metric_name: jqc_refund_pending_oldest_age_seconds
+    type: gauge
+    help: Age of the oldest PENDING refund (0 when none).
+    values: [age_seconds]
+    query: |
+      select coalesce(extract(epoch from now() - min(created_at)), 0)::float8 as age_seconds
+      from payments_refund where status = 'PENDING'
+
+  - metric_name: jqc_webhook_events_errored_last_hour
+    type: gauge
+    help: Payment webhook events stored with an error (ignored/malformed) in the last hour.
+    values: [n]
+    query: |
+      select count(*)::float8 as n
+      from payments_paymentwebhookevent
+      where error <> '' and created_at >= now() - interval '1 hour'
+
+  # --- Notifications (Phase 6: sweep_stuck_sends) ---------------------------------------------
+  - metric_name: jqc_notifications_stuck_sending
+    type: gauge
+    help: Push/SMS channels still SENDING after 15 minutes (NOTIFICATION_STUCK_SEND_MINUTES); the sweeper marks them FAILED.
+    key_labels: [channel]
+    values: [n]
+    query: |
+      select 'push' as channel, count(*)::float8 as n from notifications_notification
+      where push_status = 'SENDING' and updated_at < now() - interval '15 minutes'
+      union all
+      select 'sms' as channel, count(*)::float8 as n from notifications_notification
+      where sms_status = 'SENDING' and updated_at < now() - interval '15 minutes'
+
+  - metric_name: jqc_notifications_failed_last_hour
+    type: gauge
+    help: Push/SMS channels that ended FAILED in the last hour (includes those swept as stuck).
+    key_labels: [channel]
+    values: [n]
+    query: |
+      select 'push' as channel, count(*)::float8 as n from notifications_notification
+      where push_status = 'FAILED' and updated_at >= now() - interval '1 hour'
+      union all
+      select 'sms' as channel, count(*)::float8 as n from notifications_notification
+      where sms_status = 'FAILED' and updated_at >= now() - interval '1 hour'

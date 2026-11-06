@@ -1,7 +1,10 @@
 """Ops Console forms for the order buttons. They validate input only; the services decide."""
 
+from decimal import Decimal
+
 from django import forms
 from unfold.widgets import (
+    UnfoldAdminDecimalFieldWidget,
     UnfoldAdminIntegerFieldWidget,
     UnfoldAdminSelectWidget,
     UnfoldAdminTextareaWidget,
@@ -70,3 +73,37 @@ class AcceptingForm(forms.Form):
     accepting = forms.TypedChoiceField(
         choices=[("1", "Accepting"), ("0", "Paused")], coerce=lambda value: value == "1"
     )
+
+
+class ManualRefundForm(forms.Form):
+    """05 §2 Orders "refund (full/partial, within role limit)" (BUG-0010). Input checks only:
+    above zero, two decimals, at most what the server says is refundable. The service
+    (`order_refunds.manual_refund`) decides: role, Support limit, cap, ONLINE only."""
+
+    amount = forms.DecimalField(
+        label="Amount to refund (₹)",
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        widget=UnfoldAdminDecimalFieldWidget(attrs={"step": "0.01", "min": "0.01"}),
+    )
+    note = forms.CharField(
+        label="Note for the record",
+        required=False,
+        max_length=MAX_NOTE,
+        widget=UnfoldAdminTextareaWidget(attrs={"rows": 2}),
+        help_text="Why the customer is refunded. Internal; only its length is audited.",
+    )
+    once = forms.CharField(required=False, widget=forms.HiddenInput)
+
+    def __init__(self, *args, refundable=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.refundable = refundable
+
+    def clean_amount(self):
+        amount = self.cleaned_data["amount"]
+        if self.refundable is not None and amount > self.refundable:
+            raise forms.ValidationError(
+                f"At most ₹{self.refundable:.2f} can still be refunded on this order."
+            )
+        return amount

@@ -94,7 +94,11 @@ def test_retry_creates_a_new_refund_once(client, failed):
     assert "Sent 1 refund(s)" in response.content.decode()
     retry = Refund.objects.exclude(pk=failed.pk).get()
     assert retry.amount == failed.amount
-    assert retry.initiated_by == staff
+    # T-814 (PM decision, DL-59): the retry keeps the original refunder; the retrier is audited.
+    assert retry.initiated_by_id == failed.initiated_by_id
+    from apps.core.models import AuditLog
+
+    assert AuditLog.objects.get(action="refund.retry").actor == staff
     # Retrying the same failed refund again is refused by the service (never twice).
     response = run_action(client, failed)
     assert "Skipped 1 refund(s)" in response.content.decode()

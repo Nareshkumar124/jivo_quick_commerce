@@ -336,7 +336,7 @@ def test_offer_push_and_websocket_through_hooks(
     make_rider()
     with django_capture_on_commit_callbacks(execute=True):
         dispatch.dispatch_order(accepted.pk)
-    assert calls == ["rider.offer", "ws"]
+    assert calls == ["rider.offer_new", "ws"]
 
 
 def test_going_offline_withdraws_the_pending_offer(
@@ -477,3 +477,25 @@ def test_unassign_and_retry(accepted, make_rider):
         "delivery.unassign",
         "delivery.retry_dispatch",
     }
+
+
+def test_redispatch_round_can_reoffer_riders_from_earlier_rounds(accepted, make_rider, settings):
+    """Review M2: the "already offered" exclusion covers only the current round (offers since
+    `search_started_at`), so after a give-up and resume the same rider can be offered again."""
+    settings.MAX_OFFER_ATTEMPTS = 1
+    rider = make_rider()
+    now = timezone.now()
+    assert dispatch.dispatch_order(accepted.pk, now=now) == "offered"
+    offer = offer_of(accepted)
+    now = offer.expires_at + timedelta(seconds=1)
+    Rider.objects.filter(pk=rider.pk).update(last_location_received_at=now)
+    dispatch.expire_offer(offer.pk, now=now)
+    # Same round: the rider who let the offer expire is not offered again.
+    task = DeliveryTask.objects.get(order=accepted)
+    assert dispatch.candidates(task, accepted, now) == []
+    assert dispatch.dispatch_order(accepted.pk, now=now) == "unassigned"
+    resume = now + timedelta(seconds=settings.DISPATCH_UNASSIGNED_PAUSE_SECONDS + 1)
+    Rider.objects.filter(pk=rider.pk).update(last_location_received_at=resume)
+    assert dispatch.dispatch_order(accepted.pk, now=resume) == "offered"  # a new round
+    assert offer_of(accepted).rider == rider
+    assert DeliveryOffer.objects.filter(task__order=accepted, rider=rider).count() == 2

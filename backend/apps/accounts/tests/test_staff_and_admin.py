@@ -204,7 +204,9 @@ class TestStaffLoginThrottling:
             {"username": "ops@jivo.test", "password": "a-strong-pass-1"},
             REMOTE_ADDR="203.0.113.9",
         )
-        assert other_ip.status_code == 302  # lockout is per username + IP (no staff DoS)
+        # T-814 (H2, DL-59): the lockout is also per username, whatever the IP, so rotating
+        # IPs cannot brute-force one staff account (cool-off AXES_COOLOFF_MINUTES).
+        assert other_ip.status_code == 429
 
     def test_success_logs_in(self, client):
         StaffUserFactory(email="ops@jivo.test", password="a-strong-pass-1")
@@ -279,6 +281,7 @@ class TestOtpTestNumberSafety:
         settings.APP_ENVIRONMENT = "production"
         # Production's SMS default (the test settings' locmem backend is E003, BUG-0005).
         settings.SMS_BACKEND = "apps.notifications.sms.UnconfiguredSmsBackend"
+        settings.SIMPLE_JWT = {**settings.SIMPLE_JWT, "SIGNING_KEY": "j" * 64}  # T-814 (L3)
         ids = {error.id for error in run_checks() if error.id.startswith("accounts.")}
         assert ids == {"accounts.E001"}
 

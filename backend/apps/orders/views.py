@@ -35,7 +35,12 @@ from apps.core.schema import (
     request_examples,
     validation_error,
 )
-from apps.core.throttling import RATE_LIMITED, OrderPlacementThrottle, PaymentThrottle
+from apps.core.throttling import (
+    RATE_LIMITED,
+    InvoiceThrottle,
+    OrderPlacementThrottle,
+    PaymentThrottle,
+)
 from apps.orders import examples as ex
 from apps.orders import presenters, services
 from apps.orders.choices import ACTIVE_STATUSES, TERMINAL_STATUSES, OrderListStatus
@@ -95,7 +100,9 @@ COUPON_ERRORS = (
 class OrderListCreateView(APIView):
     def get_throttles(self):
         # Placing orders is rate limited per user; reading the list is not.
-        return [OrderPlacementThrottle()] if self.request.method == "POST" else []
+        if self.request.method == "POST":
+            return [OrderPlacementThrottle()]
+        return super().get_throttles()  # T-814 (H3): the baseline
 
     @extend_schema(
         operation_id="orders_list",
@@ -450,6 +457,8 @@ INVOICE_UNAVAILABLE = error_example(
 
 
 class OrderInvoiceView(APIView):
+    throttle_classes = [InvoiceThrottle]  # T-814 (H3)
+
     @extend_schema(
         operation_id="orders_invoice",
         tags=TAGS,

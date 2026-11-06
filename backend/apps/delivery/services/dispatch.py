@@ -145,7 +145,11 @@ def candidates(task: DeliveryTask, order: Order, now) -> list[Rider]:
     """08 §5 step 1 and 2, ranked."""
     busy = DeliveryTask.objects.filter(rider=OuterRef("pk"), status__in=RIDER_BUSY_STATUSES)
     pending = DeliveryOffer.objects.filter(rider=OuterRef("pk"), status=OfferStatus.PENDING)
-    offered = DeliveryOffer.objects.filter(rider=OuterRef("pk"), task=task)
+    # Only this dispatch round's offers (since `search_started_at`): a retry or re-dispatch
+    # (`_new_round`) may offer the task again to a rider who timed out or rejected earlier.
+    offered = DeliveryOffer.objects.filter(
+        rider=OuterRef("pk"), task=task, offered_at__gte=task.search_started_at
+    )
     last_end = (
         DeliveryTask.objects.filter(rider=OuterRef("pk"), ended_at__isnull=False)
         .order_by("-ended_at")
@@ -265,9 +269,11 @@ def _announce_offer(offer: DeliveryOffer, order: Order, task: DeliveryTask) -> N
     body = offer_body(offer, order, task)
     user = offer.rider.user
     rider_id = offer.rider_id
+    # `offer_id` keys the push (one per offer, so a later round's offer is pushed again).
+    push = {**body, "offer_id": offer.pk}
 
     def send() -> None:
-        hooks.send_push(user, "rider.offer", body)
+        hooks.send_push(user, "rider.offer_new", push)
         hooks.publish_offer(rider_id, body)
 
     transaction.on_commit(send)
@@ -504,7 +510,11 @@ def order_packed(order_id: int) -> None:
         hooks.send_push(
             task.rider.user,
             "rider.order_ready",
-            {"task_id": task.pk, "order_number": task.order.order_number},
+            {
+                "task_id": task.pk,
+                "order_number": task.order.order_number,
+                "store_name": task.store.name,
+            },
         )
     elif task.status in (TS.SEARCHING, TS.UNASSIGNED):
         DeliveryTask.objects.filter(pk=task.pk).update(next_dispatch_at=None)
@@ -526,7 +536,9 @@ def cod_amount_changed(order: Order, old_amount: Decimal) -> None:
             "task_id": task.pk,
             "order_number": order.order_number,
             "cod_amount": str(order.grand_total),
+            "cod_amount_due": str(order.grand_total),
             "cod_amount_previous": str(old_amount),
+            "ref": f"{task.pk}:{order.grand_total}",  # one push per new amount
         }
         transaction.on_commit(lambda: hooks.send_push(user, "rider.cod_amount_changed", data))
 
@@ -607,7 +619,11 @@ def manual_assign(order_id: int, rider_id: int, *, by, ip: str | None = None) ->
         transaction.on_commit(lambda: withdraw_rider_offers(rider_id))
         audit.record(by, "delivery.manual_assign", order, {"rider": rider.pk}, ip=ip)
         user = rider.user
-        data = {"task_id": task.pk, "order_number": order.order_number}
+        data = {
+            "task_id": task.pk,
+            "order_number": order.order_number,
+            "store_name": order.store.name,
+        }
         transaction.on_commit(lambda: hooks.send_push(user, "rider.task_assigned", data))
     return task
 

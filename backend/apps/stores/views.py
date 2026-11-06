@@ -18,6 +18,7 @@ from apps.core.schema import (
     error_response,
     validation_error,
 )
+from apps.core.throttling import ServiceabilityThrottle
 from apps.stores import examples as ex
 from apps.stores import services
 from apps.stores.serializers import (
@@ -56,6 +57,7 @@ def _ok(serializer, description: str, *examples: tuple[str, dict]) -> OpenApiRes
 class ServiceabilityView(APIView):
     authentication_classes: list = []
     permission_classes = [AllowAny]
+    throttle_classes = [ServiceabilityThrottle]  # T-814 (H3): per IP
 
     @extend_schema(
         operation_id="serviceability_check",

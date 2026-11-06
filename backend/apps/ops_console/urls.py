@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.ops_console import order_views, views
+from apps.ops_console import csp, mfa, order_views, views
 
 app_name = "ops"
 
@@ -9,6 +9,11 @@ urlpatterns = [
     path("dashboard/customer-kpis/", views.dashboard_customer_kpis, name="dashboard-kpis"),
     path("dashboard/signups/", views.dashboard_signups, name="dashboard-signups"),
     path("dashboard/operations/", views.dashboard_operations, name="dashboard-operations"),
+    # Staff two-step sign-in (H2) and CSP reports (L7)
+    path("mfa/setup/", mfa.setup, name="mfa-setup"),
+    path("mfa/verify/", mfa.verify, name="mfa-verify"),
+    path("mfa/recovery/", mfa.recovery, name="mfa-recovery"),
+    path("csp-report/", csp.csp_report, name="csp-report"),
     # Live order board (05 §1.2)
     path("orders/live/", order_views.live_board, name="live-board"),
     path("orders/live/columns/", order_views.live_board_columns, name="live-board-columns"),

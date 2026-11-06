@@ -329,7 +329,7 @@ def test_new_position_is_published_through_the_p6_hook(
 def test_hook_stubs_do_not_raise(rider):
     from apps.delivery import hooks
 
-    hooks.send_push(rider.user, "rider.offer", {})
+    hooks.send_push(rider.user, "rider.offer_new", {})
     hooks.publish_rider_location(rider.pk, 28.45, 77.05, timezone.now())
     hooks.publish_offer(rider.pk, {"id": 1})
 

@@ -34,6 +34,7 @@ EXPECTED = {
     capabilities.PACKING: PACKING_ROLES,
     capabilities.CANCEL_ORDER: CANCEL_ORDER_ROLES,
     capabilities.RETRY_REFUND: RETRY_REFUND_ROLES,
+    capabilities.ISSUE_REFUND: RETRY_REFUND_ROLES,  # same permission: payments.issue_refund
     capabilities.TOGGLE_STORE: TOGGLE_STORE_ROLES,
     capabilities.AUDIT_LOG: AUDIT_LOG_ROLES,
 }

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:jivo_api/jivo_api.dart' show JivoApi;
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../task/domain/rider_task.dart';
 import '../domain/today_summary.dart';
 
 /// Home's today tiles, cash verdict and home store from
@@ -23,8 +24,10 @@ class ApiTodaySummary implements TodaySummaryRepository {
         cashLimit: me.cash.cashLimit,
         limitReached: me.cash.limitReached,
         homeStoreName: me.homeStore?.name,
-        // TODO(api): `home_store` has no location, so "Navigate to store"
-        // is hidden on the "too far" guard until it does.
+        homeStoreLocation: switch (me.homeStore) {
+          final store? => GeoPoint(store.lat, store.lng),
+          null => null,
+        },
       );
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);

@@ -32,6 +32,8 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 
+from apps.core.http import open_no_redirect
+
 DEPLOYED_ENVIRONMENTS = frozenset({"staging", "production"})
 RAZORPAY_API_BASE = "https://api.razorpay.com/v1"
 # Orders API per-order capture settings (they override the Dashboard's): capture automatically;
@@ -187,6 +189,12 @@ class PaymentGateway(ABC):
         return _matches(expected, signature)
 
 
+def _open(request: urllib.request.Request, timeout: float):
+    """T-814 (L2): never follows a redirect, so the key secret only ever goes to Razorpay (a 3xx
+    surfaces as an HTTPError and becomes `GatewayUnavailable`). Patched in tests."""
+    return open_no_redirect(request, timeout)
+
+
 class RazorpayGateway(PaymentGateway):
     """The real Razorpay gateway (test keys on staging, live keys in production)."""
 
@@ -217,9 +225,7 @@ class RazorpayGateway(PaymentGateway):
             headers={"Authorization": f"Basic {token}", "Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(  # noqa: S310 - fixed https base URL
-                request, timeout=settings.RAZORPAY_TIMEOUT_SECONDS
-            ) as response:
+            with _open(request, settings.RAZORPAY_TIMEOUT_SECONDS) as response:
                 return json.loads(response.read() or b"{}")
         except urllib.error.HTTPError as exc:
             message = f"Razorpay {method} {path}: HTTP {exc.code}"
