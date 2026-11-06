@@ -9,6 +9,7 @@ import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/product_image.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../domain/order_history.dart';
+import '../../tracking/presentation/order_live.dart';
 import 'order_history_controllers.dart';
 import 'order_texts.dart';
 
@@ -54,6 +55,16 @@ class _OrderList extends ConsumerWidget {
     final controller = ref.read(orderListProvider.notifier);
     final active = state.active;
     final past = state.past;
+    // Live status for the first few active orders (`06 §4`): a change
+    // re-reads page 1 quietly.
+    for (final order in active.take(maxLiveOrdersInList)) {
+      ref.listen(orderStatusEventsProvider(order.id), (_, next) {
+        final status = next.value?.status;
+        if (status != null && status != order.status) {
+          controller.refreshQuietly();
+        }
+      });
+    }
     final rows = <Widget>[
       if (active.isNotEmpty) ...[
         _SectionTitle(l10n.ordersActive),

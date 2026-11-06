@@ -1501,6 +1501,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationUnread => 'Unread';
 
   @override
+  String get notificationsMarkAllRead => 'Mark all as read';
+
+  @override
+  String notificationsUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread notifications',
+      one: '1 unread notification',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsLoadMoreFailed =>
+      'Couldn\'t load more notifications.';
+
+  @override
   String orderLineUnavailable(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

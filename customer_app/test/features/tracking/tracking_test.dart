@@ -1,7 +1,9 @@
 import 'package:customer_app/app/providers.dart';
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
+import 'package:customer_app/features/tracking/data/order_socket.dart';
 import 'package:customer_app/features/tracking/data/track_repository.dart';
+import 'package:customer_app/features/tracking/presentation/order_live.dart';
 import 'package:customer_app/features/tracking/domain/order_track.dart';
 import 'package:customer_app/features/tracking/presentation/tracking_providers.dart';
 import 'package:customer_app/features/tracking/presentation/delivery_cards.dart';
@@ -44,6 +46,9 @@ void main() {
         retry: (_, _) => null,
         overrides: [
           trackRepositoryProvider.overrideWithValue(repo),
+          orderRealtimeProvider.overrideWithValue(
+            const DisabledOrderRealtime(),
+          ),
           trackPollIntervalProvider.overrideWithValue(Duration.zero),
         ],
       );
@@ -69,6 +74,9 @@ void main() {
       final container = ProviderContainer(
         overrides: [
           trackRepositoryProvider.overrideWithValue(repo),
+          orderRealtimeProvider.overrideWithValue(
+            const DisabledOrderRealtime(),
+          ),
           trackPollIntervalProvider.overrideWithValue(
             const Duration(milliseconds: 10),
           ),
@@ -78,7 +86,7 @@ void main() {
       final sub = container.listen(trackProvider(1), (_, _) {});
       addTearDown(sub.close);
       await container.read(trackProvider(1).future);
-      await Future<void>.delayed(const Duration(milliseconds: 60));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       expect(
         container.read(trackProvider(1)).value!.status,
         isNot(OrderStatus.accepted),

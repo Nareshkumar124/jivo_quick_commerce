@@ -20,7 +20,10 @@ import 'package:customer_app/features/location/data/maps_availability.dart';
 import 'package:customer_app/features/location/data/reverse_geocoder.dart';
 import 'package:customer_app/features/location/data/serviceability_repository.dart';
 import 'package:customer_app/features/location/domain/delivery_location.dart';
+import 'package:customer_app/features/notifications/data/notification_repository.dart';
 import 'package:customer_app/features/profile/data/profile_repository.dart';
+import 'package:customer_app/features/tracking/data/order_socket.dart';
+import 'package:customer_app/features/tracking/presentation/order_live.dart';
 import 'package:customer_app/shared/connectivity/connectivity.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -53,6 +56,8 @@ class TestApp {
     String? autofillCode,
     FakeCommerceBackend? commerce,
     this.cartRepository,
+    this.realtime = const DisabledOrderRealtime(),
+    this.notifications = const UnavailableNotificationRepository(),
   }) : autofill = FakeOtpAutofill(autofillCode),
        cart = commerce ?? FakeCommerceBackend(latency: Duration.zero);
 
@@ -77,6 +82,12 @@ class TestApp {
 
   /// The fake server cart and orders (one instance, like the server).
   final FakeCommerceBackend cart;
+
+  /// The order sockets (off unless a test scripts them).
+  final OrderRealtime realtime;
+
+  /// The inbox (empty unless a test gives one; never the network).
+  final NotificationRepository notifications;
 
   /// Replaces [cart] as the cart repository only (orders stay on [cart]).
   final CartRepository? cartRepository;
@@ -140,6 +151,8 @@ class TestApp {
           ),
           reverseGeocoderProvider.overrideWithValue(geocoder),
           bannerAutoScrollProvider.overrideWithValue(null),
+          orderRealtimeProvider.overrideWithValue(realtime),
+          notificationRepositoryProvider.overrideWithValue(notifications),
           ...extraOverrides,
         ],
       ),

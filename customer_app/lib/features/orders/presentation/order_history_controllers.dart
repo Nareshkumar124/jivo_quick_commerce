@@ -95,6 +95,21 @@ class OrderListController extends AsyncNotifier<OrderListState> {
     }
   }
 
+  /// Re-reads page 1 without a skeleton (a live status change). Loaded
+  /// later pages are dropped and load again on scroll; a failure keeps
+  /// the shown list.
+  Future<void> refreshQuietly() async {
+    try {
+      final first = await ref.read(orderHistoryRepositoryProvider).listOrders();
+      if (!ref.mounted) return;
+      state = AsyncData(
+        OrderListState(items: first.items, nextPage: first.nextPage),
+      );
+    } catch (_) {
+      // The next status change or pull to refresh tries again.
+    }
+  }
+
   /// Pull to refresh: reloads from page 1.
   Future<void> refresh() async {
     ref.invalidateSelf();

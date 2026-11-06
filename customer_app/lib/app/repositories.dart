@@ -170,12 +170,12 @@ final trackRepositoryProvider = Provider<TrackRepository>((ref) {
   return ApiTrackRepository(ref.watch(jivoApiProvider));
 });
 
-/// The notification inbox (Phase 6 lookahead on fakes). TODO(api): bind the
-/// inbox endpoints when the Phase 6 contract lands.
+/// The notification inbox (`/me/notifications/*`, P6): the API, the fake
+/// with `FAKE_API`.
 final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => _fake(ref)
       ? FakeNotificationRepository()
-      : const UnavailableNotificationRepository(),
+      : ApiNotificationRepository(ref.watch(jivoApiProvider)),
 );
 
 /// Whether order rating is shown. TODO(api): true only on fakes until

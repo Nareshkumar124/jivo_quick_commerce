@@ -64,6 +64,7 @@ OrderTrack orderTrackFromApi(api.OrderTrack t) {
             updatedAt: rider.updatedAt,
           ),
     deliveryOtp: otp == null || otp.isEmpty ? null : otp,
+    taskStatus: DeliveryTaskStatus.fromWire(t.taskStatus?.value),
   );
 }
 

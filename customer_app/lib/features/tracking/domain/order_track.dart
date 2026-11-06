@@ -37,6 +37,15 @@ class TrackRider {
 
   /// When [location] was recorded (UTC).
   final DateTime? updatedAt;
+
+  TrackRider copyWith({TrackPoint? location, DateTime? updatedAt}) =>
+      TrackRider(
+        name: name,
+        phone: phone,
+        photoUrl: photoUrl,
+        location: location ?? this.location,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
 }
 
 @immutable
@@ -68,10 +77,23 @@ class OrderTrack {
   /// Sent only while `OUT_FOR_DELIVERY` (`06 §2.6`).
   final String? deliveryOtp;
 
-  /// The delivery task's state (`08 §2`). TODO(api): `track/` does not send
-  /// it yet (api-requests: `task_status` on `OrderTrack`); null until then,
-  /// and [stage] falls back to the order status.
+  /// The delivery task's state (`08 §2`, `track/` `task_status`); null
+  /// before there is a task, and [stage] falls back to the order status.
   final DeliveryTaskStatus? taskStatus;
+
+  /// A copy with live socket data applied (`06 §4`): ETA and rider.
+  OrderTrack copyWith({DateTime? etaAt, TrackRider? rider}) => OrderTrack(
+    orderId: orderId,
+    orderNumber: orderNumber,
+    status: status,
+    store: store,
+    destination: destination,
+    storeName: storeName,
+    etaAt: etaAt ?? this.etaAt,
+    rider: rider ?? this.rider,
+    deliveryOtp: deliveryOtp,
+    taskStatus: taskStatus,
+  );
 
   /// The delivery step to explain under the status, or null before pickup.
   DeliveryStage? get stage => deliveryStageFor(status, task: taskStatus);
