@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/format/ist_format.dart';
 import '../../../shared/widgets/paged_list_view.dart';
@@ -54,51 +56,55 @@ class _HistoryTile extends StatelessWidget {
     final delivered = entry.status == TaskStatus.delivered;
     return Card(
       key: Key('history-${entry.taskId}'),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l10n.taskOrderNumber(entry.orderNumber),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                Text(
-                  historyStatusText(l10n, entry.status),
-                  key: Key('history-${entry.taskId}-status'),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: delivered
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.error,
-                  ),
-                ),
-              ],
-            ),
-            Text(istDateTime(context, entry.completedAt)),
-            const SizedBox(height: 4),
-            Text(l10n.historyRoute(entry.storeName, entry.dropLocality)),
-            Row(
-              children: [
-                // Keeps the payout on the right when there is no distance.
-                Expanded(
-                  child: entry.distanceKm == null
-                      ? const SizedBox.shrink()
-                      : Text(distanceText(l10n, entry.distanceKm)),
-                ),
-                if (entry.payout case final payout?)
-                  Text(
-                    formatRupees(payout),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push(Routes.historyDetail(entry.taskId)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.taskOrderNumber(entry.orderNumber),
+                      style: theme.textTheme.titleMedium,
                     ),
                   ),
-              ],
-            ),
-          ],
+                  Text(
+                    historyStatusText(l10n, entry.status),
+                    key: Key('history-${entry.taskId}-status'),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: delivered
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.error,
+                    ),
+                  ),
+                ],
+              ),
+              Text(istDateTime(context, entry.completedAt)),
+              const SizedBox(height: 4),
+              Text(l10n.historyRoute(entry.storeName, entry.dropLocality)),
+              Row(
+                children: [
+                  // Keeps the payout on the right when there is no distance.
+                  Expanded(
+                    child: entry.distanceKm == null
+                        ? const SizedBox.shrink()
+                        : Text(distanceText(l10n, entry.distanceKm)),
+                  ),
+                  if (entry.payout case final payout?)
+                    Text(
+                      formatRupees(payout),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

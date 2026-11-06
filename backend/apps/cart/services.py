@@ -159,20 +159,33 @@ def compute_bill(
     *,
     coupon=None,
     tip: Decimal = ZERO,
+    fixed_coupon_discount: Decimal | None = None,
+    fee_caps: Bill | None = None,
 ) -> Bill:
     """08 §6.2. `coupon` is a coupon already found applicable (promotions.check_coupon), or
     None. Fee thresholds compare against `item_total`, before the coupon (D-09). An empty cart's
-    bill is all zeros (no fees, no tip)."""
+    bill is all zeros (no fees, no tip).
+
+    Recalculation after items were found unavailable (08 §6.3, T8a): `fixed_coupon_discount` is
+    the order's original coupon discount, kept but capped at the new `item_total`, and
+    `fee_caps` is the order's bill before the change: each fee is recalculated but never above
+    what it was, so the amount payable never increases."""
     if not lines:
         return EMPTY_BILL
     mrp_total = round_money(sum((line.line_mrp_total for line in lines), ZERO))
     items_total = item_total(lines)
     coupon_discount = ZERO
-    if coupon is not None:
+    if fixed_coupon_discount is not None:
+        coupon_discount = min(fixed_coupon_discount, items_total)
+    elif coupon is not None:
         coupon_discount = min(promotions.coupon_discount(coupon, lines), items_total)
     delivery_fee = ZERO if items_total >= rules.free_delivery_threshold else rules.delivery_fee
     small_cart_fee = rules.small_cart_fee if items_total < rules.small_cart_threshold else ZERO
     handling_fee = rules.handling_fee
+    if fee_caps is not None:
+        delivery_fee = min(delivery_fee, fee_caps.delivery_fee)
+        small_cart_fee = min(small_cart_fee, fee_caps.small_cart_fee)
+        handling_fee = min(handling_fee, fee_caps.handling_fee)
     tip = clamp_tip(tip)
     product_discount = mrp_total - items_total
     grand_total = items_total - coupon_discount + delivery_fee + small_cart_fee + handling_fee + tip

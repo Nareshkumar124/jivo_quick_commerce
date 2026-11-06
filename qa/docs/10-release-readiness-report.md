@@ -62,3 +62,75 @@ Phase 1 sign-off
 - Approved by:          pending
 - Notes / deferrals:    P1-TC-61/62 (shared AppConfig), P1-TC-67 (admin rework), P1-TC-46 (time travel), device cases
 ```
+
+## Phase 3: Cart, coupons, orders and payments. Interim verdict (stage 1, 2026-11-04): **Not ready (gate incomplete); backend API on track**
+**Build:** `c2c153a` (`develop` with backend R2b and admin T-304 still WIP and unreviewed). This verdict is **interim** and must be re-run after the R2b and T-304 merges.
+
+| §5.2 criterion | Result |
+|---|---|
+| CI green | ⬜ Not verified by QA |
+| 100% of P0/P1 cases passed, ≥ 95% of all | ❌ 56/64 (87.5%). No P0/P1 case **failed**. The ones not passed are ⏭/⬜: TC-26, 59–63, 64 |
+| Smoke set | ✅ P0–P3 (72 + P3-TC-43) |
+| No open P0/P1 bugs | ✅ Only BUG-0009 (P3 Low) is new |
+| No unauthorised access, data corruption, duplicate financial transaction or crash in major flows | ✅ None found: IDOR, signatures, idempotency, races and SQL invariants all hold |
+
+**To reach Ready:**
+1. Merge R2b and re-run the full P3 suite plus `QA_SLOW=1` P3-TC-47.
+2. Merge T-304 and run P3-TC-59/60, plus P3-TC-61 with a QA coupon.
+3. Find a way to run P3-TC-62/63: a QA-owned DB/config or staging.
+4. Run the customer-app device case P3-TC-64.
+5. Run on staging, with CI evidence.
+6. Fix BUG-0009 (optional for the gate: P3).
+
+### Phase 3 update (stage 2, 2026-11-04, `f84482f`): verdict **Ready for sign-off on the QA instance, conditional; formal gate pending**
+| §5.2 criterion | Result |
+|---|---|
+| CI green | ⬜ Not verified by QA |
+| 100% of P0/P1 cases passed, ≥ 95% of all | **61/64 = 95.3%** ✅ ≥ 95%. All **P0** cases passed except P3-TC-64 (the user's device test). Two **P1** cases are ⏭: P3-TC-26 (no data) and P3-TC-63 (fault injection) |
+| Smoke set | ✅ 73 + P3-TC-43 |
+| No open P0/P1 bugs | ✅ (open: BUG-0006 and BUG-0008, both P3) |
+| No unauthorised access, data corruption, duplicate financial transaction or crash | ✅ None found |
+
+**Conditions before sign-off:**
+1. Re-check the refund cases (P3-TC-37/38/39/47/58 and worker settlement) after the refund fix run.
+2. Get a pass on P3-TC-64 from the user's phone test.
+3. Decide on the two ⏭ P1 cases: accept them as deferred, or seed a variant below ₹99 and add a gateway-down switch for the fake gateway.
+4. CI evidence and a staging run (D-05) for the formal gate.
+
+### Phase 3 update (refund re-check, 2026-11-04, `9ed7ffc`, T-310): verdict **Ready for sign-off on the QA instance; formal gate pending (device test, CI, staging)**
+Condition 1 of stage 2 (the refund re-check) is **met**. The refund fixes in develop `dff62d5` hold black-box.
+
+| §5.2 criterion | Result |
+|---|---|
+| CI green | ⬜ Not verified by QA |
+| 100% of P0/P1 cases passed, ≥ 95% of all | **66/69 = 95.7%** ✅. Every P0 case passed except P3-TC-64 (the user's device test). The two P1 ⏭ cases, P3-TC-26 and 63, moved to Phase 4 as P4-TC-49/50 (DL-50), so they no longer block P3 |
+| Smoke set | ✅ `77 passed` (P0–P4 🔥; the P4 stubs skip) |
+| No open P0/P1 bugs | ✅ (open: BUG-0006 and BUG-0008, both P3; no new bug in this run) |
+| No unauthorised access, data corruption, duplicate financial transaction or crash | ✅ No duplicate or excess refund anywhere in the DB (P4-TC-44); the webhook-before-task race settles exactly once (P3-TC-65/66); FAILED is never reopened (P3-TC-68); the 503 is bounded (P3-TC-69) |
+
+**Remaining before sign-off:**
+1. P3-TC-64 on the user's phone (PM).
+2. CI evidence and a staging run (D-05) for the formal gate.
+3. Optional: re-verify BUG-0008 (P3).
+
+## Phase 4: Order processing and store ops. Interim verdict (stage 1, 2026-11-04, `1b3552d`): **Not ready (gate incomplete); backend P4 on track**
+| §5.2 criterion | Result |
+|---|---|
+| CI green | ⬜ Not verified by QA |
+| 100% of P0/P1 cases passed, ≥ 95% of all | ❌ 37/60 fully passed (62%). **No case failed.** The cases not passed are console cases (admin P4 not merged), device cases, cases needing a second or auto-accept store, and DELIVERED-only invoice cases |
+| Smoke set | ✅ P0–P4: 89 passed; P3-TC-50 green after the oracle update (no product defect) |
+| No open P0/P1 bugs | ✅ (no new bugs; open: BUG-0006 and BUG-0008, both P3) |
+| No unauthorised access, data corruption, duplicate financial transaction or crash | ✅ IDOR 404s; roles enforced in the services; T8a = oracle; refunds never above what was paid; FAILED/retry/sync never double-refund; reservations released, no stock movement before pickup |
+
+**To reach Ready:** (1) merge admin P4 and run TC-31/38–43/60 plus the console versions of TC-19–21, 27, 32, 33 and 41; (2) a QA-owned second store (or staging) for TC-30/36 and the NOT_AVAILABLE part of TC-12; (3) a device run for TC-51–54, 56 and 58; (4) the mini-UAT (01 §8.5); (5) the invoice cases TC-16/17/57 in P5 (DELIVERED); (6) CI evidence and staging.
+
+### Phase 4 update (stage 2, 2026-11-04, `f744508`): verdict **Not ready**
+| §5.2 criterion | Result |
+|---|---|
+| CI green | ⬜ Not verified by QA |
+| 100% of P0/P1 cases passed, ≥ 95% of all | ❌ 46/60 = 77%. Not passed: TC-32/33 (P0) and TC-40 (P1) fail on BUG-0010/0011; device cases TC-51–54, 56, 58 (P0/P1) ⬜; invoice cases TC-16/17/57 and TC-55 ⏭ (need DELIVERED, P5) |
+| Smoke set | ✅ 98 passed (P0–P4) |
+| No open P0/P1 bugs | ✅ (open: BUG-0010 P2, BUG-0011 P3, BUG-0006/0008 P3) |
+| No unauthorised access, data corruption, duplicate financial transaction or crash | ✅ Role matrix and store scoping hold server-side; CSRF enforced; no double refund (retry token, T8a double post, sync); stock and money invariants hold |
+
+**To reach Ready:** (1) fix BUG-0010 (manual refund form with a one-time token) and re-run TC-32/33/40; BUG-0011 can be accepted as P3 or fixed; (2) device run TC-51–54, 56, 58; (3) the store-staff mini-UAT (01 §8.5); (4) decide whether the invoice cases (TC-16/17/57, TC-55) move to P5 like DL-50 did; (5) CI evidence and staging.

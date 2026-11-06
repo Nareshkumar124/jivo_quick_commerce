@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart' show DioException, DioExceptionType;
 import 'package:flutter/foundation.dart';
 
 import '../errors/api_error.dart';
@@ -70,6 +71,13 @@ class SessionManager extends ChangeNotifier {
   AuthTokens? _tokens;
   SignOutReason? _lastSignOutReason;
   Future<RefreshOutcome>? _refreshing;
+
+  /// A refresh token whose refresh may have reached the server although
+  /// no answer came back (a send/receive timeout, an unreadable 2xx). The
+  /// server may already have rotated it, and since the M2 hardening a
+  /// reused refresh token revokes **every** session of the user, so it is
+  /// never sent again: the next refresh ends this session instead.
+  String? _possiblySpentRefresh;
 
   /// Bumped whenever the pair changes (restore, sign-in, refresh, sign-out).
   /// Requests remember the generation they were sent with instead of the
@@ -173,6 +181,14 @@ class SessionManager extends ChangeNotifier {
     if (failedGeneration != _tokenGeneration) {
       return Future.value(RefreshSucceeded(current));
     }
+    if (current.refresh == _possiblySpentRefresh) {
+      // Never replay it (see [_possiblySpentRefresh]): sign out locally.
+      final ending = _endSession();
+      _refreshing = ending;
+      return ending.whenComplete(() {
+        if (identical(_refreshing, ending)) _refreshing = null;
+      });
+    }
     final refresh = _refresh(current);
     _refreshing = refresh;
     return refresh.whenComplete(() {
@@ -189,7 +205,12 @@ class SessionManager extends ChangeNotifier {
       if (generation != _tokenGeneration) return _outcomeAfterChange();
       final rejected =
           error.statusCode == 401 && error.code == ApiErrorCode.tokenInvalid;
-      if (!rejected) return RefreshFailed(error);
+      if (!rejected) {
+        if (mayHaveReachedServer(error)) {
+          _possiblySpentRefresh = current.refresh;
+        }
+        return RefreshFailed(error);
+      }
       // Release the single-flight slot first: sign-out hooks may call the
       // API, and requests wait for a refresh in flight before sending.
       _refreshing = null;
@@ -197,7 +218,11 @@ class SessionManager extends ChangeNotifier {
       return const SessionEnded();
     } catch (error) {
       if (generation != _tokenGeneration) return _outcomeAfterChange();
-      return RefreshFailed(ApiError.from(error));
+      final apiError = ApiError.from(error);
+      if (mayHaveReachedServer(apiError)) {
+        _possiblySpentRefresh = current.refresh;
+      }
+      return RefreshFailed(apiError);
     }
 
     // Signed out or in again meanwhile: don't write stale tokens back.
@@ -213,6 +238,40 @@ class SessionManager extends ChangeNotifier {
     return RefreshSucceeded(tokens);
   }
 
+  Future<RefreshOutcome> _endSession() async {
+    await Future<void>.delayed(Duration.zero);
+    _refreshing = null;
+    await signOut(reason: SignOutReason.sessionExpired);
+    return const SessionEnded();
+  }
+
+  /// Whether a failed refresh call may have been processed by the server
+  /// (so its refresh token may be rotated already). False only when the
+  /// request surely never arrived (no connection, connect timeout, bad
+  /// certificate) or the backend itself answered with an error status (it
+  /// rejects or rolls back without rotating). A 502 or 504 comes from a
+  /// proxy and may follow a refresh the backend already completed, so it
+  /// counts as "may have reached"; 500, 503 (our maintenance response; the
+  /// refresh endpoint is exempt) and 429 stay retryable.
+  @visibleForTesting
+  static bool mayHaveReachedServer(ApiError error) {
+    final status = error.statusCode;
+    if (status != null) return status == 502 || status == 504;
+    final cause = error.cause;
+    if (cause is DioException) {
+      return switch (cause.type) {
+        DioExceptionType.connectionError ||
+        DioExceptionType.connectionTimeout ||
+        DioExceptionType.badCertificate => false,
+        // A socket error: refused/unreachable never sent anything.
+        DioExceptionType.unknown => error.code != ApiErrorCode.network,
+        _ => true,
+      };
+    }
+    // No HTTP detail (e.g. a 2xx without a usable pair): assume it arrived.
+    return error.code != ApiErrorCode.network;
+  }
+
   RefreshOutcome _outcomeAfterChange() {
     final tokens = _tokens;
     return tokens == null ? const SessionEnded() : RefreshSucceeded(tokens);
@@ -221,6 +280,9 @@ class SessionManager extends ChangeNotifier {
   void _setTokens(AuthTokens? tokens) {
     _tokens = tokens;
     _tokenGeneration++;
+    if (tokens == null || tokens.refresh != _possiblySpentRefresh) {
+      _possiblySpentRefresh = null;
+    }
   }
 
   void _setStatus(SessionStatus status) {

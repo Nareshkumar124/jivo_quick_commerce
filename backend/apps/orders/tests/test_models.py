@@ -31,7 +31,7 @@ def test_a_valid_bill_saves():
         ({"grand_total": Decimal("299.99")}, "order_grand_total_formula"),
         ({"product_discount": Decimal("40.00")}, "order_product_discount_formula"),
         ({"tip": Decimal("-1.00"), "grand_total": Decimal("299.00")}, "order_money_not_negative"),
-        ({"amount_refunded": Decimal("300.01")}, "order_refund_within_grand_total"),
+        ({"amount_refunded": Decimal("300.01")}, "order_refund_within_paid"),
     ],
 )
 def test_an_inconsistent_bill_is_refused(changes, constraint):

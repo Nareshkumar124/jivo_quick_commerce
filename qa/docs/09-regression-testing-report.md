@@ -35,3 +35,32 @@ The smoke set was unaffected.
 ## Next regression run
 - **Phase 2 gate:** re-run the full `qa/tests` suite (P0/P1 regression), the smoke set on staging, and the fix verification for BUG-0001…0007.
 - The suite is re-runnable: `qa/tools/instance.sh start local <commit>`, then `uv run pytest`. Counters are cleared automatically in QA Redis DB 5 only.
+
+## Phase 3 stage 1 (2026-11-04, `c2c153a`)
+- **Smoke P0–P3:** `72 passed, 1 skipped` (the skip is P0-TC-04, staging profile only). P3-TC-43 was run separately: ✅.
+- **New P3 🔥 cases:** P3-TC-01, 02, 09, 10, 12, 20, 21, 22, 24, 27, 29, 33, 34, 35, 36, 38, 43, 44, 48, 49, 50.
+- **New known-bug guard:** BUG-0009, `test_p3_tc57` (`xfail(strict=True)`).
+- **Full P0–P2 regression:** not re-run in this stage; only the smoke set was. Run the whole suite after the R2b/T-304 merges.
+- **Re-run after the R2b merge:** the full P3 suite, `QA_SLOW=1` P3-TC-47, the BUG-0009 fix check, and a P3 perf baseline.
+- **Re-run after the T-304 merge:** P3-TC-59/60, plus P3-TC-61 using a QA-owned coupon created in admin.
+
+## Phase 3 stage 2 (2026-11-04, `f84482f`)
+- **Smoke P0–P3:** `73 passed, 1 skipped`, plus P3-TC-43 `1 passed`. P3-TC-59 joined the 🔥 set.
+- **Fixes verified:** BUG-0009; its guard is now a normal assertion.
+- **Full P0–P2 regression:** not re-run (smoke only). Run it at the phase gate on staging.
+- **Pending:**
+  - re-check the refund cases after the refund fix run
+  - P3-TC-64 on the user's phone
+  - re-verify BUG-0008 (residual fix in `41f02f6`)
+
+## Phase 3 refund re-check (2026-11-04, `9ed7ffc`, T-310)
+- **Smoke P0–P4:** `77 passed, 13 skipped` (12 P4 stubs awaiting R2, 1 staging-profile case). New 🔥 cases: P4-TC-44 and 45 (SQL money and stock invariants), both pass on develop.
+- **Affected area re-run:** the P3 payments suite (`13 passed`), P3-TC-47 slow (`1 passed`), the new refund-ordering cases P3-TC-65…69 (all pass).
+- **Full P0–P2 regression:** not re-run (smoke only). Run it at the phase gate on staging.
+- **Still pending:** P3-TC-64 on the user's phone; re-verify BUG-0008 (residual fix in `41f02f6`).
+
+## Phase 4 stage 1 (2026-11-04, `1b3552d`)
+`uv run pytest -m smoke` (P0–P4 🔥): `1 failed, 89 passed, 2 skipped, 406 deselected in 876.95s` (skips: P0 staging profile, P4-TC-30 second store). The failure, P3-TC-50, was a **stale QA oracle**: it counted any payment with more than one refund as a double refund, which P4 makes legitimate (T8a difference + cancel of the rest, manual partials, FAILED + retry). All 12 such payments were inspected: their standing refunds sum exactly to the payment amount. The oracle now checks Σ standing refunds ≤ amount and no two P3 capture refunds per payment; the case is kept. After the update: `8 passed` (P3 + P4 SQL). Smoke run 1 was cut off by the pause and is not counted.
+
+## Phase 4 stage 2 (2026-11-04, `f744508`)
+`uv run pytest -m smoke` (P0–P4 🔥, now including the console and QA-02 cases): `98 passed, 2 skipped, 418 deselected in 807.71s`. P3 + P4 SQL invariants after cleanup: `8 passed`.

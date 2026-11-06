@@ -19,6 +19,7 @@ import '../features/checkout/data/payment_flow.dart';
 import '../features/checkout/data/payment_launcher.dart';
 import '../features/checkout/data/razorpay_payment_launcher.dart';
 import '../features/checkout/domain/idempotency_key.dart';
+import '../features/cms/data/cms_repository.dart';
 import '../features/launch/data/config_repository.dart';
 import '../features/location/data/api_serviceability_repository.dart';
 import '../features/location/data/delivery_location_store.dart';
@@ -26,15 +27,26 @@ import '../features/location/data/maps_availability.dart';
 import '../features/location/data/reverse_geocoder.dart';
 import '../features/location/data/serviceability_repository.dart';
 import '../features/location/presentation/delivery_controller.dart';
+import '../features/notifications/data/notification_repository.dart';
+import '../features/orders/data/api_order_history_repository.dart';
 import '../features/orders/data/api_order_repository.dart';
+import '../features/orders/data/order_history_repository.dart';
 import '../features/orders/data/order_repository.dart';
 import '../features/profile/data/profile_repository.dart';
+import '../features/rating/data/api_rating_repository.dart';
+import '../features/rating/data/rating_repository.dart';
+import '../features/support/data/api_support_repository.dart';
+import '../features/support/data/support_repository.dart';
+import '../features/tracking/data/track_repository.dart';
 import 'providers.dart';
 
 /// Repositories: the API implementation, or a fake with `FAKE_API=true` in
 /// the dev flavor only (never staging or prod). Tests override these
 /// providers.
-bool _fake(Ref ref) {
+bool _fake(Ref ref) => isFakeApi(ref);
+
+/// Whether this build runs on fakes (`FAKE_API=true`, dev flavor only).
+bool isFakeApi(Ref ref) {
   final env = ref.watch(appEnvProvider);
   return env.useFakeApi && env.flavor == Flavor.dev;
 }
@@ -101,7 +113,7 @@ final cartAvailableProvider = Provider<bool>(
 /// repositories, so placing an order clears the cart. Never built for
 /// staging or prod.
 final fakeCommerceBackendProvider = Provider<FakeCommerceBackend>(
-  (ref) => FakeCommerceBackend(),
+  (ref) => FakeCommerceBackend()..seedDemoOrders(),
 );
 
 /// The server cart (`06 §2.5`): the API in the dev flavor, the fake with
@@ -127,6 +139,96 @@ final orderRepositoryProvider = Provider<OrderRepository>((ref) {
     ref.watch(jivoApiProvider),
     () => ref.read(currentStoreIdProvider),
   );
+});
+
+/// "My orders", order detail, cancel, reorder and invoice (`06 §2.6`),
+/// wired like [orderRepositoryProvider].
+final orderHistoryRepositoryProvider = Provider<OrderHistoryRepository>((ref) {
+  if (!ref.watch(cartAvailableProvider)) {
+    return const UnavailableOrderHistoryRepository();
+  }
+  if (_fake(ref)) return ref.watch(fakeCommerceBackendProvider);
+  return ApiOrderHistoryRepository(
+    ref.watch(jivoApiProvider),
+    () => ref.read(currentStoreIdProvider),
+  );
+});
+
+/// Whether this build can show live tracking: wherever orders exist (the
+/// dev flavor today, like [cartAvailableProvider]); `GET /orders/{id}/track/`
+/// is bound since P5.
+final trackingAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(cartAvailableProvider),
+);
+
+/// Live tracking (`GET /orders/{id}/track/`, polled every 10 s): the API,
+/// the fake with `FAKE_API`, nothing where there are no orders.
+final trackRepositoryProvider = Provider<TrackRepository>((ref) {
+  if (!ref.watch(trackingAvailableProvider)) {
+    return const UnavailableTrackRepository();
+  }
+  if (_fake(ref)) return FakeTrackRepository();
+  return ApiTrackRepository(ref.watch(jivoApiProvider));
+});
+
+/// The notification inbox (`/me/notifications/*`, P6): the API, the fake
+/// with `FAKE_API`.
+final notificationRepositoryProvider = Provider<NotificationRepository>(
+  (ref) => _fake(ref)
+      ? FakeNotificationRepository()
+      : ApiNotificationRepository(ref.watch(jivoApiProvider)),
+);
+
+/// TODO(api): the one-line switch to the real ratings API. Set it to true
+/// once `POST`/`GET /orders/{id}/rating/` (Phase 7, `docs/api-requests.md`
+/// #34) are merged into develop; the dev flavor then rates on the API.
+const ratingApiBound = false;
+
+/// Whether order rating is shown: on fakes, and in the dev flavor once
+/// [ratingApiBound]. Staging and prod follow with the cart (DL-30).
+final ratingAvailableProvider = Provider<bool>(
+  (ref) =>
+      _fake(ref) ||
+      (ratingApiBound && ref.watch(appEnvProvider).flavor == Flavor.dev),
+);
+
+/// Order and rider ratings: the fake with `FAKE_API`, the API once
+/// [ratingApiBound], otherwise hidden.
+final ratingRepositoryProvider = Provider<RatingRepository>((ref) {
+  if (_fake(ref)) return FakeRatingRepository();
+  if (!ref.watch(ratingAvailableProvider)) {
+    return const UnavailableRatingRepository();
+  }
+  return ApiRatingRepository(ref.watch(dioProvider));
+});
+
+/// Whether FAQs and support tickets are shown: the dev flavor (API or
+/// fakes) since the P7 support API (T-713); staging and prod show only
+/// "Call support" until it is enabled there.
+final supportAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
+);
+
+/// FAQs and tickets: the API, the fake with `FAKE_API`.
+final supportRepositoryProvider = Provider<SupportRepository>((ref) {
+  if (!ref.watch(supportAvailableProvider)) {
+    return const UnavailableSupportRepository();
+  }
+  if (_fake(ref)) return FakeSupportRepository();
+  return ApiSupportRepository(ref.watch(jivoApiProvider));
+});
+
+/// Whether Legal and About open in the in-app CMS viewer (dev flavor since
+/// T-713); otherwise the policy URLs from `config/app` open in the browser.
+final cmsAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
+);
+
+/// CMS pages: the API, the fake with `FAKE_API`.
+final cmsRepositoryProvider = Provider<CmsRepository>((ref) {
+  if (!ref.watch(cmsAvailableProvider)) return const UnavailableCmsRepository();
+  if (_fake(ref)) return FakeCmsRepository();
+  return ApiCmsRepository(ref.watch(jivoApiProvider));
 });
 
 /// The root navigator, for sheets opened outside a widget (the dev fake

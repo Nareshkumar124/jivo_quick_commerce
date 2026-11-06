@@ -22,7 +22,7 @@ class FailingLogout extends FakeAuthBackend {
   FailingLogout() : super(delay: Duration.zero);
 
   @override
-  Future<void> logout({required String refreshToken}) async =>
+  Future<void> logout({required String refreshToken, String? fcmToken}) async =>
       throw const ApiError(code: ApiErrorCode.network);
 }
 

@@ -13,8 +13,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts import roles
-from apps.accounts.admin import LOG_COD_ALLOWED, LOG_COD_BLOCKED, set_cod_blocked
 from apps.accounts.models import User
+from apps.accounts.services.customers import LOG_COD_ALLOWED, LOG_COD_BLOCKED, set_cod_blocked
 from apps.accounts.tests.factories import StaffUserFactory, UserFactory
 from apps.ops_console.tests.helpers import (
     CUSTOMER_ROLES,

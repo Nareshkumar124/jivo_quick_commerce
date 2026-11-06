@@ -21,6 +21,9 @@ class TrackerStats {
     this.lastUploadAt,
     this.lastUploadStatus = UploadStatus.none,
     this.lastError,
+    this.consecutiveFailures = 0,
+    this.heartbeats = 0,
+    this.stoppedBy,
   });
 
   factory TrackerStats.fromJson(Map<String, dynamic> json) => TrackerStats(
@@ -45,6 +48,9 @@ class TrackerStats {
       json['last_upload_status'] as String,
     ),
     lastError: json['last_error'] as String?,
+    consecutiveFailures: json['consecutive_failures'] as int? ?? 0,
+    heartbeats: json['heartbeats'] as int? ?? 0,
+    stoppedBy: json['stopped_by'] as String?,
   );
 
   final bool running;
@@ -68,6 +74,16 @@ class TrackerStats {
   final UploadStatus lastUploadStatus;
   final String? lastError;
 
+  /// Failed uploads in a row (the backoff level). 0 when the link is fine.
+  final int consecutiveFailures;
+
+  /// Heartbeats the server accepted, this session.
+  final int heartbeats;
+
+  /// The error code the server stopped tracking with (for example
+  /// `RIDER_OFFLINE` after an auto-offline), or null.
+  final String? stoppedBy;
+
   Map<String, dynamic> toJson() => {
     'running': running,
     'mode': mode.name,
@@ -80,5 +96,8 @@ class TrackerStats {
     'last_upload_at': lastUploadAt?.toUtc().toIso8601String(),
     'last_upload_status': lastUploadStatus.name,
     'last_error': lastError,
+    'consecutive_failures': consecutiveFailures,
+    'heartbeats': heartbeats,
+    'stopped_by': stoppedBy,
   };
 }

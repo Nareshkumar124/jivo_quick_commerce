@@ -105,4 +105,40 @@ void main() {
       isTrue,
     );
   });
+
+  test('coming back without "Allow all the time": explain and offer the app '
+      'settings page; still blocked', () async {
+    perms = StubbedPermissions(
+      allGranted.copyWith(locationAlways: Grant.denied),
+    );
+    container = makeContainer();
+    await container.read(permissionsGateControllerProvider.future);
+    await controller().acceptDisclosure();
+
+    verify(() => perms.service.requestLocationAlways()).called(1);
+    expect(container.read(gateNoticesProvider).alwaysNotChosen, isTrue);
+    expect(
+      container.read(permissionsGateControllerProvider).value!.canGoOnline,
+      isFalse,
+    );
+
+    perms.current = allGranted;
+    await controller().openLocationAlwaysSettings();
+    verify(() => perms.service.openAppSettings()).called(1);
+    expect(
+      container.read(permissionsGateControllerProvider).value!.canGoOnline,
+      isTrue,
+    );
+  });
+
+  test('declining the disclosure requests nothing and says why', () async {
+    perms = StubbedPermissions(freshInstall);
+    container = makeContainer();
+    await container.read(permissionsGateControllerProvider.future);
+    controller().declineDisclosure();
+
+    expect(container.read(gateNoticesProvider).disclosureDeclined, isTrue);
+    verifyNever(() => perms.service.requestLocationWhenInUse());
+    verifyNever(() => perms.service.requestLocationAlways());
+  });
 }

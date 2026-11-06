@@ -359,13 +359,13 @@ def set_accepting_orders(store: DarkStore, accepting: bool, *, actor) -> bool:
 def record_notify_me(
     *, lat: float, lng: float, phone: str | None, address_text: str, user=None
 ) -> ServiceabilityRequest:
-    """Save a notify-me lead. A repeat within 24 h and 100 m gets the existing lead back, so
-    repeated taps do not multiply leads:
-    - signed in: the user's own lead;
-    - anonymous (BUG-0008): only the *same submission* (same phone and address text). A phone
-      typed by an anonymous caller proves nothing, so an anonymous request is never merged into
-      a lead with other details, and the API answers with the caller's own values
-      (`notify_me_body`), never stored ones."""
+    """Save a notify-me lead. A signed-in user's repeat within 24 h and 100 m gets their own
+    lead back, so repeated taps do not multiply leads.
+
+    An anonymous request is never merged (BUG-0008 and its R2b review): it always gets a lead of
+    its own, so its response (`id`, `created_at`) can never reveal that someone else submitted
+    the same phone and address before. Anonymous repeats are bounded by the notify-me throttle
+    (`NOTIFY_ME_RATE`); expansion reports count distinct phones."""
     point = store_point(lat, lng)
     address_text = address_text.strip()
     if user is not None and not phone:
@@ -376,12 +376,8 @@ def record_notify_me(
     )
     if user is not None:
         existing = recent.filter(user=user).first()
-    elif phone:
-        existing = recent.filter(user__isnull=True, phone=phone, address_text=address_text).first()
-    else:
-        existing = None
-    if existing is not None:
-        return existing
+        if existing is not None:
+            return existing
     return ServiceabilityRequest.objects.create(
         location=point, user=user, phone=phone, address_text=address_text
     )
@@ -391,9 +387,8 @@ def notify_me_body(
     lead: ServiceabilityRequest, *, lat: float, lng: float, phone: str | None, address_text: str
 ) -> dict:
     """The notify-me response. A signed-in caller sees their own lead; an anonymous caller gets
-    their own submitted values back and `created_at` = the time of this request (BUG-0008: no
-    stored field of an earlier request; the lead `id` is kept because the contract publishes it
-    as a required integer, so a merged repeat returns the id of the identical submission)."""
+    the lead made for this very request (never merged, `record_notify_me`), echoing the values
+    they sent (BUG-0008: no field of an earlier request)."""
     if lead.user_id is not None:
         return {
             "id": lead.pk,
@@ -409,7 +404,7 @@ def notify_me_body(
         "lng": lng,
         "phone": phone,
         "address_text": address_text.strip(),
-        "created_at": timezone.now(),
+        "created_at": lead.created_at,
     }
 
 

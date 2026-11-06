@@ -25,7 +25,7 @@ class CartBar extends ConsumerWidget {
     final total = snapshot.itemTotal;
     final summary = [
       l10n.cartItems(snapshot.itemCount),
-      if (total != null) formatRupees(total),
+      ?formatRupeesOrNull(total),
     ].join(' · ');
 
     return SafeArea(

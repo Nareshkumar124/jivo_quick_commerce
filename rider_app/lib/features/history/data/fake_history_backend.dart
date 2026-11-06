@@ -1,11 +1,16 @@
+import 'package:jivo_core/jivo_core.dart';
+
 import '../../../shared/fake_api_endpoint.dart';
 import '../../../shared/paging.dart';
+import '../../earnings/domain/earnings.dart';
 import '../../onboarding/domain/validators.dart';
+import '../../task/domain/rider_task.dart';
 import '../../task/domain/task_status.dart';
 import '../domain/task_history.dart';
 
-/// TODO(api): stands in for `GET /rider/tasks/history/` (06 §3) until the
-/// rider contract lands (end of P4). Newest first, paged like the API.
+/// Stands in for `GET /rider/tasks/history/` and `.../history/{id}/`
+/// (06 §3) in `FAKE_API` builds and tests. Newest first; the cursor is a
+/// page number here (the API's is a `before_id`).
 class FakeHistoryBackend extends FakeApiEndpoint
     implements TaskHistoryRepository {
   FakeHistoryBackend({
@@ -17,8 +22,53 @@ class FakeHistoryBackend extends FakeApiEndpoint
   final DateTime Function() _clock;
 
   @override
-  Future<Page<TaskHistoryEntry>> fetchHistory({int page = 1}) async {
+  Future<Page<TaskHistoryEntry>> fetchHistory({int? cursor}) async {
+    final page = cursor ?? 1;
     await recordCall('fetchHistory $page');
+    return pageOf(_all(), page);
+  }
+
+  @override
+  Future<TaskHistoryDetail> fetchDetail(int taskId) async {
+    await recordCall('fetchDetail $taskId');
+    final entry = _all().where((e) => e.taskId == taskId).firstOrNull;
+    if (entry == null) {
+      throw const ApiError(code: ApiErrorCode.notFound, statusCode: 404);
+    }
+    final delivered = entry.status == TaskStatus.delivered;
+    final cod = entry.taskId.isEven;
+    final at = entry.completedAt;
+    return TaskHistoryDetail(
+      entry: entry,
+      paymentType: cod ? PaymentType.cod : PaymentType.prepaid,
+      codCollected: cod && delivered ? '349.00' : null,
+      items: const [
+        HistoryItem(name: 'Jivo Canola Oil', unit: '1 L', quantity: 2),
+        HistoryItem(name: 'Jivo Olive Pomace Oil', unit: '500 ml', quantity: 1),
+      ],
+      itemCount: 3,
+      assignedAt: at.subtract(const Duration(minutes: 20)),
+      pickedUpAt: entry.status == TaskStatus.cancelled
+          ? null
+          : at.subtract(const Duration(minutes: 12)),
+      deliveredAt: delivered ? at : null,
+      returnedAt: entry.status == TaskStatus.returned ? at : null,
+      cancelledAt: entry.status == TaskStatus.cancelled ? at : null,
+      earningsTotal: delivered ? entry.payout : null,
+      earningLines: delivered
+          ? const [
+              EarningLine(type: EarningType.base, amount: '30.00'),
+              EarningLine(
+                type: EarningType.distance,
+                amount: '10.00',
+                note: '2.4 km',
+              ),
+            ]
+          : const [],
+    );
+  }
+
+  List<TaskHistoryEntry> _all() {
     final today = istToday(_clock());
     const statuses = [
       TaskStatus.delivered,
@@ -45,7 +95,7 @@ class FakeHistoryBackend extends FakeApiEndpoint
               : '${40 + i % 3 * 5}.00',
         ),
     ];
-    return pageOf(all, page);
+    return all;
   }
 
   /// Four tasks a day, newest first: entry [i] ended on the IST day

@@ -22,6 +22,7 @@ from apps.accounts.serializers import (
     AddressSerializer,
     AuthSessionSerializer,
     DeviceSerializer,
+    DeviceUnregisterSerializer,
     LogoutSerializer,
     MeSerializer,
     OtpSendSerializer,
@@ -32,6 +33,8 @@ from apps.accounts.serializers import (
     TokenRefreshSerializer,
 )
 from apps.accounts.services import addresses, auth, otp, profile
+from apps.accounts.services.addresses import MSG_TOO_MANY
+from apps.core.autoschema import BodyOnDeleteSchema
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import OtpThrottleMixin
 from apps.core.net import client_ip
@@ -46,6 +49,7 @@ from apps.core.schema import (
     paginated_responses,
     validation_error,
 )
+from apps.core.throttling import AddressWriteThrottle
 
 
 def _own_address(request: Request, address_id: int) -> Address:
@@ -296,7 +300,9 @@ class TokenRefreshView(SimpleJWTTokenRefreshView):
         serializer = TokenRefreshSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            access, refresh = auth.rotate_refresh_token(serializer.validated_data["refresh"])
+            access, refresh = auth.rotate_refresh_token(
+                serializer.validated_data["refresh"], ip=client_ip(request)
+            )
         except TokenError as exc:
             raise InvalidToken(exc.args[0]) from exc
         return Response({"access": access, "refresh": refresh})
@@ -463,6 +469,8 @@ class AccountDeleteView(OtpThrottleMixin, APIView):
 
 
 class DeviceRegisterView(APIView):
+    schema = BodyOnDeleteSchema()  # DELETE takes {fcm_token}
+
     @extend_schema(
         operation_id="me_device_register",
         tags=["account"],
@@ -503,6 +511,33 @@ class DeviceRegisterView(APIView):
         device = profile.register_device(request.user, **serializer.validated_data)
         return Response(DeviceSerializer(device).data)
 
+    @extend_schema(
+        operation_id="me_device_unregister",
+        tags=["account"],
+        summary="Unregister this device's push token",
+        description=(
+            "Stops push to this token (e.g. on logout, api-requests #39). Only the caller's own "
+            "device is affected; an unknown token or another user's is ignored. Always 204. "
+            "`POST /auth/logout/` with `fcm_token` does the same as part of logging out."
+        ),
+        request=DeviceUnregisterSerializer,
+        examples=[_request_example("Unregister", {"fcm_token": ex.DEVICE["fcm_token"]})],
+        responses=app_responses(
+            {
+                204: OpenApiResponse(description="Unregistered (or nothing to do)."),
+                400: error_response(
+                    "Missing token.", validation_error({"fcm_token": ["This field is required."]})
+                ),
+                401: UNAUTHORIZED,
+            }
+        ),
+    )
+    def delete(self, request: Request) -> Response:
+        serializer = DeviceUnregisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile.unregister_device(request.user, **serializer.validated_data)
+        return Response(status=204)
+
 
 # --------------------------------------------------------------------------- addresses
 
@@ -519,6 +554,12 @@ ADDRESS_VALIDATION = error_response(
 
 
 class AddressListCreateView(APIView):
+    def get_throttles(self):
+        # T-814 (H3): writes have their own stricter scope; reads get the baseline throttles.
+        if self.request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            return [AddressWriteThrottle()]
+        return super().get_throttles()
+
     @extend_schema(
         operation_id="addresses_list",
         tags=["addresses"],
@@ -548,14 +589,24 @@ class AddressListCreateView(APIView):
         description=(
             "`lat`/`lng` (the map pin) are required. `receiver_name`/`receiver_phone` default to "
             "the user's own. The user's first address becomes the default. Saving an address "
-            "outside the service area is allowed; it is flagged from Phase 2 (03 §2.4)."
+            "outside the service area is allowed; it is flagged from Phase 2 (03 §2.4).\n\n"
+            "A user can keep up to 20 addresses (a server setting); above it: 400 "
+            "`VALIDATION_ERROR` with a `non_field_errors` message. Writes are rate limited "
+            "per user (429)."
         ),
         request=AddressSerializer,
         examples=[_request_example("New address", ex.ADDRESS_CREATE_REQUEST)],
         responses=app_responses(
             {
                 201: _ok(AddressSerializer, "Created.", ("Created", ex.ADDRESS_WORK)),
-                400: ADDRESS_VALIDATION,
+                400: error_response(
+                    "Invalid fields, or the address limit is reached.",
+                    *ADDRESS_VALIDATION.examples,
+                    validation_error(
+                        {"non_field_errors": [MSG_TOO_MANY.format(limit=20)]},
+                        name="Too many addresses",
+                    ),
+                ),
                 401: UNAUTHORIZED,
             }
         ),
@@ -568,6 +619,12 @@ class AddressListCreateView(APIView):
 
 
 class AddressDetailView(APIView):
+    def get_throttles(self):
+        # T-814 (H3): writes have their own stricter scope; reads get the baseline throttles.
+        if self.request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            return [AddressWriteThrottle()]
+        return super().get_throttles()
+
     http_method_names = ["get", "patch", "delete", "options"]
 
     @extend_schema(
@@ -642,6 +699,12 @@ class AddressDetailView(APIView):
 
 
 class AddressSetDefaultView(APIView):
+    def get_throttles(self):
+        # T-814 (H3): writes have their own stricter scope; reads get the baseline throttles.
+        if self.request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            return [AddressWriteThrottle()]
+        return super().get_throttles()
+
     @extend_schema(
         operation_id="addresses_set_default",
         tags=["addresses"],

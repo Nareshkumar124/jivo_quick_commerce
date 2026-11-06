@@ -122,6 +122,28 @@ void main() {
     expect(backend.keys.last, 'key-3');
   });
 
+  test('gateway down at placement (503, M6): the cart stays, the error is '
+      'published and the retry places a fresh order', () async {
+    backend.failures.add(
+      ApiError.tryParseEnvelope(
+        contractExample('orders_create/503/PAYMENTGATEWAYUNAVAILABLE'),
+        statusCode: 503,
+      )!,
+    );
+    await place();
+    final state = container.read(checkoutProvider);
+    expect(state.error?.code, ApiErrorCode.serviceUnavailable);
+    expect(state.busy, isFalse);
+    expect(state.result, isNull);
+    expect((await backend.load()).quantityOf(101), 2, reason: 'cart kept');
+
+    checkout().acknowledge();
+    await place();
+    expect(container.read(checkoutProvider).result, isA<OrderConfirmed>());
+    expect(backend.keys, hasLength(2));
+    expect(backend.orders, hasLength(1));
+  });
+
   test('a second tap while placing is ignored', () async {
     final first = place();
     final second = place();

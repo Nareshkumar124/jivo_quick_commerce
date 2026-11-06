@@ -6,6 +6,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/providers.dart';
 import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/rider_account_controller.dart';
+import '../data/api_rider_onboarding_repository.dart';
 import '../data/fake_rider_onboarding_backend.dart';
 import '../data/platform_kyc_images.dart';
 import '../domain/image_compression.dart';
@@ -30,14 +31,16 @@ final fakeRiderOnboardingBackendProvider = Provider<FakeRiderOnboardingBackend>(
   (ref) => FakeRiderOnboardingBackend(clock: ref.watch(clockProvider)),
 );
 
-/// TODO(api): bind to the generated client when the rider contract lands
-/// (end of P4): an `ApiRiderOnboardingRepository` mapping the generated
-/// types to the domain models, chosen when `!env.useFakeApi`.
+/// Registration and KYC: the generated client (P5 slice 5.1, live) where
+/// onboarding runs (dev flavor, DL-30); the fake with `FAKE_API`.
 final riderOnboardingRepositoryProvider = Provider<RiderOnboardingRepository>((
   ref,
 ) {
   if (!ref.watch(riderOnboardingEnabledProvider)) {
     return const UnavailableRiderOnboardingRepository();
+  }
+  if (!ref.watch(appEnvProvider).useFakeApi) {
+    return ApiRiderOnboardingRepository(ref.watch(jivoApiProvider));
   }
   final fake = ref.watch(fakeRiderOnboardingBackendProvider);
   fake.currentRider = () {

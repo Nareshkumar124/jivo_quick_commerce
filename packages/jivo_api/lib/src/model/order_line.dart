@@ -38,6 +38,8 @@ class OrderLine {
 
     required this.quantity,
 
+    required this.quantityUnavailable,
+
     required this.lineMrpTotal,
 
     required this.lineTotal,
@@ -70,15 +72,21 @@ class OrderLine {
   @JsonKey(name: r'selling_price', required: true, includeIfNull: false)
   final String sellingPrice;
 
+  /// Units ordered.
   // minimum: 1
   @JsonKey(name: r'quantity', required: true, includeIfNull: false)
   final int quantity;
 
-  /// `mrp` x `quantity`.
+  /// Units the store could not supply (08 T8a, Phase 4): removed from the order and the bill (refunded if paid online). 0 normally. Units coming = `quantity` - `quantity_unavailable`; show the removed ones struck through.
+  // minimum: 0
+  @JsonKey(name: r'quantity_unavailable', required: true, includeIfNull: false)
+  final int quantityUnavailable;
+
+  /// `mrp` x the units coming (`quantity` - `quantity_unavailable`).
   @JsonKey(name: r'line_mrp_total', required: true, includeIfNull: false)
   final String lineMrpTotal;
 
-  /// `selling_price` x `quantity`.
+  /// `selling_price` x the units coming (`quantity` - `quantity_unavailable`).
   @JsonKey(name: r'line_total', required: true, includeIfNull: false)
   final String lineTotal;
 
@@ -95,6 +103,7 @@ class OrderLine {
           other.mrp == mrp &&
           other.sellingPrice == sellingPrice &&
           other.quantity == quantity &&
+          other.quantityUnavailable == quantityUnavailable &&
           other.lineMrpTotal == lineMrpTotal &&
           other.lineTotal == lineTotal;
 
@@ -109,6 +118,7 @@ class OrderLine {
       mrp.hashCode +
       sellingPrice.hashCode +
       quantity.hashCode +
+      quantityUnavailable.hashCode +
       lineMrpTotal.hashCode +
       lineTotal.hashCode;
 

@@ -41,6 +41,13 @@ enum OrderStatus {
     delivered => true,
     _ => false,
   };
+
+  /// Not finished yet (`08 §1`: every non-terminal state, including
+  /// `DELIVERY_FAILED` while the items return). `GET /orders/?status=active`.
+  bool get isActive => switch (this) {
+    delivered || cancelled || paymentFailed || returned => false,
+    _ => true,
+  };
 }
 
 /// How the customer pays (`PaymentMethodEnum`).

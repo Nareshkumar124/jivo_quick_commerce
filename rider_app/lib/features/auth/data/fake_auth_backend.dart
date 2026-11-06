@@ -111,8 +111,8 @@ class FakeAuthBackend implements AuthRepository, AccountRepository {
   }
 
   @override
-  Future<void> logout({required String refreshToken}) async {
-    calls.add('logout');
+  Future<void> logout({required String refreshToken, String? fcmToken}) async {
+    calls.add(fcmToken == null ? 'logout' : 'logout fcm=$fcmToken');
     await _wait();
     _currentUser = null;
   }

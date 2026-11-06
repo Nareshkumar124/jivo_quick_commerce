@@ -3,6 +3,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../paged_list_controller.dart';
+import '../errors/rider_error_text.dart';
 
 /// A paginated list: a spinner until the first page, an error with Retry,
 /// an empty message, then the items with "Load more" at the end. [header]
@@ -56,7 +57,7 @@ class PagedListView<T, H> extends StatelessWidget {
           if (error != null) ...[
             const SizedBox(height: 8),
             Text(
-              apiErrorMessage(JivoCoreLocalizations.of(context), error),
+              riderApiErrorMessage(context, error),
               key: const Key('paged-error'),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
@@ -98,7 +99,7 @@ class _ErrorRetry extends StatelessWidget {
           const Icon(Icons.cloud_off, size: 64),
           const SizedBox(height: 16),
           Text(
-            apiErrorMessage(JivoCoreLocalizations.of(context), error),
+            riderApiErrorMessage(context, error),
             key: const Key('paged-error'),
             textAlign: TextAlign.center,
           ),

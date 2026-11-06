@@ -17,11 +17,13 @@ import 'onboarding_text.dart';
 /// and the masked number. Tapping one opens its capture screen (upload,
 /// replace or re-upload). Approved documents are locked.
 class DocumentsScreen extends ConsumerStatefulWidget {
-  const DocumentsScreen({this.readOnly = false, super.key});
+  const DocumentsScreen({this.fromProfile = false, super.key});
 
-  /// From the ACTIVE rider's profile (04 §2.9): statuses and masked numbers
-  /// only, no uploads (those go through the application steps).
-  final bool readOnly;
+  /// From the ACTIVE rider's profile (04 §2.9): the documents and their
+  /// review status, without the application steps (no step counter, no
+  /// Continue). A document ops rejected (or a missing one) can be uploaded
+  /// again; approved ones stay locked.
+  final bool fromProfile;
 
   @override
   ConsumerState<DocumentsScreen> createState() => _DocumentsScreenState();
@@ -31,10 +33,12 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   @override
   void initState() {
     super.initState();
-    if (!widget.readOnly) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPhoto());
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostPhoto());
   }
+
+  String _captureRoute(KycDocumentType type) => widget.fromProfile
+      ? Routes.profileDocumentCapture(type.wireValue)
+      : Routes.documentCapture(type.wireValue);
 
   /// Android may have stopped the app while the camera was open (low RAM):
   /// the photo comes back now and goes to the document it was taken for.
@@ -45,7 +49,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     final lost = await ref.read(kycImagePickerProvider).retrieveLost();
     await pending.clear();
     if (lost == null || !mounted) return;
-    await context.push(Routes.documentCapture(type.wireValue), extra: lost);
+    await context.push(_captureRoute(type), extra: lost);
   }
 
   Future<void> _continue(RiderProfile profile) async {
@@ -90,7 +94,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
           : const Center(child: CircularProgressIndicator());
     } else {
       final firstTime =
-          !widget.readOnly &&
+          !widget.fromProfile &&
           profile.stage == OnboardingStage.needsDocuments &&
           profile.rejectedDocuments.isEmpty;
       body = ListView(
@@ -104,13 +108,27 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
             ),
             const SizedBox(height: 4),
           ],
-          Text(l10n.documentsIntro, style: theme.textTheme.bodyLarge),
+          Text(
+            widget.fromProfile
+                ? l10n.documentsProfileIntro
+                : l10n.documentsIntro,
+            style: theme.textTheme.bodyLarge,
+          ),
+          if (widget.fromProfile && !profile.documentsComplete) ...[
+            const SizedBox(height: 12),
+            _AttentionBanner(
+              text: l10n.documentsNeedAttention(
+                profile.missingDocuments.length +
+                    profile.rejectedDocuments.length,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           for (final type in profile.requiredDocuments)
             _DocumentTile(
               type: type,
               document: profile.documentOf(type),
-              readOnly: widget.readOnly,
+              onOpen: () => context.push(_captureRoute(type)),
             ),
         ],
       );
@@ -132,7 +150,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.documentsTitle)),
       body: body,
-      bottomNavigationBar: widget.readOnly ? null : bottom,
+      bottomNavigationBar: widget.fromProfile ? null : bottom,
     );
   }
 }
@@ -141,10 +159,10 @@ class _DocumentTile extends StatelessWidget {
   const _DocumentTile({
     required this.type,
     required this.document,
-    this.readOnly = false,
+    required this.onOpen,
   });
 
-  final bool readOnly;
+  final VoidCallback onOpen;
 
   final KycDocumentType type;
   final RiderDocument? document;
@@ -171,7 +189,7 @@ class _DocumentTile extends StatelessWidget {
       DocumentReviewStatus.approved => scheme.primary,
       DocumentReviewStatus.rejected => scheme.error,
     };
-    final canOpen = !readOnly && (doc?.canReplace ?? true);
+    final canOpen = doc?.canReplace ?? true;
     final action = doc == null
         ? l10n.docActionUpload
         : status == DocumentReviewStatus.rejected
@@ -188,9 +206,7 @@ class _DocumentTile extends StatelessWidget {
           : null,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: canOpen
-            ? () => context.push(Routes.documentCapture(type.wireValue))
-            : null,
+        onTap: canOpen ? onOpen : null,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 80),
           child: Padding(
@@ -243,6 +259,41 @@ class _DocumentTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Profile mode: some documents need a (new) upload.
+class _AttentionBanner extends StatelessWidget {
+  const _AttentionBanner({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('documents-attention'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: scheme.onErrorContainer),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: scheme.onErrorContainer,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

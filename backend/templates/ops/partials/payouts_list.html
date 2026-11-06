@@ -1,0 +1,51 @@
+{% load ops %}
+{# Payouts list (slice 5.4). Context: page (Paginator page of Payout, rider selected), status. Reloads on ops:refresh. #}
+<div id="payouts-list" hx-get="{% url 'ops:payouts-list' %}{% querystring %}" hx-swap="outerHTML" hx-trigger="ops:refresh from:body" data-testid="payouts-list">
+    {% if page.object_list %}
+        <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+            <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                <thead><tr class="bg-base-50 dark:bg-base-900">
+                    <th scope="col">Rider</th><th scope="col">Period (IST)</th><th scope="col">Amount</th><th scope="col">Status</th><th scope="col">Reference</th><th scope="col"><span class="sr-only">Actions</span></th>
+                </tr></thead>
+                <tbody>
+                    {% for payout in page.object_list %}
+                        <tr data-testid="payout-{{ payout.pk }}">
+                            <td>{{ payout.rider.full_name }}</td>
+                            <td>{{ payout.period_start|date:"d M" }} &ndash; {{ payout.period_end|date:"d M Y" }}</td>
+                            <td>{{ payout.amount|inr }}</td>
+                            <td>{{ payout.get_status_display }}{% if payout.paid_at %} <span class="ops-text-secondary">{{ payout.paid_at|date:"d M H:i" }}</span>{% endif %}</td>
+                            <td>{{ payout.reference|default:"-" }}</td>
+                            <td>
+                                {% if payout.status == "PENDING" %}
+                                    <div class="flex flex-wrap gap-2">
+                                        <form class="flex gap-2" hx-post="{% url 'ops:payout-paid' payout.pk %}" hx-swap="none" method="post" action="{% url 'ops:payout-paid' payout.pk %}">
+                                            {% csrf_token %}
+                                            <label class="sr-only" for="ref-{{ payout.pk }}">Bank transfer reference (UTR)</label>
+                                            <input id="ref-{{ payout.pk }}" name="reference" maxlength="64" required placeholder="UTR"
+                                                   class="bg-white border border-base-200 px-3 py-2 rounded-default w-36 dark:bg-base-900 dark:border-base-700">
+                                            <button type="submit" class="ops-button ops-button--secondary" data-testid="paid-{{ payout.pk }}">Mark paid</button>
+                                        </form>
+                                        <form hx-post="{% url 'ops:payout-void' payout.pk %}" hx-swap="none" method="post" action="{% url 'ops:payout-void' payout.pk %}"
+                                              hx-confirm="Void this payout? Its earnings become unpaid again." data-confirm-title="Void payout?" data-confirm-label="Void" data-confirm-tone="danger">
+                                            {% csrf_token %}
+                                            <button type="submit" class="ops-button ops-button--outline-danger" data-testid="void-{{ payout.pk }}">Void</button>
+                                        </form>
+                                    </div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page.paginator.num_pages > 1 %}
+            <nav class="flex flex-wrap gap-2 items-center mt-3" aria-label="Pagination">
+                <span class="mr-auto ops-text-secondary">{{ page.start_index }}&ndash;{{ page.end_index }} of {{ page.paginator.count }}</span>
+                {% if page.has_previous %}<a class="ops-page" href="{% url 'ops:payouts' %}{% querystring page=page.previous_page_number %}">Previous</a>{% endif %}
+                {% if page.has_next %}<a class="ops-page" href="{% url 'ops:payouts' %}{% querystring page=page.next_page_number %}">Next</a>{% endif %}
+            </nav>
+        {% endif %}
+    {% else %}
+        {% include "ops/components/empty_state.html" with title="No payouts yet" icon="payments" compact=1 %}
+    {% endif %}
+</div>

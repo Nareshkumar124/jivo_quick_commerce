@@ -15,6 +15,7 @@ DEBUG = False
 SECRET_KEY = env_str("DJANGO_SECRET_KEY")
 if len(SECRET_KEY) < 50:
     raise ImproperlyConfigured("DJANGO_SECRET_KEY must be at least 50 characters long.")
+# T-814 (L3): a separate key, required by the system check accounts.E005 (not SECRET_KEY).
 SIMPLE_JWT = {**SIMPLE_JWT, "SIGNING_KEY": env_str("JWT_SIGNING_KEY", default=SECRET_KEY)}
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
@@ -24,6 +25,8 @@ if not ALLOWED_HOSTS:
 # Deployed behind nginx / a load balancer (02 §8): the number of trusted proxies must be set
 # explicitly, otherwise every client would share the proxy's IP for OTP limits and the lockout.
 NUM_PROXIES = env_int("NUM_PROXIES")
+if NUM_PROXIES < 1:  # T-814 (L1)
+    raise ImproperlyConfigured("NUM_PROXIES must be at least 1 behind nginx / a load balancer.")
 REST_FRAMEWORK = {**REST_FRAMEWORK, "NUM_PROXIES": NUM_PROXIES or None}
 
 # TLS is terminated by nginx / the load balancer (02 §8).

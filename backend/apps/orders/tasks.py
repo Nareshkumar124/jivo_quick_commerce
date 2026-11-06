@@ -3,18 +3,69 @@
 import logging
 
 from celery import shared_task
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 
 @shared_task(name="orders.order_event")
 def order_event(event: str, order_id: int) -> str:
-    """Domain event handler (`apps.orders.events`). Phase 3 records it; later phases notify."""
-    if event in ("payment.late_capture", "payment.refund_failed"):
+    """Domain event handler (`apps.orders.events`). Phase 4: a PLACED order schedules its
+    auto-accept (stores with auto-accept) and its acceptance SLA check; ops alerts are logged
+    at ERROR. Phase 5 starts dispatch (DISPATCH_TRIGGER) and tells the rider an order is packed;
+    Phase 6 fans every event out to the sockets and the customer notification (`fan_out`)."""
+    from apps.orders import events
+
+    if event in events.OPS_ALERTS:
         logger.error("Ops alert: %s on order %s", event, order_id)
     else:
         logger.info("Order event %s: order %s", event, order_id)
+    # Sockets and the customer notification first: each is its own queued task, so an error in
+    # the Phase 4/5 work below never holds them back.
+    fan_out(event, order_id)
+    if event == events.PLACED:
+        schedule_acceptance(order_id)
+    # Phase 5 (08 §2.1): dispatch starts at DISPATCH_TRIGGER (ACCEPTED by default, or PLACED).
+    trigger = {"ACCEPTED": events.ACCEPTED, "PLACED": events.PLACED}.get(
+        settings.DISPATCH_TRIGGER, events.ACCEPTED
+    )
+    if event == trigger:
+        from apps.delivery.tasks import dispatch_order
+
+        dispatch_order.delay(order_id)
+    if event == events.PACKED:
+        from apps.delivery.services.dispatch import order_packed
+
+        order_packed(order_id)
     return event
+
+
+def fan_out(event: str, order_id: int) -> None:
+    """Phase 6 (08 §9): the socket messages and the customer notification of the event, each its
+    own retried, idempotent task, so one failing never blocks the other (or this handler)."""
+    from apps.notifications.tasks import notify_order_event
+    from apps.realtime.tasks import publish_order_event
+
+    for task in (publish_order_event, notify_order_event):
+        try:
+            task.delay(event, order_id)
+        except Exception:
+            logger.exception("Order event %s: %s not run for order %s", event, task.name, order_id)
+
+
+def schedule_acceptance(order_id: int) -> None:
+    from apps.orders.models import Order
+
+    auto = (
+        Order.objects.filter(pk=order_id)
+        .values_list("store__auto_accept_orders", flat=True)
+        .first()
+    )
+    if auto:
+        auto_accept_order.apply_async((order_id,), countdown=settings.AUTO_ACCEPT_DELAY_SECONDS)
+    store_acceptance_sla_alert.apply_async(
+        (order_id,), countdown=settings.STORE_ACCEPTANCE_SLA_SECONDS
+    )
 
 
 @shared_task(name="orders.expire_unpaid_orders")
@@ -24,3 +75,45 @@ def expire_unpaid_orders() -> dict:
     from apps.orders.services import expire_unpaid_orders as run
 
     return run()
+
+
+@shared_task(name="orders.auto_accept_order")
+def auto_accept_order(order_id: int) -> str:
+    """06 §5 `auto_accept_orders` (countdown): T6 by the system for an auto-accept store."""
+    from apps.orders.store_ops import auto_accept
+
+    return auto_accept(order_id)
+
+
+@shared_task(name="orders.auto_accept_orders")
+def auto_accept_orders() -> dict:
+    """Beat, every minute: auto-accepts missed by their countdown, and acceptance SLA alerts."""
+    from apps.orders.store_ops import sweep_placed_orders
+
+    return sweep_placed_orders()
+
+
+@shared_task(name="orders.store_acceptance_sla_alert")
+def store_acceptance_sla_alert(order_id: int) -> str:
+    """06 §5 (countdown = SLA): alert ops once if the store has not accepted in time."""
+    from apps.orders.store_ops import acceptance_sla_alert
+
+    return acceptance_sla_alert(order_id)
+
+
+@shared_task(name="orders.generate_invoice")
+def generate_invoice(order_id: int) -> str:
+    """06 §5: the GST invoice of a delivered order (T10 from Phase 5; on demand in Phase 4)."""
+    from apps.orders import invoices
+    from apps.orders.models import Order
+
+    order = Order.objects.filter(pk=order_id).first()
+    if order is None or not invoices.is_invoiceable(order):
+        return "skipped"
+    invoice = invoices.ensure_invoice(order_id)
+    try:
+        invoices.ensure_pdf(invoice)
+    except invoices.InvoiceRenderingUnavailable as exc:
+        logger.error("Invoice %s not rendered: %s", invoice.invoice_number, exc)
+        return "not_rendered"
+    return "done"

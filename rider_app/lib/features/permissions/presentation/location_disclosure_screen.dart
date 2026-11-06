@@ -9,7 +9,12 @@ import '../../../l10n/app_localizations.dart';
 ///
 /// The wording follows Play's required pattern: "[app] collects location data
 /// to enable [features] even when the app is closed or not in use."
-/// TODO(jivo-legal): review the text with the privacy policy (P7).
+/// The consent button is affirmative ("I agree, turn on location", UX audit
+/// RD-13). "Calculate your distance pay" stays out of the purposes until the
+/// backend confirms whether pay uses the GPS trail (Play rejects purposes the
+/// app does not have).
+/// TODO(jivo-legal): review the text with the privacy policy (P7); the app
+/// name must match the Play listing (D-11).
 class LocationDisclosureScreen extends StatelessWidget {
   const LocationDisclosureScreen({super.key});
 
@@ -44,6 +49,10 @@ class LocationDisclosureScreen extends StatelessWidget {
                     _Point(
                       icon: Icons.toggle_on,
                       text: l10n.disclosureOnlineOnly,
+                    ),
+                    _Point(
+                      icon: Icons.notifications_active,
+                      text: l10n.disclosureNotification,
                     ),
                     _Point(
                       icon: Icons.share_location,
