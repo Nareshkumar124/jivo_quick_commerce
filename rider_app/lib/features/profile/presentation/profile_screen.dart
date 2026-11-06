@@ -4,19 +4,26 @@ import 'package:go_router/go_router.dart';
 import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../app/env.dart';
+import '../../../app/providers.dart';
 import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
 
 import 'package:jivo_core/helpers.dart';
 
 import '../../auth/domain/rider_account.dart';
+import '../../auth/presentation/logout_button.dart';
 import '../../auth/presentation/rider_account_controller.dart';
+import '../../launch/presentation/launch_controller.dart';
+import '../../onboarding/data/fake_rider_onboarding_backend.dart';
+import '../../onboarding/domain/kyc_document.dart';
 import '../../onboarding/domain/rider_profile.dart';
 import '../../onboarding/presentation/onboarding_providers.dart';
 import '../../onboarding/presentation/onboarding_text.dart';
 
 /// Profile (04 §2.9, screen 18): photo, name, phone, home store, vehicle,
-/// KYC status and rating, from `GET /rider/me/`, and the documents.
+/// KYC status and rating, from `GET /rider/me/`; the documents (re-upload
+/// of rejected ones), call support and log out.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -78,6 +85,24 @@ class _ProfileBody extends ConsumerWidget {
       vehicleName(l10n, profile.vehicleType),
       ?profile.vehicleNumber,
     ].join(' · ');
+    // Missing or rejected documents: the rider uploads them again from the
+    // documents screen.
+    final attention =
+        profile.missingDocuments.length + profile.rejectedDocuments.length;
+    final inReview = profile.documents.any(
+      (d) => d.status == DocumentReviewStatus.pending,
+    );
+    final supportPhone = ref
+        .watch(launchControllerProvider)
+        .config
+        ?.support
+        .phone;
+    final canCallSupport =
+        supportPhone != null && supportPhone.trim().isNotEmpty;
+    final devReview =
+        ref.watch(appEnvProvider).showDevTools &&
+        ref.watch(riderOnboardingRepositoryProvider)
+            is FakeRiderOnboardingBackend;
 
     return RefreshIndicator(
       onRefresh: ref.read(riderProfileControllerProvider.notifier).reload,
@@ -138,6 +163,7 @@ class _ProfileBody extends ConsumerWidget {
                   value: profile.rating == null
                       ? l10n.profileNoRating
                       : l10n.profileRatingValue(profile.rating!),
+                  onTap: () => context.push(Routes.rating),
                 ),
                 if (profile.bankAccount case final bank?)
                   _InfoRow(
@@ -154,10 +180,99 @@ class _ProfileBody extends ConsumerWidget {
             child: ListTile(
               key: const Key('profile-documents'),
               minTileHeight: 64,
-              leading: const Icon(Icons.badge_outlined),
+              leading: Icon(
+                attention > 0 ? Icons.error_outline : Icons.badge_outlined,
+                color: attention > 0 ? theme.colorScheme.error : null,
+              ),
               title: Text(l10n.documentsTitle),
+              subtitle: Text(
+                attention > 0
+                    ? l10n.profileDocumentsAttention(attention)
+                    : inReview
+                    ? l10n.profileDocumentsInReview
+                    : l10n.profileDocumentsAllGood,
+                key: const Key('profile-documents-status'),
+                style: attention > 0
+                    ? TextStyle(
+                        color: theme.colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      )
+                    : null,
+              ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push(Routes.profileDocuments),
+            ),
+          ),
+          if (devReview && attention == 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: OutlinedButton(
+                key: const Key('dev-reject-document'),
+                onPressed: () {
+                  (ref.read(
+                    riderOnboardingRepositoryProvider,
+                  ) as FakeRiderOnboardingBackend).rejectDocument(
+                    profile.requiredDocuments.contains(
+                          KycDocumentType.drivingLicence,
+                        )
+                        ? KycDocumentType.drivingLicence
+                        : KycDocumentType.pan,
+                  );
+                  ref.read(riderProfileControllerProvider.notifier).reload();
+                },
+                child: Text(l10n.devRejectDocument),
+              ),
+            ),
+          const SizedBox(height: 8),
+          if (canCallSupport)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      l10n.profileSupport,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(l10n.profileSupportBody),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      key: const Key('profile-call-support'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(56),
+                      ),
+                      onPressed: () => ref
+                          .read(urlOpenerProvider)
+                          .open(Uri(scheme: 'tel', path: supportPhone)),
+                      icon: const Icon(Icons.call),
+                      label: Text(l10n.callSupport),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              key: const Key('profile-help'),
+              minTileHeight: 64,
+              leading: const Icon(Icons.support_agent),
+              title: Text(l10n.helpTitle),
+              subtitle: Text(l10n.helpProfileSubtitle),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.help),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              key: const Key('profile-logout'),
+              minTileHeight: 64,
+              leading: const Icon(Icons.logout),
+              title: Text(l10n.logout),
+              onTap: () => logoutWithFeedback(context, ref),
             ),
           ),
         ],
@@ -180,30 +295,36 @@ class _InfoRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.onTap,
     super.key,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    child: Row(
-      children: [
-        Icon(icon, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.bodySmall),
-              Text(value, style: Theme.of(context).textTheme.titleMedium),
-            ],
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.bodySmall),
+                Text(value, style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
           ),
-        ),
-      ],
+          if (onTap != null) const Icon(Icons.chevron_right),
+        ],
+      ),
     ),
   );
 }

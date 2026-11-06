@@ -5,7 +5,8 @@ Every Ops view is wrapped in `ops_view(...)`:
   one login (admin login form, django-axes lockout, CSRF) serves both layers. Anyone else is
   sent to the admin login, like /admin/ does.
 - Then the view's permissions (all required), checked with `user.has_perms` so roles stay data
-  (`apps.accounts.roles`). A staff member without them gets a 403 page.
+  (`apps.accounts.roles`), and its 05 §3 capability if it names one (`capabilities.allowed`).
+  A staff member without them gets a 403 page.
 - HTMX requests never get a 302: htmx would swap the login page into the target. They get
   401 + `HX-Redirect` (full-page redirect to the login) or 403 (ops.js shows a toast).
 - The view runs and renders in IST (times are stored in UTC).
@@ -63,8 +64,10 @@ def forbidden(request, message: str | None = None) -> HttpResponse:
     return response
 
 
-def ops_view(*perms: str):
-    """Decorate an Ops Console view: staff only, then `perms` (all required)."""
+def ops_view(*perms: str, capability: str | None = None):
+    """Decorate an Ops Console view: staff only, then `perms` (all required) and `capability`
+    (`apps.ops_console.capabilities`)."""
+    from apps.ops_console.capabilities import allowed
 
     def decorator(view):
         @wraps(view)
@@ -72,7 +75,8 @@ def ops_view(*perms: str):
             user = request.user
             if not is_panel_staff(user):
                 return login_redirect(request)
-            if perms and not user.has_perms(perms):
+            refused = bool(perms) and not user.has_perms(perms)
+            if refused or (capability and not allowed(user, capability)):
                 with timezone.override(DISPLAY_TZ):
                     return forbidden(request)
             with timezone.override(DISPLAY_TZ):

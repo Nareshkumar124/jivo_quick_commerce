@@ -15,15 +15,15 @@ void main() {
       'below the limit', (tester) async {
     await openFromHome(tester, h, 'home-cash');
 
-    expect(textOf(tester, 'cash-in-hand'), '₹2,149.00');
-    expect(find.text('Limit ₹5,000.00'), findsOneWidget);
+    expect(textOf(tester, 'cash-in-hand'), '₹2,149');
+    expect(find.text('Limit ₹5,000'), findsOneWidget);
     expect(byKey('cash-limit-banner'), findsNothing);
     expect(byKey('cash-entry-30'), findsOneWidget);
     expect(find.text('Cash collected · Order JQ-10501'), findsOneWidget);
     // Entry times in IST (06:10 UTC; a narrow no-break space before AM).
     expect(find.text('11:40\u202FAM'), findsOneWidget);
-    expect(find.text('-₹3,100.00'), findsOneWidget, reason: 'deposit');
-    expect(find.text('Balance ₹0.00'), findsOneWidget);
+    expect(find.text('-₹3,100'), findsOneWidget, reason: 'deposit');
+    expect(find.text('Balance ₹0'), findsOneWidget);
     expect(byKey('cash-day-2026-11-02T00:00:00.000Z'), findsOneWidget);
     expect(byKey('cash-day-2026-11-01T00:00:00.000Z'), findsOneWidget);
 
@@ -50,7 +50,21 @@ void main() {
 
     expect(byKey('cash-limit-banner'), findsOneWidget);
     expect(find.text('Deposit cash'), findsOneWidget);
-    expect(textOf(tester, 'cash-in-hand'), '₹5,249.00');
+    expect(textOf(tester, 'cash-in-hand'), '₹5,249');
+  });
+
+  testWidgets('a COD order skipped below the limit (DL-61 b): "Deposit '
+      'cash" with the skipped wording, and where to deposit', (tester) async {
+    h.cash.codSkipped = true;
+    await openFromHome(tester, h, 'home-cash');
+
+    expect(byKey('cash-limit-banner'), findsOneWidget);
+    expect(
+      textOf(tester, 'cash-limit-body'),
+      startsWith('A cash order was not sent to you'),
+    );
+    expect(textOf(tester, 'cash-in-hand'), '₹2,149');
+    expect(textOf(tester, 'cash-deposit-where'), contains('Jivo Sector 18'));
   });
 
   testWidgets('load more fetches the next page', (tester) async {

@@ -21,6 +21,8 @@ class PagedListState<T, H> {
 
   final List<T> items;
   final H? header;
+
+  /// The cursor of the next page (see `Page.nextPage`), or null.
   final int? nextPage;
   final bool loading;
 
@@ -45,7 +47,9 @@ class PagedListState<T, H> {
 class PagedListNotifier<T, H> extends Notifier<PagedListState<T, H>> {
   PagedListNotifier(this._fetch, {this._keyOf});
 
-  final Future<(Page<T>, H?)> Function(Ref ref, int page) _fetch;
+  /// Fetches a page: [cursor] is null for the first one, then the
+  /// previous page's `nextPage` (a page number or a `before_id`).
+  final Future<(Page<T>, H?)> Function(Ref ref, int? cursor) _fetch;
   final Object Function(T item)? _keyOf;
 
   /// Bumped by every load; an answer for an older one is dropped.
@@ -58,7 +62,7 @@ class PagedListNotifier<T, H> extends Notifier<PagedListState<T, H>> {
   }
 
   /// Reloads from the first page, keeping the list on screen meanwhile.
-  Future<void> refresh() => _load(1, replace: true);
+  Future<void> refresh() => _load(null, replace: true);
 
   Future<void> loadMore() async {
     final next = state.nextPage;
@@ -66,7 +70,7 @@ class PagedListNotifier<T, H> extends Notifier<PagedListState<T, H>> {
     await _load(next, replace: false);
   }
 
-  Future<void> _load(int page, {required bool replace}) async {
+  Future<void> _load(int? cursor, {required bool replace}) async {
     if (!ref.mounted) return;
     final generation = ++_generation;
     state = PagedListState(
@@ -77,7 +81,7 @@ class PagedListNotifier<T, H> extends Notifier<PagedListState<T, H>> {
       loaded: state.loaded,
     );
     try {
-      final (result, header) = await _fetch(ref, page);
+      final (result, header) = await _fetch(ref, cursor);
       if (!ref.mounted || generation != _generation) return;
       state = PagedListState(
         items: replace ? result.items : _append(state.items, result.items),

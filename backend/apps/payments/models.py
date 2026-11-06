@@ -46,6 +46,11 @@ class Payment(TimeStampedModel):
     error_code = models.CharField(max_length=64, blank=True)
     error_description = models.CharField(max_length=255, blank=True)
     raw = models.JSONField(default=dict, blank=True)
+    pii_scrubbed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When `raw` lost its personal data (PAYMENT_PAYLOAD_RETENTION_DAYS, DL-60).",
+    )
     captured_at = models.DateTimeField(null=True, blank=True)
     idempotency_key = models.CharField(
         max_length=64, blank=True, help_text="The retry-payment Idempotency-Key, if any."
@@ -113,6 +118,9 @@ class Refund(TimeStampedModel):
             ),
             models.CheckConstraint(condition=Q(amount__gt=0), name="refund_amount_positive"),
         ]
+        permissions = [
+            ("issue_refund", "Can refund an order (within the role's limit) or retry a refund"),
+        ]
 
     def __str__(self) -> str:
         return f"Refund {self.amount} on order {self.order_id}: {self.status}"
@@ -130,6 +138,11 @@ class PaymentWebhookEvent(models.Model):
     processed_at = models.DateTimeField(null=True, blank=True)
     error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    pii_scrubbed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When `payload` lost its personal data (PAYMENT_PAYLOAD_RETENTION_DAYS, DL-60).",
+    )
 
     class Meta:
         indexes = [models.Index(fields=["event_type", "-created_at"], name="webhook_type_idx")]

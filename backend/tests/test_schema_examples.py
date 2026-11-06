@@ -110,6 +110,9 @@ PUBLIC = {
     "collections_retrieve",
     # Phase 3: authenticated by the Razorpay signature, never by a JWT.
     "payments_razorpay_webhook",
+    # Phase 7 (T-711): static pages and FAQs, credentials ignored.
+    "pages_retrieve",
+    "faqs_list",
 }
 # Anonymous allowed, but a token that is sent is checked (401 TOKEN_INVALID when invalid).
 OPTIONAL_AUTH = {"home_retrieve", "serviceability_notify_me"}
@@ -132,6 +135,7 @@ STORE_SCOPED = {
     "cart_coupon_apply",
     "cart_coupon_remove",
     "orders_create",
+    "orders_reorder",  # Phase 4: the cart is priced at that store
 }
 # Phase 3: operations that take the Idempotency-Key header (02 §5).
 IDEMPOTENT = {"orders_create", "orders_retry_payment"}

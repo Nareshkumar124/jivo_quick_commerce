@@ -37,7 +37,7 @@ class _Pages {
 class _SpyNotifier extends PagedListNotifier<int, void> {
   _SpyNotifier(_Pages pages, {required bool dedupe})
     : super(
-        (ref, page) async => (await pages.fetch(page), null),
+        (ref, cursor) async => (await pages.fetch(cursor ?? 1), null),
         keyOf: dedupe ? (item) => item : null,
       );
 

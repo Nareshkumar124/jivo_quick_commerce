@@ -44,3 +44,44 @@ Exploit-level details of open security findings are in `qa/private/` (gitignored
 - **Uploads and KYC storage:** Phase 5.
 - **TLS/HSTS on a real host:** no staging deployment yet.
 - **OWASP API Top 10 review and penetration test:** Phase 8.
+
+## Phase 3 stage 1 (2026-11-04, `c2c153a`)
+| Area | Result |
+|---|---|
+| IDOR: cart lines (PATCH/DELETE), orders (retrieve/cancel/retry), verify on another user's order, another user's address on cart/order | ✅ 404 / 400, nothing changed, nothing leaked (P3-TC-08/10/29/34) |
+| Payment trust: verify needs a valid HMAC over `order_id|payment_id` **and** a gateway order belonging to this order; the app callback alone never places an order | ✅ P3-TC-34 |
+| Webhook auth: HMAC of the raw body bytes; tampered body, wrong secret, missing signature/event id → 400, nothing stored; app headers not needed | ✅ P3-TC-35 |
+| No duplicate financial transactions: event-id idempotency (also 6× parallel), one capture per payment, one refund per capture, verify/cancel race | ✅ P3-TC-36/50/52/53 |
+| The amount always comes from the server: a wrong-amount capture never places the order (it is refunded) | ✅ P3-TC-37 |
+| Money/stock tamper: the client total is only a guard (PRICE_CHANGED); quantities bounded by max qty and stock | ✅ P3-TC-05/24 |
+| Abuse limits: 30/h placement → 429 RATE_LIMITED with Retry-After | ✅ P3-TC-46 |
+| Malformed webhook input | ❌ [BUG-0009](../bugs/BUG-0009.md) (P3 Low): over-long ids → 500. Needs the webhook secret, so it is not exploitable; it is a robustness issue only. |
+| PII in logs (all P3 instance logs) | ✅ 0 unmasked `+91` numbers, 0 JWTs. Every 500 in the logs is a BUG-0009 probe. |
+| Fake gateway refused outside local/test (payments.E001) | ⏭ Covered by the backend suite; re-check with staging settings after R2b |
+| Admin P3 role matrix (DL-46) | ⏭ T-304 |
+
+## Phase 3 stage 2 (2026-11-04, `f84482f`)
+- **Admin role matrix (P3-TC-59):** 49/49 page checks are server-side 403/200 as expected. A view-only role's change POST is 403. The order add, change and delete paths are closed for every role, including Super Admin (state changes only through the order services).
+- **PII (P3-TC-60b):** no full QA phone number appears for Store Manager, Store Staff or Finance on the order list, the order detail (address snapshot included) or phone search.
+- **BUG-0009 verified:** malformed webhook ids → `ignored`, and the stage-2 instance log has 0 responses with status 500.
+- **SMS safety:** the QA instance ran with the console SMS backend (no Twilio).
+
+## Phase 3 refund re-check (2026-11-04, `9ed7ffc`, T-310)
+- **Duplicate financial transactions:** none. In SQL over the whole shared DB (P4-TC-44 🔥), no payment is refunded above its capture, refund ids and keys are unique, and every PROCESSED refund has a gateway id. The webhook-before-task race produces one refund (P3-TC-65/66).
+- **Webhook abuse:** signed refund events for an unrelated payment, or with another payment's receipt, are `ignored` and never matched across payments (P3-TC-67). The 503 retry path is bounded by the window (P3-TC-69), so a signed event cannot keep the gateway retrying forever.
+- **No new security bugs.**
+
+## Phase 4 stage 1 (2026-11-04, `1b3552d`)
+- **IDOR:** cancel (PAYMENT_PENDING and PLACED), reorder and invoice of another user's order → 404; A's order and reservation unchanged (TC-07, TC-14) ✅. No token → 401 ✅.
+- **Role matrix (05 §3), service level:** process denied to Catalog/Support/Finance; cancel denied to Store Staff/Catalog/Finance; manual refund denied to Ops/Store Manager/Store Staff/Catalog; Support refund limit enforced server-side ✅. Console pages, CSRF (TC-42) and cross-store scoping (TC-30: only GGN-01 exists) ⏭.
+- **Audit (TC-41):** one row per action with the acting staff user; `changes` holds no phone, address or free-text note (note length only) ✅.
+- **Customer reasons:** staff reasons, empty/null/number and a 251-character note → 400 ✅.
+- No new security bug; nothing written to `qa/private/` for P4.
+
+## Phase 4 stage 2 (2026-11-04, `f744508`)
+- **05 §3 pages × 7 roles** match the matrix exactly: live board (Super, Ops, SM, Support), packing console (Super, Ops, SM own, SS own), audit log (Super, Finance), refunds (Super, Support, Finance) ✅.
+- **Server-side POSTs:** accept by Catalog/Support/Finance 403; cancel by Store Staff 403 (console and board); accepting switch by Store Staff 403 with GGN-01 unchanged; Support may cancel (cancelled_by ops) ✅.
+- **Store scoping (TC-30, QA-02):** GGN-01's Store Manager/Staff get 404 for QA-02's console, queues, every step, "Can't supply", board cancel and the order's admin page; the order never appears on their board or queue; Ops sees it with the store filter ✅.
+- **CSRF (TC-42):** POST without the token 403 and nothing changes; GET on action URLs 405 ✅.
+- **PII (TC-43):** full phone for Super/Ops/Support on the customer page; SM/SS cannot open Customers and see no phone on the order detail; no phone on the board, queues or slip ✅.
+- **Audit log:** read-only (no add, no save, no delete) ✅.

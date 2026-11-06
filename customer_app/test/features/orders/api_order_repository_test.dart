@@ -136,7 +136,7 @@ void main() {
       '/api/v1/orders/5012/retry-payment/' => contractExample(
         'orders_retry_payment/200/Retry',
       ),
-      _ => contractExample('orders_cancel/200/Cancelled'),
+      _ => contractExample('orders_cancel/200/CancelledBeforePaying(T5)'),
     };
     final paid = await repository.verifyPayment(
       const PaymentProof(

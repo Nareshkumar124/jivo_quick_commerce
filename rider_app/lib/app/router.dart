@@ -10,8 +10,15 @@ import '../features/auth/presentation/rider_account_controller.dart';
 import '../features/cash/presentation/cash_screen.dart';
 import '../features/earnings/presentation/earnings_screen.dart';
 import '../features/earnings/presentation/payouts_screen.dart';
+import '../features/history/presentation/history_detail_screen.dart';
 import '../features/history/presentation/history_screen.dart';
+import '../features/notifications/presentation/inbox_screen.dart';
 import '../features/launch/presentation/launch_controller.dart';
+import '../features/legal/presentation/legal_page_screen.dart';
+import '../features/rating/presentation/my_rating_screen.dart';
+import '../features/support/domain/support_models.dart';
+import '../features/support/presentation/help_screen.dart';
+import '../features/support/presentation/ticket_screens.dart';
 import '../features/launch/presentation/maintenance_screen.dart';
 import '../features/launch/presentation/splash_screen.dart';
 import '../features/launch/presentation/update_screen.dart';
@@ -193,6 +200,63 @@ final routerProvider = Provider<GoRouter>((ref) {
           path: Routes.history,
           name: 'history',
           builder: (_, _) => const HistoryScreen(),
+          routes: [
+            GoRoute(
+              path: ':taskId',
+              name: 'history-detail',
+              builder: (_, state) => HistoryDetailScreen(
+                taskId: int.tryParse(state.pathParameters['taskId']!) ?? 0,
+              ),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: Routes.inbox,
+          name: 'inbox',
+          builder: (_, _) => const InboxScreen(),
+        ),
+        GoRoute(
+          path: Routes.help,
+          name: 'help',
+          builder: (_, _) => const HelpScreen(),
+          routes: [
+            GoRoute(
+              path: 'tickets',
+              name: 'tickets',
+              builder: (_, _) => const TicketsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'new',
+                  name: 'new_ticket',
+                  builder: (_, state) => NewTicketScreen(
+                    topic: RiderTicketTopic.fromCode(
+                      state.uri.queryParameters['topic'],
+                    ),
+                    reference: state.uri.queryParameters['ref'],
+                  ),
+                ),
+                GoRoute(
+                  path: ':ticketId',
+                  name: 'ticket',
+                  builder: (_, state) => TicketThreadScreen(
+                    ticketId:
+                        int.tryParse(state.pathParameters['ticketId']!) ?? 0,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        GoRoute(
+          path: Routes.rating,
+          name: 'rating',
+          builder: (_, _) => const MyRatingScreen(),
+        ),
+        GoRoute(
+          path: '/legal/:slug',
+          name: 'legal',
+          builder: (_, state) =>
+              LegalPageScreen(slug: state.pathParameters['slug']!),
         ),
         GoRoute(
           path: Routes.profile,
@@ -202,7 +266,23 @@ final routerProvider = Provider<GoRouter>((ref) {
             GoRoute(
               path: 'documents',
               name: 'profile_documents',
-              builder: (_, _) => const DocumentsScreen(readOnly: true),
+              builder: (_, _) => const DocumentsScreen(fromProfile: true),
+              routes: [
+                GoRoute(
+                  path: ':type',
+                  name: 'profile_document_capture',
+                  redirect: (_, state) => _documentType(state) == null
+                      ? Routes.profileDocuments
+                      : null,
+                  builder: (_, state) => DocumentCaptureScreen(
+                    type: _documentType(state)!,
+                    fromProfile: true,
+                    recovered: state.extra is PickedImage
+                        ? state.extra! as PickedImage
+                        : null,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -229,18 +309,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      // The go-online guard (04 §2.1): every flavor.
+      GoRoute(
+        path: Routes.permissions,
+        name: 'permissions',
+        builder: (_, _) => const PermissionsGateScreen(),
+        routes: [
+          GoRoute(
+            path: 'disclosure',
+            name: 'disclosure',
+            builder: (_, _) => const LocationDisclosureScreen(),
+          ),
+        ],
+      ),
       // The Phase 0 spike screens exist in the dev flavor only.
       if (env.showDevTools) ...[
-        GoRoute(
-          path: Routes.permissions,
-          builder: (_, _) => const PermissionsGateScreen(),
-          routes: [
-            GoRoute(
-              path: 'disclosure',
-              builder: (_, _) => const LocationDisclosureScreen(),
-            ),
-          ],
-        ),
         GoRoute(
           path: Routes.locationDebug,
           builder: (_, _) => const LocationDebugScreen(),

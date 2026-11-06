@@ -22,13 +22,22 @@ enum OemBrand { xiaomi, oppo, vivo, realme, oneplus }
 
 @immutable
 class GateItem {
-  const GateItem(this.step, {required this.done, this.blocked = false});
+  const GateItem(
+    this.step, {
+    required this.done,
+    this.blocked = false,
+    this.approximate = false,
+  });
 
   final GateStep step;
   final bool done;
 
   /// Only the system settings page can fix this step (permanently denied).
   final bool blocked;
+
+  /// [GateStep.locationWhenInUse] only: location is granted, but as
+  /// "Approximate". Asking again shows Android's "change to precise" dialog.
+  final bool approximate;
 }
 
 @immutable
@@ -77,9 +86,10 @@ abstract final class PermissionGate {
     PermissionSnapshot s, {
     required bool disclosureAccepted,
   }) {
-    final whenInUse = s.locationWhenInUse == Grant.granted;
+    final granted = s.locationWhenInUse == Grant.granted;
+    final whenInUse = granted && s.locationPrecise;
     final always = s.sdkInt < backgroundLocationSdk
-        ? whenInUse
+        ? granted
         : s.locationAlways == Grant.granted;
     final notifications =
         s.sdkInt < notificationPermissionSdk ||
@@ -94,6 +104,7 @@ abstract final class PermissionGate {
           GateStep.locationWhenInUse,
           done: whenInUse,
           blocked: s.locationWhenInUse == Grant.blocked,
+          approximate: granted && !s.locationPrecise,
         ),
         GateItem(
           GateStep.locationAlways,

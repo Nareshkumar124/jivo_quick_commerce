@@ -35,6 +35,7 @@ from apps.core.schema import (
     request_examples,
     validation_error,
 )
+from apps.core.throttling import CouponApplyThrottle
 from apps.promotions import examples as promo
 from apps.promotions.serializers import CouponListSerializer
 from apps.stores.context import get_store
@@ -327,6 +328,12 @@ class CartCouponListView(APIView):
 
 class CartCouponView(APIView):
     http_method_names = ["post", "delete", "options"]
+
+    def get_throttles(self):
+        # T-814 (H3): applying a code is limited (no guessing); removing one is not.
+        if self.request.method == "POST":
+            return [CouponApplyThrottle()]
+        return super().get_throttles()
 
     @extend_schema(
         operation_id="cart_coupon_apply",

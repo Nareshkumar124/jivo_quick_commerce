@@ -39,6 +39,7 @@ from apps.core.schema import (
     error_example,
     validation_error,
 )
+from apps.core.throttling import SearchThrottle
 from apps.stores.context import get_store
 from apps.stores.schema import STORE_ID_PARAMETER, store_responses
 from apps.stores.services import store_status
@@ -250,6 +251,8 @@ class ProductDetailView(_PublicStoreView):
 
 
 class SearchView(_PublicStoreView):
+    throttle_classes = [SearchThrottle]  # T-814 (H3)
+
     @extend_schema(
         operation_id="search_products",
         tags=TAGS,
@@ -295,6 +298,8 @@ class SearchView(_PublicStoreView):
 
 
 class SearchSuggestView(_PublicStoreView):
+    throttle_classes = [SearchThrottle]  # T-814 (H3)
+
     @extend_schema(
         operation_id="search_suggest",
         tags=TAGS,

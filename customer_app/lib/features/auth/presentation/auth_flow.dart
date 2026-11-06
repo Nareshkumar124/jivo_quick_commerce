@@ -7,6 +7,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/launch_state.dart';
 import '../../../app/providers.dart';
 import '../../../app/repositories.dart';
+import '../../notifications/presentation/push_registration.dart';
 import '../../../shared/validation/validators.dart';
 import '../domain/auth_models.dart';
 
@@ -163,12 +164,24 @@ final logoutProvider = Provider<Future<void> Function()>((ref) {
     final repository = ref.read(authRepositoryProvider);
     const timeout = Duration(seconds: 10);
     final sent = session.refreshToken;
+    // This device's push token, so the server stops pushing to it.
+    final messaging = ref.read(pushMessagingProvider);
+    String? fcmToken;
+    if (messaging.isConfigured) {
+      try {
+        fcmToken = await messaging.getToken().timeout(timeout);
+      } catch (_) {
+        // Logout goes ahead without it.
+      }
+    }
     if (sent != null) {
       try {
-        await repository.logout(sent).timeout(timeout);
+        await repository.logout(sent, fcmToken: fcmToken).timeout(timeout);
         final rotated = session.refreshToken;
         if (rotated != null && rotated != sent) {
-          await repository.logout(rotated).timeout(timeout);
+          await repository
+              .logout(rotated, fcmToken: fcmToken)
+              .timeout(timeout);
         }
       } catch (_) {
         // Best effort: the user is signed out locally regardless.

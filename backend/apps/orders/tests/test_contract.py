@@ -29,6 +29,8 @@ def test_routes():
     assert reverse("order-detail", args=[5012]) == "/api/v1/orders/5012/"
     assert reverse("order-retry-payment", args=[5012]) == "/api/v1/orders/5012/retry-payment/"
     assert reverse("order-cancel", args=[5012]) == "/api/v1/orders/5012/cancel/"
+    assert reverse("order-reorder", args=[5012]) == "/api/v1/orders/5012/reorder/"
+    assert reverse("order-invoice", args=[5012]) == "/api/v1/orders/5012/invoice/"
 
 
 def test_active_and_terminal_statuses():
@@ -209,7 +211,8 @@ class TestOrderExamples:
         assert order["can_retry_payment"] is pending
         assert (order["placed_at"] is None) is (order["status"] in {"PAYMENT_PENDING", "CANCELLED"})
         assert (order["eta_at"] is not None) is (order["status"] == "PLACED")
-        assert order["can_cancel"] is (order["status"] == "PAYMENT_PENDING")  # Phase 3
+        # 08 §7 (Phase 4): PAYMENT_PENDING, PLACED and ACCEPTED
+        assert order["can_cancel"] is (order["status"] in {"PAYMENT_PENDING", "PLACED"})
         if pending:
             assert at(order["payment_expires_at"]) - at(order["created_at"]) == PAYMENT_WINDOW
             assert order["payment_status"] == "PENDING"
@@ -316,3 +319,73 @@ def test_pending_order_conflict_is_documented():
         ("/api/v1/payments/razorpay/verify/", "post"),
     ]:
         assert "429" in schema["paths"][path][method]["responses"], path
+
+
+# --------------------------------------------------------------------------- Phase 4 (R1)
+
+
+@pytest.mark.parametrize("order", ex.PHASE4_ORDERS, ids=lambda o: o["status"])
+class TestPhase4OrderExamples:
+    """P4 R1 contract: consistent money, lines and states in the new examples."""
+
+    def test_lines_match_the_bill(self, order):
+        mrp = sum(Decimal(line["line_mrp_total"]) for line in order["items"])
+        total = sum(Decimal(line["line_total"]) for line in order["items"])
+        assert f"{mrp:.2f}" == order["bill"]["mrp_total"]
+        assert f"{total:.2f}" == order["bill"]["item_total"]
+        for line in order["items"]:
+            coming = line["quantity"] - line["quantity_unavailable"]
+            assert Decimal(line["line_total"]) == Decimal(line["selling_price"]) * coming
+        assert order["item_count"] == sum(
+            line["quantity"] - line["quantity_unavailable"] for line in order["items"]
+        )
+
+    def test_bill_formula(self, order):
+        """08 §6.2 on every example bill."""
+        bill = {k: Decimal(v) for k, v in order["bill"].items()}
+        assert bill["grand_total"] == (
+            bill["item_total"]
+            - bill["coupon_discount"]
+            + bill["delivery_fee"]
+            + bill["small_cart_fee"]
+            + bill["handling_fee"]
+            + bill["tip"]
+        )
+        assert bill["product_discount"] == bill["mrp_total"] - bill["item_total"]
+        assert bill["total_savings"] == bill["product_discount"] + bill["coupon_discount"]
+
+    def test_states(self, order):
+        statuses = [step["status"] for step in order["timeline"]]
+        assert statuses[-1] == order["status"]
+        assert (order["cancellation"] is not None) is (order["status"] == "CANCELLED")
+        assert order["can_cancel"] is (order["status"] in {"PLACED", "ACCEPTED"})
+        assert order["can_download_invoice"] is (order["status"] == "DELIVERED")
+        processed = sum(
+            Decimal(r["amount"]) for r in order["refunds"] if r["status"] == "PROCESSED"
+        )
+        assert f"{processed:.2f}" == order["amount_refunded"]
+
+
+def test_partial_refund_is_the_bill_difference():
+    """08 §6.3: ONLINE refund = old grand_total - new grand_total."""
+    old = Decimal(ex.ORDER_ACCEPTED["bill"]["grand_total"])
+    new = Decimal(ex.ORDER_ITEM_UNAVAILABLE["bill"]["grand_total"])
+    assert ex.ORDER_ITEM_UNAVAILABLE["refunds"][0]["amount"] == f"{old - new:.2f}"
+    assert ex.ORDER_CANCELLED_REFUNDED["refunds"][0]["amount"] == f"{old:.2f}"
+
+
+@pytest.mark.django_db
+class TestPhase4Access:
+    @pytest.mark.parametrize(
+        ("method", "path"),
+        [("post", "/api/v1/orders/5012/reorder/"), ("get", "/api/v1/orders/5012/invoice/")],
+    )
+    def test_authentication_required(self, api_client, method, path):
+        response = getattr(api_client, method)(path)
+        assert response.status_code == 401
+
+    def test_reorder_needs_the_store_header(self, auth_client):
+        assert auth_client.post("/api/v1/orders/5012/reorder/").status_code == 400
+
+    def test_unknown_order(self, auth_client):
+        assert auth_client.get("/api/v1/orders/999999/invoice/").status_code == 404

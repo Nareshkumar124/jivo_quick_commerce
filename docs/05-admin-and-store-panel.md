@@ -85,10 +85,10 @@ Implemented with Django Groups + model permissions + **store scoping**. Store st
 | Live order board | ✔ | ✔ all | ✔ own | | | ✔ view | |
 | Packing console | ✔ | ✔ | ✔ own | ✔ own | | | |
 | Cancel order | ✔ | ✔ | ✔ own (before pickup) | | | ✔ (before pickup) | |
-| Refund | ✔ | | | | | ✔ up to ₹500 | ✔ |
+| Refund | ✔ | | | | | ✔ up to ₹500 per order, ₹5,000 per day (DL-59) | ✔ |
 | Rider approval / suspend | ✔ | ✔ | view own | | | | |
 | Manual dispatch | ✔ | ✔ | ✔ own | | | | |
-| Cash deposit entry | ✔ | | ✔ own | | | | view |
+| Cash deposit entry | ✔ | ✔ | ✔ own | | | | ✔ |
 | Payouts | ✔ | | | | | | ✔ |
 | Coupons | ✔ | | | | ✔ | view | view |
 | Customers (PII) | ✔ | ✔ | limited (name, masked phone on orders) | limited | | ✔ | |
@@ -102,9 +102,19 @@ Phase 2 store scoping (P2 R3, code review #2): `apps.stores.services.stores_for(
 
 Customer moderation (P2 R3): the Customers admin blocks and unblocks through `apps.accounts.services.customers.block_customer(user_id, by=)` / `unblock_customer(user_id, by=)`. Block deactivates the account, revokes every refresh token and deactivates push devices. Both refuse staff and anonymised accounts, return whether anything changed, and record the actor as an admin log entry (no personal data in it; scrubbed again on anonymisation) until the full audit log (P4–P8). "Anonymise now" needs `accounts.anonymise_customer`, which only Super Admin holds (DL-35). Stores: pausing or resuming orders goes through `apps.stores.services.set_accepting_orders(store, accepting, actor=)` (atomic, actor in the admin log, caches refreshed).
 
+Phase 5 slice 5.4 permissions (`apps.accounts.roles`; services re-check them and the store scope; all audited):
+- **Cash deposit entry (DL-61 a):** `delivery.record_cash_deposit` and `delivery.view_ridercashledger` (the ledger and the day-end report) for Super Admin, Ops, Finance and Store Manager (riders whose home store is theirs). Support has none. Cash **adjustments** (`delivery.adjust_cash`) are Super Admin only (⚠ PM default: no row above).
+- **Payouts:** `delivery.manage_payouts` (create, mark paid, void, incentives and penalties) plus views of payouts, earning lines and earning rules for Finance; Super Admin has all. Earning rules are changed by Super Admin only, Finance views them (⚠ PM default, like pricing config).
+- **Ops delivery actions (DL-61 a):** force offline, set cash limit, unlock pickup, unlock delivery OTP, retry / manual assign / unassign dispatch, ops-verified delivery, ops-marked delivery failure (T13) and receive return (T14): `delivery.dispatch_order`, i.e. the "Manual dispatch" row (Super Admin, Ops, Store Manager own stores). Support, Store Staff and Finance have none. Ops cannot override the COD cash limit.
+- **COD block lift (DL-61 d):** `delivery.lift_cod_block` (Super Admin, Ops) via `delivery.services.ops.lift_cod_block`.
+
 Phase 3 permissions (R2a, PM default ⚠ until the Phase 4 order and refund screens refine them; `apps.accounts.roles`): Super Admin has every cart, coupon, order and payment permission. Catalog Manager manages coupons and views redemptions (05 §3 Coupons ✔). Support and Finance view coupons and redemptions, orders and payments/refunds (Finance also webhook events). Ops, Store Manager and Store Staff view orders (live board, packing console; store roles scoped with `stores_for`). Nobody but Super Admin may change orders through model permissions: order state changes go through `orders.services.transition()`.
 
+Phase 4 permissions and services (R2, `apps.accounts.roles`; ⚠ PM default, T-407c): custom permissions `orders.process_order` (packing console: Super Admin, Ops, Store Manager, Store Staff), `orders.cancel_order` (T12: Super Admin, Ops, Store Manager, Support), `payments.issue_refund` (Super Admin, Finance, Support up to `SUPPORT_REFUND_LIMIT` ₹500 **in total per order** and `SUPPORT_REFUND_DAILY_LIMIT` ₹5,000 per agent per IST day, DL-59/T-814; an ops alert `payment.refund_volume_high` fires when one staff member issues more than `REFUND_VOLUME_ALERT_PER_HOUR` refunds in an hour) and `core.view_auditlog` (Super Admin, Finance view). Store roles stay scoped by `stores_for`. The screens call `apps.orders.store_ops` (accept, start packing, item unavailable, packed, cancel) and `apps.payments.order_refunds` (`manual_refund`, `retry_refund`), which re-check the permission and scope and write `core.AuditLog`. COD blocking is `apps.accounts.services.customers.set_cod_blocked(user_id, blocked, *, by)` (T-405c). `PricingConfig.clean()` bounds fees and thresholds (T-406c).
+
 Import/export (P2 R3): CSV and Excel (`.xlsx`) only (`apps.core.export_formats`). On export, any text cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading apostrophe, so a spreadsheet shows it as text and never runs it as a formula (CSV/formula injection); plain numbers are unchanged. The import preview is kept in Redis between the preview and confirm requests (`IMPORT_EXPORT_TMP_STORAGE_CLASS`), so it works across web processes.
+
+Phase 7 permissions (T-711, ⚠ PM default): `support.handle_ticket` plus view on tickets and messages for Super Admin, Ops and Support (the "Support tickets" row). The admin calls `apps.support.services` (`staff_reply`, `change_status`, `assign`, `set_priority`), which re-check the permission; support is not store scoped. FAQs belong to the Support module, so Support also adds/changes/deletes FAQs; CMS pages stay Super Admin only.
 
 Phase 1 implementation: the seven roles are Django Groups (`Super Admin`, `Ops / Dispatch`, `Store Manager`, `Store Staff`, `Catalog Manager`, `Support`, `Finance`), synced idempotently after every `migrate` (`apps.accounts.roles.sync_roles`). Each phase adds the permissions for its models. Store scoping (`StaffStoreAccess`) arrives in Phase 2 with stores. In Phase 1, Super Admin manages staff users, roles and app config; Ops and Support can view customers and block/unblock them (Customers admin, a proxy model so they cannot edit staff accounts).
 

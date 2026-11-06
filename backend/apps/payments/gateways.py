@@ -32,6 +32,8 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.module_loading import import_string
 
+from apps.core.http import open_no_redirect
+
 DEPLOYED_ENVIRONMENTS = frozenset({"staging", "production"})
 RAZORPAY_API_BASE = "https://api.razorpay.com/v1"
 # Orders API per-order capture settings (they override the Dashboard's): capture automatically;
@@ -72,7 +74,9 @@ class PaymentGatewayRejected(PaymentGatewayError):
     @property
     def already_done(self) -> bool:
         """The refund was made before (a repeated receipt) or the payment is fully refunded:
-        look the refund up instead of failing (code review M1)."""
+        look the refund up instead of failing. A fallback only: the task's lookup before the POST
+        is the guard, and Razorpay refusing a repeated refund receipt is assumed from its docs
+        (confirm in Razorpay test mode)."""
         text = self.description.lower()
         return "duplicate receipt" in text or "refunded already" in text
 
@@ -108,9 +112,21 @@ class GatewayRefund:
     receipt: str = ""
 
 
+@dataclass(frozen=True)
+class GatewayQr:
+    """A UPI QR code at the gateway (Razorpay QR Codes: single use, fixed amount), for a COD
+    order's amount due (06 §3 `cod-qr`)."""
+
+    id: str  # e.g. "qr_Nq7aB2cD3eF4gH"
+    image_url: str  # https PNG
+    amount_paise: int
+    status: str  # Razorpay: active / closed
+
+
 def refund_receipt(key: str) -> str:
-    """The refund `receipt`, which Razorpay treats as the refund's idempotency key (a repeat is
-    refused with "Duplicate receipt found"). At most 40 characters."""
+    """The refund `receipt` (at most 40 characters): how `process_refund` recognises its own
+    refund among the payment's refunds at the gateway. Razorpay's docs also say a repeated
+    refund receipt is refused ("Duplicate receipt"); assumed, confirm in Razorpay test mode."""
     return key if len(key) <= 40 else "rk_" + hashlib.sha256(key.encode()).hexdigest()[:37]
 
 
@@ -160,12 +176,32 @@ class PaymentGateway(ABC):
     def refund(
         self, *, payment_id: str, amount_paise: int, notes: dict, receipt: str
     ) -> GatewayRefund:
-        """Refund to the original payment (08 §4 rule 4; T3a late captures). `receipt` is the
-        refund's idempotency key at the gateway (`refund_receipt()`)."""
+        """Refund to the original payment (08 §4 rule 4; T3a late captures). `receipt` identifies
+        the refund at the gateway (`refund_receipt()`)."""
 
     @abstractmethod
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
         """Every refund of a payment, to find one made before (a repeated receipt)."""
+
+    @property
+    def qr_available(self) -> bool:
+        """True when this gateway can make UPI QR codes now (keys configured)."""
+        return True
+
+    @abstractmethod
+    def create_qr_code(
+        self, *, amount_paise: int, close_by: int, description: str, notes: dict
+    ) -> GatewayQr:
+        """A single-use UPI QR for exactly `amount_paise` (from the server-side order), closing
+        by `close_by` (Unix seconds)."""
+
+    @abstractmethod
+    def close_qr_code(self, qr_id: str) -> None:
+        """Close a QR so it takes no more payments. Closing a closed QR is not an error."""
+
+    @abstractmethod
+    def fetch_qr_payments(self, qr_id: str) -> list[GatewayPayment]:
+        """Payments made on a QR (missed-webhook lookup before refusing a UPI delivery)."""
 
     @abstractmethod
     def _key_secret(self) -> str: ...
@@ -182,6 +218,12 @@ class PaymentGateway(ABC):
         """True when `X-Razorpay-Signature` matches the raw body."""
         expected = razorpay_webhook_signature(self._webhook_secret(), body)
         return _matches(expected, signature)
+
+
+def _open(request: urllib.request.Request, timeout: float):
+    """T-814 (L2): never follows a redirect, so the key secret only ever goes to Razorpay (a 3xx
+    surfaces as an HTTPError and becomes `GatewayUnavailable`). Patched in tests."""
+    return open_no_redirect(request, timeout)
 
 
 class RazorpayGateway(PaymentGateway):
@@ -214,9 +256,7 @@ class RazorpayGateway(PaymentGateway):
             headers={"Authorization": f"Basic {token}", "Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(  # noqa: S310 - fixed https base URL
-                request, timeout=settings.RAZORPAY_TIMEOUT_SECONDS
-            ) as response:
+            with _open(request, settings.RAZORPAY_TIMEOUT_SECONDS) as response:
                 return json.loads(response.read() or b"{}")
         except urllib.error.HTTPError as exc:
             message = f"Razorpay {method} {path}: HTTP {exc.code}"
@@ -273,8 +313,62 @@ class RazorpayGateway(PaymentGateway):
         )
         return _gateway_refund(data, payment_id)
 
+    @property
+    def qr_available(self) -> bool:
+        return all(
+            getattr(settings, name, "")
+            for name in ("RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET", "RAZORPAY_WEBHOOK_SECRET")
+        )
+
+    def create_qr_code(
+        self, *, amount_paise: int, close_by: int, description: str, notes: dict
+    ) -> GatewayQr:
+        data = self._call(
+            "POST",
+            "/payments/qr_codes",
+            {
+                "type": "upi_qr",
+                "name": "Jivo",
+                "usage": "single_use",
+                "fixed_amount": True,
+                "payment_amount": amount_paise,
+                "description": description[:100],
+                "close_by": close_by,
+                "notes": notes,
+            },
+        )
+        return GatewayQr(
+            id=data["id"],
+            image_url=data["image_url"],
+            amount_paise=int(data.get("payment_amount") or amount_paise),
+            status=data.get("status", "active"),
+        )
+
+    def close_qr_code(self, qr_id: str) -> None:
+        try:
+            self._call("POST", f"/payments/qr_codes/{urllib.parse.quote(qr_id)}/close")
+        except PaymentGatewayRejected as exc:
+            # Razorpay refuses to close a QR that is already closed (paid or expired).
+            if "closed" not in exc.description.lower():
+                raise
+
+    def fetch_qr_payments(self, qr_id: str) -> list[GatewayPayment]:
+        data = self._call("GET", f"/payments/qr_codes/{urllib.parse.quote(qr_id)}/payments")
+        return [
+            GatewayPayment(
+                id=item["id"],
+                order_id="",
+                amount_paise=item["amount"],
+                status=item["status"],
+                method=item.get("method") or "",
+                raw=item,
+            )
+            for item in data.get("items", [])
+        ]
+
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
-        data = self._call("GET", f"/payments/{urllib.parse.quote(payment_id)}/refunds")
+        # Razorpay pages 10 by default; 100 is its maximum per request.
+        data = self._call("GET", f"/payments/{urllib.parse.quote(payment_id)}/refunds?count=100")
         return [_gateway_refund(item, payment_id) for item in data.get("items", [])]
 
 
@@ -328,7 +422,21 @@ class FakeRazorpayGateway(PaymentGateway):
     def _webhook_secret(self) -> str:
         return FAKE_WEBHOOK_SECRET
 
+    @staticmethod
+    def _check_up() -> None:
+        """`FAKE_GATEWAY_DOWN` (local development only, P3-TC-63): every gateway call fails as
+        if Razorpay could not be reached, so the "payment unavailable" paths can be tried."""
+        if getattr(settings, "FAKE_GATEWAY_DOWN", False):
+            raise GatewayUnavailable("Fake gateway is down (FAKE_GATEWAY_DOWN).")
+
+    def verify_payment_signature(self, *, order_id: str, payment_id: str, signature: str) -> bool:
+        self._check_up()
+        return super().verify_payment_signature(
+            order_id=order_id, payment_id=payment_id, signature=signature
+        )
+
     def create_order(self, *, amount_paise: int, receipt: str, notes: dict) -> GatewayOrder:
+        self._check_up()
         return GatewayOrder(
             id=_fake_id("order_"), amount_paise=amount_paise, currency="INR", receipt=receipt
         )
@@ -337,6 +445,8 @@ class FakeRazorpayGateway(PaymentGateway):
         """The fake has no payment service: it reports the captures the server itself learnt
         (through verify or a signed webhook). A dev payment never verified is never captured."""
         from apps.payments.models import Payment, PaymentAttemptStatus
+
+        self._check_up()
 
         return [
             GatewayPayment(
@@ -351,11 +461,47 @@ class FakeRazorpayGateway(PaymentGateway):
             ).exclude(gateway_payment_id=None)
         ]
 
+    def create_qr_code(
+        self, *, amount_paise: int, close_by: int, description: str, notes: dict
+    ) -> GatewayQr:
+        """A QR id and a placeholder image URL (the fake draws no QR; local development pays it
+        with `manage.py fake_cod_qr_payment`, which posts a signed `qr_code.credited` event)."""
+        self._check_up()
+        qr_id = _fake_id("qr_")
+        return GatewayQr(
+            id=qr_id,
+            image_url=f"https://fake-razorpay.invalid/qr/{qr_id}.png",
+            amount_paise=amount_paise,
+            status="active",
+        )
+
+    def close_qr_code(self, qr_id: str) -> None:
+        self._check_up()
+
+    def fetch_qr_payments(self, qr_id: str) -> list[GatewayPayment]:
+        """The QR payments the server itself learnt (signed webhooks); the fake keeps no state."""
+        from apps.payments.models import Payment, PaymentAttemptStatus
+
+        self._check_up()
+        return [
+            GatewayPayment(
+                id=payment.gateway_payment_id,
+                order_id="",
+                amount_paise=to_paise(payment.amount),
+                status="captured",
+                method=payment.method,
+            )
+            for payment in Payment.objects.filter(
+                gateway_order_id=qr_id, status=PaymentAttemptStatus.CAPTURED
+            ).exclude(gateway_payment_id=None)
+        ]
+
     def refund(
         self, *, payment_id: str, amount_paise: int, notes: dict, receipt: str
     ) -> GatewayRefund:
         """Processed at once. Idempotent on `receipt` like Razorpay: the same receipt always
         gives the same refund id."""
+        self._check_up()
         digest = hashlib.sha256(f"{payment_id}|{receipt}".encode()).hexdigest()[:14]
         return GatewayRefund(
             id=f"rfnd_{digest}",
@@ -368,6 +514,8 @@ class FakeRazorpayGateway(PaymentGateway):
     def fetch_payment_refunds(self, payment_id: str) -> list[GatewayRefund]:
         """The refunds the server recorded for this payment (the fake keeps no state)."""
         from apps.payments.models import Refund
+
+        self._check_up()
 
         return [
             GatewayRefund(

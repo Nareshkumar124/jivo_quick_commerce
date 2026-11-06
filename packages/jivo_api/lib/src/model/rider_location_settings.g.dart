@@ -11,6 +11,12 @@ abstract class _$RiderLocationSettingsCWProxy {
 
   RiderLocationSettings idleIntervalSeconds(int idleIntervalSeconds);
 
+  RiderLocationSettings activeSampleSeconds(int activeSampleSeconds);
+
+  RiderLocationSettings idleSampleSeconds(int idleSampleSeconds);
+
+  RiderLocationSettings maxBatch(int maxBatch);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RiderLocationSettings(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -20,6 +26,9 @@ abstract class _$RiderLocationSettingsCWProxy {
   RiderLocationSettings call({
     int activeIntervalSeconds,
     int idleIntervalSeconds,
+    int activeSampleSeconds,
+    int idleSampleSeconds,
+    int maxBatch,
   });
 }
 
@@ -39,6 +48,17 @@ class _$RiderLocationSettingsCWProxyImpl
       this(idleIntervalSeconds: idleIntervalSeconds);
 
   @override
+  RiderLocationSettings activeSampleSeconds(int activeSampleSeconds) =>
+      this(activeSampleSeconds: activeSampleSeconds);
+
+  @override
+  RiderLocationSettings idleSampleSeconds(int idleSampleSeconds) =>
+      this(idleSampleSeconds: idleSampleSeconds);
+
+  @override
+  RiderLocationSettings maxBatch(int maxBatch) => this(maxBatch: maxBatch);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RiderLocationSettings(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -48,6 +68,9 @@ class _$RiderLocationSettingsCWProxyImpl
   RiderLocationSettings call({
     Object? activeIntervalSeconds = const $CopyWithPlaceholder(),
     Object? idleIntervalSeconds = const $CopyWithPlaceholder(),
+    Object? activeSampleSeconds = const $CopyWithPlaceholder(),
+    Object? idleSampleSeconds = const $CopyWithPlaceholder(),
+    Object? maxBatch = const $CopyWithPlaceholder(),
   }) {
     return RiderLocationSettings(
       activeIntervalSeconds:
@@ -59,6 +82,18 @@ class _$RiderLocationSettingsCWProxyImpl
           ? _value.idleIntervalSeconds
           // ignore: cast_nullable_to_non_nullable
           : idleIntervalSeconds as int,
+      activeSampleSeconds: activeSampleSeconds == const $CopyWithPlaceholder()
+          ? _value.activeSampleSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : activeSampleSeconds as int,
+      idleSampleSeconds: idleSampleSeconds == const $CopyWithPlaceholder()
+          ? _value.idleSampleSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : idleSampleSeconds as int,
+      maxBatch: maxBatch == const $CopyWithPlaceholder()
+          ? _value.maxBatch
+          // ignore: cast_nullable_to_non_nullable
+          : maxBatch as int,
     );
   }
 }
@@ -82,7 +117,13 @@ RiderLocationSettings _$RiderLocationSettingsFromJson(
   ($checkedConvert) {
     $checkKeys(
       json,
-      requiredKeys: const ['active_interval_seconds', 'idle_interval_seconds'],
+      requiredKeys: const [
+        'active_interval_seconds',
+        'idle_interval_seconds',
+        'active_sample_seconds',
+        'idle_sample_seconds',
+        'max_batch',
+      ],
     );
     final val = RiderLocationSettings(
       activeIntervalSeconds: $checkedConvert(
@@ -93,12 +134,24 @@ RiderLocationSettings _$RiderLocationSettingsFromJson(
         'idle_interval_seconds',
         (v) => (v as num).toInt(),
       ),
+      activeSampleSeconds: $checkedConvert(
+        'active_sample_seconds',
+        (v) => (v as num).toInt(),
+      ),
+      idleSampleSeconds: $checkedConvert(
+        'idle_sample_seconds',
+        (v) => (v as num).toInt(),
+      ),
+      maxBatch: $checkedConvert('max_batch', (v) => (v as num).toInt()),
     );
     return val;
   },
   fieldKeyMap: const {
     'activeIntervalSeconds': 'active_interval_seconds',
     'idleIntervalSeconds': 'idle_interval_seconds',
+    'activeSampleSeconds': 'active_sample_seconds',
+    'idleSampleSeconds': 'idle_sample_seconds',
+    'maxBatch': 'max_batch',
   },
 );
 
@@ -107,4 +160,7 @@ Map<String, dynamic> _$RiderLocationSettingsToJson(
 ) => <String, dynamic>{
   'active_interval_seconds': instance.activeIntervalSeconds,
   'idle_interval_seconds': instance.idleIntervalSeconds,
+  'active_sample_seconds': instance.activeSampleSeconds,
+  'idle_sample_seconds': instance.idleSampleSeconds,
+  'max_batch': instance.maxBatch,
 };

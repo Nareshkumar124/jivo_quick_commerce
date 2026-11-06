@@ -6,23 +6,43 @@
 - Webhook events: `payments.view_paymentwebhookevent` (Super Admin, Finance).
 - Nobody adds, changes or deletes rows here, superusers included: payments and refunds change
   only through the payment services (08 §4), and refunds are started from the order (Phase 4).
+- OBS-P4-01: the action bar carries a one-time token (`ops_console.once`) and its Run button
+  submits once, so a double submit never retries twice.
+- Phase 4 (T-401c): "Retry failed refund" calls `payments.order_refunds.retry_refund(refund_id,
+  by=)` (via `ops_console.order_actions`) once per selected refund. The service owns the rules
+  (role and scope, failed or stuck-pending refunds only, never twice, audit). Capability
+  `retry_refund` = `payments.issue_refund` (Super Admin, Finance, Support).
 - `Payment.raw` and `PaymentWebhookEvent.payload` are Razorpay entities holding the customer's
   contact, email, VPA and card details: never rendered. Only allow-listed scalar keys are shown
   (`ops_console.pii.gateway_fields`).
 """
 
-from django.contrib import admin
+from django import forms
+from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
 from django.db.models import BooleanField, Value
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 from unfold.admin import ModelAdmin
-from unfold.decorators import display
+from unfold.decorators import action, display
+from unfold.forms import ActionForm
 
-from apps.ops_console import status
+from apps.ops_console import capabilities, once, order_actions, status
 from apps.ops_console.money import inr
 from apps.ops_console.pii import can_view_full_phone, gateway_fields, person_label, webhook_entities
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin
 from apps.payments.models import Payment, PaymentWebhookEvent, Refund
+
+
+class RefundActionForm(ActionForm):
+    """The changelist action bar with a one-time token (OBS-P4-01): a resubmitted retry form is
+    refused before the refund service is called."""
+
+    once = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput,
+        initial=lambda: once.new_token(once.REFUND_RETRY),
+    )
 
 
 class OrderStoreFilter(ScopedStoreFilter):
@@ -193,6 +213,11 @@ class RefundAdmin(StoreScopedAdminMixin, ReadOnlyAdmin):
         "processed_at",
     )
     readonly_fields = fields
+    actions = ["retry_failed"]
+    action_form = RefundActionForm
+
+    class Media:
+        js = ("ops/js/submit_once.js",)  # the action bar's Run button submits once
 
     def get_queryset(self, request):
         return (
@@ -202,6 +227,46 @@ class RefundAdmin(StoreScopedAdminMixin, ReadOnlyAdmin):
                 full_pii=Value(can_view_full_phone(request.user), output_field=BooleanField())
             )
         )
+
+    # ---------------------------------------------------------------- retry (T-401c)
+
+    def get_actions(self, request):
+        # ReadOnlyAdmin drops every action; this one is a service call, not an edit.
+        actions = ModelAdmin.get_actions(self, request)
+        actions.pop("delete_selected", None)
+        return actions
+
+    def has_retry_permission(self, request) -> bool:
+        return capabilities.allowed(
+            request.user, capabilities.RETRY_REFUND
+        ) and order_actions.available(order_actions.RETRY_REFUND)
+
+    @action(description="Retry failed refund (send to the gateway again)", permissions=["retry"])
+    def retry_failed(self, request, queryset):
+        if not self.has_retry_permission(request):
+            raise PermissionDenied
+        if not once.consume(request.user, once.REFUND_RETRY, request.POST.get(once.FIELD)):
+            self.message_user(request, once.MSG_REUSED, messages.ERROR)
+            return
+        sent = 0
+        skipped: dict[str, int] = {}
+
+        def skip(reason: str) -> None:
+            skipped[reason] = skipped.get(reason, 0) + 1
+
+        # `queryset` is the changelist's, already scoped to the user's stores. The service
+        # checks the role, scope, state (failed, or stuck pending) and earlier retries under
+        # lock, and writes the audit entry; the panel only reports its answers.
+        for refund in queryset.order_by("pk"):
+            try:
+                order_actions.retry_refund(refund, actor=request.user)
+            except order_actions.ActionRefused as refusal:
+                skip(refusal.message)
+                continue
+            sent += 1
+        self.message_user(request, f"Sent {sent} refund(s) to the gateway again.", messages.SUCCESS)
+        for reason, count in skipped.items():
+            self.message_user(request, f"Skipped {count} refund(s): {reason}", messages.WARNING)
 
     @display(description="Order", ordering="order__order_number")
     def order_number(self, obj) -> str:

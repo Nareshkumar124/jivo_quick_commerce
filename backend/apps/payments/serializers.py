@@ -7,6 +7,7 @@ from apps.payments.choices import WebhookResult
 # Razorpay ids are a prefix plus (today) 14 letters and digits; a little slack is allowed.
 RAZORPAY_ORDER_ID_PATTERN = r"^order_[A-Za-z0-9]{10,40}$"
 RAZORPAY_PAYMENT_ID_PATTERN = r"^pay_[A-Za-z0-9]{10,40}$"
+RAZORPAY_QR_ID_PATTERN = r"^qr_[A-Za-z0-9]{10,40}$"
 SIGNATURE_PATTERN = r"^[0-9a-f]{64}$"
 
 

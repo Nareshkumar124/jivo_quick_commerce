@@ -282,6 +282,31 @@ void main() {
     expect(placeButton(tester).onPressed, isNotNull); // can try again
   });
 
+  testWidgets('online, gateway down (503): a clear message, the cart is '
+      'kept, and a retry succeeds', (tester) async {
+    final app = await appWithCart();
+    await openCheckout(tester, app);
+
+    app.cart.failNext = const ApiError(
+      code: ApiErrorCode.serviceUnavailable,
+      statusCode: 503,
+    );
+    await placeOrder(tester);
+    expect(
+      find.text(
+        'Payment service is unavailable right now. Try again, or choose '
+        'Cash on Delivery.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(CheckoutScreen), findsOneWidget);
+    expect((await app.cart.load()).quantityOf(101), 2);
+    expect(placeButton(tester).onPressed, isNotNull);
+
+    await placeOrder(tester);
+    expect(find.byType(OrderSuccessScreen), findsOneWidget);
+  });
+
   testWidgets('STOCK_UNAVAILABLE goes back to the cart with the flag', (
     tester,
   ) async {
