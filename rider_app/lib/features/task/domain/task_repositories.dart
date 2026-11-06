@@ -42,10 +42,30 @@ class OfferArrived extends OfferEvent {
   final ReceivedOffer received;
 }
 
+/// Why an offer ended on the server's side (`offer.withdrawn.reason`, or
+/// `offer.expired`): decides the text the rider sees.
+enum OfferEndReason {
+  /// ORDER_CANCELLED, REASSIGNED or no reason: "Order cancelled".
+  cancelled,
+
+  /// EXPIRED / `offer.expired`: "Offer expired".
+  expired,
+
+  /// TAKEN: "Order taken".
+  taken;
+
+  static OfferEndReason fromWire(String? reason) => switch (reason) {
+    'EXPIRED' => expired,
+    'TAKEN' => taken,
+    _ => cancelled,
+  };
+}
+
 class OfferWithdrawn extends OfferEvent {
-  const OfferWithdrawn(this.offerId);
+  const OfferWithdrawn(this.offerId, {this.reason = OfferEndReason.cancelled});
 
   final int offerId;
+  final OfferEndReason reason;
 }
 
 abstract interface class OfferEventSource {

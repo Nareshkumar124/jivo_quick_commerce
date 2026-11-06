@@ -593,4 +593,55 @@ void main() {
     expect(state().task, isNull);
     expect(h.tasks.calls, isEmpty);
   });
+
+  group('pickup_code restores the pickup lock after a restart', () {
+    RiderTask atStore() =>
+        task(TaskStatus.atStore)
+            .copyWith(storeProgress: StoreOrderProgress.ready);
+
+    test('locked on the server: no more tries from the phone', () async {
+      h = RiderTestHarness();
+      h.tasks
+        ..seedTask(atStore())
+        ..pickupAttemptsLeft = 0;
+      await h.signedInBefore(activePhone);
+      c = await h.container();
+      c.listen(taskFlowControllerProvider, (_, _) {});
+      await c.read(riderAccountControllerProvider.notifier).load();
+      await flow().load();
+
+      expect(state().task!.status, TaskStatus.atStore);
+      expect(state().task!.pickupLocked, isTrue);
+      expect(state().pickupLocked, isTrue);
+      expect(state().pickupAttemptsRemaining, 0);
+      final calls = server().calls.length;
+      expect(await flow().pickup('7K2P'), isFalse);
+      expect(state().localError, TaskLocalError.pickupLocked);
+      expect(server().calls.length, calls, reason: 'locked: no call');
+    });
+
+    test('attempts left come back; an ops unlock clears the lock', () async {
+      h = RiderTestHarness();
+      h.tasks
+        ..seedTask(atStore())
+        ..pickupAttemptsLeft = 2;
+      await h.signedInBefore(activePhone);
+      c = await h.container();
+      c.listen(taskFlowControllerProvider, (_, _) {});
+      await c.read(riderAccountControllerProvider.notifier).load();
+      await flow().load();
+      expect(state().pickupAttemptsRemaining, 2);
+      expect(state().pickupLocked, isFalse);
+
+      server().pickupAttemptsLeft = 0;
+      await flow().load();
+      expect(state().pickupLocked, isTrue);
+
+      server().pickupAttemptsLeft = FakeTaskBackend.maxPickupAttempts;
+      await flow().load();
+      expect(state().pickupLocked, isFalse);
+      expect(await flow().pickup('7K2P'), isTrue);
+      expect(state().task!.status, TaskStatus.pickedUp);
+    });
+  });
 }

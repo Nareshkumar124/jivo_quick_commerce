@@ -83,14 +83,13 @@ class TaskFlowState {
   /// resets it (the wait timer comes from the server and does not reset).
   final int callAttempts;
 
-  /// From the last `PICKUP_CODE_INVALID` (`attempts_remaining`) for this
-  /// task; null before any wrong code.
-  ///
-  /// TODO(api): `RiderTask` does not carry the pickup-code attempts, so a
-  /// restart forgets them until the next answer (reported as an API gap).
+  /// Wrong pickup codes left: from the task's `pickup_code` (so a restart
+  /// restores it) or the last `PICKUP_CODE_INVALID` (`attempts_remaining`).
+  /// Null when neither was sent.
   final int? pickupAttemptsRemaining;
 
-  /// `PICKUP_CODE_LOCKED` answered for this task.
+  /// `pickup_code.locked` of the task, or `PICKUP_CODE_LOCKED` answered for
+  /// it. The server's task state wins (ops can unlock the pickup).
   final bool pickupLocked;
 
   /// The task screen is the rider's screen (a task, or a notice to read).
@@ -295,12 +294,25 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       callAttempts: sameTask ? state.callAttempts : 0,
       resetPickup: !sameTask,
     );
+    _syncPickup(fetched);
+  }
+
+  /// Restores the pickup-code lock and attempts from the server's task
+  /// (`pickup_code`), so a restart at the store does not forget them.
+  void _syncPickup(RiderTask task) {
+    final left = task.pickupAttemptsRemaining;
+    if (left == null && !task.pickupLocked) return;
+    state = state.copyWith(
+      pickupAttemptsRemaining: left ?? (task.pickupLocked ? 0 : null),
+      pickupLocked: task.pickupLocked,
+    );
   }
 
   /// The offer was accepted: the task starts (ASSIGNED).
   void assigned(RiderTask task) {
     _setTask(task);
     state = TaskFlowState(loaded: true, task: task);
+    _syncPickup(task);
     _armPoll();
   }
 
@@ -478,6 +490,7 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       if (!ref.mounted) return false;
       _setTask(updated);
       state = state.copyWith(task: updated, clearBusy: true);
+      _syncPickup(updated);
       _armPoll();
       return true;
     } on Object catch (e) {

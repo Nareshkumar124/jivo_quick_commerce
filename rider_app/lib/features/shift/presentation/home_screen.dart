@@ -11,6 +11,8 @@ import '../../../shared/widgets/dev_tools_button.dart';
 import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/logout_button.dart';
 import '../../auth/presentation/rider_account_controller.dart';
+import '../../notifications/presentation/inbox_providers.dart';
+import '../../notifications/presentation/inbox_screen.dart';
 import '../../task/data/fake_task_backend.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
@@ -82,7 +84,9 @@ class HomeScreen extends ConsumerWidget {
     );
 
     Future<void> refresh() async {
-      ref.invalidate(todaySummaryProvider);
+      ref
+        ..invalidate(todaySummaryProvider)
+        ..invalidate(inboxUnreadCountProvider);
       await Future.wait([
         ref.read(shiftControllerProvider.notifier).sync(),
         ref.read(todaySummaryProvider.future).then((_) {}, onError: (_) {}),
@@ -97,6 +101,7 @@ class HomeScreen extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          const InboxBellButton(),
           IconButton(
             key: const Key('home-appbar-profile'),
             tooltip: l10n.profileTitle,

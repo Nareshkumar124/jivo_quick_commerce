@@ -824,6 +824,19 @@
       }
     }
   },
+  "inboxTitle": "Notifications",
+  "@inboxTitle": {"description": "Inbox screen title and the home bell tooltip."},
+  "inboxEmpty": "No notifications yet.",
+  "inboxMarkAllRead": "Mark all read",
+  "inboxMarkAllFailed": "Could not mark them read. Try again.",
+  "inboxUnreadBadge": "{count} unread",
+  "@inboxUnreadBadge": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
   "historyTitle": "History",
   "historyEmpty": "No past orders yet.",
   "historyRoute": "{store} → {drop}",

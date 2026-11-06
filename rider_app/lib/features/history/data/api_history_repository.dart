@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
-import 'package:jivo_api/jivo_api.dart'
-    show EarningLine, JivoApi, TaskHistoryItem;
+import 'package:jivo_api/jivo_api.dart' as api show TaskHistoryDetail;
+import 'package:jivo_api/jivo_api.dart' show JivoApi, TaskHistoryItem;
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../shared/paging.dart';
@@ -33,21 +33,13 @@ class ApiHistoryRepository implements TaskHistoryRepository {
     }
   }
 
-  /// TODO(api): `rider_tasks_history_detail` is in the backend's slice 5.4
-  /// schema but not yet in this worktree's generated client. Read with the
-  /// shared Dio and the generated models until the PM regenerates
-  /// `jivo_api`; then call `riderTasksHistoryDetail(id:)`.
   @override
   Future<TaskHistoryDetail> fetchDetail(int taskId) async {
     try {
-      final response = await _api.dio.get<Object>(
-        '/api/v1/rider/tasks/history/$taskId/',
-      );
-      final body = response.data;
-      if (body is! Map<String, dynamic>) {
-        throw const ApiError(code: ApiErrorCode.unknown, statusCode: 200);
-      }
-      return historyDetailOf(body);
+      final detail = (await _api.getRiderApi().riderTasksHistoryDetail(
+        id: taskId,
+      )).data!;
+      return historyDetailOf(detail);
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
     }
@@ -65,48 +57,45 @@ TaskHistoryEntry historyEntryOf(TaskHistoryItem item) => TaskHistoryEntry(
   payout: item.payout,
 );
 
-/// The `TaskHistoryDetail` body. The list fields reuse the generated
-/// `TaskHistoryItem` parser, the pay lines the generated `EarningLine`.
-TaskHistoryDetail historyDetailOf(Map<String, dynamic> body) {
-  DateTime? time(String key) => switch (body[key]) {
-    final String value => DateTime.parse(value),
-    _ => null,
-  };
-  final earnings = body['earnings'];
-  final rawItems = body['items'];
-  final rawLines = earnings is Map ? earnings['lines'] : null;
-  return TaskHistoryDetail(
-    entry: historyEntryOf(TaskHistoryItem.fromJson(body)),
-    paymentType: PaymentType.fromWire(body['payment_type'] as String?),
-    codCollected: body['cod_collected'] as String?,
-    items: [
-      if (rawItems is List)
-        for (final item in rawItems.whereType<Map<String, dynamic>>())
+/// The generated `TaskHistoryDetail` mapped onto the screen's model.
+TaskHistoryDetail historyDetailOf(api.TaskHistoryDetail body) =>
+    TaskHistoryDetail(
+      entry: TaskHistoryEntry(
+        taskId: body.taskId,
+        orderNumber: body.orderNumber,
+        completedAt: body.completedAt,
+        storeName: body.storeName,
+        dropLocality: body.dropLocality,
+        status: TaskStatus.fromWire(body.status.value),
+        distanceKm: body.distanceKm,
+        payout: body.payout,
+      ),
+      paymentType: PaymentType.fromWire(body.paymentType.value),
+      codCollected: body.codCollected,
+      items: [
+        for (final item in body.items)
           HistoryItem(
-            name: item['name'] as String? ?? '',
-            unit: switch (item['variant']) {
-              final String v when v.trim().isNotEmpty => v.trim(),
-              _ => null,
+            name: item.name,
+            unit: switch (item.variant.trim()) {
+              '' => null,
+              final unit => unit,
             },
-            quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+            quantity: item.quantity,
           ),
-    ],
-    itemCount: (body['item_count'] as num?)?.toInt() ?? 0,
-    assignedAt: time('assigned_at'),
-    pickedUpAt: time('picked_up_at'),
-    deliveredAt: time('delivered_at'),
-    failedAt: time('failed_at'),
-    failReason: FailReason.values
-        .where((r) => r.wireValue == body['fail_reason'])
-        .firstOrNull,
-    returnedAt: time('returned_at'),
-    cancelledAt: time('cancelled_at'),
-    earningsTotal: earnings is Map ? earnings['total'] as String? : null,
-    earningLines: rawLines is List
-        ? earningLinesOf([
-            for (final line in rawLines.whereType<Map<String, dynamic>>())
-              EarningLine.fromJson(line),
-          ])
-        : const [],
-  );
-}
+      ],
+      itemCount: body.itemCount,
+      assignedAt: body.assignedAt,
+      pickedUpAt: body.pickedUpAt,
+      deliveredAt: body.deliveredAt,
+      failedAt: body.failedAt,
+      failReason: FailReason.values
+          .where((r) => r.wireValue == body.failReason?.value)
+          .firstOrNull,
+      returnedAt: body.returnedAt,
+      cancelledAt: body.cancelledAt,
+      earningsTotal: body.earnings?.total,
+      earningLines: switch (body.earnings) {
+        final earnings? => earningLinesOf(earnings.lines),
+        null => const [],
+      },
+    );

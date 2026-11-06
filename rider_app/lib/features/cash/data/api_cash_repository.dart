@@ -28,12 +28,12 @@ class ApiCashRepository implements CashRepository {
       return CashLedgerPage(
         summary: switch (read) {
           null => null,
-          final read => CashSummary(
-            cashInHand: read.profile.cash.cashInHand,
-            cashLimit: read.profile.cash.cashLimit,
-            limitReached: read.profile.cash.limitReached,
-            depositRequired: read.depositRequired,
-            homeStoreName: read.profile.homeStore?.name,
+          final me => CashSummary(
+            cashInHand: me.cash.cashInHand,
+            cashLimit: me.cash.cashLimit,
+            limitReached: me.cash.limitReached,
+            depositRequired: me.cash.depositRequired,
+            homeStoreName: me.homeStore?.name,
           ),
         },
         entries: Page(

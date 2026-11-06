@@ -1,11 +1,10 @@
 /// A rider push, parsed from the FCM data payload.
 ///
-/// TODO(api): the payload is not in the contract yet. Assumed until the
-/// backend defines it (P5 slice 5.3 sender, api-requests): `type` uses the
-/// rider WebSocket message names from 06 §4 (`offer.new`, `offer.withdrawn`,
-/// `task.updated`), with `offer_id` / `task_id` as decimal strings (FCM data
-/// values are strings). Unknown types are ignored, so the server can add
-/// types without breaking older apps.
+/// The payload is 06 §4.3 (api-requests #41): `type` is the rider socket
+/// message name (`offer.new`, `offer.withdrawn`, `task.updated`), with
+/// `offer_id` / `task_id` as decimal strings (FCM data values are strings).
+/// Unknown types are ignored, so the server can add types without breaking
+/// older apps.
 sealed class RiderPush {
   const RiderPush();
 

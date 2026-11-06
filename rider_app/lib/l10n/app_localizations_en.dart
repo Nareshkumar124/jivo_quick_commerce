@@ -1451,6 +1451,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get inboxTitle => 'Notifications';
+
+  @override
+  String get inboxEmpty => 'No notifications yet.';
+
+  @override
+  String get inboxMarkAllRead => 'Mark all read';
+
+  @override
+  String get inboxMarkAllFailed => 'Could not mark them read. Try again.';
+
+  @override
+  String inboxUnreadBadge(String count) {
+    return '$count unread';
+  }
+
+  @override
   String get historyTitle => 'History';
 
   @override

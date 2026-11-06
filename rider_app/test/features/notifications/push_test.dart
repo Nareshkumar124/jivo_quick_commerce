@@ -1,10 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/features/auth/presentation/rider_account_controller.dart';
 import 'package:rider_app/features/location/domain/backoff.dart';
+import 'package:rider_app/features/notifications/data/fake_push_messaging.dart';
 import 'package:rider_app/features/notifications/domain/push_messaging.dart';
 import 'package:rider_app/features/notifications/domain/rider_push.dart';
 import 'package:rider_app/features/notifications/presentation/push_providers.dart';
@@ -12,44 +11,10 @@ import 'package:rider_app/features/offers/presentation/offer_controller.dart';
 
 import '../../helpers/rider_app_harness.dart';
 
-/// Test double for FCM: a token, refreshes and messages driven by the test.
-class FakePushMessaging implements PushMessaging {
-  String? currentToken = 'fcm-token-1';
-  final _refreshes = StreamController<String>.broadcast();
-  final _messages = StreamController<PushMessage>.broadcast();
-  PushMessage? launch;
-
-  void refreshToken(String token) {
-    currentToken = token;
-    _refreshes.add(token);
-  }
-
-  void deliver(PushMessage message) => _messages.add(message);
-
-  @override
-  bool get isAvailable => true;
-
-  @override
-  Future<String?> token() async => currentToken;
-
-  @override
-  Stream<String> get tokenRefreshes => _refreshes.stream;
-
-  @override
-  Stream<PushMessage> get messages => _messages.stream;
-
-  @override
-  Future<PushMessage?> initialMessage() async {
-    final m = launch;
-    launch = null;
-    return m;
-  }
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('RiderPush.parse (payload assumed until the contract, TODO(api))', () {
+  group('RiderPush.parse (06 §4.3, api-requests #41)', () {
     test('offer.new, offer.withdrawn, task.updated', () {
       expect(
         RiderPush.parse({'type': 'offer.new', 'offer_id': '7'}),
