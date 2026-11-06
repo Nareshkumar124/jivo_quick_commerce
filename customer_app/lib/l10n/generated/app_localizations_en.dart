@@ -1474,7 +1474,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trackingOtpHint =>
-      'Share this code with the rider only when you receive your order.';
+      'Share this with your rider at the door, only when you receive your order.';
 
   @override
   String get trackingMapStore => 'Store';
@@ -1734,4 +1734,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get onlinePaymentUnavailable =>
       'Payment service is unavailable right now. Try again, or choose Cash on Delivery.';
+
+  @override
+  String get deliveryStagePickedUpTitle => 'Order picked up';
+
+  @override
+  String get deliveryStagePickedUpBody =>
+      'Your rider has your order and is on the way.';
+
+  @override
+  String get deliveryStageArrivingTitle => 'Rider is arriving';
+
+  @override
+  String get deliveryStageArrivingBody =>
+      'Your rider has reached your location. Keep your delivery OTP ready.';
+
+  @override
+  String get deliveryStageFailedTitle => 'Delivery failed';
+
+  @override
+  String get deliveryStageFailedBody =>
+      'We couldn\'t deliver your order. The items are going back to the store.';
+
+  @override
+  String get deliveryStageReturnedTitle => 'Order returned';
+
+  @override
+  String get deliveryStageReturnedBody => 'Your items are back at the store.';
+
+  @override
+  String get refundNoteStarted =>
+      'Your refund has started. It goes back to your original payment method.';
+
+  @override
+  String refundNoteDone(String amount) {
+    return '$amount refunded to your original payment method.';
+  }
+
+  @override
+  String codPayRiderTitle(String amount) {
+    return 'Pay $amount to the rider';
+  }
+
+  @override
+  String get codPayRiderHint =>
+      'Cash on delivery. Pay by cash or UPI when your order arrives.';
 }
