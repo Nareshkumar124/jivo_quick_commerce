@@ -136,6 +136,12 @@ class TestNavigation:
             apps.get_model("core", "AuditLog")
         except LookupError:
             pending.add("admin:core_auditlog_changelist")
+        # SLICE 5.4: these admin lists register with the Payout model (delivery/admin_54.py).
+        try:
+            apps.get_model("delivery", "Payout")
+        except LookupError:
+            for model in ("ridercashledger", "riderearning", "earningrule"):
+                pending.add(f"admin:delivery_{model}_changelist")
         for section in navigation.MODULES:
             for item in section.items:
                 if item.url_name in pending:

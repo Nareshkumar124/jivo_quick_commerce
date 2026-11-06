@@ -348,6 +348,8 @@ CELERY_BEAT_SCHEDULE = {
     "auto-accept-orders": {"task": "orders.auto_accept_orders", "schedule": 60.0},
     # Phase 5 (06 §5): auto-offline riders with no location for RIDER_AUTO_OFFLINE_MINUTES.
     "rider-heartbeat-check": {"task": "delivery.rider_heartbeat_check", "schedule": 120.0},
+    # Phase 5 slice 5.3 (08 §5): offer expiry, dispatch retries, resume after UNASSIGNED.
+    "dispatch-sweep": {"task": "delivery.dispatch_sweep", "schedule": 15.0},
     # Phase 5 (D-14 default): KYC documents deleted 1 year after offboarding/erasure. 04:15 IST.
     "purge-offboarded-kyc": {
         "task": "delivery.purge_offboarded_kyc",
@@ -732,6 +734,7 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
         "rider_profile_write": env_str("RIDER_PROFILE_WRITE_RATE", default="20/hour"),
         "rider_locations": env_str("RIDER_LOCATIONS_RATE", default="6/min"),
         "rider_heartbeat": env_str("RIDER_HEARTBEAT_RATE", default="6/min"),
+        "rider_pickup": env_str("RIDER_PICKUP_RATE", default="10/min"),
     }
 )
 RIDER_MIN_AGE_YEARS = env_int("RIDER_MIN_AGE_YEARS", default=18)
@@ -765,8 +768,26 @@ MAX_OFFER_ATTEMPTS = env_int("MAX_OFFER_ATTEMPTS", default=5)
 DISPATCH_TIMEOUT_SECONDS = env_int("DISPATCH_TIMEOUT_SECONDS", default=180)
 DELIVERY_OTP_LENGTH = 4  # 04 §2.6 (the contract publishes it as `delivery_otp.length`)
 DELIVERY_OTP_MAX_ATTEMPTS = env_int("DELIVERY_OTP_MAX_ATTEMPTS", default=5)
+# Wrong order codes at pickup before the task's pickup is locked (code review of slice 5.3).
+PICKUP_CODE_MAX_ATTEMPTS = env_int("PICKUP_CODE_MAX_ATTEMPTS", default=5)
 # `GET /rider/tasks/current/` returns the rider's last ended task as `recent_task` this long.
 RIDER_RECENT_TASK_SECONDS = env_int("RIDER_RECENT_TASK_SECONDS", default=600)
+# 08 §5 dispatch (slice 5.3): a candidate's last location must have arrived within this; riders
+# within DISPATCH_AT_STORE_RADIUS_M of the store come first (longest idle first); with no
+# candidate the search runs again after DISPATCH_RETRY_SECONDS; after UNASSIGNED the auto-retry
+# pauses DISPATCH_UNASSIGNED_PAUSE_SECONDS (step 6).
+DISPATCH_PING_MAX_AGE_SECONDS = env_int("DISPATCH_PING_MAX_AGE_SECONDS", default=120)
+DISPATCH_AT_STORE_RADIUS_M = env_int("DISPATCH_AT_STORE_RADIUS_M", default=200)
+DISPATCH_RETRY_SECONDS = env_int("DISPATCH_RETRY_SECONDS", default=15)
+DISPATCH_UNASSIGNED_PAUSE_SECONDS = env_int("DISPATCH_UNASSIGNED_PAUSE_SECONDS", default=60)
+# D-16 default (doc 11, to confirm with Jivo Ops/HR): rider pay per order = base + per km of the
+# server-computed store-to-drop route distance. Shown as `estimated_payout` on offers and tasks;
+# earnings are recorded from slice 5.4.
+RIDER_PAY_BASE_PER_ORDER = Decimal(env_str("RIDER_PAY_BASE_PER_ORDER", default="30.00"))
+RIDER_PAY_PER_KM = Decimal(env_str("RIDER_PAY_PER_KM", default="5.00"))
+# 08 §6.4 (D-10 default, to confirm): a customer whose COD orders were refused this many times
+# is COD-blocked automatically (0 = never).
+COD_BLOCK_AFTER_REFUSALS = env_int("COD_BLOCK_AFTER_REFUSALS", default=2)
 # --------------------------------------------------------------------------- support (P7)
 # Per user, fail open (apps.core.throttling). A customer raises a few tickets at most; these
 # only stop scripted abuse of the support inbox.

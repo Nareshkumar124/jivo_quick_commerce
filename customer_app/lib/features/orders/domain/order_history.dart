@@ -276,6 +276,26 @@ class OrderDetail {
 
   /// The order can be ordered again: it is finished (`03 §2.10`).
   bool get canReorder => !isActive && lines.isNotEmpty;
+
+  /// What to pay the rider at the door for a cash-on-delivery order still
+  /// to be collected: the server's `bill.grand_total` exactly as sent (the
+  /// bill is recomputed by the server after any change, `08 §5`). Null for
+  /// an online order, once collected, or when the delivery failed (T13/T14:
+  /// nothing to collect).
+  String? get codAmountDue {
+    if (paymentMethod != PaymentMethod.cod ||
+        paymentStatus != PaymentStatus.codPending) {
+      return null;
+    }
+    return switch (status) {
+      OrderStatus.placed ||
+      OrderStatus.accepted ||
+      OrderStatus.packing ||
+      OrderStatus.packed ||
+      OrderStatus.outForDelivery => bill.grandTotal,
+      _ => null,
+    };
+  }
 }
 
 /// The customer-facing progress steps (`03 §2.10`: Placed → Confirmed →
@@ -378,7 +398,11 @@ List<TimelineStep> timelineFor(
 /// wasn't.
 @immutable
 class ReorderResult {
-  const ReorderResult({this.unavailable = const [], this.cart, this.addedCount});
+  const ReorderResult({
+    this.unavailable = const [],
+    this.cart,
+    this.addedCount,
+  });
 
   /// Lines that couldn't be added as ordered.
   final List<ReorderSkippedItem> unavailable;

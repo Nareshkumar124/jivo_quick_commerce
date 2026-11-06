@@ -13,6 +13,12 @@
 - PII: roles with full customer access (`accounts.view_customer`: Super Admin, Ops) see the
   rider's phone, date of birth and emergency contact; Store Manager sees the name and a masked
   phone. Bank details are shown as the last four digits only, to everyone.
+- Delivery tasks and offers (slice 5.3) are read-only for everyone
+  (`delivery.view_deliverytask` / `view_deliveryoffer`: Super Admin, Ops, Store Manager own
+  stores), scoped to the user's stores by the task's store; another store's task is a 404.
+  The delivery OTP (encrypted column) and the failure photo are never shown; the pickup code and
+  the OTP appear only as their lock state. Changes go through the Ops dispatch screens
+  (`/ops/dispatch/`), which call the delivery services.
 - Shifts and location history are read-only for everyone (locations: Super Admin only, the
   `delivery.view_riderlocation` permission), coordinates rounded to 4 decimals (about 10 m).
 """
@@ -33,7 +39,14 @@ from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextareaWidget
 
 from apps.core.exceptions import ApiError
 from apps.core.net import client_ip
-from apps.delivery.models import Rider, RiderDocument, RiderLocation, RiderShift
+from apps.delivery.models import (
+    DeliveryOffer,
+    DeliveryTask,
+    Rider,
+    RiderDocument,
+    RiderLocation,
+    RiderShift,
+)
 from apps.delivery.services import kyc
 from apps.ops_console.money import RupeeInput, inr
 from apps.ops_console.pii import can_view_full_phone, mask_phone
@@ -254,6 +267,16 @@ class RiderAdmin(ScopedObjectMixin, ReadOnlyMixin, ModelAdmin):
     def has_review_permission(self, request, object_id=None) -> bool:
         return kyc.can_review(request.user)
 
+    def has_cash_limit_permission(self, request, object_id=None) -> bool:
+        """DL-61 (a): Super Admin, Ops, Store Manager (own store riders; the queryset scopes).
+        SLICE 5.4: `kyc.set_cash_limit` moves from `review_rider` to `dispatch_order`
+        (`kyc.OPS_DELIVERY`); until that merge the button follows the review permission."""
+        ops_perm = getattr(kyc, "OPS_DELIVERY", None)
+        if ops_perm is None:
+            return kyc.can_review(request.user)
+        user = request.user
+        return bool(user.is_active and user.is_staff and user.has_perm(ops_perm))
+
     def _rider(self, request, object_id) -> Rider:
         if not kyc.can_review(request.user):
             raise PermissionDenied
@@ -387,7 +410,7 @@ class RiderAdmin(ScopedObjectMixin, ReadOnlyMixin, ModelAdmin):
             "Save",
         )
 
-    @action(description="Change cash limit", url_path="cash-limit", permissions=["review"])
+    @action(description="Change cash limit", url_path="cash-limit", permissions=["cash_limit"])
     def change_cash_limit(self, request, object_id):
         rider = self._rider(request, object_id)
         form = CashLimitForm(request.POST or None)
@@ -629,3 +652,188 @@ class RiderLocationAdmin(ScopedObjectMixin, ReadOnlyMixin, ModelAdmin):
     @display(description="Location (about 10 m)")
     def coordinates(self, obj) -> str:
         return f"{obj.point.y:.4f}, {obj.point.x:.4f}" if obj.point else "-"
+
+
+# --------------------------------------------------------------------------- tasks and offers
+
+
+def _ops_task_link(task) -> str:
+    return format_html(
+        '<a class="text-primary-600" href="{}">Open in dispatch</a>',
+        reverse("ops:dispatch-task", args=[task.pk]),
+    )
+
+
+class OfferInline(ReadOnlyMixin, TabularInline):
+    model = DeliveryOffer
+    extra = 0
+    can_delete = False
+    fields = ("rider_name", "status", "offered_at", "expires_at", "responded_at", "reject_reason")
+    readonly_fields = fields
+    ordering = ("-offered_at",)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("rider")
+
+    @display(description="Rider")
+    def rider_name(self, obj) -> str:
+        return obj.rider.full_name
+
+
+@admin.register(DeliveryTask)
+class DeliveryTaskAdmin(ScopedObjectMixin, ReadOnlyMixin, ModelAdmin):
+    list_display = (
+        "order_number",
+        "store_code",
+        "status",
+        "rider_name",
+        "assignment_mode",
+        "search_started_at",
+        "locks",
+    )
+    list_filter = ("status", "assignment_mode")
+    search_fields = ("order__order_number",)
+    list_select_related = ("order", "store", "rider")
+    ordering = ("-search_started_at", "-id")
+    list_per_page = 50
+    show_full_result_count = False
+    inlines = (OfferInline,)
+    fields = (
+        "order_number",
+        "store_code",
+        "status",
+        "rider_name",
+        "assignment_mode",
+        "attempt_count",
+        "distance_km",
+        "payout_amount_inr",
+        "search_started_at",
+        "next_dispatch_at",
+        "unassigned_at",
+        "assigned_at",
+        "arrived_store_at",
+        "picked_up_at",
+        "arrived_customer_at",
+        "arrival_override_reason",
+        "delivered_at",
+        "failed_at",
+        "fail_reason",
+        "fail_note",
+        "fail_call_attempts",
+        "returned_at",
+        "cancelled_at",
+        "pickup_attempts",
+        "pickup_lock",
+        "otp_attempts",
+        "otp_lock",
+        "ops_link",
+    )
+    readonly_fields = fields
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .filter(store__in=stores_for(request.user))
+            .defer("delivery_otp_encrypted")
+            .select_related("order", "store", "rider")
+        )
+
+    @display(description="Order", ordering="order__order_number")
+    def order_number(self, obj) -> str:
+        return obj.order.order_number
+
+    @display(description="Store", ordering="store__code")
+    def store_code(self, obj) -> str:
+        return obj.store.code
+
+    @display(description="Rider", ordering="rider__full_name")
+    def rider_name(self, obj) -> str:
+        return obj.rider.full_name if obj.rider_id else "-"
+
+    @display(description="Estimated payout")
+    def payout_amount_inr(self, obj) -> str:
+        return inr(obj.payout_amount)
+
+    @display(description="Pickup code")
+    def pickup_lock(self, obj) -> str:
+        return "Locked" if obj.pickup_locked_at else "Not locked"
+
+    @display(description="Delivery OTP")
+    def otp_lock(self, obj) -> str:
+        return "Locked" if obj.otp_locked_at else "Not locked"
+
+    @display(description="Locks")
+    def locks(self, obj) -> str:
+        parts = []
+        if obj.pickup_locked_at:
+            parts.append("Pickup code locked")
+        if obj.otp_locked_at:
+            parts.append("OTP locked")
+        return ", ".join(parts) or "-"
+
+    @display(description="Ops Console")
+    def ops_link(self, obj) -> str:
+        return _ops_task_link(obj)
+
+
+@admin.register(DeliveryOffer)
+class DeliveryOfferAdmin(ScopedObjectMixin, ReadOnlyMixin, ModelAdmin):
+    list_display = (
+        "order_number",
+        "store_code",
+        "rider_name",
+        "status",
+        "offered_at",
+        "expires_at",
+        "responded_at",
+        "reject_reason",
+    )
+    list_filter = ("status", "reject_reason")
+    search_fields = ("task__order__order_number",)
+    list_select_related = ("task__order", "task__store", "rider")
+    ordering = ("-offered_at", "-id")
+    list_per_page = 50
+    show_full_result_count = False
+    fields = (
+        "order_number",
+        "store_code",
+        "rider_name",
+        "status",
+        "offered_at",
+        "expires_at",
+        "responded_at",
+        "reject_reason",
+    )
+    readonly_fields = fields
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .filter(task__store__in=stores_for(request.user))
+            .defer("task__delivery_otp_encrypted")
+            .select_related("task__order", "task__store", "rider")
+        )
+
+    @display(description="Order", ordering="task__order__order_number")
+    def order_number(self, obj) -> str:
+        return obj.task.order.order_number
+
+    @display(description="Store", ordering="task__store__code")
+    def store_code(self, obj) -> str:
+        return obj.task.store.code
+
+    @display(description="Rider", ordering="rider__full_name")
+    def rider_name(self, obj) -> str:
+        return obj.rider.full_name
+
+
+# --------------------------------------------------------------------------- slice 5.4
+
+# SLICE 5.4: cash ledger, earnings, payouts and earning rules (admin_54.py) register only once
+# their models are merged into this branch.
+from apps.delivery import models as _delivery_models  # noqa: E402
+
+if hasattr(_delivery_models, "Payout"):
+    from apps.delivery import admin_54  # noqa: F401

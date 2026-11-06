@@ -1,0 +1,11 @@
+{% extends "ops/base.html" %}
+{% load static %}
+
+{% block page_scripts %}<script src="{% static 'ops/js/orders.js' %}" defer></script>{% endblock %}
+
+{% block content %}
+    {# Store returns (05 §1.3 "Returns", 08 T14). Tablet first. Context: store, rows (dispatch.ReturnRow), can_receive, poll_seconds. #}
+    <p class="mb-3"><a class="text-primary-600 dark:text-primary-500" href="{% url 'ops:packing' store.code %}">&larr; Packing console</a></p>
+    <p class="mb-3 ops-text-secondary">When the rider is at the counter with the items of a failed delivery, count them, enter any damaged units, and confirm. Good units go back on the shelf.</p>
+    {% include "ops/partials/returns_list.html" %}
+{% endblock %}

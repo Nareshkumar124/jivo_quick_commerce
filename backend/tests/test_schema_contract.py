@@ -34,3 +34,12 @@ def test_health_operations(generated):
     assert ready["responses"]["503"]["content"]["application/json"]["schema"]["$ref"].endswith(
         "/ErrorEnvelope"
     )
+
+
+def test_device_unregister_publishes_its_delete_body(generated):
+    """DELETE /me/devices/ takes {fcm_token}; generated clients must be able to send it."""
+    operation = generated["paths"]["/api/v1/me/devices/"]["delete"]
+    assert operation["operationId"] == "me_device_unregister"
+    body = operation["requestBody"]["content"]["application/json"]["schema"]
+    assert body["$ref"].endswith("/DeviceUnregisterRequest")
+    assert operation["requestBody"]["required"] is True

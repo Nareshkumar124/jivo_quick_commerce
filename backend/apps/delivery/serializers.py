@@ -713,10 +713,20 @@ class PickupSerializer(serializers.Serializer):
     order_code = serializers.CharField(
         max_length=64,
         help_text=(
-            "The 4-character order code typed by the rider, or the whole bag QR payload "
-            "`JQC1:<order_number>:<code>` as scanned. Case-insensitive."
+            "The 4-character order code typed by the rider (ASCII letters and digits), or the "
+            "whole bag QR payload `JQC1:<order_number>:<code>` as scanned. Case-insensitive. "
+            "Anything else (non-ASCII, wrong shape): 400 `PICKUP_CODE_INVALID`."
         ),
     )
+
+    def validate_order_code(self, value: str) -> str:
+        from apps.core.errors import ErrorCode
+        from apps.core.exceptions import ApiError
+        from apps.delivery.services.tasks import code_format_ok
+
+        if not code_format_ok(value):
+            raise ApiError(ErrorCode.PICKUP_CODE_INVALID)
+        return value.strip()
 
 
 class CodCollectionSerializer(serializers.Serializer):

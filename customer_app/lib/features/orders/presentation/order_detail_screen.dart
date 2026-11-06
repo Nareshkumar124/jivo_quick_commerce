@@ -99,6 +99,12 @@ class _OrderBody extends ConsumerWidget {
     }
     final rider = track?.rider;
     final otp = track?.deliveryOtp;
+    // The task state comes with `track/` (when sent); otherwise the order
+    // status alone decides (`deliveryStageFor`).
+    final stage = track != null && track.status == order.status
+        ? track.stage
+        : deliveryStageFor(order.status);
+    final codDue = order.codAmountDue;
     final eta = track?.etaAt ?? order.etaAt;
     final coupon = order.couponCode;
 
@@ -160,9 +166,20 @@ class _OrderBody extends ConsumerWidget {
             ),
           ],
         ],
+        if (stage != null) ...[
+          const SizedBox(height: JivoSpacing.md),
+          DeliveryStageCard(
+            stage: stage,
+            refundNote: refundNoteFor(l10n, order),
+          ),
+        ],
         if (otp != null) ...[
           const SizedBox(height: JivoSpacing.md),
           DeliveryOtpCard(otp: otp),
+        ],
+        if (codDue != null) ...[
+          const SizedBox(height: JivoSpacing.md),
+          CodDueCard(amount: codDue),
         ],
         if (rider != null && order.isActive) ...[
           const SizedBox(height: JivoSpacing.sm),
@@ -267,8 +284,7 @@ class _OrderBody extends ConsumerWidget {
             label: l10n.helpWithThisOrder,
             busy: false,
             enabled: true,
-            onPressed: () =>
-                context.push(Routes.newTicket(orderId: order.id)),
+            onPressed: () => context.push(Routes.newTicket(orderId: order.id)),
           ),
         const SizedBox(height: JivoSpacing.xl),
       ],

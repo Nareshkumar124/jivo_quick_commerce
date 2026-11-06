@@ -89,6 +89,11 @@ ALLOWED_TRANSITIONS: dict[tuple[str, str], str] = {
     (OrderStatus.ACCEPTED, OrderStatus.CANCELLED): "T11/T12",
     (OrderStatus.PACKING, OrderStatus.CANCELLED): "T12",
     (OrderStatus.PACKED, OrderStatus.CANCELLED): "T12",
+    # Phase 5 (apps.delivery.services.tasks; T14 in apps.orders.store_ops.receive_return)
+    (OrderStatus.PACKED, OrderStatus.OUT_FOR_DELIVERY): "T9",
+    (OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED): "T10",
+    (OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERY_FAILED): "T13",
+    (OrderStatus.DELIVERY_FAILED, OrderStatus.RETURNED): "T14",
 }
 TIMESTAMP_FIELDS = {
     OrderStatus.PLACED: "placed_at",
@@ -1031,8 +1036,10 @@ def cancel_active(order: Order, *, actor, actor_type: str, reason: str, note: st
     - ONLINE: everything still refundable is refunded to the original payment (08 §6.4: full
       refund; after a T8a partial refund, the rest), `payment_status` REFUND_PENDING;
       COD: nothing is due, `payment_status` FAILED ("Not paid");
-    - the pending offer / assigned rider is freed in Phase 5 (no delivery tasks yet).
+    - the delivery task is cancelled: a pending offer withdrawn, the assigned rider freed and
+      told (Phase 5, `delivery.services.dispatch.withdraw_for_order`).
     Raises `INVALID_STATE_TRANSITION` from any other state."""
+    from apps.delivery.services.dispatch import withdraw_for_order
     from apps.payments import order_refunds
 
     staff = actor_type != ActorType.CUSTOMER
@@ -1052,6 +1059,7 @@ def cancel_active(order: Order, *, actor, actor_type: str, reason: str, note: st
         note=f"{label}: cancelled by {actor_type} ({reason})",
         **changes,
     )
+    withdraw_for_order(order)  # Lock: the delivery task (after the order), then offers
     inventory.release_reservations(order)  # Lock: stock rows, variant-id order
     promotions.reverse_coupon(order)
     promotions.release_coupon(order)

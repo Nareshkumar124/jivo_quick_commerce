@@ -17,12 +17,18 @@ PACKING = "order.packing"  # T7: customer label only
 PACKED = "order.packed"  # T8: rider "Order ready" (Phase 5), board
 ITEMS_ADJUSTED = "order.items_adjusted"  # T8a: customer push + SMS with the refund / new amount
 ACCEPTANCE_SLA_BREACHED = "order.acceptance_sla_breached"  # ops alert, store re-alert
+# Phase 5 (08 §9). Push/WebSocket for T9 and "rider arrived" go through apps.delivery.hooks.
+DELIVERED = "order.delivered"  # T10: customer push + rating prompt, board, invoice
+DELIVERY_FAILED = "order.delivery_failed"  # T13: customer push, store "expect return", ops alert
+RETURNED = "order.returned"  # T14: board
 LATE_CAPTURE = "payment.late_capture"  # T3a: ops alert
 REFUND_FAILED = "payment.refund_failed"  # ops alert: retry with order_refunds.retry_refund()
 # T-814 (DL-59): one staff member issued more than REFUND_VOLUME_ALERT_PER_HOUR refunds in an hour
 # (the order is the one that crossed the line).
 REFUND_VOLUME_HIGH = "payment.refund_volume_high"
-OPS_ALERTS = frozenset({LATE_CAPTURE, REFUND_FAILED, ACCEPTANCE_SLA_BREACHED, REFUND_VOLUME_HIGH})
+OPS_ALERTS = frozenset(
+    {LATE_CAPTURE, REFUND_FAILED, ACCEPTANCE_SLA_BREACHED, REFUND_VOLUME_HIGH, DELIVERY_FAILED}
+)
 
 
 def emit(event: str, order_id: int) -> None:
