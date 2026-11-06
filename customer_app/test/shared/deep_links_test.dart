@@ -90,4 +90,60 @@ void main() {
       isNull,
     );
   });
+
+  test('rate links open the rate screen when rating is available', () {
+    String? rate(String link, {bool rating = false}) =>
+        deepLinkLocation(Uri.parse(link), ratingAvailable: rating);
+    expect(rate('jivo://orders/12/rate', rating: true), '/orders/12/rate');
+    expect(rate('jivo://orders/12/rate'), '/orders/12');
+    expect(rate('jivo://orders/x/rate', rating: true), isNull);
+  });
+
+  test('support links open the ticket when support is available', () {
+    String? support(String link, {bool on = false}) =>
+        deepLinkLocation(Uri.parse(link), supportAvailable: on);
+    expect(
+      support('jivo://support/tickets/7', on: true),
+      '/account/help/tickets/7',
+    );
+    expect(
+      support('jivo://support/tickets', on: true),
+      '/account/help/tickets',
+    );
+    expect(support('jivo://support/tickets/7'), '/account/help');
+    expect(support('jivo://support/tickets'), '/account/help');
+    expect(support('jivo://support/tickets/0', on: true), isNull);
+    expect(support('jivo://help'), '/account/help');
+  });
+
+  test(
+    'a ticket push opens the ticket; an empty link falls back to the type',
+    () {
+      expect(
+        notificationLocation({
+          'type': 'ticket',
+          'ticket_id': '7',
+        }, supportAvailable: true),
+        '/account/help/tickets/7',
+      );
+      expect(
+        notificationLocation({
+          'link': '',
+          'type': 'ticket',
+          'ticket_id': 7,
+        }, supportAvailable: true),
+        '/account/help/tickets/7',
+      );
+      expect(
+        notificationLocation({'type': 'ticket', 'ticket_id': '-1'}),
+        isNull,
+      );
+      expect(
+        notificationLocation({
+          'link': 'jivo://orders/5/rate',
+        }, ratingAvailable: true),
+        '/orders/5/rate',
+      );
+    },
+  );
 }

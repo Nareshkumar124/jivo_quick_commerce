@@ -27,13 +27,24 @@ class NotificationTapRouter {
     required this.session,
     required this.launch,
     required this.trackingAvailable,
-  });
+    bool Function()? ratingAvailable,
+    bool Function()? supportAvailable,
+  }) : ratingAvailable = ratingAvailable ?? _no,
+       supportAvailable = supportAvailable ?? _no;
+
+  static bool _no() => false;
 
   final PushMessaging messaging;
   final GoRouter router;
   final SessionManager session;
   final LaunchState launch;
   final bool Function() trackingAvailable;
+
+  /// Whether `orders/<id>/rate` opens the rate screen (else the detail).
+  final bool Function() ratingAvailable;
+
+  /// Whether ticket links open the ticket (else Help).
+  final bool Function() supportAvailable;
 
   StreamSubscription<Object?>? _taps;
   String? _pending;
@@ -64,6 +75,8 @@ class NotificationTapRouter {
     final location = notificationLocation(
       data,
       trackingAvailable: trackingAvailable(),
+      ratingAvailable: ratingAvailable(),
+      supportAvailable: supportAvailable(),
     );
     if (location == null) return;
     if (_inApp) {
@@ -109,6 +122,8 @@ final notificationTapRouterProvider = Provider<NotificationTapRouter>((ref) {
     session: ref.watch(sessionProvider),
     launch: ref.watch(launchStateProvider),
     trackingAvailable: () => ref.read(trackingAvailableProvider),
+    ratingAvailable: () => ref.read(ratingAvailableProvider),
+    supportAvailable: () => ref.read(supportAvailableProvider),
   )..start();
   ref.onDispose(tapRouter.dispose);
   return tapRouter;

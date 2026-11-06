@@ -77,6 +77,40 @@ class _RateOrderScreenState extends ConsumerState<RateOrderScreen> {
       child: Text(text, style: theme.textTheme.titleMedium),
     );
 
+    // Opened from a notification or the inbox on an order already rated:
+    // show the rating instead of a form the server would refuse.
+    final existing = ref.watch(orderRatingProvider(widget.orderId)).value;
+    if (existing != null && !form.submitting) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.rateOrderTitle)),
+        body: ListView(
+          key: const Key('rate-order-done'),
+          padding: const EdgeInsets.all(JivoSpacing.gutter),
+          children: [
+            header(l10n.ratedOrder(existing.orderStars)),
+            const SizedBox(height: JivoSpacing.sm),
+            StarRatingPicker(value: existing.orderStars, onChanged: null),
+            if (existing.tags.isNotEmpty) ...[
+              const SizedBox(height: JivoSpacing.md),
+              Wrap(
+                spacing: JivoSpacing.sm,
+                runSpacing: JivoSpacing.sm,
+                children: [
+                  for (final tag in RatingTag.values)
+                    if (existing.tags.contains(tag))
+                      Chip(label: Text(ratingTagLabel(l10n, tag))),
+                ],
+              ),
+            ],
+            if (existing.comment.isNotEmpty) ...[
+              const SizedBox(height: JivoSpacing.md),
+              Text(existing.comment, style: theme.textTheme.bodyMedium),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: Text(l10n.rateOrderTitle)),
       body: ListView(

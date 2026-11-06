@@ -301,6 +301,8 @@ class _InboxTile extends ConsumerWidget {
               : deepLinkLocation(
                   link,
                   trackingAvailable: ref.read(trackingAvailableProvider),
+                  ratingAvailable: ref.read(ratingAvailableProvider),
+                  supportAvailable: ref.read(supportAvailableProvider),
                 );
           if (location != null) context.push(location);
         },
