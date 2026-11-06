@@ -432,3 +432,91 @@ def release_units(order, variant_id: int, quantity: int) -> int:
             reservation.status = ReservationStatus.RELEASED
         reservation.save(update_fields=["quantity", "status", "updated_at"])
         return units
+
+
+# ----------------------------------------------------------------------- pickup and returns (P5)
+
+
+def commit_reservations(order, actor=None) -> int:
+    """08 T9 / §6.1 "Picked up": for every ACTIVE reservation of the order, `on_hand -= qty`
+    and `reserved -= qty` with a `StockMovement(SALE)` linked to the order; the reservation
+    becomes COMMITTED. Rows are locked in variant-id order. Idempotent (0 the second time).
+    Must run inside the pickup transaction (the order row is locked by the caller)."""
+    from django.db import connection
+
+    from apps.inventory.models import ReservationStatus, StockReservation
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Stock is committed only inside the pickup transaction.")
+    active = list(
+        StockReservation.objects.select_for_update()
+        .filter(order=order, status=ReservationStatus.ACTIVE)
+        .order_by("variant_id")
+    )
+    if not active:
+        return 0
+    rows = {
+        row.variant_id: row
+        for row in StoreInventory.objects.select_for_update()
+        .filter(store_id=active[0].store_id, variant_id__in=[r.variant_id for r in active])
+        .order_by("variant_id")
+    }
+    reason = f"Order {order.order_number} picked up"
+    for reservation in active:
+        row = rows[reservation.variant_id]
+        quantity = reservation.quantity
+        with stock_write():
+            row.on_hand -= quantity
+            row.reserved = max(row.reserved - quantity, 0)
+            row.save(update_fields=["on_hand", "reserved", "updated_at"])
+        StockMovement.objects.create(
+            store_id=row.store_id,
+            variant_id=row.variant_id,
+            delta=-quantity,
+            type=MovementType.SALE,
+            reason=reason,
+            created_by=actor if getattr(actor, "is_authenticated", False) else None,
+            on_hand_after=row.on_hand,
+            order=order,
+        )
+    StockReservation.objects.filter(pk__in=[r.pk for r in active]).update(
+        status=ReservationStatus.COMMITTED
+    )
+    return len(active)
+
+
+def receive_returned_units(order, returns: list[tuple[int, int, int]], actor=None) -> None:
+    """08 T14 / §6.1: items of a failed delivery are back at the store. `returns` lists
+    `(variant_id, good, damaged)` units. Good units: `on_hand += good`, `StockMovement(RETURN)`.
+    Damaged units are recorded but never go back on the shelf: a RETURN of `damaged` followed
+    by a DAMAGE of `-damaged` (net `on_hand` unchanged; the ledger refuses a zero-delta row).
+    Rows are locked in variant-id order. The caller holds the order row lock."""
+    returns = sorted((r for r in returns if r[1] or r[2]), key=lambda r: r[0])
+    if not returns:
+        return
+    rows = {
+        row.variant_id: row
+        for row in StoreInventory.objects.select_for_update()
+        .filter(store_id=order.store_id, variant_id__in=[r[0] for r in returns])
+        .order_by("variant_id")
+    }
+    reason = f"Order {order.order_number} returned"
+    created_by = actor if getattr(actor, "is_authenticated", False) else None
+    for variant_id, good, damaged in returns:
+        row = rows[variant_id]  # committed at T9, so the row exists
+        for delta, kind in ((good + damaged, MovementType.RETURN), (-damaged, MovementType.DAMAGE)):
+            if not delta:
+                continue
+            with stock_write():
+                row.on_hand += delta
+                row.save(update_fields=["on_hand", "updated_at"])
+            StockMovement.objects.create(
+                store_id=row.store_id,
+                variant_id=variant_id,
+                delta=delta,
+                type=kind,
+                reason=reason if kind == MovementType.RETURN else f"{reason}: damaged",
+                created_by=created_by,
+                on_hand_after=row.on_hand,
+                order=order,
+            )

@@ -272,7 +272,10 @@ void main() {
     expect(find.text('4821'), findsOneWidget);
     final semantics = tester.ensureSemantics();
     await tester.pump();
-    expect(find.bySemanticsLabel(RegExp('Delivery OTP 4 8 2 1')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('Delivery OTP 4 8 2 1')),
+      findsOneWidget,
+    );
     semantics.dispose();
     expect(find.byKey(const Key('rider-card')), findsOneWidget);
     expect(find.text('Ravi Kumar'), findsOneWidget);
@@ -286,6 +289,35 @@ void main() {
     await openOrder(tester, idOf(OrderStatus.packing));
     expect(find.byKey(const Key('delivery-otp')), findsNothing);
     expect(find.byKey(const Key('rider-card')), findsNothing);
+  });
+
+  testWidgets('COD order: "pay ₹X to the rider" with the server total (P5)', (
+    tester,
+  ) async {
+    final id = idOf(OrderStatus.packing);
+    final total = (await backend.getOrderDetail(id)).bill.grandTotal;
+    await openOrders(tester, app());
+    await openOrder(tester, id);
+    final cod = tester.widget<Text>(find.byKey(const Key('cod-due-amount')));
+    expect(cod.data, startsWith('Pay ₹'));
+    expect(cod.data, contains(total.split('.').first));
+  });
+
+  testWidgets('delivery failed: same label, stage card, nothing to pay (P5)', (
+    tester,
+  ) async {
+    final id = idOf(OrderStatus.packing);
+    backend
+      ..advanceOrder(id, OrderStatus.packed)
+      ..advanceOrder(id, OrderStatus.outForDelivery)
+      ..advanceOrder(id, OrderStatus.deliveryFailed);
+    await openOrders(tester, app());
+    await openOrder(tester, id);
+    expect(find.byKey(const Key('order-status')), findsOneWidget);
+    expect(find.text('Delivery unsuccessful'), findsWidgets);
+    expect(find.byKey(const Key('delivery-stage-failed')), findsOneWidget);
+    expect(find.byKey(const Key('delivery-refund-note')), findsOneWidget);
+    expect(find.byKey(const Key('cod-due')), findsNothing);
   });
 
   testWidgets('without tracking the detail has no track button', (

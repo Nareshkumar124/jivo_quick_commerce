@@ -23,8 +23,13 @@ from apps.core.crypto import DecryptionError, decrypt
 from apps.core.models import TimeStampedModel
 from apps.delivery.choices import (
     RIDER_PROFILE_STATUSES,
+    CashEntryType,
+    DeliveryFailReason,
+    DeliveryTaskStatus,
     DocumentStatus,
     DocumentType,
+    OfferRejectReason,
+    OfferStatus,
     ShiftEndReason,
     VehicleType,
     required_documents,
@@ -304,7 +309,9 @@ class RiderLocation(models.Model):
     shift = models.ForeignKey(
         RiderShift, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
-    # `task` (nullable FK to DeliveryTask) arrives with the tasks of slice 5.3.
+    task = models.ForeignKey(
+        "DeliveryTask", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
 
     class Meta:
         constraints = [
@@ -315,3 +322,164 @@ class RiderLocation(models.Model):
 
     def __str__(self) -> str:
         return f"Rider {self.rider_id} at {self.recorded_at:%Y-%m-%d %H:%M:%S}"
+
+
+# --------------------------------------------------------------------------- slice 5.3
+
+RIDER_BUSY_STATUSES = ["ASSIGNED", "AT_STORE", "PICKED_UP", "AT_CUSTOMER", "FAILED", "RETURNING"]
+
+
+class AssignmentMode(models.TextChoices):
+    AUTO = "AUTO", "Offer accepted"
+    MANUAL = "MANUAL", "Assigned by ops"
+
+
+class DeliveryTask(TimeStampedModel):
+    """The delivery of one order (07 §2.8, 08 §3). Created when dispatch starts; states change
+    only through `apps.delivery.services` (dispatch, tasks). Lock order on every path: the
+    Order row, then this row, then offers, then the rider."""
+
+    order = models.OneToOneField(
+        "orders.Order", on_delete=models.PROTECT, related_name="delivery_task"
+    )
+    store = models.ForeignKey("stores.DarkStore", on_delete=models.PROTECT, related_name="+")
+    rider = models.ForeignKey(
+        Rider, on_delete=models.PROTECT, null=True, blank=True, related_name="tasks"
+    )
+    status = models.CharField(max_length=12, choices=DeliveryTaskStatus.choices)
+    assignment_mode = models.CharField(max_length=6, choices=AssignmentMode.choices, blank=True)
+    attempt_count = models.PositiveSmallIntegerField(
+        default=0, help_text="Offers made in the current search round (08 §5 step 6)."
+    )
+    search_started_at = models.DateTimeField(help_text="Start of the current search round.")
+    unassigned_at = models.DateTimeField(null=True, blank=True)
+    next_dispatch_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When dispatch runs next (retry, or resume after UNASSIGNED).",
+    )
+    distance_km = models.DecimalField(max_digits=6, decimal_places=2)
+    payout_amount = models.DecimalField(**MONEY, help_text="Estimated base + distance pay.")
+    cod_amount_previous = models.DecimalField(
+        **MONEY, null=True, blank=True, help_text="COD due before the last change (08 T8a)."
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    arrived_store_at = models.DateTimeField(null=True, blank=True)
+    picked_up_at = models.DateTimeField(null=True, blank=True)
+    arrived_customer_at = models.DateTimeField(null=True, blank=True)
+    arrival_override_reason = models.CharField(max_length=200, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    failed_at = models.DateTimeField(null=True, blank=True)
+    fail_reason = models.CharField(max_length=24, choices=DeliveryFailReason.choices, blank=True)
+    fail_note = models.CharField(max_length=300, blank=True)
+    fail_call_attempts = models.PositiveSmallIntegerField(null=True, blank=True)
+    fail_photo = models.FileField(upload_to="delivery-failures/", blank=True, max_length=200)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True, help_text="When the task ended.")
+    # Delivery OTP (04 §2.6): generated at T9, shown only to the order's owner while out for
+    # delivery; encrypted (not hashed) because the customer app shows it.
+    delivery_otp_encrypted = models.TextField(blank=True, editable=False)
+    otp_attempts = models.PositiveSmallIntegerField(default=0)
+    otp_locked_at = models.DateTimeField(null=True, blank=True)
+    # Wrong order codes at pickup; locked after PICKUP_CODE_MAX_ATTEMPTS (ops alerted).
+    pickup_attempts = models.PositiveSmallIntegerField(default=0)
+    pickup_locked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["rider"],
+                condition=models.Q(status__in=RIDER_BUSY_STATUSES),
+                name="delivery_task_one_active_per_rider",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rider__isnull=False)
+                | models.Q(status__in=["SEARCHING", "OFFERED", "UNASSIGNED", "CANCELLED"]),
+                name="delivery_task_rider_when_assigned",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "store"], name="delivery_task_status_store"),
+            models.Index(fields=["rider", "-ended_at"], name="delivery_task_rider_ended"),
+        ]
+        permissions = [
+            ("dispatch_order", "Can assign, unassign and re-dispatch riders (manual dispatch)"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Task {self.pk} ({self.status}) for order {self.order_id}"
+
+
+class DeliveryOffer(models.Model):
+    """One offer of a task to a rider (07 §2.8, 08 §5). At most one PENDING per task and per
+    rider (partial unique indexes)."""
+
+    task = models.ForeignKey(DeliveryTask, on_delete=models.CASCADE, related_name="offers")
+    rider = models.ForeignKey(Rider, on_delete=models.CASCADE, related_name="offers")
+    status = models.CharField(max_length=10, choices=OfferStatus.choices)
+    offered_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    responded_at = models.DateTimeField(null=True, blank=True)
+    reject_reason = models.CharField(max_length=16, choices=OfferRejectReason.choices, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task"],
+                condition=models.Q(status="PENDING"),
+                name="delivery_offer_one_pending_per_task",
+            ),
+            models.UniqueConstraint(
+                fields=["rider"],
+                condition=models.Q(status="PENDING"),
+                name="delivery_offer_one_pending_per_rider",
+            ),
+        ]
+        indexes = [models.Index(fields=["status", "expires_at"], name="delivery_offer_due")]
+
+    def __str__(self) -> str:
+        return f"Offer {self.pk} ({self.status})"
+
+
+class RiderCashLedgerQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValueError("The cash ledger is append-only.")
+
+    def delete(self):
+        raise ValueError("The cash ledger is append-only.")
+
+
+class RiderCashLedger(models.Model):
+    """Cash in hand (07 §2.8, 04 §2.7): append-only; `Rider.cash_in_hand` is its running
+    balance, changed only together with a new entry under the rider row lock."""
+
+    rider = models.ForeignKey(Rider, on_delete=models.PROTECT, related_name="cash_entries")
+    entry_type = models.CharField(max_length=14, choices=CashEntryType.choices)
+    amount = models.DecimalField(**MONEY, help_text="Signed: + collected, - deposited.")
+    balance_after = models.DecimalField(**MONEY)
+    order = models.ForeignKey(
+        "orders.Order", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    note = models.CharField(max_length=200, blank=True)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    objects = RiderCashLedgerQuerySet.as_manager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(amount=0), name="delivery_cashledger_amount_not_zero"
+            ),
+            models.UniqueConstraint(
+                fields=["order"],
+                condition=models.Q(entry_type="COD_COLLECTED"),
+                name="delivery_cashledger_one_cod_per_order",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.entry_type} {self.amount} (rider {self.rider_id})"

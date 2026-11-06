@@ -24,3 +24,31 @@ def purge_offboarded_kyc() -> int:
     from apps.delivery.services.privacy import purge_offboarded_kyc as purge
 
     return purge()
+
+
+# --------------------------------------------------------------------------- dispatch (5.3)
+
+
+@shared_task(name="delivery.dispatch_order")
+def dispatch_order(order_id: int) -> str:
+    """06 §5: offer the order's task to the best rider (08 §5). Idempotent."""
+    from apps.delivery.services.dispatch import dispatch_order as run
+
+    return run(order_id)
+
+
+@shared_task(name="delivery.expire_offer")
+def expire_offer(offer_id: int) -> str:
+    """06 §5 (countdown = offer timeout): expire a still-pending offer and re-dispatch."""
+    from apps.delivery.services.dispatch import expire_offer as run
+
+    return run(offer_id)
+
+
+@shared_task(name="delivery.dispatch_sweep")
+def dispatch_sweep() -> dict:
+    """Beat, every 15 s: expire due offers, run due searches, resume UNASSIGNED tasks (the
+    `unassigned_order_alert` of 06 §5 is raised by dispatch itself)."""
+    from apps.delivery.services.dispatch import dispatch_sweep as run
+
+    return run()

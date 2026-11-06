@@ -2575,7 +2575,7 @@ abstract class AppLocalizations {
   /// Tracking: OTP guidance.
   ///
   /// In en, this message translates to:
-  /// **'Share this code with the rider only when you receive your order.'**
+  /// **'Share this with your rider at the door, only when you receive your order.'**
   String get trackingOtpHint;
 
   /// Route sketch: the store end.
@@ -3021,6 +3021,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Payment service is unavailable right now. Try again, or choose Cash on Delivery.'**
   String get onlinePaymentUnavailable;
+
+  /// Tracking/order detail: task PICKED_UP (order OUT_FOR_DELIVERY).
+  ///
+  /// In en, this message translates to:
+  /// **'Order picked up'**
+  String get deliveryStagePickedUpTitle;
+
+  /// Tracking/order detail: picked-up explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider has your order and is on the way.'**
+  String get deliveryStagePickedUpBody;
+
+  /// Tracking/order detail: task AT_CUSTOMER.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider is arriving'**
+  String get deliveryStageArrivingTitle;
+
+  /// Tracking/order detail: arriving explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider has reached your location. Keep your delivery OTP ready.'**
+  String get deliveryStageArrivingBody;
+
+  /// Tracking/order detail: order DELIVERY_FAILED.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery failed'**
+  String get deliveryStageFailedTitle;
+
+  /// Tracking/order detail: delivery-failed explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t deliver your order. The items are going back to the store.'**
+  String get deliveryStageFailedBody;
+
+  /// Tracking/order detail: order RETURNED.
+  ///
+  /// In en, this message translates to:
+  /// **'Order returned'**
+  String get deliveryStageReturnedTitle;
+
+  /// Tracking/order detail: returned explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your items are back at the store.'**
+  String get deliveryStageReturnedBody;
+
+  /// Failed/returned delivery: payment_status REFUND_PENDING.
+  ///
+  /// In en, this message translates to:
+  /// **'Your refund has started. It goes back to your original payment method.'**
+  String get refundNoteStarted;
+
+  /// Failed/returned delivery: payment_status REFUNDED or PARTIALLY_REFUNDED; amount is the server's amount_refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} refunded to your original payment method.'**
+  String refundNoteDone(String amount);
+
+  /// Cash on delivery: the server's bill grand total to hand to the rider.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {amount} to the rider'**
+  String codPayRiderTitle(String amount);
+
+  /// Cash on delivery: how to pay.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery. Pay by cash or UPI when your order arrives.'**
+  String get codPayRiderHint;
 }
 
 class _AppLocalizationsDelegate

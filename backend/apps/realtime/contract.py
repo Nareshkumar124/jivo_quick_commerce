@@ -67,6 +67,12 @@ ALERT_CODES = (
     "REFUND_FAILED",  # a refund failed at the gateway: retry it
     "DELIVERY_FAILED",  # T13 (Phase 5)
     "DISPATCH_UNASSIGNED",  # no rider found (Phase 5)
+    "PICKUP_CODE_LOCKED",  # too many wrong pickup codes (Phase 5)
+    "DELIVERY_OTP_LOCKED",  # too many wrong delivery OTPs (Phase 5)
+    "STOCK_NOT_COMMITTED",  # T9 with no active stock reservation (Phase 5)
+    "ARRIVAL_GEOFENCE_OVERRIDE",  # rider marked arrival outside the drop geofence (Phase 5)
+    "MOCKED_LOCATION",  # the rider app reports mocked GPS (Phase 5)
+    "RIDER_STALE_ON_TASK",  # a rider on a task stopped sending locations (Phase 5)
 )
 OFFER_WITHDRAWN_REASONS = ("EXPIRED", "TAKEN", "ORDER_CANCELLED", "REASSIGNED")
 TASK_CHANGES = ("ORDER_PACKED", "ORDER_CANCELLED", "AMOUNT_CHANGED", "REASSIGNED", "STATUS_CHANGED")

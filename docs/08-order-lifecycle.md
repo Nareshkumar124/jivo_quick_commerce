@@ -65,6 +65,11 @@ Every transition goes through `orders.services.transition()`. Anything not liste
 | T13 | `OUT_FOR_DELIVERY` → `DELIVERY_FAILED` | Rider marks failed (reason; "not reachable" requires call attempts + the 10-min wait timer) or ops marks it | | Task → `RETURNING`; notify the customer and ops; refund policy applies (§6.4) |
 | T14 | `DELIVERY_FAILED` → `RETURNED` | Store staff "Receive return" | Rider is at the store | Good items → `StockMovement(RETURN)`, `on_hand += qty`; damaged → `StockMovement(DAMAGE)` record only; COD → nothing to collect; task `RETURNED`; rider freed |
 
+**Phase 5 implementation notes (slice 5.3):**
+- **T13 refund mapping (D-10 default, ⚠ to confirm):** "customer fault" (delivery fee kept) = CUSTOMER_NOT_REACHABLE and CUSTOMER_REFUSED; WRONG_ADDRESS and OTHER are refunded in full, following the §6.4 table literally.
+- **T14 damaged items:** recorded as a RETURN followed by a DAMAGE of the same units, so `on_hand` is unchanged and both movements exist (the ledger refuses zero-delta rows).
+- **T10:** the COD collection is validated before the OTP, so a wrong amount never uses an OTP attempt. After 5 wrong OTPs only ops can resolve the delivery.
+
 ### 2.1 Dispatch trigger
 Setting `DISPATCH_TRIGGER` = `ACCEPTED` (default) or `PLACED`. Dispatching in parallel with packing keeps the overall time low. The rider usually arrives as packing finishes.
 
@@ -127,7 +132,7 @@ Rules:
 
 When dispatch starts for an order:
 
-1. **Candidate riders** = riders where: `status=ACTIVE`, `is_online=true`, `home_store = order.store`, no active task (v1: one order at a time), last ping ≤ 2 min old, not already offered this task, and **for COD orders** `cash_in_hand + order.grand_total ≤ cash_limit`.
+1. **Candidate riders** = riders where: `status=ACTIVE`, `is_online=true`, `home_store = order.store`, no active task (v1: one order at a time), last ping ≤ 2 min old, not already offered this task in the current dispatch round (offers since the round's `search_started_at`; a re-dispatch after UNASSIGNED or an unassign starts a new round), and **for COD orders** `cash_in_hand + order.grand_total ≤ cash_limit`.
 2. **Rank** by: (a) riders *at the store* (within 200 m) first, ordered by longest idle time (fairness); then (b) others by distance to the store (PostGIS), nearest first.
 3. **Offer** to the top candidate: create `DeliveryOffer(PENDING, expires_at=now+30s)`, task `OFFERED`, send FCM high-priority + WebSocket. Schedule `expire_offer` at expiry.
 4. **Accept** (inside a transaction with a row lock on the task): task `ASSIGNED`, rider bound, all other pending offers withdrawn. A late accept after expiry returns `OFFER_EXPIRED`.

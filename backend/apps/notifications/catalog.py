@@ -132,6 +132,14 @@ SPECS: dict[str, EventSpec] = {
             data_type="offer.withdrawn",
         ),
         EventSpec(
+            "rider.task_assigned",
+            "Order assigned to you",
+            "Order {{order_number}} has been assigned to you. Pick it up at {{store_name}}.",
+            app=AppName.RIDER,
+            link="",
+            data_type="task.updated",
+        ),
+        EventSpec(
             "rider.order_ready",
             "Order ready for pickup",
             "Order {{order_number}} is packed and ready at {{store_name}}.",

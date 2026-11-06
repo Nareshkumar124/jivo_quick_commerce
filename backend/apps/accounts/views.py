@@ -34,6 +34,7 @@ from apps.accounts.serializers import (
 )
 from apps.accounts.services import addresses, auth, otp, profile
 from apps.accounts.services.addresses import MSG_TOO_MANY
+from apps.core.autoschema import BodyOnDeleteSchema
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import OtpThrottleMixin
 from apps.core.net import client_ip
@@ -468,6 +469,8 @@ class AccountDeleteView(OtpThrottleMixin, APIView):
 
 
 class DeviceRegisterView(APIView):
+    schema = BodyOnDeleteSchema()  # DELETE takes {fcm_token}
+
     @extend_schema(
         operation_id="me_device_register",
         tags=["account"],
