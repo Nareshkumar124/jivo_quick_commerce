@@ -32,6 +32,8 @@ import 'package:rider_app/features/onboarding/data/fake_rider_onboarding_backend
 import 'package:rider_app/features/onboarding/domain/image_picking.dart';
 import 'package:rider_app/features/onboarding/presentation/onboarding_providers.dart';
 import 'package:rider_app/features/notifications/data/api_device_registry.dart';
+import 'package:rider_app/features/notifications/data/fake_inbox_backend.dart';
+import 'package:rider_app/features/notifications/presentation/inbox_providers.dart';
 import 'package:rider_app/features/notifications/presentation/push_providers.dart';
 import 'package:rider_app/features/shift/data/fake_shift_backend.dart';
 import 'package:rider_app/features/shift/data/fake_today_summary.dart';
@@ -208,6 +210,7 @@ class RiderTestHarness {
   final shift = FakeShiftBackend(delay: Duration.zero);
   final today = FakeTodaySummary(delay: Duration.zero);
   final devices = FakeDeviceRegistry();
+  late final inbox = FakeInboxBackend(delay: Duration.zero, clock: () => now);
   List<String> scannerValues = const ['7K2P', 'HELLO-WORLD'];
 
   /// The test screen in physical pixels (DPR 2.625): 411×914 dp. Screens
@@ -244,6 +247,7 @@ class RiderTestHarness {
     fakeShiftBackendProvider.overrideWithValue(shift),
     fakeTodaySummaryProvider.overrideWithValue(today),
     fakeDeviceRegistryProvider.overrideWithValue(devices),
+    fakeInboxBackendProvider.overrideWithValue(inbox),
     qrScannerBuilderProvider.overrideWith((ref) => fakeScanner(scannerValues)),
     scannerControllerProvider.overrideWith((ref) => null),
     ...extraOverrides,

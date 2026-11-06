@@ -12,6 +12,7 @@ import '../features/earnings/presentation/earnings_screen.dart';
 import '../features/earnings/presentation/payouts_screen.dart';
 import '../features/history/presentation/history_detail_screen.dart';
 import '../features/history/presentation/history_screen.dart';
+import '../features/notifications/presentation/inbox_screen.dart';
 import '../features/launch/presentation/launch_controller.dart';
 import '../features/launch/presentation/maintenance_screen.dart';
 import '../features/launch/presentation/splash_screen.dart';
@@ -203,6 +204,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ),
           ],
+        ),
+        GoRoute(
+          path: Routes.inbox,
+          name: 'inbox',
+          builder: (_, _) => const InboxScreen(),
         ),
         GoRoute(
           path: Routes.profile,

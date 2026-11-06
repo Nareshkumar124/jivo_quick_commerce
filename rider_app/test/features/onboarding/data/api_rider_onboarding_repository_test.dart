@@ -53,6 +53,7 @@ const _profile = {
     'cash_in_hand': '0.00',
     'cash_limit': '5000.00',
     'limit_reached': false,
+    'deposit_required': false,
   },
   'today': {
     'date': '2026-11-04',

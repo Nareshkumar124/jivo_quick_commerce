@@ -16,8 +16,13 @@ import '../data/noop_push_messaging.dart';
 import '../domain/device_registry.dart';
 import '../domain/push_messaging.dart';
 import '../domain/rider_push.dart';
+import 'inbox_providers.dart';
 
-/// TODO(D-19): the Firebase adapter replaces the no-op in P6.
+/// The push channel. TODO(D-19): the Firebase adapter (firebase_messaging,
+/// with its background isolate that turns an `offer.new` data message into
+/// the full-screen offer alert) replaces the no-op once Jivo's FCM projects
+/// exist. Until then offers arrive on the rider socket, with polling as the
+/// fallback. Tests (and a future dev tool) use `FakePushMessaging`.
 final pushMessagingProvider = Provider<PushMessaging>(
   (ref) => const NoopPushMessaging(),
 );
@@ -65,9 +70,6 @@ final pushRegistrationControllerProvider =
 /// refresh. A transient failure (no network, 5xx, 429) retries with backoff;
 /// a client error (4xx) is logged and not retried until the next trigger.
 ///
-/// TODO(api): there is no `DELETE /me/devices/` in the contract, so logout
-/// cannot unregister the token. The upsert moves it to the next user who
-/// signs in on this phone.
 class PushRegistrationController extends Notifier<PushRegistrationState> {
   Timer? _retry;
   Backoff? _backoff;
@@ -104,7 +106,7 @@ class PushRegistrationController extends Notifier<PushRegistrationState> {
     try {
       token = await ref.read(pushMessagingProvider).token();
     } on Object catch (error) {
-      debugPrint('PushRegistration: token unavailable: $error');
+      debugPrint('PushRegistration: token unavailable: ${error.runtimeType}');
       return;
     }
     if (token != null && ref.mounted) await _register(token);
@@ -150,7 +152,7 @@ class PushRegistrationController extends Notifier<PushRegistrationState> {
       try {
         token = await push.token();
       } on Object catch (error) {
-        debugPrint('PushRegistration: token unavailable: $error');
+        debugPrint('PushRegistration: token unavailable: ${error.runtimeType}');
       }
     }
     if (token == null || !ref.mounted) return token;
@@ -207,17 +209,23 @@ class PushMessageHandler {
     if (!_ref.read(riderWorkActiveProvider)) return;
     switch (RiderPush.parse(message.data)) {
       case OfferPush():
-        unawaited(_ref.read(offerControllerProvider.notifier).refresh());
+        // A new offer replaces an ended one still on screen ("expired").
+        final offers = _ref.read(offerControllerProvider.notifier);
+        if (_ref.read(offerControllerProvider).isEnded) offers.acknowledge();
+        unawaited(offers.refresh());
       case OfferWithdrawnPush(:final offerId):
         _ref.read(offerControllerProvider.notifier).withdrawn(offerId);
         unawaited(
           _ref
               .read(offerAlertNotificationsProvider)
               .dismiss(id: OfferAlertNotifications.offerNotificationId)
-              .catchError((Object e) => debugPrint('dismiss alert: $e')),
+              .catchError(
+                (Object e) => debugPrint('dismiss alert: ${e.runtimeType}'),
+              ),
         );
       case TaskUpdatedPush():
         unawaited(_ref.read(taskFlowControllerProvider.notifier).load());
+        _ref.invalidate(inboxUnreadCountProvider);
       case UnknownPush():
         // Only the type: the payload may carry order details.
         debugPrint(

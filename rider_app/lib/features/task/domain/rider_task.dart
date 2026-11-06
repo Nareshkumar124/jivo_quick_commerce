@@ -176,6 +176,8 @@ class RiderTask {
     this.otpAttemptsRemaining,
     this.otpLocked = false,
     this.codQr,
+    this.pickupAttemptsRemaining,
+    this.pickupLocked = false,
   });
 
   final int id;
@@ -225,6 +227,14 @@ class RiderTask {
   final bool otpLocked;
   final CodQr? codQr;
 
+  /// `pickup_code.attempts_remaining`: wrong order codes left before the
+  /// pickup locks. Null when the server did not send it (older fakes).
+  final int? pickupAttemptsRemaining;
+
+  /// `pickup_code.locked`: too many wrong codes; the store or ops hand the
+  /// order over (or ops unlock it). Restored after a restart.
+  final bool pickupLocked;
+
   bool get isCod => paymentType == PaymentType.cod;
 
   RiderTask copyWith({
@@ -238,6 +248,8 @@ class RiderTask {
     CodQr? codQr,
     String? codAmountDue,
     String? codAmountChangedFrom,
+    int? pickupAttemptsRemaining,
+    bool? pickupLocked,
   }) => RiderTask(
     id: id,
     status: status ?? this.status,
@@ -260,6 +272,9 @@ class RiderTask {
     otpAttemptsRemaining: otpAttemptsRemaining ?? this.otpAttemptsRemaining,
     otpLocked: otpLocked ?? this.otpLocked,
     codQr: codQr ?? this.codQr,
+    pickupAttemptsRemaining:
+        pickupAttemptsRemaining ?? this.pickupAttemptsRemaining,
+    pickupLocked: pickupLocked ?? this.pickupLocked,
   );
 
   @override

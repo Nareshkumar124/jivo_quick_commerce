@@ -26,6 +26,7 @@ Map<String, Object?> _meWith({Object? depositRequired, bool limit = false}) {
     'limit_reached': limit,
   };
   if (depositRequired != null) cash['deposit_required'] = depositRequired;
+  // Required since the P5 schema: the server decides, never limit_reached.
   return {...riderMeActiveExample, 'cash': cash};
 }
 
@@ -105,15 +106,16 @@ void main() {
       expect(http.requests.map((r) => r.path), isNot(contains(_me)));
     });
 
-    test(
-      'without deposit_required the verdict falls back to limit_reached',
-      () async {
-        http.answers[_ledger] = const Canned(200, ledgerExample);
-        http.answers[_me] = Canned(200, _meWith(limit: true));
-        final page = await ApiCashRepository(cannedApi(http)).fetchLedger();
-        expect(page.summary!.depositRequired, isTrue);
-      },
-    );
+    test('deposit_required is the server verdict, not limit_reached', () async {
+      http.answers[_ledger] = const Canned(200, ledgerExample);
+      http.answers[_me] = Canned(
+        200,
+        _meWith(limit: true, depositRequired: false),
+      );
+      final page = await ApiCashRepository(cannedApi(http)).fetchLedger();
+      expect(page.summary!.limitReached, isTrue);
+      expect(page.summary!.depositRequired, isFalse);
+    });
 
     test('errors arrive as ApiError, also when /rider/me/ fails', () async {
       http.answers[_ledger] = Canned(503, errorBody('MAINTENANCE'));

@@ -175,6 +175,7 @@ void main() {
             'attempts_remaining': 0,
             'locked': true,
           },
+          'pickup_code': {'attempts_remaining': 0, 'locked': true},
           'cod_qr': {
             'qr_id': 'qr_1',
             'image_url': 'https://rzp.example/qr.png',
@@ -198,6 +199,8 @@ void main() {
       expect(task.codAmountChangedFrom, '549.00');
       expect(task.otpLocked, isTrue);
       expect(task.otpAttemptsRemaining, 0);
+      expect(task.pickupLocked, isTrue);
+      expect(task.pickupAttemptsRemaining, 0);
       expect(task.codQr!.status, UpiQrStatus.paid);
       expect(task.codQr!.imageUrl, 'https://rzp.example/qr.png');
       expect(task.earningsTotal, '42.00');

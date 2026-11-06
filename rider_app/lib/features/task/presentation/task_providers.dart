@@ -10,6 +10,7 @@ import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../../offers/domain/delivery_offer.dart';
 import '../../offers/presentation/offer_alert_providers.dart';
+import '../../realtime/presentation/rider_socket_providers.dart';
 import '../data/api_task_repository.dart';
 import '../data/fake_task_backend.dart';
 import '../data/platform_task_services.dart';
@@ -63,9 +64,15 @@ final offerRepositoryProvider = Provider<OfferRepository>(
   (ref) => _taskBackend<OfferRepository>(ref, const _Unavailable()),
 );
 
-final offerEventSourceProvider = Provider<OfferEventSource>(
-  (ref) => _taskBackend<OfferEventSource>(ref, const _Unavailable()),
-);
+/// Pushed offer events: the fake's in `FAKE_API` builds, otherwise the
+/// rider socket's (`/ws/v1/rider/`, P6).
+final offerEventSourceProvider = Provider<OfferEventSource>((ref) {
+  if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
+  if (ref.watch(appEnvProvider).useFakeApi) {
+    return ref.watch(fakeTaskBackendProvider);
+  }
+  return ref.watch(socketOfferEventsProvider);
+});
 
 final taskRepositoryProvider = Provider<TaskRepository>(
   (ref) => _taskBackend<TaskRepository>(ref, const _Unavailable()),

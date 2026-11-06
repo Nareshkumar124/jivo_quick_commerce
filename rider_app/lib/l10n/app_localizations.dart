@@ -2534,6 +2534,36 @@ abstract class AppLocalizations {
   /// **'Balance {amount}'**
   String cashBalanceAfter(String amount);
 
+  /// Inbox screen title and the home bell tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get inboxTitle;
+
+  /// No description provided for @inboxEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications yet.'**
+  String get inboxEmpty;
+
+  /// No description provided for @inboxMarkAllRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all read'**
+  String get inboxMarkAllRead;
+
+  /// No description provided for @inboxMarkAllFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not mark them read. Try again.'**
+  String get inboxMarkAllFailed;
+
+  /// No description provided for @inboxUnreadBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} unread'**
+  String inboxUnreadBadge(String count);
+
   /// No description provided for @historyTitle.
   ///
   /// In en, this message translates to:

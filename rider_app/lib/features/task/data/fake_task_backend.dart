@@ -169,6 +169,10 @@ class FakeTaskBackend
     _pickupAttemptsLeft = maxPickupAttempts;
   }
 
+  /// Wrong pickup codes left on the server (tests: a lock or attempts used
+  /// before a restart; ops unlock = [maxPickupAttempts]).
+  set pickupAttemptsLeft(int left) => _pickupAttemptsLeft = left;
+
   RiderTask newTask({bool cod = false, TaskStatus? status}) {
     final task = _newTask(_nextId++, cod: cod);
     return status == null ? task : task.copyWith(status: status);
@@ -227,7 +231,10 @@ class FakeTaskBackend
         recent != null &&
         now.difference(recent.endedAt ?? now) < const Duration(minutes: 10);
     return CurrentTask(
-      task: _task,
+      task: switch (_task) {
+        final task? => _withPickupState(task),
+        null => null,
+      },
       recentTask: showRecent ? recent : null,
       serverTime: now,
     );
@@ -558,8 +565,14 @@ class FakeTaskBackend
       applyThenFailNext = null;
       throw lost;
     }
-    return task;
+    return _withPickupState(task);
   }
+
+  /// `pickup_code {attempts_remaining, locked}` as the server sends it.
+  RiderTask _withPickupState(RiderTask task) => task.copyWith(
+    pickupAttemptsRemaining: _pickupAttemptsLeft,
+    pickupLocked: _pickupAttemptsLeft <= 0,
+  );
 
   static ApiError _riderError(
     RiderErrorCode code,

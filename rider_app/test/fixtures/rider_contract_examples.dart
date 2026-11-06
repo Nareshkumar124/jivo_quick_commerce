@@ -175,6 +175,7 @@ const Map<String, Object?> riderMeActiveExample = {
     "cash_in_hand": "1250.00",
     "cash_limit": "5000.00",
     "limit_reached": false,
+    "deposit_required": false,
   },
 };
 
@@ -264,6 +265,7 @@ const Map<String, Object?> arrivedCustomerExample = {
   "estimated_payout": "42.00",
   "geofence": {"store_radius_m": 200, "customer_radius_m": 200},
   "delivery_otp": {"length": 4, "attempts_remaining": 5, "locked": false},
+  "pickup_code": {"attempts_remaining": 5, "locked": false},
   "cod_qr": null,
   "assigned_at": "2026-11-10T09:30:12.000000Z",
   "arrived_store_at": "2026-11-10T09:36:40.000000Z",
@@ -331,6 +333,7 @@ const Map<String, Object?> deliveredTaskExample = {
   "estimated_payout": "42.00",
   "geofence": {"store_radius_m": 200, "customer_radius_m": 200},
   "delivery_otp": {"length": 4, "attempts_remaining": 5, "locked": false},
+  "pickup_code": {"attempts_remaining": 5, "locked": false},
   "cod_qr": null,
   "assigned_at": "2026-11-10T09:30:12.000000Z",
   "arrived_store_at": "2026-11-10T09:36:40.000000Z",
@@ -402,6 +405,7 @@ const Map<String, Object?> currentTaskAtStoreExample = {
     "estimated_payout": "42.00",
     "geofence": {"store_radius_m": 200, "customer_radius_m": 200},
     "delivery_otp": {"length": 4, "attempts_remaining": 5, "locked": false},
+    "pickup_code": {"attempts_remaining": 5, "locked": false},
     "cod_qr": null,
     "assigned_at": "2026-11-10T09:30:12.000000Z",
     "arrived_store_at": "2026-11-10T09:36:40.000000Z",

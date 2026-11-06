@@ -12,9 +12,8 @@ import '../domain/task_status.dart';
 /// 5.3/5.4 contract, T-515b): offers, the delivery steps, the UPI QR and
 /// `deliver` with the COD collection.
 ///
-/// Offer events: no push channel is bound here yet (FCM `offer.new` wakes
-/// the app, the WebSocket is P6), so [events] is empty and the offer
-/// controller's polling of `GET /rider/offers/current/` finds offers.
+/// Offer events come from the rider socket (`SocketOfferEvents`, P6) and
+/// FCM, not from here: [events] is empty.
 class ApiTaskRepository
     implements OfferRepository, OfferEventSource, TaskRepository {
   ApiTaskRepository(this._api);
@@ -310,4 +309,6 @@ RiderTask riderTaskOf(api.RiderTask task) => RiderTask(
     final qr? => codQrOf(qr),
     null => null,
   },
+  pickupAttemptsRemaining: task.pickupCode.attemptsRemaining,
+  pickupLocked: task.pickupCode.locked,
 );

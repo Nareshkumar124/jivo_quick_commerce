@@ -48,6 +48,9 @@ abstract final class Routes {
   /// One past task, e.g. `/history/7001`.
   static String historyDetail(int taskId) => '$history/$taskId';
   static const profile = '/profile';
+
+  /// ACTIVE riders: the in-app inbox (P6).
+  static const inbox = '/inbox';
   static const profileDocuments = '/profile/documents';
 
   /// An ACTIVE rider re-uploads one rejected (or missing) document, e.g.
@@ -61,6 +64,7 @@ abstract final class Routes {
     cash,
     history,
     profile,
+    inbox,
   ].any((root) => location == root || location.startsWith('$root/'));
 
   /// Permissions gate (04 §2.1, screen 7) and the prominent location

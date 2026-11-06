@@ -13,8 +13,7 @@ class ApiTodaySummary implements TodaySummaryRepository {
 
   @override
   Future<TodaySummary> fetch() async {
-    final read = await fetchRiderMe(_api);
-    final me = read.profile;
+    final me = await fetchRiderMe(_api);
     return TodaySummary(
       deliveredCount: me.today.ordersDelivered,
       earnedToday: me.today.earnings,
@@ -22,7 +21,7 @@ class ApiTodaySummary implements TodaySummaryRepository {
       cashInHand: me.cash.cashInHand,
       cashLimit: me.cash.cashLimit,
       limitReached: me.cash.limitReached,
-      depositRequired: read.depositRequired,
+      depositRequired: me.cash.depositRequired,
       homeStoreName: me.homeStore?.name,
       homeStoreLocation: switch (me.homeStore) {
         final store? => GeoPoint(store.lat, store.lng),
