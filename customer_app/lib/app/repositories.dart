@@ -33,6 +33,7 @@ import '../features/orders/data/api_order_repository.dart';
 import '../features/orders/data/order_history_repository.dart';
 import '../features/orders/data/order_repository.dart';
 import '../features/profile/data/profile_repository.dart';
+import '../features/rating/data/api_rating_repository.dart';
 import '../features/rating/data/rating_repository.dart';
 import '../features/support/data/api_support_repository.dart';
 import '../features/support/data/support_repository.dart';
@@ -178,15 +179,28 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
       : ApiNotificationRepository(ref.watch(jivoApiProvider)),
 );
 
-/// Whether order rating is shown. TODO(api): true only on fakes until
-/// `POST /orders/{id}/rating/` (Phase 7) is bound.
-final ratingAvailableProvider = Provider<bool>((ref) => _fake(ref));
+/// TODO(api): the one-line switch to the real ratings API. Set it to true
+/// once `POST`/`GET /orders/{id}/rating/` (Phase 7, `docs/api-requests.md`
+/// #34) are merged into develop; the dev flavor then rates on the API.
+const ratingApiBound = false;
 
-/// Order and rider ratings (Phase 7 lookahead on fakes).
-final ratingRepositoryProvider = Provider<RatingRepository>(
+/// Whether order rating is shown: on fakes, and in the dev flavor once
+/// [ratingApiBound]. Staging and prod follow with the cart (DL-30).
+final ratingAvailableProvider = Provider<bool>(
   (ref) =>
-      _fake(ref) ? FakeRatingRepository() : const UnavailableRatingRepository(),
+      _fake(ref) ||
+      (ratingApiBound && ref.watch(appEnvProvider).flavor == Flavor.dev),
 );
+
+/// Order and rider ratings: the fake with `FAKE_API`, the API once
+/// [ratingApiBound], otherwise hidden.
+final ratingRepositoryProvider = Provider<RatingRepository>((ref) {
+  if (_fake(ref)) return FakeRatingRepository();
+  if (!ref.watch(ratingAvailableProvider)) {
+    return const UnavailableRatingRepository();
+  }
+  return ApiRatingRepository(ref.watch(dioProvider));
+});
 
 /// Whether FAQs and support tickets are shown: the dev flavor (API or
 /// fakes) since the P7 support API (T-713); staging and prod show only

@@ -22,6 +22,11 @@ Set<String> parseAppLinkHosts(String value) => {
 /// - `orders/<id>`: the order's tracking, or its detail when tracking isn't
 ///   available in this build ([trackingAvailable])
 /// - `orders/<id>/detail`: the order detail
+/// - `orders/<id>/rate`: rate the delivered order ([ratingAvailable]),
+///   otherwise its detail (which carries the rating card when it can)
+/// - `support/tickets/<id>`, `support/tickets`: a support ticket or the
+///   ticket list ([supportAvailable]), otherwise Help (call support)
+/// - `help`: Help & support
 /// - `product/<slug>`, `collection/<slug>`, `category/<slug>`
 /// - `orders`, `notifications`, `cart`, `home`
 ///
@@ -29,6 +34,8 @@ Set<String> parseAppLinkHosts(String value) => {
 String? deepLinkLocation(
   Uri uri, {
   bool trackingAvailable = false,
+  bool ratingAvailable = false,
+  bool supportAvailable = false,
   Set<String>? allowedHosts,
 }) {
   switch (uri.scheme) {
@@ -69,6 +76,20 @@ String? deepLinkLocation(
     case ['orders', final id, 'detail']:
       final orderId = _id(id);
       return orderId == null ? null : Routes.order(orderId);
+    case ['orders', final id, 'rate']:
+      final orderId = _id(id);
+      if (orderId == null) return null;
+      return ratingAvailable
+          ? Routes.rateOrder(orderId)
+          : Routes.order(orderId);
+    case ['help']:
+      return Routes.help;
+    case ['support', 'tickets']:
+      return supportAvailable ? Routes.tickets : Routes.help;
+    case ['support', 'tickets', final id]:
+      final ticketId = _id(id);
+      if (ticketId == null) return null;
+      return supportAvailable ? Routes.ticket(ticketId) : Routes.help;
     case ['product', final s] when slug.hasMatch(s):
       return Routes.product(s);
     case ['collection', final s] when slug.hasMatch(s):
@@ -79,30 +100,39 @@ String? deepLinkLocation(
   return null;
 }
 
-/// The location for an FCM data payload (`type` + `order_id` / `slug`), as
-/// sent from Phase 6 (`08 §9`).
+/// The location for an FCM data payload (`type` + `order_id` / `slug` /
+/// `ticket_id`), as sent from Phase 6 (`08 §9`). A `link` wins over the
+/// type.
 String? notificationLocation(
   Map<String, Object?> data, {
   bool trackingAvailable = false,
+  bool ratingAvailable = false,
+  bool supportAvailable = false,
   Set<String>? allowedHosts,
 }) {
   final link = data['link'];
-  if (link is String) {
+  if (link is String && link.isNotEmpty) {
     final uri = Uri.tryParse(link);
     if (uri != null) {
       return deepLinkLocation(
         uri,
         trackingAvailable: trackingAvailable,
+        ratingAvailable: ratingAvailable,
+        supportAvailable: supportAvailable,
         allowedHosts: allowedHosts,
       );
     }
   }
   final type = data['type'];
   final orderId = data['order_id'];
+  final ticketId = data['ticket_id'];
   final slug = data['slug'];
   final path = switch (type) {
     'order' when orderId != null && _id('$orderId') != null =>
       'orders/$orderId',
+    // TODO(api): a support reply push (`docs/api-requests.md`, P7).
+    'ticket' when ticketId != null && _id('$ticketId') != null =>
+      'support/tickets/$ticketId',
     'product' ||
     'collection' ||
     'category' when slug is String => '$type/$slug',
@@ -113,6 +143,8 @@ String? notificationLocation(
       : deepLinkLocation(
           Uri.parse('jivo://$path'),
           trackingAvailable: trackingAvailable,
+          ratingAvailable: ratingAvailable,
+          supportAvailable: supportAvailable,
         );
 }
 
