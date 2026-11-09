@@ -4,15 +4,10 @@ import 'package:jivo_core/jivo_core.dart';
 /// "My rating" (04 §2.9, P7): the rider's average, how many ratings it is
 /// based on, the tags customers chose and the recent ratings. No customer
 /// data: no name, phone, address or comment (a comment is free text and may
-/// carry PII).
-///
-/// TODO(api): the shapes are the app's proposal until the backend's P7
-/// ratings API lands (api-requests, P7 rider report):
-/// `GET /rider/ratings/?before_id=` →
-/// `{rating_avg ("4.8" or null), ratings_count, tag_counts [{tag, count}],
-///   results [{id, stars, tags[], rated_at, order_number}], next}`.
+/// carry PII). From `GET /rider/ratings/?before_id=` (`rider_ratings_list`).
 
-/// Rider-facing rating tags (the rider subset of api-requests #34).
+/// Rider-facing rating tags (the rider subset of `RatingTagEnum`; the store
+/// tags such as WELL_PACKED map to [unknown] and are not shown).
 enum RatingTag {
   onTime('ON_TIME', positive: true),
   politeRider('POLITE_RIDER', positive: true),
@@ -98,14 +93,4 @@ class RatingSummary {
 abstract interface class RatingRepository {
   /// The summary with the newest ratings; [beforeId] pages back.
   Future<RatingSummary> fetch({int? beforeId});
-}
-
-/// Builds with the rider work screens but no ratings API yet: every call
-/// is 404, and the screen says ratings are not available yet.
-class UnavailableRatingRepository implements RatingRepository {
-  const UnavailableRatingRepository();
-
-  @override
-  Future<RatingSummary> fetch({int? beforeId}) async =>
-      throw const ApiError(code: ApiErrorCode.notFound, statusCode: 404);
 }

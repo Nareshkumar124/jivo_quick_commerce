@@ -182,7 +182,8 @@ class _Detail extends StatelessWidget {
           onPressed: () => context.push(
             Routes.newTicket(
               topic: RiderTicketTopic.task.code,
-              reference: detail.entry.orderNumber,
+              taskId: detail.entry.taskId,
+              label: detail.entry.orderNumber,
             ),
           ),
           icon: const Icon(Icons.support_agent),

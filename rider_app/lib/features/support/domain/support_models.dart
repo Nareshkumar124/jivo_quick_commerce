@@ -56,36 +56,20 @@ enum TicketStatus {
   }
 }
 
-/// What the rider needs help with. The ticket API has only the customer's
-/// categories and takes an `order_id` only for the caller's own order (a
-/// rider never owns the order), so every rider topic is sent as `OTHER` or
-/// `ACCOUNT` and the topic and reference travel in a first line of the
-/// message (`[TASK JV-261104-000123] ...`).
-///
-/// TODO(api): rider categories (TASK, PAYOUT, CASH) and `task_id` /
-/// `payout_id` on create (api-requests, P7 rider report).
+/// What the rider needs help with: the ticket `category` the rider app
+/// sends (TASK, PAYOUT and CASH are rider-only; the customer categories are
+/// never offered here).
 enum RiderTicketTopic {
-  task('TASK', wireCategory: 'OTHER', takesReference: true),
-  payout('PAYOUT', wireCategory: 'OTHER', takesReference: true),
-  cash('CASH', wireCategory: 'OTHER', takesReference: false),
-  account('ACCOUNT', wireCategory: 'ACCOUNT', takesReference: false),
-  app('APP', wireCategory: 'OTHER', takesReference: false),
-  other('OTHER', wireCategory: 'OTHER', takesReference: false);
+  task('TASK'),
+  payout('PAYOUT'),
+  cash('CASH'),
+  account('ACCOUNT'),
+  other('OTHER');
 
-  const RiderTicketTopic(
-    this.code, {
-    required this.wireCategory,
-    required this.takesReference,
-  });
+  const RiderTicketTopic(this.code);
 
-  /// The tag in the message's first line, read by support staff.
+  /// The wire `category`.
   final String code;
-
-  /// The `category` sent to `support_tickets_create`.
-  final String wireCategory;
-
-  /// The form asks for an order number or payout reference.
-  final bool takesReference;
 
   static RiderTicketTopic? fromCode(String? code) {
     for (final topic in values) {
@@ -100,65 +84,60 @@ enum RiderTicketTopic {
 const ticketMessageMinLength = 10;
 const ticketMessageMaxLength = 1000;
 
-/// The longest reference the form takes (an order number or payout period).
-const ticketReferenceMaxLength = 40;
-
-/// What the rider typed may be at most this long, so the tagged message
-/// stays within [ticketMessageMaxLength].
-const riderTicketTextMaxLength =
-    ticketMessageMaxLength - ticketReferenceMaxLength - 12;
-
 /// Why a new ticket can't be sent yet.
-enum TicketDraftProblem { tooShort, tooLong, referenceTooLong }
+enum TicketDraftProblem { tooShort, tooLong }
 
-/// A new ticket as the rider fills it in.
+/// A new ticket as the rider fills it in. [taskId] / [payoutId] link the
+/// ticket to one of the rider's tasks or payouts (sent as `task_id` /
+/// `payout_id`, only with the matching topic); [label] is how the screen
+/// shows that record (the order number, the payout period) and is never
+/// sent.
 @immutable
 class TicketDraft {
-  const TicketDraft({required this.topic, this.reference = '', this.text = ''});
+  const TicketDraft({
+    required this.topic,
+    this.taskId,
+    this.payoutId,
+    this.label,
+    this.text = '',
+  });
 
   final RiderTicketTopic topic;
-  final String reference;
+  final int? taskId;
+  final int? payoutId;
+  final String? label;
   final String text;
+
+  /// The task sent with the ticket (TASK only).
+  int? get linkedTaskId => topic == RiderTicketTopic.task ? taskId : null;
+
+  /// The payout sent with the ticket (PAYOUT only).
+  int? get linkedPayoutId => topic == RiderTicketTopic.payout ? payoutId : null;
+
+  /// The label of the linked record, if the current topic has one.
+  String? get linkedLabel =>
+      linkedTaskId != null || linkedPayoutId != null ? label : null;
 
   TicketDraftProblem? get problem {
     final body = text.trim();
     if (body.length < ticketMessageMinLength) {
       return TicketDraftProblem.tooShort;
     }
-    if (body.length > riderTicketTextMaxLength) {
+    if (body.length > ticketMessageMaxLength) {
       return TicketDraftProblem.tooLong;
-    }
-    if (reference.trim().length > ticketReferenceMaxLength) {
-      return TicketDraftProblem.referenceTooLong;
     }
     return null;
   }
 
-  /// The message sent to support: a tag line, then the rider's text.
-  String get message {
-    final ref = topic.takesReference ? _oneLine(reference) : '';
-    final tag = ref.isEmpty ? topic.code : '${topic.code} $ref';
-    return '[$tag] ${text.trim()}';
-  }
+  /// The message sent to support: the rider's text, trimmed.
+  String get message => text.trim();
 
-  static String _oneLine(String value) =>
-      value.trim().replaceAll(RegExp(r'[\s\[\]]+'), ' ');
-}
-
-/// Splits a ticket's first message into the rider's topic and text. A
-/// message without a known tag comes back unchanged with no topic.
-({RiderTicketTopic? topic, String? reference, String text}) parseRiderMessage(
-  String message,
-) {
-  final match = RegExp(r'^\[([A-Z]+)(?: ([^\]]+))?\] ?').firstMatch(message);
-  final topic = RiderTicketTopic.fromCode(match?.group(1));
-  if (match == null || topic == null) {
-    return (topic: null, reference: null, text: message);
-  }
-  return (
-    topic: topic,
-    reference: match.group(2),
-    text: message.substring(match.end),
+  TicketDraft copyWith({RiderTicketTopic? topic, String? text}) => TicketDraft(
+    topic: topic ?? this.topic,
+    taskId: taskId,
+    payoutId: payoutId,
+    label: label,
+    text: text ?? this.text,
   );
 }
 
@@ -171,6 +150,10 @@ class SupportTicket {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.topic,
+    this.orderNumber,
+    this.taskId,
+    this.payoutId,
     this.lastMessage,
   });
 
@@ -179,6 +162,15 @@ class SupportTicket {
   /// Shown to the rider and to support, e.g. `TK-000123`.
   final String number;
   final TicketStatus status;
+
+  /// The ticket's `category`; null for a category the rider app doesn't
+  /// offer.
+  final RiderTicketTopic? topic;
+
+  /// For a task ticket, that task's order number.
+  final String? orderNumber;
+  final int? taskId;
+  final int? payoutId;
   final DateTime createdAt;
 
   /// The last activity.
@@ -197,6 +189,10 @@ class SupportTicket {
     status: status ?? this.status,
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    topic: topic,
+    orderNumber: orderNumber,
+    taskId: taskId,
+    payoutId: payoutId,
     lastMessage: lastMessage ?? this.lastMessage,
   );
 }
@@ -209,6 +205,7 @@ class TicketMessage {
     required this.body,
     required this.fromSupport,
     required this.createdAt,
+    this.attachments = const [],
   });
 
   final int id;
@@ -217,7 +214,28 @@ class TicketMessage {
   /// Sent by Jivo support, not the rider.
   final bool fromSupport;
   final DateTime createdAt;
+
+  /// Photos on the message: short-lived signed URLs.
+  final List<Uri> attachments;
 }
+
+/// A photo uploaded to a ticket (`support_tickets_attachments_create`),
+/// waiting to be sent with the next reply as an `attachment_keys` entry.
+@immutable
+class UploadedAttachment {
+  const UploadedAttachment({required this.key, required this.url});
+
+  final String key;
+  final Uri url;
+}
+
+/// At most this many photos per reply (`attachment_keys`).
+const maxAttachmentsPerReply = 3;
+
+/// Photos are compressed on the phone to at most this many bytes before
+/// upload. The server takes 5 MB, but the live proxy rejects bodies above
+/// about 2.5 MB (413), so stay well under it.
+const kTicketPhotoMaxBytes = 2000000;
 
 /// A ticket with its messages, oldest first.
 @immutable
@@ -235,7 +253,5 @@ class TicketThread {
   /// ticket reopens it).
   final bool canReply;
 
-  /// The topic of the rider's first message, if it carries one.
-  RiderTicketTopic? get topic =>
-      messages.isEmpty ? null : parseRiderMessage(messages.first.body).topic;
+  RiderTicketTopic? get topic => ticket.topic;
 }

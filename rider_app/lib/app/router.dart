@@ -216,49 +216,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           builder: (_, _) => const InboxScreen(),
         ),
         GoRoute(
-          path: Routes.help,
-          name: 'help',
-          builder: (_, _) => const HelpScreen(),
-          routes: [
-            GoRoute(
-              path: 'tickets',
-              name: 'tickets',
-              builder: (_, _) => const TicketsScreen(),
-              routes: [
-                GoRoute(
-                  path: 'new',
-                  name: 'new_ticket',
-                  builder: (_, state) => NewTicketScreen(
-                    topic: RiderTicketTopic.fromCode(
-                      state.uri.queryParameters['topic'],
-                    ),
-                    reference: state.uri.queryParameters['ref'],
-                  ),
-                ),
-                GoRoute(
-                  path: ':ticketId',
-                  name: 'ticket',
-                  builder: (_, state) => TicketThreadScreen(
-                    ticketId:
-                        int.tryParse(state.pathParameters['ticketId']!) ?? 0,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        GoRoute(
-          path: Routes.rating,
-          name: 'rating',
-          builder: (_, _) => const MyRatingScreen(),
-        ),
-        GoRoute(
-          path: '/legal/:slug',
-          name: 'legal',
-          builder: (_, state) =>
-              LegalPageScreen(slug: state.pathParameters['slug']!),
-        ),
-        GoRoute(
           path: Routes.profile,
           name: 'profile',
           builder: (_, _) => const ProfileScreen(),
@@ -287,6 +244,54 @@ final routerProvider = Provider<GoRouter>((ref) {
           ],
         ),
       ],
+      // Help and support, My rating and the legal pages (P7): the real API
+      // in every flavor.
+      GoRoute(
+        path: Routes.help,
+        name: 'help',
+        builder: (_, _) => const HelpScreen(),
+        routes: [
+          GoRoute(
+            path: 'tickets',
+            name: 'tickets',
+            builder: (_, _) => const TicketsScreen(),
+            routes: [
+              GoRoute(
+                path: 'new',
+                name: 'new_ticket',
+                builder: (_, state) {
+                  final query = state.uri.queryParameters;
+                  return NewTicketScreen(
+                    topic: RiderTicketTopic.fromCode(query['topic']),
+                    taskId: int.tryParse(query['task'] ?? ''),
+                    payoutId: int.tryParse(query['payout'] ?? ''),
+                    label: query['label'],
+                  );
+                },
+              ),
+              GoRoute(
+                path: ':ticketId',
+                name: 'ticket',
+                builder: (_, state) => TicketThreadScreen(
+                  ticketId:
+                      int.tryParse(state.pathParameters['ticketId']!) ?? 0,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      GoRoute(
+        path: Routes.rating,
+        name: 'rating',
+        builder: (_, _) => const MyRatingScreen(),
+      ),
+      GoRoute(
+        path: '/legal/:slug',
+        name: 'legal',
+        builder: (_, state) =>
+            LegalPageScreen(slug: state.pathParameters['slug']!),
+      ),
       GoRoute(
         path: Routes.offer,
         name: 'offer',

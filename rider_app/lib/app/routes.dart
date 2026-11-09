@@ -64,16 +64,36 @@ abstract final class Routes {
   static const tickets = '/help/tickets';
   static String ticket(int id) => '$tickets/$id';
 
-  /// The new-ticket form, optionally with a topic code and a reference
-  /// (`/help/tickets/new?topic=TASK&ref=JV-...`).
-  static String newTicket({String? topic, String? reference}) => Uri(
+  /// The new-ticket form, optionally with a topic code and the task or
+  /// payout it is about, plus how to show that record
+  /// (`/help/tickets/new?topic=TASK&task=7001&label=JV-...`).
+  static String newTicket({
+    String? topic,
+    int? taskId,
+    int? payoutId,
+    String? label,
+  }) => Uri(
     path: '$tickets/new',
-    queryParameters: {'topic': ?topic, 'ref': ?reference},
+    queryParameters: {
+      'topic': ?topic,
+      'task': ?taskId?.toString(),
+      'payout': ?payoutId?.toString(),
+      'label': ?label,
+    },
   ).toString();
   static const rating = '/rating';
 
   /// A CMS legal page, e.g. `/legal/privacy`.
   static String legal(String slug) => '/legal/$slug';
+
+  /// Help and support, "My rating" and the legal pages: on the real API in
+  /// every flavor (P7), so ACTIVE riders reach them even in builds where
+  /// the rest of the rider records are still gated.
+  static bool isSupportRoute(String location) => [
+    help,
+    rating,
+    '/legal',
+  ].any((root) => location == root || location.startsWith('$root/'));
 
   static bool isAccountRoute(String location) => [
     earnings,

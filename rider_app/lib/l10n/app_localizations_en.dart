@@ -2128,19 +2128,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ticketTopicAccount => 'My account';
 
   @override
-  String get ticketTopicApp => 'App problem';
-
-  @override
   String get ticketTopicOther => 'Something else';
 
   @override
-  String get ticketReferenceOrder => 'Order number';
+  String ticketLinkedOrder(String number) {
+    return 'Order $number';
+  }
 
   @override
-  String get ticketReferencePayout => 'Payout dates or reference';
-
-  @override
-  String get ticketReferenceOptional => 'Optional';
+  String ticketLinkedPayout(String period) {
+    return 'Payout $period';
+  }
 
   @override
   String get ticketDescribe => 'Tell us what happened';
@@ -2195,11 +2193,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyGetHelp => 'Get help with this order';
 
   @override
-  String get ratingTitle => 'My rating';
+  String get payoutGetHelp => 'Get help';
 
   @override
-  String get ratingUnavailable =>
-      'Your rating details are not available yet. Your average shows on your profile.';
+  String get ticketAddPhoto => 'Add a photo';
+
+  @override
+  String get ticketPhotoCamera => 'Take a photo';
+
+  @override
+  String get ticketPhotoGallery => 'Choose from gallery';
+
+  @override
+  String ticketPhoto(int index) {
+    return 'Photo $index';
+  }
+
+  @override
+  String ticketPhotoRemove(int index) {
+    return 'Remove photo $index';
+  }
+
+  @override
+  String get ticketPhotoTooLarge =>
+      'This photo is too large. Try another photo.';
+
+  @override
+  String get ticketPhotoUnreadable =>
+      'This file is not a photo we can use. Try another photo.';
+
+  @override
+  String ticketPhotoLimit(int count) {
+    return 'You can add up to $count photos to one reply.';
+  }
+
+  @override
+  String get ticketPhotoNeedsText =>
+      'Write a short message to send with the photo.';
+
+  @override
+  String get ratingTitle => 'My rating';
 
   @override
   String get ratingNoneYet =>

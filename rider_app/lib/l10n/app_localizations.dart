@@ -3632,35 +3632,23 @@ abstract class AppLocalizations {
   /// **'My account'**
   String get ticketTopicAccount;
 
-  /// No description provided for @ticketTopicApp.
-  ///
-  /// In en, this message translates to:
-  /// **'App problem'**
-  String get ticketTopicApp;
-
   /// No description provided for @ticketTopicOther.
   ///
   /// In en, this message translates to:
   /// **'Something else'**
   String get ticketTopicOther;
 
-  /// No description provided for @ticketReferenceOrder.
+  /// No description provided for @ticketLinkedOrder.
   ///
   /// In en, this message translates to:
-  /// **'Order number'**
-  String get ticketReferenceOrder;
+  /// **'Order {number}'**
+  String ticketLinkedOrder(String number);
 
-  /// No description provided for @ticketReferencePayout.
+  /// No description provided for @ticketLinkedPayout.
   ///
   /// In en, this message translates to:
-  /// **'Payout dates or reference'**
-  String get ticketReferencePayout;
-
-  /// No description provided for @ticketReferenceOptional.
-  ///
-  /// In en, this message translates to:
-  /// **'Optional'**
-  String get ticketReferenceOptional;
+  /// **'Payout {period}'**
+  String ticketLinkedPayout(String period);
 
   /// No description provided for @ticketDescribe.
   ///
@@ -3752,17 +3740,71 @@ abstract class AppLocalizations {
   /// **'Get help with this order'**
   String get historyGetHelp;
 
+  /// No description provided for @payoutGetHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Get help'**
+  String get payoutGetHelp;
+
+  /// No description provided for @ticketAddPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a photo'**
+  String get ticketAddPhoto;
+
+  /// No description provided for @ticketPhotoCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get ticketPhotoCamera;
+
+  /// No description provided for @ticketPhotoGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get ticketPhotoGallery;
+
+  /// No description provided for @ticketPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {index}'**
+  String ticketPhoto(int index);
+
+  /// No description provided for @ticketPhotoRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove photo {index}'**
+  String ticketPhotoRemove(int index);
+
+  /// No description provided for @ticketPhotoTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is too large. Try another photo.'**
+  String get ticketPhotoTooLarge;
+
+  /// No description provided for @ticketPhotoUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is not a photo we can use. Try another photo.'**
+  String get ticketPhotoUnreadable;
+
+  /// No description provided for @ticketPhotoLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'You can add up to {count} photos to one reply.'**
+  String ticketPhotoLimit(int count);
+
+  /// No description provided for @ticketPhotoNeedsText.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a short message to send with the photo.'**
+  String get ticketPhotoNeedsText;
+
   /// No description provided for @ratingTitle.
   ///
   /// In en, this message translates to:
   /// **'My rating'**
   String get ratingTitle;
-
-  /// No description provided for @ratingUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Your rating details are not available yet. Your average shows on your profile.'**
-  String get ratingUnavailable;
 
   /// No description provided for @ratingNoneYet.
   ///

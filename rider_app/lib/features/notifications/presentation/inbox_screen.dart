@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,9 +10,11 @@ import '../../../shared/format/ist_format.dart';
 import '../../../shared/widgets/paged_list_view.dart';
 import '../domain/inbox.dart';
 import 'inbox_providers.dart';
+import 'rider_links.dart';
 
 /// The in-app inbox (04 §2.10): newest first, unread in bold with a dot. A
-/// tap marks the entry read; "Mark all read" clears the badge.
+/// tap marks the entry read and opens its `jivo://rider/...` link, if any
+/// ([routeForRiderLink]); "Mark all read" clears the badge.
 class InboxScreen extends ConsumerWidget {
   const InboxScreen({super.key});
 
@@ -45,8 +49,15 @@ class InboxScreen extends ConsumerWidget {
         onRefresh: notifier.refresh,
         onLoadMore: notifier.loadMore,
         emptyText: l10n.inboxEmpty,
-        itemBuilder: (context, entry) =>
-            _InboxTile(entry: entry, onTap: () => notifier.markRead(entry.id)),
+        itemBuilder: (context, entry) => _InboxTile(
+          entry: entry,
+          onTap: () {
+            unawaited(notifier.markRead(entry.id));
+            if (routeForRiderLink(entry.link) case final route?) {
+              ref.read(riderLinkNavigatorProvider)(route);
+            }
+          },
+        ),
       ),
     );
   }

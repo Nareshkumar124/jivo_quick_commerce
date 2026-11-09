@@ -5,10 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/routes.dart';
 import '../../location/domain/backoff.dart';
 import '../../offers/data/offer_alert_notifications.dart';
 import '../../offers/presentation/offer_alert_providers.dart';
+import '../../cash/presentation/cash_providers.dart';
 import '../../offers/presentation/offer_controller.dart';
+import '../../shift/presentation/home_providers.dart';
+import '../../support/presentation/support_providers.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
 import '../data/api_device_registry.dart';
@@ -17,6 +21,7 @@ import '../domain/device_registry.dart';
 import '../domain/push_messaging.dart';
 import '../domain/rider_push.dart';
 import 'inbox_providers.dart';
+import 'rider_links.dart';
 
 /// The push channel. TODO(D-19): the Firebase adapter (firebase_messaging,
 /// with its background isolate that turns an `offer.new` data message into
@@ -205,9 +210,24 @@ class PushMessageHandler {
   /// - `offer.withdrawn`: end the open offer ("Order cancelled") and remove
   ///   its alert.
   /// - `task.updated`: re-read the current task.
+  /// - `cash.updated`: re-read the cash summary and ledger; tapped, open
+  ///   the cash ledger.
+  /// - `ticket` (every flavor): re-read that ticket and the list; tapped,
+  ///   open the ticket.
   void handle(PushMessage message) {
+    final push = RiderPush.parse(message.data);
+    if (push case TicketPush(:final ticketId)) {
+      _ref
+        ..invalidate(ticketThreadProvider(ticketId))
+        ..invalidate(ticketsProvider)
+        ..invalidate(inboxUnreadCountProvider);
+      if (message.openedApp) {
+        _ref.read(riderLinkNavigatorProvider)(Routes.ticket(ticketId));
+      }
+      return;
+    }
     if (!_ref.read(riderWorkActiveProvider)) return;
-    switch (RiderPush.parse(message.data)) {
+    switch (push) {
       case OfferPush():
         // A new offer replaces an ended one still on screen ("expired").
         final offers = _ref.read(offerControllerProvider.notifier);
@@ -226,6 +246,16 @@ class PushMessageHandler {
       case TaskUpdatedPush():
         unawaited(_ref.read(taskFlowControllerProvider.notifier).load());
         _ref.invalidate(inboxUnreadCountProvider);
+      case CashUpdatedPush():
+        _ref
+          ..invalidate(todaySummaryProvider)
+          ..invalidate(cashLedgerProvider)
+          ..invalidate(inboxUnreadCountProvider);
+        if (message.openedApp) {
+          _ref.read(riderLinkNavigatorProvider)(Routes.cash);
+        }
+      case TicketPush():
+        break; // handled above, in every flavor
       case UnknownPush():
         // Only the type: the payload may carry order details.
         debugPrint(
