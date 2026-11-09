@@ -1207,5 +1207,98 @@
   "historyEarned": "You earned",
   "taskChipDontRingBell": "Don't ring the bell",
   "taskChipLeaveAtDoor": "Leave at the door",
-  "taskChipAvoidCalling": "Avoid calling"
+  "taskChipAvoidCalling": "Avoid calling",
+  "helpTitle": "Help and support",
+  "helpProfileSubtitle": "FAQs, tickets and legal pages",
+  "helpRaiseTicket": "Raise a ticket",
+  "helpFaqTitle": "Questions riders ask",
+  "helpFaqEmpty": "No questions here yet. Raise a ticket and our team will help.",
+  "legalTitle": "Legal",
+  "legalRiderAgreement": "Rider agreement",
+  "legalPrivacy": "Privacy policy",
+  "legalLocationDisclosure": "How we use your location",
+  "legalEmpty": "This page is empty.",
+  "legalNotPublished": "This page is not available yet.",
+  "legalOpenInBrowser": "Open in browser",
+  "legalUpdatedOn": "Updated {date}",
+  "@legalUpdatedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "ticketsTitle": "My tickets",
+  "ticketsEmpty": "You have not raised any tickets.",
+  "newTicketTitle": "Raise a ticket",
+  "newTicketTopic": "What do you need help with?",
+  "ticketTopicTask": "An order",
+  "ticketTopicPayout": "A payout",
+  "ticketTopicCash": "Cash deposit",
+  "ticketTopicAccount": "My account",
+  "ticketTopicApp": "App problem",
+  "ticketTopicOther": "Something else",
+  "ticketReferenceOrder": "Order number",
+  "ticketReferencePayout": "Payout dates or reference",
+  "ticketReferenceOptional": "Optional",
+  "ticketDescribe": "Tell us what happened",
+  "ticketTooShort": "Write at least {count} characters.",
+  "@ticketTooShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ticketTooLong": "This is too long. Shorten it a little.",
+  "ticketSend": "Send",
+  "ticketSent": "Ticket {number} sent. We will reply here.",
+  "@ticketSent": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "ticketUpdated": "Last update {when}",
+  "@ticketUpdated": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "ticketStatusOpen": "Open",
+  "ticketStatusInProgress": "In progress",
+  "ticketStatusResolved": "Resolved",
+  "ticketStatusClosed": "Closed",
+  "ticketReplyHint": "Write a reply",
+  "ticketClosedNote": "This ticket is closed. Raise a new ticket if you still need help.",
+  "ticketFromYou": "You",
+  "ticketFromSupport": "Jivo support",
+  "historyGetHelp": "Get help with this order",
+  "ratingTitle": "My rating",
+  "ratingUnavailable": "Your rating details are not available yet. Your average shows on your profile.",
+  "ratingNoneYet": "No ratings yet. Customers can rate you after each delivery.",
+  "ratingCount": "{count, plural, =0{No ratings yet} =1{From 1 rating} other{From {count} ratings}}",
+  "@ratingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ratingStars": "{count, plural, =1{1 star} other{{count} stars}}",
+  "@ratingStars": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ratingTagOnTime": "On time",
+  "ratingTagPolite": "Polite",
+  "ratingTagLate": "Late",
+  "ratingTagRude": "Rude",
+  "ratingTagOther": "Other"
 }

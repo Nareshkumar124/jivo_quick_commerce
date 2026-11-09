@@ -58,6 +58,23 @@ abstract final class Routes {
   static String profileDocumentCapture(String wireValue) =>
       '$profileDocuments/${wireValue.toLowerCase()}';
 
+  /// ACTIVE riders, between orders (P7): help and support (screen 20),
+  /// tickets, "My rating" and the legal pages.
+  static const help = '/help';
+  static const tickets = '/help/tickets';
+  static String ticket(int id) => '$tickets/$id';
+
+  /// The new-ticket form, optionally with a topic code and a reference
+  /// (`/help/tickets/new?topic=TASK&ref=JV-...`).
+  static String newTicket({String? topic, String? reference}) => Uri(
+    path: '$tickets/new',
+    queryParameters: {'topic': ?topic, 'ref': ?reference},
+  ).toString();
+  static const rating = '/rating';
+
+  /// A CMS legal page, e.g. `/legal/privacy`.
+  static String legal(String slug) => '/legal/$slug';
+
   static bool isAccountRoute(String location) => [
     earnings,
     payouts,
@@ -65,6 +82,9 @@ abstract final class Routes {
     history,
     profile,
     inbox,
+    help,
+    rating,
+    '/legal',
   ].any((root) => location == root || location.startsWith('$root/'));
 
   /// Permissions gate (04 §2.1, screen 7) and the prominent location

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
+
+import '../../../app/routes.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/errors/rider_error_text.dart';
 import '../../../shared/format/ist_format.dart';
 import '../../earnings/presentation/earnings_screen.dart';
+import '../../support/domain/support_models.dart';
 import '../../task/domain/rider_task.dart';
 import '../../task/domain/task_rules.dart';
 import '../../task/presentation/task_text.dart';
@@ -169,6 +173,21 @@ class _Detail extends StatelessWidget {
               ],
             ),
         ],
+        const SizedBox(height: 24),
+        OutlinedButton.icon(
+          key: const Key('history-detail-help'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(56),
+          ),
+          onPressed: () => context.push(
+            Routes.newTicket(
+              topic: RiderTicketTopic.task.code,
+              reference: detail.entry.orderNumber,
+            ),
+          ),
+          icon: const Icon(Icons.support_agent),
+          label: Text(l10n.historyGetHelp),
+        ),
       ],
     );
   }

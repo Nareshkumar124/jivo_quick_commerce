@@ -163,6 +163,7 @@ class _ProfileBody extends ConsumerWidget {
                   value: profile.rating == null
                       ? l10n.profileNoRating
                       : l10n.profileRatingValue(profile.rating!),
+                  onTap: () => context.push(Routes.rating),
                 ),
                 if (profile.bankAccount case final bank?)
                   _InfoRow(
@@ -255,6 +256,18 @@ class _ProfileBody extends ConsumerWidget {
           const SizedBox(height: 8),
           Card(
             child: ListTile(
+              key: const Key('profile-help'),
+              minTileHeight: 64,
+              leading: const Icon(Icons.support_agent),
+              title: Text(l10n.helpTitle),
+              subtitle: Text(l10n.helpProfileSubtitle),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.help),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
               key: const Key('profile-logout'),
               minTileHeight: 64,
               leading: const Icon(Icons.logout),
@@ -282,30 +295,36 @@ class _InfoRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.onTap,
     super.key,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    child: Row(
-      children: [
-        Icon(icon, color: Theme.of(context).colorScheme.primary),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.bodySmall),
-              Text(value, style: Theme.of(context).textTheme.titleMedium),
-            ],
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.bodySmall),
+                Text(value, style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
           ),
-        ),
-      ],
+          if (onTap != null) const Icon(Icons.chevron_right),
+        ],
+      ),
     ),
   );
 }
