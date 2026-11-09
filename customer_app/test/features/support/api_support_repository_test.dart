@@ -1,12 +1,16 @@
 import 'package:customer_app/features/cms/data/cms_repository.dart';
 import 'package:customer_app/features/support/data/api_support_repository.dart';
 import 'package:customer_app/features/support/domain/support_models.dart';
+
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../fixtures/contract_examples.dart';
 import '../../helpers/fake_http.dart';
+import 'photo_fixtures.dart';
 
 /// The P7 support and CMS API (T-713) against the contract's own examples.
 void main() {
@@ -102,9 +106,15 @@ void main() {
 
     test('create errors: order required, too short, rate limited', () async {
       for (final (key, code) in [
-        ('support_tickets_create/400/OrderRequired', ApiErrorCode.validationError),
+        (
+          'support_tickets_create/400/OrderRequired',
+          ApiErrorCode.validationError,
+        ),
         ('support_tickets_create/400/NotMyOrder', ApiErrorCode.validationError),
-        ('support_tickets_create/400/MessageTooShort', ApiErrorCode.validationError),
+        (
+          'support_tickets_create/400/MessageTooShort',
+          ApiErrorCode.validationError,
+        ),
         ('support_tickets_create/429/RATELIMITED', ApiErrorCode.rateLimited),
       ]) {
         answer = (_) => example(key);
@@ -146,27 +156,194 @@ void main() {
     });
 
     test('reply posts the message and returns the updated ticket', () async {
+      // The contract example: the reply carries a photo uploaded before.
+      const key = '9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19';
       answer = (_) => example('support_tickets_messages_create/201/Replied');
-      final thread = await support().reply(12, ' Thank you, I can see the refund now. ');
+      final thread = await support().reply(
+        12,
+        ' Here is a photo of the bottle. ',
+        photoKeys: [key],
+      );
       final sent = http.requests.single;
       expect(sent.method, 'POST');
       expect(sent.uri.path, '/api/v1/support/tickets/12/messages/');
-      expect(http.body(0), {'message': 'Thank you, I can see the refund now.'});
-      expect(thread.messages.last.body, 'Thank you, I can see the refund now.');
+      expect(http.body(0), {
+        'message': 'Here is a photo of the bottle.',
+        'attachment_keys': [key],
+      });
+      expect(thread.messages, hasLength(3));
+      expect(thread.messages.last.body, 'Here is a photo of the bottle.');
+      expect(thread.messages.last.fromSupport, isFalse);
+      final photo = thread.messages.last.photos.single;
+      expect(photo.key, key);
+      expect(photo.url, startsWith('https://storage.example.com/private/'));
+      expect(thread.messages.first.photos, isEmpty);
       expect(thread.ticket.status, TicketStatus.open);
+      expect(thread.ticket.lastMessage, 'Here is a photo of the bottle.');
+      expect(thread.canReply, isTrue);
+    });
+
+    test('a reply without photos leaves attachment_keys out', () async {
+      answer = (_) => example('support_tickets_messages_create/201/Replied');
+      await support().reply(12, 'Thank you');
+      expect(http.body(0), {'message': 'Thank you'});
     });
 
     test('reply errors: closed, empty, not found, rate limited', () async {
       for (final (key, code) in [
-        ('support_tickets_messages_create/400/TicketClosed', ApiErrorCode.validationError),
-        ('support_tickets_messages_create/400/EmptyMessage', ApiErrorCode.validationError),
+        (
+          'support_tickets_messages_create/400/TicketClosed',
+          ApiErrorCode.validationError,
+        ),
+        (
+          'support_tickets_messages_create/400/EmptyMessage',
+          ApiErrorCode.validationError,
+        ),
+        (
+          'support_tickets_messages_create/400/UnknownOrExpiredPhoto',
+          ApiErrorCode.validationError,
+        ),
         ('support_tickets_messages_create/404/NOTFOUND', ApiErrorCode.notFound),
-        ('support_tickets_messages_create/429/RATELIMITED', ApiErrorCode.rateLimited),
+        (
+          'support_tickets_messages_create/429/RATELIMITED',
+          ApiErrorCode.rateLimited,
+        ),
       ]) {
         answer = (_) => example(key);
-        await expectLater(support().reply(12, 'x'), apiError(code), reason: key);
+        await expectLater(
+          support().reply(12, 'x'),
+          apiError(code),
+          reason: key,
+        );
       }
     });
+  });
+
+  group('photos', () {
+    final png = TicketPhotoFile(bytes: pngBytes, filename: 'IMG_0001.png');
+
+    test(
+      'upload sends multipart `file` with its type and returns the key',
+      () async {
+        answer = (_) =>
+            example('support_tickets_attachments_create/201/Uploaded');
+        final photo = await support().uploadPhoto(12, png);
+        final sent = http.requests.single;
+        expect(sent.method, 'POST');
+        expect(sent.uri.path, '/api/v1/support/tickets/12/attachments/');
+        final form = sent.data as FormData;
+        final file = form.files.single;
+        expect(file.key, 'file');
+        expect(file.value.contentType.toString(), 'image/png');
+        // The device file name is not sent.
+        expect(file.value.filename, 'photo.png');
+        expect(file.value.length, pngBytes.length);
+        expect(photo.key, '9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19');
+        expect(photo.url, contains('X-Amz-Signature'));
+      },
+    );
+
+    test('JPEG and WebP are sent with their types', () async {
+      answer = (_) =>
+          example('support_tickets_attachments_create/201/Uploaded');
+      await support().uploadPhoto(
+        12,
+        TicketPhotoFile(bytes: jpegBytes, filename: 'a.jpg'),
+      );
+      await support().uploadPhoto(
+        12,
+        TicketPhotoFile(bytes: webpBytes, filename: 'a.webp'),
+      );
+      final types = [
+        for (final r in http.requests)
+          (r.data as FormData).files.single.value.contentType.toString(),
+      ];
+      expect(types, ['image/jpeg', 'image/webp']);
+    });
+
+    test(
+      'other types and files over 5 MB are refused before any request',
+      () async {
+        await expectLater(
+          support().uploadPhoto(
+            12,
+            TicketPhotoFile(
+              bytes: Uint8List.fromList('GIF89a....'.codeUnits),
+              filename: 'a.gif',
+            ),
+          ),
+          throwsA(
+            isA<TicketPhotoException>().having(
+              (e) => e.problem,
+              'problem',
+              TicketPhotoProblem.unsupportedType,
+            ),
+          ),
+        );
+        final big = Uint8List(ticketPhotoMaxBytes + 1)..setAll(0, jpegBytes);
+        await expectLater(
+          support().uploadPhoto(12, TicketPhotoFile(bytes: big, filename: 'b')),
+          throwsA(
+            isA<TicketPhotoException>().having(
+              (e) => e.problem,
+              'problem',
+              TicketPhotoProblem.tooLarge,
+            ),
+          ),
+        );
+        final exact = Uint8List(ticketPhotoMaxBytes)..setAll(0, jpegBytes);
+        expect(
+          checkTicketPhoto(TicketPhotoFile(bytes: exact, filename: 'c')),
+          isNull,
+        );
+        expect(http.requests, isEmpty);
+      },
+    );
+
+    test('413 from the server or a proxy is a photo-size error', () async {
+      answer = (_) => (413, null);
+      await expectLater(
+        support().uploadPhoto(12, png),
+        throwsA(
+          isA<TicketPhotoException>().having(
+            (e) => e.problem,
+            'problem',
+            TicketPhotoProblem.rejectedSize,
+          ),
+        ),
+      );
+    });
+
+    test(
+      'upload errors: not an image, closed, not found, rate limited',
+      () async {
+        for (final (key, code) in [
+          (
+            'support_tickets_attachments_create/400/NotAnImage',
+            ApiErrorCode.validationError,
+          ),
+          (
+            'support_tickets_attachments_create/400/TicketClosed',
+            ApiErrorCode.validationError,
+          ),
+          (
+            'support_tickets_attachments_create/404/NOTFOUND',
+            ApiErrorCode.notFound,
+          ),
+          (
+            'support_tickets_attachments_create/429/RATELIMITED',
+            ApiErrorCode.rateLimited,
+          ),
+        ]) {
+          answer = (_) => example(key);
+          await expectLater(
+            support().uploadPhoto(12, png),
+            apiError(code),
+            reason: key,
+          );
+        }
+      },
+    );
   });
 
   group('CMS pages', () {

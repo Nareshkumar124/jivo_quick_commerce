@@ -2782,6 +2782,12 @@ abstract class AppLocalizations {
   /// **'{stars, plural, =1{You rated this order 1 star} other{You rated this order {stars} stars}}'**
   String ratedOrder(int stars);
 
+  /// Rated order: the customer's rider rating.
+  ///
+  /// In en, this message translates to:
+  /// **'{stars, plural, =1{You rated the delivery partner 1 star} other{You rated the delivery partner {stars} stars}}'**
+  String ratedRider(int stars);
+
   /// Help screen title and account row.
   ///
   /// In en, this message translates to:
@@ -2937,6 +2943,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send'**
   String get ticketSend;
+
+  /// Ticket: add a photo to the message.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photo'**
+  String get ticketAddPhoto;
+
+  /// New ticket: the photos section.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos (optional, up to {max})'**
+  String ticketPhotosHint(int max);
+
+  /// Ticket photo source: camera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get ticketPhotoCamera;
+
+  /// Ticket photo source: gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get ticketPhotoGallery;
+
+  /// Ticket: remove a picked photo.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove photo {number}'**
+  String ticketPhotoRemove(int number);
+
+  /// Ticket thread: a message photo (semantic label).
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {number}'**
+  String ticketPhotoOpen(int number);
+
+  /// Ticket thread: a photo that failed to load (signed links expire).
+  ///
+  /// In en, this message translates to:
+  /// **'Photo unavailable. Pull down to refresh.'**
+  String get ticketPhotoUnavailable;
+
+  /// Ticket photo: wrong type.
+  ///
+  /// In en, this message translates to:
+  /// **'This file type isn\'t supported. Choose a JPEG, PNG or WebP photo.'**
+  String get ticketPhotoUnsupported;
+
+  /// Ticket photo: over the API limit.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is larger than {mb} MB. Choose a smaller one.'**
+  String ticketPhotoTooLarge(int mb);
+
+  /// Ticket photo: too many photos.
+  ///
+  /// In en, this message translates to:
+  /// **'You can add up to {max} photos to a message.'**
+  String ticketPhotoTooMany(int max);
+
+  /// Ticket photo: the server refused the size (HTTP 413).
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is too large to upload. Try a smaller photo or a screenshot of it.'**
+  String get ticketPhotoRejectedSize;
+
+  /// Ticket photo: the picker failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the camera or gallery. Check the app\'s permissions and try again.'**
+  String get ticketPhotoPickFailed;
+
+  /// New ticket: the text of the message that carries the photos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos of the issue'**
+  String get ticketPhotosMessage;
+
+  /// New ticket: created, photo upload failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket created, but the photos weren\'t added. {reason} You can add them from the ticket.'**
+  String ticketPhotosNotAdded(String reason);
 
   /// Ticket issue type.
   ///

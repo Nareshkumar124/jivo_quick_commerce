@@ -130,7 +130,8 @@ String? notificationLocation(
   final path = switch (type) {
     'order' when orderId != null && _id('$orderId') != null =>
       'orders/$orderId',
-    // TODO(api): a support reply push (`docs/api-requests.md`, P7).
+    // A support reply (`support.ticket_replied`, P7): `{type: ticket,
+    // ticket_id}`; its inbox row links `jivo://support/tickets/<id>`.
     'ticket' when ticketId != null && _id('$ticketId') != null =>
       'support/tickets/$ticketId',
     'product' ||

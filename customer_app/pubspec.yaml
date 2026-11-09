@@ -58,6 +58,9 @@ dependencies:
   # The order socket (`/ws/v1/orders/{id}/`, 06 §4); same version as the
   # transitive one in jivo_api's lockfile.
   web_socket_channel: 3.0.3
+  # Support ticket photos (camera or the Android photo picker, no storage
+  # permission); same version as rider_app's.
+  image_picker: 1.2.4
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -37,6 +37,7 @@ import '../features/rating/data/api_rating_repository.dart';
 import '../features/rating/data/rating_repository.dart';
 import '../features/support/data/api_support_repository.dart';
 import '../features/support/data/support_repository.dart';
+import '../features/support/data/ticket_photo_picker.dart';
 import '../features/tracking/data/track_repository.dart';
 import 'providers.dart';
 
@@ -179,27 +180,16 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
       : ApiNotificationRepository(ref.watch(jivoApiProvider)),
 );
 
-/// TODO(api): the one-line switch to the real ratings API. Set it to true
-/// once `POST`/`GET /orders/{id}/rating/` (Phase 7, `docs/api-requests.md`
-/// #34) are merged into develop; the dev flavor then rates on the API.
-const ratingApiBound = false;
+/// Whether order rating is shown: in every flavor since the P7 ratings API
+/// (`orders_rating_*`). Rating needs a delivered order, so it only appears
+/// where orders exist.
+final ratingAvailableProvider = Provider<bool>((ref) => true);
 
-/// Whether order rating is shown: on fakes, and in the dev flavor once
-/// [ratingApiBound]. Staging and prod follow with the cart (DL-30).
-final ratingAvailableProvider = Provider<bool>(
-  (ref) =>
-      _fake(ref) ||
-      (ratingApiBound && ref.watch(appEnvProvider).flavor == Flavor.dev),
-);
-
-/// Order and rider ratings: the fake with `FAKE_API`, the API once
-/// [ratingApiBound], otherwise hidden.
+/// Order and rider ratings: the API in every flavor, the fake only with
+/// `FAKE_API` in the dev flavor.
 final ratingRepositoryProvider = Provider<RatingRepository>((ref) {
   if (_fake(ref)) return FakeRatingRepository();
-  if (!ref.watch(ratingAvailableProvider)) {
-    return const UnavailableRatingRepository();
-  }
-  return ApiRatingRepository(ref.watch(dioProvider));
+  return ApiRatingRepository(ref.watch(jivoApiProvider));
 });
 
 /// Whether FAQs and support tickets are shown: the dev flavor (API or
@@ -217,6 +207,11 @@ final supportRepositoryProvider = Provider<SupportRepository>((ref) {
   if (_fake(ref)) return FakeSupportRepository();
   return ApiSupportRepository(ref.watch(jivoApiProvider));
 });
+
+/// Camera or gallery for support ticket photos (tests override it).
+final ticketPhotoPickerProvider = Provider<TicketPhotoPicker>(
+  (ref) => ImagePickerTicketPhotoPicker(),
+);
 
 /// Whether Legal and About open in the in-app CMS viewer (dev flavor since
 /// T-713); otherwise the policy URLs from `config/app` open in the browser.

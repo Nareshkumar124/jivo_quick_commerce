@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/repositories.dart';
+import '../data/support_repository.dart';
 import '../domain/support_models.dart';
 
 /// The customer-app FAQs.
@@ -99,22 +100,59 @@ class TicketThreadController extends AsyncNotifier<TicketThread> {
     await future;
   }
 
-  /// Sends [message]; the thread shows the server's copy. Throws
-  /// `ApiError` for the screen to show (the typed text stays).
-  Future<void> reply(String message) async {
-    final thread = await ref
-        .read(supportRepositoryProvider)
-        .reply(ticketId, message.trim());
+  /// Sends [message] with [photos] (uploaded first, each once); the thread
+  /// shows the server's copy. Throws `ApiError` or `TicketPhotoException`
+  /// for the screen to show (the typed text and photos stay).
+  Future<void> reply(
+    String message, {
+    List<PendingTicketPhoto> photos = const [],
+  }) async {
+    final repository = ref.read(supportRepositoryProvider);
+    final keys = await uploadTicketPhotos(repository, ticketId, photos);
+    final thread = await repository.reply(
+      ticketId,
+      message.trim(),
+      photoKeys: keys,
+    );
     if (!ref.mounted) return;
     state = AsyncData(thread);
     ref.invalidate(ticketListProvider);
   }
 }
 
+/// Uploads the [photos] not uploaded yet, in order, and returns all their
+/// keys. Throws on the first failure (earlier uploads keep their keys).
+Future<List<String>> uploadTicketPhotos(
+  SupportRepository repository,
+  int ticketId,
+  List<PendingTicketPhoto> photos,
+) async {
+  if (photos.length > ticketPhotosPerMessage) {
+    throw const TicketPhotoException(TicketPhotoProblem.tooMany);
+  }
+  for (final photo in photos) {
+    photo.uploadedKey ??= (await repository.uploadPhoto(
+      ticketId,
+      photo.file,
+    )).key;
+  }
+  return [for (final photo in photos) photo.uploadedKey!];
+}
+
 final ticketThreadProvider = AsyncNotifierProvider.autoDispose
     .family<TicketThreadController, TicketThread, int>(
       TicketThreadController.new,
     );
+
+/// A created ticket, and why its photos weren't added (null when they
+/// were, or there were none).
+@immutable
+class NewTicketResult {
+  const NewTicketResult(this.thread, {this.photoError});
+
+  final TicketThread thread;
+  final Object? photoError;
+}
 
 /// The new-ticket form's submit state.
 @immutable
@@ -129,32 +167,51 @@ class NewTicketController extends Notifier<NewTicketState> {
   @override
   NewTicketState build() => const NewTicketState();
 
-  /// Opens the ticket. Returns its thread, or null on failure (kept in
-  /// [NewTicketState.error]) or while a submit runs.
-  Future<TicketThread?> submit({
+  /// Opens the ticket, then adds [photos] to it: the API takes photos only
+  /// on a reply, so they go up as a second message, [photosMessage].
+  /// Returns the ticket (with [NewTicketResult.photoError] when only the
+  /// photos failed), or null when the ticket wasn't created (the error is
+  /// kept in [NewTicketState.error]) or while a submit runs.
+  Future<NewTicketResult?> submit({
     required TicketCategory category,
     required String message,
     int? orderId,
+    List<PendingTicketPhoto> photos = const [],
+    String photosMessage = '',
   }) async {
     if (state.submitting) return null;
     state = const NewTicketState(submitting: true);
+    final repository = ref.read(supportRepositoryProvider);
+    TicketThread thread;
     try {
-      final thread = await ref
-          .read(supportRepositoryProvider)
-          .createTicket(
-            category: category,
-            message: message.trim(),
-            orderId: orderId,
-          );
-      if (ref.mounted) {
-        state = const NewTicketState();
-        ref.invalidate(ticketListProvider);
-      }
-      return thread;
+      thread = await repository.createTicket(
+        category: category,
+        message: message.trim(),
+        orderId: orderId,
+      );
     } catch (error) {
       if (ref.mounted) state = NewTicketState(error: error);
       return null;
     }
+    Object? photoError;
+    if (photos.isNotEmpty) {
+      try {
+        final ticketId = thread.ticket.id;
+        final keys = await uploadTicketPhotos(repository, ticketId, photos);
+        thread = await repository.reply(
+          ticketId,
+          photosMessage,
+          photoKeys: keys,
+        );
+      } catch (error) {
+        photoError = error;
+      }
+    }
+    if (ref.mounted) {
+      state = const NewTicketState();
+      ref.invalidate(ticketListProvider);
+    }
+    return NewTicketResult(thread, photoError: photoError);
   }
 }
 

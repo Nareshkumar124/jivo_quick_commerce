@@ -1617,6 +1617,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String ratedRider(int stars) {
+    String _temp0 = intl.Intl.pluralLogic(
+      stars,
+      locale: localeName,
+      other: 'You rated the delivery partner $stars stars',
+      one: 'You rated the delivery partner 1 star',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get helpTitle => 'Help & support';
 
   @override
@@ -1697,6 +1708,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ticketSend => 'Send';
+
+  @override
+  String get ticketAddPhoto => 'Add photo';
+
+  @override
+  String ticketPhotosHint(int max) {
+    return 'Photos (optional, up to $max)';
+  }
+
+  @override
+  String get ticketPhotoCamera => 'Take a photo';
+
+  @override
+  String get ticketPhotoGallery => 'Choose from gallery';
+
+  @override
+  String ticketPhotoRemove(int number) {
+    return 'Remove photo $number';
+  }
+
+  @override
+  String ticketPhotoOpen(int number) {
+    return 'Photo $number';
+  }
+
+  @override
+  String get ticketPhotoUnavailable =>
+      'Photo unavailable. Pull down to refresh.';
+
+  @override
+  String get ticketPhotoUnsupported =>
+      'This file type isn\'t supported. Choose a JPEG, PNG or WebP photo.';
+
+  @override
+  String ticketPhotoTooLarge(int mb) {
+    return 'This photo is larger than $mb MB. Choose a smaller one.';
+  }
+
+  @override
+  String ticketPhotoTooMany(int max) {
+    return 'You can add up to $max photos to a message.';
+  }
+
+  @override
+  String get ticketPhotoRejectedSize =>
+      'This photo is too large to upload. Try a smaller photo or a screenshot of it.';
+
+  @override
+  String get ticketPhotoPickFailed =>
+      'Couldn\'t open the camera or gallery. Check the app\'s permissions and try again.';
+
+  @override
+  String get ticketPhotosMessage => 'Photos of the issue';
+
+  @override
+  String ticketPhotosNotAdded(String reason) {
+    return 'Ticket created, but the photos weren\'t added. $reason You can add them from the ticket.';
+  }
 
   @override
   String get ticketMissingItems => 'Missing items';
