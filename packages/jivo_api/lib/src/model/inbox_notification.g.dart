@@ -177,6 +177,7 @@ const _$InboxNotificationCategoryEnumEnumMap = {
   InboxNotificationCategoryEnum.order: 'order',
   InboxNotificationCategoryEnum.promo: 'promo',
   InboxNotificationCategoryEnum.system: 'system',
+  InboxNotificationCategoryEnum.support: 'support',
   InboxNotificationCategoryEnum.unknownDefaultOpenApi:
       'unknown_default_open_api',
 };

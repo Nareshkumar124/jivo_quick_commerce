@@ -180,5 +180,6 @@ const _$WsTaskUpdatedDataChangeEnumEnumMap = {
   WsTaskUpdatedDataChangeEnum.AMOUNT_CHANGED: 'AMOUNT_CHANGED',
   WsTaskUpdatedDataChangeEnum.REASSIGNED: 'REASSIGNED',
   WsTaskUpdatedDataChangeEnum.STATUS_CHANGED: 'STATUS_CHANGED',
+  WsTaskUpdatedDataChangeEnum.ASSIGNED: 'ASSIGNED',
   WsTaskUpdatedDataChangeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

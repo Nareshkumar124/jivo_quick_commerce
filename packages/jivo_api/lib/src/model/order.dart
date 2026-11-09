@@ -5,6 +5,7 @@
 
 // ignore_for_file: unused_element
 import 'package:jivo_api/src/model/order_address.dart';
+import 'package:jivo_api/src/model/order_rating.dart';
 import 'package:jivo_api/src/model/payment_method_enum.dart';
 import 'package:jivo_api/src/model/order_cancellation.dart';
 import 'package:jivo_api/src/model/order_line.dart';
@@ -75,6 +76,10 @@ class Order {
     required this.refunds,
 
     required this.canDownloadInvoice,
+
+    required this.canRate,
+
+    required this.rating,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -176,6 +181,14 @@ class Order {
   @JsonKey(name: r'can_download_invoice', required: true, includeIfNull: false)
   final bool canDownloadInvoice;
 
+  /// True when `POST /orders/{id}/rating/` is allowed: DELIVERED and not rated yet.
+  @JsonKey(name: r'can_rate', required: true, includeIfNull: false)
+  final bool canRate;
+
+  /// The customer's rating once given; null before (Phase 7).
+  @JsonKey(name: r'rating', required: true, includeIfNull: true)
+  final OrderRating? rating;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -202,7 +215,9 @@ class Order {
           other.cancellation == cancellation &&
           other.amountRefunded == amountRefunded &&
           other.refunds == refunds &&
-          other.canDownloadInvoice == canDownloadInvoice;
+          other.canDownloadInvoice == canDownloadInvoice &&
+          other.canRate == canRate &&
+          other.rating == rating;
 
   @override
   int get hashCode =>
@@ -228,7 +243,9 @@ class Order {
       (cancellation == null ? 0 : cancellation.hashCode) +
       amountRefunded.hashCode +
       refunds.hashCode +
-      canDownloadInvoice.hashCode;
+      canDownloadInvoice.hashCode +
+      canRate.hashCode +
+      (rating == null ? 0 : rating.hashCode);
 
   factory Order.fromJson(Map<String, dynamic> json) => _$OrderFromJson(json);
 

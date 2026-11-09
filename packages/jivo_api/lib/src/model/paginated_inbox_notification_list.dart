@@ -27,6 +27,8 @@ class PaginatedInboxNotificationList {
     required this.previous,
 
     required this.results,
+
+    required this.unreadCount,
   });
 
   @JsonKey(name: r'count', required: true, includeIfNull: false)
@@ -41,6 +43,10 @@ class PaginatedInboxNotificationList {
   @JsonKey(name: r'results', required: true, includeIfNull: false)
   final List<InboxNotification> results;
 
+  /// Unread entries for this app (all pages; api-requests #45).
+  @JsonKey(name: r'unread_count', required: true, includeIfNull: false)
+  final int unreadCount;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -48,14 +54,16 @@ class PaginatedInboxNotificationList {
           other.count == count &&
           other.next == next &&
           other.previous == previous &&
-          other.results == results;
+          other.results == results &&
+          other.unreadCount == unreadCount;
 
   @override
   int get hashCode =>
       count.hashCode +
       (next == null ? 0 : next.hashCode) +
       (previous == null ? 0 : previous.hashCode) +
-      results.hashCode;
+      results.hashCode +
+      unreadCount.hashCode;
 
   factory PaginatedInboxNotificationList.fromJson(Map<String, dynamic> json) =>
       _$PaginatedInboxNotificationListFromJson(json);

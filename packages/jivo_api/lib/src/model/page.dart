@@ -28,7 +28,7 @@ class Page {
     required this.updatedAt,
   });
 
-  /// about, terms, privacy or refund-policy.
+  /// about, terms, privacy, refund-policy, rider-agreement or rider-location-disclosure.
   @JsonKey(name: r'slug', required: true, includeIfNull: false)
   final String slug;
 

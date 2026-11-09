@@ -36,6 +36,7 @@ import 'package:jivo_api/src/model/rider_bank_account_update_request.dart';
 import 'package:jivo_api/src/model/rider_document.dart';
 import 'package:jivo_api/src/model/rider_document_type_enum.dart';
 import 'package:jivo_api/src/model/rider_profile.dart';
+import 'package:jivo_api/src/model/rider_ratings_page.dart';
 import 'package:jivo_api/src/model/rider_register_request.dart';
 import 'package:jivo_api/src/model/rider_task.dart';
 import 'package:jivo_api/src/model/shift_start_request.dart';
@@ -1044,6 +1045,91 @@ class RiderApi {
     }
 
     return Response<PaginatedPayoutList>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// My ratings
+  /// Phase 7 (rider app request). The caller&#39;s average rating (&#x60;rating_avg&#x60;, also in &#x60;GET /rider/me/&#x60;), the number of ratings, the tags customers chose for the rider (ON_TIME, POLITE_RIDER, LATE_DELIVERY, RUDE_RIDER) and the ratings themselves, newest first, paged by &#x60;before_id&#x60; (follow &#x60;next&#x60;). Customer names, phones, addresses and comments are never shown to riders. Any rider status.
+  ///
+  /// Parameters:
+  /// * [beforeId] - Return ratings older than this rating id (from `next`).
+  /// * [pageSize] - Items per page: default 20, max 100.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RiderRatingsPage] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RiderRatingsPage>> riderRatingsList({
+    int? beforeId,
+    int? pageSize,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/rider/ratings/';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (beforeId != null) r'before_id': beforeId,
+      if (pageSize != null) r'page_size': pageSize,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RiderRatingsPage? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<RiderRatingsPage, RiderRatingsPage>(
+              rawData,
+              'RiderRatingsPage',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RiderRatingsPage>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

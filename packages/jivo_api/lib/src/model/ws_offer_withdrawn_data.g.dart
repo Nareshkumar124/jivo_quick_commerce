@@ -115,6 +115,7 @@ const _$WsOfferWithdrawnDataReasonEnumEnumMap = {
   WsOfferWithdrawnDataReasonEnum.TAKEN: 'TAKEN',
   WsOfferWithdrawnDataReasonEnum.ORDER_CANCELLED: 'ORDER_CANCELLED',
   WsOfferWithdrawnDataReasonEnum.REASSIGNED: 'REASSIGNED',
+  WsOfferWithdrawnDataReasonEnum.RIDER_OFFLINE: 'RIDER_OFFLINE',
   WsOfferWithdrawnDataReasonEnum.unknownDefaultOpenApi:
       'unknown_default_open_api',
 };

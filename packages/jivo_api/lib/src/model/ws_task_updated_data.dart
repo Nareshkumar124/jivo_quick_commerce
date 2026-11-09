@@ -97,6 +97,8 @@ enum WsTaskUpdatedDataChangeEnum {
   REASSIGNED(r'REASSIGNED'),
   @JsonValue(r'STATUS_CHANGED')
   STATUS_CHANGED(r'STATUS_CHANGED'),
+  @JsonValue(r'ASSIGNED')
+  ASSIGNED(r'ASSIGNED'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

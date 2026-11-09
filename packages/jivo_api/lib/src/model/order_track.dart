@@ -32,6 +32,10 @@ class OrderTrack {
 
     required this.etaAt,
 
+    required this.liveEtaAt,
+
+    required this.liveEtaMinutes,
+
     required this.store,
 
     required this.destination,
@@ -63,6 +67,14 @@ class OrderTrack {
   /// Promised delivery time (08 §8); null once the order ended.
   @JsonKey(name: r'eta_at', required: true, includeIfNull: true)
   final DateTime? etaAt;
+
+  /// The live ETA (08 §8), recomputed now from the order and task status and the rider's latest position; the same value `order.eta` pushes on the order socket. Null once the order ended.
+  @JsonKey(name: r'live_eta_at', required: true, includeIfNull: true)
+  final DateTime? liveEtaAt;
+
+  /// Minutes from `server_time` to `live_eta_at`, at least 1.
+  @JsonKey(name: r'live_eta_minutes', required: true, includeIfNull: true)
+  final int? liveEtaMinutes;
 
   @JsonKey(name: r'store', required: true, includeIfNull: false)
   final TrackStore store;
@@ -99,6 +111,8 @@ class OrderTrack {
           other.orderNumber == orderNumber &&
           other.status == status &&
           other.etaAt == etaAt &&
+          other.liveEtaAt == liveEtaAt &&
+          other.liveEtaMinutes == liveEtaMinutes &&
           other.store == store &&
           other.destination == destination &&
           other.rider == rider &&
@@ -112,6 +126,8 @@ class OrderTrack {
       orderNumber.hashCode +
       status.hashCode +
       (etaAt == null ? 0 : etaAt.hashCode) +
+      (liveEtaAt == null ? 0 : liveEtaAt.hashCode) +
+      (liveEtaMinutes == null ? 0 : liveEtaMinutes.hashCode) +
       store.hashCode +
       destination.hashCode +
       (rider == null ? 0 : rider.hashCode) +

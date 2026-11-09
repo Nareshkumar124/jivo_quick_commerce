@@ -6,7 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// * `order` - Order updates * `promo` - Offers * `system` - Account and app
+/// * `order` - Order updates * `promo` - Offers * `system` - Account and app * `support` - Help and support
 enum InboxNotificationCategoryEnum {
   @JsonValue(r'order')
   order(r'order'),
@@ -14,6 +14,8 @@ enum InboxNotificationCategoryEnum {
   promo(r'promo'),
   @JsonValue(r'system')
   system(r'system'),
+  @JsonValue(r'support')
+  support(r'support'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

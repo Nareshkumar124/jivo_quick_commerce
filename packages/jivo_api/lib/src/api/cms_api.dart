@@ -92,7 +92,7 @@ class CmsApi {
   }
 
   /// Static page (About, Terms, Privacy, Refund policy)
-  /// Public. Slugs the apps use: &#x60;about&#x60;, &#x60;terms&#x60;, &#x60;privacy&#x60;, &#x60;refund-policy&#x60;. The HTML is sanitised server-side to a small allow-list (see &#x60;html&#x60;). An unknown or unpublished slug is 404 &#x60;NOT_FOUND&#x60;: fall back to the policy URL from &#x60;GET /config/app/&#x60;. Cached for up to 5 minutes.
+  /// Public. Slugs the apps use: &#x60;about&#x60;, &#x60;terms&#x60;, &#x60;privacy&#x60;, &#x60;refund-policy&#x60; and, in the rider app, &#x60;rider-agreement&#x60; and &#x60;rider-location-disclosure&#x60;. The HTML is sanitised server-side to a small allow-list (see &#x60;html&#x60;). An unknown or unpublished slug is 404 &#x60;NOT_FOUND&#x60;: fall back to the policy URL from &#x60;GET /config/app/&#x60;. Cached for up to 5 minutes.
   ///
   /// Parameters:
   /// * [slug] - `Page.slug`.

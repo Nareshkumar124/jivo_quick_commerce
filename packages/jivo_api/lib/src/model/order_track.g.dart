@@ -15,6 +15,10 @@ abstract class _$OrderTrackCWProxy {
 
   OrderTrack etaAt(DateTime? etaAt);
 
+  OrderTrack liveEtaAt(DateTime? liveEtaAt);
+
+  OrderTrack liveEtaMinutes(int? liveEtaMinutes);
+
   OrderTrack store(TrackStore store);
 
   OrderTrack destination(TrackPoint destination);
@@ -38,6 +42,8 @@ abstract class _$OrderTrackCWProxy {
     String orderNumber,
     OrderStatusEnum status,
     DateTime? etaAt,
+    DateTime? liveEtaAt,
+    int? liveEtaMinutes,
     TrackStore store,
     TrackPoint destination,
     TrackRider? rider,
@@ -64,6 +70,13 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
 
   @override
   OrderTrack etaAt(DateTime? etaAt) => this(etaAt: etaAt);
+
+  @override
+  OrderTrack liveEtaAt(DateTime? liveEtaAt) => this(liveEtaAt: liveEtaAt);
+
+  @override
+  OrderTrack liveEtaMinutes(int? liveEtaMinutes) =>
+      this(liveEtaMinutes: liveEtaMinutes);
 
   @override
   OrderTrack store(TrackStore store) => this(store: store);
@@ -97,6 +110,8 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
     Object? orderNumber = const $CopyWithPlaceholder(),
     Object? status = const $CopyWithPlaceholder(),
     Object? etaAt = const $CopyWithPlaceholder(),
+    Object? liveEtaAt = const $CopyWithPlaceholder(),
+    Object? liveEtaMinutes = const $CopyWithPlaceholder(),
     Object? store = const $CopyWithPlaceholder(),
     Object? destination = const $CopyWithPlaceholder(),
     Object? rider = const $CopyWithPlaceholder(),
@@ -121,6 +136,14 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
           ? _value.etaAt
           // ignore: cast_nullable_to_non_nullable
           : etaAt as DateTime?,
+      liveEtaAt: liveEtaAt == const $CopyWithPlaceholder()
+          ? _value.liveEtaAt
+          // ignore: cast_nullable_to_non_nullable
+          : liveEtaAt as DateTime?,
+      liveEtaMinutes: liveEtaMinutes == const $CopyWithPlaceholder()
+          ? _value.liveEtaMinutes
+          // ignore: cast_nullable_to_non_nullable
+          : liveEtaMinutes as int?,
       store: store == const $CopyWithPlaceholder()
           ? _value.store
           // ignore: cast_nullable_to_non_nullable
@@ -170,6 +193,8 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
         'order_number',
         'status',
         'eta_at',
+        'live_eta_at',
+        'live_eta_minutes',
         'store',
         'destination',
         'rider',
@@ -192,6 +217,14 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
       etaAt: $checkedConvert(
         'eta_at',
         (v) => v == null ? null : DateTime.parse(v as String),
+      ),
+      liveEtaAt: $checkedConvert(
+        'live_eta_at',
+        (v) => v == null ? null : DateTime.parse(v as String),
+      ),
+      liveEtaMinutes: $checkedConvert(
+        'live_eta_minutes',
+        (v) => (v as num?)?.toInt(),
       ),
       store: $checkedConvert(
         'store',
@@ -226,6 +259,8 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
     'orderId': 'order_id',
     'orderNumber': 'order_number',
     'etaAt': 'eta_at',
+    'liveEtaAt': 'live_eta_at',
+    'liveEtaMinutes': 'live_eta_minutes',
     'deliveryOtp': 'delivery_otp',
     'taskStatus': 'task_status',
     'serverTime': 'server_time',
@@ -238,6 +273,8 @@ Map<String, dynamic> _$OrderTrackToJson(OrderTrack instance) =>
       'order_number': instance.orderNumber,
       'status': _$OrderStatusEnumEnumMap[instance.status]!,
       'eta_at': instance.etaAt?.toIso8601String(),
+      'live_eta_at': instance.liveEtaAt?.toIso8601String(),
+      'live_eta_minutes': instance.liveEtaMinutes,
       'store': instance.store.toJson(),
       'destination': instance.destination.toJson(),
       'rider': instance.rider?.toJson(),

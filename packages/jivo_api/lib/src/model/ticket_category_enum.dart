@@ -6,7 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// * `MISSING_ITEMS` - Missing items * `DAMAGED_ITEMS` - Damaged items * `WRONG_ITEMS` - Wrong items * `LATE_DELIVERY` - Late delivery * `PAYMENT_REFUND` - Payment or refund * `ACCOUNT` - Account * `OTHER` - Other
+/// * `MISSING_ITEMS` - Missing items * `DAMAGED_ITEMS` - Damaged items * `WRONG_ITEMS` - Wrong items * `LATE_DELIVERY` - Late delivery * `PAYMENT_REFUND` - Payment or refund * `ACCOUNT` - Account * `OTHER` - Other * `TASK` - A delivery task * `PAYOUT` - Payout * `CASH` - Cash deposit
 enum TicketCategoryEnum {
   @JsonValue(r'MISSING_ITEMS')
   MISSING_ITEMS(r'MISSING_ITEMS'),
@@ -22,6 +22,12 @@ enum TicketCategoryEnum {
   ACCOUNT(r'ACCOUNT'),
   @JsonValue(r'OTHER')
   OTHER(r'OTHER'),
+  @JsonValue(r'TASK')
+  TASK(r'TASK'),
+  @JsonValue(r'PAYOUT')
+  PAYOUT(r'PAYOUT'),
+  @JsonValue(r'CASH')
+  CASH(r'CASH'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

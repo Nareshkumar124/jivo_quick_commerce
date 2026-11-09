@@ -71,6 +71,8 @@ import 'package:jivo_api/src/model/order_create_request.dart';
 import 'package:jivo_api/src/model/order_invoice.dart';
 import 'package:jivo_api/src/model/order_line.dart';
 import 'package:jivo_api/src/model/order_placement.dart';
+import 'package:jivo_api/src/model/order_rating.dart';
+import 'package:jivo_api/src/model/order_rating_create_request.dart';
 import 'package:jivo_api/src/model/order_refund.dart';
 import 'package:jivo_api/src/model/order_store.dart';
 import 'package:jivo_api/src/model/order_summary.dart';
@@ -117,6 +119,9 @@ import 'package:jivo_api/src/model/rider_home_store.dart';
 import 'package:jivo_api/src/model/rider_location_settings.dart';
 import 'package:jivo_api/src/model/rider_offer.dart';
 import 'package:jivo_api/src/model/rider_profile.dart';
+import 'package:jivo_api/src/model/rider_rating_item.dart';
+import 'package:jivo_api/src/model/rider_rating_tag_count.dart';
+import 'package:jivo_api/src/model/rider_ratings_page.dart';
 import 'package:jivo_api/src/model/rider_register_request.dart';
 import 'package:jivo_api/src/model/rider_shift.dart';
 import 'package:jivo_api/src/model/rider_store.dart';
@@ -137,6 +142,7 @@ import 'package:jivo_api/src/model/task_history_item.dart';
 import 'package:jivo_api/src/model/task_item.dart';
 import 'package:jivo_api/src/model/task_store.dart';
 import 'package:jivo_api/src/model/ticket.dart';
+import 'package:jivo_api/src/model/ticket_attachment.dart';
 import 'package:jivo_api/src/model/ticket_create_request.dart';
 import 'package:jivo_api/src/model/ticket_message.dart';
 import 'package:jivo_api/src/model/ticket_reply_request.dart';
@@ -147,6 +153,7 @@ import 'package:jivo_api/src/model/track_point.dart';
 import 'package:jivo_api/src/model/track_rider.dart';
 import 'package:jivo_api/src/model/track_store.dart';
 import 'package:jivo_api/src/model/unit_price.dart';
+import 'package:jivo_api/src/model/unread_count.dart';
 import 'package:jivo_api/src/model/variant_detail.dart';
 import 'package:jivo_api/src/model/variant_summary.dart';
 import 'package:jivo_api/src/model/webhook_ack.dart';
@@ -155,14 +162,21 @@ import 'package:jivo_api/src/model/ws_alert_message.dart';
 import 'package:jivo_api/src/model/ws_auth_ok_data.dart';
 import 'package:jivo_api/src/model/ws_auth_ok_message.dart';
 import 'package:jivo_api/src/model/ws_auth_request.dart';
+import 'package:jivo_api/src/model/ws_cash_updated_data.dart';
+import 'package:jivo_api/src/model/ws_cash_updated_message.dart';
 import 'package:jivo_api/src/model/ws_error_data.dart';
 import 'package:jivo_api/src/model/ws_error_message.dart';
+import 'package:jivo_api/src/model/ws_notification_new_data.dart';
+import 'package:jivo_api/src/model/ws_notification_new_message.dart';
 import 'package:jivo_api/src/model/ws_offer_data.dart';
+import 'package:jivo_api/src/model/ws_offer_expired_message.dart';
 import 'package:jivo_api/src/model/ws_offer_new_message.dart';
 import 'package:jivo_api/src/model/ws_offer_withdrawn_data.dart';
 import 'package:jivo_api/src/model/ws_offer_withdrawn_message.dart';
 import 'package:jivo_api/src/model/ws_ops_rider_location_data.dart';
 import 'package:jivo_api/src/model/ws_ops_rider_location_message.dart';
+import 'package:jivo_api/src/model/ws_ops_task_status_data.dart';
+import 'package:jivo_api/src/model/ws_ops_task_status_message.dart';
 import 'package:jivo_api/src/model/ws_order_created_data.dart';
 import 'package:jivo_api/src/model/ws_order_created_message.dart';
 import 'package:jivo_api/src/model/ws_order_eta_data.dart';
@@ -404,6 +418,11 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'OrderPlacement':
       return OrderPlacement.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'OrderRating':
+      return OrderRating.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'OrderRatingCreateRequest':
+      return OrderRatingCreateRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'OrderRefund':
       return OrderRefund.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'OrderRefundReasonEnum':
@@ -498,6 +517,7 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'ProductDetail':
       return ProductDetail.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'RatingTagEnum':
     case 'RazorpayCheckout':
       return RazorpayCheckout.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -543,6 +563,15 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'RiderPaymentTypeEnum':
     case 'RiderProfile':
       return RiderProfile.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'RiderRatingItem':
+      return RiderRatingItem.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RiderRatingTagCount':
+      return RiderRatingTagCount.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RiderRatingsPage':
+      return RiderRatingsPage.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'RiderRegisterRequest':
       return RiderRegisterRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -596,6 +625,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return TaskStore.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'Ticket':
       return Ticket.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'TicketAttachment':
+      return TicketAttachment.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'TicketCategoryEnum':
     case 'TicketCreateRequest':
       return TicketCreateRequest.fromJson(value as Map<String, dynamic>)
@@ -623,6 +655,8 @@ ReturnType deserialize<ReturnType, BaseType>(
       return TrackStore.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'UnitPrice':
       return UnitPrice.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'UnreadCount':
+      return UnreadCount.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'VariantDetail':
       return VariantDetail.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -646,13 +680,28 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'WsAuthRequest':
       return WsAuthRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'WsCashUpdatedData':
+      return WsCashUpdatedData.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'WsCashUpdatedMessage':
+      return WsCashUpdatedMessage.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'WsErrorData':
       return WsErrorData.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'WsErrorMessage':
       return WsErrorMessage.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'WsNotificationNewData':
+      return WsNotificationNewData.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'WsNotificationNewMessage':
+      return WsNotificationNewMessage.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'WsOfferData':
       return WsOfferData.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'WsOfferExpiredMessage':
+      return WsOfferExpiredMessage.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'WsOfferNewMessage':
       return WsOfferNewMessage.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -667,6 +716,12 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'WsOpsRiderLocationMessage':
       return WsOpsRiderLocationMessage.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'WsOpsTaskStatusData':
+      return WsOpsTaskStatusData.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'WsOpsTaskStatusMessage':
+      return WsOpsTaskStatusMessage.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'WsOrderCreatedData':
       return WsOrderCreatedData.fromJson(value as Map<String, dynamic>)

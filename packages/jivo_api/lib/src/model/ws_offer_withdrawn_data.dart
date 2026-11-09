@@ -71,6 +71,8 @@ enum WsOfferWithdrawnDataReasonEnum {
   ORDER_CANCELLED(r'ORDER_CANCELLED'),
   @JsonValue(r'REASSIGNED')
   REASSIGNED(r'REASSIGNED'),
+  @JsonValue(r'RIDER_OFFLINE')
+  RIDER_OFFLINE(r'RIDER_OFFLINE'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

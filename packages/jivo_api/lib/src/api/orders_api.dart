@@ -17,6 +17,8 @@ import 'package:jivo_api/src/model/order_cancel_request.dart';
 import 'package:jivo_api/src/model/order_create_request.dart';
 import 'package:jivo_api/src/model/order_invoice.dart';
 import 'package:jivo_api/src/model/order_placement.dart';
+import 'package:jivo_api/src/model/order_rating.dart';
+import 'package:jivo_api/src/model/order_rating_create_request.dart';
 import 'package:jivo_api/src/model/order_track.dart';
 import 'package:jivo_api/src/model/paginated_order_summary_list.dart';
 import 'package:jivo_api/src/model/reorder_result.dart';
@@ -380,6 +382,187 @@ class OrdersApi {
     }
 
     return Response<PaginatedOrderSummaryList>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Rate my delivered order
+  /// Phase 7 (api-requests #34). Once the order is DELIVERED (&#x60;can_rate&#x60;), the customer rates the order (&#x60;order_stars&#x60; 1-5) and optionally the rider who delivered it (&#x60;rider_stars&#x60;), with tags and a comment (at most 500 characters). One rating per order; it cannot be changed. An order not DELIVERED or already rated is 400 &#x60;VALIDATION_ERROR&#x60; with &#x60;details.order&#x60; and &#x60;details.reason&#x60; (NOT_DELIVERED / ALREADY_RATED). POLITE_RIDER / RUDE_RIDER need &#x60;rider_stars&#x60;; &#x60;rider_stars&#x60; on an order without a rider is 400. The order detail then shows it in &#x60;rating&#x60;.
+  ///
+  /// Parameters:
+  /// * [id] - `Order.id`.
+  /// * [orderRatingCreateRequest]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [OrderRating] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<OrderRating>> ordersRatingCreate({
+    required int id,
+    required OrderRatingCreateRequest orderRatingCreateRequest,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/orders/{id}/rating/'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(orderRatingCreateRequest);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    OrderRating? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OrderRating, OrderRating>(
+              rawData,
+              'OrderRating',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<OrderRating>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// My rating of an order
+  /// Phase 7 (api-requests #34). The caller&#39;s rating of their order, or 404 when it is not rated yet (or not the caller&#39;s order). The order detail carries the same data in &#x60;rating&#x60;.
+  ///
+  /// Parameters:
+  /// * [id] - `Order.id`.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [OrderRating] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<OrderRating>> ordersRatingRetrieve({
+    required int id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/orders/{id}/rating/'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    OrderRating? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OrderRating, OrderRating>(
+              rawData,
+              'OrderRating',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<OrderRating>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
