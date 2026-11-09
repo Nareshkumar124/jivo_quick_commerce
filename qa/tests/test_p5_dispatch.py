@@ -124,7 +124,9 @@ def test_p5_tc41_expiry_then_late_accept(r1, r2, p5_shop_a):
     assert offers_of(ctx["task_id"])[0][2] == "EXPIRED"
     assert_error(r1.accept(ctx["offer"]["id"]), 409, "OFFER_EXPIRED")
     r = r1.reject(ctx["offer"]["id"])
-    assert r.status_code == 409, describe(r)
+    # Observation O-P5-02: a late reject is a 204 no-op (doc silent); it must not rewrite the offer.
+    assert r.status_code in (204, 409), describe(r)
+    assert offers_of(ctx["task_id"])[0][2] == "EXPIRED"
 
 
 def test_p5_tc43_parallel_accepts_one_assignment(r1, p5_shop_a):

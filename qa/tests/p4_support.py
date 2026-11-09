@@ -12,12 +12,13 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from pathlib import Path
 from decimal import Decimal
 
 from p3_support import money
 from qa_support import QA_DIR, STORE_ID, db_query
 
-BACKEND = QA_DIR.parent / "backend"
+BACKEND = Path(os.environ["QA_BACKEND_DIR"]) if os.environ.get("QA_BACKEND_DIR") else QA_DIR.parent / "backend"
 DRIVER = QA_DIR / "tools" / "store_ops_driver.py"
 
 STAFF = "store.staff@jivo.test"
@@ -32,7 +33,8 @@ _ENV = {
     "REDIS_URL": "redis://localhost:6380/5",
     "CHANNELS_REDIS_URL": "redis://localhost:6380/6",
     "CELERY_BROKER_URL": "redis://localhost:6380/7",
-    "DJANGO_SETTINGS_MODULE": "config.settings.local",
+    "DJANGO_SETTINGS_MODULE": os.environ.get("QA_DJANGO_SETTINGS", "config.settings.local"),
+    **({"PYTHONPATH": os.environ["QA_PYTHONPATH"]} if os.environ.get("QA_PYTHONPATH") else {}),
     "SMS_BACKEND": "apps.notifications.sms.ConsoleSmsBackend",
     "OTP_TEST_NUMBERS": "+919000000101:123456,+919000000102:123456,+919000000103:123456,+919000000104:123456,+919000000105:123456",
     "PYTHONIOENCODING": "utf-8",
@@ -140,7 +142,7 @@ def t8a_oracle(old: dict, lines: list[tuple[Decimal, Decimal, int]]) -> dict:
 def _qa_worker_pids() -> list[int]:
     ps = (
         "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'celery.exe' -and "
-        "$_.CommandLine -like '*worktrees?qa?backend*' -and $_.CommandLine -like '*worker*' } "
+        "($_.CommandLine -like '*worktrees?qa?backend*' -or $_.CommandLine -like '*qa-dev?backend*') -and $_.CommandLine -like '*worker*' } "
         "| ForEach-Object { $_.ProcessId }"
     )
     out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout

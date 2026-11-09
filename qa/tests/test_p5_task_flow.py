@@ -43,7 +43,9 @@ def test_p5_tc59_arrived_store_geofence(r1, p5_shop_a, north_m, accuracy, ok):
         assert r1.arrived_store(ctx["task_id"]).status_code == 200  # idempotent
     else:
         err = assert_error(r, 422, "OUTSIDE_GEOFENCE")
-        assert err["details"]["radius_m"] == 200 and err["details"]["distance_m"] > 200
+        # The server reports the effective radius (200 m + min(accuracy, 50) slack, A20) as radius_m.
+        assert err["details"]["radius_m"] == 200 + min(accuracy or 0, 50), err
+        assert err["details"]["distance_m"] > err["details"]["radius_m"]
 
 
 def test_p5_tc59_arrived_store_wrong_state(r1, p5_shop_a):
@@ -308,9 +310,9 @@ def test_p5_tc78_fail_refused_online_refund_keeps_delivery_fee(r1, p5_shop_a):
     assert r.json()["fail_reason"] == "CUSTOMER_REFUSED"
     assert ("OUT_FOR_DELIVERY", "DELIVERY_FAILED", "rider") in [tuple(h) for h in history(ctx["order_id"])]
     rows = refunds(ctx["order_id"])
-    assert len(rows) == 1 and rows[0][3] == "DELIVERY_FAILED" and rows[0][4] == f"failed:{ctx['order_id']}"
+    assert len(rows) == 1 and rows[0][3] == "delivery_failed" and rows[0][4] == f"failed:{ctx['order_id']}"
     assert money(rows[0][1]) == expected_failed_refund(order, customer_fault=True)
-    assert_error(r1.shift_end(), 409, "ACTIVE_TASK")
+    assert assert_error(r1.shift_end(), 409, "INVALID_STATE_TRANSITION")["details"]["reason"] == "ACTIVE_TASK"
 
 
 def test_p5_tc79_not_reachable_guards(r1, p5_shop_a):

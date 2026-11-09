@@ -32,16 +32,15 @@ for k, v in {
     if os.environ.get(k) != v:
         sys.exit(f"refusing to run: {k} must be the QA Redis DB")
 
-import django  # noqa: E402
+import django
 
 django.setup()
 
-from django.contrib.auth import get_user_model  # noqa: E402
-from django.core.exceptions import PermissionDenied, ValidationError  # noqa: E402
-
-from apps.core.exceptions import ApiError  # noqa: E402
-from apps.delivery.models import Rider  # noqa: E402
-from apps.orders.models import Order  # noqa: E402
+from apps.core.exceptions import ApiError
+from apps.delivery.models import Rider
+from apps.orders.models import Order
+from django.contrib.auth import get_user_model
+from django.core.exceptions import PermissionDenied, ValidationError
 
 QA_PREFIX = "+9190000001"
 User = get_user_model()
@@ -99,7 +98,7 @@ def task_state(order_id: int) -> dict:
     }
 
 
-def run(step: dict) -> dict:  # noqa: C901 (a flat dispatch table reads best here)
+def run(step: dict) -> dict:
     op = step["op"]
     by = User.objects.get(email=step["as"]) if step.get("as") else None
     oid = step.get("order_id")
@@ -137,6 +136,34 @@ def run(step: dict) -> dict:  # noqa: C901 (a flat dispatch table reads best her
         else:
             kyc.reinstate_rider(rider.pk, by=by)
         return {"ok": True, "result": rider_state(rider)}
+    if op in ("approve_rider", "reject_rider", "set_home_store"):
+        from apps.delivery.services import kyc
+
+        rider = rider_by_phone(step["phone"])
+        if op == "approve_rider":
+            kyc.approve_rider(rider.pk, by=by, home_store_id=step["store_id"])
+        elif op == "reject_rider":
+            kyc.reject_rider(rider.pk, by=by, reason=step.get("reason", ""))
+        else:
+            kyc.set_home_store(rider.pk, step["store_id"], by=by)
+        return {"ok": True, "result": rider_state(rider)}
+    if op in ("approve_document", "reject_document", "document_number", "document_url"):
+        # The rider's current document of `doc_type` (any status).
+        from apps.delivery.services import kyc
+
+        rider = rider_by_phone(step["phone"])
+        doc = rider.documents.filter(doc_type=step["doc_type"]).order_by("-pk").first()
+        if op == "approve_document":
+            kyc.approve_document(doc.pk, by=by)
+            return {"ok": True, "result": rider_state(rider)}
+        if op == "reject_document":
+            kyc.reject_document(doc.pk, by=by, note=step.get("note", ""))
+            return {"ok": True, "result": rider_state(rider)}
+        if op == "document_number":
+            number = kyc.document_number(doc.pk, by=by)
+            return {"ok": True, "result": {"len": len(number), "last4": number[-4:]}}
+        url, expires = kyc.document_file_url(doc.pk, by=by)
+        return {"ok": True, "result": {"url": url, "expires_at": expires}}
     if op == "force_offline":
         from apps.delivery.services import shifts
 
@@ -191,16 +218,62 @@ def run(step: dict) -> dict:  # noqa: C901 (a flat dispatch table reads best her
         store_ops.receive_return(oid, by=by, damaged=damaged)
         return {"ok": True, "result": task_state(oid)}
 
+    # ---------------------------------------------------------------- cash, payouts, unlocks (slice 5.4)
+    if op == "record_deposit":
+        from apps.delivery.services import cash
+
+        rider = rider_by_phone(step["phone"])
+        entry = cash.record_deposit(rider.pk, step["amount"], by=by, note=step.get("note", "QA deposit"),
+                                    idempotency_key=step.get("key", ""))
+        return {"ok": True, "result": {"entry_id": entry.pk, "balance_after": str(entry.balance_after),
+                                       **rider_state(rider)}}
+    if op == "day_report":
+        from datetime import date as _d
+
+        from apps.delivery.services import cash
+
+        rep = cash.store_day_report(by, step["store_id"], _d.fromisoformat(step["day"]))
+        return {"ok": True, "result": rep}
+    if op == "create_payout":
+        from datetime import date as _d
+
+        from apps.delivery.services import payouts
+
+        rider = rider_by_phone(step["phone"])
+        payout = payouts.create_payout(rider.pk, _d.fromisoformat(step["start"]), _d.fromisoformat(step["end"]), by=by)
+        return {"ok": True, "result": {"payout_id": payout.pk, "amount": str(payout.amount), "status": payout.status}}
+    if op == "mark_paid":
+        from apps.delivery.services import payouts
+
+        payout = payouts.mark_paid(step["payout_id"], reference=step.get("reference", "QA-REF"), by=by)
+        return {"ok": True, "result": {"payout_id": payout.pk, "status": payout.status}}
+    if op in ("unlock_pickup", "unlock_otp"):
+        from apps.delivery.services import ops as dops
+
+        (dops.unlock_pickup if op == "unlock_pickup" else dops.unlock_delivery_otp)(oid, by=by)
+        return {"ok": True, "result": task_state(oid)}
+    if op == "lift_cod_block":
+        from apps.delivery.services import ops as dops
+
+        user = User.objects.get(phone=step["customer_phone"])
+        if not _qa_phone(user):
+            raise SystemExit("refusing: not a QA customer")
+        return {"ok": True, "result": {"lifted": dops.lift_cod_block(user.pk, by=by)}}
+
     # ---------------------------------------------------------------- cleanup of a QA rider
     if op == "cleanup_rider":
         # End whatever the rider is doing so the next case starts idle and offline:
         # ASSIGNED/AT_STORE -> unassign; PICKED_UP/AT_CUSTOMER -> fail (WRONG_ADDRESS) and
         # receive the return; RETURNING -> receive the return; then force offline.
-        from apps.delivery.services import dispatch, shifts, tasks
+        from apps.delivery.services import shifts
 
+        try:  # slice 5.3+; on a 5.1/5.2 build there are no tasks to end
+            from apps.delivery.services import dispatch, tasks
+        except ImportError:
+            tasks = None
         rider = rider_by_phone(step["phone"])
         done = []
-        task = tasks.active_task(rider)
+        task = tasks.active_task(rider) if tasks is not None else None
         if task is not None:
             guard_order(task.order_id)
             if task.status in ("ASSIGNED", "AT_STORE"):

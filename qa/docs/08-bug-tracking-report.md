@@ -56,3 +56,17 @@ Verified fixes: none yet (first run).
 **OBS-P4-01: resolved** (one-time token on the refund-retry form): the identical retry form posted twice makes one retry (TC-34c). The same protection must be on the manual refund form when BUG-0010 is built.
 
 **Open by severity:** P0 0 · P1 0 · P2 1 (BUG-0010) · P3 3 (BUG-0006, BUG-0008, BUG-0011).
+
+## Phase 5 stage 2 (2026-11-06, develop `999ef38` → `f5d39ff` → `680b904`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0012](../bugs/BUG-0012.md) | Dispatch crashes outside test settings (`CELERY_TASK_ALWAYS_EAGER` read from settings), so no rider is ever offered an order | backend: delivery dispatch | **P0 Blocker (Critical)** | P0 | django-backend-dev | **Verified** (fix `f5d39ff`) | P5-TC-34, 39 and every 5.3 flow |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 `rider_status NONE` (documents, bank-account) | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open | P5-TC-16 |
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| O-P5-01 | A BICYCLE registration with a vehicle number is refused ("Only motorbikes and scooters have a number here"). | 06 §3 only says the number is *required* for motorised vehicles; the test case assumed "optional". Doc ambiguity: PM to confirm, then 06 states it. |
+| O-P5-02 | Rejecting an already-EXPIRED offer returns 204 (no-op; the offer stays EXPIRED). | 06/08 are silent on a late reject. The state is not rewritten (checked), so harmless. Suggest 06 states "late reject is a no-op 204". |
+| O-P5-03 | `shift/start` accepts numeric strings for lat/lng (DRF FloatField coercion); the location batch contract says "JSON numbers". | No harm (judged on the position). Align the contract text or make the field strict. |
+| O-P5-04 | `PUT /rider/bank-account/` normalises a lowercase IFSC to upper case; the response has `upi_id: null` although the schema types it as a non-null string. | Normalising is fine. `null` vs schema: check `RiderBankAccount.upi_id` nullability on the next schema export (strict validation did not fail because the op validated a 200 with upi_id set). |
+| O-P5-05 | `shift/end` with an active task answers code `INVALID_STATE_TRANSITION` with `details.reason = ACTIVE_TASK` (06 §3 wording "409 `ACTIVE_TASK`" reads like a code). | Code is in the doc-06 §6 set; QA oracle updated. Suggest 06 says "reason". |

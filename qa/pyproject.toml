@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml==6.0.3",
     "redis==6.4.0",
     "schemathesis==4.33.0",
+    "websockets==15.0.1",
 ]
 
 [tool.uv]

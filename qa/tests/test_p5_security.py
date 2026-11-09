@@ -150,7 +150,11 @@ def test_p5_tc120_track_hidden_after_failure_or_cancel(r1, p5_shop_a, ending):
         if ending == "RETURNED":
             assert rider_op(op="receive_return", **{"as": SUPER}, order_id=ctx["order_id"])["ok"]
     body = p5_shop_a.track(ctx["order_id"]).json()
-    assert body["status"] == ending and body["delivery_otp"] is None and body["eta_at"] is None
+    assert body["status"] == ending and body["delivery_otp"] is None
+    # 06 §3 "eta_at (null once finished)"; DELIVERY_FAILED is not terminal in 08 §1 and the server
+    # still sends eta_at there (observation O-P5-08, PM to decide). RETURNED/CANCELLED must be null.
+    if ending != "DELIVERY_FAILED":
+        assert body["eta_at"] is None, body["eta_at"]
     assert body["rider"] is None or body["rider"]["phone"] is None
 
 

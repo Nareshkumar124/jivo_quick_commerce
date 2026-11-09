@@ -622,3 +622,106 @@ Nothing in this section has been executed: every status is ⬜, or ⏭ with the 
 | CUS | 1 | 0 | 0 | 1 | 0 |
 
 None executed: 127 ⬜ and 5 ⏭ (TC-19, TC-33, TC-124, TC-131, TC-132: device run or P6/D-19). Slice split: 5.4-only cases are marked `⬜ 5.4`.
+
+## Phase 6: Real-time and notifications (written 2026-11-06, stage 1: T-611 on develop `8f87d7b`)
+Plan, environment and ambiguities: `01-test-plan.md` §10. Automated cases are `test_p6_tcNN_*` in `qa/tests/test_p6_ws.py`. **Task** = the tracker task that delivers the behaviour; T-612/613/614 cases are ⏭ until they land.
+
+**Shorthands:** A, B, E = QA customers (`…101`, `…102`, `…105`); R1 = QA rider (`…103`, ACTIVE at QA-02); SA/OPS/SM/SS/CAT/SUP/FIN = seeded staff (SM and SS are GGN-01 only); `WS(path)` = a socket on the QA instance; "auth" = the first message `{"type":"auth","token":<access>}`.
+
+### Order socket `/ws/v1/orders/{id}/` (06 §4.1)
+| ID | Area | Pri | Task | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P6-TC-01 🔥 | BE | P0 | T-611 | 06 §4.1, §4.2 | A has an order | WS(own order); auth with A's access token | `auth.ok` `{user_id, expires_at}` (= token exp), then exactly one `order.status` snapshot of that order; every message is `{type, data, sent_at}`; data keys = order_id, order_number, store_id, status, payment_status, eta_at, updated_at (no OTP, phone, address, name) | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-02 🔥 | BE | P0 | T-611 | 06 §4 (never in the URL); 09 | A's order | WS(own order + `?token=<A access>`); send nothing | The query token is ignored: no `auth.ok`, no data; closed 4408 after the auth timeout | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-03 | BE | P0 | T-611 | 06 §4.1 | A's order | WS with subprotocols `jivo.v1` + `jivo.auth.<token>` | Handshake selects `jivo.v1`; no response header contains the token; `auth.ok` then the snapshot without an auth message | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-04 | BE | P0 | T-611 | 06 §4.1 close codes | A's order | Auth with: a tampered signature, A's refresh token, an empty string, a 5,000-char string, a number | 4401 each time; nothing sent before the close | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-05 | BE | P1 | T-611 | 06 §4.1 | — | WS(own order), wait 12 s without a message | Closed 4408 after ~10 s (`WS_AUTH_TIMEOUT_SECONDS`) | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-06 | BE | P0 | T-611 | 06 §4.1 | — | First message: `{"type":"ping"}`; non-JSON text; a JSON array | 4400 each, nothing sent | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-07 🔥 | BE | P0 | T-611 | 06 §4.1 4404; CLAUDE.md IDOR | A and B each have an order | A's token on WS(B's order); A's token on WS(id 999999999) | 4404 for both (same code, so ids leak nothing); no `auth.ok`, no data | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-08 | BE | P0 | T-611 | 06 §4.1 renewal | A's socket authorised | Re-auth with a fresh token of A; then re-auth with B's valid token | A's renewal: a second `auth.ok`, socket stays; B's token: 4401 | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-09 | BE | P1 | T-611 | 06 §4.1 | Instance profile `shorttoken` (access lifetime 60 s) | Auth, wait past `expires_at` without renewing | Closed 4401 at expiry | ⏭ needs the `shorttoken` profile (stage 2) |
+| P6-TC-10 | BE | P1 | T-611 | 06 §4.2 control | A authorised | `ping`; then `{"type":"bogus"}` | `pong` with `sent_at`; `error` `{code: VALIDATION_ERROR}`, socket stays open | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-11 🔥 | E2E | P0 | T-611 | 06 §4.4; 08 §9 | A places COD at QA-02 | WS(that order) authorised; A cancels via REST | `order.status` CANCELLED arrives on the socket within 3 s of the cancel response | ⬜ first run blocked: A's COD was blocked by a concurrent P5 DL-61 case; test switched to an ONLINE order, rerun pending |
+| P6-TC-12 | BE | P0 | T-611/T-612 | 06 §4.1 (OTP never on a socket) | Orders of A in every state | Snapshot `order.status` of each | No `otp`/`delivery_otp` key (or 4-digit OTP value) in any socket message | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-13 | BE | P1 | T-611 | 06 §4.1; 09 | A deactivated/deleted user's token | Auth | 4401 | ⏭ needs a spare QA number to delete (E is reserved for the deletion run) |
+| P6-TC-14 🔥 | E2E | P0 | T-612 | 06 §4.2 `rider.location`; 08 §8 | OUT_FOR_DELIVERY order of A, R1 on task | R1 sends location points | A's socket gets `rider.location` `{order_id, lat, lng, heading, recorded_at}`; B's socket for B's order gets nothing | ⏭ T-612 |
+| P6-TC-15 | BE | P1 | T-612 | 08 §8 | As TC-14 | Location updates every 5 s for 2 min | `order.eta` recomputed per the 08 §8 formula (road factor 1.3, 20 km/h, +2 min), no more often than `WS_ETA_MIN_INTERVAL_SECONDS` (30 s) | ⏭ T-612 |
+| P6-TC-16 | BE | P0 | T-612 | 06 §4.2; 09 privacy | Orders before pickup and after T10 | R1 pings | No `rider.location` to the customer before OUT_FOR_DELIVERY or after DELIVERED/FAILED | ⏭ T-612 |
+| P6-TC-17 | CUS | P0 | T-613 | 06 §4.1 fallback | Device run | Drop the socket during tracking (airplane mode) | App polls `GET /orders/{id}/track/` every 10 s and reconnects with backoff, re-reading REST on reconnect; no crash, no stale status | ⏭ device run (PM) |
+| P6-TC-18 | BE | P1 | T-611 | 06 §4.2 (state, not diffs) | A's order | Connect, auth, close; reconnect and auth again | A fresh snapshot each time; the closed socket's slot is released | ✅ (8f87d7b, 2026-11-06) |
+
+### Rider socket `/ws/v1/rider/` (06 §4.1, §4.2)
+| ID | Area | Pri | Task | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P6-TC-19 🔥 | BE | P0 | T-611 | 06 §4.1 | R1 ACTIVE; E has no rider profile | R1 rider-app token; R1 customer-app token; E rider-app token | `auth.ok`; 4403; 4403 | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-20 | BE | P0 | T-611 | 06 §4.1 re-check | Spare QA rider, instance profile `wsrecheck` | Suspend the rider while the socket is open | Closed 4403 at the next re-check (≤ `WS_RIDER_RECHECK_SECONDS`) | ⏭ stage 2 (spare rider and profile) |
+| P6-TC-21 🔥 | E2E | P0 | T-612 | 06 §4.2 `offer.new`; 08 §5 | R1 online at QA-02, socket open | A places COD at QA-02 | `offer.new` within 3 s of dispatch; data equals `GET /rider/offers/current/` | ⏭ T-612 |
+| P6-TC-22 | BE | P0 | T-612 | 06 §4.2 `offer.withdrawn` | R1 has an offer | Let it expire; cancel the order; another rider takes it; ops reassign | `offer.withdrawn` with reason EXPIRED / ORDER_CANCELLED / TAKEN / REASSIGNED | ⏭ T-612 |
+| P6-TC-23 | BE | P1 | T-612 | Brief `offer.expired` vs 06 §4.2 | As TC-22 | Expire an offer | Per 06: `offer.withdrawn` reason EXPIRED (no `offer.expired` type); ambiguity P6-A1 | ⏭ T-612 |
+| P6-TC-24 | BE | P0 | T-612 | 06 §4.2 `task.updated` | R1 assigned | Pack, adjust items (COD), cancel, reassign, status change | `task.updated` with change ORDER_PACKED / AMOUNT_CHANGED / ORDER_CANCELLED / REASSIGNED / STATUS_CHANGED; the REST task matches | ⏭ T-612 |
+| P6-TC-25 | BE | P1 | T-612 | Brief `cash.updated`; 08 §6 | R1 collects COD, ops records a deposit | — | A cash update event (contract to be defined, P6-A1) with `cash_in_hand` equal to `GET /rider/cash/` | ⏭ T-612 |
+| P6-TC-26 🔥 | BE | P0 | T-612 | 06 §4 scoping | R1 and R2 sockets open | An offer to R1 | R2 receives nothing | ⏭ T-612 |
+
+### Ops live feed `/ws/ops/live/` (06 §4.1; 05 §3)
+| ID | Area | Pri | Task | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P6-TC-27 🔥 | ADM | P0 | T-611 | 06 §4.1 | OPS signed in (session) | WS(`/ws/ops/live/`) with the session cookie and Origin `http://127.0.0.1:8004`; `ping` | Open without an auth message; `pong` | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-28 | ADM | P0 | T-611 | 06 §4.1; 09 (CSWSH) | OPS session | No cookie; a forged session id; the right cookie with Origin `https://evil.example`; no Origin | 4401; 4401; handshake refused (403); handshake refused | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-29 🔥 | ADM | P0 | T-611 | 05 §3; 06 §4.1 | Each seeded role signed in | Open the feed as SA, OPS, SM, SS, SUP, FIN, CAT | Open for roles with `orders.view_order` and ≥ 1 store; CAT (no order view) 4403 | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-30 🔥 | ADM | P0 | T-611 | 06 §4.1 (scoped to permitted stores) | OPS, SM (GGN-01), SS (GGN-01) feeds open | A places COD at QA-02, then cancels | OPS gets `order.created` and `order.status` for the order; SM and SS get nothing about it | ⬜ rerun pending (same test as TC-11) |
+| P6-TC-31 | ADM | P0 | T-611 | 06 §4.2 (no customer data) | As TC-30 | Inspect `order.created`/`order.status` | Keys exactly as the 06 §4.2 example; no phone, name, address, OTP | ⬜ rerun pending (same test as TC-11) |
+| P6-TC-32 | ADM | P1 | T-611 | 06 §4.1 (P8 M1) | Profile `wsrecheck` (short `WS_OPS_RECHECK_SECONDS`) | Log out / let the session expire while the feed is open | Closed 4401 at the re-check or the session deadline | ⏭ stage 2 (profile) |
+| P6-TC-33 | ADM | P1 | T-611/T-612 | 06 §4.2 `alert`; 08 §9 | QA-02 order unaccepted past the SLA / failed delivery / unassigned | — | `alert` with ACCEPTANCE_SLA_BREACHED / DELIVERY_FAILED / DISPATCH_UNASSIGNED to the store's feeds only | ⏭ timer profile, stage 2 |
+| P6-TC-34 | ADM | P1 | T-612 | 06 §4.2 `rider.status`, `rider.location` | QA rider goes online/offline, pings on task | — | `rider.status`/`rider.location` to the rider's home-store feeds only | ⏭ T-612 |
+
+### Inbox (06 §2.7)
+| ID | Area | Pri | Task | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P6-TC-35 🔥 | BE | P0 | T-611 | 06 §2.7 | A has order notifications | `GET /me/notifications/` (customer token) | 200, standard page, newest first, schema-valid; only customer-app entries (no `rider.*`) | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-36 🔥 | BE | P0 | T-611 | 06 §2.7; IDOR | A and B have entries; R1 has rider entries | A marks own entry read (twice); A marks B's id; A marks 999999999; R1's customer token marks R1's rider-app entry | 200 `read: true` both times; 404; 404; 404 (app scoping) | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-37 | BE | P1 | T-611 | 06 §2.7 | A has unread entries | `POST /me/notifications/read-all/` twice | `{updated: n}` then `{updated: 0}`; list shows all `read: true` | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-38 🔥 | BE | P0 | T-611 | 08 §9; catalog (no OTP in the inbox) | Entries of `order.out_for_delivery` exist | Read the inbox and DB | No OTP in any inbox body; `order.rider_arrived` never in the inbox | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-39 | BE | P1 | T-611 | 06 §6 envelope | — | Inbox endpoints without a token / with a bad token | 401 `{"error":{code,...}}` | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-40 | BE | P2 | T-611 | 06 §2.7; 02 §5 paging | A | `?page_size=1000`; `link` values | Page capped at 100; `link` is `jivo://orders/<id>[/detail]` or null | ✅ (8f87d7b, 2026-11-06) |
+
+### Notifications, SMS and push (08 §9; 06 §4.3, §5; 09 DLT)
+| ID | Area | Pri | Task | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P6-TC-41 🔥 | BE | P0 | T-611 | 08 §9 | Notifications of all users (read-only SQL) | Group by event and channel status | SMS channel used only for placed, items_adjusted, out_for_delivery, cancelled, refund.processed; accepted, payment_failed, delivered, delivery_failed, rider_arrived are push-only (`sms_status` NONE); at most one row per (event, user, order) except items_adjusted | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-42 | BE | P0 | T-611 | 06 §5; 09 DLT | Local (no `SMS_DLT_TEMPLATE_IDS`) | SMS events | `sms_status` never SENT without a DLT id (rows with SMS SENT have a `sms_dlt_template_id`) | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-43 🔥 | BE | P0 | T-611 | 09 (secrets at rest) | Sent `order.out_for_delivery` rows | Read-only SQL on `push_body`, `sms_body`, `body` | No OTP stored after the send (blanked) | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-44 | BE | P1 | T-611 | 06 §5 retries | Fault-injection profile (push/SMS gateway down) | Trigger events | Transient errors retried ≤ 5 with backoff; rejected/unknown-outcome SMS FAILED, never resent; SENDING > 15 min swept to FAILED and text blanked | ⏭ needs a gateway-fault profile; backend unit tests cover it |
+| P6-TC-45 | BE | P1 | T-611 | 06 §4.3; D-19 | — | `manage.py check --deploy` with staging settings and a console `PUSH_BACKEND` | `notifications.E001` refuses console/locmem push on staging/prod | ⏭ config review (DevOps/PM) |
+| P6-TC-46 | BE | P1 | T-611 | 06 §4.3 (stored refund amount) | A places a paid ONLINE order at QA-02 | A cancels | `order.cancelled` inbox body quotes `₹<Refund.amount>` equal to the stored refund | ✅ (8f87d7b, 2026-11-06) |
+
+### Purge and sweep jobs (06 §5; 07 §4)
+| ID | Area | Pri | Task | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P6-TC-47 | BE | P1 | T-611 | 06 §5 | — | Read the beat schedule (`django_celery_beat_periodictask`, read-only) | `realtime.purge_old_locations` and `notifications.purge_old_notifications` daily, `notifications.sweep_stuck_sends` every 15 min | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-48 | BE | P1 | T-611 | 07 §4 retention | Beat has run | Read-only SQL | No notification older than 90 days, no rider location older than 30 days | ✅ (8f87d7b, 2026-11-06) |
+
+### Socket abuse limits (06 §4.1, P8 L5)
+| ID | Area | Pri | Task | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P6-TC-49 🔥 | BE | P0 | T-611 | 06 §4.1 4429 | A | Open 6 authorised sockets; close one; open another | 6th closed 4429; after a close a new one is accepted | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-50 | BE | P0 | T-611 | 06 §4.1 1009 | A | Send 5,000 bytes before auth; after auth | Closed 1009 both times | ❌ BUG-0020 (1011, not 1009, on daphne) |
+| P6-TC-51 | BE | P1 | T-611 | 06 §4.1 4400 | A authorised | 11 malformed/unknown messages | 10 `error` replies, then closed 4400 | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-52 | BE | P1 | T-611 | 09; 06 §4.1 | A | Binary frame, invalid JSON, deep nesting, huge numbers, unicode | Never a server crash; `/health/live` 200 afterwards; another open socket unaffected | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-53 | BE | P2 | T-611 | 06 §4.1 leases | A | 20 rapid connect/auth/close cycles (≤ 5 open at once) | No leaked slots: 5 fresh sockets then authorise | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-54 | BE | P1 | T-611 | 06 §4.1 (ASGI frame cap) | Staging config | Review daphne/uvicorn flags | `--ws-max-size 65536` / `--websocket_max_size 65536` | ⏭ DevOps config review |
+
+### Cross-cutting
+| ID | Area | Pri | Task | Ref | Pre | Steps | Expected | Status |
+|---|---|---|---|---|---|---|---|---|
+| P6-TC-55 🔥 | BE | P0 | T-611 | 06 §4; 09 logs | After the WS run | Grep the QA instance log for JWTs (`eyJ…`) | None | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-56 | BE | P1 | T-611 | 06 §4.1 contract | `openapi/schema.yaml` | Look up `Ws…Message` components | One per message type in 06 §4.2 (order.status, order.eta, order.created, rider.location, rider.status, offer.new, offer.withdrawn, task.updated, alert, auth.ok, pong, error) | ✅ (8f87d7b, 2026-11-06) |
+| P6-TC-57 | RID | P0 | T-614 | 04; 06 §4.1 fallback | Device run | Rider app with the socket dropped | Polls `GET /rider/offers/current/`, FCM fallback, inbox; no crash | ⏭ device run (PM) |
+
+### Totals (Phase 6, stage 1 design, 2026-11-06)
+| Cases | 🔥 | P0 | P1 | P2 | BE | ADM | E2E | CUS | RID | T-611 (incl. 2 shared with T-612) | T-612 | T-613 | T-614 | ⬜ | ⏭ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 57 | 18 | 33 | 22 | 2 | 44 | 8 | 3 | 1 | 1 | 45 | 10 | 1 | 1 | 37 | 20 |
+
+⏭ reasons: T-612 not merged (10), device run (2: TC-17, TC-57), stage 2 timer/instance profiles (5: TC-09, 20, 32, 33 and the fault profile TC-44), config review (TC-45, TC-54), spare QA number (TC-13). Execution results: `03-api-testing-report.md` / `06-security-testing-report.md` (Phase 6 sections) after the run.
+
+**Stage 1 execution (2026-11-06, develop `8f87d7b`, QA instance :8004, `config.settings.local`, daphne runserver):** `uv run pytest tests/test_p6_ws.py -q -rfEsx` gave 45 passed, 4 failed and 18 skipped. Afterwards, TC-04 [huge] was fixed in the test (it used a 5,000-byte message, which is the TC-50 path) and rerun: 5 passed. By case: 33 ✅, 1 ❌ (TC-50, BUG-0020), 3 ⬜ waiting for a rerun (TC-11/30/31), and 20 ⏭.

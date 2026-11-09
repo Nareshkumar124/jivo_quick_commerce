@@ -160,16 +160,20 @@ def rider_ops(*steps: dict, extra_env: dict | None = None) -> list[dict]:
     env = {k: v for k, v in os.environ.items() if not k.startswith("POSTGRES_")}
     env.update(_ENV)
     env.update(extra_env or {})
-    p = subprocess.run(
-        ["uv", "run", "--quiet", "python", str(RIDER_DRIVER)],
-        input=json.dumps(list(steps)),
-        cwd=BACKEND,
-        env=env,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        timeout=300,
-    )
+    for _ in range(3):  # Windows: a spawn can die with 0xC0000142 (DLL init) under load; retry
+        p = subprocess.run(
+            ["uv", "run", "--quiet", "python", str(RIDER_DRIVER)],
+            input=json.dumps(list(steps)),
+            cwd=BACKEND,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=300,
+        )
+        if p.returncode != 3221225794:
+            break
+        time.sleep(2)
     lines = [ln for ln in p.stdout.splitlines() if ln.startswith("{")]
     if p.returncode != 0 or len(lines) != len(steps):
         raise AssertionError(f"rider driver failed rc={p.returncode}: {p.stderr[-2000:]}")
@@ -301,6 +305,11 @@ class RiderClient:
         return self.post("heartbeat/")
 
     def online_at(self, point=None) -> None:
+        from qa_support import clear_throttle
+
+        # 6/min location + heartbeat limits (P5-TC-30) would trip across back-to-back cases.
+        clear_throttle("rider_locations")
+        clear_throttle("rider_heartbeat")
         point = point or offset(QA02, north_m=20)
         r = self.shift_start(point)
         assert r.status_code == 200, describe(r)
@@ -436,6 +445,22 @@ class Qa02Shop(Shop):
 
 
 def make_qa02_shop(api: httpx.Client, make_address, phone_key: str) -> Qa02Shop:
+    from qa_support import clear_throttle
+
+    # A P5 run places far more than the per-user hourly limits allow (orders 30/h, addresses 30/h,
+    # payments 60/h); the limits themselves are covered by P3/P4 cases. QA Redis DB 5 only.
+    for scope in ("orders_create", "payments", "address_write"):
+        clear_throttle(scope)
+    # DL-61 (d): earlier cases legitimately refuse COD deliveries, which blocks the QA customer
+    # from COD after two refusals. Lift it (as Ops, through the service) so each case starts clean.
+    if db_query("select cod_blocked from accounts_user where phone=%s", (QA_PHONES[phone_key],))[0][0]:
+        rider_op(op="lift_cod_block", **{"as": SUPER}, customer_phone=QA_PHONES[phone_key])
+    # T9 commits stock at every pickup: top QA-02 up (inventory service, INWARD) when it runs low.
+    for vid in (V_SUN_1L, V_FLAX):
+        row = db_query("select on_hand - reserved from inventory_storeinventory where store_id=%s and variant_id=%s",
+                       (QA02_ID, vid))
+        if row and row[0][0] < 20:
+            store_ops({"op": "inward_qa02", "as": SUPER, "variant_id": vid, "qty": 100})
     session = login(QA_PHONES[phone_key])
     shop = Qa02Shop(api, session)
     shop.placed = []

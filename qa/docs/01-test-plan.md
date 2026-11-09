@@ -285,3 +285,31 @@ Console cases run through the real pages (`qa/tests/test_p4_console.py`, `p4_con
   4. the timer profiles
 - **Stage 3 (after 5.4):** COD UPI QR, ledger, deposits, earnings, payouts, history, the ops screens and the role matrix through the console; regression of 5.3.
 - **Device run (PM):** P5-TC-19, 33, 124 and 131 on the user's phone.
+
+## 10. Phase 6 (real-time and notifications): plan, 2026-11-06 (prep while T-612/613/614 are in progress)
+**Contract read:** develop `8f87d7b` (T-611 merged: `f08c329`, `b5591c7`, `21428a2`): 06 §4 (sockets, close codes, abuse limits, message shapes), 06 §2.7 inbox, 06 §5 jobs, 08 §8 ETA, 08 §9 notifications per transition, 07 (Notification, retention), 09 (DPDP, DLT). Code inspected: `apps/realtime` (consumers, auth, limits, groups, routing, services) and `apps/notifications` (catalog, services, tasks, views).
+
+### 10.1 Scope
+| Task | What QA tests | When |
+|---|---|---|
+| T-611 (on develop) | Order socket auth (first message or subprotocol; never the URL), close codes 4400/4401/4404/4408/4429/1009, snapshot and live `order.status`; ops live feed (session, Origin, role matrix, store scope, no customer data); inbox list/read/read-all, scoping and IDOR; 08 §9 event→channel matrix, DLT rule, no OTP at rest or in the inbox; purge/sweep jobs scheduled; abuse limits; no JWT in server logs | Now (P6 stage 1) |
+| T-612 | Rider socket events `offer.new` (< 3 s), `offer.withdrawn` (EXPIRED/TAKEN/ORDER_CANCELLED/REASSIGNED), `task.updated`, cash updates; customer `rider.location` and `order.eta` (08 §8); ops `rider.location`/`rider.status`/alerts | When T-612 merges (cases ⏭ until then) |
+| T-613 / T-614 | App behaviour: tracking over WS with polling fallback and reconnect, inbox screens, FCM adapter; rider app socket with polling/FCM fallback | Device run (PM, user's phone) |
+
+Out of scope: real FCM (D-19, push backend disabled/console), real SMS delivery (no DLT ids locally), load testing of sockets (Phase 8 on staging).
+
+### 10.2 Approach and environment
+- Black-box `qa/tests/test_p6_ws.py` with the `websockets` client (pinned 15.0.1) against the QA instance `127.0.0.1:8004` (runserver with `daphne` first in `INSTALLED_APPS`, so it serves ASGI and WebSockets), Redis DBs 5–7, the QA Celery worker on DB 7 (order events fan out through `broadcast_ws`).
+- Users: QA customers A/B/E (`+9190000001{01,02,05}`), QA rider R1 (`…103`) only to open its socket (no rider-state changes outside the P5 harness), seeded staff for the ops feed. Orders for live-event cases are placed at the QA-only store QA-02 and cancelled by the test.
+- Database: read-only SQL for the notification matrix, OTP-at-rest and the beat schedule. Purge jobs are never run on the shared DB (they delete rows); their behaviour is covered by the backend's tests, QA checks the schedule and retention read-only.
+- Timers: auth timeout (10 s) runs live; token expiry, ops re-check (300 s) and rider re-check (60 s) need short-timer instance profiles (`shorttoken`, `wsrecheck`) and run in stage 2.
+
+### 10.3 Entry and exit criteria (10 §5)
+- **Entry:** T-611 on develop and migrations `notifications.0001` applied (true at `8f87d7b`); for stage 2, T-612 merged.
+- **Exit:** no open P0/P1 bug; 100% of P0/P1 P6 cases passed and ≥ 95% overall; the P6 🔥 set plus the P5 🔥 regression set pass; no socket that reveals another user's order, rider or store data; no OTP or JWT in logs, the inbox or at rest; offer latency < 3 s (T-612); device run of T-613/T-614 done by the PM.
+
+### 10.4 Risks
+- Live-event cases depend on the QA Celery worker; a dead worker looks like a missing event (the harness starts it and the case reports a worker problem separately).
+- Socket leases live in Redis DB 5 for 20 minutes; a crashed test could hold slots and give false 4429s, so the suite clears `ws:sockets:*` in DB 5 first.
+- Shared DB latency (~10 ms/query) inflates event latency measurements; the < 3 s offer target is measured end to end and recorded with that caveat.
+- Doc ambiguities to raise: (P6-A1) the coordinator brief lists `offer.expired` and `cash.updated`, but 06 §4 has only `offer.withdrawn` with reason EXPIRED and no cash message; (P6-A2) 06 §4 lists only DISPATCH/… alerts, not when `rider.status` is sent; (P6-A3) the order socket does not check the token's `app` claim (a rider-app token of the owner can open the order socket); harmless, but unspecified.

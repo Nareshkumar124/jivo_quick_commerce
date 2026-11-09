@@ -1,19 +1,27 @@
 """Phase 5 slice 5.2 shifts, locations and heartbeat (06 §3 Shift/Location, 04 §2.3, §3).
 
-Stage 1 scaffold (2026-11-05): the rider fixtures need slice 5.3 (cleanup unassigns tasks), so the
-module is gated with the 5.3 cases. Not executed yet.
+Stage 2 (2026-11-06): the rider fixtures work on a 5.1/5.2 build (the driver's cleanup skips
+tasks when slice 5.3 is absent), so only the cases that need offers/tasks are gated with P5_53.
 """
 
 from __future__ import annotations
 
 import pytest
-
 from p5_support import (  # noqa: F401 (fixtures)
-    P5_53, QA02, R1_PHONE, now_iso, offset, p5_shop_a, qa_worker, r1, r2, rider_id_of,
+    P5_53,
+    QA02,
+    R1_PHONE,
+    now_iso,
+    offset,
+    p5_shop_a,
+    qa_worker,
+    r1,
+    r2,
+    rider_id_of,
 )
-from qa_support import assert_error, db_query, describe, validate_response
+from qa_support import assert_error, clear_throttle, db_query, describe, validate_response
 
-pytestmark = P5_53
+GATED_53 = P5_53[1]  # skipif: slice 5.3 absent
 
 
 def open_shifts(rider_id: int) -> int:
@@ -43,10 +51,17 @@ def test_p5_tc22_shift_start_radius(r1, metres, ok):
         assert err["details"]["radius_m"] == 2000 and err["details"]["distance_m"] > 2000
 
 
-@pytest.mark.parametrize("body", [{}, {"lat": 91, "lng": 75.78}, {"lat": "26.9", "lng": "75.7"}, {"lat": 26.9}])
+@pytest.mark.parametrize("body", [{}, {"lat": 91, "lng": 75.78}, {"lat": 26.9}])
 def test_p5_tc22_shift_start_invalid(r1, body):
     """P5-TC-22 invalid positions → 400."""
     assert_error(r1.post("shift/start/", body), 400, "VALIDATION_ERROR")
+
+
+def test_p5_tc22_shift_start_string_coordinates(r1):
+    """P5-TC-22 string lat/lng: observation O-P5-03, numeric strings are coerced (DRF FloatField) and
+    the request is judged on the position (here 8.7 km away → 422); never a 500."""
+    r = r1.post("shift/start/", {"lat": "26.9", "lng": "75.7"})
+    assert r.status_code in (400, 422), describe(r)
 
 
 def test_p5_tc24_shift_end_idle_then_offline_location(r1):
@@ -59,6 +74,8 @@ def test_p5_tc24_shift_end_idle_then_offline_location(r1):
     assert_error(r1.ping(), 409, "RIDER_OFFLINE")
 
 
+@pytest.mark.p5_53
+@GATED_53
 def test_p5_tc24_shift_end_withdraws_offer_and_refused_on_task(r1, r2, p5_shop_a):
     """P5-TC-24 with a pending offer: offline and the offer withdrawn (R2 offered next);
     with an active task: 409 ACTIVE_TASK, still online."""
@@ -71,7 +88,8 @@ def test_p5_tc24_shift_end_withdraws_offer_and_refused_on_task(r1, r2, p5_shop_a
     assert r1.offer().json()["offer"] is None
     offer = r2.wait_offer(task_id=ctx["task_id"])
     assert r2.accept(offer["id"]).status_code == 200
-    assert_error(r2.shift_end(), 409, "ACTIVE_TASK")
+    err = assert_error(r2.shift_end(), 409, "INVALID_STATE_TRANSITION")
+    assert err["details"]["reason"] == "ACTIVE_TASK"
     assert r2.heartbeat().json()["is_online"] is True
 
 
@@ -84,18 +102,24 @@ def test_p5_tc25_location_batches(r1):
     validate_response(r, "rider_locations_create")
     assert r.status_code == 200, describe(r)
     assert (r.json()["accepted"], r.json()["duplicates"]) == (1, 1)
+    clear_throttle("rider_locations")
     r = r1.post("locations/", {"points": [{**p, "recorded_at": t}]})
     assert r.json()["duplicates"] == 1 and r.json()["accepted"] == 0
+    clear_throttle("rider_locations")
     r = r1.post("locations/", {"points": [{**p, "recorded_at": now_iso(-25 * 3600)}, {**p, "recorded_at": now_iso(180)},
                                           {**p, "recorded_at": now_iso(60)}]})
     assert (r.json()["accepted"], r.json()["rejected"]) == (1, 2), describe(r)
+    clear_throttle("rider_locations")
     assert_error(r1.post("locations/", {"points": []}), 400, "VALIDATION_ERROR")
     many = [{**p, "recorded_at": now_iso(-i - 100)} for i in range(51)]
     assert_error(r1.post("locations/", {"points": many}), 400, "VALIDATION_ERROR")
+    clear_throttle("rider_locations")
     for bad in ({**p, "lat": 91, "recorded_at": now_iso(-2)}, {**p, "accuracy": -1, "recorded_at": now_iso(-3)}):
         assert_error(r1.post("locations/", {"points": [bad]}), 400, "VALIDATION_ERROR")
 
 
+@pytest.mark.p5_53
+@GATED_53
 def test_p5_tc27_heartbeat_states(r1, p5_shop_a):
     """P5-TC-27 heartbeat reports is_online, pending offer, active task and shift."""
     from p5_support import bring_to
@@ -118,6 +142,7 @@ def test_p5_tc32_no_tracking_while_offline(r1):
     rid = rider_id_of(R1_PHONE)
     before = db_query("select count(*) from delivery_riderlocation where rider_id=%s", (rid,))[0][0]
     for _ in range(3):
+        clear_throttle("rider_locations")
         assert_error(r1.ping(recorded_at=now_iso(-1)), 409, "RIDER_OFFLINE")
     after = db_query("select count(*) from delivery_riderlocation where rider_id=%s", (rid,))[0][0]
     assert after == before
