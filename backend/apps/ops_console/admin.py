@@ -285,3 +285,9 @@ def _unregister_otp_admins() -> None:
 
 
 _unregister_otp_admins()
+
+
+# P7 ratings (05 §2): read-only, store-scoped admin over the backend's Rating model.
+from apps.ops_console import ratings_admin  # noqa: E402
+
+ratings_admin.register()

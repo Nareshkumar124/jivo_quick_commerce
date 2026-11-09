@@ -1,0 +1,14 @@
+{% extends "ops/base.html" %}
+
+{% block content %}
+    {# Reports index (05 §4). Context: reports (only those the role may open, 05 §3). #}
+    <p class="mb-4 ops-text-secondary">Every report filters by IST date range and store and downloads as CSV. Store managers see their own stores only.</p>
+    <ul class="ops-grid-2" data-testid="report-list">
+        {% for report in reports %}
+            <li class="ops-card bg-white border border-base-200 p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" data-report="{{ report.slug }}">
+                <a class="font-semibold text-primary-600 dark:text-primary-500" href="{% url 'ops:report' report.slug %}">{{ report.title }}</a>
+                <p class="mt-1 text-xs text-font-subtle-light dark:text-font-subtle-dark">{{ report.description }}</p>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

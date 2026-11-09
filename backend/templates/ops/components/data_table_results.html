@@ -6,7 +6,7 @@
                 <thead class="text-font-important-light dark:text-font-important-dark">
                     <tr class="bg-base-50 dark:bg-base-900">
                         {% for column in table.columns %}
-                            <th scope="col" class="border-b border-base-200 font-semibold px-3 py-2 text-left whitespace-nowrap dark:border-base-800">{{ column.title }}</th>
+                            <th scope="col" class="border-b border-base-200 font-semibold px-3 py-2 text-left whitespace-nowrap dark:border-base-800"{% if column.help %} title="{{ column.help }}"{% endif %}>{{ column.title }}</th>
                         {% endfor %}
                     </tr>
                 </thead>

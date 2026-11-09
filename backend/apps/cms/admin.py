@@ -3,8 +3,9 @@ from django.db import models
 from django.shortcuts import redirect
 from django.urls import reverse
 from unfold.admin import ModelAdmin, TabularInline
+from unfold.widgets import UnfoldAdminTextareaWidget
 
-from apps.cms.models import AppConfig, AppVersionPolicy
+from apps.cms.models import FAQ, AppConfig, AppVersionPolicy, Page
 
 
 def _https_urls(overrides: dict) -> dict:
@@ -80,3 +81,40 @@ class AppConfigAdmin(ModelAdmin):
 
     def has_delete_permission(self, request, obj=None) -> bool:
         return False
+
+
+# --------------------------------------------------------------------------- P7: pages and FAQs
+
+
+@admin.register(Page)
+class PageAdmin(ModelAdmin):
+    """05 §2 CMS: About, Terms, Privacy, Refund policy (Super Admin only, T-711 PM default; by
+    model permissions). `Page.save()` sanitises `body_html` to the allow-list in
+    `apps.cms.html`, so whatever is pasted here, only safe markup is stored and served; saving
+    refreshes the API cache (`cms.services.invalidate_page`). Changes are in Admin history."""
+
+    list_display = ("title", "slug", "is_published", "updated_at")
+    list_filter = ("is_published",)
+    search_fields = ("title", "slug")
+    ordering = ("slug",)
+    readonly_fields = ("updated_at",)
+    fields = ("slug", "title", "body_html", "is_published", "updated_at")
+    formfield_overrides = {
+        **ModelAdmin.formfield_overrides,
+        models.TextField: {"widget": UnfoldAdminTextareaWidget(attrs={"rows": 24})},
+    }
+
+
+@admin.register(FAQ)
+class FAQAdmin(ModelAdmin):
+    """05 §2 Support FAQs per app (Super Admin and Support, T-711 PM default; by model
+    permissions). Plain text only (the model validators refuse HTML). Saving refreshes the API
+    cache (`cms.services.invalidate_faqs`)."""
+
+    list_display = ("question", "app", "category", "sort_order", "is_active", "updated_at")
+    list_editable = ("sort_order", "is_active")
+    list_filter = ("app", "is_active", "category")
+    search_fields = ("question", "category")
+    ordering = ("app", "sort_order", "id")
+    fields = ("app", "category", "question", "answer", "sort_order", "is_active")
+    list_per_page = 50

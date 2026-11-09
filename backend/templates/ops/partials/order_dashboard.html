@@ -1,0 +1,62 @@
+{# Dashboard orders section (05 §1.1, P7). Context: orders_section (apps.ops_console.dashboard_orders.build). Every figure comes from the server; amounts are formatted, never computed here. #}
+{% with s=orders_section %}
+<section id="order-dashboard" class="mb-8" aria-labelledby="orders-heading" data-testid="order-dashboard">
+    <div class="flex flex-wrap items-end gap-3 mb-3">
+        <div class="flex flex-col">
+            <h2 id="orders-heading" class="font-semibold text-base text-font-important-light dark:text-font-important-dark">Orders</h2>
+            <span class="text-xs text-font-subtle-light dark:text-font-subtle-dark">IST day; your stores only. "Right now" cards ignore the day. Refreshes every minute.</span>
+        </div>
+        <form class="flex flex-wrap gap-3 items-end ml-auto" method="get" action="{% url 'ops:dashboard' %}"
+              hx-get="{% url 'ops:dashboard-orders' %}" hx-target="#order-dashboard" hx-swap="outerHTML" hx-trigger="change, every 60s" hx-indicator="#order-dashboard-loading">
+            {% include "ops/components/form_field.html" with field=s.order_form.day %}
+            {% include "ops/components/form_field.html" with field=s.order_form.store %}
+            <noscript><button type="submit" class="ops-button ops-button--secondary">Apply</button></noscript>
+        </form>
+    </div>
+    {% include "ops/components/loading.html" with id="order-dashboard-loading" label="Updating" %}
+
+    {% if s.order_errors %}
+        {% include "ops/components/error_state.html" with title="Check the filters" message="Choose a valid day and one of your stores." %}
+    {% else %}
+        <div class="ops-grid-kpi mb-6" data-testid="order-kpis">
+            {% for label, value, icon, hint in s.kpi_cards %}
+                {% include "ops/components/kpi_card.html" with label=label value=value icon=icon hint=hint testid="kpi-order" %}
+            {% endfor %}
+        </div>
+
+        <section class="ops-card bg-white border border-base-200 mb-6 p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-labelledby="alerts-heading" data-testid="ops-alerts">
+            <h3 id="alerts-heading" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Alerts right now</h3>
+            {% if s.alerts_total %}
+                <ul class="flex flex-col gap-2">
+                    {% for alert in s.alert_rows %}
+                        {% if alert.count %}
+                            <li class="flex flex-col gap-1" data-alert="{{ alert.key }}">
+                                <div class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined md-18 ops-tone-{{ alert.tone }}" aria-hidden="true">warning</span>
+                                    <span class="grow">{{ alert.label }}</span>
+                                    <span class="font-semibold">{{ alert.count }}</span>
+                                    {% if alert.href %}<a class="text-primary-600 dark:text-primary-500" href="{{ alert.href }}">Open</a>{% endif %}
+                                </div>
+                                {% if alert.items %}
+                                    <ul class="ml-7 text-xs text-font-subtle-light dark:text-font-subtle-dark">
+                                        {% for item in alert.items %}<li>{{ item }}</li>{% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-font-subtle-light dark:text-font-subtle-dark" data-alert="none">No open alerts for your stores.</p>
+            {% endif %}
+        </section>
+
+        <div class="ops-grid-2 mb-6">
+            {% include "ops/components/chart_card.html" with title="Orders per hour" description="Orders placed per IST hour on the chosen day" chart_id="orders-hour-chart" chart=s.hour_chart summary="Bar chart of orders per hour" %}
+            {% include "ops/components/chart_card.html" with title="GMV, last 7 days" description="Non-cancelled orders, ending on the chosen day" chart_id="gmv-trend-chart" chart=s.gmv_chart summary="Line chart of GMV per day for 7 days" %}
+            {% include "ops/components/chart_card.html" with title="Top products" description="Units sold on the chosen day" chart_id="top-products-chart" chart=s.top_chart summary="Bar chart of the top products by units" %}
+            {% include "ops/components/chart_card.html" with title="Payment method split" description="Orders by payment method on the chosen day" chart_id="payment-split-chart" chart=s.split_chart summary="Bar chart of orders by payment method" %}
+        </div>
+    {% endif %}
+</section>
+{% endwith %}
