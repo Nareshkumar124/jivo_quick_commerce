@@ -10,8 +10,8 @@ import '../domain/order_rating.dart';
 import 'rating_controllers.dart';
 
 /// Rate a delivered order and its delivery partner (`03 §2.10`, screen #30,
-/// Phase 7 built ahead on fakes): order stars (required), quick tags, rider
-/// stars (optional) and a comment.
+/// Phase 7): order stars (required), quick tags, rider stars (optional;
+/// the rider tags appear once they are picked) and a comment.
 class RateOrderScreen extends ConsumerStatefulWidget {
   const RateOrderScreen({required this.orderId, this.initialStars, super.key});
 
@@ -69,7 +69,7 @@ class _RateOrderScreenState extends ConsumerState<RateOrderScreen> {
     final theme = Theme.of(context);
     final form = ref.watch(ratingFormProvider(widget.orderId));
     final controller = ref.read(ratingFormProvider(widget.orderId).notifier);
-    final tags = RatingTag.forStars(form.orderStars);
+    final tags = form.offeredTags;
     final error = form.error;
 
     Widget header(String text) => Semantics(
@@ -90,6 +90,16 @@ class _RateOrderScreenState extends ConsumerState<RateOrderScreen> {
             header(l10n.ratedOrder(existing.orderStars)),
             const SizedBox(height: JivoSpacing.sm),
             StarRatingPicker(value: existing.orderStars, onChanged: null),
+            if (existing.riderStars case final riderStars?) ...[
+              const SizedBox(height: JivoSpacing.md),
+              header(l10n.ratedRider(riderStars)),
+              const SizedBox(height: JivoSpacing.sm),
+              StarRatingPicker(
+                key: const Key('rated-rider-stars'),
+                value: riderStars,
+                onChanged: null,
+              ),
+            ],
             if (existing.tags.isNotEmpty) ...[
               const SizedBox(height: JivoSpacing.md),
               Wrap(

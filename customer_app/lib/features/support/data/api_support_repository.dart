@@ -1,10 +1,12 @@
 import 'package:dio/dio.dart';
-import 'package:jivo_api/jivo_api.dart' as api
+import 'package:jivo_api/jivo_api.dart'
+    as api
     show
         JivoApi,
         Faq,
         Ticket,
         TicketCategoryEnum,
+        TicketAttachment,
         TicketCreateRequest,
         TicketMessage,
         TicketReplyRequest,
@@ -19,8 +21,10 @@ import 'support_repository.dart';
 /// Errors are [ApiError]s: 400 `VALIDATION_ERROR` (message length, an order
 /// issue without `order_id`, someone else's order, a reply to a CLOSED
 /// ticket), 404 for another user's ticket, 429 `RATE_LIMITED` with
-/// `retry_after_seconds` (10 new tickets / 60 replies an hour). The screens
-/// show them through jivo_core's messages.
+/// `retry_after_seconds` (10 new tickets / 60 replies / 30 photos an hour).
+/// The screens show them through jivo_core's messages. Photos the API won't
+/// take (type, size, HTTP 413 from the server or a proxy) are
+/// [TicketPhotoException]s.
 class ApiSupportRepository implements SupportRepository {
   const ApiSupportRepository(this._api);
 
@@ -34,9 +38,8 @@ class ApiSupportRepository implements SupportRepository {
 
   @override
   Future<TicketPage> listTickets({int page = 1}) => _guard(() async {
-    final result = (await _api.getSupportApi().supportTicketsList(
-      page: page,
-    )).data!;
+    final result = (await _api.getSupportApi().supportTicketsList(page: page))
+        .data!;
     return TicketPage(
       items: [for (final t in result.results) ticketFromSummary(t)],
       nextPage: result.next == null ? null : page + 1,
@@ -67,14 +70,45 @@ class ApiSupportRepository implements SupportRepository {
   });
 
   @override
-  Future<TicketThread> reply(int ticketId, String message) => _guard(
+  Future<TicketThread> reply(
+    int ticketId,
+    String message, {
+    List<String> photoKeys = const [],
+  }) => _guard(
     () async => threadFromApi(
       (await _api.getSupportApi().supportTicketsMessagesCreate(
         id: ticketId,
-        ticketReplyRequest: api.TicketReplyRequest(message: message.trim()),
+        ticketReplyRequest: api.TicketReplyRequest(
+          message: message.trim(),
+          attachmentKeys: photoKeys.isEmpty ? null : photoKeys,
+        ),
       )).data!,
     ),
   );
+
+  @override
+  Future<TicketPhoto> uploadPhoto(int ticketId, TicketPhotoFile photo) async {
+    final problem = checkTicketPhoto(photo);
+    if (problem != null) throw TicketPhotoException(problem);
+    final type = photo.type!;
+    try {
+      final uploaded =
+          (await _api.getSupportApi().supportTicketsAttachmentsCreate(
+            id: ticketId,
+            file: MultipartFile.fromBytes(
+              photo.bytes,
+              filename: 'photo.${type.extension}',
+              contentType: DioMediaType.parse(type.mimeType),
+            ),
+          )).data!;
+      return photoFromApi(uploaded);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 413) {
+        throw const TicketPhotoException(TicketPhotoProblem.rejectedSize);
+      }
+      throw ApiError.fromDioException(e);
+    }
+  }
 }
 
 Future<T> _guard<T>(Future<T> Function() call) async {
@@ -85,17 +119,13 @@ Future<T> _guard<T>(Future<T> Function() call) async {
   }
 }
 
-Faq faqFromApi(api.Faq f) => Faq(
-  id: f.id,
-  category: f.category,
-  question: f.question,
-  answer: f.answer,
-);
+Faq faqFromApi(api.Faq f) =>
+    Faq(id: f.id, category: f.category, question: f.question, answer: f.answer);
 
-api.TicketCategoryEnum categoryToApi(TicketCategory category) =>
-    api.TicketCategoryEnum.values.firstWhere(
-      (e) => e.value == category.wireValue,
-    );
+api.TicketCategoryEnum categoryToApi(TicketCategory category) => api
+    .TicketCategoryEnum
+    .values
+    .firstWhere((e) => e.value == category.wireValue);
 
 SupportTicket ticketFromSummary(api.TicketSummary t) => SupportTicket(
   id: t.id,
@@ -130,4 +160,8 @@ TicketMessage _message(api.TicketMessage m) => TicketMessage(
   body: m.body,
   fromSupport: m.fromSupport,
   createdAt: m.createdAt,
+  photos: [for (final a in m.attachments) photoFromApi(a)],
 );
+
+TicketPhoto photoFromApi(api.TicketAttachment a) =>
+    TicketPhoto(key: a.key, url: a.url);

@@ -55,6 +55,10 @@
             <action android:name="android.intent.action.SENDTO" />
             <data android:scheme="mailto" />
         </intent>
+        <!-- image_picker: a camera app for support ticket photos. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

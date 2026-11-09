@@ -7,6 +7,7 @@ import 'package:customer_app/app/launch_state.dart';
 import 'package:customer_app/features/notifications/presentation/notification_tap_router.dart';
 import 'package:customer_app/features/notifications/presentation/push_registration.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
+import 'package:customer_app/features/support/data/support_repository.dart';
 import 'package:customer_app/features/tracking/data/track_repository.dart';
 import 'package:customer_app/features/tracking/presentation/tracking_providers.dart';
 import 'package:flutter/material.dart';
@@ -302,6 +303,26 @@ void main() {
       );
       await app(push, FakeDeviceRepository()).pump(tester);
       expect(find.byKey(const Key('tracking')), findsOneWidget);
+    });
+
+    testWidgets('a support reply push (support.ticket_replied: type ticket + '
+        'ticket_id) opens the ticket', (tester) async {
+      final push = FakePushMessaging(token: 't');
+      await TestApp(
+        tokens: signedInTokens,
+        commerce: backend,
+        extraOverrides: [
+          pushMessagingProvider.overrideWithValue(push),
+          deviceRepositoryProvider.overrideWithValue(FakeDeviceRepository()),
+          supportAvailableProvider.overrideWithValue(true),
+          supportRepositoryProvider.overrideWithValue(FakeSupportRepository()),
+        ],
+      ).pump(tester);
+      // The FCM data payload exactly as the backend's fcm_payload sends it.
+      push.tap({'type': 'ticket', 'ticket_id': '1'});
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('ticket-thread')), findsOneWidget);
+      expect(find.text('TK-000001'), findsOneWidget);
     });
 
     testWidgets('an unknown payload is ignored', (tester) async {

@@ -11,6 +11,7 @@ import '../../orders/domain/order_history.dart';
 import '../../orders/presentation/order_history_controllers.dart';
 import '../domain/support_models.dart';
 import 'support_controllers.dart';
+import 'ticket_photos.dart';
 
 String ticketCategoryLabel(AppLocalizations l10n, TicketCategory category) =>
     switch (category) {
@@ -156,9 +157,8 @@ class TicketStatusChip extends StatelessWidget {
 
 /// New ticket (`03 §2.11` "choose an order, then an issue type"). Opened
 /// from an order ([orderId]) or from Help, where an order can be picked.
-///
-/// TODO(api): the optional photo needs the P7 attachment upload contract;
-/// it is not built yet.
+/// Up to [ticketPhotosPerMessage] optional photos go up once the ticket
+/// exists (the API takes photos on a reply), as a second message.
 class NewTicketScreen extends ConsumerStatefulWidget {
   const NewTicketScreen({this.orderId, super.key});
 
@@ -175,11 +175,22 @@ class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
   late int? _orderId = widget.orderId;
   String? _orderNumber;
   bool _categoryMissing = false;
+  final List<PendingTicketPhoto> _photos = [];
 
   @override
   void dispose() {
     _message.dispose();
     super.dispose();
+  }
+
+  Future<void> _addPhoto() async {
+    final photo = await pickTicketPhoto(
+      context,
+      ref,
+      alreadyPicked: _photos.length,
+    );
+    if (photo == null || !mounted) return;
+    setState(() => _photos.add(photo));
   }
 
   Future<void> _pickOrder() async {
@@ -206,12 +217,27 @@ class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
     final category = _category;
     setState(() => _categoryMissing = category == null);
     if (!_formKey.currentState!.validate() || category == null) return;
-    final thread = await ref
+    final l10n = AppLocalizations.of(context);
+    final result = await ref
         .read(newTicketProvider.notifier)
-        .submit(category: category, message: _message.text, orderId: _orderId);
-    if (thread == null || !mounted) return;
-    showMessage(context, AppLocalizations.of(context).ticketCreated);
-    context.pushReplacement(Routes.ticket(thread.ticket.id));
+        .submit(
+          category: category,
+          message: _message.text,
+          orderId: _orderId,
+          photos: List.of(_photos),
+          photosMessage: l10n.ticketPhotosMessage,
+        );
+    if (result == null || !mounted) return;
+    final photoError = result.photoError;
+    showMessage(
+      context,
+      photoError == null
+          ? l10n.ticketCreated
+          : l10n.ticketPhotosNotAdded(
+              describeSupportError(context, photoError),
+            ),
+    );
+    context.pushReplacement(Routes.ticket(result.thread.ticket.id));
   }
 
   @override
@@ -239,7 +265,10 @@ class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
           children: [
             Semantics(
               header: true,
-              child: Text(l10n.ticketOrderLabel, style: theme.textTheme.titleMedium),
+              child: Text(
+                l10n.ticketOrderLabel,
+                style: theme.textTheme.titleMedium,
+              ),
             ),
             ListTile(
               key: const Key('ticket-order'),
@@ -262,7 +291,10 @@ class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
             const SizedBox(height: JivoSpacing.md),
             Semantics(
               header: true,
-              child: Text(l10n.ticketIssueLabel, style: theme.textTheme.titleMedium),
+              child: Text(
+                l10n.ticketIssueLabel,
+                style: theme.textTheme.titleMedium,
+              ),
             ),
             RadioGroup<TicketCategory>(
               groupValue: _category,
@@ -309,10 +341,40 @@ class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
                   ? l10n.ticketMessageTooShort(ticketMessageMinLength)
                   : null,
             ),
+            const SizedBox(height: JivoSpacing.sm),
+            Semantics(
+              header: true,
+              child: Text(
+                l10n.ticketPhotosHint(ticketPhotosPerMessage),
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: JivoSpacing.sm),
+            if (_photos.isNotEmpty) ...[
+              PickedPhotoStrip(
+                photos: _photos,
+                enabled: !state.submitting,
+                onRemove: (photo) => setState(() => _photos.remove(photo)),
+              ),
+              const SizedBox(height: JivoSpacing.sm),
+            ],
+            if (_photos.length < ticketPhotosPerMessage)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: const Key('ticket-add-photo'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                  ),
+                  onPressed: state.submitting ? null : _addPhoto,
+                  icon: const Icon(Icons.add_a_photo_outlined),
+                  label: Text(l10n.ticketAddPhoto),
+                ),
+              ),
             if (error != null) ...[
               const SizedBox(height: JivoSpacing.sm),
               Text(
-                describeErrorWithDetails(context, error),
+                describeSupportError(context, error),
                 key: const Key('ticket-error'),
                 style: TextStyle(color: theme.colorScheme.error),
               ),
@@ -351,7 +413,9 @@ class _OrderPickerSheet extends ConsumerWidget {
               ListTile(
                 key: Key('pick-order-${order.id}'),
                 title: Text(l10n.orderTitle(order.number)),
-                subtitle: Text(formatDateTime(order.placedAt ?? order.createdAt)),
+                subtitle: Text(
+                  formatDateTime(order.placedAt ?? order.createdAt),
+                ),
                 onTap: () => Navigator.pop(context, order),
               ),
           ],
@@ -373,12 +437,12 @@ class TicketDetailScreen extends ConsumerStatefulWidget {
   final int ticketId;
 
   @override
-  ConsumerState<TicketDetailScreen> createState() =>
-      _TicketDetailScreenState();
+  ConsumerState<TicketDetailScreen> createState() => _TicketDetailScreenState();
 }
 
 class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
   final _reply = TextEditingController();
+  final List<PendingTicketPhoto> _photos = [];
   bool _sending = false;
 
   @override
@@ -387,17 +451,33 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
     super.dispose();
   }
 
+  Future<void> _addPhoto() async {
+    final photo = await pickTicketPhoto(
+      context,
+      ref,
+      alreadyPicked: _photos.length,
+    );
+    if (photo == null || !mounted) return;
+    setState(() => _photos.add(photo));
+  }
+
+  /// Sends the text with the picked photos. The API needs text, so photos
+  /// alone go with "Photos of the issue".
   Future<void> _send() async {
-    final text = _reply.text.trim();
+    var text = _reply.text.trim();
+    if (text.isEmpty && _photos.isNotEmpty) {
+      text = AppLocalizations.of(context).ticketPhotosMessage;
+    }
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
       await ref
           .read(ticketThreadProvider(widget.ticketId).notifier)
-          .reply(text);
+          .reply(text, photos: List.of(_photos));
       _reply.clear();
+      if (mounted) setState(_photos.clear);
     } catch (error) {
-      if (mounted) showMessage(context, describeErrorWithDetails(context, error));
+      if (mounted) showMessage(context, describeSupportError(context, error));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -440,6 +520,9 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
                 controller: _reply,
                 sending: _sending,
                 onSend: _send,
+                photos: _photos,
+                onAddPhoto: _addPhoto,
+                onRemovePhoto: (photo) => setState(() => _photos.remove(photo)),
               )
             else
               Padding(
@@ -513,6 +596,10 @@ class _MessageBubble extends StatelessWidget {
               ),
               const SizedBox(height: JivoSpacing.xs),
               Text(message.body),
+              if (message.photos.isNotEmpty) ...[
+                const SizedBox(height: JivoSpacing.sm),
+                MessagePhotos(photos: message.photos),
+              ],
               const SizedBox(height: JivoSpacing.xs),
               Text(
                 formatDateTime(message.createdAt),
@@ -531,11 +618,17 @@ class _ReplyBox extends StatelessWidget {
     required this.controller,
     required this.sending,
     required this.onSend,
+    required this.photos,
+    required this.onAddPhoto,
+    required this.onRemovePhoto,
   });
 
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onSend;
+  final List<PendingTicketPhoto> photos;
+  final VoidCallback onAddPhoto;
+  final ValueChanged<PendingTicketPhoto> onRemovePhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -544,50 +637,71 @@ class _ReplyBox extends StatelessWidget {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          JivoSpacing.gutter,
+          JivoSpacing.sm,
           JivoSpacing.sm,
           JivoSpacing.sm,
           JivoSpacing.sm,
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: TextField(
-                key: const Key('ticket-reply'),
-                controller: controller,
+            if (photos.isNotEmpty) ...[
+              PickedPhotoStrip(
+                photos: photos,
                 enabled: !sending,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: ticketMessageMaxLength,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: l10n.ticketReplyHint,
-                  counterText: '',
-                ),
+                onRemove: onRemovePhoto,
               ),
-            ),
-            const SizedBox(width: JivoSpacing.sm),
-            sending
-                ? const SizedBox.square(
-                    dimension: 48,
-                    child: Padding(
-                      padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : IconButton.filled(
-                    key: const Key('ticket-send'),
-                    tooltip: l10n.ticketSend,
-                    constraints: const BoxConstraints(
-                      minWidth: 48,
-                      minHeight: 48,
-                    ),
-                    onPressed: onSend,
-                    icon: const Icon(Icons.send),
-                  ),
+              const SizedBox(height: JivoSpacing.sm),
+            ],
+            _replyRow(l10n),
           ],
         ),
       ),
     );
   }
+
+  Widget _replyRow(AppLocalizations l10n) => Row(
+    children: [
+      IconButton(
+        key: const Key('ticket-reply-photo'),
+        tooltip: l10n.ticketAddPhoto,
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        onPressed: sending || photos.length >= ticketPhotosPerMessage
+            ? null
+            : onAddPhoto,
+        icon: const Icon(Icons.add_a_photo_outlined),
+      ),
+      Expanded(
+        child: TextField(
+          key: const Key('ticket-reply'),
+          controller: controller,
+          enabled: !sending,
+          minLines: 1,
+          maxLines: 4,
+          maxLength: ticketMessageMaxLength,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            hintText: l10n.ticketReplyHint,
+            counterText: '',
+          ),
+        ),
+      ),
+      const SizedBox(width: JivoSpacing.sm),
+      sending
+          ? const SizedBox.square(
+              dimension: 48,
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : IconButton.filled(
+              key: const Key('ticket-send'),
+              tooltip: l10n.ticketSend,
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              onPressed: onSend,
+              icon: const Icon(Icons.send),
+            ),
+    ],
+  );
 }

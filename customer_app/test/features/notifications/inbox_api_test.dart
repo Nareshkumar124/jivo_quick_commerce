@@ -32,6 +32,8 @@ void main() {
             'count': 3,
             'next': 'http://x/api/v1/me/notifications/?page=2',
             'previous': null,
+            // Required since api-requests #45 (P7 contract).
+            'unread_count': 1,
             'results': [
               entry(1, link: 'jivo://orders/1203'),
               entry(2, read: true, link: 'https://evil.example/'),

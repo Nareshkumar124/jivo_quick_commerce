@@ -15,11 +15,40 @@ import '../../helpers/test_app.dart';
 void main() {
   group('RatingTag', () {
     test('4–5 stars offer the positive tags, 1–3 the negative', () {
-      expect(RatingTag.forStars(0), isEmpty);
-      expect(RatingTag.forStars(5).every((t) => t.positive), isTrue);
-      expect(RatingTag.forStars(2).every((t) => !t.positive), isTrue);
+      expect(RatingTag.forStars(0, riderRated: true), isEmpty);
+      expect(
+        RatingTag.forStars(5, riderRated: true).every((t) => t.positive),
+        isTrue,
+      );
+      expect(
+        RatingTag.forStars(2, riderRated: true).every((t) => !t.positive),
+        isTrue,
+      );
       expect(RatingTag.fromWire('ON_TIME'), RatingTag.onTime);
       expect(RatingTag.fromWire('NOPE'), isNull);
+    });
+
+    test('rider tags are offered only once the rider is rated', () {
+      expect(
+        RatingTag.forStars(5, riderRated: false),
+        isNot(contains(RatingTag.politeRider)),
+      );
+      expect(
+        RatingTag.forStars(1, riderRated: false),
+        isNot(contains(RatingTag.rudeRider)),
+      );
+      expect(
+        RatingTag.forStars(5, riderRated: true),
+        contains(RatingTag.politeRider),
+      );
+      expect(
+        RatingTag.forStars(1, riderRated: true),
+        contains(RatingTag.rudeRider),
+      );
+      expect(RatingTag.values.where((t) => t.needsRider), {
+        RatingTag.politeRider,
+        RatingTag.rudeRider,
+      });
     });
   });
 
@@ -76,6 +105,57 @@ void main() {
       expect(input.tags, {RatingTag.onTime});
       expect(input.comment, 'Great');
       expect(await container.read(orderRatingProvider(4).future), isNotNull);
+    });
+
+    test('rider tags need rider stars; canSubmit stays consistent', () async {
+      final sub = container.listen(ratingFormProvider(2), (_, _) {});
+      addTearDown(sub.close);
+      final form = container.read(ratingFormProvider(2).notifier)
+        ..setOrderStars(5)
+        ..toggleTag(RatingTag.politeRider);
+      var state = container.read(ratingFormProvider(2));
+      // Not offered without rider stars, so it can't be picked.
+      expect(state.offeredTags, isNot(contains(RatingTag.politeRider)));
+      expect(state.tags, isEmpty);
+      expect(state.canSubmit, isTrue);
+
+      form
+        ..setRiderStars(5)
+        ..toggleTag(RatingTag.politeRider);
+      state = container.read(ratingFormProvider(2));
+      expect(state.offeredTags, contains(RatingTag.politeRider));
+      expect(state.tags, {RatingTag.politeRider});
+      expect(state.canSubmit, isTrue);
+
+      // A form holding a rider tag without rider stars can't submit.
+      expect(
+        const RatingFormState(
+          orderStars: 1,
+          tags: {RatingTag.rudeRider},
+        ).canSubmit,
+        isFalse,
+      );
+
+      await form.submit('');
+      final (_, input) = repo.submissions.single;
+      expect(input.riderStars, 5);
+      expect(input.tags, {RatingTag.politeRider});
+    });
+
+    test('the fake refuses rider tags without rider stars, as the server', () {
+      expect(
+        repo.submit(
+          3,
+          const OrderRatingInput(orderStars: 5, tags: {RatingTag.politeRider}),
+        ),
+        throwsA(
+          isA<ApiError>().having(
+            (e) => e.code,
+            'code',
+            ApiErrorCode.validationError,
+          ),
+        ),
+      );
     });
 
     test('a failure is kept for the screen and the form can retry', () async {
@@ -148,10 +228,12 @@ void main() {
       await tester.scrollUntilVisible(
         find.byKey(const Key('submit-rating')),
         200,
-        scrollable: find.descendant(
-          of: find.byKey(const Key('rate-order')),
-          matching: find.byType(Scrollable),
-        ).first,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('rate-order')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('submit-rating')));
@@ -186,6 +268,30 @@ void main() {
       expect(star.height, greaterThanOrEqualTo(48));
       expect(find.byTooltip('1 star'), findsNWidgets(2));
       expect(find.text('What went wrong?'), findsOneWidget);
+    });
+
+    testWidgets('rider tags appear only after the rider stars are picked', (
+      tester,
+    ) async {
+      await openDelivered(tester);
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('rate-order-card')),
+          matching: find.byKey(const Key('star-5')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('tag-ON_TIME')), findsOneWidget);
+      expect(find.byKey(const Key('tag-POLITE_RIDER')), findsNothing);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('rider-stars')),
+          matching: find.byKey(const Key('star-5')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('tag-POLITE_RIDER')), findsOneWidget);
     });
 
     testWidgets('not delivered: no rating card', (tester) async {
