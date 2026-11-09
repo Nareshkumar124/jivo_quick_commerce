@@ -7,7 +7,8 @@
   cells escaped). Refused (ValidationError) above `REPORT_SYNC_MAX_ROWS`: use an export.
 - `request_export(user, key, ...) -> ReportExport`: a Celery CSV export into the private
   bucket (`reports.generate_export`, after commit); `user_exports(user)`;
-  `export_download_url(user, export_id)` (a signed URL, own exports only, DONE only).
+  `export_download_url(user, export_id)` (a signed URL, own exports only, DONE only;
+  audited `reports.export_download`).
 
 Access (05 §3 "Reports"): the report's permission (`reports.view_reports`,
 `view_catalog_reports`, `view_finance_reports`) else `PermissionDenied`; rows are limited to
@@ -94,9 +95,16 @@ def _dates(start: date | None, end: date | None) -> tuple[date, date]:
 
 
 def _query(user, key, start, end, store_id) -> tuple[ReportSpec, ReportQuery]:
+    from apps.stores.services import sees_all_stores
+
     spec = get_spec(user, key)
     start, end = _dates(start, end)
-    return spec, ReportQuery(stores=scoped_stores(user, store_id), start=start, end=end)
+    return spec, ReportQuery(
+        stores=scoped_stores(user, store_id),
+        start=start,
+        end=end,
+        all_stores=store_id is None and sees_all_stores(user),
+    )
 
 
 def cell(value) -> str:
@@ -201,19 +209,65 @@ def request_export(
     return export
 
 
-def generate_export(export_id: int) -> ReportExport:
-    """Build the export's CSV into the private bucket. Idempotent: a DONE export is left as
-    is. Runs as the requester, so a lost permission or store fails it."""
+MSG_EXPORT_FAILED = "The export could not be built. Please request it again."
+
+
+def _fail(export: ReportExport, error: str) -> ReportExport:
+    export.status = ExportStatus.FAILED
+    export.error = error[:200]
+    export.finished_at = timezone.now()
+    export.save(update_fields=["status", "error", "finished_at"])
+    return export
+
+
+def generate_export(export_id: int, *, final_attempt: bool = True) -> ReportExport | None:
+    """Build the export's CSV into the private bucket. Runs as the requester, so a lost
+    permission or store fails it (FAILED with the reason).
+
+    Idempotent and safe to retry (code review):
+    - a deleted export is a no-op (None, nothing to retry);
+    - a DONE export is returned as is; a RUNNING one started less than
+      `REPORT_EXPORT_STALE_MINUTES` ago is left to the run in progress (a duplicate delivery);
+      an older RUNNING one (its worker died) is run again;
+    - an unexpected error is logged and, on the `final_attempt`, the export is FAILED with a
+      generic message; otherwise it goes back to PENDING and the error is raised for the task
+      to retry. An export never stays RUNNING because of an error."""
+    now = timezone.now()
+    stale_before = now - timedelta(minutes=settings.REPORT_EXPORT_STALE_MINUTES)
     with transaction.atomic():
         export = (
             ReportExport.objects.select_for_update()
             .select_related("requested_by")
-            .get(pk=export_id)
+            .filter(pk=export_id)
+            .first()
         )
+        if export is None:
+            logger.info("report export %s no longer exists: skipped", export_id)
+            return None
         if export.status == ExportStatus.DONE:
             return export
+        running = export.status == ExportStatus.RUNNING
+        if running and export.started_at and export.started_at > stale_before:
+            logger.info("report export %s is already running: skipped", export.pk)
+            return export
         export.status = ExportStatus.RUNNING
-        export.save(update_fields=["status"])
+        export.started_at = now
+        export.save(update_fields=["status", "started_at"])
+    try:
+        return _build_export(export)
+    except Exception:
+        logger.exception("report export %s failed", export.pk)
+        if not ReportExport.objects.filter(pk=export.pk).exists():
+            return None  # deleted while it ran
+        if final_attempt:
+            return _fail(export, MSG_EXPORT_FAILED)
+        ReportExport.objects.filter(pk=export.pk, status=ExportStatus.RUNNING).update(
+            status=ExportStatus.PENDING, started_at=None
+        )
+        raise
+
+
+def _build_export(export: ReportExport) -> ReportExport:
     params = export.params
     try:
         _, query = _query(
@@ -234,10 +288,7 @@ def generate_export(export_id: int) -> ReportExport:
 
         content = _write_csv(spec.columns, counting())
     except (PermissionDenied, ValidationError) as exc:
-        export.status = ExportStatus.FAILED
-        export.error = str(getattr(exc, "message", exc))[:200]
-        export.finished_at = timezone.now()
-        export.save(update_fields=["status", "error", "finished_at"])
+        _fail(export, str(getattr(exc, "message", exc)))
         logger.warning("report export %s refused: %s", export.pk, export.error)
         return export
     if export.file:
@@ -250,6 +301,15 @@ def generate_export(export_id: int) -> ReportExport:
     export.save(update_fields=["file", "status", "row_count", "error", "finished_at"])
     logger.info("report export %s done: %s rows", export.pk, export.row_count)
     return export
+
+
+def fail_stuck_exports(now=None) -> int:
+    """PENDING or RUNNING exports older than a day (their task was lost) become FAILED, so the
+    list never shows a spinner forever. Run by the daily purge."""
+    cutoff = (now or timezone.now()) - timedelta(days=1)
+    return ReportExport.objects.filter(
+        status__in=(ExportStatus.PENDING, ExportStatus.RUNNING), created_at__lt=cutoff
+    ).update(status=ExportStatus.FAILED, error=MSG_EXPORT_FAILED, finished_at=now or timezone.now())
 
 
 def user_exports(user):
@@ -266,9 +326,16 @@ def export_download_url(user, export_id: int) -> str:
     get_spec(user, export.report)  # still allowed to see this report
     seconds = settings.REPORT_EXPORT_URL_SECONDS
     try:
-        return default_storage.url(export.file.name, expire=seconds)
+        url = default_storage.url(export.file.name, expire=seconds)
     except TypeError:  # local file storage (tests): no expiry argument
-        return default_storage.url(export.file.name)
+        url = default_storage.url(export.file.name)
+    audit.record(
+        user,
+        "reports.export_download",
+        export,
+        {"report": export.report, "rows": export.row_count},
+    )
+    return url
 
 
 def purge_old_exports(now=None) -> int:

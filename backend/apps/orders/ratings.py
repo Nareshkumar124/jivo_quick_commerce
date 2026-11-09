@@ -14,7 +14,7 @@ RUDE_RIDER). The API returns them merged, without repeats. The app shows positiv
 4-5 stars and negative ones for 1-3; the server does not enforce that.
 
 **Rider average**: each rider rating recomputes `Rider.rating_avg` (mean of the rider's stars,
-one decimal, half up) in the same transaction.
+one decimal, half up) in the same transaction, under the rider row lock (`refresh_rider_average`).
 
 **Rider** (`rider_summary`, `rider_rating_rows`, `rider_rating_item`): the rider's own average,
 count, tag counts and ratings paged by `before_id` (stars, tags, date and order number only: no
@@ -74,9 +74,17 @@ def _rounded_avg(value) -> Decimal | None:
 
 
 def refresh_rider_average(rider_id: int) -> Decimal | None:
-    """Recompute `Rider.rating_avg` from the rider's RIDER ratings (None when there are none)."""
+    """Recompute `Rider.rating_avg` from the rider's RIDER ratings (None when there are none).
+
+    Takes the rider row lock first (code review: two ratings of the same rider committing at
+    once each averaged without the other's row and the later write lost one). Under the lock
+    the aggregate is a new statement, so it sees every rating committed before the lock was
+    granted. Lock order: the caller already holds the order row (order, then rider, as in
+    dispatch and the COD cash ledger)."""
     from apps.delivery.models import Rider
 
+    if not Rider.objects.select_for_update().filter(pk=rider_id).exists():
+        return None
     avg = Rating.objects.filter(target=RatingTarget.RIDER, rider_id=rider_id).aggregate(
         avg=Avg("stars")
     )["avg"]
@@ -278,13 +286,15 @@ def staff_rider_summary(user, rider_id: int) -> dict:
     """`rider_summary` for the admin's rider page; the rider must be one the user may see
     (home store in `stores_for`; global roles see every rider)."""
     from apps.delivery.models import Rider
-    from apps.stores.services import stores_for
+    from apps.stores.services import sees_all_stores, stores_for
 
     _require_viewer(user)
-    stores = stores_for(user)
-    visible = Rider.objects.filter(pk=rider_id).filter(
-        Q(home_store__in=stores) | Q(home_store__isnull=True, preferred_store__in=stores)
-    )
+    visible = Rider.objects.filter(pk=rider_id)
+    if not sees_all_stores(user):  # global roles also see riders with no store yet
+        stores = stores_for(user)
+        visible = visible.filter(
+            Q(home_store__in=stores) | Q(home_store__isnull=True, preferred_store__in=stores)
+        )
     if not visible.exists():
         raise PermissionDenied("You do not have permission to do this.")
     return rider_summary(rider_id)

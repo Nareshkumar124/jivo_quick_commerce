@@ -30,6 +30,9 @@ class ReportExport(models.Model):
     row_count = models.PositiveIntegerField(default=0)
     error = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the current run started (RUNNING)."
+    )
     finished_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

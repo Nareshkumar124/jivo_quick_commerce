@@ -494,3 +494,43 @@ def test_gateway_failure_at_placement_races_a_replay(shop, monkeypatch):
     for order in live:
         assert order.payments.count() == 1
     assert any(not isinstance(r, Exception) for r in results) or not live
+
+
+def test_concurrent_ratings_of_one_rider_keep_the_average():
+    """P7-TC-04 (code review): two customers rate the same rider at once. The rider row lock in
+    `refresh_rider_average` makes the second average see the first rating: (5 + 1) / 2 = 3.0,
+    never 5.0 or 1.0 (a lost update)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.delivery.models import DeliveryTask, Rider
+    from apps.delivery.tests.factories import RiderFactory
+    from apps.orders import ratings
+
+    rider = RiderFactory()
+    now = timezone.now()
+    jobs = []
+    for stars in (5, 1):
+        customer = UserFactory()
+        order = OrderFactory(
+            user=customer, status="DELIVERED", payment_status="COD_COLLECTED", delivered_at=now
+        )
+        DeliveryTask.objects.create(
+            order=order,
+            store=order.store,
+            status="DELIVERED",
+            rider=rider,
+            search_started_at=now - timedelta(minutes=20),
+            delivered_at=now,
+            distance_km=Decimal("2.00"),
+            payout_amount=Decimal("30.00"),
+        )
+
+        def job(customer=customer, order=order, stars=stars):
+            return ratings.rate_order(customer, order.pk, order_stars=5, rider_stars=stars)
+
+        jobs.append(job)
+    results = race(*jobs)
+    assert not [r for r in results if isinstance(r, Exception)], results
+    assert Rider.objects.get(pk=rider.pk).rating_avg == Decimal("3.0")

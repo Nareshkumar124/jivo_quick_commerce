@@ -831,6 +831,9 @@ REPORT_SYNC_MAX_ROWS = env_int("REPORT_SYNC_MAX_ROWS", default=5000)
 REPORT_MAX_RANGE_DAYS = env_int("REPORT_MAX_RANGE_DAYS", default=366)
 REPORT_EXPORT_URL_SECONDS = env_int("REPORT_EXPORT_URL_SECONDS", default=900)
 REPORT_EXPORT_RETENTION_DAYS = env_int("REPORT_EXPORT_RETENTION_DAYS", default=7)
+# A RUNNING export started less than this long ago is not run again by a duplicate task; an
+# older one (its worker died) is.
+REPORT_EXPORT_STALE_MINUTES = env_int("REPORT_EXPORT_STALE_MINUTES", default=15)
 # 05 §1.1 alerts panel thresholds.
 DASHBOARD_ACCEPT_WAIT_ALERT_MINUTES = env_int("DASHBOARD_ACCEPT_WAIT_ALERT_MINUTES", default=2)
 DASHBOARD_NO_RIDER_ALERT_MINUTES = env_int("DASHBOARD_NO_RIDER_ALERT_MINUTES", default=3)
@@ -912,6 +915,11 @@ CELERY_BEAT_SCHEDULE.update(
         "purge-report-exports": {
             "task": "reports.purge_old_exports",
             "schedule": crontab(hour=22, minute=50),
+        },
+        # Support photos never claimed by a reply (05:25 IST).
+        "purge-unclaimed-support-attachments": {
+            "task": "support.purge_unclaimed_attachments",
+            "schedule": crontab(hour=23, minute=55),
         },
         "flush-expired-tokens": {
             "task": "accounts.flush_expired_tokens",

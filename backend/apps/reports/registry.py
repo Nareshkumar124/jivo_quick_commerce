@@ -8,9 +8,18 @@ customer's name, phone or address (09 PII); riders appear by id and name (payout
 
 Definitions (⚠ PM defaults, documented in docs/05 §4):
 - An order **counts** on the IST day of `placed_at` (orders that never reached PLACED are left
-  out). **GMV** = sum of `grand_total` of counted orders that are not CANCELLED (the current,
-  possibly reduced, bill). **AOV** = GMV / those orders. **Net revenue** = GMV - refunded
-  (processed refunds) - tips (passed to riders).
+  out). **Live** orders are the counted orders that are not CANCELLED.
+- **GMV** = sum of `grand_total` of live orders (the current bill: after a T8a partial
+  unavailability it is already the reduced one). **AOV** = GMV / live orders.
+- **Tips** = tips of live orders except DELIVERY_FAILED / RETURNED (a tip is passed to the
+  rider on delivery; a failed delivery's tip is refunded to an online customer inside the
+  failed-delivery refund, 08 §6.4, so it is not subtracted twice).
+- **Refunded** = processed refunds (`amount_refunded`) of live orders, minus their processed
+  T8a (`item_unavailable`) refunds, which the reduced `grand_total` already reflects.
+  **Unavailable refunds** (those T8a refunds) are shown for reconciliation only.
+- **Net revenue** = GMV - tips - refunded.
+- **Cancelled refunds** = processed refunds of CANCELLED orders: shown on their own, never
+  part of GMV or net revenue (those orders are not in GMV).
 - **Product sales** count DELIVERED orders on the IST day of `delivered_at`: units delivered
   (ordered - unavailable) and their value at the order price (before the coupon share).
 - **GST** follows the invoice maths (`orders.invoices.tax_lines`), grouped per invoice, HSN/SAC
@@ -53,6 +62,7 @@ class ReportQuery:
     stores: object  # QuerySet[DarkStore], already scoped to the user (and to store_id)
     start: date
     end: date  # inclusive
+    all_stores: bool = False  # every store, unfiltered (a global role, no store_id)
 
     @property
     def since(self) -> datetime:
@@ -92,9 +102,14 @@ def _counted_orders(query: ReportQuery):
 
 
 def sales_summary(query: ReportQuery) -> Iterator[tuple]:
+    """See the module doc for GMV, tips, refunded, net revenue and cancelled refunds."""
     from apps.orders.choices import OrderStatus
+    from apps.payments.models import Refund, RefundStatus
+    from apps.payments.order_refunds import ITEM_UNAVAILABLE
 
-    live = ~Q(status=OrderStatus.CANCELLED)
+    cancelled = Q(status=OrderStatus.CANCELLED)
+    live = ~cancelled
+    tipped = live & ~Q(status__in=(OrderStatus.DELIVERY_FAILED, OrderStatus.RETURNED))
     rows = (
         _counted_orders(query)
         .annotate(day=TruncDate("placed_at", tzinfo=ist()))
@@ -102,7 +117,7 @@ def sales_summary(query: ReportQuery) -> Iterator[tuple]:
         .annotate(
             orders=Count("id"),
             delivered=Count("id", filter=Q(status=OrderStatus.DELIVERED)),
-            cancelled=Count("id", filter=Q(status=OrderStatus.CANCELLED)),
+            cancelled=Count("id", filter=cancelled),
             gmv=Coalesce(Sum("grand_total", filter=live), ZERO),
             item_total=Coalesce(Sum("item_total", filter=live), ZERO),
             product_discount=Coalesce(Sum("product_discount", filter=live), ZERO),
@@ -111,14 +126,29 @@ def sales_summary(query: ReportQuery) -> Iterator[tuple]:
                 Sum(F("delivery_fee") + F("small_cart_fee") + F("handling_fee"), filter=live),
                 ZERO,
             ),
-            tips=Coalesce(Sum("tip", filter=live), ZERO),
-            refunded=_money_sum("amount_refunded"),
+            tips=Coalesce(Sum("tip", filter=tipped), ZERO),
+            live_refunded=Coalesce(Sum("amount_refunded", filter=live), ZERO),
+            cancelled_refunds=Coalesce(Sum("amount_refunded", filter=cancelled), ZERO),
         )
         .order_by("day", "store__code")
     )
+    # T8a refunds of live orders, by the same (order day, store) key.
+    unavailable = {
+        (row["day"], row["order__store__code"]): row["amount"]
+        for row in Refund.objects.filter(
+            order__in=_counted_orders(query).filter(live),
+            reason=ITEM_UNAVAILABLE,
+            status=RefundStatus.PROCESSED,
+        )
+        .annotate(day=TruncDate("order__placed_at", tzinfo=ist()))
+        .values("day", "order__store__code")
+        .annotate(amount=_money_sum("amount"))
+    }
     for row in rows:
         live_orders = row["orders"] - row["cancelled"]
         aov = round_money(row["gmv"] / live_orders) if live_orders else ZERO
+        unavailable_refunds = unavailable.get((row["day"], row["store__code"]), ZERO)
+        refunded = max(row["live_refunded"] - unavailable_refunds, ZERO)
         yield (
             row["day"],
             row["store__code"],
@@ -131,9 +161,11 @@ def sales_summary(query: ReportQuery) -> Iterator[tuple]:
             row["fees"],
             row["tips"],
             row["gmv"],
-            row["refunded"],
-            row["gmv"] - row["refunded"] - row["tips"],
+            refunded,
+            row["gmv"] - row["tips"] - refunded,
             aov,
+            unavailable_refunds,
+            row["cancelled_refunds"],
         )
 
 
@@ -376,7 +408,7 @@ def inventory_movements(query: ReportQuery) -> Iterator[tuple]:
 
 def gst_invoices(query: ReportQuery) -> Iterator[tuple]:
     """Invoice-wise taxable value and CGST/SGST/IGST per HSN/SAC and rate (GSTR-1 prep)."""
-    from apps.orders.invoices import _intra_state, tax_lines
+    from apps.orders.invoices import is_intra_state, tax_lines
     from apps.orders.models import Invoice
 
     invoices = (
@@ -391,7 +423,7 @@ def gst_invoices(query: ReportQuery) -> Iterator[tuple]:
     )
     for invoice in invoices.iterator(chunk_size=500):
         order = invoice.order
-        intra = _intra_state(order)
+        intra = is_intra_state(order)
         groups: dict[tuple[str, Decimal], list] = {}
         for line in tax_lines(order):
             group = groups.setdefault((line.code, line.rate), [0, ZERO, ZERO])
@@ -433,6 +465,10 @@ def gst_hsn_summary(query: ReportQuery) -> Iterator[tuple]:
 
 
 def _rider_store_q(query: ReportQuery) -> Q:
+    """Riders of the query's stores (home store, else the store they applied for). Not
+    filtered at all for an all-store query, so no rider is ever hidden from global roles."""
+    if query.all_stores:
+        return Q()
     return Q(rider__home_store__in=query.stores) | Q(
         rider__home_store__isnull=True, rider__preferred_store__in=query.stores
     )
@@ -528,9 +564,12 @@ REPORTS: dict[str, ReportSpec] = {
                 "refunded",
                 "net_revenue",
                 "aov",
+                "unavailable_refunds",
+                "cancelled_refunds",
             ),
             sales_summary,
-            "Orders, GMV, discounts, fees, net revenue and AOV per IST day and store.",
+            "Orders, GMV, discounts, fees, net revenue and AOV per IST day and store "
+            "(refunds of cancelled orders shown apart).",
         ),
         ReportSpec(
             "orders",

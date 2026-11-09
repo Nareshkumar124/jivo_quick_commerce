@@ -232,6 +232,36 @@ class TestRiderRatings:
         assert body["ratings_count"] == 0
         assert auth_client.get("/api/v1/rider/ratings/").status_code == 403
 
+    def test_refresh_of_an_unknown_rider(self):
+        assert ratings.refresh_rider_average(999_999_999) is None
+
+    def test_anonymisation_erases_the_comment(self, rider):
+        """DPDP (09, DL-60): an anonymised customer's rating comment is erased; stars, tags and
+        the rider average stay. Another customer's comment is untouched."""
+        from apps.accounts.services import auth
+
+        customer, other = UserFactory(), UserFactory()
+        ratings.rate_order(
+            customer,
+            delivered(customer, rider=rider).pk,
+            order_stars=4,
+            rider_stars=2,
+            tags=["LATE_DELIVERY"],
+            comment="Call me on 98100 00000",
+        )
+        ratings.rate_order(other, delivered(other).pk, order_stars=5, comment="Lovely")
+        customer.deleted_at = timezone.now() - timedelta(days=60)
+        customer.save(update_fields=["deleted_at"])
+        assert auth.anonymise_user(customer.pk)
+        rows = {r.target: r for r in Rating.objects.filter(user=customer)}
+        assert rows[RatingTarget.ORDER].comment == auth.ERASED_TEXT
+        assert rows[RatingTarget.ORDER].stars == 4
+        assert rows[RatingTarget.RIDER].comment == ""  # rider rows carry no comment
+        assert rows[RatingTarget.RIDER].tags == ["LATE_DELIVERY"]
+        assert Rating.objects.get(user=other).comment == "Lovely"
+        rider.refresh_from_db()
+        assert rider.rating_avg == Decimal("2.0")
+
     def test_refresh_without_ratings(self, rider):
         Rider.objects.filter(pk=rider.pk).update(rating_avg=Decimal("4.0"))
         assert ratings.refresh_rider_average(rider.pk) is None
@@ -292,6 +322,12 @@ class TestStaffRatings:
     def test_staff_rider_summary(self, make_staff, rider):
         ops = make_staff(roles.OPS)
         assert ratings.staff_rider_summary(ops, rider.pk)["ratings_count"] == 0
+        # global roles are not store-filtered (a rider of any store, home store or not)
+        applicant = RiderFactory()
+        assert applicant.home_store_id is None
+        assert ratings.staff_rider_summary(ops, applicant.pk)["ratings_count"] == 0
+        own = make_staff(roles.STORE_MANAGER, applicant.preferred_store)
+        assert ratings.staff_rider_summary(own, applicant.pk)["ratings_count"] == 0
         stranger = make_staff(roles.STORE_MANAGER, DarkStoreFactory())
         with pytest.raises(PermissionDenied):
             ratings.staff_rider_summary(stranger, rider.pk)

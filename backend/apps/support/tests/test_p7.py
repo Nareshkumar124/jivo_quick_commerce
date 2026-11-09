@@ -118,12 +118,60 @@ class TestAttachments:
             services.add_customer_message(user, ticket.pk, "many", attachment_keys=keys)
 
     def test_staff_url(self, user, ticket, agent):
+        """P7-TC-10: staff opening a customer's photo is audited (ids only, 09 PII)."""
+        from apps.core.models import AuditLog
+
         key = services.upload_attachment(user, ticket.pk, image_file()).key
-        assert services.staff_attachment_url(agent, key)
+        assert services.staff_attachment_url(agent, key, ip="10.0.0.9")
+        entry = AuditLog.objects.get(action="support.attachment_view")
+        assert entry.actor == agent
+        assert entry.object_id == str(ticket.pk)
+        assert entry.changes == {"attachment": key, "message_id": None}
         with pytest.raises(ValidationError):
             services.staff_attachment_url(agent, "0" * 32)
         with pytest.raises(PermissionDenied):
             services.staff_attachment_url(user, key)
+        assert AuditLog.objects.filter(action="support.attachment_view").count() == 1
+
+    def test_purge_unclaimed(self, user, ticket, settings, django_capture_on_commit_callbacks):
+        """P7-TC-10: photos never sent with a reply are deleted (row and file) once the claim
+        window has passed; claimed and recent ones stay. Wired into beat."""
+        from django.core.files.storage import default_storage
+
+        from apps.support.tasks import purge_unclaimed_attachments
+
+        with freeze_time(timezone.now() - timedelta(hours=2)):
+            stale = services.upload_attachment(user, ticket.pk, image_file())
+            claimed = services.upload_attachment(user, ticket.pk, image_file())
+        TicketAttachment.objects.filter(pk=claimed.pk).update(message=ticket.messages.first())
+        fresh = services.upload_attachment(user, ticket.pk, image_file())
+        stale_name = stale.file.name
+        assert default_storage.exists(stale_name)
+        with django_capture_on_commit_callbacks(execute=True):
+            assert purge_unclaimed_attachments() == 1
+        assert not default_storage.exists(stale_name)
+        assert set(TicketAttachment.objects.values_list("pk", flat=True)) == {
+            claimed.pk,
+            fresh.pk,
+        }
+        assert services.purge_unclaimed_attachments() == 0  # idempotent
+        tasks = {entry["task"] for entry in settings.CELERY_BEAT_SCHEDULE.values()}
+        assert "support.purge_unclaimed_attachments" in tasks
+
+    def test_purge_tolerates_a_missing_file(self, user, ticket, monkeypatch, caplog):
+        from django.core.files.storage import default_storage
+
+        def broken(name):
+            raise OSError("gone")
+
+        monkeypatch.setattr(default_storage, "delete", broken)
+        services._delete_file("support/1/x.webp")
+        assert "could not delete" in caplog.text
+
+    def test_attachment_cap_covers_the_limit(self, settings):
+        """Django's DATA_UPLOAD_MAX_MEMORY_SIZE does not count multipart file data, so the
+        5 MB photo limit is enforced by `upload_attachment` itself (above)."""
+        assert settings.SUPPORT_ATTACHMENT_MAX_BYTES == 5 * 1024 * 1024
 
 
 class TestSla:
@@ -281,3 +329,46 @@ class TestRiderTickets:
             )
             assert response.status_code == 400
             assert field in response.json()["error"]["details"]
+
+
+class TestTicketsPerApp:
+    """Code review: one person who uses both apps sees customer tickets in the customer app
+    and rider tickets in the rider app; a ticket of the other app is 404 everywhere."""
+
+    def test_lists_and_lookups_are_per_app(self, make_auth_client, rider_setup):
+        rider, _, _ = rider_setup
+        customer_client = make_auth_client(rider.user, "customer")
+        rider_client = make_auth_client(rider.user, "rider")
+        as_customer = services.create_ticket(
+            rider.user, category="OTHER", message="A customer question.", app="customer"
+        )
+        as_rider = services.create_ticket(
+            rider.user, category="CASH", message="Deposit not shown yet.", app="rider"
+        )
+        listed = [t["id"] for t in customer_client.get(TICKETS).json()["results"]]
+        assert listed == [as_customer.pk]
+        listed = [t["id"] for t in rider_client.get(TICKETS).json()["results"]]
+        assert listed == [as_rider.pk]
+        for client, own, foreign in (
+            (customer_client, as_customer, as_rider),
+            (rider_client, as_rider, as_customer),
+        ):
+            assert client.get(f"{TICKETS}{own.pk}/").status_code == 200
+            assert client.get(f"{TICKETS}{foreign.pk}/").status_code == 404
+            reply = client.post(
+                f"{TICKETS}{foreign.pk}/messages/", {"message": "Hello"}, format="json"
+            )
+            assert reply.status_code == 404
+            upload = client.post(
+                f"{TICKETS}{foreign.pk}/attachments/", {"file": image_file()}, format="multipart"
+            )
+            assert upload.status_code == 404
+        reply = rider_client.post(f"{TICKETS}{as_rider.pk}/messages/", {"message": "Any news?"})
+        assert reply.status_code == 201
+
+    def test_service_defaults_to_the_customer_app(self, user):
+        ticket = services.create_ticket(user, category="OTHER", message="Unknown app ticket.")
+        assert ticket.app == "customer"
+        assert list(services.own_tickets(user)) == [ticket]
+        assert list(services.own_tickets(user, "rider")) == []
+        assert services.ticket_app("something") == "customer"

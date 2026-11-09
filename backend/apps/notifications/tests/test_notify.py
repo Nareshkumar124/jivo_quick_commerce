@@ -650,3 +650,61 @@ def test_two_workers_claiming_one_sms_send_it_once(monkeypatch):
         thread.join(timeout=60)
     assert sorted(results) == ["sent", "skipped"]
     assert len(sent) == 1
+
+
+# --------------------------------------------------------------------------- Phase 7 (review)
+
+
+def test_delivered_links_to_the_rating_screen(order, run_on_commit):
+    """P7-TC-01: `order.delivered` opens the rating screen (`jivo://orders/{id}/rate`); the FCM
+    payload stays `{type: order, order_id}` (#30)."""
+    device(order.user)
+    notification = run_on_commit(services.notify_order_event, "order.delivered", order.pk)
+    assert notification.data["link"] == f"jivo://orders/{order.pk}/rate"
+    assert "Rate your order" in notification.body
+    [message] = push.outbox
+    assert message.data == {"type": "order", "order_id": str(order.pk)}
+
+
+@pytest.mark.parametrize(
+    ("event", "app", "link"),
+    [
+        ("support.ticket_replied", "customer", "jivo://support/tickets/{id}"),
+        ("support.ticket_replied_rider", "rider", "jivo://rider/help/tickets/{id}"),
+    ],
+)
+def test_support_reply_specs_and_fcm_ticket_id(user, run_on_commit, event, app, link):
+    """P7-TC-12: the support reply events: push + inbox in the right app, category support, no
+    SMS, the ticket link, and `ticket_id` in the FCM data (`FCM_KEYS`)."""
+    from apps.notifications.catalog import SPECS
+
+    spec = SPECS[event]
+    assert (spec.app, spec.category, spec.data_type, spec.sms) == (app, "support", "ticket", "")
+    assert spec.push
+    assert spec.inbox
+    device(user, app="customer")
+    device(user, app="rider")
+    notification = run_on_commit(
+        services.notify,
+        user,
+        event,
+        {"ticket_id": 77, "ticket_number": "TK-000077"},
+        dedupe_key=f"{event}:{user.pk}:1",
+        sms=False,
+    )
+    assert notification.app == app
+    assert notification.in_inbox
+    assert notification.data["link"] == link.format(id=77)
+    assert notification.data["ticket_id"] == "77"
+    assert "TK-000077" in notification.body
+    [message] = push.outbox
+    assert len(message.tokens) == 1  # only the device of that app
+    assert message.data == {"type": "ticket", "ticket_id": "77"}
+    assert sms.outbox == []
+
+
+def test_fcm_keys_carry_ticket_id_for_both_apps():
+    assert "ticket_id" in services.FCM_KEYS["customer"]
+    assert "ticket_id" in services.FCM_KEYS["rider"]
+    payload = services.fcm_payload("customer", {"type": "ticket", "ticket_id": 5, "link": "x"})
+    assert payload == {"type": "ticket", "ticket_id": "5"}

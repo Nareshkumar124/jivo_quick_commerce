@@ -1,7 +1,8 @@
 """Phase 7 support endpoints for the apps (06 §2.7): my tickets, open a ticket, one ticket with
 its thread, reply.
 
-Tickets are always looked up in the caller's own tickets: another user's ticket id is a 404.
+Tickets are always looked up in the caller's own tickets of the calling app (the access
+token's `app` claim): another user's ticket id, or a ticket raised from the other app, is a 404.
 Views are thin: validate, call `apps.support.services`, render with the serializers.
 """
 
@@ -62,8 +63,9 @@ def _session_app(request: Request) -> str | None:
         return None
 
 
-def _ticket_body(user, ticket_id: int) -> dict:
-    return TicketSerializer(services.get_own_ticket(user, ticket_id)).data
+def _ticket_body(request: Request, ticket_id: int) -> dict:
+    ticket = services.get_own_ticket(request.user, ticket_id, app=_session_app(request))
+    return TicketSerializer(ticket).data
 
 
 class TicketListCreateView(APIView):
@@ -78,8 +80,9 @@ class TicketListCreateView(APIView):
         tags=TAGS,
         summary="My support tickets",
         description=(
-            "The caller's tickets, newest activity first (a new message or a status change "
-            "moves a ticket to the top)."
+            "The caller's tickets raised from this app (the rider app lists rider tickets, "
+            "the customer app customer tickets), newest activity first (a new message or a "
+            "status change moves a ticket to the top)."
         ),
         parameters=PAGINATION_PARAMETERS,
         responses=paginated_responses(
@@ -95,9 +98,8 @@ class TicketListCreateView(APIView):
         ),
     )
     def get(self, request: Request) -> Response:
-        tickets = services.with_list_relations(services.own_tickets(request.user)).order_by(
-            "-last_activity_at", "-id"
-        )
+        own = services.own_tickets(request.user, _session_app(request))
+        tickets = services.with_list_relations(own).order_by("-last_activity_at", "-id")
         paginator = StandardPagination()
         page = paginator.paginate_queryset(tickets, request, view=self)
         return paginator.get_paginated_response(TicketSummarySerializer(page, many=True).data)
@@ -160,7 +162,7 @@ class TicketListCreateView(APIView):
             task_id=data.validated_data.get("task_id"),
             payout_id=data.validated_data.get("payout_id"),
         )
-        return Response(_ticket_body(request.user, ticket.pk), status=201)
+        return Response(_ticket_body(request, ticket.pk), status=201)
 
 
 class TicketDetailView(APIView):
@@ -168,7 +170,10 @@ class TicketDetailView(APIView):
         operation_id="support_tickets_retrieve",
         tags=TAGS,
         summary="One of my tickets with its messages",
-        description="Messages oldest first. Another user's ticket id is a 404.",
+        description=(
+            "Messages oldest first. Another user's ticket id, or a ticket raised from the "
+            "other app, is a 404."
+        ),
         parameters=[TICKET_ID],
         responses=app_responses(
             {
@@ -184,7 +189,7 @@ class TicketDetailView(APIView):
         ),
     )
     def get(self, request: Request, id: int) -> Response:
-        return Response(_ticket_body(request.user, id))
+        return Response(_ticket_body(request, id))
 
 
 class TicketMessageCreateView(APIView):
@@ -242,8 +247,9 @@ class TicketMessageCreateView(APIView):
             id,
             data.validated_data["message"],
             attachment_keys=data.validated_data.get("attachment_keys", []),
+            app=_session_app(request),
         )
-        return Response(_ticket_body(request.user, id), status=201)
+        return Response(_ticket_body(request, id), status=201)
 
 
 class TicketAttachmentCreateView(APIView):
@@ -288,5 +294,7 @@ class TicketAttachmentCreateView(APIView):
     def post(self, request: Request, id: int) -> Response:
         data = TicketAttachmentUploadSerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        attachment = services.upload_attachment(request.user, id, data.validated_data["file"])
+        attachment = services.upload_attachment(
+            request.user, id, data.validated_data["file"], app=_session_app(request)
+        )
         return Response(services.attachment_body(attachment), status=201)

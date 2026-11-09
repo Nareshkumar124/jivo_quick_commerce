@@ -13,9 +13,11 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
+from celery.exceptions import Retry
 from django.contrib.auth.models import Group
 from django.core import mail
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Q
 from django.utils import timezone
 from freezegun import freeze_time
 
@@ -467,3 +469,295 @@ class TestDailyEmail:
         assert shop["b"].code not in mail.outbox[0].body
         settings.DAILY_REPORTS_EMAIL_ENABLED = False
         assert daily_reports_email() == 0
+
+
+# --------------------------------------------------------------------------- code review fixes
+
+
+def paid_order(store, hour, *, status, refunds=(), **fields):
+    """An ONLINE order at `store` on DAY with its capture and PROCESSED order refunds (the
+    refund signal settles `amount_refunded`)."""
+    fields.setdefault("amount_paid", fields.get("grand_total", Decimal("300.00")))
+    order = OrderFactory(
+        store=store,
+        status=status,
+        payment_method=PaymentMethod.ONLINE,
+        payment_status=PaymentStatus.PAID,
+        placed_at=at(hour),
+        **fields,
+    )
+    payment = Payment.objects.create(
+        order=order, gateway="razorpay", amount=order.amount_paid, status="CAPTURED"
+    )
+    for index, (reason, amount) in enumerate(refunds):
+        Refund.objects.create(
+            payment=payment,
+            order=order,
+            amount=Decimal(amount),
+            reason=reason,
+            status="PROCESSED",
+            processed_at=at(hour, 30),
+            idempotency_key=f"{reason}:{order.pk}:{index}",
+        )
+    order.refresh_from_db()
+    return order
+
+
+class TestNetRevenue:
+    """Code review (docs/05 §4): T8a refunds are already in the reduced `grand_total`; refunds of
+    cancelled orders are not in GMV; the tip of a failed delivery is inside its refund."""
+
+    @pytest.fixture
+    def store(self, db):
+        store = DarkStoreFactory()
+        paid_order(  # delivered, tip 20
+            store,
+            9,
+            status=OrderStatus.DELIVERED,
+            tip=Decimal("20.00"),
+            grand_total=Decimal("320.00"),
+        )
+        partial = paid_order(  # paid 300; T8a cut 100 (grand_total 200), then a manual 30
+            store,
+            10,
+            status=OrderStatus.DELIVERED,
+            mrp_total=Decimal("250.00"),
+            item_total=Decimal("200.00"),
+            grand_total=Decimal("200.00"),
+            amount_paid=Decimal("300.00"),
+            refunds=(("item_unavailable", "100.00"), ("manual", "30.00")),
+        )
+        assert partial.amount_refunded == Decimal("130.00")
+        paid_order(  # cancelled and refunded in full: not in GMV, shown apart
+            store,
+            11,
+            status=OrderStatus.CANCELLED,
+            cancelled_at=at(11, 5),
+            refunds=(("customer_cancel", "300.00"),),
+        )
+        paid_order(  # delivery failed (customer fault): 350 paid, 320 back, delivery fee kept
+            store,
+            12,
+            status=OrderStatus.DELIVERY_FAILED,
+            item_total=Decimal("300.00"),
+            delivery_fee=Decimal("30.00"),
+            tip=Decimal("20.00"),
+            grand_total=Decimal("350.00"),
+            refunds=(("delivery_failed", "320.00"),),
+        )
+        return store
+
+    def test_definitions(self, store, superuser):
+        """P7-TC-20: GMV 320 + 200 + 350; tips 20 (the failed delivery tip was refunded);
+        refunded 130 + 320 - 100 (T8a); net 500 = 300 + 170 + 30 kept."""
+        [row] = run(superuser, "sales_summary", store_id=store.pk)
+        assert (row["orders"], row["delivered"], row["cancelled"]) == ("4", "2", "1")
+        assert row["gmv"] == "870.00"
+        assert row["tips"] == "20.00"
+        assert row["refunded"] == "350.00"
+        assert row["net_revenue"] == "500.00"
+        assert row["unavailable_refunds"] == "100.00"
+        assert row["cancelled_refunds"] == "300.00"
+        assert row["aov"] == "290.00"
+
+    def test_only_cancelled_refunds(self, superuser):
+        store = DarkStoreFactory()
+        paid_order(
+            store,
+            9,
+            status=OrderStatus.CANCELLED,
+            cancelled_at=at(9, 5),
+            refunds=(("staff_cancel", "300.00"),),
+        )
+        [row] = run(superuser, "sales_summary", store_id=store.pk)
+        assert (row["gmv"], row["refunded"], row["net_revenue"]) == ("0.00", "0.00", "0.00")
+        assert row["cancelled_refunds"] == "300.00"
+        assert row["aov"] == "0.00"
+
+
+class TestRiderScope:
+    def test_all_store_queries_are_not_store_filtered(self, shop, superuser):
+        """Code review: global roles (no store_id) are not filtered by the store of a rider; a
+        store_id or a store role is."""
+        from apps.reports.registry import _rider_store_q
+
+        _, query = services._query(superuser, "rider_earnings", DAY, DAY, None)
+        assert query.all_stores
+        assert _rider_store_q(query) == Q()
+        _, query = services._query(superuser, "rider_earnings", DAY, DAY, shop["a"].pk)
+        assert not query.all_stores
+        manager = staff(roles.STORE_MANAGER, shop["a"])
+        _, query = services._query(manager, "sales_summary", DAY, DAY, None)
+        assert not query.all_stores
+        finance = staff(roles.FINANCE)
+        rider = RiderFactory()  # an applicant: no home store yet
+        task = DeliveryTask.objects.create(
+            order=shop["delivered"],
+            store=shop["a"],
+            status="DELIVERED",
+            rider=rider,
+            search_started_at=at(10),
+            distance_km=Decimal("1.00"),
+            payout_amount=Decimal("30.00"),
+        )
+        RiderEarning.objects.create(
+            rider=rider, task=task, type="BASE", amount=Decimal("25.00"), earned_at=at(10, 20)
+        )
+        rows = run(finance, "rider_earnings")
+        assert [r["rider_id"] for r in rows] == [str(rider.pk)]
+
+
+class TestExportRobustness:
+    def make(self, user, **fields):
+        return ReportExport.objects.create(
+            report="orders",
+            requested_by=user,
+            params={"start": DAY.isoformat(), "end": DAY.isoformat(), "store_id": None},
+            **fields,
+        )
+
+    def test_deleted_export_is_a_no_op(self, db):
+        from apps.reports.tasks import generate_export
+
+        assert services.generate_export(999_999_999) is None
+        assert generate_export.apply(args=(999_999_999,)).get() == "missing"
+
+    def test_unexpected_error_fails_on_the_last_attempt(self, shop, superuser, monkeypatch):
+        """An unexpected error never leaves the export RUNNING: not final -> PENDING and
+        raised (the task retries); final -> FAILED with a generic message."""
+
+        def boom(export):
+            raise RuntimeError("storage down")
+
+        monkeypatch.setattr(services, "_build_export", boom)
+        export = self.make(superuser)
+        with pytest.raises(RuntimeError):
+            services.generate_export(export.pk, final_attempt=False)
+        export.refresh_from_db()
+        assert (export.status, export.started_at) == (ExportStatus.PENDING, None)
+        result = services.generate_export(export.pk)
+        assert result.status == ExportStatus.FAILED
+        assert result.error == services.MSG_EXPORT_FAILED
+        assert "storage" not in result.error
+        export.refresh_from_db()
+        assert export.status == ExportStatus.FAILED
+        assert export.finished_at is not None
+
+    def test_task_retries_then_fails(self, shop, superuser, monkeypatch):
+        from apps.reports.tasks import generate_export
+
+        calls = []
+
+        def boom(export):
+            calls.append(export.pk)
+            raise RuntimeError("storage down")
+
+        monkeypatch.setattr(services, "_build_export", boom)
+        export = self.make(superuser)
+        with pytest.raises(Retry):  # not the last attempt: retried, back to PENDING
+            generate_export.apply(args=(export.pk,))
+        export.refresh_from_db()
+        assert export.status == ExportStatus.PENDING
+        last = generate_export.max_retries
+        result = generate_export.apply(args=(export.pk,), retries=last, throw=False)
+        assert result.get() == ExportStatus.FAILED
+        assert len(calls) == 2
+        export.refresh_from_db()
+        assert export.status == ExportStatus.FAILED
+
+    def test_deleted_while_running(self, shop, superuser, monkeypatch):
+        def vanish(export):
+            ReportExport.objects.filter(pk=export.pk).delete()
+            raise RuntimeError("gone")
+
+        monkeypatch.setattr(services, "_build_export", vanish)
+        export = self.make(superuser)
+        assert services.generate_export(export.pk) is None
+
+    def test_running_is_skipped_unless_stale(self, shop, superuser, settings):
+        settings.REPORT_EXPORT_STALE_MINUTES = 15
+        now = timezone.now()
+        busy = self.make(superuser, status=ExportStatus.RUNNING, started_at=now)
+        result = services.generate_export(busy.pk)
+        assert result.status == ExportStatus.RUNNING
+        assert not result.file
+        stale = self.make(
+            superuser, status=ExportStatus.RUNNING, started_at=now - timedelta(minutes=16)
+        )
+        assert services.generate_export(stale.pk).status == ExportStatus.DONE
+
+    def test_stuck_exports_fail_in_the_daily_purge(self, shop, superuser):
+        from apps.reports.tasks import purge_old_exports
+
+        stuck = self.make(superuser)
+        ReportExport.objects.filter(pk=stuck.pk).update(
+            created_at=timezone.now() - timedelta(days=2)
+        )
+        fresh = self.make(superuser)
+        purge_old_exports()
+        stuck.refresh_from_db()
+        fresh.refresh_from_db()
+        assert stuck.status == ExportStatus.FAILED
+        assert fresh.status == ExportStatus.PENDING
+
+    def test_download_is_audited(self, shop, django_capture_on_commit_callbacks):
+        """Code review: like `reports.download` and `reports.export`."""
+        from apps.core.models import AuditLog
+
+        finance = staff(roles.FINANCE)
+        with django_capture_on_commit_callbacks(execute=True):
+            export = services.request_export(finance, "orders", start=DAY, end=DAY)
+        services.export_download_url(finance, export.pk)
+        entry = AuditLog.objects.get(action="reports.export_download")
+        assert entry.actor == finance
+        assert entry.object_id == str(export.pk)
+        assert entry.changes == {"report": "orders", "rows": 4}
+
+
+class TestDailyEmailPerManager:
+    def test_fans_out_one_task_per_manager(self, shop, monkeypatch):
+        from apps.reports import tasks
+
+        first = staff(roles.STORE_MANAGER, shop["a"])
+        second = staff(roles.STORE_MANAGER, shop["b"])
+        queued = []
+        monkeypatch.setattr(tasks.daily_report_mail, "delay", lambda *args: queued.append(args))
+        assert tasks.daily_reports_email(DAY.isoformat()) == 2
+        assert sorted(queued) == sorted([(first.pk, DAY.isoformat()), (second.pk, DAY.isoformat())])
+
+    def test_one_failure_does_not_stop_the_others_and_no_double_send(self, shop, monkeypatch):
+        """Code review: an SMTP error affects (and retries) that manager only; a sent mail is
+        not sent again by a redelivered task."""
+        from apps.reports import tasks
+
+        failing = staff(roles.STORE_MANAGER, shop["a"])
+        fine = staff(roles.STORE_MANAGER, shop["b"])
+        real_send = tasks.send_mail
+
+        def send(subject, body, sender, to):
+            if to == [failing.email]:
+                raise OSError("SMTP down")
+            return real_send(subject, body, sender, to)
+
+        monkeypatch.setattr(tasks, "send_mail", send)
+        day = DAY.isoformat()
+        with pytest.raises(Retry):
+            tasks.daily_report_mail.apply(args=(failing.pk, day))
+        last = tasks.daily_report_mail.max_retries
+        result = tasks.daily_report_mail.apply(args=(failing.pk, day), retries=last, throw=False)
+        assert result.failed()
+        assert tasks.daily_report_mail.apply(args=(fine.pk, day)).get() == "sent"
+        assert [m.to for m in mail.outbox] == [[fine.email]]
+        assert tasks.daily_report_mail.apply(args=(fine.pk, day)).get() == "already_sent"
+        assert len(mail.outbox) == 1
+        ops = staff(roles.OPS)
+        assert tasks.daily_report_mail.apply(args=(ops.pk, day)).get() == "skipped"
+        assert tasks.daily_report_mail.apply(args=(999_999_999, day)).get() == "skipped"
+
+    def test_disabled(self, shop, settings):
+        from apps.reports import tasks
+
+        manager = staff(roles.STORE_MANAGER, shop["a"])
+        settings.DAILY_REPORTS_EMAIL_ENABLED = False
+        result = tasks.daily_report_mail.apply(args=(manager.pk, DAY.isoformat())).get()
+        assert result == "disabled"

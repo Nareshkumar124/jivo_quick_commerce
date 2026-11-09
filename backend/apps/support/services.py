@@ -1,8 +1,10 @@
 """Support tickets (06 §2.7, 07 §2.9, 05 §2 Support): every ticket change goes through here.
 
 **Customer side** (the API): `own_tickets`, `get_own_ticket`, `create_ticket`,
-`add_customer_message`. Tickets are always looked up inside the caller's own tickets: another
-user's ticket is "not found", never fetched first and checked after.
+`add_customer_message`. Tickets are always looked up inside the caller's own tickets of the
+calling app (`app`, from the access token: the rider app sees the rider tickets, the customer
+app the customer ones, even for one person who uses both): another user's ticket, or one of the
+other app, is "not found", never fetched first and checked after.
 
 **Staff side** (the admin / Ops Console, 05 §3 "Support tickets": Super Admin, Ops, Support):
 `staff_tickets`, `staff_reply`, `change_status`, `assign`, `set_priority`. Each checks
@@ -155,12 +157,18 @@ def due_times(start, priority: str) -> dict:
     }
 
 
-def own_tickets(user):
-    return SupportTicket.objects.filter(user=user)
+def ticket_app(app: str | None) -> str:
+    """The ticket app for a session's `app` claim: rider, else customer (as `create_ticket`)."""
+    return AppName.RIDER if app == AppName.RIDER else AppName.CUSTOMER
 
 
-def get_own_ticket(user, ticket_id: int) -> SupportTicket:
-    ticket = with_detail_relations(own_tickets(user)).filter(pk=ticket_id).first()
+def own_tickets(user, app: str | None = None):
+    """The user's tickets raised from `app` (None or unknown: the customer app)."""
+    return SupportTicket.objects.filter(user=user, app=ticket_app(app))
+
+
+def get_own_ticket(user, ticket_id: int, *, app: str | None = None) -> SupportTicket:
+    ticket = with_detail_relations(own_tickets(user, app)).filter(pk=ticket_id).first()
     if ticket is None:
         raise ApiError(ErrorCode.NOT_FOUND, MSG_TICKET_NOT_FOUND)
     return ticket
@@ -200,7 +208,7 @@ def create_ticket(
     with transaction.atomic():
         ticket = SupportTicket.objects.create(
             user=user,
-            app=app if app in AppName.values else AppName.CUSTOMER,
+            app=ticket_app(app),
             order=order,
             task=task,
             payout=payout,
@@ -245,12 +253,17 @@ def _rider_records(user, task_id, payout_id):
 
 
 def add_customer_message(
-    user, ticket_id: int, body: str, *, attachment_keys: list[str] | tuple[str, ...] = ()
+    user,
+    ticket_id: int,
+    body: str,
+    *,
+    attachment_keys: list[str] | tuple[str, ...] = (),
+    app: str | None = None,
 ) -> SupportTicket:
     """The customer's reply. CLOSED refuses it (400 VALIDATION_ERROR); RESOLVED reopens the
     ticket (OPEN)."""
     with transaction.atomic():
-        ticket = own_tickets(user).select_for_update().filter(pk=ticket_id).first()
+        ticket = own_tickets(user, app).select_for_update().filter(pk=ticket_id).first()
         if ticket is None:
             raise ApiError(ErrorCode.NOT_FOUND, MSG_TICKET_NOT_FOUND)
         if ticket.status == TicketStatus.CLOSED:
@@ -522,11 +535,13 @@ def _reencode(upload) -> ContentFile:
     return ContentFile(buffer.getvalue())
 
 
-def upload_attachment(user, ticket_id: int, upload) -> TicketAttachment:
+def upload_attachment(user, ticket_id: int, upload, *, app: str | None = None) -> TicketAttachment:
     """Store a photo for the caller's own ticket (06 §2.7): JPEG/PNG/WebP, at most
     `SUPPORT_ATTACHMENT_MAX_BYTES`, re-encoded to WebP (EXIF stripped) under
-    `support/<ticket id>/<key>.webp` in the private bucket. A CLOSED ticket refuses it."""
-    ticket = own_tickets(user).filter(pk=ticket_id).first()
+    `support/<ticket id>/<key>.webp` in the private bucket. A CLOSED ticket refuses it.
+    A photo no reply claims within `ATTACHMENT_CLAIM_WINDOW` is deleted by
+    `purge_unclaimed_attachments`."""
+    ticket = own_tickets(user, app).filter(pk=ticket_id).first()
     if ticket is None:
         raise ApiError(ErrorCode.NOT_FOUND, MSG_TICKET_NOT_FOUND)
     if ticket.status == TicketStatus.CLOSED:
@@ -589,13 +604,54 @@ def attachment_body(attachment: TicketAttachment) -> dict:
     return {"key": attachment.key, "url": attachment_url(attachment)}
 
 
-def staff_attachment_url(user, key: str) -> str:
-    """Signed URL of an attachment for the admin's ticket thread."""
+def staff_attachment_url(user, key: str, *, ip: str | None = None) -> str:
+    """Signed URL of an attachment for the admin's ticket thread. The photo is the customer's
+    personal data, so each opening is audited (`support.attachment_view`: ids only)."""
     _require_handler(user)
     attachment = TicketAttachment.objects.filter(key=key, ticket__in=staff_tickets(user)).first()
     if attachment is None:
         raise ValidationError(MSG_ATTACHMENT_NOT_FOUND)
-    return attachment_url(attachment)
+    url = attachment_url(attachment)
+    audit.record(
+        user,
+        "support.attachment_view",
+        attachment.ticket,
+        {"attachment": attachment.key, "message_id": attachment.message_id},
+        ip=ip,
+    )
+    return url
+
+
+def purge_unclaimed_attachments(now=None) -> int:
+    """Delete photos (rows and stored files) that no reply claimed within
+    `ATTACHMENT_CLAIM_WINDOW` (they can no longer be claimed). Daily beat job; idempotent.
+    Returns the number deleted."""
+    cutoff = (now or timezone.now()) - ATTACHMENT_CLAIM_WINDOW
+    count = 0
+    stale = TicketAttachment.objects.filter(message__isnull=True, created_at__lt=cutoff)
+    for attachment in stale.iterator():
+        with transaction.atomic():
+            locked = (
+                TicketAttachment.objects.select_for_update(skip_locked=True)
+                .filter(pk=attachment.pk, message__isnull=True)
+                .first()
+            )
+            if locked is None:  # claimed meanwhile, or being claimed now
+                continue
+            name = locked.file.name
+            locked.delete()
+            transaction.on_commit(lambda name=name: _delete_file(name))
+            count += 1
+    if count:
+        logger.info("support: %s unclaimed attachments purged", count)
+    return count
+
+
+def _delete_file(name: str) -> None:
+    try:
+        default_storage.delete(name)
+    except Exception:  # the row is gone; a stray file is only logged
+        logger.warning("support: could not delete attachment file %s", name, exc_info=True)
 
 
 # --------------------------------------------------------------------------- canned replies
