@@ -32,6 +32,7 @@ SEED_STEPS: list[str] = [
     # Phase 7: placeholder CMS pages and FAQs, a demo support ticket
     "apps.cms.seed.seed_pages_and_faqs",
     "apps.support.seed.seed_tickets",
+    "apps.support.seed.seed_canned_replies",
 ]
 
 

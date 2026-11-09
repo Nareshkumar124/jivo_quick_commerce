@@ -66,6 +66,10 @@ class TestRoles:
             "view_payout",
             "view_riderearning",
             "view_earningrule",
+            # Phase 7 (05 §3 Reports row, ⚠ PM default): all three report families
+            "view_reports",
+            "view_catalog_reports",
+            "view_finance_reports",
         }
 
     @pytest.mark.parametrize(

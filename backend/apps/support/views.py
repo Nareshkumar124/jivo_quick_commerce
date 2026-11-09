@@ -1,11 +1,13 @@
 """Phase 7 support endpoints for the apps (06 §2.7): my tickets, open a ticket, one ticket with
 its thread, reply.
 
-Tickets are always looked up in the caller's own tickets: another user's ticket id is a 404.
+Tickets are always looked up in the caller's own tickets of the calling app (the access
+token's `app` claim): another user's ticket id, or a ticket raised from the other app, is a 404.
 Views are thin: validate, call `apps.support.services`, render with the serializers.
 """
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework.parsers import MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -28,12 +30,18 @@ from apps.support import examples as ex
 from apps.support import services
 from apps.support.serializers import (
     PaginatedTicketSummaryListSerializer,
+    TicketAttachmentSerializer,
+    TicketAttachmentUploadSerializer,
     TicketCreateSerializer,
     TicketReplySerializer,
     TicketSerializer,
     TicketSummarySerializer,
 )
-from apps.support.throttling import TicketCreateThrottle, TicketMessageThrottle
+from apps.support.throttling import (
+    TicketAttachmentThrottle,
+    TicketCreateThrottle,
+    TicketMessageThrottle,
+)
 
 TAGS = ["support"]
 
@@ -55,8 +63,9 @@ def _session_app(request: Request) -> str | None:
         return None
 
 
-def _ticket_body(user, ticket_id: int) -> dict:
-    return TicketSerializer(services.get_own_ticket(user, ticket_id)).data
+def _ticket_body(request: Request, ticket_id: int) -> dict:
+    ticket = services.get_own_ticket(request.user, ticket_id, app=_session_app(request))
+    return TicketSerializer(ticket).data
 
 
 class TicketListCreateView(APIView):
@@ -71,8 +80,9 @@ class TicketListCreateView(APIView):
         tags=TAGS,
         summary="My support tickets",
         description=(
-            "The caller's tickets, newest activity first (a new message or a status change "
-            "moves a ticket to the top)."
+            "The caller's tickets raised from this app (the rider app lists rider tickets, "
+            "the customer app customer tickets), newest activity first (a new message or a "
+            "status change moves a ticket to the top)."
         ),
         parameters=PAGINATION_PARAMETERS,
         responses=paginated_responses(
@@ -88,9 +98,8 @@ class TicketListCreateView(APIView):
         ),
     )
     def get(self, request: Request) -> Response:
-        tickets = services.with_list_relations(services.own_tickets(request.user)).order_by(
-            "-last_activity_at", "-id"
-        )
+        own = services.own_tickets(request.user, _session_app(request))
+        tickets = services.with_list_relations(own).order_by("-last_activity_at", "-id")
         paginator = StandardPagination()
         page = paginator.paginate_queryset(tickets, request, view=self)
         return paginator.get_paginated_response(TicketSummarySerializer(page, many=True).data)
@@ -103,17 +112,24 @@ class TicketListCreateView(APIView):
             "Creates an OPEN ticket whose first message is `message`. MISSING_ITEMS, "
             "DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY are about an order and need "
             "`order_id`; the other categories may name one. The order must be the caller's own. "
-            "Attachments are not accepted yet (planned contract: 06 §2.7). Rate limited per "
+            "To add photos, upload them to the new ticket (`support_tickets_attachments_create`) "
+            "and send them with a reply (`attachment_keys`). Rate limited per "
             "user (`SUPPORT_TICKETS_CREATE_RATE`, default 10 per hour)."
         ),
         request=TicketCreateSerializer,
         examples=request_examples(
             ("About an order", ex.CREATE_WITH_ORDER),
             ("General question", ex.CREATE_WITHOUT_ORDER),
+            ("Rider: about a task", ex.CREATE_RIDER_TASK),
         ),
         responses=app_responses(
             {
-                201: ok_response(TicketSerializer, "The new ticket.", ("Created", ex.TICKET_NEW)),
+                201: ok_response(
+                    TicketSerializer,
+                    "The new ticket.",
+                    ("Created", ex.TICKET_NEW),
+                    ("Rider ticket", ex.RIDER_TICKET),
+                ),
                 400: error_response(
                     "Invalid input: unknown category, message shorter than 10 or longer than "
                     "1000 characters, an order category without `order_id`, or an `order_id` "
@@ -143,8 +159,10 @@ class TicketListCreateView(APIView):
             message=data.validated_data["message"],
             order_id=data.validated_data.get("order_id"),
             app=_session_app(request),
+            task_id=data.validated_data.get("task_id"),
+            payout_id=data.validated_data.get("payout_id"),
         )
-        return Response(_ticket_body(request.user, ticket.pk), status=201)
+        return Response(_ticket_body(request, ticket.pk), status=201)
 
 
 class TicketDetailView(APIView):
@@ -152,7 +170,10 @@ class TicketDetailView(APIView):
         operation_id="support_tickets_retrieve",
         tags=TAGS,
         summary="One of my tickets with its messages",
-        description="Messages oldest first. Another user's ticket id is a 404.",
+        description=(
+            "Messages oldest first. Another user's ticket id, or a ticket raised from the "
+            "other app, is a 404."
+        ),
         parameters=[TICKET_ID],
         responses=app_responses(
             {
@@ -168,7 +189,7 @@ class TicketDetailView(APIView):
         ),
     )
     def get(self, request: Request, id: int) -> Response:
-        return Response(_ticket_body(request.user, id))
+        return Response(_ticket_body(request, id))
 
 
 class TicketMessageCreateView(APIView):
@@ -181,12 +202,14 @@ class TicketMessageCreateView(APIView):
         description=(
             "Adds the caller's message and returns the whole ticket. A RESOLVED ticket is "
             "reopened (OPEN). A CLOSED ticket refuses replies with 400 `VALIDATION_ERROR` "
-            "(`details.ticket`): offer a new ticket instead. Rate limited per user "
-            "(`SUPPORT_MESSAGES_RATE`, default 60 per hour)."
+            "(`details.ticket`): offer a new ticket instead. Photos: upload each with "
+            "`support_tickets_attachments_create`, then send up to 3 `attachment_keys` (keys the "
+            "caller uploaded to this ticket in the last hour, not used yet). Rate limited per "
+            "user (`SUPPORT_MESSAGES_RATE`, default 60 per hour)."
         ),
         parameters=[TICKET_ID],
         request=TicketReplySerializer,
-        examples=request_examples(("Reply", ex.REPLY)),
+        examples=request_examples(("Reply", ex.REPLY), ("Reply with a photo", ex.REPLY_WITH_PHOTO)),
         responses=app_responses(
             {
                 201: ok_response(
@@ -205,6 +228,10 @@ class TicketMessageCreateView(APIView):
                     validation_error(
                         {"message": ["This field may not be blank."]}, name="Empty message"
                     ),
+                    validation_error(
+                        {"attachment_keys": [services.MSG_ATTACHMENT_NOT_FOUND]},
+                        name="Unknown or expired photo",
+                    ),
                 ),
                 401: UNAUTHORIZED,
                 404: TICKET_NOT_FOUND,
@@ -215,5 +242,59 @@ class TicketMessageCreateView(APIView):
     def post(self, request: Request, id: int) -> Response:
         data = TicketReplySerializer(data=request.data)
         data.is_valid(raise_exception=True)
-        services.add_customer_message(request.user, id, data.validated_data["message"])
-        return Response(_ticket_body(request.user, id), status=201)
+        services.add_customer_message(
+            request.user,
+            id,
+            data.validated_data["message"],
+            attachment_keys=data.validated_data.get("attachment_keys", []),
+            app=_session_app(request),
+        )
+        return Response(_ticket_body(request, id), status=201)
+
+
+class TicketAttachmentCreateView(APIView):
+    parser_classes = [MultiPartParser]
+    throttle_classes = [TicketAttachmentThrottle]
+
+    @extend_schema(
+        operation_id="support_tickets_attachments_create",
+        tags=TAGS,
+        summary="Upload a photo to my ticket",
+        description=(
+            "Phase 7 (06 §2.7). Multipart `file`: a JPEG, PNG or WebP image of at most 5 MB. "
+            "It is stored re-encoded (WebP, EXIF removed) in private storage and returned with "
+            "its `key` and a short-lived signed `url`. Send the key in `attachment_keys` of the "
+            "next reply within an hour, or it is not attached. A CLOSED ticket refuses uploads. "
+            "Rate limited per user (`SUPPORT_ATTACHMENTS_RATE`, default 30 per hour)."
+        ),
+        parameters=[TICKET_ID],
+        request={"multipart/form-data": TicketAttachmentUploadSerializer},
+        responses=app_responses(
+            {
+                201: ok_response(
+                    TicketAttachmentSerializer, "Stored.", ("Uploaded", ex.ATTACHMENT)
+                ),
+                400: error_response(
+                    "Missing file, not a JPEG/PNG/WebP image, larger than 5 MB, or the ticket "
+                    "is CLOSED.",
+                    validation_error({"file": [services.MSG_IMAGE_TYPE]}, name="Not an image"),
+                    error_example(
+                        ErrorCode.VALIDATION_ERROR,
+                        services.MSG_TICKET_CLOSED,
+                        {"ticket": [services.MSG_TICKET_CLOSED]},
+                        name="Ticket closed",
+                    ),
+                ),
+                401: UNAUTHORIZED,
+                404: TICKET_NOT_FOUND,
+                429: RATE_LIMITED,
+            }
+        ),
+    )
+    def post(self, request: Request, id: int) -> Response:
+        data = TicketAttachmentUploadSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        attachment = services.upload_attachment(
+            request.user, id, data.validated_data["file"], app=_session_app(request)
+        )
+        return Response(services.attachment_body(attachment), status=201)

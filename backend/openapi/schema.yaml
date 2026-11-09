@@ -8269,6 +8269,8 @@ paths:
                       amount_refunded: '0.00'
                       refunds: []
                       can_download_invoice: false
+                      can_rate: false
+                      rating: null
                       placed_at: null
                       payment_expires_at: '2026-11-03T06:45:00Z'
                       eta_at: null
@@ -8373,6 +8375,8 @@ paths:
                       amount_refunded: '0.00'
                       refunds: []
                       can_download_invoice: false
+                      can_rate: false
+                      rating: null
                       placed_at: null
                       payment_expires_at: '2026-11-03T06:45:00Z'
                       eta_at: null
@@ -8477,6 +8481,8 @@ paths:
                       amount_refunded: '0.00'
                       refunds: []
                       can_download_invoice: false
+                      can_rate: false
+                      rating: null
                       placed_at: '2026-11-03T06:30:00Z'
                       payment_expires_at: null
                       eta_at: '2026-11-03T06:44:00Z'
@@ -8576,6 +8582,8 @@ paths:
                       amount_refunded: '0.00'
                       refunds: []
                       can_download_invoice: false
+                      can_rate: false
+                      rating: null
                       placed_at: null
                       payment_expires_at: '2026-11-03T06:45:00Z'
                       eta_at: null
@@ -8680,6 +8688,8 @@ paths:
                       amount_refunded: '0.00'
                       refunds: []
                       can_download_invoice: false
+                      can_rate: false
+                      rating: null
                       placed_at: '2026-11-03T06:32:10Z'
                       payment_expires_at: null
                       eta_at: '2026-11-03T06:46:00Z'
@@ -9102,6 +9112,8 @@ paths:
                     amount_refunded: '0.00'
                     refunds: []
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: null
                     payment_expires_at: '2026-11-03T06:45:00Z'
                     eta_at: null
@@ -9192,6 +9204,8 @@ paths:
                     amount_refunded: '0.00'
                     refunds: []
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
@@ -9285,6 +9299,8 @@ paths:
                     amount_refunded: '0.00'
                     refunds: []
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: '2026-11-03T06:30:00Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:44:00Z'
@@ -9379,6 +9395,8 @@ paths:
                     amount_refunded: '0.00'
                     refunds: []
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: null
                     payment_expires_at: null
                     eta_at: null
@@ -9472,6 +9490,8 @@ paths:
                     amount_refunded: '0.00'
                     refunds: []
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
@@ -9574,6 +9594,8 @@ paths:
                       created_at: '2026-11-03T06:34:05Z'
                       processed_at: null
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
@@ -9683,6 +9705,8 @@ paths:
                       created_at: '2026-11-03T06:35:00Z'
                       processed_at: '2026-11-03T06:35:04Z'
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
@@ -9786,6 +9810,8 @@ paths:
                     amount_refunded: '0.00'
                     refunds: []
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: '2026-11-03T06:30:00Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:44:00Z'
@@ -9879,6 +9905,8 @@ paths:
                     amount_refunded: '0.00'
                     refunds: []
                     can_download_invoice: true
+                    can_rate: true
+                    rating: null
                     placed_at: '2026-11-03T06:30:00Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:44:00Z'
@@ -10125,6 +10153,8 @@ paths:
                     amount_refunded: '0.00'
                     refunds: []
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: null
                     payment_expires_at: null
                     eta_at: null
@@ -10228,6 +10258,8 @@ paths:
                       created_at: '2026-11-03T06:35:00Z'
                       processed_at: '2026-11-03T06:35:04Z'
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
@@ -10511,6 +10543,365 @@ paths:
           description: Force update. Sent only when the request carries `X-App-Name`,
             `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
             for that app and platform. Requests without these headers never get 426.
+  /api/v1/orders/{id}/rating/:
+    get:
+      operationId: orders_rating_retrieve
+      description: 'Phase 7 (api-requests #34). The caller''s rating of their order,
+        or 404 when it is not rated yet (or not the caller''s order). The order detail
+        carries the same data in `rating`.'
+      summary: My rating of an order
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: '`Order.id`.'
+        required: true
+      tags:
+      - orders
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderRating'
+              examples:
+                OrderAndRider:
+                  value:
+                    order_stars: 5
+                    rider_stars: 5
+                    tags:
+                    - ON_TIME
+                    - WELL_PACKED
+                    - POLITE_RIDER
+                    comment: Quick delivery, thank you!
+                    created_at: '2026-11-03T07:02:00Z'
+                  summary: Order and rider
+                OrderOnly:
+                  value:
+                    order_stars: 2
+                    rider_stars: null
+                    tags:
+                    - DAMAGED_ITEMS
+                    comment: ''
+                    created_at: '2026-11-03T07:02:00Z'
+                  summary: Order only
+          description: The rating.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTRATED:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: This order has not been rated.
+                      details: {}
+                  summary: NOT_RATED
+                ORDERNOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Order not found.
+                      details: {}
+                  summary: ORDER_NOT_FOUND
+          description: The order does not exist, is not the caller's, or has not been
+            rated.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+    post:
+      operationId: orders_rating_create
+      description: 'Phase 7 (api-requests #34). Once the order is DELIVERED (`can_rate`),
+        the customer rates the order (`order_stars` 1-5) and optionally the rider
+        who delivered it (`rider_stars`), with tags and a comment (at most 500 characters).
+        One rating per order; it cannot be changed. An order not DELIVERED or already
+        rated is 400 `VALIDATION_ERROR` with `details.order` and `details.reason`
+        (NOT_DELIVERED / ALREADY_RATED). POLITE_RIDER / RUDE_RIDER need `rider_stars`;
+        `rider_stars` on an order without a rider is 400. The order detail then shows
+        it in `rating`.'
+      summary: Rate my delivered order
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: '`Order.id`.'
+        required: true
+      tags:
+      - orders
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderRatingCreateRequest'
+            examples:
+              OrderAndRider:
+                value:
+                  order_stars: 5
+                  rider_stars: 5
+                  tags:
+                  - ON_TIME
+                  - WELL_PACKED
+                  - POLITE_RIDER
+                  comment: Quick delivery, thank you!
+                summary: Order and rider
+              OrderOnly:
+                value:
+                  order_stars: 2
+                  tags:
+                  - DAMAGED_ITEMS
+                  comment: ''
+                summary: Order only
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderRating'
+              examples:
+                OrderAndRider:
+                  value:
+                    order_stars: 5
+                    rider_stars: 5
+                    tags:
+                    - ON_TIME
+                    - WELL_PACKED
+                    - POLITE_RIDER
+                    comment: Quick delivery, thank you!
+                    created_at: '2026-11-03T07:02:00Z'
+                  summary: Order and rider
+                OrderOnly:
+                  value:
+                    order_stars: 2
+                    rider_stars: null
+                    tags:
+                    - DAMAGED_ITEMS
+                    comment: ''
+                    created_at: '2026-11-03T07:02:00Z'
+                  summary: Order only
+          description: The rating as stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                StarsOutOfRange:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        order_stars:
+                        - Ensure this value is less than or equal to 5.
+                  summary: Stars out of range
+                RiderTags:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        tags:
+                        - Rate the rider to use rider tags.
+                  summary: Rider tags
+                NoRider:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        rider_stars:
+                        - This order has no rider to rate.
+                  summary: No rider
+                NOTDELIVERED:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: You can rate an order once it is delivered.
+                      details:
+                        order:
+                        - You can rate an order once it is delivered.
+                        reason: NOT_DELIVERED
+                        status: OUT_FOR_DELIVERY
+                  summary: NOT_DELIVERED
+                ALREADYRATED:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: You have already rated this order.
+                      details:
+                        order:
+                        - You have already rated this order.
+                        reason: ALREADY_RATED
+                  summary: ALREADY_RATED
+          description: Invalid stars, unknown tag, comment too long, rider tags without
+            `rider_stars`, `rider_stars` for an order without a rider, an order that
+            is not DELIVERED, or one already rated.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Order not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The order does not exist or is not the caller's.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/orders/{id}/reorder/:
     post:
       operationId: orders_reorder
@@ -11066,6 +11457,8 @@ paths:
                       amount_refunded: '0.00'
                       refunds: []
                       can_download_invoice: false
+                      can_rate: false
+                      rating: null
                       placed_at: null
                       payment_expires_at: '2026-11-03T06:45:00Z'
                       eta_at: null
@@ -11449,7 +11842,8 @@ paths:
   /api/v1/pages/{slug}/:
     get:
       operationId: pages_retrieve
-      description: 'Public. Slugs the apps use: `about`, `terms`, `privacy`, `refund-policy`.
+      description: 'Public. Slugs the apps use: `about`, `terms`, `privacy`, `refund-policy`
+        and, in the rider app, `rider-agreement` and `rider-location-disclosure`.
         The HTML is sanitised server-side to a small allow-list (see `html`). An unknown
         or unpublished slug is 404 `NOT_FOUND`: fall back to the policy URL from `GET
         /config/app/`. Cached for up to 5 minutes.'
@@ -11659,6 +12053,8 @@ paths:
                     amount_refunded: '0.00'
                     refunds: []
                     can_download_invoice: false
+                    can_rate: false
+                    rating: null
                     placed_at: '2026-11-03T06:32:10Z'
                     payment_expires_at: null
                     eta_at: '2026-11-03T06:46:00Z'
@@ -15302,6 +15698,168 @@ paths:
                   summary: Page out of range
           description: '`page` is not a page of this list: 0, past the last page,
             or not a number. Go back to page 1.'
+  /api/v1/rider/ratings/:
+    get:
+      operationId: rider_ratings_list
+      description: Phase 7 (rider app request). The caller's average rating (`rating_avg`,
+        also in `GET /rider/me/`), the number of ratings, the tags customers chose
+        for the rider (ON_TIME, POLITE_RIDER, LATE_DELIVERY, RUDE_RIDER) and the ratings
+        themselves, newest first, paged by `before_id` (follow `next`). Customer names,
+        phones, addresses and comments are never shown to riders. Any rider status.
+      summary: My ratings
+      parameters:
+      - in: query
+        name: before_id
+        schema:
+          type: integer
+        description: Return ratings older than this rating id (from `next`).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: 'Items per page: default 20, max 100.'
+      tags:
+      - rider
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiderRatingsPage'
+              examples:
+                Rated:
+                  value:
+                    rating_avg: '4.8'
+                    ratings_count: 41
+                    tag_counts:
+                    - tag: POLITE_RIDER
+                      count: 30
+                    - tag: ON_TIME
+                      count: 22
+                    results:
+                    - id: 812
+                      stars: 5
+                      tags:
+                      - ON_TIME
+                      - POLITE_RIDER
+                      rated_at: '2026-11-03T07:02:00Z'
+                      order_number: JV-261103-000123
+                    next: https://api.jivo.example/api/v1/rider/ratings/?before_id=812
+                NoRatingsYet:
+                  value:
+                    rating_avg: null
+                    ratings_count: 0
+                    tag_counts: []
+                    results: []
+                    next: null
+                  summary: No ratings yet
+          description: A page.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        before_id:
+                        - A valid integer is required.
+                  summary: VALIDATION_ERROR
+          description: Invalid `before_id`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTARIDER:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Register as a rider first.
+                      details:
+                        rider_status: NONE
+                  summary: NOT_A_RIDER
+          description: The caller has no rider profile (`details.rider_status` = NONE).
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/rider/register/:
     post:
       operationId: rider_register
@@ -18916,8 +19474,9 @@ paths:
   /api/v1/support/tickets/:
     get:
       operationId: support_tickets_list
-      description: The caller's tickets, newest activity first (a new message or a
-        status change moves a ticket to the top).
+      description: The caller's tickets raised from this app (the rider app lists
+        rider tickets, the customer app customer tickets), newest activity first (a
+        new message or a status change moves a ticket to the top).
       summary: My support tickets
       parameters:
       - in: query
@@ -18953,6 +19512,8 @@ paths:
                       status: IN_PROGRESS
                       order_id: 1002
                       order_number: JV-261104-001002
+                      task_id: null
+                      payout_id: null
                       last_message: Sorry about that! We have started a refund for
                         the bottle.
                       created_at: '2026-11-04T05:10:00Z'
@@ -18963,6 +19524,8 @@ paths:
                       status: RESOLVED
                       order_id: null
                       order_number: null
+                      task_id: null
+                      payout_id: null
                       last_message: Your phone number is updated. Anything else we
                         can help with?
                       created_at: '2026-11-01T09:00:00Z'
@@ -19065,11 +19628,12 @@ paths:
             or not a number. Go back to page 1.'
     post:
       operationId: support_tickets_create
-      description: 'Creates an OPEN ticket whose first message is `message`. MISSING_ITEMS,
+      description: Creates an OPEN ticket whose first message is `message`. MISSING_ITEMS,
         DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY are about an order and need `order_id`;
-        the other categories may name one. The order must be the caller''s own. Attachments
-        are not accepted yet (planned contract: 06 §2.7). Rate limited per user (`SUPPORT_TICKETS_CREATE_RATE`,
-        default 10 per hour).'
+        the other categories may name one. The order must be the caller's own. To
+        add photos, upload them to the new ticket (`support_tickets_attachments_create`)
+        and send them with a reply (`attachment_keys`). Rate limited per user (`SUPPORT_TICKETS_CREATE_RATE`,
+        default 10 per hour).
       summary: Open a support ticket
       tags:
       - support
@@ -19090,6 +19654,12 @@ paths:
                   category: ACCOUNT
                   message: How do I change the phone number on my account?
                 summary: General question
+              Rider:AboutATask:
+                value:
+                  category: TASK
+                  message: The customer's gate was locked and nobody answered.
+                  task_id: 310
+                summary: 'Rider: about a task'
         required: true
       security:
       - jwtAuth: []
@@ -19108,6 +19678,8 @@ paths:
                     status: OPEN
                     order_id: 1002
                     order_number: JV-261104-001002
+                    task_id: null
+                    payout_id: null
                     last_message: The oil bottle cap was broken when it arrived.
                     created_at: '2026-11-04T05:10:00Z'
                     updated_at: '2026-11-04T05:10:00Z'
@@ -19117,6 +19689,28 @@ paths:
                       body: The oil bottle cap was broken when it arrived.
                       from_support: false
                       created_at: '2026-11-04T05:10:00Z'
+                      attachments: []
+                RiderTicket:
+                  value:
+                    id: 14
+                    number: TK-000014
+                    category: TASK
+                    status: OPEN
+                    order_id: null
+                    order_number: JV-261104-001010
+                    task_id: 310
+                    payout_id: null
+                    last_message: The customer's gate was locked and nobody answered.
+                    created_at: '2026-11-04T08:00:00Z'
+                    updated_at: '2026-11-04T08:00:00Z'
+                    can_reply: true
+                    messages:
+                    - id: 40
+                      body: The customer's gate was locked and nobody answered.
+                      from_support: false
+                      created_at: '2026-11-04T08:00:00Z'
+                      attachments: []
+                  summary: Rider ticket
           description: The new ticket.
         '400':
           content:
@@ -19230,7 +19824,8 @@ paths:
   /api/v1/support/tickets/{id}/:
     get:
       operationId: support_tickets_retrieve
-      description: Messages oldest first. Another user's ticket id is a 404.
+      description: Messages oldest first. Another user's ticket id, or a ticket raised
+        from the other app, is a 404.
       summary: One of my tickets with its messages
       parameters:
       - in: path
@@ -19258,6 +19853,8 @@ paths:
                     status: IN_PROGRESS
                     order_id: 1002
                     order_number: JV-261104-001002
+                    task_id: null
+                    payout_id: null
                     last_message: Sorry about that! We have started a refund for the
                       bottle.
                     created_at: '2026-11-04T05:10:00Z'
@@ -19268,10 +19865,12 @@ paths:
                       body: The oil bottle cap was broken when it arrived.
                       from_support: false
                       created_at: '2026-11-04T05:10:00Z'
+                      attachments: []
                     - id: 32
                       body: Sorry about that! We have started a refund for the bottle.
                       from_support: true
                       created_at: '2026-11-04T05:25:00Z'
+                      attachments: []
                   summary: Answered by support
                 Closed:
                   value:
@@ -19281,6 +19880,8 @@ paths:
                     status: CLOSED
                     order_id: 1002
                     order_number: JV-261104-001002
+                    task_id: null
+                    payout_id: null
                     last_message: Sorry about that! We have started a refund for the
                       bottle.
                     created_at: '2026-11-04T05:10:00Z'
@@ -19291,10 +19892,12 @@ paths:
                       body: The oil bottle cap was broken when it arrived.
                       from_support: false
                       created_at: '2026-11-04T05:10:00Z'
+                      attachments: []
                     - id: 32
                       body: Sorry about that! We have started a refund for the bottle.
                       from_support: true
                       created_at: '2026-11-04T05:25:00Z'
+                      attachments: []
           description: The ticket.
         '401':
           content:
@@ -19383,12 +19986,168 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/support/tickets/{id}/attachments/:
+    post:
+      operationId: support_tickets_attachments_create
+      description: 'Phase 7 (06 §2.7). Multipart `file`: a JPEG, PNG or WebP image
+        of at most 5 MB. It is stored re-encoded (WebP, EXIF removed) in private storage
+        and returned with its `key` and a short-lived signed `url`. Send the key in
+        `attachment_keys` of the next reply within an hour, or it is not attached.
+        A CLOSED ticket refuses uploads. Rate limited per user (`SUPPORT_ATTACHMENTS_RATE`,
+        default 30 per hour).'
+      summary: Upload a photo to my ticket
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: '`SupportTicket.id` (not the TK- number).'
+        required: true
+      tags:
+      - support
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TicketAttachmentUploadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketAttachment'
+              examples:
+                Uploaded:
+                  value:
+                    key: 9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19
+                    url: https://storage.example.com/private/support/12/9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19.webp?X-Amz-Expires=600&X-Amz-Signature=abc123
+          description: Stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NotAnImage:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        file:
+                        - Upload a JPEG, PNG or WebP image.
+                  summary: Not an image
+                TicketClosed:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: This ticket is closed. Open a new ticket if you still
+                        need help.
+                      details:
+                        ticket:
+                        - This ticket is closed. Open a new ticket if you still need
+                          help.
+                  summary: Ticket closed
+          description: Missing file, not a JPEG/PNG/WebP image, larger than 5 MB,
+            or the ticket is CLOSED.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NOTFOUND:
+                  value:
+                    error:
+                      code: NOT_FOUND
+                      message: Ticket not found.
+                      details: {}
+                  summary: NOT_FOUND
+          description: The ticket does not exist or is not the caller's.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/support/tickets/{id}/messages/:
     post:
       operationId: support_tickets_messages_create
       description: 'Adds the caller''s message and returns the whole ticket. A RESOLVED
         ticket is reopened (OPEN). A CLOSED ticket refuses replies with 400 `VALIDATION_ERROR`
-        (`details.ticket`): offer a new ticket instead. Rate limited per user (`SUPPORT_MESSAGES_RATE`,
+        (`details.ticket`): offer a new ticket instead. Photos: upload each with `support_tickets_attachments_create`,
+        then send up to 3 `attachment_keys` (keys the caller uploaded to this ticket
+        in the last hour, not used yet). Rate limited per user (`SUPPORT_MESSAGES_RATE`,
         default 60 per hour).'
       summary: Reply on my ticket
       parameters:
@@ -19409,6 +20168,12 @@ paths:
               Reply:
                 value:
                   message: Thank you, I can see the refund now.
+              ReplyWithAPhoto:
+                value:
+                  message: Here is a photo of the bottle.
+                  attachment_keys:
+                  - 9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19
+                summary: Reply with a photo
         required: true
       security:
       - jwtAuth: []
@@ -19427,7 +20192,9 @@ paths:
                     status: OPEN
                     order_id: 1002
                     order_number: JV-261104-001002
-                    last_message: Thank you, I can see the refund now.
+                    task_id: null
+                    payout_id: null
+                    last_message: Here is a photo of the bottle.
                     created_at: '2026-11-04T05:10:00Z'
                     updated_at: '2026-11-04T06:02:00Z'
                     can_reply: true
@@ -19436,14 +20203,19 @@ paths:
                       body: The oil bottle cap was broken when it arrived.
                       from_support: false
                       created_at: '2026-11-04T05:10:00Z'
+                      attachments: []
                     - id: 32
                       body: Sorry about that! We have started a refund for the bottle.
                       from_support: true
                       created_at: '2026-11-04T05:25:00Z'
+                      attachments: []
                     - id: 33
-                      body: Thank you, I can see the refund now.
+                      body: Here is a photo of the bottle.
                       from_support: false
                       created_at: '2026-11-04T06:02:00Z'
+                      attachments:
+                      - key: 9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19
+                        url: https://storage.example.com/private/support/12/9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19.webp?X-Amz-Expires=600&X-Amz-Signature=abc123
           description: The ticket with the new message.
         '400':
           content:
@@ -19471,6 +20243,15 @@ paths:
                         message:
                         - This field may not be blank.
                   summary: Empty message
+                UnknownOrExpiredPhoto:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        attachment_keys:
+                        - 'Upload the photo again: it was not found or has expired.'
+                  summary: Unknown or expired photo
           description: Empty or too long message (1 to 1000 characters), or the ticket
             is CLOSED.
         '401':
@@ -21494,11 +22275,13 @@ components:
       - order
       - promo
       - system
+      - support
       type: string
       description: |-
         * `order` - Order updates
         * `promo` - Offers
         * `system` - Account and app
+        * `support` - Help and support
     LocationBatchRequest:
       type: object
       properties:
@@ -21884,12 +22667,22 @@ components:
           type: boolean
           description: 'True when `GET /orders/{id}/invoice/` has an invoice: DELIVERED
             orders (Phase 4).'
+        can_rate:
+          type: boolean
+          description: 'True when `POST /orders/{id}/rating/` is allowed: DELIVERED
+            and not rated yet.'
+        rating:
+          allOf:
+          - $ref: '#/components/schemas/OrderRating'
+          nullable: true
+          description: The customer's rating once given; null before (Phase 7).
       required:
       - address
       - amount_refunded
       - bill
       - can_cancel
       - can_download_invoice
+      - can_rate
       - can_retry_payment
       - cancellation
       - coupon_code
@@ -21904,6 +22697,7 @@ components:
       - payment_method
       - payment_status
       - placed_at
+      - rating
       - refunds
       - status
       - store
@@ -22171,6 +22965,65 @@ components:
       required:
       - order
       - razorpay
+    OrderRating:
+      type: object
+      description: The customer's rating of a delivered order (Phase 7).
+      properties:
+        order_stars:
+          type: integer
+          maximum: 5
+          minimum: 1
+        rider_stars:
+          type: integer
+          maximum: 5
+          minimum: 1
+          nullable: true
+          description: Null when the rider was not rated.
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/RatingTagEnum'
+        comment:
+          type: string
+          description: Plain text; may be empty.
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - comment
+      - created_at
+      - order_stars
+      - rider_stars
+      - tags
+    OrderRatingCreateRequest:
+      type: object
+      properties:
+        order_stars:
+          type: integer
+          maximum: 5
+          minimum: 1
+          description: 1 to 5 stars.
+        rider_stars:
+          type: integer
+          maximum: 5
+          minimum: 1
+          nullable: true
+          description: 'Optional: 1 to 5 stars for the rider who delivered the order.'
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/RatingTagEnum'
+          description: Optional tags. The app offers ON_TIME, WELL_PACKED, FRESH_PRODUCTS
+            and POLITE_RIDER for 4-5 stars and LATE_DELIVERY, DAMAGED_ITEMS, MISSING_ITEMS
+            and RUDE_RIDER for 1-3 (not enforced). POLITE_RIDER and RUDE_RIDER need
+            `rider_stars`.
+          maxItems: 8
+        comment:
+          type: string
+          description: Optional, plain text, at most 500 characters.
+          maxLength: 500
+      required:
+      - order_stars
     OrderRefund:
       type: object
       description: Money going back to the original payment method (08 §4 rule 4,
@@ -22524,7 +23377,7 @@ components:
       properties:
         slug:
           type: string
-          description: about, terms, privacy or refund-policy.
+          description: about, terms, privacy, refund-policy, rider-agreement or rider-location-disclosure.
         title:
           type: string
         html:
@@ -23225,6 +24078,26 @@ components:
       - slug
       - storage_instructions
       - variants
+    RatingTagEnum:
+      enum:
+      - ON_TIME
+      - WELL_PACKED
+      - FRESH_PRODUCTS
+      - POLITE_RIDER
+      - LATE_DELIVERY
+      - DAMAGED_ITEMS
+      - MISSING_ITEMS
+      - RUDE_RIDER
+      type: string
+      description: |-
+        * `ON_TIME` - On time
+        * `WELL_PACKED` - Well packed
+        * `FRESH_PRODUCTS` - Fresh products
+        * `POLITE_RIDER` - Polite rider
+        * `LATE_DELIVERY` - Late delivery
+        * `DAMAGED_ITEMS` - Damaged items
+        * `MISSING_ITEMS` - Missing items
+        * `RUDE_RIDER` - Rude rider
     RazorpayCheckout:
       type: object
       description: |-
@@ -23845,6 +24718,75 @@ components:
       - today
       - vehicle_number
       - vehicle_type
+    RiderRatingItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Use as `before_id` for older ratings.
+        stars:
+          type: integer
+          maximum: 5
+          minimum: 1
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/RatingTagEnum'
+        rated_at:
+          type: string
+          format: date-time
+        order_number:
+          type: string
+      required:
+      - id
+      - order_number
+      - rated_at
+      - stars
+      - tags
+    RiderRatingTagCount:
+      type: object
+      properties:
+        tag:
+          $ref: '#/components/schemas/RatingTagEnum'
+        count:
+          type: integer
+      required:
+      - count
+      - tag
+    RiderRatingsPage:
+      type: object
+      description: The rider's own ratings (Phase 7, rider app request). No customer
+        details, no comments.
+      properties:
+        rating_avg:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,1})?$
+          nullable: true
+          description: Average stars, one decimal ("4.8"); null until the first rating.
+        ratings_count:
+          type: integer
+        tag_counts:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiderRatingTagCount'
+          description: Tags customers chose for the rider, most frequent first.
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiderRatingItem'
+          description: Newest first.
+        next:
+          type: string
+          format: uri
+          nullable: true
+          description: The next (older) page, `?before_id=`; null at the end.
+      required:
+      - next
+      - rating_avg
+      - ratings_count
+      - results
+      - tag_counts
     RiderRegisterRequest:
       type: object
       description: Shared validation of the editable profile fields (register and
@@ -24640,6 +25582,17 @@ components:
         order_number:
           type: string
           nullable: true
+          readOnly: true
+          description: The order's number; for a rider ticket about a task, that task's
+            order.
+        task_id:
+          type: integer
+          nullable: true
+          description: 'Rider tickets: the task it is about (Phase 7).'
+        payout_id:
+          type: integer
+          nullable: true
+          description: 'Rider tickets: the payout it is about (Phase 7).'
         last_message:
           type: string
           nullable: true
@@ -24671,8 +25624,34 @@ components:
       - number
       - order_id
       - order_number
+      - payout_id
       - status
+      - task_id
       - updated_at
+    TicketAttachment:
+      type: object
+      description: |-
+        An attached photo (Phase 7). `url` is signed and short-lived (about 10 minutes):
+        re-fetch the ticket for a fresh one; never cache it.
+      properties:
+        key:
+          type: string
+        url:
+          type: string
+          format: uri
+      required:
+      - key
+      - url
+    TicketAttachmentUploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: JPEG, PNG or WebP, at most 5 MB. Stored re-encoded, without
+            EXIF data.
+      required:
+      - file
     TicketCategoryEnum:
       enum:
       - MISSING_ITEMS
@@ -24682,6 +25661,9 @@ components:
       - PAYMENT_REFUND
       - ACCOUNT
       - OTHER
+      - TASK
+      - PAYOUT
+      - CASH
       type: string
       description: |-
         * `MISSING_ITEMS` - Missing items
@@ -24691,6 +25673,9 @@ components:
         * `PAYMENT_REFUND` - Payment or refund
         * `ACCOUNT` - Account
         * `OTHER` - Other
+        * `TASK` - A delivery task
+        * `PAYOUT` - Payout
+        * `CASH` - Cash deposit
     TicketCreateRequest:
       type: object
       properties:
@@ -24698,7 +25683,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/TicketCategoryEnum'
           description: |-
-            MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY need `order_id`.
+            MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY need `order_id`. TASK, PAYOUT and CASH are for the rider app only (a rider session).
 
             * `MISSING_ITEMS` - Missing items
             * `DAMAGED_ITEMS` - Damaged items
@@ -24707,6 +25692,9 @@ components:
             * `PAYMENT_REFUND` - Payment or refund
             * `ACCOUNT` - Account
             * `OTHER` - Other
+            * `TASK` - A delivery task
+            * `PAYOUT` - Payout
+            * `CASH` - Cash deposit
         message:
           type: string
           minLength: 10
@@ -24718,6 +25706,16 @@ components:
           nullable: true
           description: One of the caller's orders (another user's order is refused
             as not found).
+        task_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'Rider app: a task the caller was assigned (else 400 not found).'
+        payout_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'Rider app: one of the caller''s payouts (else 400 not found).'
       required:
       - category
       - message
@@ -24735,7 +25733,14 @@ components:
         created_at:
           type: string
           format: date-time
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TicketAttachment'
+          readOnly: true
+          description: Photos attached to this message (Phase 7); [] when none.
       required:
+      - attachments
       - body
       - created_at
       - from_support
@@ -24748,6 +25753,16 @@ components:
           minLength: 1
           description: Plain text, 1 to 1000 characters after trimming.
           maxLength: 1000
+        attachment_keys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 32
+          description: 'Optional, at most 3: keys returned by `POST /support/tickets/{id}/attachments/`
+            for this ticket by the caller in the last hour, not yet used by another
+            message (Phase 7).'
+          maxItems: 3
       required:
       - message
     TicketStatusEnum:
@@ -24789,6 +25804,17 @@ components:
         order_number:
           type: string
           nullable: true
+          readOnly: true
+          description: The order's number; for a rider ticket about a task, that task's
+            order.
+        task_id:
+          type: integer
+          nullable: true
+          description: 'Rider tickets: the task it is about (Phase 7).'
+        payout_id:
+          type: integer
+          nullable: true
+          description: 'Rider tickets: the payout it is about (Phase 7).'
         last_message:
           type: string
           nullable: true
@@ -24809,7 +25835,9 @@ components:
       - number
       - order_id
       - order_number
+      - payout_id
       - status
+      - task_id
       - updated_at
     TokenPair:
       type: object

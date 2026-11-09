@@ -151,7 +151,16 @@ class AppVersionPolicy(TimeStampedModel):
 
 # --------------------------------------------------------------------------- P7: pages and FAQs
 
-PAGE_SLUGS = ("about", "terms", "privacy", "refund-policy")
+PAGE_SLUGS = (
+    "about",
+    "terms",
+    "privacy",
+    "refund-policy",
+    # Phase 7 rider app (api-requests): partner agreement and the background-location
+    # prominent disclosure (Play policy, 09).
+    "rider-agreement",
+    "rider-location-disclosure",
+)
 FAQ_ANSWER_MAX_LENGTH = 2000
 
 _html_tag = RegexValidator(

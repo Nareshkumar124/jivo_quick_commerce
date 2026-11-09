@@ -182,6 +182,26 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         *PAYOUTS_MANAGE,
     ],
 }
+# Phase 7 (P7 backend, ⚠ PM default; one self-contained block so it merges cleanly):
+# - Reports (05 §3 "Reports": Super Admin, Ops, Store Manager own store, Catalog Manager catalog,
+#   Finance). `reports.view_reports` = sales, orders, SLA, cancellations, refunds, COD
+#   reconciliation and the dashboard; `view_catalog_reports` = product sales and inventory;
+#   `view_finance_reports` = GST and rider earnings / payouts (the "Payouts" row: Finance).
+# - Ratings (05 §2 Ratings): view for Ops, Support and Store Manager (own stores).
+REPORTS_VIEW = "reports.view_reports"
+REPORTS_CATALOG = "reports.view_catalog_reports"
+REPORTS_FINANCE = "reports.view_finance_reports"
+RATINGS_VIEW = "orders.view_rating"
+SUPER_ADMIN_APPS = (*SUPER_ADMIN_APPS, "reports")
+for _role, _extra in {
+    OPS: [REPORTS_VIEW, REPORTS_CATALOG, RATINGS_VIEW],
+    STORE_MANAGER: [REPORTS_VIEW, REPORTS_CATALOG, RATINGS_VIEW],
+    CATALOG_MANAGER: [REPORTS_CATALOG],
+    SUPPORT: [RATINGS_VIEW],
+    FINANCE: [REPORTS_VIEW, REPORTS_CATALOG, REPORTS_FINANCE],
+}.items():
+    ROLE_PERMISSIONS[_role] = [*ROLE_PERMISSIONS[_role], *_extra]
+
 # Roles limited to the stores in StaffStoreAccess.
 STORE_SCOPED_ROLES = frozenset({STORE_MANAGER, STORE_STAFF})
 # Roles that see every store (05 §3). An explicit allow-list: any other group (unknown, or a

@@ -8,6 +8,7 @@ from django.db.models import Prefetch, QuerySet
 from django.utils import timezone
 
 from apps.core.money import money_str
+from apps.orders import ratings
 from apps.orders.choices import (
     OrderCancelReason,
     OrderStatus,
@@ -119,6 +120,7 @@ def cancellation_body(order: Order) -> dict | None:
 
 def order_body(order: Order, now: datetime | None = None) -> dict:
     items = list(order.items.all())
+    order_ratings = list(order.ratings.all()) if order.status == OrderStatus.DELIVERED else []
     instructions = order.instructions or {}
     return {
         "id": order.pk,
@@ -147,6 +149,8 @@ def order_body(order: Order, now: datetime | None = None) -> dict:
         "amount_refunded": money_str(order.amount_refunded),
         "refunds": customer_refunds(list(order.refunds.all())),
         "can_download_invoice": order.status == OrderStatus.DELIVERED,
+        "can_rate": ratings.can_rate(order, order_ratings),
+        "rating": ratings.rating_body(order_ratings),
     }
 
 

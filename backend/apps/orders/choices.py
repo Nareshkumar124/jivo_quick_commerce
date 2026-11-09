@@ -170,3 +170,31 @@ def customer_cancellable() -> frozenset[str]:
         if status == until:
             break
     return frozenset(allowed)
+
+
+class RatingTarget(models.TextChoices):
+    """07 §2.6 `Rating.target`: one rating row per order and target."""
+
+    ORDER = "ORDER", "Order"
+    RIDER = "RIDER", "Rider"
+
+
+class RatingTag(models.TextChoices):
+    """Rating tags (03 §2.9; the customer app's proposed codes). The rider tags go on the rider's
+    rating, the others on the order's."""
+
+    ON_TIME = "ON_TIME", "On time"
+    WELL_PACKED = "WELL_PACKED", "Well packed"
+    FRESH_PRODUCTS = "FRESH_PRODUCTS", "Fresh products"
+    POLITE_RIDER = "POLITE_RIDER", "Polite rider"
+    LATE_DELIVERY = "LATE_DELIVERY", "Late delivery"
+    DAMAGED_ITEMS = "DAMAGED_ITEMS", "Damaged items"
+    MISSING_ITEMS = "MISSING_ITEMS", "Missing items"
+    RUDE_RIDER = "RUDE_RIDER", "Rude rider"
+
+
+# Rider-only tags: stored on the RIDER row only, and need rider_stars.
+RIDER_RATING_TAGS = frozenset({RatingTag.POLITE_RIDER, RatingTag.RUDE_RIDER})
+# Tags about the delivery as a whole: stored on the ORDER row and copied to the RIDER row when
+# the rider is rated (the rider app's tags: ON_TIME, POLITE_RIDER, LATE_DELIVERY, RUDE_RIDER).
+SHARED_RATING_TAGS = frozenset({RatingTag.ON_TIME, RatingTag.LATE_DELIVERY})

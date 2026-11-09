@@ -424,14 +424,24 @@ def stores_for(user) -> QuerySet[DarkStore]:
     """
     if not (user and user.is_authenticated and user.is_active and user.is_staff):
         return DarkStore.objects.none()
-    if user.is_superuser:
+    if sees_all_stores(user):
         return DarkStore.objects.all()
     groups = set(user.groups.values_list("name", flat=True))
     if groups & roles.STORE_SCOPED_ROLES:
         return DarkStore.objects.filter(staff_access__user=user).distinct()
-    if groups & roles.GLOBAL_ROLES:
-        return DarkStore.objects.all()
     return DarkStore.objects.none()
+
+
+def sees_all_stores(user) -> bool:
+    """True when `stores_for(user)` is every store (a superuser, or a global role and no
+    store-scoped role). Lets callers include rows that belong to no store yet (e.g. a rider
+    with neither a home nor a preferred store), which a store filter would hide."""
+    if not (user and user.is_authenticated and user.is_active and user.is_staff):
+        return False
+    if user.is_superuser:
+        return True
+    groups = set(user.groups.values_list("name", flat=True))
+    return not (groups & roles.STORE_SCOPED_ROLES) and bool(groups & roles.GLOBAL_ROLES)
 
 
 def grant_store_access(user, store: DarkStore) -> None:

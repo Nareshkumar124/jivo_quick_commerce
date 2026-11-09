@@ -254,16 +254,20 @@ def anonymise_user(user_id: int) -> bool:
 
 def _scrub_free_text(user: User) -> None:
     """T-814 (M4, DL-60 ⚠ Jivo): free text the customer typed is erased: their orders' delivery
-    instructions, and the bodies of the support messages they sent (staff replies and the
-    ticket rows stay for the support history). `Order.address_snapshot` is kept for invoiced
-    orders (tax retention, 07 §4)."""
-    from apps.orders.models import Order
+    instructions, the bodies of the support messages they sent (staff replies and the
+    ticket rows stay for the support history) and the comments of their ratings (stars and tags
+    stay: the rider average and the reports need them). `Order.address_snapshot` is kept for
+    invoiced orders (tax retention, 07 §4)."""
+    from apps.orders.models import Order, Rating
     from apps.support.models import TicketMessage
 
     Order.objects.filter(user=user).exclude(instructions={}).update(
         instructions={}, updated_at=timezone.now()
     )
     TicketMessage.objects.filter(ticket__user=user, is_staff=False).update(body=ERASED_TEXT)
+    Rating.objects.filter(user=user).exclude(comment="").update(
+        comment=ERASED_TEXT, updated_at=timezone.now()
+    )
 
 
 ERASED_TEXT = "[removed: account deleted]"

@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     "apps.payments",
     "apps.delivery",
     "apps.support",
+    "apps.reports",  # Phase 7: dashboard metrics, reports, exports (05 §1.1, §4)
     "apps.realtime",  # Phase 6: WebSockets (06 §4)
     "apps.loadtest",  # P8 T-812: load-test data commands (no models, no API)
     "apps.ops_console",
@@ -799,11 +800,50 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
     {
         "support_tickets_create": env_str("SUPPORT_TICKETS_CREATE_RATE", default="10/hour"),
         "support_messages": env_str("SUPPORT_MESSAGES_RATE", default="60/hour"),
+        "support_attachments": env_str("SUPPORT_ATTACHMENTS_RATE", default="30/hour"),
     }
 )
+# Phase 7 support: photo attachments (06 §2.7) and SLA targets per priority (PM default ⚠ until
+# Jivo sets them; "PRIORITY:value,..." in the env).
+SUPPORT_ATTACHMENT_MAX_BYTES = env_int("SUPPORT_ATTACHMENT_MAX_BYTES", default=5 * 1024 * 1024)
+SUPPORT_ATTACHMENT_URL_SECONDS = env_int("SUPPORT_ATTACHMENT_URL_SECONDS", default=600)
+SUPPORT_FIRST_RESPONSE_SLA_MINUTES = {
+    key: int(value)
+    for key, value in env_dict(
+        "SUPPORT_FIRST_RESPONSE_SLA_MINUTES",
+        default={"URGENT": "15", "HIGH": "30", "NORMAL": "60", "LOW": "240"},
+    ).items()
+}
+SUPPORT_RESOLUTION_SLA_HOURS = {
+    key: int(value)
+    for key, value in env_dict(
+        "SUPPORT_RESOLUTION_SLA_HOURS",
+        default={"URGENT": "4", "HIGH": "8", "NORMAL": "24", "LOW": "72"},
+    ).items()
+}
+
+# --------------------------------------------------------------------------- reports (P7)
+# 05 §4 reports and 05 §1.1 dashboard (apps.reports). On screen and the synchronous CSV are
+# capped at REPORT_SYNC_MAX_ROWS rows; larger exports run in Celery into the private bucket and
+# are downloaded through a signed URL valid REPORT_EXPORT_URL_SECONDS. Export files are deleted
+# after REPORT_EXPORT_RETENTION_DAYS. A date range is at most REPORT_MAX_RANGE_DAYS days.
+REPORT_SYNC_MAX_ROWS = env_int("REPORT_SYNC_MAX_ROWS", default=5000)
+REPORT_MAX_RANGE_DAYS = env_int("REPORT_MAX_RANGE_DAYS", default=366)
+REPORT_EXPORT_URL_SECONDS = env_int("REPORT_EXPORT_URL_SECONDS", default=900)
+REPORT_EXPORT_RETENTION_DAYS = env_int("REPORT_EXPORT_RETENTION_DAYS", default=7)
+# A RUNNING export started less than this long ago is not run again by a duplicate task; an
+# older one (its worker died) is.
+REPORT_EXPORT_STALE_MINUTES = env_int("REPORT_EXPORT_STALE_MINUTES", default=15)
+# 05 §1.1 alerts panel thresholds.
+DASHBOARD_ACCEPT_WAIT_ALERT_MINUTES = env_int("DASHBOARD_ACCEPT_WAIT_ALERT_MINUTES", default=2)
+DASHBOARD_NO_RIDER_ALERT_MINUTES = env_int("DASHBOARD_NO_RIDER_ALERT_MINUTES", default=3)
+# 06 §5 daily_reports_email: store-wise summary of the previous IST day to store managers, at
+# 08:00 IST (02:30 UTC).
+DAILY_REPORTS_EMAIL_ENABLED = env_bool("DAILY_REPORTS_EMAIL_ENABLED", default=True)
 SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"].update(
     {
         "TicketCategoryEnum": "apps.support.choices.TicketCategory",
+        "RatingTagEnum": "apps.orders.choices.RatingTag",
         "TicketStatusEnum": "apps.support.choices.TicketStatus",
     }
 )
@@ -867,6 +907,20 @@ AXES_LOCKOUT_PARAMETERS = ["username", ["ip_address", "username"]]
 # IST). M4 (DL-60): payment payloads are scrubbed of personal data after the retention period.
 CELERY_BEAT_SCHEDULE.update(
     {
+        # Phase 7 (06 §5): daily store summary to managers; old report exports removed.
+        "daily-reports-email": {
+            "task": "reports.daily_reports_email",
+            "schedule": crontab(hour=2, minute=30),
+        },
+        "purge-report-exports": {
+            "task": "reports.purge_old_exports",
+            "schedule": crontab(hour=22, minute=50),
+        },
+        # Support photos never claimed by a reply (05:25 IST).
+        "purge-unclaimed-support-attachments": {
+            "task": "support.purge_unclaimed_attachments",
+            "schedule": crontab(hour=23, minute=55),
+        },
         "flush-expired-tokens": {
             "task": "accounts.flush_expired_tokens",
             "schedule": crontab(hour=22, minute=0),
