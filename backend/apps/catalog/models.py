@@ -234,6 +234,13 @@ class ProductImage(ProcessedImageMixin, TimeStampedModel):
     )
     alt_text = models.CharField(max_length=150, blank=True)
     sort_order = models.IntegerField(default=0)
+    source_sha256 = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        editable=False,
+        help_text="SHA-256 of the source file, set by `import_catalog_images` (idempotency key).",
+    )
 
     class Meta:
         ordering = ["sort_order", "id"]
