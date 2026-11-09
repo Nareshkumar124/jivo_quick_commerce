@@ -560,6 +560,67 @@ class TestNetRevenue:
         assert row["cancelled_refunds"] == "300.00"
         assert row["aov"] == "290.00"
 
+    def test_uncollected_cod_excluded_from_net_revenue(self, store, superuser):
+        """P7-TC-20, DL-65: a COD failed delivery (250, tip 10) and a COD return (180) stay in
+        GMV but are not net revenue; the return's stray 50 refund is not subtracted twice and
+        the failed tip is not subtracted either. A delivered COD order is collected."""
+        common = {"payment_method": PaymentMethod.COD, "payment_status": PaymentStatus.FAILED}
+        OrderFactory(
+            store=store,
+            status=OrderStatus.DELIVERY_FAILED,
+            placed_at=at(13),
+            mrp_total=Decimal("290.00"),
+            item_total=Decimal("240.00"),
+            tip=Decimal("10.00"),
+            grand_total=Decimal("250.00"),
+            **common,
+        )
+        OrderFactory(
+            store=store,
+            status=OrderStatus.RETURNED,
+            placed_at=at(14),
+            mrp_total=Decimal("230.00"),
+            item_total=Decimal("180.00"),
+            grand_total=Decimal("180.00"),
+            amount_refunded=Decimal("50.00"),
+            **common,
+        )
+        OrderFactory(
+            store=store,
+            status=OrderStatus.DELIVERED,
+            placed_at=at(15),
+            mrp_total=Decimal("150.00"),
+            item_total=Decimal("100.00"),
+            grand_total=Decimal("100.00"),
+            payment_method=PaymentMethod.COD,
+            payment_status=PaymentStatus.COD_COLLECTED,
+        )
+        [row] = run(superuser, "sales_summary", store_id=store.pk)
+        assert row["gmv"] == "1400.00"  # 870 + 250 + 180 + 100
+        assert row["tips"] == "20.00"
+        assert row["refunded"] == "350.00"
+        assert row["uncollected_cod"] == "430.00"
+        assert row["net_revenue"] == "600.00"  # 1400 - 20 - 350 - 430
+        assert row["aov"] == "233.33"  # 1400 / 6 live orders
+
+    def test_online_failed_delivery_unchanged(self, superuser):
+        """DL-65: an ONLINE failed delivery is not uncollected COD: its refund counts as before."""
+        store = DarkStoreFactory()
+        paid_order(
+            store,
+            12,
+            status=OrderStatus.DELIVERY_FAILED,
+            item_total=Decimal("300.00"),
+            delivery_fee=Decimal("30.00"),
+            tip=Decimal("20.00"),
+            grand_total=Decimal("350.00"),
+            refunds=(("delivery_failed", "320.00"),),
+        )
+        [row] = run(superuser, "sales_summary", store_id=store.pk)
+        assert (row["gmv"], row["tips"], row["refunded"]) == ("350.00", "0.00", "320.00")
+        assert row["uncollected_cod"] == "0.00"
+        assert row["net_revenue"] == "30.00"
+
     def test_only_cancelled_refunds(self, superuser):
         store = DarkStoreFactory()
         paid_order(

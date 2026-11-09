@@ -17,7 +17,10 @@ Definitions (⚠ PM defaults, documented in docs/05 §4):
 - **Refunded** = processed refunds (`amount_refunded`) of live orders, minus their processed
   T8a (`item_unavailable`) refunds, which the reduced `grand_total` already reflects.
   **Unavailable refunds** (those T8a refunds) are shown for reconciliation only.
-- **Net revenue** = GMV - tips - refunded.
+- **Uncollected COD** (DL-65) = `grand_total` of live COD orders that ended DELIVERY_FAILED or
+  RETURNED: no cash was collected. They stay in GMV (value ordered) but not in net revenue, and
+  their refunds (if any) are left out of Refunded so nothing is subtracted twice.
+- **Net revenue** = GMV - tips - refunded - uncollected COD.
 - **Cancelled refunds** = processed refunds of CANCELLED orders: shown on their own, never
   part of GMV or net revenue (those orders are not in GMV).
 - **Product sales** count DELIVERED orders on the IST day of `delivered_at`: units delivered
@@ -103,13 +106,17 @@ def _counted_orders(query: ReportQuery):
 
 def sales_summary(query: ReportQuery) -> Iterator[tuple]:
     """See the module doc for GMV, tips, refunded, net revenue and cancelled refunds."""
-    from apps.orders.choices import OrderStatus
+    from apps.orders.choices import OrderStatus, PaymentMethod
     from apps.payments.models import Refund, RefundStatus
     from apps.payments.order_refunds import ITEM_UNAVAILABLE
 
     cancelled = Q(status=OrderStatus.CANCELLED)
     live = ~cancelled
-    tipped = live & ~Q(status__in=(OrderStatus.DELIVERY_FAILED, OrderStatus.RETURNED))
+    failed = Q(status__in=(OrderStatus.DELIVERY_FAILED, OrderStatus.RETURNED))
+    tipped = live & ~failed
+    # DL-65: COD orders that failed or came back collected no money.
+    uncollected = failed & Q(payment_method=PaymentMethod.COD)
+    refundable = live & ~uncollected
     rows = (
         _counted_orders(query)
         .annotate(day=TruncDate("placed_at", tzinfo=ist()))
@@ -127,7 +134,8 @@ def sales_summary(query: ReportQuery) -> Iterator[tuple]:
                 ZERO,
             ),
             tips=Coalesce(Sum("tip", filter=tipped), ZERO),
-            live_refunded=Coalesce(Sum("amount_refunded", filter=live), ZERO),
+            live_refunded=Coalesce(Sum("amount_refunded", filter=refundable), ZERO),
+            uncollected_cod=Coalesce(Sum("grand_total", filter=uncollected), ZERO),
             cancelled_refunds=Coalesce(Sum("amount_refunded", filter=cancelled), ZERO),
         )
         .order_by("day", "store__code")
@@ -136,7 +144,7 @@ def sales_summary(query: ReportQuery) -> Iterator[tuple]:
     unavailable = {
         (row["day"], row["order__store__code"]): row["amount"]
         for row in Refund.objects.filter(
-            order__in=_counted_orders(query).filter(live),
+            order__in=_counted_orders(query).filter(refundable),
             reason=ITEM_UNAVAILABLE,
             status=RefundStatus.PROCESSED,
         )
@@ -162,10 +170,11 @@ def sales_summary(query: ReportQuery) -> Iterator[tuple]:
             row["tips"],
             row["gmv"],
             refunded,
-            row["gmv"] - row["tips"] - refunded,
+            row["gmv"] - row["tips"] - refunded - row["uncollected_cod"],
             aov,
             unavailable_refunds,
             row["cancelled_refunds"],
+            row["uncollected_cod"],
         )
 
 
@@ -566,6 +575,7 @@ REPORTS: dict[str, ReportSpec] = {
                 "aov",
                 "unavailable_refunds",
                 "cancelled_refunds",
+                "uncollected_cod",
             ),
             sales_summary,
             "Orders, GMV, discounts, fees, net revenue and AOV per IST day and store "
