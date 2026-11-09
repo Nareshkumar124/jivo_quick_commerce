@@ -452,6 +452,8 @@ TRACK_PACKING = {
     **_TRACK,
     "status": "PACKING",
     "eta_at": "2026-11-10T09:58:00Z",
+    "live_eta_at": "2026-11-10T09:57:00Z",
+    "live_eta_minutes": 12,
     "rider": {
         "name": "Ravi K.",
         "phone": None,
@@ -466,7 +468,14 @@ TRACK_PACKING = {
     "delivery_otp": None,
     "task_status": "ASSIGNED",
 }
-TRACK_NO_RIDER = {**TRACK_PACKING, "status": "ACCEPTED", "rider": None, "task_status": "SEARCHING"}
+TRACK_NO_RIDER = {
+    **TRACK_PACKING,
+    "status": "ACCEPTED",
+    "rider": None,
+    "task_status": "SEARCHING",
+    "live_eta_at": "2026-11-10T10:00:00Z",
+    "live_eta_minutes": 15,
+}
 TRACK_OUT_FOR_DELIVERY = {
     **TRACK_PACKING,
     "status": "OUT_FOR_DELIVERY",
@@ -478,11 +487,15 @@ TRACK_OUT_FOR_DELIVERY = {
     },
     "delivery_otp": "4821",
     "task_status": "PICKED_UP",
+    "live_eta_at": "2026-11-10T09:52:00Z",
+    "live_eta_minutes": 7,
 }
 TRACK_DELIVERED = {
     **TRACK_PACKING,
     "status": "DELIVERED",
     "eta_at": None,
+    "live_eta_at": None,
+    "live_eta_minutes": None,
     "rider": None,
     "task_status": "DELIVERED",
 }

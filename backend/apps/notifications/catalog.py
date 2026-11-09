@@ -34,7 +34,7 @@ class EventSpec:
     inbox_body: str = ""  # inbox text when it must differ from the push (no OTP in the inbox)
     link: str = ORDER_LINK
     # FCM data `type`. Customer (api-requests #30): order | product | collection | category.
-    # Rider (#41): offer.new | offer.withdrawn | task.updated.
+    # Rider (#41): offer.new | offer.withdrawn | offer.expired | task.updated | cash.updated.
     data_type: str = "order"
 
 
@@ -130,6 +130,33 @@ SPECS: dict[str, EventSpec] = {
             inbox=False,
             link="",
             data_type="offer.withdrawn",
+        ),
+        EventSpec(
+            "rider.offer_expired",
+            "Offer expired",
+            "The order offer timed out. Stay online for the next one.",
+            app=AppName.RIDER,
+            inbox=False,
+            link="",
+            data_type="offer.expired",
+        ),
+        EventSpec(
+            "rider.task_updated",
+            "Order updated",
+            "Order {{order_number}} was updated by the store team. Open the app for the next step.",
+            app=AppName.RIDER,
+            inbox=False,
+            link="",
+            data_type="task.updated",
+        ),
+        EventSpec(
+            "rider.cash_updated",
+            "Cash in hand updated",
+            "Your cash in hand has changed. Open the app to see the balance.",
+            app=AppName.RIDER,
+            inbox=False,
+            link="jivo://rider/cash",
+            data_type="cash.updated",
         ),
         EventSpec(
             "rider.task_assigned",

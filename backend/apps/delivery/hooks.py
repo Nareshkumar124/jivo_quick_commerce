@@ -10,6 +10,7 @@ import logging
 
 from django.apps import apps
 from django.core.exceptions import FieldError
+from django.db import transaction
 
 from apps.delivery.choices import DeliveryTaskStatus
 
@@ -165,3 +166,125 @@ def ops_alert(kind: str, data: dict) -> None:
         )
     except Exception:
         logger.exception("hooks.ops_alert failed: kind=%s", kind)
+
+
+# --------------------------------------------------------------------------- T-612 rider events
+# Rider-facing socket messages (`/ws/v1/rider/`) with their FCM data push (06 §4.3), for changes
+# the rider did not make themselves. Call these inside the service's transaction: each one
+# schedules its work with `transaction.on_commit` (and runs at once outside a transaction).
+
+
+def _on_commit(label: str, func) -> None:
+    def run() -> None:
+        try:
+            func()
+        except Exception:
+            logger.exception("hooks.%s failed", label)
+
+    transaction.on_commit(run)
+
+
+def offer_closed(offer, order, reason: str) -> None:
+    """The rider's pending offer is gone: `offer.expired` (reason EXPIRED) or `offer.withdrawn`
+    (TAKEN, ORDER_CANCELLED, REASSIGNED, RIDER_OFFLINE), plus the push."""
+    from apps import realtime
+
+    rider_id, user = offer.rider_id, offer.rider.user
+    ids = {"offer_id": offer.pk, "task_id": offer.task_id}
+    push = {**ids, "order_number": order.order_number, "status": offer.status}
+
+    def send() -> None:
+        if reason == "EXPIRED":
+            realtime.publish_offer_expired(rider_id, **ids)
+            send_push(user, "rider.offer_expired", push)
+        else:
+            realtime.publish_offer_withdrawn(rider_id, reason=reason, **ids)
+            send_push(user, "rider.offer_withdrawn", push)
+
+    _on_commit("offer_closed", send)
+
+
+def task_updated(
+    task,
+    order,
+    change: str,
+    *,
+    rider=None,
+    push_event: str | None = None,
+    push_data: dict | None = None,
+) -> None:
+    """`task.updated` to the task's rider (or `rider`, e.g. the one just taken off), with the
+    push `push_event` (a `rider.*` event in `apps.notifications.catalog`), if given."""
+    from apps import realtime
+
+    rider = rider if rider is not None else task.rider
+    if rider is None:
+        return
+    rider_id, user = rider.pk, rider.user
+    data = {
+        "task_id": task.pk,
+        "order_id": order.pk,
+        "status": task.status,
+        "order_status": order.status,
+        "change": change,
+    }
+
+    def send() -> None:
+        realtime.publish_task_updated(rider_id, **data)
+        if push_event:
+            send_push(user, push_event, push_data or {"task_id": task.pk})
+
+    _on_commit("task_updated", send)
+
+
+def cash_updated(rider, reason: str, *, push_ref: str | None = None) -> None:
+    """`cash.updated` to the rider (the balance as it is when sent); with `push_ref`, also the
+    `rider.cash_updated` push (one per ref: staff deposits and adjustments, the deposit flag)."""
+    from apps import realtime
+
+    rider_id, user = rider.pk, rider.user
+
+    def send() -> None:
+        realtime.publish_cash_updated(rider_id, reason=reason)
+        if push_ref:
+            send_push(user, "rider.cash_updated", {"ref": push_ref})
+
+    _on_commit("cash_updated", send)
+
+
+# --------------------------------------------------------------------------- T-612 ops / ETA
+
+
+def task_changed(task, previous_status: str | None, previous_rider_id: int | None) -> None:
+    """A task was created or changed status or rider (`apps.delivery.live`): `task.status` to the
+    store's ops sockets, `rider.status` for the riders whose on-task state may have changed, and
+    a recomputed `order.eta` to the customer (08 §8)."""
+    from apps import realtime
+    from apps.realtime.services import task_status_data
+
+    order_number = (
+        task.order.order_number
+        if "order" in task._state.fields_cache
+        else apps.get_model("orders", "Order")
+        .objects.filter(pk=task.order_id)
+        .values_list("order_number", flat=True)
+        .first()
+    )
+    data = task_status_data(task, order_number or "", previous_status)
+    store_id, order_id = task.store_id, task.order_id
+    riders = {r for r in (previous_rider_id, task.rider_id) if r}
+
+    def send() -> None:
+        realtime.publish_task_status(store_id, data)
+        for rider_id in sorted(riders):
+            realtime.publish_rider_presence(rider_id)
+        realtime.publish_order_eta(order_id)
+
+    _on_commit("task_changed", send)
+
+
+def rider_presence(rider_id: int) -> None:
+    """`rider.status` to ops after the rider went online or offline."""
+    from apps import realtime
+
+    _on_commit("rider_presence", lambda: realtime.publish_rider_presence(rider_id))

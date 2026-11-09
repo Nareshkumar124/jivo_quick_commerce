@@ -91,11 +91,17 @@ def test_status_event_goes_to_the_order_and_its_store(components):
     order = OrderFactory(status=OrderStatus.ACCEPTED, eta_at=timezone.now())
     listener = Listener(order_group(order.pk))
     ops = Listener(store_group(order.store_id))
-    assert services.publish_order_event("order.accepted", order.pk) == ["order.status"]
-    [message] = listener.messages()
+    assert services.publish_order_event("order.accepted", order.pk) == [
+        "order.status",
+        "order.eta",
+    ]
+    message, eta = listener.messages()
     assert message["type"] == "order.status"
     assert message["data"]["status"] == "ACCEPTED"
     validate(components, "WsOrderStatusMessage", message)
+    # T-612: the recomputed ETA follows every status change (08 §8), to the customer only.
+    assert eta["type"] == "order.eta"
+    validate(components, "WsOrderEtaMessage", eta)
     assert ops.messages() == [message]
 
 
@@ -104,6 +110,7 @@ def test_placed_also_sends_order_created_to_the_store(components):
     ops = Listener(store_group(order.store_id))
     assert services.publish_order_event("order.placed", order.pk) == [
         "order.status",
+        "order.eta",
         "order.created",
     ]
     status, created = ops.messages()
@@ -155,7 +162,10 @@ def test_order_event_task_fans_out(django_capture_on_commit_callbacks):
     listener = Listener(order_group(order.pk))
     with django_capture_on_commit_callbacks(execute=True):
         events.emit(events.ACCEPTED, order.pk)
-    assert [m["type"] for m in listener.messages()] == ["order.status"]
+    # T-612: `order.eta` follows the status (08 §8); `notification.new` goes to the user group.
+    types = [m["type"] for m in listener.messages()]
+    assert types[0] == "order.status"
+    assert set(types[1:]) == {"order.eta"}  # also after dispatch creates the task
     assert order.user.notifications.filter(event="order.accepted").count() == 1
 
 

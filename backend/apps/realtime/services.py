@@ -148,6 +148,9 @@ def publish_order_event(event: str, order_id: int) -> list[str]:
             message(contract.ORDER_STATUS, order_status_data(order)),
         )
         sent.append(contract.ORDER_STATUS)
+        # 08 §8: the ETA is recomputed on every status change.
+        if send_order_eta(order.pk, order=order):
+            sent.append(contract.ORDER_ETA)
     if event == "order.placed":
         send_now(stores, message(contract.ORDER_CREATED, order_created_data(order)))
         sent.append(contract.ORDER_CREATED)
@@ -254,39 +257,82 @@ def send_rider_location(rider_id, lat, lng, recorded_at, *, store_id, order_id, 
 def eta_minutes_from(lat: float, lng: float, drop_lat: float, drop_lng: float) -> int:
     """08 §8 once the order is on its way: rider to drop (straight line x road factor) at the
     average speed, plus the buffer. At least 1 minute."""
-    from apps.stores.services import haversine_km
+    from apps.delivery.services.eta import travel_minutes
 
-    km = haversine_km(lat, lng, drop_lat, drop_lng) * settings.ETA_ROAD_FACTOR
-    minutes = km / settings.ETA_AVG_SPEED_KMPH * 60 + settings.ETA_BUFFER_MINUTES
+    minutes = travel_minutes(lat, lng, drop_lat, drop_lng) + settings.ETA_BUFFER_MINUTES
     return max(1, math.ceil(minutes))
 
 
+def eta_data(order_id: int, eta) -> dict:
+    return {"order_id": order_id, "eta_at": iso(eta.eta_at), "eta_minutes": eta.minutes}
+
+
+def send_order_eta(order_id: int, *, order=None, point=None) -> bool:
+    """`order.eta` to the order's customer, recomputed now (`apps.delivery.services.eta`).
+    False (nothing sent) for an order without a live ETA (not yet placed, or ended)."""
+    from apps.delivery.services import eta as eta_service
+
+    if order is not None:
+        eta = eta_service.for_order(order, point=point)
+    else:
+        eta = eta_service.for_order_id(order_id, point=point)
+    if eta is None:
+        return False
+    send_now([order_group(order_id)], message(contract.ORDER_ETA, eta_data(order_id, eta)))
+    return True
+
+
+def publish_order_eta(order_id: int) -> None:
+    """After commit, queue `order.eta` for the order (a delivery task status change)."""
+    from apps.realtime.tasks import publish_order_eta_task
+
+    def queue() -> None:
+        try:
+            publish_order_eta_task.delay(order_id)
+        except Exception:
+            logger.exception("order.eta not queued: order %s", order_id)
+
+    transaction.on_commit(queue)
+
+
 def publish_eta_from_location(order_id: int, lat: float, lng: float) -> bool:
-    """`order.eta` for an order OUT_FOR_DELIVERY, throttled per order. Only published, never
-    stored (`Order.eta_at` stays the promise made at placement)."""
+    """`order.eta` from a rider location for an order OUT_FOR_DELIVERY (08 §8), throttled per
+    order to one every WS_ETA_MIN_INTERVAL_SECONDS. Only published, never stored
+    (`Order.eta_at` stays the promise made at placement)."""
     from apps.orders.choices import OrderStatus
     from apps.orders.models import Order
 
     if not cache.add(f"ws:eta:{order_id}", 1, timeout=settings.WS_ETA_MIN_INTERVAL_SECONDS):
         return False
-    point = (
-        Order.objects.filter(pk=order_id, status=OrderStatus.OUT_FOR_DELIVERY)
-        .values_list("delivery_location", flat=True)
+    order = (
+        Order.objects.select_related("store")
+        .filter(pk=order_id, status=OrderStatus.OUT_FOR_DELIVERY)
         .first()
     )
-    if point is None:
+    if order is None or not send_order_eta(order_id, order=order, point=(lat, lng)):
         cache.delete(f"ws:eta:{order_id}")
         return False
-    minutes = eta_minutes_from(lat, lng, point.y, point.x)
-    eta_at = timezone.now() + timedelta(minutes=minutes)
-    data = {"order_id": order_id, "eta_at": iso(eta_at), "eta_minutes": minutes}
-    send_now([order_group(order_id)], message(contract.ORDER_ETA, data))
     return True
+
+
+def jsonable(data: dict) -> dict:
+    """The API rendering of a service body: datetimes as UTC ISO strings, Decimals as strings
+    (the channel layer and Celery carry JSON-safe values only)."""
+    from decimal import Decimal
+
+    out = {}
+    for key, value in data.items():
+        if isinstance(value, datetime):
+            value = iso(value)
+        elif isinstance(value, Decimal):
+            value = str(value)
+        out[key] = value
+    return out
 
 
 def publish_offer(rider_id: int, offer: dict) -> None:
     """`offer.new` to the rider; `offer` is the `RiderOffer` body (as serialized for the API)."""
-    broadcast([rider_group(rider_id)], message(contract.OFFER_NEW, dict(offer)))
+    broadcast([rider_group(rider_id)], message(contract.OFFER_NEW, jsonable(offer)))
 
 
 def publish_offer_withdrawn(rider_id: int, *, offer_id: int, task_id: int, reason: str) -> None:
@@ -294,6 +340,125 @@ def publish_offer_withdrawn(rider_id: int, *, offer_id: int, task_id: int, reaso
         raise ValueError(f"Unknown offer.withdrawn reason {reason!r}")
     data = {"offer_id": offer_id, "task_id": task_id, "reason": reason}
     broadcast([rider_group(rider_id)], message(contract.OFFER_WITHDRAWN, data))
+
+
+def publish_offer_expired(rider_id: int, *, offer_id: int, task_id: int) -> None:
+    """`offer.expired`: the rider's offer timed out (08 §5 step 5)."""
+    data = {"offer_id": offer_id, "task_id": task_id, "reason": "EXPIRED"}
+    broadcast([rider_group(rider_id)], message(contract.OFFER_EXPIRED, data))
+
+
+def publish_cash_updated(rider_id: int, *, reason: str) -> None:
+    """`cash.updated` to the rider: their cash in hand as it is when the task runs."""
+    if reason not in contract.CASH_REASONS:
+        raise ValueError(f"Unknown cash.updated reason {reason!r}")
+    from apps.realtime.tasks import publish_cash_task
+
+    def queue() -> None:
+        try:
+            publish_cash_task.delay(rider_id, reason)
+        except Exception:
+            logger.exception("cash.updated not queued: rider %s", rider_id)
+
+    transaction.on_commit(queue)
+
+
+def send_cash_updated(rider_id: int, reason: str) -> bool:
+    Rider = _rider_model()
+    rider = Rider.objects.filter(pk=rider_id).first() if Rider is not None else None
+    if rider is None:
+        return False
+    from apps.delivery.services.presenters import cash_body
+
+    data = {
+        "rider_id": rider.pk,
+        **cash_body(rider),
+        "reason": reason,
+        "updated_at": iso(timezone.now()),
+    }
+    send_now([rider_group(rider.pk)], message(contract.CASH_UPDATED, data))
+    return True
+
+
+def send_notification_new(notification_id: int) -> bool:
+    """`notification.new` to the user's open sockets of that app: the inbox entry as the inbox
+    API shows it, and the unread count now. Nothing for entries not in the inbox."""
+    from apps.notifications import services as notifications
+    from apps.notifications.models import Notification
+    from apps.notifications.serializers import InboxNotificationSerializer
+    from apps.realtime.groups import user_group
+
+    notification = Notification.objects.filter(pk=notification_id, in_inbox=True).first()
+    if notification is None:
+        return False
+    data = {
+        **InboxNotificationSerializer(notification).data,
+        "unread_count": notifications.unread_count(notification.user, notification.app),
+    }
+    send_now(
+        [user_group(notification.user_id, notification.app)],
+        message(contract.NOTIFICATION_NEW, data),
+    )
+    return True
+
+
+def task_status_data(task, order_number: str, previous_status: str | None) -> dict:
+    return {
+        "task_id": task.pk,
+        "order_id": task.order_id,
+        "order_number": order_number,
+        "store_id": task.store_id,
+        "status": task.status,
+        "previous_status": previous_status,
+        "rider_id": task.rider_id,
+        "assignment_mode": task.assignment_mode or None,
+        "attempt_count": task.attempt_count,
+        "updated_at": iso(task.updated_at or timezone.now()),
+    }
+
+
+def publish_task_status(store_id: int, data: dict) -> None:
+    """`task.status` to the store's ops sockets (dispatch board)."""
+    broadcast([store_group(store_id)], message(contract.TASK_STATUS, data))
+
+
+def publish_rider_presence(rider_id: int) -> None:
+    """After commit, queue `rider.status` for the rider, read when the task runs (online, on a
+    task, home store): ops see it on the rider map and the dispatch board."""
+    from apps.realtime.tasks import publish_rider_presence_task
+
+    def queue() -> None:
+        try:
+            publish_rider_presence_task.delay(rider_id)
+        except Exception:
+            logger.exception("rider.status not queued: rider %s", rider_id)
+
+    transaction.on_commit(queue)
+
+
+def send_rider_presence(rider_id: int) -> bool:
+    Rider = _rider_model()
+    row = (
+        Rider.objects.filter(pk=rider_id).values("home_store_id", "is_online").first()
+        if Rider is not None
+        else None
+    )
+    if row is None or row["home_store_id"] is None:
+        return False
+    from apps.delivery.models import RIDER_BUSY_STATUSES, DeliveryTask
+
+    on_task = DeliveryTask.objects.filter(
+        rider_id=rider_id, status__in=RIDER_BUSY_STATUSES
+    ).exists()
+    data = {
+        "rider_id": rider_id,
+        "store_id": row["home_store_id"],
+        "is_online": bool(row["is_online"]),
+        "on_task": on_task,
+        "updated_at": iso(timezone.now()),
+    }
+    send_now([store_group(row["home_store_id"])], message(contract.RIDER_STATUS, data))
+    return True
 
 
 def publish_task_updated(

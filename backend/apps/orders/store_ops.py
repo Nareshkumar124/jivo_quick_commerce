@@ -470,6 +470,8 @@ def receive_return(
     with transaction.atomic():
         order = _locked(by, order_id, roles.RIDER_DISPATCH[0])
         task = DeliveryTask.objects.select_for_update(of=("self",)).filter(order=order).first()
+        if task is not None:
+            task.order = order  # cached for the live publish (T-612)
         if (
             order.status != OrderStatus.DELIVERY_FAILED
             or task is None
@@ -499,6 +501,10 @@ def receive_return(
         task.returned_at = now
         task.ended_at = now
         task.save(update_fields=["status", "returned_at", "ended_at", "updated_at"])
+        if task.rider_id:
+            from apps.delivery import hooks
+
+            hooks.task_updated(task, order, "STATUS_CHANGED")  # T-612: the return is closed
         audit.record(
             by,
             "order.return_received",

@@ -399,9 +399,9 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 
 | Path | Client | Server → client message types |
 |------|--------|-------------------------------|
-| `/ws/v1/orders/{order_id}/` | Customer (owner) | `order.status`, `rider.location`, `order.eta` |
-| `/ws/v1/rider/` | Rider | `offer.new`, `offer.withdrawn`, `task.updated` (e.g., packed / cancelled) |
-| `/ws/ops/live/` | Staff | `order.created`, `order.status`, `rider.location`, `rider.status`, `alert` (scoped to permitted stores) |
+| `/ws/v1/orders/{order_id}/` | Customer (owner) | `order.status`, `rider.location`, `order.eta`, `notification.new` |
+| `/ws/v1/rider/` | Rider | `offer.new`, `offer.expired`, `offer.withdrawn`, `task.updated` (e.g., packed / cancelled), `cash.updated`, `notification.new` |
+| `/ws/ops/live/` | Staff | `order.created`, `order.status`, `task.status`, `rider.location`, `rider.status`, `alert` (scoped to permitted stores) |
 
 ### 4.1 Connecting (Phase 6, `apps.realtime`)
 - **App sockets (`/ws/v1/`):** connect, then send `{"type": "auth", "token": "<access JWT>"}` within `WS_AUTH_TIMEOUT_SECONDS` (10 s). Or offer the subprotocols `["jivo.v1", "jivo.auth.<access JWT>"]`: the server selects `jivo.v1` and never echoes the token. The server answers `auth.ok` with the token's `expires_at`. Before then, send a new auth message with a refreshed token (same user), or the socket closes with 4401. `{"type": "ping"}` is answered with `pong`. There is no Origin check: native apps send none, and the JWT is not ambient, so a cross-site page cannot use it.
@@ -430,11 +430,19 @@ Customer, `/ws/v1/orders/{order_id}/`:
 {"type": "rider.location", "data": {"order_id": 1203, "lat": 28.4741, "lng": 77.0489, "heading": 72.5, "recorded_at": "2026-11-10T09:47:12Z"}, "sent_at": "2026-11-10T09:47:12.400000Z"}
 {"type": "order.eta", "data": {"order_id": 1203, "eta_at": "2026-11-10T09:56:00Z", "eta_minutes": 9}, "sent_at": "2026-11-10T09:47:12.400000Z"}
 ```
-Rider, `/ws/v1/rider/`. `offer.new` data is exactly the `RiderOffer` of `GET /rider/offers/current/`. On `task.updated`, re-read `GET /rider/tasks/current/`. `offer.withdrawn.reason` is EXPIRED, TAKEN, ORDER_CANCELLED or REASSIGNED. `task.updated.change` is ORDER_PACKED, ORDER_CANCELLED, AMOUNT_CHANGED, REASSIGNED or STATUS_CHANGED.
+Customer extras (T-612): `rider.location` is sent only while the order's task is ASSIGNED, AT_STORE, PICKED_UP or AT_CUSTOMER (the tracking gate), and only for a fix newer than the last one stored, so `recorded_at` only grows per rider (and per order: a rider has one task); drop older fixes. `order.eta` (08 §8, `eta_minutes` from `sent_at`) follows every order status change and every delivery-task change, and while OUT_FOR_DELIVERY at most every `WS_ETA_MIN_INTERVAL_SECONDS` (30 s) from rider pings. `GET /orders/{id}/track/` returns the same live value as `live_eta_at` / `live_eta_minutes` (`eta_at` stays the promise made at placement).
+
+Rider, `/ws/v1/rider/`. `offer.new` data is exactly the `RiderOffer` of `GET /rider/offers/current/`. On `task.updated`, re-read `GET /rider/tasks/current/`. **An offer that times out is `offer.expired`** (reason always EXPIRED); `offer.withdrawn.reason` is TAKEN (ops assigned the order to someone else), ORDER_CANCELLED, REASSIGNED (ops assigned you another order) or RIDER_OFFLINE. `task.updated.change` is ORDER_PACKED, ORDER_CANCELLED, AMOUNT_CHANGED, REASSIGNED (ops took you off), ASSIGNED (ops assigned you directly) or STATUS_CHANGED (ops unlocked a code, confirmed or failed the delivery, or the store received the return). `cash.updated` carries the same values as `cash` on `GET /rider/me/` plus `reason` (COD_COLLECTED, DEPOSIT, ADJUSTMENT, DEPOSIT_REQUIRED). The rider's own actions (accept, arrive, pickup, deliver) get their answer in the REST response, not on the socket.
 ```json
 {"type": "offer.new", "data": {"id": 9001, "task_id": 7001, "store_name": "Jivo Sector 14", "drop_locality": "Sector 21, Gurugram", "distance_km": "2.40", "payment_type": "COD", "cod_amount": "498.00", "estimated_payout": "42.00", "item_count": 3, "offered_at": "2026-11-10T09:30:00Z", "expires_at": "2026-11-10T09:30:30Z"}, "sent_at": "2026-11-10T09:30:00.120000Z"}
 {"type": "offer.withdrawn", "data": {"offer_id": 9001, "task_id": 7001, "reason": "ORDER_CANCELLED"}, "sent_at": "2026-11-10T09:30:12Z"}
 {"type": "task.updated", "data": {"task_id": 7001, "order_id": 1203, "status": "ASSIGNED", "order_status": "PACKED", "change": "ORDER_PACKED"}, "sent_at": "2026-11-10T09:41:05.120000Z"}
+{"type": "offer.expired", "data": {"offer_id": 9001, "task_id": 7001, "reason": "EXPIRED"}, "sent_at": "2026-11-10T09:30:30.200000Z"}
+{"type": "cash.updated", "data": {"rider_id": 41, "cash_in_hand": "1498.00", "cash_limit": "2000.00", "limit_reached": false, "deposit_required": false, "reason": "COD_COLLECTED", "updated_at": "2026-11-10T09:58:10Z"}, "sent_at": "2026-11-10T09:58:10.300000Z"}
+```
+Every app socket (customer order sockets and the rider socket), api-requests #47: a new inbox entry for that app, with the unread count. **The customer app has no account-level socket: a customer gets `notification.new` only while one of their order sockets is open** (the rider gets it whenever the rider socket is open). Otherwise re-read the inbox (or `GET /me/notifications/unread-count/`) on the FCM message and when the app resumes.
+```json
+{"type": "notification.new", "data": {"id": 5512, "title": "Order confirmed", "body": "The store has confirmed order JV-261110-001203 and will pack it now.", "category": "order", "link": "jivo://orders/1203", "read": false, "created_at": "2026-11-10T09:41:05Z", "unread_count": 3}, "sent_at": "2026-11-10T09:41:05.300000Z"}
 ```
 Ops, `/ws/ops/live/`. No customer data goes on this socket. `alert.code` is ACCEPTANCE_SLA_BREACHED, LATE_CAPTURE, REFUND_FAILED, DELIVERY_FAILED, DISPATCH_UNASSIGNED, PICKUP_CODE_LOCKED, DELIVERY_OTP_LOCKED, STOCK_NOT_COMMITTED, ARRIVAL_GEOFENCE_OVERRIDE, MOCKED_LOCATION or RIDER_STALE_ON_TASK; more may be added, so show `message` for unknown codes.
 ```json
@@ -442,6 +450,7 @@ Ops, `/ws/ops/live/`. No customer data goes on this socket. `alert.code` is ACCE
 {"type": "order.status", "data": {"order_id": 1203, "order_number": "JV-261110-001203", "store_id": 1, "status": "ACCEPTED", "payment_status": "PAID", "eta_at": "2026-11-10T09:58:00Z", "updated_at": "2026-11-10T09:41:04.880000Z"}, "sent_at": "2026-11-10T09:41:05.120000Z"}
 {"type": "rider.location", "data": {"rider_id": 41, "store_id": 1, "order_id": 1203, "lat": 28.4741, "lng": 77.0489, "heading": 72.5, "recorded_at": "2026-11-10T09:47:12Z"}, "sent_at": "2026-11-10T09:47:12.400000Z"}
 {"type": "rider.status", "data": {"rider_id": 41, "store_id": 1, "is_online": true, "on_task": false, "updated_at": "2026-11-10T09:30:00Z"}, "sent_at": "2026-11-10T09:30:00.200000Z"}
+{"type": "task.status", "data": {"task_id": 7001, "order_id": 1203, "order_number": "JV-261110-001203", "store_id": 1, "status": "ASSIGNED", "previous_status": "OFFERED", "rider_id": 41, "assignment_mode": "AUTO", "attempt_count": 1, "updated_at": "2026-11-10T09:30:08Z"}, "sent_at": "2026-11-10T09:30:08.200000Z"}
 {"type": "alert", "data": {"code": "ACCEPTANCE_SLA_BREACHED", "message": "Order JV-261110-001203 has not been accepted within 60 seconds.", "store_id": 1, "order_id": 1203, "rider_id": null, "at": "2026-11-10T09:41:31Z"}, "sent_at": "2026-11-10T09:41:31.100000Z"}
 ```
 Control messages, on every socket:
@@ -456,7 +465,7 @@ Control messages, on every socket:
 ### 4.3 Push data payloads (FCM `data`; every value is a string)
 FCM is sent for every important event in 08 §9, even while a socket is open. Until D-19 the push backend is disabled (`PUSH_BACKEND`), but the notification and inbox entry are still recorded. Staging and production refuse the console and locmem push backends (system check `notifications.E001`); the console backend never logs the body. Refund texts quote the stored `Refund.amount` (cancel: the `cancel:<order>` refund; `refund.processed` via `apps.notifications.notify_refund_processed(refund)`, which payments must call when a refund reaches PROCESSED). The `notification` part carries the title and body; the `data` part is what a tap routes on:
 - **Customer app** (api-requests #30): `{"type": "order", "order_id": "1203"}`. Later, `{"type": "product" | "collection" | "category", "slug": "..."}`. Or `{"link": "jivo://..."}` when no type applies.
-- **Rider app** (api-requests #41): `{"type": "offer.new", "offer_id": "9001", "task_id": "7001"}`, `{"type": "offer.withdrawn", "offer_id": "9001", "task_id": "7001"}`, `{"type": "task.updated", "task_id": "7001"}`.
+- **Rider app** (api-requests #41): `{"type": "offer.new", "offer_id": "9001", "task_id": "7001"}`, `{"type": "offer.expired" | "offer.withdrawn", "offer_id": "9001", "task_id": "7001"}`, `{"type": "task.updated", "task_id": "7001"}`, `{"type": "cash.updated"}` (staff deposits and adjustments, and the deposit-required flag; not for the rider's own COD collection). Rider inbox entries (task assigned, order ready, amount changed, task cancelled, return to store) have `link: null` in v1: route on `type` and open the current task. No rider `jivo://` links are sent yet.
 
 ### 4.4 Publishing (server side)
 The order domain events send the order messages (`apps.orders.tasks.order_event` → `realtime.publish_order_event`):
@@ -465,6 +474,8 @@ The order domain events send the order messages (`apps.orders.tasks.order_event`
 - the ops alert events send `alert`
 
 Phase 5 calls the functions in `apps.realtime`: `publish_rider_location`, `publish_offer`, `publish_offer_withdrawn`, `publish_task_updated`, `publish_rider_status` and `publish_ops_alert` (signatures in the package docstring). Each runs after commit through the `broadcast_ws` task and is best effort.
+
+T-612: every save that creates a `DeliveryTask` or changes its status or rider (`apps.delivery.live`, a `post_save` observer) sends `task.status` to the store's ops group, `rider.status` for the riders concerned and a recomputed `order.eta`. Going online/offline sends `rider.status`. Rider events with a reason (`offer.*`, `task.updated`, `cash.updated`) are sent by the delivery services through `apps.delivery.hooks`, each with its FCM push. New inbox entries send `notification.new` to the group `user.<id>.<app>`, which every app socket joins. Latency: dispatch to `offer.new` on the rider socket is under 3 s (test `test_offer_reaches_the_rider_socket_within_3_seconds`; in production add the `broadcast_ws` queue hop).
 
 ## 5. Background jobs (Celery)
 

@@ -10,8 +10,9 @@ This records the first deployment of the Jivo Quick Commerce backend to the shar
 | Backend stack running on the server (commit `72669d2`) | Done |
 | Database migrated (103 migrations) and demo data seeded | Done |
 | Works locally on the server (health, OTP login, home, cart, admin) | Done |
-| nginx site for `jqc.jivo.in`, HTTP part | Done |
-| HTTPS certificate for `jqc.jivo.in` | **Blocked**: see "What is blocked" |
+| nginx site for `jqc.jivo.in` (HTTP and HTTPS) | Done |
+| HTTPS certificate for `jqc.jivo.in` | Done (2026-11-06, after the user opened port 80): see section 5 |
+| Live site tested from outside (health, admin, ops, API, OTP login, WebSocket, media, TLS) | Done |
 | Other websites on the server | Unchanged (checked before and after every change) |
 | Backups and monitoring | Deferred (D7/D8) |
 
@@ -89,20 +90,48 @@ This records the first deployment of the Jivo Quick Commerce backend to the shar
 - The Celery worker and beat are running scheduled jobs (the dispatch sweep runs every 15 seconds).
 - The other websites are unchanged, and the other 21 containers were not touched.
 
-## 5. What is blocked
+## 5. HTTPS (done 2026-11-06)
 
-**The HTTPS certificate.** Let's Encrypt cannot connect to the server on port 80 ("Timeout during connect"), although the site opens normally from India. A firewall in front of the server blocks it. This also hits the other sites: their automatic renewals failed in October, and their recent certificates were made by hand with the DNS method.
+**First attempt: blocked.** Let's Encrypt could not connect to port 80 ("Timeout during connect") because of the firewall in front of the server. Until then, `https://jqc.jivo.in` showed another site (eximbe.jivo.in). That is why `/ops/` gave a 404 and `/admin/` showed a foreign login page.
 
-To finish, choose one:
-- **Option A: DNS method.** Run `sudo certbot certonly --manual --preferred-challenges dns -d jqc.jivo.in` on the server, and add the TXT record it shows (`_acme-challenge.jqc.jivo.in`) at the jivo.in DNS provider. This must be repeated every 90 days.
-- **Option B: firewall.** Ask the network admin to let Let's Encrypt reach port 80. This needs approval. Renewal then happens automatically.
+**After the user opened port 80:**
+1. **Certificate.**
+   - A certbot dry run passed first.
+   - Then `certbot certonly --webroot -w /srv/jqc/acme -d jqc.jivo.in` issued the certificate, for `jqc.jivo.in` only, using the server's existing Let's Encrypt account.
+   - The only new renewal file is `/etc/letsencrypt/renewal/jqc.jivo.in.conf` (webroot `/srv/jqc/acme`, renew hook `systemctl reload nginx`). No other certificate was touched.
+2. **The certificate itself.**
+   - Subject `CN=jqc.jivo.in` (SAN `jqc.jivo.in`), issued by Let's Encrypt YE1, which chains to ISRG Root X1.
+   - Valid from 2026-11-06 to **2027-02-04**. The chain verifies OK.
+   - It renews automatically through the existing certbot timer. `certbot renew --cert-name jqc.jivo.in --dry-run` reported "all simulated renewals succeeded". Non-interactive renew waits a random 0-8 minutes before contacting the CA; that delay is normal.
+3. **nginx.**
+   - Installed the full `jqc.jivo.in.conf` with the HTTPS block, ran `nginx -t`, then reloaded.
+   - The `nginx -T` diff shows only added lines (the JQC HTTPS block), nothing removed.
+   - All 23 other hostnames returned the same status before and after.
 
-After the certificate exists, the full nginx file (with HTTPS) is installed, tested and reloaded. The site then works at:
-- **Admin:** https://jqc.jivo.in/admin/
+**Live tests from outside (2026-11-06), all passed:**
+
+| Test | Result |
+|---|---|
+| `https://jqc.jivo.in/health/ready` | 200 `{"status":"ok","checks":{"database":"ok","redis":"ok"}}` |
+| `http://` → `https://` | 301 |
+| `/admin/login/` | 200 (login page) |
+| `/admin/` and `/ops/` | 302 to `/admin/login/?next=...` (login required, as expected) |
+| `/static/admin/css/base.css` | 200 |
+| `/api/v1/config/app/` | 200 |
+| Serviceability (Gurugram, Sector 14) | 200, serviceable, store GGN-01, 14-minute ETA |
+| OTP request + verify, `+919000000001` / `123456` | 200 / 200, token issued |
+| `/api/v1/me/`, `/api/v1/cart/`, `/api/v1/orders/` | 200 |
+| `/api/v1/home/` (store 1) | 200, with 45 image URLs under `https://jqc.jivo.in/media/...` |
+| A `/media/` image | 200 `image/webp` |
+| WebSocket `wss://jqc.jivo.in/ws/v1/orders/1/` | Handshake OK. The `auth` first message got `auth.ok`, then `order.status`, then `ping` got `pong` |
+| HSTS header | `max-age=31536000; includeSubDomains` |
+
+The site is live at:
+- **Admin:** https://jqc.jivo.in/admin/ (staff login, then authenticator-app setup on first login)
 - **Ops Console:** https://jqc.jivo.in/ops/
-- **API:** https://jqc.jivo.in/api/v1/
+- **API for the apps:** `https://jqc.jivo.in` (build the staging flavors with `--dart-define=API_BASE_URL=https://jqc.jivo.in`)
 
-**Warning about the other sites:** some of their certificates expire soon and will fail to renew for the same reason:
+**Warning about the other sites (not changed by JQC):** these certificates expire soon. They failed to renew while port 80 was blocked, so check that they renew now that it is open:
 - datasync: Nov 7
 - factory: Nov 9
 - hana2sheets: Nov 10

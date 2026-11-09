@@ -105,6 +105,7 @@ def _locked(user, task_id: int) -> tuple[Rider, Order, DeliveryTask]:
         .get(pk=probe["order_id"])
     )
     task = DeliveryTask.objects.select_for_update(of=("self",)).get(pk=task_id)
+    task.order = order  # cached: the live publish needs no extra query (T-612)
     if task.rider_id != rider.pk:  # reassigned between the lookup and the lock
         raise ApiError(ErrorCode.NOT_FOUND, MSG_TASK_NOT_FOUND)
     return rider, order, task
