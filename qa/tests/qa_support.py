@@ -75,6 +75,12 @@ QA_PHONES = {
     "c": "+919000000103",  # rider-app login, profile tests
     "d": "+919000000104",  # devices / misc
     "e": "+919000000105",  # account deletion
+    # PM-approved P5 stage 2 (2026-11-09), QA instance env only:
+    "f": "+919000000106",  # third rider (ranking with three candidates)
+    "g": "+919000000107",  # PENDING_KYC / REJECTED rider
+    "h": "+919000000108",  # rider to anonymise
+    "i": "+919000000109",  # COD-refusal customer (COD block)
+    "j": "+919000000110",  # spare (P6/P7 inbox and support)
 }
 # Non-test numbers for limit tests: the console SMS backend sends nothing and no Celery worker
 # consumes the QA broker DB, so no SMS ever leaves the machine.

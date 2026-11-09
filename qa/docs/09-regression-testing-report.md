@@ -64,3 +64,6 @@ The smoke set was unaffected.
 
 ## Phase 4 stage 2 (2026-11-04, `f744508`)
 `uv run pytest -m smoke` (P0–P4 🔥, now including the console and QA-02 cases): `98 passed, 2 skipped, 418 deselected in 807.71s`. P3 + P4 SQL invariants after cleanup: `8 passed`.
+
+## P5–P7 stage 2 (2026-11-09, `efb3c3d`): partial
+Smoke P0–P7 not run as a set this session (stopped for a PC shutdown). Regression evidence: P5 partial run 122 passed / 5 failed of 148 (`qa/private/runs/s2-p5-partial-map.txt`), P7 subset 30/30, P6-TC-13 1/1. Re-run the full smoke set next session.

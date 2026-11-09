@@ -291,6 +291,15 @@ def run(step: dict) -> dict:
         if rider.is_online:
             shifts.force_offline(rider.pk, by=by)
             done.append("offline")
+        if step.get("clear_cash", True) and rider.cash_in_hand > 0:
+            # COD deliveries accumulate cash; without a deposit the rider reaches the cash limit
+            # and stops getting COD offers (DL-61 b), which breaks later cases. Deposit it all
+            # through the cash service (as the staff user in `as`), like ops would at day end.
+            from apps.delivery.services import cash
+
+            cash.record_deposit(rider.pk, str(rider.cash_in_hand), by=by, note="QA cleanup deposit")
+            done.append("deposited")
+            rider.refresh_from_db()
         return {"ok": True, "result": {"done": done, **rider_state(rider)}}
     raise SystemExit(f"unknown op {op}")
 

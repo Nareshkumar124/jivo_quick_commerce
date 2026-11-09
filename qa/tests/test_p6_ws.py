@@ -50,7 +50,7 @@ from qa_support import (
     validate_response,
 )
 
-T612 = pytest.mark.skip(reason="T-612 (rider socket events, rider.location, order.eta) not on develop yet")
+T612 = pytest.mark.skip(reason="T-612 merged (d29ed94): implemented in tests/test_p6_t612.py")
 OTP_RE = re.compile(r"\bOTP\s*:?\s*\d{4,6}\b")
 
 
@@ -325,9 +325,30 @@ def test_p6_tc12_no_otp_on_any_snapshot(a):
         assert set(s["data"]) == STATUS_KEYS
 
 
-@pytest.mark.skip(reason="P6-TC-13 needs a spare QA number to deactivate (E is reserved)")
 def test_p6_tc13_deleted_user_4401():
-    """P6-TC-13 placeholder."""
+    """P6-TC-13 a token of a user who deleted the account (spare QA user J, +919000000110, PM-approved
+    2026-11-09) is refused with 4401 on the rider socket, where the same user's live account gets
+    4403 (no rider profile): the auth step itself rejects the deleted user, nothing is sent."""
+    from conftest import request_otp
+    from qa_support import TEST_OTP
+
+    j = login(QA_PHONES["j"], app="rider")
+    live = login(QA_PHONES["j"], app="rider")
+    cust = login(QA_PHONES["j"])
+
+    async def one(token):
+        async with ws_open("/ws/v1/rider/") as ws:
+            await ws.send(json.dumps({"type": "auth", "token": token}))
+            return await until_closed(ws, 4)
+
+    assert run(one(live.access)) == (4403, []), "live non-rider user should be 4403"
+    with httpx.Client(base_url=ORIGIN, timeout=60) as c:
+        assert request_otp(c, QA_PHONES["j"], purpose="delete_account").status_code == 200
+        r = c.post("/api/v1/me/delete/", json={"otp": TEST_OTP, "reason": "QA P6-TC-13"},
+                   headers={**APP_HEADERS, **bearer(cust.access)})
+    assert r.status_code == 200, describe(r)
+    code, msgs = run(one(j.access))
+    assert (code, msgs) == (4401, []), (code, msgs)
 
 
 @T612
@@ -720,6 +741,7 @@ def test_p6_tc49_max_sockets_per_user(a, a_order):
     assert ok_again and ok_again["type"] == "auth.ok", ok_again
 
 
+@pytest.mark.xfail(strict=True, reason="BUG-0020: 1011 instead of 1009 on daphne")
 @pytest.mark.parametrize("when", ["before_auth", "after_auth"])
 def test_p6_tc50_message_over_4096_bytes_1009(a, a_order, when):
     """P6-TC-50 a 5,000-byte message → closed 1009, before and after auth."""

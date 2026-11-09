@@ -27,6 +27,8 @@ OPS = "ops@jivo.test"
 SUPPORT = "support@jivo.test"
 FINANCE = "finance@jivo.test"
 SUPER = "superadmin@jivo.test"
+# QA-only Store Manager scoped to QA-02 (PM-approved, created by QA through the admin 2026-11-09)
+QA02_MANAGER = "qa02.manager@jivo.test"
 CATALOG = "catalog@jivo.test"
 
 _ENV = {
@@ -154,6 +156,11 @@ def stop_worker() -> None:
         subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
 
 
+# Threads pool (P5 stage 2): with --pool=solo the slow socket fan-out tasks (2-6 s each against the
+# remote DB) queue ahead of auto-accept and dispatch countdowns. QA_WORKER_POOL=solo restores it.
+_POOL = "--pool=solo" if os.environ.get("QA_WORKER_POOL") == "solo" else "--pool=threads --concurrency=4"
+
+
 def start_worker(log_name: str) -> None:
     """Start the QA worker detached through Git Bash `nohup` (a child of pytest would die with
     the test run on Windows and leave refunds queued)."""
@@ -164,7 +171,7 @@ def start_worker(log_name: str) -> None:
     envs = " ".join(f"{k}={v!r}" if " " in v else f"{k}='{v}'" for k, v in _ENV.items())
     log = (QA_DIR / "private" / "logs" / log_name).as_posix()
     cmd = (f"cd '{BACKEND.as_posix()}' && unset POSTGRES_HOST POSTGRES_PORT POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD VIRTUAL_ENV; "
-           f"{envs} nohup uv run celery -A config worker --pool=solo --without-heartbeat --without-mingle "
+           f"{envs} nohup uv run celery -A config worker {_POOL} --without-heartbeat --without-mingle "
            f"--without-gossip --loglevel INFO >> '{log}' 2>&1 &")
     subprocess.run(["C:/Program Files/Git/bin/bash.exe", "-c", cmd], timeout=30)
     _t.sleep(12)

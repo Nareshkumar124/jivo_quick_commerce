@@ -9,9 +9,7 @@ Design: `qa/docs/01-test-plan.md` §9 and the P5 cases in `02-test-case-reposito
   QA-02 pin (`offset`).
 - Staff/system actions run through `qa/tools/rider_ops_driver.py` (rider review, dispatch,
   returns) and `qa/tools/store_ops_driver.py` (packing) until the 5.4 Ops Console pages exist.
-- Slice 5.3 cases are gated by `requires_53`: they run only when commit fd1490c is an ancestor
-  of the commit under test **and** the shared DB has `delivery_deliveryoffer` (migration
-  `delivery.0002`, applied by the PM). `QA_P5_53=1` forces them.
+- Slice 5.3 cases carry the `p5_53` marker (selection only; the skip gate was removed in stage 2).
 """
 
 from __future__ import annotations
@@ -45,36 +43,14 @@ from qa_support import (
     instance_commit,
 )
 
-# --------------------------------------------------------------------------- gate for slice 5.3
+# --------------------------------------------------------------------------- slice 5.3 marker
+# The 5.3 skip gate was removed in P5 stage 2 (2026-11-09): slice 5.3 (fd1490c) and 5.4 are on
+# develop and delivery.0002+ is applied to the shared DB. `p5_53` stays as a selection marker only.
 
 P5_53_COMMIT = "fd1490c"  # backend/phase-5: P5 slice 5.3 (T-514a)
+requires_53 = pytest.mark.p5_53
+P5_53 = [pytest.mark.p5_53]
 
-
-def slice_53_ready() -> tuple[bool, str]:
-    if os.environ.get("QA_P5_53") == "1":
-        return True, "forced by QA_P5_53=1"
-    try:
-        commit = instance_commit()
-        ancestor = subprocess.run(
-            ["git", "-C", str(REPO), "merge-base", "--is-ancestor", P5_53_COMMIT, commit],
-            capture_output=True,
-        ).returncode == 0
-    except (OSError, subprocess.CalledProcessError):
-        ancestor = False
-    if not ancestor:
-        return False, f"awaiting P5 slice 5.3 ({P5_53_COMMIT}) on develop"
-    try:
-        table = db_query("select to_regclass('public.delivery_deliveryoffer')")[0][0]
-    except Exception as exc:  # DB unreachable: never run half a flow
-        return False, f"cannot check delivery.0002 ({type(exc).__name__})"
-    if table is None:
-        return False, "awaiting migration delivery.0002 on the shared DB (PM, user approval)"
-    return True, "slice 5.3 present"
-
-
-_READY, _WHY = slice_53_ready()
-requires_53 = pytest.mark.skipif(not _READY, reason=_WHY)
-P5_53 = [pytest.mark.p5_53, requires_53]
 
 # --------------------------------------------------------------------------- places
 
@@ -521,7 +497,13 @@ def bring_to(stage: str, *, shop: Qa02Shop, rider: RiderClient, method: str = "C
     order = shop.place_cod(lines) if method == "COD" else shop.place_online_paid(lines)
     oid = order["id"]
     wait_order_status(oid, "ACCEPTED")  # auto-accept at QA-02 (QA worker)
-    offer = rider.wait_offer()
+    # Wait for this order's own task, so a stale offer of an earlier order is never taken.
+    end = time.monotonic() + 30
+    row = task_row(oid)
+    while row is None and time.monotonic() < end:
+        time.sleep(0.5)
+        row = task_row(oid)
+    offer = rider.wait_offer(task_id=row["id"] if row else None)
     ctx = {"order": order, "order_id": oid, "offer": offer, "task_id": offer["task_id"]}
     if stage == "OFR":
         return ctx

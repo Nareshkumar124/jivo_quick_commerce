@@ -70,3 +70,14 @@ Verified fixes: none yet (first run).
 | O-P5-03 | `shift/start` accepts numeric strings for lat/lng (DRF FloatField coercion); the location batch contract says "JSON numbers". | No harm (judged on the position). Align the contract text or make the field strict. |
 | O-P5-04 | `PUT /rider/bank-account/` normalises a lowercase IFSC to upper case; the response has `upi_id: null` although the schema types it as a non-null string. | Normalising is fine. `null` vs schema: check `RiderBankAccount.upi_id` nullability on the next schema export (strict validation did not fail because the op validated a 200 with upi_id set). |
 | O-P5-05 | `shift/end` with an active task answers code `INVALID_STATE_TRANSITION` with `details.reason = ACTIVE_TASK` (06 §3 wording "409 `ACTIVE_TASK`" reads like a code). | Code is in the doc-06 §6 set; QA oracle updated. Suggest 06 says "reason". |
+
+## Phases 6 and 7, and P5 stage 2 rerun (2026-11-09, develop `efb3c3d`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0020](../bugs/BUG-0020.md) | An oversized socket message closes with 1011 instead of 1009 on the dev server | backend: realtime consumers | P3 Minor (Low) | P2 | django-backend-dev | Open (code unchanged at `efb3c3d`) | P6-TC-50 |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open (xfail still holds at `efb3c3d`) | P5-TC-16 |
+
+**No new bug filed on 2026-11-09.** To investigate (not bugs yet): 5 P5 failures in `test_p5_cash.py` (TC-88 ×2, TC-89 ×2, TC-93), details not captured before the run was stopped; per-broadcast ~2 s latency in the QA worker (performance observation).
+
+**Open by severity:** P0 0 · P1 0 · P2 1 (BUG-0010) · P3 5 (BUG-0006, 0008, 0011, 0013, 0020).
+

@@ -21,7 +21,7 @@ from p5_support import (  # noqa: F401 (fixtures)
 )
 from qa_support import assert_error, clear_throttle, db_query, describe, validate_response
 
-GATED_53 = P5_53[1]  # skipif: slice 5.3 absent
+GATED_53 = pytest.mark.p5_53  # was the 5.3 skip gate (removed in stage 2)
 
 
 def open_shifts(rider_id: int) -> int:

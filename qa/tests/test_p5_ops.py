@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from p4_console import Ops
-from p4_support import CATALOG, FINANCE, MANAGER, OPS, STAFF, SUPER, SUPPORT
+from p4_support import CATALOG, FINANCE, MANAGER, OPS, QA02_MANAGER, STAFF, SUPER, SUPPORT
 from p5_support import (  # noqa: F401 (fixtures)
     P5_53, R1_PHONE, bring_to, p5_shop_a, pickup_code, qa_worker, r1, rider_id_of, task_row,
     wait_task_status, wrong_otp,
@@ -21,8 +21,8 @@ from p5_support import (  # noqa: F401 (fixtures)
 
 pytestmark = P5_53
 
-ALL_ROLES = [SUPER, OPS, MANAGER, STAFF, CATALOG, SUPPORT, FINANCE]
-DISPATCHERS = {SUPER, OPS, MANAGER}  # MANAGER: own store (GGN-01) only
+ALL_ROLES = [SUPER, OPS, MANAGER, QA02_MANAGER, STAFF, CATALOG, SUPPORT, FINANCE]
+DISPATCHERS = {SUPER, OPS, MANAGER, QA02_MANAGER}  # MANAGER: own store (GGN-01) only
 
 
 @pytest.fixture
@@ -108,6 +108,20 @@ def test_p5_tc56_ops_unassign_and_retry(staff, r1, p5_shop_a):
     assert r.status_code in (200, 204, 302), r.status_code
     row = task_row(ctx["order_id"])
     assert row["status"] in ("SEARCHING", "OFFERED", "UNASSIGNED") and row["rider_id"] in (None, rider_id_of(R1_PHONE))
+    assert r1.task().json()["task"] is None
+
+
+@pytest.mark.smoke
+def test_p5_tc113_own_store_manager_unassigns(staff, r1, p5_shop_a):
+    """P5-TC-113 🔥 DL-61 (a): the QA-02 Store Manager (SMQ) may unassign a QA-02 task (own store)."""
+    r1.online_at()
+    ctx = bring_to("ASG", shop=p5_shop_a, rider=r1)
+    s = staff(QA02_MANAGER)
+    assert s.get(f"/ops/dispatch/tasks/{ctx['task_id']}/").status_code == 200
+    r = s.post(f"/ops/dispatch/tasks/{ctx['task_id']}/unassign/", {}, order_id=ctx["order_id"])
+    assert r.status_code in (200, 204, 302), r.status_code
+    row = task_row(ctx["order_id"])
+    assert row["status"] in ("SEARCHING", "OFFERED", "UNASSIGNED"), row
     assert r1.task().json()["task"] is None
 
 

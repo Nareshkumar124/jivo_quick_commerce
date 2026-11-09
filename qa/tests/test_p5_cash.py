@@ -18,7 +18,7 @@ from decimal import Decimal
 
 import pytest
 from p3_support import send_webhook
-from p4_support import CATALOG, FINANCE, MANAGER, OPS, STAFF, SUPER, SUPPORT
+from p4_support import CATALOG, FINANCE, MANAGER, OPS, QA02_MANAGER, STAFF, SUPER, SUPPORT
 from p5_support import (  # noqa: F401 (fixtures)
     QA02,
     QA02_ID,
@@ -304,14 +304,18 @@ def test_p5_tc96_deposit_idempotent(r1, p5_shop_a):
 
 
 @pytest.mark.smoke
-@pytest.mark.parametrize(("role", "allowed"), [(SUPER, True), (OPS, True), (FINANCE, True), (MANAGER, False),
+@pytest.mark.parametrize(("role", "allowed"), [(SUPER, True), (OPS, True), (FINANCE, True), (QA02_MANAGER, True), (MANAGER, False),
                                                (SUPPORT, False), (CATALOG, False), (STAFF, False)])
 def test_p5_tc114_deposit_roles(r1, role, allowed):
     """P5-TC-114 🔥 DL-61 (a): deposits by Super Admin, Ops, Finance (and the store's own manager);
-    Support and others refused. MANAGER is GGN-01 only, so QA-02's rider is out of scope."""
+    Support and others refused. MANAGER is GGN-01 only, so QA-02's rider is out of scope;
+    QA02_MANAGER is the QA-02 Store Manager (own store: allowed)."""
     out = rider_op(op="record_deposit", **{"as": role}, phone=R1_PHONE, amount="0.01")
     if allowed:
-        assert out["ok"] or "cash" in (out.get("message") or "").lower() or out.get("code") == "VALIDATION_ERROR", out
+        # Allowed: the permission check passes; with no cash in hand the amount check refuses
+        # ("The rider has only ₹0.00 in hand."), which is not a permission refusal.
+        msg = (out.get("message") or "").lower()
+        assert out["ok"] or out.get("error") == "ValidationError" and ("in hand" in msg or "cash" in msg), out
     else:
         assert not out["ok"] and out.get("error") in ("PermissionDenied", "ValidationError"), out
 

@@ -152,3 +152,30 @@ Stage 1 was test design only. The plan is `01-test-plan.md` §9 and the 132 case
 - slice 5.4 is not built
 - the QA requests in `01` §9.4 are open: extra QA numbers, a QA-02 store manager, a QA-02 stock top-up
 - 23 doc ambiguities (A1–A23, `01` §9.6) need PM/Jivo answers. A3 (how ops resolve a locked delivery OTP) and A4 (the missing 05 §3 rows) affect P0 cases
+
+## Phases 5, 6 and 7: QA stage 2 (2026-11-09, develop `efb3c3d`, QA instance :8004): **partial run, stopped for a PC shutdown**
+**Environment:** QA worktree `qa/phase-2` with develop `efb3c3d` merged (not committed), `127.0.0.1:8004` (`config.settings.local`, Redis 6380 DB 5/6/7, QA OTP numbers `+919000000101…110`), QA Celery worker on DB 7 (threads pool, 4), shared remote DB. The P5 skip gate was removed (slice 5.3/5.4 on develop). PM-approved QA set-up done: numbers 106–110 (instance env only), QA-02 Store Manager `qa02.manager@jivo.test` (created through the admin as Super Admin; Store Manager group, QA-02 access only), P4 QA-02 shopper moved from user D to user B. QA-02 stock top-up was not needed (JV-SUN-1L 67, JV-FLAX-250 110 on hand).
+
+**What ran:**
+- P5: `uv run pytest tests/test_p5_*.py` stopped after **148 of 226** tests: 122 passed, 18 skipped, 3 xfail (known bugs), **5 failed** (`test_p5_cash`: TC-88 ×2, TC-89 ×2, TC-93). The failure details were not printed before the stop (pytest prints them at the end), so their cause is **not analysed** and no bug is filed. Per case: **52 ✅, 4 ❌** (TC-88, 89, 93; TC-16 = BUG-0013), the rest not reached (files `test_p5_kyc` tail, `ops`, `security`, `shift`, `task_flow` were partly or not run in this session; the 2026-11-06 runs in `private/runs/p5-final-*` passed most of them on an earlier build).
+- P6: TC-13 (deleted user's token → 4401) ✅. The T-612 suite (`test_p6_t612.py`, incl. new TC-59 polling-fallback parity) and the T-611 regression were **not run** this session. BUG-0020 (TC-50) confirmed still in the code (static check); TC-50 now `xfail(strict)`.
+- P7: rider-free subset `uv run pytest tests/test_p7.py -k "<18 cases>"` → **30 passed, 0 failed** after one test-side fix (TC-15 accepted only SigV4 URLs; local MinIO signs SigV2 with a 600 s `Expires`). Cases ✅: TC-10, 11, 12, 15–22, 24–27, 32 (dashboard roles and store scope), 35, 36 (support SLA). Not run: ratings (TC-01–08), TC-13/14, TC-22b, TC-23 (DL-65 oracle), TC-30, dashboard KPIs/alerts/charts (TC-31, 33, 34).
+- No 500 or traceback in the instance or worker log during 30 min of P5 traffic.
+
+| Phase | Verdict | Why |
+|---|---|---|
+| **5** | **Not ready (gate incomplete)** | 5 P5 tests failed (COD UPI QR TC-88/89, unlock TC-93), cause not yet analysed; 78 tests not run this session; BUG-0013 (P3) open; device cases P5-TC-19, 33, 124, 131 pending. No P0/P1 bug open (BUG-0012 verified). |
+| **6** | **Not ready (gate incomplete)** | T-612 cases (TC-14–16, 21–26, 34, 58, 59) not run this session; BUG-0020 (P3) open; device cases TC-17, TC-57 pending; profile cases TC-09, 20, 32, 33, 44 still ⏭. |
+| **7** | **Not ready (gate incomplete)** | Executed P7 cases all pass (18/18), but ratings, DL-65 sales oracle, dashboard KPIs/alerts, erasure not yet run; admin P7 screens not merged (TC-40); device cases TC-37–39 pending. No P7 bug found so far. |
+
+**Open bugs by severity:** P0 0 · P1 0 · P2 1 (BUG-0010) · P3 5 (BUG-0006, 0008, 0011, 0013, 0020). **No new bug filed in this session.**
+
+**Observation (performance, local only):** each `realtime.broadcast_ws` / `publish_*` task takes a flat ~2 s in the QA worker (an order event fans out in 6–8 s). Against 09 §1 (offer < 3 s, location → map < 5 s) this needs a check on staging; on this machine it may be the remote DB or the Windows Redis channel layer. Not filed.
+
+**Next session, in order:**
+1. Start the instance (`bash qa/private/qa_instance.sh start local`) and worker; check R1/R2 are offline with 0 cash (`cleanup_rider` now deposits leftover cash, which caused "no offer within 25 s" failures earlier: R1 had reached ₹4,560 of ₹5,000).
+2. `uv run pytest tests/test_p5_cash.py -k "tc88 or tc89 or tc93" -rfE` and analyse the 5 failures; file bugs if real.
+3. Finish P5: `test_p5_kyc.py` (rest), `test_p5_ops.py` (incl. new SMQ case), `test_p5_security.py`, `test_p5_shift.py`, `test_p5_task_flow.py`, `test_p5_final.py`, `test_p5_db.py`; then timer profiles (`dispatchfast`, `riderclock`, `triggerplaced`).
+4. P6: `uv run pytest tests/test_p6_ws.py tests/test_p6_t612.py`.
+5. P7: the remaining `tests/test_p7.py` cases (ratings, TC-22b, 23, 30, 31, 33, 34).
+6. 🔥 smoke P0–P7, then update 03–09.
