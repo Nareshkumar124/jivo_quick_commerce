@@ -1,4 +1,6 @@
 import 'package:customer_app/app/repositories.dart';
+import 'package:customer_app/features/tracking/data/order_socket.dart';
+import 'package:customer_app/features/tracking/presentation/order_live.dart';
 import 'package:customer_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -15,10 +17,12 @@ Widget harness(
   List<Override> overrides = const [],
   TextScaler textScaler = TextScaler.noScaling,
   bool cartAvailable = true,
+  OrderRealtime realtime = const DisabledOrderRealtime(),
 }) => ProviderScope(
   retry: noAutomaticRetry,
   overrides: [
     cartAvailableProvider.overrideWithValue(cartAvailable),
+    orderRealtimeProvider.overrideWithValue(realtime),
     ...overrides,
   ],
   child: MaterialApp(

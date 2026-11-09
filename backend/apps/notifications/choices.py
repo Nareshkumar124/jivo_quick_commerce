@@ -7,6 +7,7 @@ class NotificationCategory(models.TextChoices):
     ORDER = "order", "Order updates"
     PROMO = "promo", "Offers"
     SYSTEM = "system", "Account and app"
+    SUPPORT = "support", "Help and support"  # Phase 7: support ticket replies
 
 
 class Channel(models.TextChoices):

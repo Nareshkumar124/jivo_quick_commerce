@@ -1,11 +1,12 @@
 /// A rider push, parsed from the FCM data payload.
 ///
-/// TODO(api): the payload is not in the contract yet. Assumed until the
-/// backend defines it (P5 slice 5.3 sender, api-requests): `type` uses the
-/// rider WebSocket message names from 06 §4 (`offer.new`, `offer.withdrawn`,
-/// `task.updated`), with `offer_id` / `task_id` as decimal strings (FCM data
-/// values are strings). Unknown types are ignored, so the server can add
-/// types without breaking older apps.
+/// The payload is 06 §4.3 (api-requests #41): `type` is the rider socket
+/// message name (`offer.new`, `offer.withdrawn`, `task.updated`,
+/// `cash.updated`) or `ticket` (a support reply, P7), with `offer_id` /
+/// `task_id` / `ticket_id` as decimal strings (FCM data values are
+/// strings).
+/// Unknown types are ignored, so the server can add types without breaking
+/// older apps.
 sealed class RiderPush {
   const RiderPush();
 
@@ -23,6 +24,11 @@ sealed class RiderPush {
             : OfferWithdrawnPush(offerId);
       case 'task.updated':
         return TaskUpdatedPush(id('task_id'));
+      case 'cash.updated':
+        return const CashUpdatedPush();
+      case 'ticket':
+        final ticketId = id('ticket_id');
+        return ticketId == null ? const UnknownPush() : TicketPush(ticketId);
       default:
         return const UnknownPush();
     }
@@ -51,6 +57,20 @@ class TaskUpdatedPush extends RiderPush {
   const TaskUpdatedPush(this.taskId);
 
   final int? taskId;
+}
+
+/// `cash.updated`: a staff deposit or adjustment, or the deposit-required
+/// flag. Tapped, it opens the cash ledger.
+class CashUpdatedPush extends RiderPush {
+  const CashUpdatedPush();
+}
+
+/// `ticket`: support replied on ticket [ticketId]. Tapped, it opens the
+/// ticket (`jivo://rider/help/tickets/{id}`).
+class TicketPush extends RiderPush {
+  const TicketPush(this.ticketId);
+
+  final int ticketId;
 }
 
 class UnknownPush extends RiderPush {

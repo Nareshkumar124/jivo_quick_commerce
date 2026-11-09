@@ -44,7 +44,13 @@ abstract final class Routes {
   static const payouts = '/payouts';
   static const cash = '/cash';
   static const history = '/history';
+
+  /// One past task, e.g. `/history/7001`.
+  static String historyDetail(int taskId) => '$history/$taskId';
   static const profile = '/profile';
+
+  /// ACTIVE riders: the in-app inbox (P6).
+  static const inbox = '/inbox';
   static const profileDocuments = '/profile/documents';
 
   /// An ACTIVE rider re-uploads one rejected (or missing) document, e.g.
@@ -52,12 +58,53 @@ abstract final class Routes {
   static String profileDocumentCapture(String wireValue) =>
       '$profileDocuments/${wireValue.toLowerCase()}';
 
+  /// ACTIVE riders, between orders (P7): help and support (screen 20),
+  /// tickets, "My rating" and the legal pages.
+  static const help = '/help';
+  static const tickets = '/help/tickets';
+  static String ticket(int id) => '$tickets/$id';
+
+  /// The new-ticket form, optionally with a topic code and the task or
+  /// payout it is about, plus how to show that record
+  /// (`/help/tickets/new?topic=TASK&task=7001&label=JV-...`).
+  static String newTicket({
+    String? topic,
+    int? taskId,
+    int? payoutId,
+    String? label,
+  }) => Uri(
+    path: '$tickets/new',
+    queryParameters: {
+      'topic': ?topic,
+      'task': ?taskId?.toString(),
+      'payout': ?payoutId?.toString(),
+      'label': ?label,
+    },
+  ).toString();
+  static const rating = '/rating';
+
+  /// A CMS legal page, e.g. `/legal/privacy`.
+  static String legal(String slug) => '/legal/$slug';
+
+  /// Help and support, "My rating" and the legal pages: on the real API in
+  /// every flavor (P7), so ACTIVE riders reach them even in builds where
+  /// the rest of the rider records are still gated.
+  static bool isSupportRoute(String location) => [
+    help,
+    rating,
+    '/legal',
+  ].any((root) => location == root || location.startsWith('$root/'));
+
   static bool isAccountRoute(String location) => [
     earnings,
     payouts,
     cash,
     history,
     profile,
+    inbox,
+    help,
+    rating,
+    '/legal',
   ].any((root) => location == root || location.startsWith('$root/'));
 
   /// Permissions gate (04 §2.1, screen 7) and the prominent location

@@ -6,22 +6,22 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../helpers/test_app.dart';
 
-/// The notification inbox (Phase 6 lookahead on fake data).
+/// The notification inbox (`/me/notifications/*`, P6).
 void main() {
   Future<TestApp> openInbox(
     WidgetTester tester,
-    NotificationRepository repo,
-  ) async {
+    NotificationRepository repo, {
+    void Function()? onAccount,
+  }) async {
     final app = TestApp(
       tokens: signedInTokens,
-      extraOverrides: [
-        notificationRepositoryProvider.overrideWithValue(repo),
-        trackingAvailableProvider.overrideWithValue(false),
-      ],
+      notifications: repo,
+      extraOverrides: [trackingAvailableProvider.overrideWithValue(false)],
     );
     await app.pump(tester);
     await tester.tap(find.byTooltip('Account'));
     await tester.pumpAndSettle();
+    onAccount?.call();
     await tester.tap(find.byKey(const Key('account-notifications')));
     await tester.pumpAndSettle();
     return app;
@@ -48,9 +48,14 @@ void main() {
   });
 
   testWidgets('a failed load offers retry', (tester) async {
-    final repo = FakeNotificationRepository()
-      ..failNext = const ApiError(code: ApiErrorCode.network);
-    await openInbox(tester, repo);
+    final repo = FakeNotificationRepository();
+    // After the account row's badge has loaded.
+    await openInbox(
+      tester,
+      repo,
+      onAccount: () =>
+          repo.failNext = const ApiError(code: ApiErrorCode.network),
+    );
     expect(find.text('Retry'), findsOneWidget);
     await tester.tap(find.text('Retry'));
     await tester.pumpAndSettle();

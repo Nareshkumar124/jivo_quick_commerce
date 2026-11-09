@@ -16,6 +16,7 @@ from apps.cart.serializers import (
     DeliveryInstructionsSerializer,
 )
 from apps.catalog.serializers import ImageSetSerializer, money
+from apps.delivery.choices import DeliveryTaskStatus
 from apps.orders.choices import (
     ActorType,
     CancelReason,
@@ -26,6 +27,7 @@ from apps.orders.choices import (
     OrderStatus,
     PaymentMethod,
     PaymentStatus,
+    RatingTag,
     ReorderIssueReason,
 )
 
@@ -144,6 +146,79 @@ class OrderRefundSerializer(serializers.Serializer):
     processed_at = serializers.DateTimeField(allow_null=True)
 
 
+class OrderRatingSerializer(serializers.Serializer):
+    """The customer's rating of a delivered order (Phase 7)."""
+
+    order_stars = serializers.IntegerField(min_value=1, max_value=5)
+    rider_stars = serializers.IntegerField(
+        min_value=1, max_value=5, allow_null=True, help_text="Null when the rider was not rated."
+    )
+    tags = serializers.ListField(child=serializers.ChoiceField(choices=RatingTag.choices))
+    comment = serializers.CharField(allow_blank=True, help_text="Plain text; may be empty.")
+    created_at = serializers.DateTimeField()
+
+
+class OrderRatingCreateSerializer(serializers.Serializer):
+    order_stars = serializers.IntegerField(min_value=1, max_value=5, help_text="1 to 5 stars.")
+    rider_stars = serializers.IntegerField(
+        min_value=1,
+        max_value=5,
+        required=False,
+        allow_null=True,
+        help_text="Optional: 1 to 5 stars for the rider who delivered the order.",
+    )
+    tags = serializers.ListField(
+        child=serializers.ChoiceField(choices=RatingTag.choices),
+        required=False,
+        max_length=len(RatingTag.choices),
+        help_text=(
+            "Optional tags. The app offers ON_TIME, WELL_PACKED, FRESH_PRODUCTS and "
+            "POLITE_RIDER for 4-5 stars and LATE_DELIVERY, DAMAGED_ITEMS, MISSING_ITEMS and "
+            "RUDE_RIDER for 1-3 (not enforced). POLITE_RIDER and RUDE_RIDER need `rider_stars`."
+        ),
+    )
+    comment = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=500,
+        trim_whitespace=True,
+        help_text="Optional, plain text, at most 500 characters.",
+    )
+
+
+class RiderRatingTagCountSerializer(serializers.Serializer):
+    tag = serializers.ChoiceField(choices=RatingTag.choices)
+    count = serializers.IntegerField()
+
+
+class RiderRatingItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField(help_text="Use as `before_id` for older ratings.")
+    stars = serializers.IntegerField(min_value=1, max_value=5)
+    tags = serializers.ListField(child=serializers.ChoiceField(choices=RatingTag.choices))
+    rated_at = serializers.DateTimeField()
+    order_number = serializers.CharField()
+
+
+class RiderRatingsPageSerializer(serializers.Serializer):
+    """The rider's own ratings (Phase 7, rider app request). No customer details, no comments."""
+
+    rating_avg = serializers.DecimalField(
+        max_digits=2,
+        decimal_places=1,
+        allow_null=True,
+        coerce_to_string=True,
+        help_text='Average stars, one decimal ("4.8"); null until the first rating.',
+    )
+    ratings_count = serializers.IntegerField()
+    tag_counts = RiderRatingTagCountSerializer(
+        many=True, help_text="Tags customers chose for the rider, most frequent first."
+    )
+    results = RiderRatingItemSerializer(many=True, help_text="Newest first.")
+    next = serializers.URLField(
+        allow_null=True, help_text="The next (older) page, `?before_id=`; null at the end."
+    )
+
+
 class OrderSerializer(serializers.Serializer):
     """An order with its bill. The bill is a snapshot made by `compute_bill()` at placement."""
 
@@ -208,6 +283,13 @@ class OrderSerializer(serializers.Serializer):
         help_text=(
             "True when `GET /orders/{id}/invoice/` has an invoice: DELIVERED orders (Phase 4)."
         )
+    )
+    # Phase 7 (additive)
+    can_rate = serializers.BooleanField(
+        help_text="True when `POST /orders/{id}/rating/` is allowed: DELIVERED and not rated yet."
+    )
+    rating = OrderRatingSerializer(
+        allow_null=True, help_text="The customer's rating once given; null before (Phase 7)."
     )
 
 
@@ -424,6 +506,17 @@ class OrderTrackSerializer(serializers.Serializer):
     eta_at = serializers.DateTimeField(
         allow_null=True, help_text="Promised delivery time (08 §8); null once the order ended."
     )
+    live_eta_at = serializers.DateTimeField(
+        allow_null=True,
+        help_text=(
+            "The live ETA (08 §8), recomputed now from the order and task status and the "
+            "rider's latest position; the same value `order.eta` pushes on the order socket. "
+            "Null once the order ended."
+        ),
+    )
+    live_eta_minutes = serializers.IntegerField(
+        allow_null=True, help_text="Minutes from `server_time` to `live_eta_at`, at least 1."
+    )
     store = TrackStoreSerializer()
     destination = TrackPointSerializer(help_text="The delivery pin.")
     rider = TrackRiderSerializer(
@@ -435,6 +528,15 @@ class OrderTrackSerializer(serializers.Serializer):
         help_text=(
             "The 4-digit OTP to give the rider, only while OUT_FOR_DELIVERY; null otherwise. "
             "Never share it before the rider arrives."
+        ),
+    )
+    task_status = serializers.ChoiceField(
+        choices=DeliveryTaskStatus.choices,
+        allow_null=True,
+        help_text=(
+            "The order's delivery task status (SEARCHING, OFFERED, ASSIGNED, AT_STORE, "
+            "PICKED_UP, AT_CUSTOMER, DELIVERED, FAILED, ...); null while no task exists "
+            "(before dispatch starts)."
         ),
     )
     server_time = serializers.DateTimeField()

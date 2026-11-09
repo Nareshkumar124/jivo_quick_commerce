@@ -23,7 +23,11 @@ from apps.payments.choices import WebhookResult
 from apps.payments.gateways import get_gateway, refund_receipt
 from apps.payments.models import Payment, PaymentWebhookEvent, Refund, RefundStatus
 from apps.payments.refunds import record_refund_status
-from apps.payments.serializers import RAZORPAY_ORDER_ID_PATTERN, RAZORPAY_PAYMENT_ID_PATTERN
+from apps.payments.serializers import (
+    RAZORPAY_ORDER_ID_PATTERN,
+    RAZORPAY_PAYMENT_ID_PATTERN,
+    RAZORPAY_QR_ID_PATTERN,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +119,13 @@ def _gateway_id(value, pattern: str) -> str:
 
 def _dispatch(event: dict) -> str:
     kind = event.get("event")
+    if kind == "qr_code.credited":
+        return _qr_credited(event)
     if kind == "payment.captured":
         entity = _entity(event, "payment")
+        if entity.get("order_id") is None:
+            # A COD UPI QR payment: handled by its `qr_code.credited` event.
+            return WebhookResult.IGNORED
         gateway_order_id = _gateway_id(entity["order_id"], RAZORPAY_ORDER_ID_PATTERN)
         payment_id = _gateway_id(entity["id"], RAZORPAY_PAYMENT_ID_PATTERN)
         payment = Payment.objects.filter(gateway_order_id=gateway_order_id).first()
@@ -152,6 +161,25 @@ def _dispatch(event: dict) -> str:
         record_refund_status(refund, kind.split(".", 1)[1], gateway_refund_id)
         return WebhookResult.PROCESSED
     return WebhookResult.IGNORED
+
+
+def _qr_credited(event: dict) -> str:
+    """A payment on a COD UPI QR (P5 slice 5.4, `apps.delivery.services.cod_qr`): the QR becomes
+    PAID, or the payment is refunded automatically when it was not needed."""
+    from apps.delivery.services import cod_qr
+
+    qr_id = _gateway_id(_entity(event, "qr_code")["id"], RAZORPAY_QR_ID_PATTERN)
+    payment = _entity(event, "payment")
+    if payment.get("status") != "captured":
+        return WebhookResult.IGNORED
+    result = cod_qr.record_credit(
+        qr_id,
+        payment_id=_gateway_id(payment["id"], RAZORPAY_PAYMENT_ID_PATTERN),
+        amount_paise=int(payment["amount"]),
+        method=payment.get("method") or "upi",
+        raw=payment,
+    )
+    return WebhookResult.PROCESSED if result in ("paid", "refunded") else WebhookResult.IGNORED
 
 
 def _refund_by_receipt(entity: dict) -> Refund | None:

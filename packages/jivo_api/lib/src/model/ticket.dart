@@ -34,6 +34,10 @@ class Ticket {
 
     required this.orderNumber,
 
+    required this.taskId,
+
+    required this.payoutId,
+
     required this.lastMessage,
 
     required this.createdAt,
@@ -72,8 +76,17 @@ class Ticket {
   @JsonKey(name: r'order_id', required: true, includeIfNull: true)
   final int? orderId;
 
+  /// The order's number; for a rider ticket about a task, that task's order.
   @JsonKey(name: r'order_number', required: true, includeIfNull: true)
   final String? orderNumber;
+
+  /// Rider tickets: the task it is about (Phase 7).
+  @JsonKey(name: r'task_id', required: true, includeIfNull: true)
+  final int? taskId;
+
+  /// Rider tickets: the payout it is about (Phase 7).
+  @JsonKey(name: r'payout_id', required: true, includeIfNull: true)
+  final int? payoutId;
 
   /// The newest message, cut to 140 characters (plain text).
   @JsonKey(name: r'last_message', required: true, includeIfNull: true)
@@ -103,6 +116,8 @@ class Ticket {
           other.status == status &&
           other.orderId == orderId &&
           other.orderNumber == orderNumber &&
+          other.taskId == taskId &&
+          other.payoutId == payoutId &&
           other.lastMessage == lastMessage &&
           other.createdAt == createdAt &&
           other.updatedAt == updatedAt &&
@@ -117,6 +132,8 @@ class Ticket {
       status.hashCode +
       (orderId == null ? 0 : orderId.hashCode) +
       (orderNumber == null ? 0 : orderNumber.hashCode) +
+      (taskId == null ? 0 : taskId.hashCode) +
+      (payoutId == null ? 0 : payoutId.hashCode) +
       (lastMessage == null ? 0 : lastMessage.hashCode) +
       createdAt.hashCode +
       updatedAt.hashCode +

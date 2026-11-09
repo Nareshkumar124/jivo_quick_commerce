@@ -64,6 +64,7 @@ OrderTrack orderTrackFromApi(api.OrderTrack t) {
             updatedAt: rider.updatedAt,
           ),
     deliveryOtp: otp == null || otp.isEmpty ? null : otp,
+    taskStatus: DeliveryTaskStatus.fromWire(t.taskStatus?.value),
   );
 }
 
@@ -87,16 +88,22 @@ class UnavailableTrackRepository implements TrackRepository {
 
 /// Fake tracking for the lookahead UI (`FAKE_API=true` and tests): each
 /// fetch moves the order on — confirmed, packing, then the rider rides from
-/// the store to the customer in [ridePings] steps, then delivered.
+/// the store to the customer in [ridePings] steps (the last one at the
+/// door, task `AT_CUSTOMER`), then delivered; with [failDelivery], delivery
+/// failed and then returned instead.
 class FakeTrackRepository implements TrackRepository {
   FakeTrackRepository({
     this.ridePings = 6,
     DateTime Function()? clock,
     this.startStep = 0,
+    this.failDelivery = false,
   }) : _clock = clock ?? DateTime.now;
 
   final int ridePings;
   final int startStep;
+
+  /// End in DELIVERY_FAILED, then RETURNED, instead of DELIVERED.
+  final bool failDelivery;
   final DateTime Function() _clock;
   final _steps = <int, int>{};
 
@@ -121,9 +128,22 @@ class FakeTrackRepository implements TrackRepository {
       0 => OrderStatus.accepted,
       1 => OrderStatus.packing,
       _ when riding < ridePings => OrderStatus.outForDelivery,
-      _ => OrderStatus.delivered,
+      _ when !failDelivery => OrderStatus.delivered,
+      _ when riding == ridePings => OrderStatus.deliveryFailed,
+      _ => OrderStatus.returned,
     };
     final out = status == OrderStatus.outForDelivery;
+    final ended = !status.isActive;
+    final task = switch (status) {
+      OrderStatus.accepted => DeliveryTaskStatus.searching,
+      OrderStatus.packing => DeliveryTaskStatus.assigned,
+      OrderStatus.outForDelivery when riding == ridePings - 1 =>
+        DeliveryTaskStatus.atCustomer,
+      OrderStatus.outForDelivery => DeliveryTaskStatus.pickedUp,
+      OrderStatus.deliveryFailed => DeliveryTaskStatus.returning,
+      OrderStatus.returned => DeliveryTaskStatus.returned,
+      _ => DeliveryTaskStatus.delivered,
+    };
     final fraction = out ? riding / ridePings : 0.0;
     return OrderTrack(
       orderId: orderId,
@@ -132,10 +152,10 @@ class FakeTrackRepository implements TrackRepository {
       storeName: 'Jivo Connaught Place',
       store: store,
       destination: home,
-      etaAt: status == OrderStatus.delivered
+      etaAt: ended || status == OrderStatus.deliveryFailed
           ? null
           : now.add(Duration(minutes: out ? (ridePings - riding) * 2 : 14)),
-      rider: step == 0
+      rider: step == 0 || ended
           ? null
           : TrackRider(
               name: 'Ravi Kumar',
@@ -149,6 +169,7 @@ class FakeTrackRepository implements TrackRepository {
               updatedAt: now,
             ),
       deliveryOtp: out ? '4821' : null,
+      taskStatus: task,
     );
   }
 }

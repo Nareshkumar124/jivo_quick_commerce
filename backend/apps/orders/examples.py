@@ -75,6 +75,9 @@ _ORDER = {
     "amount_refunded": "0.00",
     "refunds": [],
     "can_download_invoice": False,
+    # Phase 7 (additive)
+    "can_rate": False,
+    "rating": None,
 }
 
 
@@ -249,6 +252,7 @@ ORDER_DELIVERED = {
     "payment_status": "COD_COLLECTED",
     "can_cancel": False,
     "can_download_invoice": True,
+    "can_rate": True,
     "timeline": [
         *ORDER_COD_PLACED["timeline"],
         step("ACCEPTED", "Order confirmed", "2026-11-03T06:30:20Z"),
@@ -265,6 +269,51 @@ PHASE4_ORDERS = (
     ORDER_CANCELLED_BY_STORE,
     ORDER_DELIVERED,
 )
+# Phase 7: ratings.
+RATING_REQUEST = {
+    "order_stars": 5,
+    "rider_stars": 5,
+    "tags": ["ON_TIME", "WELL_PACKED", "POLITE_RIDER"],
+    "comment": "Quick delivery, thank you!",
+}
+RATING_ORDER_ONLY_REQUEST = {"order_stars": 2, "tags": ["DAMAGED_ITEMS"], "comment": ""}
+RATING = {
+    "order_stars": 5,
+    "rider_stars": 5,
+    "tags": ["ON_TIME", "WELL_PACKED", "POLITE_RIDER"],
+    "comment": "Quick delivery, thank you!",
+    "created_at": "2026-11-03T07:02:00Z",
+}
+RATING_ORDER_ONLY = {
+    "order_stars": 2,
+    "rider_stars": None,
+    "tags": ["DAMAGED_ITEMS"],
+    "comment": "",
+    "created_at": "2026-11-03T07:02:00Z",
+}
+ORDER_DELIVERED_RATED = {**ORDER_DELIVERED, "can_rate": False, "rating": RATING}
+RIDER_RATINGS = {
+    "rating_avg": "4.8",
+    "ratings_count": 41,
+    "tag_counts": [{"tag": "POLITE_RIDER", "count": 30}, {"tag": "ON_TIME", "count": 22}],
+    "results": [
+        {
+            "id": 812,
+            "stars": 5,
+            "tags": ["ON_TIME", "POLITE_RIDER"],
+            "rated_at": "2026-11-03T07:02:00Z",
+            "order_number": "JV-261103-000123",
+        }
+    ],
+    "next": "https://api.jivo.example/api/v1/rider/ratings/?before_id=812",
+}
+RIDER_RATINGS_EMPTY = {
+    "rating_avg": None,
+    "ratings_count": 0,
+    "tag_counts": [],
+    "results": [],
+    "next": None,
+}
 ORDER_CANCEL_CHANGED_MIND_REQUEST = {"reason": "CHANGED_MIND"}
 
 INVOICE = {
@@ -403,6 +452,8 @@ TRACK_PACKING = {
     **_TRACK,
     "status": "PACKING",
     "eta_at": "2026-11-10T09:58:00Z",
+    "live_eta_at": "2026-11-10T09:57:00Z",
+    "live_eta_minutes": 12,
     "rider": {
         "name": "Ravi K.",
         "phone": None,
@@ -415,8 +466,16 @@ TRACK_PACKING = {
         "updated_at": "2026-11-10T09:44:55Z",
     },
     "delivery_otp": None,
+    "task_status": "ASSIGNED",
 }
-TRACK_NO_RIDER = {**TRACK_PACKING, "status": "ACCEPTED", "rider": None}
+TRACK_NO_RIDER = {
+    **TRACK_PACKING,
+    "status": "ACCEPTED",
+    "rider": None,
+    "task_status": "SEARCHING",
+    "live_eta_at": "2026-11-10T10:00:00Z",
+    "live_eta_minutes": 15,
+}
 TRACK_OUT_FOR_DELIVERY = {
     **TRACK_PACKING,
     "status": "OUT_FOR_DELIVERY",
@@ -427,5 +486,16 @@ TRACK_OUT_FOR_DELIVERY = {
         "lng": 77.0570,
     },
     "delivery_otp": "4821",
+    "task_status": "PICKED_UP",
+    "live_eta_at": "2026-11-10T09:52:00Z",
+    "live_eta_minutes": 7,
 }
-TRACK_DELIVERED = {**TRACK_PACKING, "status": "DELIVERED", "eta_at": None, "rider": None}
+TRACK_DELIVERED = {
+    **TRACK_PACKING,
+    "status": "DELIVERED",
+    "eta_at": None,
+    "live_eta_at": None,
+    "live_eta_minutes": None,
+    "rider": None,
+    "task_status": "DELIVERED",
+}

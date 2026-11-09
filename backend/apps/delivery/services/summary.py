@@ -2,7 +2,6 @@
 part: online time from shifts (5.2), deliveries (5.3), earnings (5.4)."""
 
 from datetime import datetime, time, timedelta
-from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -31,12 +30,26 @@ def online_seconds(rider, start: datetime, end: datetime, now: datetime) -> int:
     return total
 
 
+def delivered_count(rider, start: datetime, end: datetime) -> int:
+    from apps.delivery.choices import DeliveryTaskStatus
+    from apps.delivery.models import DeliveryTask
+
+    return DeliveryTask.objects.filter(
+        rider=rider,
+        status=DeliveryTaskStatus.DELIVERED,
+        delivered_at__gte=start,
+        delivered_at__lt=end,
+    ).count()
+
+
 def today(rider, now: datetime) -> dict:
+    from apps.delivery.services.earnings import total_for
+
     start, end, day = ist_day_bounds(now)
     return {
         "date": day,
-        "orders_delivered": 0,  # slice 5.3: tasks delivered today
-        "earnings": money_str(Decimal("0.00")),  # slice 5.4: RiderEarning of today
+        "orders_delivered": delivered_count(rider, start, end),
+        "earnings": money_str(total_for(rider, start, end)),
         "cash_in_hand": money_str(rider.cash_in_hand),
         "online_seconds": online_seconds(rider, start, end, now),
     }

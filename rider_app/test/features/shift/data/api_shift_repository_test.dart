@@ -24,6 +24,7 @@ Map<String, Object?> _shiftState({
     'cash_in_hand': '5200.00',
     'cash_limit': '5000.00',
     'limit_reached': prepaidOnly,
+    'deposit_required': prepaidOnly,
   },
   'location': locationSettingsJson,
   'server_time': '2026-11-04T10:00:00Z',
@@ -160,6 +161,7 @@ const _riderMe = {
     'cash_in_hand': '1840.00',
     'cash_limit': '5000.00',
     'limit_reached': false,
+    'deposit_required': false,
   },
   'today': {
     'date': '2026-11-04',

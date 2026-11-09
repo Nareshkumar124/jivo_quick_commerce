@@ -2575,7 +2575,7 @@ abstract class AppLocalizations {
   /// Tracking: OTP guidance.
   ///
   /// In en, this message translates to:
-  /// **'Share this code with the rider only when you receive your order.'**
+  /// **'Share this with your rider at the door, only when you receive your order.'**
   String get trackingOtpHint;
 
   /// Route sketch: the store end.
@@ -2619,6 +2619,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unread'**
   String get notificationUnread;
+
+  /// Inbox app-bar action.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all as read'**
+  String get notificationsMarkAllRead;
+
+  /// Screen reader: the unread badge on the account row.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 unread notification} other{{count} unread notifications}}'**
+  String notificationsUnreadCount(int count);
+
+  /// Inbox footer when the next page fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load more notifications.'**
+  String get notificationsLoadMoreFailed;
 
   /// Order line: units the store marked unavailable (08 T8a).
   ///
@@ -2763,6 +2781,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{stars, plural, =1{You rated this order 1 star} other{You rated this order {stars} stars}}'**
   String ratedOrder(int stars);
+
+  /// Rated order: the customer's rider rating.
+  ///
+  /// In en, this message translates to:
+  /// **'{stars, plural, =1{You rated the delivery partner 1 star} other{You rated the delivery partner {stars} stars}}'**
+  String ratedRider(int stars);
 
   /// Help screen title and account row.
   ///
@@ -2920,6 +2944,90 @@ abstract class AppLocalizations {
   /// **'Send'**
   String get ticketSend;
 
+  /// Ticket: add a photo to the message.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photo'**
+  String get ticketAddPhoto;
+
+  /// New ticket: the photos section.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos (optional, up to {max})'**
+  String ticketPhotosHint(int max);
+
+  /// Ticket photo source: camera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get ticketPhotoCamera;
+
+  /// Ticket photo source: gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get ticketPhotoGallery;
+
+  /// Ticket: remove a picked photo.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove photo {number}'**
+  String ticketPhotoRemove(int number);
+
+  /// Ticket thread: a message photo (semantic label).
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {number}'**
+  String ticketPhotoOpen(int number);
+
+  /// Ticket thread: a photo that failed to load (signed links expire).
+  ///
+  /// In en, this message translates to:
+  /// **'Photo unavailable. Pull down to refresh.'**
+  String get ticketPhotoUnavailable;
+
+  /// Ticket photo: wrong type.
+  ///
+  /// In en, this message translates to:
+  /// **'This file type isn\'t supported. Choose a JPEG, PNG or WebP photo.'**
+  String get ticketPhotoUnsupported;
+
+  /// Ticket photo: over the API limit.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is larger than {mb} MB. Choose a smaller one.'**
+  String ticketPhotoTooLarge(int mb);
+
+  /// Ticket photo: too many photos.
+  ///
+  /// In en, this message translates to:
+  /// **'You can add up to {max} photos to a message.'**
+  String ticketPhotoTooMany(int max);
+
+  /// Ticket photo: the server refused the size (HTTP 413).
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is too large to upload. Try a smaller photo or a screenshot of it.'**
+  String get ticketPhotoRejectedSize;
+
+  /// Ticket photo: the picker failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the camera or gallery. Check the app\'s permissions and try again.'**
+  String get ticketPhotoPickFailed;
+
+  /// New ticket: the text of the message that carries the photos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos of the issue'**
+  String get ticketPhotosMessage;
+
+  /// New ticket: created, photo upload failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket created, but the photos weren\'t added. {reason} You can add them from the ticket.'**
+  String ticketPhotosNotAdded(String reason);
+
   /// Ticket issue type.
   ///
   /// In en, this message translates to:
@@ -3021,6 +3129,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Payment service is unavailable right now. Try again, or choose Cash on Delivery.'**
   String get onlinePaymentUnavailable;
+
+  /// Tracking/order detail: task PICKED_UP (order OUT_FOR_DELIVERY).
+  ///
+  /// In en, this message translates to:
+  /// **'Order picked up'**
+  String get deliveryStagePickedUpTitle;
+
+  /// Tracking/order detail: picked-up explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider has your order and is on the way.'**
+  String get deliveryStagePickedUpBody;
+
+  /// Tracking/order detail: task AT_CUSTOMER.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider is arriving'**
+  String get deliveryStageArrivingTitle;
+
+  /// Tracking/order detail: arriving explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider has reached your location. Keep your delivery OTP ready.'**
+  String get deliveryStageArrivingBody;
+
+  /// Tracking/order detail: order DELIVERY_FAILED.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery failed'**
+  String get deliveryStageFailedTitle;
+
+  /// Tracking/order detail: delivery-failed explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t deliver your order. The items are going back to the store.'**
+  String get deliveryStageFailedBody;
+
+  /// Tracking/order detail: order RETURNED.
+  ///
+  /// In en, this message translates to:
+  /// **'Order returned'**
+  String get deliveryStageReturnedTitle;
+
+  /// Tracking/order detail: returned explanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your items are back at the store.'**
+  String get deliveryStageReturnedBody;
+
+  /// Failed/returned delivery: payment_status REFUND_PENDING.
+  ///
+  /// In en, this message translates to:
+  /// **'Your refund has started. It goes back to your original payment method.'**
+  String get refundNoteStarted;
+
+  /// Failed/returned delivery: payment_status REFUNDED or PARTIALLY_REFUNDED; amount is the server's amount_refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} refunded to your original payment method.'**
+  String refundNoteDone(String amount);
+
+  /// Cash on delivery: the server's bill grand total to hand to the rider.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {amount} to the rider'**
+  String codPayRiderTitle(String amount);
+
+  /// Cash on delivery: how to pay.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery. Pay by cash or UPI when your order arrives.'**
+  String get codPayRiderHint;
 }
 
 class _AppLocalizationsDelegate

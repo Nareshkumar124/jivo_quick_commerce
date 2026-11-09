@@ -18,19 +18,25 @@ part 'ticket_reply_request.g.dart';
 )
 class TicketReplyRequest {
   /// Returns a new [TicketReplyRequest] instance.
-  TicketReplyRequest({required this.message});
+  TicketReplyRequest({required this.message, this.attachmentKeys});
 
   /// Plain text, 1 to 1000 characters after trimming.
   @JsonKey(name: r'message', required: true, includeIfNull: false)
   final String message;
 
+  /// Optional, at most 3: keys returned by `POST /support/tickets/{id}/attachments/` for this ticket by the caller in the last hour, not yet used by another message (Phase 7).
+  @JsonKey(name: r'attachment_keys', required: false, includeIfNull: false)
+  final List<String>? attachmentKeys;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is TicketReplyRequest && other.message == message;
+      other is TicketReplyRequest &&
+          other.message == message &&
+          other.attachmentKeys == attachmentKeys;
 
   @override
-  int get hashCode => message.hashCode;
+  int get hashCode => message.hashCode + attachmentKeys.hashCode;
 
   factory TicketReplyRequest.fromJson(Map<String, dynamic> json) =>
       _$TicketReplyRequestFromJson(json);

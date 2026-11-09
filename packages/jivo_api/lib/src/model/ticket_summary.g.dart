@@ -19,6 +19,10 @@ abstract class _$TicketSummaryCWProxy {
 
   TicketSummary orderNumber(String? orderNumber);
 
+  TicketSummary taskId(int? taskId);
+
+  TicketSummary payoutId(int? payoutId);
+
   TicketSummary lastMessage(String? lastMessage);
 
   TicketSummary createdAt(DateTime createdAt);
@@ -38,6 +42,8 @@ abstract class _$TicketSummaryCWProxy {
     TicketStatusEnum status,
     int? orderId,
     String? orderNumber,
+    int? taskId,
+    int? payoutId,
     String? lastMessage,
     DateTime createdAt,
     DateTime updatedAt,
@@ -71,6 +77,12 @@ class _$TicketSummaryCWProxyImpl implements _$TicketSummaryCWProxy {
       this(orderNumber: orderNumber);
 
   @override
+  TicketSummary taskId(int? taskId) => this(taskId: taskId);
+
+  @override
+  TicketSummary payoutId(int? payoutId) => this(payoutId: payoutId);
+
+  @override
   TicketSummary lastMessage(String? lastMessage) =>
       this(lastMessage: lastMessage);
 
@@ -94,6 +106,8 @@ class _$TicketSummaryCWProxyImpl implements _$TicketSummaryCWProxy {
     Object? status = const $CopyWithPlaceholder(),
     Object? orderId = const $CopyWithPlaceholder(),
     Object? orderNumber = const $CopyWithPlaceholder(),
+    Object? taskId = const $CopyWithPlaceholder(),
+    Object? payoutId = const $CopyWithPlaceholder(),
     Object? lastMessage = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
     Object? updatedAt = const $CopyWithPlaceholder(),
@@ -123,6 +137,14 @@ class _$TicketSummaryCWProxyImpl implements _$TicketSummaryCWProxy {
           ? _value.orderNumber
           // ignore: cast_nullable_to_non_nullable
           : orderNumber as String?,
+      taskId: taskId == const $CopyWithPlaceholder()
+          ? _value.taskId
+          // ignore: cast_nullable_to_non_nullable
+          : taskId as int?,
+      payoutId: payoutId == const $CopyWithPlaceholder()
+          ? _value.payoutId
+          // ignore: cast_nullable_to_non_nullable
+          : payoutId as int?,
       lastMessage: lastMessage == const $CopyWithPlaceholder()
           ? _value.lastMessage
           // ignore: cast_nullable_to_non_nullable
@@ -163,6 +185,8 @@ TicketSummary _$TicketSummaryFromJson(Map<String, dynamic> json) =>
             'status',
             'order_id',
             'order_number',
+            'task_id',
+            'payout_id',
             'last_message',
             'created_at',
             'updated_at',
@@ -189,6 +213,8 @@ TicketSummary _$TicketSummaryFromJson(Map<String, dynamic> json) =>
           ),
           orderId: $checkedConvert('order_id', (v) => (v as num?)?.toInt()),
           orderNumber: $checkedConvert('order_number', (v) => v as String?),
+          taskId: $checkedConvert('task_id', (v) => (v as num?)?.toInt()),
+          payoutId: $checkedConvert('payout_id', (v) => (v as num?)?.toInt()),
           lastMessage: $checkedConvert('last_message', (v) => v as String?),
           createdAt: $checkedConvert(
             'created_at',
@@ -204,6 +230,8 @@ TicketSummary _$TicketSummaryFromJson(Map<String, dynamic> json) =>
       fieldKeyMap: const {
         'orderId': 'order_id',
         'orderNumber': 'order_number',
+        'taskId': 'task_id',
+        'payoutId': 'payout_id',
         'lastMessage': 'last_message',
         'createdAt': 'created_at',
         'updatedAt': 'updated_at',
@@ -218,6 +246,8 @@ Map<String, dynamic> _$TicketSummaryToJson(TicketSummary instance) =>
       'status': _$TicketStatusEnumEnumMap[instance.status]!,
       'order_id': instance.orderId,
       'order_number': instance.orderNumber,
+      'task_id': instance.taskId,
+      'payout_id': instance.payoutId,
       'last_message': instance.lastMessage,
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),
@@ -231,6 +261,9 @@ const _$TicketCategoryEnumEnumMap = {
   TicketCategoryEnum.PAYMENT_REFUND: 'PAYMENT_REFUND',
   TicketCategoryEnum.ACCOUNT: 'ACCOUNT',
   TicketCategoryEnum.OTHER: 'OTHER',
+  TicketCategoryEnum.TASK: 'TASK',
+  TicketCategoryEnum.PAYOUT: 'PAYOUT',
+  TicketCategoryEnum.CASH: 'CASH',
   TicketCategoryEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

@@ -30,7 +30,16 @@ class RatingFormState {
   /// Why the last submit failed.
   final Object? error;
 
-  bool get canSubmit => orderStars > 0 && !submitting;
+  /// Order stars are picked, and a rider tag comes with rider stars (the
+  /// server refuses POLITE_RIDER / RUDE_RIDER without them).
+  bool get canSubmit =>
+      orderStars > 0 &&
+      !submitting &&
+      (riderStars != null || !tags.any((tag) => tag.needsRider));
+
+  /// The tags the form offers now.
+  List<RatingTag> get offeredTags =>
+      RatingTag.forStars(orderStars, riderRated: riderStars != null);
 
   RatingFormState copyWith({
     int? orderStars,
@@ -48,7 +57,7 @@ class RatingFormState {
   );
 }
 
-/// Rates one delivered order (`03 §2.10`, P7 lookahead).
+/// Rates one delivered order (`03 §2.10`, P7).
 class RatingFormController extends Notifier<RatingFormState> {
   RatingFormController(this.orderId);
 
@@ -60,7 +69,10 @@ class RatingFormController extends Notifier<RatingFormState> {
   /// Picks the order's stars. Tags that don't fit the new rating (a
   /// "late delivery" tag after switching to 5 stars) are dropped.
   void setOrderStars(int stars) {
-    final offered = RatingTag.forStars(stars).toSet();
+    final offered = RatingTag.forStars(
+      stars,
+      riderRated: state.riderStars != null,
+    ).toSet();
     state = state.copyWith(
       orderStars: stars,
       tags: state.tags.intersection(offered),
@@ -71,7 +83,9 @@ class RatingFormController extends Notifier<RatingFormState> {
   void setRiderStars(int stars) =>
       state = state.copyWith(riderStars: stars, clearError: true);
 
+  /// Toggles an offered tag (a rider tag only once the rider is rated).
   void toggleTag(RatingTag tag) {
+    if (!state.offeredTags.contains(tag)) return;
     final tags = {...state.tags};
     if (!tags.remove(tag)) tags.add(tag);
     state = state.copyWith(tags: tags, clearError: true);

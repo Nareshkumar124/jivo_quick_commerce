@@ -43,6 +43,8 @@ abstract class _$RiderTaskCWProxy {
 
   RiderTask deliveryOtp(DeliveryOtpState deliveryOtp);
 
+  RiderTask pickupCode(PickupCodeState pickupCode);
+
   RiderTask codQr(CodQr? codQr);
 
   RiderTask assignedAt(DateTime assignedAt);
@@ -90,6 +92,7 @@ abstract class _$RiderTaskCWProxy {
     String estimatedPayout,
     TaskGeofence geofence,
     DeliveryOtpState deliveryOtp,
+    PickupCodeState pickupCode,
     CodQr? codQr,
     DateTime assignedAt,
     DateTime? arrivedStoreAt,
@@ -174,6 +177,10 @@ class _$RiderTaskCWProxyImpl implements _$RiderTaskCWProxy {
       this(deliveryOtp: deliveryOtp);
 
   @override
+  RiderTask pickupCode(PickupCodeState pickupCode) =>
+      this(pickupCode: pickupCode);
+
+  @override
   RiderTask codQr(CodQr? codQr) => this(codQr: codQr);
 
   @override
@@ -237,6 +244,7 @@ class _$RiderTaskCWProxyImpl implements _$RiderTaskCWProxy {
     Object? estimatedPayout = const $CopyWithPlaceholder(),
     Object? geofence = const $CopyWithPlaceholder(),
     Object? deliveryOtp = const $CopyWithPlaceholder(),
+    Object? pickupCode = const $CopyWithPlaceholder(),
     Object? codQr = const $CopyWithPlaceholder(),
     Object? assignedAt = const $CopyWithPlaceholder(),
     Object? arrivedStoreAt = const $CopyWithPlaceholder(),
@@ -322,6 +330,10 @@ class _$RiderTaskCWProxyImpl implements _$RiderTaskCWProxy {
           ? _value.deliveryOtp
           // ignore: cast_nullable_to_non_nullable
           : deliveryOtp as DeliveryOtpState,
+      pickupCode: pickupCode == const $CopyWithPlaceholder()
+          ? _value.pickupCode
+          // ignore: cast_nullable_to_non_nullable
+          : pickupCode as PickupCodeState,
       codQr: codQr == const $CopyWithPlaceholder()
           ? _value.codQr
           // ignore: cast_nullable_to_non_nullable
@@ -405,6 +417,7 @@ RiderTask _$RiderTaskFromJson(Map<String, dynamic> json) => $checkedCreate(
         'estimated_payout',
         'geofence',
         'delivery_otp',
+        'pickup_code',
         'cod_qr',
         'assigned_at',
         'arrived_store_at',
@@ -481,6 +494,10 @@ RiderTask _$RiderTaskFromJson(Map<String, dynamic> json) => $checkedCreate(
         'delivery_otp',
         (v) => DeliveryOtpState.fromJson(v as Map<String, dynamic>),
       ),
+      pickupCode: $checkedConvert(
+        'pickup_code',
+        (v) => PickupCodeState.fromJson(v as Map<String, dynamic>),
+      ),
       codQr: $checkedConvert(
         'cod_qr',
         (v) => v == null ? null : CodQr.fromJson(v as Map<String, dynamic>),
@@ -546,6 +563,7 @@ RiderTask _$RiderTaskFromJson(Map<String, dynamic> json) => $checkedCreate(
     'distanceKm': 'distance_km',
     'estimatedPayout': 'estimated_payout',
     'deliveryOtp': 'delivery_otp',
+    'pickupCode': 'pickup_code',
     'codQr': 'cod_qr',
     'assignedAt': 'assigned_at',
     'arrivedStoreAt': 'arrived_store_at',
@@ -578,6 +596,7 @@ Map<String, dynamic> _$RiderTaskToJson(RiderTask instance) => <String, dynamic>{
   'estimated_payout': instance.estimatedPayout,
   'geofence': instance.geofence.toJson(),
   'delivery_otp': instance.deliveryOtp.toJson(),
+  'pickup_code': instance.pickupCode.toJson(),
   'cod_qr': instance.codQr?.toJson(),
   'assigned_at': instance.assignedAt.toIso8601String(),
   'arrived_store_at': instance.arrivedStoreAt?.toIso8601String(),

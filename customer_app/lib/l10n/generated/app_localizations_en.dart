@@ -1474,7 +1474,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trackingOtpHint =>
-      'Share this code with the rider only when you receive your order.';
+      'Share this with your rider at the door, only when you receive your order.';
 
   @override
   String get trackingMapStore => 'Store';
@@ -1499,6 +1499,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationUnread => 'Unread';
+
+  @override
+  String get notificationsMarkAllRead => 'Mark all as read';
+
+  @override
+  String notificationsUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread notifications',
+      one: '1 unread notification',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsLoadMoreFailed =>
+      'Couldn\'t load more notifications.';
 
   @override
   String orderLineUnavailable(int count) {
@@ -1599,6 +1617,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String ratedRider(int stars) {
+    String _temp0 = intl.Intl.pluralLogic(
+      stars,
+      locale: localeName,
+      other: 'You rated the delivery partner $stars stars',
+      one: 'You rated the delivery partner 1 star',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get helpTitle => 'Help & support';
 
   @override
@@ -1681,6 +1710,64 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ticketSend => 'Send';
 
   @override
+  String get ticketAddPhoto => 'Add photo';
+
+  @override
+  String ticketPhotosHint(int max) {
+    return 'Photos (optional, up to $max)';
+  }
+
+  @override
+  String get ticketPhotoCamera => 'Take a photo';
+
+  @override
+  String get ticketPhotoGallery => 'Choose from gallery';
+
+  @override
+  String ticketPhotoRemove(int number) {
+    return 'Remove photo $number';
+  }
+
+  @override
+  String ticketPhotoOpen(int number) {
+    return 'Photo $number';
+  }
+
+  @override
+  String get ticketPhotoUnavailable =>
+      'Photo unavailable. Pull down to refresh.';
+
+  @override
+  String get ticketPhotoUnsupported =>
+      'This file type isn\'t supported. Choose a JPEG, PNG or WebP photo.';
+
+  @override
+  String ticketPhotoTooLarge(int mb) {
+    return 'This photo is larger than $mb MB. Choose a smaller one.';
+  }
+
+  @override
+  String ticketPhotoTooMany(int max) {
+    return 'You can add up to $max photos to a message.';
+  }
+
+  @override
+  String get ticketPhotoRejectedSize =>
+      'This photo is too large to upload. Try a smaller photo or a screenshot of it.';
+
+  @override
+  String get ticketPhotoPickFailed =>
+      'Couldn\'t open the camera or gallery. Check the app\'s permissions and try again.';
+
+  @override
+  String get ticketPhotosMessage => 'Photos of the issue';
+
+  @override
+  String ticketPhotosNotAdded(String reason) {
+    return 'Ticket created, but the photos weren\'t added. $reason You can add them from the ticket.';
+  }
+
+  @override
   String get ticketMissingItems => 'Missing items';
 
   @override
@@ -1734,4 +1821,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get onlinePaymentUnavailable =>
       'Payment service is unavailable right now. Try again, or choose Cash on Delivery.';
+
+  @override
+  String get deliveryStagePickedUpTitle => 'Order picked up';
+
+  @override
+  String get deliveryStagePickedUpBody =>
+      'Your rider has your order and is on the way.';
+
+  @override
+  String get deliveryStageArrivingTitle => 'Rider is arriving';
+
+  @override
+  String get deliveryStageArrivingBody =>
+      'Your rider has reached your location. Keep your delivery OTP ready.';
+
+  @override
+  String get deliveryStageFailedTitle => 'Delivery failed';
+
+  @override
+  String get deliveryStageFailedBody =>
+      'We couldn\'t deliver your order. The items are going back to the store.';
+
+  @override
+  String get deliveryStageReturnedTitle => 'Order returned';
+
+  @override
+  String get deliveryStageReturnedBody => 'Your items are back at the store.';
+
+  @override
+  String get refundNoteStarted =>
+      'Your refund has started. It goes back to your original payment method.';
+
+  @override
+  String refundNoteDone(String amount) {
+    return '$amount refunded to your original payment method.';
+  }
+
+  @override
+  String codPayRiderTitle(String amount) {
+    return 'Pay $amount to the rider';
+  }
+
+  @override
+  String get codPayRiderHint =>
+      'Cash on delivery. Pay by cash or UPI when your order arrives.';
 }

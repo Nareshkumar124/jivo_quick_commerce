@@ -53,6 +53,10 @@ abstract class _$OrderCWProxy {
 
   Order canDownloadInvoice(bool canDownloadInvoice);
 
+  Order canRate(bool canRate);
+
+  Order rating(OrderRating? rating);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `Order(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -83,6 +87,8 @@ abstract class _$OrderCWProxy {
     String amountRefunded,
     List<OrderRefund> refunds,
     bool canDownloadInvoice,
+    bool canRate,
+    OrderRating? rating,
   });
 }
 
@@ -170,6 +176,12 @@ class _$OrderCWProxyImpl implements _$OrderCWProxy {
       this(canDownloadInvoice: canDownloadInvoice);
 
   @override
+  Order canRate(bool canRate) => this(canRate: canRate);
+
+  @override
+  Order rating(OrderRating? rating) => this(rating: rating);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `Order(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -200,6 +212,8 @@ class _$OrderCWProxyImpl implements _$OrderCWProxy {
     Object? amountRefunded = const $CopyWithPlaceholder(),
     Object? refunds = const $CopyWithPlaceholder(),
     Object? canDownloadInvoice = const $CopyWithPlaceholder(),
+    Object? canRate = const $CopyWithPlaceholder(),
+    Object? rating = const $CopyWithPlaceholder(),
   }) {
     return Order(
       id: id == const $CopyWithPlaceholder()
@@ -294,6 +308,14 @@ class _$OrderCWProxyImpl implements _$OrderCWProxy {
           ? _value.canDownloadInvoice
           // ignore: cast_nullable_to_non_nullable
           : canDownloadInvoice as bool,
+      canRate: canRate == const $CopyWithPlaceholder()
+          ? _value.canRate
+          // ignore: cast_nullable_to_non_nullable
+          : canRate as bool,
+      rating: rating == const $CopyWithPlaceholder()
+          ? _value.rating
+          // ignore: cast_nullable_to_non_nullable
+          : rating as OrderRating?,
     );
   }
 }
@@ -338,6 +360,8 @@ Order _$OrderFromJson(Map<String, dynamic> json) => $checkedCreate(
         'amount_refunded',
         'refunds',
         'can_download_invoice',
+        'can_rate',
+        'rating',
       ],
     );
     final val = Order(
@@ -432,6 +456,12 @@ Order _$OrderFromJson(Map<String, dynamic> json) => $checkedCreate(
         'can_download_invoice',
         (v) => v as bool,
       ),
+      canRate: $checkedConvert('can_rate', (v) => v as bool),
+      rating: $checkedConvert(
+        'rating',
+        (v) =>
+            v == null ? null : OrderRating.fromJson(v as Map<String, dynamic>),
+      ),
     );
     return val;
   },
@@ -449,6 +479,7 @@ Order _$OrderFromJson(Map<String, dynamic> json) => $checkedCreate(
     'canRetryPayment': 'can_retry_payment',
     'amountRefunded': 'amount_refunded',
     'canDownloadInvoice': 'can_download_invoice',
+    'canRate': 'can_rate',
   },
 );
 
@@ -476,6 +507,8 @@ Map<String, dynamic> _$OrderToJson(Order instance) => <String, dynamic>{
   'amount_refunded': instance.amountRefunded,
   'refunds': instance.refunds.map((e) => e.toJson()).toList(),
   'can_download_invoice': instance.canDownloadInvoice,
+  'can_rate': instance.canRate,
+  'rating': instance.rating?.toJson(),
 };
 
 const _$OrderStatusEnumEnumMap = {

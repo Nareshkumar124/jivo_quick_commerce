@@ -68,6 +68,19 @@ PAGES = {
         "working days.</p><ul><li>Cancelled orders are refunded in full.</li><li>Items the "
         "store could not supply are refunded automatically.</li></ul>",
     ),
+    "rider-agreement": (
+        "Delivery Partner Agreement",
+        "<h1>Delivery Partner Agreement</h1><p>This agreement sets out how you deliver Jivo "
+        "orders as an independent delivery partner.</p><ul><li>Earnings are paid weekly.</li>"
+        "<li>Cash collected must be deposited at the store.</li></ul>"
+        f"<p>Questions? Write to {SUPPORT_LINK}.</p>",
+    ),
+    "rider-location-disclosure": (
+        "Location Use",
+        "<h1>How we use your location</h1><p>While you are online, the Jivo Rider app collects "
+        "your location, also in the background, to offer you nearby orders and show customers "
+        "where their order is.</p><p>Location is not collected while you are offline.</p>",
+    ),
 }
 
 FAQS = [

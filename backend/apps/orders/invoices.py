@@ -111,7 +111,9 @@ def tax_lines(order: Order) -> list[TaxLine]:
     return lines
 
 
-def _intra_state(order: Order) -> bool:
+def is_intra_state(order: Order) -> bool:
+    """True when the place of supply (the delivery address's state) is the store's state:
+    CGST + SGST; otherwise IGST. Shared by the invoice and the GST reports."""
     state = (order.address_snapshot or {}).get("state", "")
     return state.strip().lower() == (order.store.state or "").strip().lower()
 
@@ -138,7 +140,7 @@ def ensure_invoice(order_id: int) -> Invoice:
         lines = tax_lines(order)
         taxable = sum((line.taxable for line in lines), ZERO)
         tax = sum((line.tax for line in lines), ZERO)
-        if _intra_state(order):
+        if is_intra_state(order):
             cgst = round_money(tax / 2)
             sgst, igst = tax - cgst, ZERO
         else:

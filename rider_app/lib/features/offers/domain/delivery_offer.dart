@@ -3,7 +3,7 @@ import '../../task/domain/rider_task.dart';
 /// A pending order offer (04 §2.4, 07 §2.8 `DeliveryOffer`), as
 /// `GET /rider/offers/current/` and the `offer.new` push carry it.
 ///
-/// TODO(api): hand-written until the rider contract lands (end of P4).
+/// Mirrors the `RiderOffer` schema of the slice 5.3 contract.
 class DeliveryOffer {
   const DeliveryOffer({
     required this.id,
@@ -14,9 +14,17 @@ class DeliveryOffer {
     required this.estimatedPayout,
     required this.expiresAt,
     this.codAmount,
+    this.taskId,
+    this.itemCount,
   });
 
   final int id;
+
+  /// The task this offer is for (`task_id`).
+  final int? taskId;
+
+  /// Units in the bag (`item_count`).
+  final int? itemCount;
   final String storeName;
 
   /// Locality only, never the full address (revealed on accept).
@@ -87,9 +95,7 @@ class OfferCountdown {
   bool isExpired(DateTime now) => remaining(now) == Duration.zero;
 }
 
-/// Why the rider declined (04 §2.4: optional).
-///
-/// TODO(api): wire values assumed.
+/// Why the rider declined (04 §2.4: optional; `OfferRejectReasonEnum`).
 enum OfferRejectReason {
   tooFar('TOO_FAR'),
   vehicleIssue('VEHICLE_ISSUE'),

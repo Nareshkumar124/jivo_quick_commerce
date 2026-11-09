@@ -1451,6 +1451,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get inboxTitle => 'Notifications';
+
+  @override
+  String get inboxEmpty => 'No notifications yet.';
+
+  @override
+  String get inboxMarkAllRead => 'Mark all read';
+
+  @override
+  String get inboxMarkAllFailed => 'Could not mark them read. Try again.';
+
+  @override
+  String inboxUnreadBadge(String count) {
+    return '$count unread';
+  }
+
+  @override
   String get historyTitle => 'History';
 
   @override
@@ -1914,4 +1931,348 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get shiftEndedByOpsBody =>
       'Jivo operations set you offline. Go online again when you are ready, or call support.';
+
+  @override
+  String pickupCodeWrongLeft(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count tries left.',
+      one: '1 try left.',
+    );
+    return 'That code doesn\'t match this order. $_temp0';
+  }
+
+  @override
+  String get pickupCodeLocked =>
+      'Too many wrong codes. Ask the store staff or call support to hand over this order.';
+
+  @override
+  String get pickupLockedTitle => 'Code entry locked';
+
+  @override
+  String get pickupCallStore => 'Call store';
+
+  @override
+  String get riderOfflineError =>
+      'You are offline. Go online again to continue.';
+
+  @override
+  String get failWaitNotElapsed =>
+      'Wait 10 minutes at the drop location before choosing this.';
+
+  @override
+  String get failNeedsCalls => 'Call the customer at least 2 times first.';
+
+  @override
+  String codAmountChangedCollect(String amount) {
+    return 'The amount changed. Collect exactly $amount.';
+  }
+
+  @override
+  String get codUpiNotConfirmed =>
+      'The UPI payment isn\'t confirmed yet. Wait for it, or collect cash.';
+
+  @override
+  String scanOtherOrder(String orderNumber) {
+    return 'This bag is for order $orderNumber, not this one.';
+  }
+
+  @override
+  String get taskReturnWaiting => 'Checking with the store every few seconds…';
+
+  @override
+  String offerItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String cashDepositSkippedBody(String limit) {
+    return 'A cash order was not sent to you because it would take your cash over the limit of $limit. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.';
+  }
+
+  @override
+  String cashDepositWhere(String store) {
+    return 'Deposit cash with the store manager at $store. It shows here once they record it.';
+  }
+
+  @override
+  String get earningsOrdersTruncated =>
+      'Showing the latest 200 orders. The totals above include all orders in these dates.';
+
+  @override
+  String get historyDetailTitle => 'Order details';
+
+  @override
+  String get historyAssignedAt => 'Accepted';
+
+  @override
+  String get historyPickedUpAt => 'Picked up';
+
+  @override
+  String get historyDeliveredAt => 'Delivered';
+
+  @override
+  String get historyFailedAt => 'Delivery failed';
+
+  @override
+  String get historyReturnedAt => 'Returned to store';
+
+  @override
+  String get historyCancelledAt => 'Cancelled';
+
+  @override
+  String historyItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get historyPaymentCod => 'Cash on delivery';
+
+  @override
+  String get historyPaymentPrepaid => 'Prepaid';
+
+  @override
+  String historyCodCollected(String amount) {
+    return 'Collected $amount';
+  }
+
+  @override
+  String get historyEarned => 'You earned';
+
+  @override
+  String get taskChipDontRingBell => 'Don\'t ring the bell';
+
+  @override
+  String get taskChipLeaveAtDoor => 'Leave at the door';
+
+  @override
+  String get taskChipAvoidCalling => 'Avoid calling';
+
+  @override
+  String get helpTitle => 'Help and support';
+
+  @override
+  String get helpProfileSubtitle => 'FAQs, tickets and legal pages';
+
+  @override
+  String get helpRaiseTicket => 'Raise a ticket';
+
+  @override
+  String get helpFaqTitle => 'Questions riders ask';
+
+  @override
+  String get helpFaqEmpty =>
+      'No questions here yet. Raise a ticket and our team will help.';
+
+  @override
+  String get legalTitle => 'Legal';
+
+  @override
+  String get legalRiderAgreement => 'Rider agreement';
+
+  @override
+  String get legalPrivacy => 'Privacy policy';
+
+  @override
+  String get legalLocationDisclosure => 'How we use your location';
+
+  @override
+  String get legalEmpty => 'This page is empty.';
+
+  @override
+  String get legalNotPublished => 'This page is not available yet.';
+
+  @override
+  String get legalOpenInBrowser => 'Open in browser';
+
+  @override
+  String legalUpdatedOn(String date) {
+    return 'Updated $date';
+  }
+
+  @override
+  String get ticketsTitle => 'My tickets';
+
+  @override
+  String get ticketsEmpty => 'You have not raised any tickets.';
+
+  @override
+  String get newTicketTitle => 'Raise a ticket';
+
+  @override
+  String get newTicketTopic => 'What do you need help with?';
+
+  @override
+  String get ticketTopicTask => 'An order';
+
+  @override
+  String get ticketTopicPayout => 'A payout';
+
+  @override
+  String get ticketTopicCash => 'Cash deposit';
+
+  @override
+  String get ticketTopicAccount => 'My account';
+
+  @override
+  String get ticketTopicOther => 'Something else';
+
+  @override
+  String ticketLinkedOrder(String number) {
+    return 'Order $number';
+  }
+
+  @override
+  String ticketLinkedPayout(String period) {
+    return 'Payout $period';
+  }
+
+  @override
+  String get ticketDescribe => 'Tell us what happened';
+
+  @override
+  String ticketTooShort(int count) {
+    return 'Write at least $count characters.';
+  }
+
+  @override
+  String get ticketTooLong => 'This is too long. Shorten it a little.';
+
+  @override
+  String get ticketSend => 'Send';
+
+  @override
+  String ticketSent(String number) {
+    return 'Ticket $number sent. We will reply here.';
+  }
+
+  @override
+  String ticketUpdated(String when) {
+    return 'Last update $when';
+  }
+
+  @override
+  String get ticketStatusOpen => 'Open';
+
+  @override
+  String get ticketStatusInProgress => 'In progress';
+
+  @override
+  String get ticketStatusResolved => 'Resolved';
+
+  @override
+  String get ticketStatusClosed => 'Closed';
+
+  @override
+  String get ticketReplyHint => 'Write a reply';
+
+  @override
+  String get ticketClosedNote =>
+      'This ticket is closed. Raise a new ticket if you still need help.';
+
+  @override
+  String get ticketFromYou => 'You';
+
+  @override
+  String get ticketFromSupport => 'Jivo support';
+
+  @override
+  String get historyGetHelp => 'Get help with this order';
+
+  @override
+  String get payoutGetHelp => 'Get help';
+
+  @override
+  String get ticketAddPhoto => 'Add a photo';
+
+  @override
+  String get ticketPhotoCamera => 'Take a photo';
+
+  @override
+  String get ticketPhotoGallery => 'Choose from gallery';
+
+  @override
+  String ticketPhoto(int index) {
+    return 'Photo $index';
+  }
+
+  @override
+  String ticketPhotoRemove(int index) {
+    return 'Remove photo $index';
+  }
+
+  @override
+  String get ticketPhotoTooLarge =>
+      'This photo is too large. Try another photo.';
+
+  @override
+  String get ticketPhotoUnreadable =>
+      'This file is not a photo we can use. Try another photo.';
+
+  @override
+  String ticketPhotoLimit(int count) {
+    return 'You can add up to $count photos to one reply.';
+  }
+
+  @override
+  String get ticketPhotoNeedsText =>
+      'Write a short message to send with the photo.';
+
+  @override
+  String get ratingTitle => 'My rating';
+
+  @override
+  String get ratingNoneYet =>
+      'No ratings yet. Customers can rate you after each delivery.';
+
+  @override
+  String ratingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'From $count ratings',
+      one: 'From 1 rating',
+      zero: 'No ratings yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String ratingStars(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count stars',
+      one: '1 star',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get ratingTagOnTime => 'On time';
+
+  @override
+  String get ratingTagPolite => 'Polite';
+
+  @override
+  String get ratingTagLate => 'Late';
+
+  @override
+  String get ratingTagRude => 'Rude';
+
+  @override
+  String get ratingTagOther => 'Other';
 }

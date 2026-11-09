@@ -28,5 +28,9 @@ class InboxNotificationSerializer(serializers.ModelSerializer):
         return obj.link
 
 
+class UnreadCountSerializer(serializers.Serializer):
+    unread = serializers.IntegerField(help_text="Unread inbox entries for this app.")
+
+
 class ReadAllResultSerializer(serializers.Serializer):
     updated = serializers.IntegerField(help_text="How many entries were unread and are now read.")

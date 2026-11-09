@@ -2,24 +2,33 @@ import 'package:flutter/foundation.dart';
 
 /// Quick tags on an order rating (`03 §2.10` "1–5 stars + tags").
 ///
-/// TODO(api): the tag codes are the app's proposal for
-/// `POST /orders/{id}/rating/` (`06 §2.6`, P7); the backend confirms them.
+/// The codes are the contract's `RatingTagEnum` (`orders_rating_create`).
+/// POLITE_RIDER and RUDE_RIDER need `rider_stars`: the server refuses them
+/// without it (400 `details.tags`), so they are offered only once the
+/// rider has been rated ([needsRider]).
 enum RatingTag {
   onTime('ON_TIME', positive: true),
   wellPacked('WELL_PACKED', positive: true),
   freshProducts('FRESH_PRODUCTS', positive: true),
-  politeRider('POLITE_RIDER', positive: true),
+  politeRider('POLITE_RIDER', positive: true, needsRider: true),
   lateDelivery('LATE_DELIVERY', positive: false),
   damagedItems('DAMAGED_ITEMS', positive: false),
   missingItems('MISSING_ITEMS', positive: false),
-  rudeRider('RUDE_RIDER', positive: false);
+  rudeRider('RUDE_RIDER', positive: false, needsRider: true);
 
-  const RatingTag(this.wireValue, {required this.positive});
+  const RatingTag(
+    this.wireValue, {
+    required this.positive,
+    this.needsRider = false,
+  });
 
   final String wireValue;
 
   /// Offered with 4–5 stars; the others with 1–3.
   final bool positive;
+
+  /// About the delivery partner: only with rider stars.
+  final bool needsRider;
 
   static RatingTag? fromWire(String value) {
     for (final tag in values) {
@@ -28,12 +37,15 @@ enum RatingTag {
     return null;
   }
 
-  /// The tags offered for [stars] (none before a star is picked).
-  static List<RatingTag> forStars(int stars) => stars == 0
+  /// The tags offered for [stars] (none before a star is picked). Rider
+  /// tags only when the rider is rated ([riderRated]).
+  static List<RatingTag> forStars(int stars, {required bool riderRated}) =>
+      stars == 0
       ? const []
       : [
           for (final tag in values)
-            if (tag.positive == (stars >= 4)) tag,
+            if (tag.positive == (stars >= 4) && (riderRated || !tag.needsRider))
+              tag,
         ];
 }
 

@@ -1,0 +1,41 @@
+{% load ops %}
+{# Failed deliveries waiting to be received back. Context: store, rows (dispatch.ReturnRow), can_receive. The form posts to store_ops.receive_return through order_actions. #}
+<div id="returns-list" class="ops-touch" hx-get="{% url 'ops:store-returns-list' store.code %}" hx-swap="outerHTML"
+     hx-trigger="ops:refresh from:body" data-testid="returns-list">
+    {# No timed poll: it would wipe damaged counts being entered. Refreshes after a receive, or on demand. #}
+    <p class="mb-3"><button type="button" class="ops-button ops-button--secondary" hx-get="{% url 'ops:store-returns-list' store.code %}" hx-target="#returns-list" hx-swap="outerHTML" data-testid="returns-refresh">
+        <span class="material-symbols-outlined md-18" aria-hidden="true">refresh</span>Refresh</button></p>
+    {% for row in rows %}
+        <section class="bg-white border border-base-200 mb-4 ops-card p-3 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800"
+                 aria-label="Return of {{ row.order.order_number }}" data-testid="return-{{ row.order.order_number }}">
+            <div class="flex flex-wrap gap-2 items-center mb-2">
+                <span class="font-semibold text-font-important-light dark:text-font-important-dark">{{ row.order.order_number }}</span>
+                {% if row.task %}{% status_badge "task" row.task.status %}{% endif %}
+                <span class="ml-auto ops-text-secondary">Rider: {{ row.task.rider.full_name|default:"-" }}</span>
+            </div>
+            {% if row.ready %}
+                <form method="post" action="{% url 'ops:store-receive-return' store.code row.order.pk %}"
+                      hx-post="{% url 'ops:store-receive-return' store.code row.order.pk %}" hx-swap="none"
+                      hx-confirm="Good units go back into stock and the rider is freed. This cannot be undone." data-confirm-title="Receive the return?" data-confirm-label="Receive">
+                    {% csrf_token %}
+                    <div class="ops-return-lines">
+                        {% for line in row.lines %}
+                            <label class="flex gap-2 items-center justify-between">
+                                <span>{{ line.item.product_name }} {{ line.item.variant_name }} <span class="ops-text-secondary">&times; {{ line.units }} sent</span></span>
+                                <span class="flex gap-2 items-center">Damaged
+                                    <input type="number" name="damaged_{{ line.item.pk }}" value="0" min="0" max="{{ line.units }}" inputmode="numeric"
+                                           class="border border-base-200 px-2 py-1 rounded-default w-20 dark:bg-base-900 dark:border-base-700" data-testid="damaged-{{ line.item.pk }}">
+                                </span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    <button type="submit" class="mt-3 ops-button" data-testid="receive-{{ row.order.order_number }}"{% if not can_receive %} disabled title="Not available yet"{% endif %}>Receive return</button>
+                </form>
+            {% else %}
+                <p class="ops-text-secondary" data-testid="not-ready-{{ row.order.order_number }}">The rider has not started the return yet. It can be received once the rider is on the way back.</p>
+            {% endif %}
+        </section>
+    {% empty %}
+        {% include "ops/components/empty_state.html" with title="No return is waiting" icon="assignment_return" %}
+    {% endfor %}
+</div>

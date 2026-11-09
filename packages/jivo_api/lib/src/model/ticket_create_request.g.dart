@@ -13,6 +13,10 @@ abstract class _$TicketCreateRequestCWProxy {
 
   TicketCreateRequest orderId(int? orderId);
 
+  TicketCreateRequest taskId(int? taskId);
+
+  TicketCreateRequest payoutId(int? payoutId);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TicketCreateRequest(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -23,6 +27,8 @@ abstract class _$TicketCreateRequestCWProxy {
     TicketCategoryEnum category,
     String message,
     int? orderId,
+    int? taskId,
+    int? payoutId,
   });
 }
 
@@ -43,6 +49,12 @@ class _$TicketCreateRequestCWProxyImpl implements _$TicketCreateRequestCWProxy {
   TicketCreateRequest orderId(int? orderId) => this(orderId: orderId);
 
   @override
+  TicketCreateRequest taskId(int? taskId) => this(taskId: taskId);
+
+  @override
+  TicketCreateRequest payoutId(int? payoutId) => this(payoutId: payoutId);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TicketCreateRequest(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -53,6 +65,8 @@ class _$TicketCreateRequestCWProxyImpl implements _$TicketCreateRequestCWProxy {
     Object? category = const $CopyWithPlaceholder(),
     Object? message = const $CopyWithPlaceholder(),
     Object? orderId = const $CopyWithPlaceholder(),
+    Object? taskId = const $CopyWithPlaceholder(),
+    Object? payoutId = const $CopyWithPlaceholder(),
   }) {
     return TicketCreateRequest(
       category: category == const $CopyWithPlaceholder()
@@ -67,6 +81,14 @@ class _$TicketCreateRequestCWProxyImpl implements _$TicketCreateRequestCWProxy {
           ? _value.orderId
           // ignore: cast_nullable_to_non_nullable
           : orderId as int?,
+      taskId: taskId == const $CopyWithPlaceholder()
+          ? _value.taskId
+          // ignore: cast_nullable_to_non_nullable
+          : taskId as int?,
+      payoutId: payoutId == const $CopyWithPlaceholder()
+          ? _value.payoutId
+          // ignore: cast_nullable_to_non_nullable
+          : payoutId as int?,
     );
   }
 }
@@ -83,22 +105,33 @@ extension $TicketCreateRequestCopyWith on TicketCreateRequest {
 // **************************************************************************
 
 TicketCreateRequest _$TicketCreateRequestFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('TicketCreateRequest', json, ($checkedConvert) {
-      $checkKeys(json, requiredKeys: const ['category', 'message']);
-      final val = TicketCreateRequest(
-        category: $checkedConvert(
-          'category',
-          (v) => $enumDecode(
-            _$TicketCategoryEnumEnumMap,
-            v,
-            unknownValue: TicketCategoryEnum.unknownDefaultOpenApi,
+    $checkedCreate(
+      'TicketCreateRequest',
+      json,
+      ($checkedConvert) {
+        $checkKeys(json, requiredKeys: const ['category', 'message']);
+        final val = TicketCreateRequest(
+          category: $checkedConvert(
+            'category',
+            (v) => $enumDecode(
+              _$TicketCategoryEnumEnumMap,
+              v,
+              unknownValue: TicketCategoryEnum.unknownDefaultOpenApi,
+            ),
           ),
-        ),
-        message: $checkedConvert('message', (v) => v as String),
-        orderId: $checkedConvert('order_id', (v) => (v as num?)?.toInt()),
-      );
-      return val;
-    }, fieldKeyMap: const {'orderId': 'order_id'});
+          message: $checkedConvert('message', (v) => v as String),
+          orderId: $checkedConvert('order_id', (v) => (v as num?)?.toInt()),
+          taskId: $checkedConvert('task_id', (v) => (v as num?)?.toInt()),
+          payoutId: $checkedConvert('payout_id', (v) => (v as num?)?.toInt()),
+        );
+        return val;
+      },
+      fieldKeyMap: const {
+        'orderId': 'order_id',
+        'taskId': 'task_id',
+        'payoutId': 'payout_id',
+      },
+    );
 
 Map<String, dynamic> _$TicketCreateRequestToJson(
   TicketCreateRequest instance,
@@ -106,6 +139,8 @@ Map<String, dynamic> _$TicketCreateRequestToJson(
   'category': _$TicketCategoryEnumEnumMap[instance.category]!,
   'message': instance.message,
   'order_id': ?instance.orderId,
+  'task_id': ?instance.taskId,
+  'payout_id': ?instance.payoutId,
 };
 
 const _$TicketCategoryEnumEnumMap = {
@@ -116,5 +151,8 @@ const _$TicketCategoryEnumEnumMap = {
   TicketCategoryEnum.PAYMENT_REFUND: 'PAYMENT_REFUND',
   TicketCategoryEnum.ACCOUNT: 'ACCOUNT',
   TicketCategoryEnum.OTHER: 'OTHER',
+  TicketCategoryEnum.TASK: 'TASK',
+  TicketCategoryEnum.PAYOUT: 'PAYOUT',
+  TicketCategoryEnum.CASH: 'CASH',
   TicketCategoryEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

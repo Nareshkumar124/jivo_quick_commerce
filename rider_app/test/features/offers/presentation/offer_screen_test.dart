@@ -43,6 +43,7 @@ void main() {
     expect(find.text('New order'), findsOneWidget);
     expect(find.text('Jivo Sector 18'), findsOneWidget);
     expect(find.text('Sector 21, Noida · 2.4 km'), findsOneWidget);
+    expect(find.text('3 items'), findsOneWidget);
     expect(find.text('Cash ₹1,249 to collect'), findsOneWidget);
     expect(find.text('You earn about ₹45'), findsOneWidget);
     expect(tester.widget<Text>(byKey('offer-countdown')).data, '30');

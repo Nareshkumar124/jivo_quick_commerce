@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
 
 import '../../../app/env.dart';
 import '../../../app/providers.dart';
@@ -11,6 +12,8 @@ import '../../../shared/widgets/dev_tools_button.dart';
 import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/logout_button.dart';
 import '../../auth/presentation/rider_account_controller.dart';
+import '../../notifications/presentation/inbox_providers.dart';
+import '../../notifications/presentation/inbox_screen.dart';
 import '../../task/data/fake_task_backend.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
@@ -24,7 +27,8 @@ import 'shift_controller.dart';
 /// control (or the current-task card) pinned at the bottom.
 ///
 /// Builds without the rider work screens (staging and prod until the rider
-/// API lands) keep the Phase 1 placeholder.
+/// API lands) keep the Phase 1 placeholder, with help and My rating (P7,
+/// real API in every flavor).
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -68,6 +72,7 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
               const _RecordsMenu(),
+              const _SupportMenu(),
               const DevToolsButton(),
             ],
           ),
@@ -82,7 +87,9 @@ class HomeScreen extends ConsumerWidget {
     );
 
     Future<void> refresh() async {
-      ref.invalidate(todaySummaryProvider);
+      ref
+        ..invalidate(todaySummaryProvider)
+        ..invalidate(inboxUnreadCountProvider);
       await Future.wait([
         ref.read(shiftControllerProvider.notifier).sync(),
         ref.read(todaySummaryProvider.future).then((_) {}, onError: (_) {}),
@@ -97,6 +104,7 @@ class HomeScreen extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          const InboxBellButton(),
           IconButton(
             key: const Key('home-appbar-profile'),
             tooltip: l10n.profileTitle,
@@ -191,6 +199,40 @@ class _DevOfferButtons extends ConsumerWidget {
 
 /// The rider's own records (screens 15–18). Only where the records fake
 /// runs (dev flavor) until the rider API lands.
+/// The placeholder home's links that work in every flavor: help and
+/// support (tickets, FAQs, legal pages) and My rating. ACTIVE riders only.
+class _SupportMenu extends ConsumerWidget {
+  const _SupportMenu();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final account = ref.watch(riderAccountControllerProvider);
+    if (account is! AccountLoaded ||
+        account.riderStatus != RiderStatusEnum.ACTIVE) {
+      return const SizedBox.shrink();
+    }
+    final l10n = AppLocalizations.of(context);
+    Widget item(String key, IconData icon, String label, String route) =>
+        ListTile(
+          key: Key(key),
+          minTileHeight: kRiderListRowMin,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          leading: Icon(icon, size: 28),
+          title: Text(label, style: Theme.of(context).textTheme.titleMedium),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.push(route),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        item('home-help', Icons.support_agent, l10n.helpTitle, Routes.help),
+        item('home-rating', Icons.star, l10n.ratingTitle, Routes.rating),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
 class _RecordsMenu extends ConsumerWidget {
   const _RecordsMenu();
 
@@ -226,6 +268,7 @@ class _RecordsMenu extends ConsumerWidget {
           Routes.payouts,
         ),
         item('home-profile', Icons.person, l10n.profileTitle, Routes.profile),
+        item('home-help', Icons.support_agent, l10n.helpTitle, Routes.help),
         const SizedBox(height: 8),
       ],
     );

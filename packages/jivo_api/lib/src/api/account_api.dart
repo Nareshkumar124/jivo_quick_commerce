@@ -15,6 +15,7 @@ import 'package:jivo_api/src/model/account_delete_request.dart';
 import 'package:jivo_api/src/model/account_deletion.dart';
 import 'package:jivo_api/src/model/device.dart';
 import 'package:jivo_api/src/model/device_request.dart';
+import 'package:jivo_api/src/model/device_unregister_request.dart';
 import 'package:jivo_api/src/model/error_envelope.dart';
 import 'package:jivo_api/src/model/me.dart';
 import 'package:jivo_api/src/model/patched_me_request.dart';
@@ -208,6 +209,7 @@ class AccountApi {
   /// Stops push to this token (e.g. on logout, api-requests #39). Only the caller&#39;s own device is affected; an unknown token or another user&#39;s is ignored. Always 204. &#x60;POST /auth/logout/&#x60; with &#x60;fcm_token&#x60; does the same as part of logging out.
   ///
   /// Parameters:
+  /// * [deviceUnregisterRequest]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -218,6 +220,7 @@ class AccountApi {
   /// Returns a [Future]
   /// Throws [DioException] if API call or serialization fails
   Future<Response<void>> meDeviceUnregister({
+    required DeviceUnregisterRequest deviceUnregisterRequest,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -235,11 +238,26 @@ class AccountApi {
         ],
         ...?extra,
       },
+      contentType: 'application/json',
       validateStatus: validateStatus,
     );
 
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(deviceUnregisterRequest);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
     final _response = await _dio.request<Object>(
       _path,
+      data: _bodyData,
       options: _options,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,

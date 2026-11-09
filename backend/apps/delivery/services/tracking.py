@@ -1,17 +1,26 @@
-"""`GET /orders/{id}/track/` body (api-requests #28). The order is already scoped to its owner
-by the caller (`orders.services`). Slice 5.3 fills `rider` (from the delivery task, ASSIGNED
-until the order ends) and `delivery_otp` (only while OUT_FOR_DELIVERY)."""
+"""`GET /orders/{id}/track/` body (api-requests #28, #33). The order is already scoped to its
+owner by the caller (`orders.services.get_own_order`; another user's order is 404).
 
+- `rider`: the assigned rider (task ASSIGNED, AT_STORE, PICKED_UP, AT_CUSTOMER) while the order
+  is active; null before assignment and once the order ended. Position from the rider's latest
+  point (Redis, else the row).
+- The rider's phone and `delivery_otp`: only while the order is OUT_FOR_DELIVERY (DL-56, user
+  decision 2026-11-04); null otherwise. Masked/proxy calling is planned.
+"""
+
+from django.conf import settings
 from django.utils import timezone
 
+from apps.delivery.choices import DeliveryTaskStatus as TS
+from apps.delivery.choices import DocumentType
 from apps.orders.choices import TERMINAL_STATUSES, OrderStatus
 from apps.orders.models import Order
 
+TRACKED_TASK_STATUSES = frozenset({TS.ASSIGNED, TS.AT_STORE, TS.PICKED_UP, TS.AT_CUSTOMER})
+
 
 def rider_body(order: Order, rider, location: dict | None, photo_url: str | None) -> dict:
-    """The `rider` object of `track/` for the order's owner (the caller scoped the order).
-    The rider's phone only while OUT_FOR_DELIVERY (user decision 2026-11-04; the same rule
-    applies to `delivery_otp`); masked/proxy calling is planned."""
+    """The `rider` object of `track/` for the order's owner."""
     show_contact = order.status == OrderStatus.OUT_FOR_DELIVERY
     return {
         "name": _short_name(rider.full_name),
@@ -31,14 +40,58 @@ def _short_name(full_name: str) -> str:
     return f"{parts[0]} {parts[-1][0]}."
 
 
+def _photo_url(rider) -> str | None:
+    from apps.delivery.services.presenters import signed_url
+
+    document = rider.documents.filter(doc_type=DocumentType.PHOTO).first()
+    if document is None or not document.file:
+        return None
+    return signed_url(document.file.name, settings.RIDER_PHOTO_URL_EXPIRY_SECONDS)
+
+
+def _task(order: Order):
+    from apps.delivery.models import DeliveryTask
+
+    return (
+        DeliveryTask.objects.select_related("rider__user")
+        .filter(order=order, status__in=TRACKED_TASK_STATUSES)
+        .first()
+    )
+
+
+def _task_status(order: Order, task) -> str | None:
+    """The order's delivery task status (any state, also once it ended), or None without a
+    task (api-requests: customer track `task_status`)."""
+    if task is not None:
+        return task.status
+    from apps.delivery.models import DeliveryTask
+
+    return DeliveryTask.objects.filter(order=order).values_list("status", flat=True).first()
+
+
 def track_body(order: Order, now=None) -> dict:
+    from apps.delivery.services import eta as eta_service
+    from apps.delivery.services.shifts import latest_location
+    from apps.delivery.services.tasks import delivery_otp
+
+    now = now or timezone.now()
     store = order.store
     finished = order.status in TERMINAL_STATUSES
+    task = None if finished else _task(order)
+    rider = None
+    point = None
+    if task is not None and task.rider_id:
+        location = latest_location(task.rider)
+        rider = rider_body(order, task.rider, location, _photo_url(task.rider))
+        point = (location["lat"], location["lng"]) if location else None
+    live = None if finished else eta_service.compute(order, task, point, now=now)
     return {
         "order_id": order.pk,
         "order_number": order.order_number,
         "status": order.status,
         "eta_at": None if finished else order.eta_at,
+        "live_eta_at": live.eta_at if live else None,
+        "live_eta_minutes": live.minutes if live else None,
         "store": {
             "id": store.pk,
             "name": store.name,
@@ -46,7 +99,8 @@ def track_body(order: Order, now=None) -> dict:
             "lng": store.location.x,
         },
         "destination": {"lat": order.delivery_location.y, "lng": order.delivery_location.x},
-        "rider": None,  # slice 5.3: rider_body(order, task.rider, ...) while a task is assigned
-        "delivery_otp": None,  # slice 5.3: only while OUT_FOR_DELIVERY
-        "server_time": now or timezone.now(),
+        "rider": rider,
+        "delivery_otp": delivery_otp(task, order),
+        "task_status": _task_status(order, task),
+        "server_time": now,
     }

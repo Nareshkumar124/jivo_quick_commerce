@@ -58,6 +58,10 @@ def inbox(user, app: str):
     )
 
 
+def unread_count(user, app: str) -> int:
+    return inbox(user, app).filter(read_at__isnull=True).count()
+
+
 def mark_read(user, app: str, notification_id: int) -> Notification:
     notification = inbox(user, app).filter(pk=notification_id).first()
     if notification is None:
@@ -156,9 +160,9 @@ def _texts(spec: EventSpec, context: Mapping[str, Any]) -> dict[str, str]:
 
 FCM_KEYS = {
     # api-requests #30: {type: order|product|collection|category, order_id | slug}
-    AppName.CUSTOMER: ("order_id", "slug"),
+    AppName.CUSTOMER: ("order_id", "slug", "ticket_id"),  # ticket_id: P7 support replies
     # api-requests #41: {type: offer.new|offer.withdrawn|task.updated, offer_id?, task_id?}
-    AppName.RIDER: ("offer_id", "task_id"),
+    AppName.RIDER: ("offer_id", "task_id", "ticket_id"),  # ticket_id: P7 support replies
 }
 
 
@@ -244,6 +248,8 @@ def notify(
                 "sms_dlt_template_id": texts["dlt_id"] if wants_sms else "",
             },
         )
+        if created and notification.in_inbox:
+            _announce(notification.pk)
         if not created:
             changed = []
             if wants_push and notification.push_status == DeliveryStatus.NONE:
@@ -259,6 +265,21 @@ def notify(
                 notification.save(update_fields=[*changed, "updated_at"])
         _queue(notification)
     return notification
+
+
+def _announce(notification_id: int) -> None:
+    """After commit, `notification.new` to the user's open app sockets (api-requests #47; best
+    effort: the app also re-reads the inbox on the FCM message)."""
+
+    def queue() -> None:
+        try:
+            from apps.realtime.tasks import publish_notification_new_task
+
+            publish_notification_new_task.delay(notification_id)
+        except Exception:
+            logger.exception("notification.new not queued: %s", notification_id)
+
+    transaction.on_commit(queue)
 
 
 def _queue(notification: Notification) -> None:

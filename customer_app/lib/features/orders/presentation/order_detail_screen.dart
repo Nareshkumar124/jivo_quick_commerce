@@ -18,6 +18,7 @@ import '../../rating/presentation/rate_order_screen.dart';
 import '../../rating/presentation/rating_controllers.dart';
 import '../../tracking/domain/order_track.dart';
 import '../../tracking/presentation/delivery_cards.dart';
+import '../../tracking/presentation/order_live.dart';
 import '../../tracking/presentation/tracking_providers.dart';
 import '../domain/order.dart';
 import '../domain/order_history.dart';
@@ -39,6 +40,17 @@ class OrderDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final detail = ref.watch(orderDetailProvider(orderId));
+    // Live status over the order socket (`06 §4`) while the order is
+    // active: a new status re-reads the order (bill, refunds, actions).
+    final shown = detail.value;
+    if (shown != null && shown.status.isActive) {
+      ref.listen(orderStatusEventsProvider(orderId), (_, next) {
+        final status = next.value?.status;
+        if (status != null && status != shown.status) {
+          ref.read(orderDetailProvider(orderId).notifier).refreshQuietly();
+        }
+      });
+    }
     return Scaffold(
       appBar: AppBar(
         leading: homeBackButton(context),
@@ -99,6 +111,12 @@ class _OrderBody extends ConsumerWidget {
     }
     final rider = track?.rider;
     final otp = track?.deliveryOtp;
+    // The task state comes with `track/` (when sent); otherwise the order
+    // status alone decides (`deliveryStageFor`).
+    final stage = track != null && track.status == order.status
+        ? track.stage
+        : deliveryStageFor(order.status);
+    final codDue = order.codAmountDue;
     final eta = track?.etaAt ?? order.etaAt;
     final coupon = order.couponCode;
 
@@ -160,9 +178,20 @@ class _OrderBody extends ConsumerWidget {
             ),
           ],
         ],
+        if (stage != null) ...[
+          const SizedBox(height: JivoSpacing.md),
+          DeliveryStageCard(
+            stage: stage,
+            refundNote: refundNoteFor(l10n, order),
+          ),
+        ],
         if (otp != null) ...[
           const SizedBox(height: JivoSpacing.md),
           DeliveryOtpCard(otp: otp),
+        ],
+        if (codDue != null) ...[
+          const SizedBox(height: JivoSpacing.md),
+          CodDueCard(amount: codDue),
         ],
         if (rider != null && order.isActive) ...[
           const SizedBox(height: JivoSpacing.sm),
@@ -267,8 +296,7 @@ class _OrderBody extends ConsumerWidget {
             label: l10n.helpWithThisOrder,
             busy: false,
             enabled: true,
-            onPressed: () =>
-                context.push(Routes.newTicket(orderId: order.id)),
+            onPressed: () => context.push(Routes.newTicket(orderId: order.id)),
           ),
         const SizedBox(height: JivoSpacing.xl),
       ],

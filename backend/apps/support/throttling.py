@@ -9,3 +9,7 @@ class TicketCreateThrottle(FailOpenUserThrottle):
 
 class TicketMessageThrottle(FailOpenUserThrottle):
     scope = "support_messages"
+
+
+class TicketAttachmentThrottle(FailOpenUserThrottle):
+    scope = "support_attachments"

@@ -11,6 +11,10 @@ class TicketCategory(models.TextChoices):
     PAYMENT_REFUND = "PAYMENT_REFUND", "Payment or refund"
     ACCOUNT = "ACCOUNT", "Account"
     OTHER = "OTHER", "Other"
+    # Phase 7 rider app (api-requests): only from a rider session.
+    TASK = "TASK", "A delivery task"
+    PAYOUT = "PAYOUT", "Payout"
+    CASH = "CASH", "Cash deposit"
 
 
 # These are about one order: a ticket in one of them must name the customer's order.
@@ -22,6 +26,10 @@ ORDER_REQUIRED_CATEGORIES = frozenset(
         TicketCategory.LATE_DELIVERY,
     }
 )
+
+
+# Categories only riders may use (a session whose JWT `app` is rider).
+RIDER_CATEGORIES = frozenset({TicketCategory.TASK, TicketCategory.PAYOUT, TicketCategory.CASH})
 
 
 class TicketStatus(models.TextChoices):

@@ -5,9 +5,8 @@ import '../domain/order_rating.dart';
 /// Order and rider ratings (`03 §2.10` Rate, `06 §2.6`
 /// `POST /orders/{id}/rating/`, Phase 7).
 ///
-/// TODO(api): not in jivo_api yet. The screens run on
-/// [FakeRatingRepository] (`FAKE_API=true`, tests) until the P7 contract;
-/// the real-API build hides rating ([UnavailableRatingRepository]).
+/// `ApiRatingRepository` in every flavor; [FakeRatingRepository] with the
+/// dev flavor's `FAKE_API=true` and in tests.
 abstract interface class RatingRepository {
   /// The order's rating, or null when the customer hasn't rated it.
   /// Throws [ApiError].
@@ -18,7 +17,7 @@ abstract interface class RatingRepository {
   Future<OrderRating> submit(int orderId, OrderRatingInput input);
 }
 
-/// The real-API build until the P7 endpoint exists.
+/// A build without rating (kept for tests and future flavors).
 class UnavailableRatingRepository implements RatingRepository {
   const UnavailableRatingRepository();
 
@@ -61,6 +60,16 @@ class FakeRatingRepository implements RatingRepository {
   @override
   Future<OrderRating> submit(int orderId, OrderRatingInput input) async {
     _maybeFail();
+    if (input.riderStars == null && input.tags.any((t) => t.needsRider)) {
+      // As the server: rider tags need rider stars.
+      throw const ApiError(
+        code: ApiErrorCode.validationError,
+        statusCode: 400,
+        details: {
+          'tags': ['Rate the rider to use rider tags.'],
+        },
+      );
+    }
     if (ratings.containsKey(orderId)) {
       throw const ApiError(
         code: ApiErrorCode.validationError,

@@ -9,13 +9,15 @@ part of 'ticket_reply_request.dart';
 abstract class _$TicketReplyRequestCWProxy {
   TicketReplyRequest message(String message);
 
+  TicketReplyRequest attachmentKeys(List<String>? attachmentKeys);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TicketReplyRequest(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
   /// ```dart
   /// TicketReplyRequest(...).copyWith(id: 12, name: "My name")
   /// ````
-  TicketReplyRequest call({String message});
+  TicketReplyRequest call({String message, List<String>? attachmentKeys});
 }
 
 /// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfTicketReplyRequest.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfTicketReplyRequest.copyWith.fieldName(...)`
@@ -28,18 +30,29 @@ class _$TicketReplyRequestCWProxyImpl implements _$TicketReplyRequestCWProxy {
   TicketReplyRequest message(String message) => this(message: message);
 
   @override
+  TicketReplyRequest attachmentKeys(List<String>? attachmentKeys) =>
+      this(attachmentKeys: attachmentKeys);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TicketReplyRequest(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
   /// ```dart
   /// TicketReplyRequest(...).copyWith(id: 12, name: "My name")
   /// ````
-  TicketReplyRequest call({Object? message = const $CopyWithPlaceholder()}) {
+  TicketReplyRequest call({
+    Object? message = const $CopyWithPlaceholder(),
+    Object? attachmentKeys = const $CopyWithPlaceholder(),
+  }) {
     return TicketReplyRequest(
       message: message == const $CopyWithPlaceholder()
           ? _value.message
           // ignore: cast_nullable_to_non_nullable
           : message as String,
+      attachmentKeys: attachmentKeys == const $CopyWithPlaceholder()
+          ? _value.attachmentKeys
+          // ignore: cast_nullable_to_non_nullable
+          : attachmentKeys as List<String>?,
     );
   }
 }
@@ -60,9 +73,16 @@ TicketReplyRequest _$TicketReplyRequestFromJson(Map<String, dynamic> json) =>
       $checkKeys(json, requiredKeys: const ['message']);
       final val = TicketReplyRequest(
         message: $checkedConvert('message', (v) => v as String),
+        attachmentKeys: $checkedConvert(
+          'attachment_keys',
+          (v) => (v as List<dynamic>?)?.map((e) => e as String).toList(),
+        ),
       );
       return val;
-    });
+    }, fieldKeyMap: const {'attachmentKeys': 'attachment_keys'});
 
 Map<String, dynamic> _$TicketReplyRequestToJson(TicketReplyRequest instance) =>
-    <String, dynamic>{'message': instance.message};
+    <String, dynamic>{
+      'message': instance.message,
+      'attachment_keys': ?instance.attachmentKeys,
+    };

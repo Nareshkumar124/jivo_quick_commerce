@@ -23,8 +23,16 @@ from apps.core.crypto import DecryptionError, decrypt
 from apps.core.models import TimeStampedModel
 from apps.delivery.choices import (
     RIDER_PROFILE_STATUSES,
+    CashEntryType,
+    CodQrStatus,
+    DeliveryFailReason,
+    DeliveryTaskStatus,
     DocumentStatus,
     DocumentType,
+    EarningType,
+    OfferRejectReason,
+    OfferStatus,
+    PayoutStatus,
     ShiftEndReason,
     VehicleType,
     required_documents,
@@ -93,6 +101,15 @@ class Rider(TimeStampedModel):
         validators=[MinValueValidator(Decimal("0.00"))],
         help_text="At or above it the rider gets prepaid offers only (04 §2.7). Default ₹5,000.",
     )
+    cash_skipped_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "DL-61 (b): when dispatch last left this rider out of a COD offer because cash in "
+            "hand + the order amount was over the limit. Cleared by a deposit. Drives the "
+            '"deposit cash" banner.'
+        ),
+    )
     rating_avg = models.DecimalField(
         max_digits=2,
         decimal_places=1,
@@ -139,6 +156,7 @@ class Rider(TimeStampedModel):
             "last_location_at",
             "last_location_received_at",
             "last_heartbeat_at",
+            "cash_skipped_at",
             "updated_at",
         ]
     )
@@ -151,6 +169,9 @@ class Rider(TimeStampedModel):
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(cash_limit__gte=0), name="delivery_rider_cash_limit_gte_0"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(cash_in_hand__gte=0), name="delivery_rider_cash_in_hand_gte_0"
             ),
             models.CheckConstraint(
                 condition=~models.Q(status=RiderStatus.ACTIVE) | models.Q(home_store__isnull=False),
@@ -304,7 +325,9 @@ class RiderLocation(models.Model):
     shift = models.ForeignKey(
         RiderShift, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
-    # `task` (nullable FK to DeliveryTask) arrives with the tasks of slice 5.3.
+    task = models.ForeignKey(
+        "DeliveryTask", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
 
     class Meta:
         constraints = [
@@ -315,3 +338,377 @@ class RiderLocation(models.Model):
 
     def __str__(self) -> str:
         return f"Rider {self.rider_id} at {self.recorded_at:%Y-%m-%d %H:%M:%S}"
+
+
+# --------------------------------------------------------------------------- slice 5.3
+
+RIDER_BUSY_STATUSES = ["ASSIGNED", "AT_STORE", "PICKED_UP", "AT_CUSTOMER", "FAILED", "RETURNING"]
+
+
+class AssignmentMode(models.TextChoices):
+    AUTO = "AUTO", "Offer accepted"
+    MANUAL = "MANUAL", "Assigned by ops"
+
+
+class DeliveryTask(TimeStampedModel):
+    """The delivery of one order (07 §2.8, 08 §3). Created when dispatch starts; states change
+    only through `apps.delivery.services` (dispatch, tasks). Lock order on every path: the
+    Order row, then this row, then offers, then the rider."""
+
+    order = models.OneToOneField(
+        "orders.Order", on_delete=models.PROTECT, related_name="delivery_task"
+    )
+    store = models.ForeignKey("stores.DarkStore", on_delete=models.PROTECT, related_name="+")
+    rider = models.ForeignKey(
+        Rider, on_delete=models.PROTECT, null=True, blank=True, related_name="tasks"
+    )
+    status = models.CharField(max_length=12, choices=DeliveryTaskStatus.choices)
+    assignment_mode = models.CharField(max_length=6, choices=AssignmentMode.choices, blank=True)
+    attempt_count = models.PositiveSmallIntegerField(
+        default=0, help_text="Offers made in the current search round (08 §5 step 6)."
+    )
+    search_started_at = models.DateTimeField(help_text="Start of the current search round.")
+    unassigned_at = models.DateTimeField(null=True, blank=True)
+    next_dispatch_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When dispatch runs next (retry, or resume after UNASSIGNED).",
+    )
+    distance_km = models.DecimalField(max_digits=6, decimal_places=2)
+    payout_amount = models.DecimalField(**MONEY, help_text="Estimated base + distance pay.")
+    cod_amount_previous = models.DecimalField(
+        **MONEY, null=True, blank=True, help_text="COD due before the last change (08 T8a)."
+    )
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    arrived_store_at = models.DateTimeField(null=True, blank=True)
+    picked_up_at = models.DateTimeField(null=True, blank=True)
+    arrived_customer_at = models.DateTimeField(null=True, blank=True)
+    arrival_override_reason = models.CharField(max_length=200, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    failed_at = models.DateTimeField(null=True, blank=True)
+    fail_reason = models.CharField(max_length=24, choices=DeliveryFailReason.choices, blank=True)
+    fail_note = models.CharField(max_length=300, blank=True)
+    fail_call_attempts = models.PositiveSmallIntegerField(null=True, blank=True)
+    fail_photo = models.FileField(upload_to="delivery-failures/", blank=True, max_length=200)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True, help_text="When the task ended.")
+    # Delivery OTP (04 §2.6): generated at T9, shown only to the order's owner while out for
+    # delivery; encrypted (not hashed) because the customer app shows it.
+    delivery_otp_encrypted = models.TextField(blank=True, editable=False)
+    otp_attempts = models.PositiveSmallIntegerField(default=0)
+    otp_locked_at = models.DateTimeField(null=True, blank=True)
+    # Wrong order codes at pickup; locked after PICKUP_CODE_MAX_ATTEMPTS (ops alerted).
+    pickup_attempts = models.PositiveSmallIntegerField(default=0)
+    pickup_locked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["rider"],
+                condition=models.Q(status__in=RIDER_BUSY_STATUSES),
+                name="delivery_task_one_active_per_rider",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rider__isnull=False)
+                | models.Q(status__in=["SEARCHING", "OFFERED", "UNASSIGNED", "CANCELLED"]),
+                name="delivery_task_rider_when_assigned",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status", "store"], name="delivery_task_status_store"),
+            models.Index(fields=["rider", "-ended_at"], name="delivery_task_rider_ended"),
+        ]
+        permissions = [
+            ("dispatch_order", "Can assign, unassign and re-dispatch riders (manual dispatch)"),
+            ("lift_cod_block", "Can lift a customer's automatic COD block (DL-61)"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Task {self.pk} ({self.status}) for order {self.order_id}"
+
+    # `apps.delivery.live`: the (status, rider_id) last read from or committed to the DB, or
+    # None when unknown (a deferred field, a new instance). Unknown means "publish".
+    _live_snapshot: tuple | None = None
+
+    def _live_remember(self) -> None:
+        loaded = self.__dict__
+        if "status" in loaded and "rider_id" in loaded:
+            self._live_snapshot = (loaded["status"], loaded["rider_id"])
+        else:
+            self._live_snapshot = None
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._live_remember()
+        return instance
+
+    def refresh_from_db(self, using=None, fields=None, from_queryset=None):
+        """Also refresh the live snapshot when status or rider were re-read; a partial refresh
+        of other fields keeps it (the in-memory status may be an unsaved change)."""
+        super().refresh_from_db(using=using, fields=fields, from_queryset=from_queryset)
+        names = None if fields is None else set(fields)
+        if names is None or {"status", "rider", "rider_id"} & names:
+            if names is None or ({"status"} <= names and names & {"rider", "rider_id"}):
+                self._live_remember()
+            else:
+                self._live_snapshot = None  # only half of it re-read: unknown
+
+
+class DeliveryOffer(models.Model):
+    """One offer of a task to a rider (07 §2.8, 08 §5). At most one PENDING per task and per
+    rider (partial unique indexes)."""
+
+    task = models.ForeignKey(DeliveryTask, on_delete=models.CASCADE, related_name="offers")
+    rider = models.ForeignKey(Rider, on_delete=models.CASCADE, related_name="offers")
+    status = models.CharField(max_length=10, choices=OfferStatus.choices)
+    offered_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    responded_at = models.DateTimeField(null=True, blank=True)
+    reject_reason = models.CharField(max_length=16, choices=OfferRejectReason.choices, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task"],
+                condition=models.Q(status="PENDING"),
+                name="delivery_offer_one_pending_per_task",
+            ),
+            models.UniqueConstraint(
+                fields=["rider"],
+                condition=models.Q(status="PENDING"),
+                name="delivery_offer_one_pending_per_rider",
+            ),
+        ]
+        indexes = [models.Index(fields=["status", "expires_at"], name="delivery_offer_due")]
+
+    def __str__(self) -> str:
+        return f"Offer {self.pk} ({self.status})"
+
+
+class RiderCashLedgerQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValueError("The cash ledger is append-only.")
+
+    def delete(self):
+        raise ValueError("The cash ledger is append-only.")
+
+
+class RiderCashLedger(models.Model):
+    """Cash in hand (07 §2.8, 04 §2.7): append-only; `Rider.cash_in_hand` is its running
+    balance, changed only together with a new entry under the rider row lock."""
+
+    rider = models.ForeignKey(Rider, on_delete=models.PROTECT, related_name="cash_entries")
+    entry_type = models.CharField(max_length=14, choices=CashEntryType.choices)
+    amount = models.DecimalField(**MONEY, help_text="Signed: + collected, - deposited.")
+    balance_after = models.DecimalField(**MONEY)
+    order = models.ForeignKey(
+        "orders.Order", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    note = models.CharField(max_length=200, blank=True)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+    # Slice 5.4: the store the cash was collected for (COD_COLLECTED: the order's store) or handed
+    # in at (DEPOSIT), for the store's day-end report (05 §1.5); and the deposit form's key, so a
+    # double-submitted deposit is recorded once.
+    store = models.ForeignKey(
+        "stores.DarkStore", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    idempotency_key = models.CharField(max_length=64, blank=True)
+
+    objects = RiderCashLedgerQuerySet.as_manager()
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["store", "entry_type", "recorded_at"], name="delivery_cash_store_day"
+            )
+        ]
+        permissions = [
+            ("record_cash_deposit", "Can record a rider's cash deposit at a store"),
+            ("adjust_cash", "Can correct a rider's cash in hand (adjustment)"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["rider", "idempotency_key"],
+                condition=~models.Q(idempotency_key=""),
+                name="delivery_cashledger_idempotency_key",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(amount=0), name="delivery_cashledger_amount_not_zero"
+            ),
+            models.UniqueConstraint(
+                fields=["order"],
+                condition=models.Q(entry_type="COD_COLLECTED"),
+                name="delivery_cashledger_one_cod_per_order",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.entry_type} {self.amount} (rider {self.rider_id})"
+
+
+class CodQr(models.Model):
+    """A UPI QR for a COD order's amount due (06 §3 `cod-qr`, api-requests #16; Razorpay QR
+    Codes: single use, fixed amount). The server confirms payment (webhook `qr_code.credited`,
+    or a gateway lookup); the amount always comes from the order, never from the client."""
+
+    task = models.ForeignKey(DeliveryTask, on_delete=models.PROTECT, related_name="cod_qrs")
+    order = models.ForeignKey("orders.Order", on_delete=models.PROTECT, related_name="+")
+    gateway_qr_id = models.CharField(max_length=64, unique=True)
+    image_url = models.URLField(max_length=500)
+    amount = models.DecimalField(**MONEY)
+    status = models.CharField(max_length=10, choices=CodQrStatus.choices)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    payment = models.OneToOneField(
+        "payments.Payment", on_delete=models.PROTECT, null=True, blank=True, related_name="cod_qr"
+    )
+
+    class Meta:
+        verbose_name = "COD UPI QR"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task"],
+                condition=models.Q(status__in=["PENDING", "PAID"]),
+                name="delivery_codqr_one_open_per_task",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0), name="delivery_codqr_amount_gt_0"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"QR {self.gateway_qr_id} ({self.status})"
+
+
+class EarningRule(models.Model):
+    """Rider pay (07 §2.8, D-16 default ⚠): `base_per_order` per delivered order plus
+    `per_km_rate` for each km of the store-to-drop route distance beyond `per_km_after`. The rule
+    in force at a time is the newest with `effective_from` <= that time; with none, the settings
+    `RIDER_PAY_BASE_PER_ORDER` / `RIDER_PAY_PER_KM` apply. A rule is not edited once it is in
+    force: add a new one."""
+
+    base_per_order = models.DecimalField(**MONEY, validators=[MinValueValidator(Decimal("0.00"))])
+    per_km_rate = models.DecimalField(**MONEY, validators=[MinValueValidator(Decimal("0.00"))])
+    per_km_after = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Km included in the base pay (distance pay starts after them).",
+    )
+    effective_from = models.DateTimeField(unique=True)
+    note = models.CharField(max_length=200, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-effective_from"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(base_per_order__gte=0)
+                & models.Q(per_km_rate__gte=0)
+                & models.Q(per_km_after__gte=0),
+                name="delivery_earningrule_not_negative",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.base_per_order} + {self.per_km_rate}/km from {self.effective_from:%Y-%m-%d}"
+
+
+class Payout(models.Model):
+    """A payout to a rider for a period (D-16: weekly bank transfers made offline by Finance and
+    recorded here). Its earning lines point at it; `amount` is their sum."""
+
+    rider = models.ForeignKey(Rider, on_delete=models.PROTECT, related_name="payouts")
+    period_start = models.DateField(help_text="IST date.")
+    period_end = models.DateField(help_text="IST date, inclusive.")
+    amount = models.DecimalField(**MONEY)
+    status = models.CharField(
+        max_length=8, choices=PayoutStatus.choices, default=PayoutStatus.PENDING
+    )
+    reference = models.CharField(max_length=64, blank=True, help_text="Bank transfer UTR.")
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    paid_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(amount__gt=0), name="delivery_payout_amount_gt_0"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(period_end__gte=models.F("period_start")),
+                name="delivery_payout_period_order",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(status="PENDING")
+                | (models.Q(paid_at__isnull=False) & ~models.Q(reference="")),
+                name="delivery_payout_paid_has_reference",
+            ),
+        ]
+        indexes = [models.Index(fields=["rider", "-period_end"], name="delivery_payout_rider")]
+        permissions = [
+            ("manage_payouts", "Can create payouts, mark them paid and add incentives/penalties"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Payout {self.pk} to rider {self.rider_id}: {self.amount} ({self.status})"
+
+
+class RiderEarning(models.Model):
+    """One earning line (07 §2.8). A delivered task gets BASE, DISTANCE and TIP (at most one of
+    each per task, so recording them twice is a no-op); INCENTIVE and PENALTY are staff
+    adjustments (a penalty is negative). `earned_at` (the delivery time) is what date ranges and
+    payout periods use. A paid line points at its payout."""
+
+    rider = models.ForeignKey(Rider, on_delete=models.PROTECT, related_name="earnings")
+    task = models.ForeignKey(
+        DeliveryTask, on_delete=models.PROTECT, null=True, blank=True, related_name="earnings"
+    )
+    type = models.CharField(max_length=10, choices=EarningType.choices)
+    amount = models.DecimalField(**MONEY)
+    note = models.CharField(max_length=200, blank=True)
+    earned_at = models.DateTimeField()
+    payout = models.ForeignKey(
+        Payout, on_delete=models.PROTECT, null=True, blank=True, related_name="earnings"
+    )
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["task", "type"],
+                condition=models.Q(task__isnull=False),
+                name="delivery_earning_one_type_per_task",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(type="PENALTY", amount__lt=0)
+                | (~models.Q(type="PENALTY") & models.Q(amount__gt=0)),
+                name="delivery_earning_sign",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["rider", "earned_at"], name="delivery_earning_rider_time"),
+            models.Index(fields=["rider", "payout"], name="delivery_earning_unpaid"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.type} {self.amount} (rider {self.rider_id})"

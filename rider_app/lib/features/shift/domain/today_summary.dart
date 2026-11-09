@@ -18,9 +18,10 @@ class TodaySummary {
     this.cashInHand,
     this.cashLimit,
     this.limitReached = false,
+    bool? depositRequired,
     this.homeStoreName,
     this.homeStoreLocation,
-  });
+  }) : depositRequired = depositRequired ?? limitReached;
 
   final int? deliveredCount;
 
@@ -35,6 +36,11 @@ class TodaySummary {
   /// The server's verdict that cash in hand is at or over the limit: the
   /// rider gets prepaid offers only until a deposit (04 §2.7).
   final bool limitReached;
+
+  /// `cash.deposit_required` (DL-61 b): show "Deposit cash". True at the
+  /// limit, and also below it once a COD order was skipped because cash in
+  /// hand plus its amount was over the limit. Cleared by a deposit.
+  final bool depositRequired;
 
   /// For "Waiting for orders near {store}" and "Navigate to store".
   final String? homeStoreName;

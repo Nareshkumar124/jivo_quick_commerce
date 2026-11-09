@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     "apps.payments",
     "apps.delivery",
     "apps.support",
+    "apps.reports",  # Phase 7: dashboard metrics, reports, exports (05 §1.1, §4)
     "apps.realtime",  # Phase 6: WebSockets (06 §4)
     "apps.loadtest",  # P8 T-812: load-test data commands (no models, no API)
     "apps.ops_console",
@@ -348,6 +349,8 @@ CELERY_BEAT_SCHEDULE = {
     "auto-accept-orders": {"task": "orders.auto_accept_orders", "schedule": 60.0},
     # Phase 5 (06 §5): auto-offline riders with no location for RIDER_AUTO_OFFLINE_MINUTES.
     "rider-heartbeat-check": {"task": "delivery.rider_heartbeat_check", "schedule": 120.0},
+    # Phase 5 slice 5.3 (08 §5): offer expiry, dispatch retries, resume after UNASSIGNED.
+    "dispatch-sweep": {"task": "delivery.dispatch_sweep", "schedule": 15.0},
     # Phase 5 (D-14 default): KYC documents deleted 1 year after offboarding/erasure. 04:15 IST.
     "purge-offboarded-kyc": {
         "task": "delivery.purge_offboarded_kyc",
@@ -732,6 +735,7 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
         "rider_profile_write": env_str("RIDER_PROFILE_WRITE_RATE", default="20/hour"),
         "rider_locations": env_str("RIDER_LOCATIONS_RATE", default="6/min"),
         "rider_heartbeat": env_str("RIDER_HEARTBEAT_RATE", default="6/min"),
+        "rider_pickup": env_str("RIDER_PICKUP_RATE", default="10/min"),
     }
 )
 RIDER_MIN_AGE_YEARS = env_int("RIDER_MIN_AGE_YEARS", default=18)
@@ -765,8 +769,30 @@ MAX_OFFER_ATTEMPTS = env_int("MAX_OFFER_ATTEMPTS", default=5)
 DISPATCH_TIMEOUT_SECONDS = env_int("DISPATCH_TIMEOUT_SECONDS", default=180)
 DELIVERY_OTP_LENGTH = 4  # 04 §2.6 (the contract publishes it as `delivery_otp.length`)
 DELIVERY_OTP_MAX_ATTEMPTS = env_int("DELIVERY_OTP_MAX_ATTEMPTS", default=5)
+# Wrong order codes at pickup before the task's pickup is locked (code review of slice 5.3).
+PICKUP_CODE_MAX_ATTEMPTS = env_int("PICKUP_CODE_MAX_ATTEMPTS", default=5)
 # `GET /rider/tasks/current/` returns the rider's last ended task as `recent_task` this long.
 RIDER_RECENT_TASK_SECONDS = env_int("RIDER_RECENT_TASK_SECONDS", default=600)
+# 08 §5 dispatch (slice 5.3): a candidate's last location must have arrived within this; riders
+# within DISPATCH_AT_STORE_RADIUS_M of the store come first (longest idle first); with no
+# candidate the search runs again after DISPATCH_RETRY_SECONDS; after UNASSIGNED the auto-retry
+# pauses DISPATCH_UNASSIGNED_PAUSE_SECONDS (step 6).
+DISPATCH_PING_MAX_AGE_SECONDS = env_int("DISPATCH_PING_MAX_AGE_SECONDS", default=120)
+DISPATCH_AT_STORE_RADIUS_M = env_int("DISPATCH_AT_STORE_RADIUS_M", default=200)
+DISPATCH_RETRY_SECONDS = env_int("DISPATCH_RETRY_SECONDS", default=15)
+DISPATCH_UNASSIGNED_PAUSE_SECONDS = env_int("DISPATCH_UNASSIGNED_PAUSE_SECONDS", default=60)
+# D-16 default (doc 11, to confirm with Jivo Ops/HR): rider pay per order = base + per km of the
+# server-computed store-to-drop route distance. Shown as `estimated_payout` on offers and tasks;
+# earnings are recorded on delivery (slice 5.4). An `EarningRule` row in force overrides them.
+RIDER_PAY_BASE_PER_ORDER = Decimal(env_str("RIDER_PAY_BASE_PER_ORDER", default="30.00"))
+RIDER_PAY_PER_KM = Decimal(env_str("RIDER_PAY_PER_KM", default="5.00"))
+# 08 §6.4 (D-10 default, to confirm): a customer whose COD orders were refused this many times
+# is COD-blocked automatically (0 = never).
+COD_BLOCK_AFTER_REFUSALS = env_int("COD_BLOCK_AFTER_REFUSALS", default=2)
+# Slice 5.4: the COD UPI QR (06 §3 `cod-qr`; Razorpay QR Codes, single use, fixed amount). Off,
+# or with the real gateway and no Razorpay keys, `cod-qr` answers 503 and the rider takes cash.
+COD_UPI_QR_ENABLED = env_bool("COD_UPI_QR_ENABLED", default=True)
+COD_QR_EXPIRY_SECONDS = env_int("COD_QR_EXPIRY_SECONDS", default=900)
 # --------------------------------------------------------------------------- support (P7)
 # Per user, fail open (apps.core.throttling). A customer raises a few tickets at most; these
 # only stop scripted abuse of the support inbox.
@@ -774,11 +800,50 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
     {
         "support_tickets_create": env_str("SUPPORT_TICKETS_CREATE_RATE", default="10/hour"),
         "support_messages": env_str("SUPPORT_MESSAGES_RATE", default="60/hour"),
+        "support_attachments": env_str("SUPPORT_ATTACHMENTS_RATE", default="30/hour"),
     }
 )
+# Phase 7 support: photo attachments (06 §2.7) and SLA targets per priority (PM default ⚠ until
+# Jivo sets them; "PRIORITY:value,..." in the env).
+SUPPORT_ATTACHMENT_MAX_BYTES = env_int("SUPPORT_ATTACHMENT_MAX_BYTES", default=5 * 1024 * 1024)
+SUPPORT_ATTACHMENT_URL_SECONDS = env_int("SUPPORT_ATTACHMENT_URL_SECONDS", default=600)
+SUPPORT_FIRST_RESPONSE_SLA_MINUTES = {
+    key: int(value)
+    for key, value in env_dict(
+        "SUPPORT_FIRST_RESPONSE_SLA_MINUTES",
+        default={"URGENT": "15", "HIGH": "30", "NORMAL": "60", "LOW": "240"},
+    ).items()
+}
+SUPPORT_RESOLUTION_SLA_HOURS = {
+    key: int(value)
+    for key, value in env_dict(
+        "SUPPORT_RESOLUTION_SLA_HOURS",
+        default={"URGENT": "4", "HIGH": "8", "NORMAL": "24", "LOW": "72"},
+    ).items()
+}
+
+# --------------------------------------------------------------------------- reports (P7)
+# 05 §4 reports and 05 §1.1 dashboard (apps.reports). On screen and the synchronous CSV are
+# capped at REPORT_SYNC_MAX_ROWS rows; larger exports run in Celery into the private bucket and
+# are downloaded through a signed URL valid REPORT_EXPORT_URL_SECONDS. Export files are deleted
+# after REPORT_EXPORT_RETENTION_DAYS. A date range is at most REPORT_MAX_RANGE_DAYS days.
+REPORT_SYNC_MAX_ROWS = env_int("REPORT_SYNC_MAX_ROWS", default=5000)
+REPORT_MAX_RANGE_DAYS = env_int("REPORT_MAX_RANGE_DAYS", default=366)
+REPORT_EXPORT_URL_SECONDS = env_int("REPORT_EXPORT_URL_SECONDS", default=900)
+REPORT_EXPORT_RETENTION_DAYS = env_int("REPORT_EXPORT_RETENTION_DAYS", default=7)
+# A RUNNING export started less than this long ago is not run again by a duplicate task; an
+# older one (its worker died) is.
+REPORT_EXPORT_STALE_MINUTES = env_int("REPORT_EXPORT_STALE_MINUTES", default=15)
+# 05 §1.1 alerts panel thresholds.
+DASHBOARD_ACCEPT_WAIT_ALERT_MINUTES = env_int("DASHBOARD_ACCEPT_WAIT_ALERT_MINUTES", default=2)
+DASHBOARD_NO_RIDER_ALERT_MINUTES = env_int("DASHBOARD_NO_RIDER_ALERT_MINUTES", default=3)
+# 06 §5 daily_reports_email: store-wise summary of the previous IST day to store managers, at
+# 08:00 IST (02:30 UTC).
+DAILY_REPORTS_EMAIL_ENABLED = env_bool("DAILY_REPORTS_EMAIL_ENABLED", default=True)
 SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"].update(
     {
         "TicketCategoryEnum": "apps.support.choices.TicketCategory",
+        "RatingTagEnum": "apps.orders.choices.RatingTag",
         "TicketStatusEnum": "apps.support.choices.TicketStatus",
     }
 )
@@ -842,6 +907,20 @@ AXES_LOCKOUT_PARAMETERS = ["username", ["ip_address", "username"]]
 # IST). M4 (DL-60): payment payloads are scrubbed of personal data after the retention period.
 CELERY_BEAT_SCHEDULE.update(
     {
+        # Phase 7 (06 §5): daily store summary to managers; old report exports removed.
+        "daily-reports-email": {
+            "task": "reports.daily_reports_email",
+            "schedule": crontab(hour=2, minute=30),
+        },
+        "purge-report-exports": {
+            "task": "reports.purge_old_exports",
+            "schedule": crontab(hour=22, minute=50),
+        },
+        # Support photos never claimed by a reply (05:25 IST).
+        "purge-unclaimed-support-attachments": {
+            "task": "support.purge_unclaimed_attachments",
+            "schedule": crontab(hour=23, minute=55),
+        },
         "flush-expired-tokens": {
             "task": "accounts.flush_expired_tokens",
             "schedule": crontab(hour=22, minute=0),

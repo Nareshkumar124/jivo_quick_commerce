@@ -12,6 +12,7 @@
         {% endif %}
 
         <div class="flex items-center gap-2 ml-auto">
+            {% if ops_live_url %}{% include "ops/components/live_status.html" %}{% endif %}
             <div class="ops-user min-w-0" data-testid="ops-user">
                 <span class="font-semibold text-font-important-light truncate dark:text-font-important-dark">{{ user.name|default:user.email }}</span>
                 <span class="text-xs text-font-subtle-light truncate dark:text-font-subtle-dark" data-testid="ops-roles">{{ user_roles|join:", "|default:"No role" }}</span>

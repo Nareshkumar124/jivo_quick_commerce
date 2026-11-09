@@ -25,9 +25,13 @@ class TicketCreateRequest {
     required this.message,
 
     this.orderId,
+
+    this.taskId,
+
+    this.payoutId,
   });
 
-  /// MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY need `order_id`.  * `MISSING_ITEMS` - Missing items * `DAMAGED_ITEMS` - Damaged items * `WRONG_ITEMS` - Wrong items * `LATE_DELIVERY` - Late delivery * `PAYMENT_REFUND` - Payment or refund * `ACCOUNT` - Account * `OTHER` - Other
+  /// MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY need `order_id`. TASK, PAYOUT and CASH are for the rider app only (a rider session).  * `MISSING_ITEMS` - Missing items * `DAMAGED_ITEMS` - Damaged items * `WRONG_ITEMS` - Wrong items * `LATE_DELIVERY` - Late delivery * `PAYMENT_REFUND` - Payment or refund * `ACCOUNT` - Account * `OTHER` - Other * `TASK` - A delivery task * `PAYOUT` - Payout * `CASH` - Cash deposit
   @JsonKey(
     name: r'category',
     required: true,
@@ -45,19 +49,33 @@ class TicketCreateRequest {
   @JsonKey(name: r'order_id', required: false, includeIfNull: false)
   final int? orderId;
 
+  /// Rider app: a task the caller was assigned (else 400 not found).
+  // minimum: 1
+  @JsonKey(name: r'task_id', required: false, includeIfNull: false)
+  final int? taskId;
+
+  /// Rider app: one of the caller's payouts (else 400 not found).
+  // minimum: 1
+  @JsonKey(name: r'payout_id', required: false, includeIfNull: false)
+  final int? payoutId;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is TicketCreateRequest &&
           other.category == category &&
           other.message == message &&
-          other.orderId == orderId;
+          other.orderId == orderId &&
+          other.taskId == taskId &&
+          other.payoutId == payoutId;
 
   @override
   int get hashCode =>
       category.hashCode +
       message.hashCode +
-      (orderId == null ? 0 : orderId.hashCode);
+      (orderId == null ? 0 : orderId.hashCode) +
+      (taskId == null ? 0 : taskId.hashCode) +
+      (payoutId == null ? 0 : payoutId.hashCode);
 
   factory TicketCreateRequest.fromJson(Map<String, dynamic> json) =>
       _$TicketCreateRequestFromJson(json);

@@ -80,8 +80,9 @@ def test_list_is_paginated_with_a_constant_number_of_queries(user, auth_client):
     with CaptureQueriesContext(connection) as more:
         response = auth_client.get(LIST, {"page_size": 2})
     assert len(more) == len(few)  # not one query per entry
-    # Session-less JWT request: the user, the page count and the page itself.
-    assert len(more) <= 3, [q["sql"] for q in more.captured_queries]
+    # Session-less JWT request: the user, the page count, the page itself and the unread
+    # count (api-requests #45).
+    assert len(more) <= 4, [q["sql"] for q in more.captured_queries]
     assert response.json()["count"] == 3
     assert len(response.json()["results"]) == 2
     assert "page=2" in response.json()["next"]

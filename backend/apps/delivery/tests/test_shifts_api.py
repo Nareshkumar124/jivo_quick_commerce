@@ -80,6 +80,7 @@ def test_cash_over_limit_is_prepaid_only(client, rider):
         "cash_in_hand": "5000.00",
         "cash_limit": "5000.00",
         "limit_reached": True,
+        "deposit_required": True,
     }
 
 
@@ -329,7 +330,7 @@ def test_new_position_is_published_through_the_p6_hook(
 def test_hook_stubs_do_not_raise(rider):
     from apps.delivery import hooks
 
-    hooks.send_push(rider.user, "rider.offer", {})
+    hooks.send_push(rider.user, "rider.offer_new", {})
     hooks.publish_rider_location(rider.pk, 28.45, 77.05, timezone.now())
     hooks.publish_offer(rider.pk, {"id": 1})
 
@@ -386,26 +387,25 @@ def test_cache_outage_is_tolerated(client, rider, monkeypatch):
     assert shifts.latest_location(rider)["lat"] == pytest.approx(AT_STORE["lat"])
 
 
-def test_has_active_task_with_a_task_model(rider, monkeypatch):
-    """Slice 5.3 adds DeliveryTask; the check queries it when it exists."""
-    from django.apps import apps as django_apps
+def test_has_active_task_with_a_real_task(rider):
+    """Slice 5.3: a busy task (ASSIGNED..RETURNING) makes the rider busy; ended ones do not."""
+    from decimal import Decimal
 
-    class FakeManager:
-        def filter(self, **kwargs):
-            assert kwargs["rider"] == rider
-            return self
+    from apps.delivery.models import DeliveryTask
+    from apps.orders.tests.factories import OrderFactory
 
-        def exists(self):
-            return True
-
-    class FakeTask:
-        objects = FakeManager()
-
-    monkeypatch.setattr(django_apps, "get_model", lambda *args: FakeTask)
+    task = DeliveryTask.objects.create(
+        order=OrderFactory(store=rider.home_store),
+        store=rider.home_store,
+        rider=rider,
+        status="RETURNING",
+        search_started_at=timezone.now(),
+        distance_km=Decimal("1.00"),
+        payout_amount=Decimal("35.00"),
+    )
     assert shifts.has_active_task(rider) is True
-
-
-# --------------------------------------------------------------------------- clock skew (review)
+    DeliveryTask.objects.filter(pk=task.pk).update(status="RETURNED")
+    assert shifts.has_active_task(rider) is False
 
 
 def test_presence_uses_server_receipt_time_not_the_device_clock(client, rider):

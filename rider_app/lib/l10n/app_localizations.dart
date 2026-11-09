@@ -2534,6 +2534,36 @@ abstract class AppLocalizations {
   /// **'Balance {amount}'**
   String cashBalanceAfter(String amount);
 
+  /// Inbox screen title and the home bell tooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get inboxTitle;
+
+  /// No description provided for @inboxEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications yet.'**
+  String get inboxEmpty;
+
+  /// No description provided for @inboxMarkAllRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all read'**
+  String get inboxMarkAllRead;
+
+  /// No description provided for @inboxMarkAllFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not mark them read. Try again.'**
+  String get inboxMarkAllFailed;
+
+  /// No description provided for @inboxUnreadBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} unread'**
+  String inboxUnreadBadge(String count);
+
   /// No description provided for @historyTitle.
   ///
   /// In en, this message translates to:
@@ -3295,6 +3325,534 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Jivo operations set you offline. Go online again when you are ready, or call support.'**
   String get shiftEndedByOpsBody;
+
+  /// No description provided for @pickupCodeWrongLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'That code doesn\'t match this order. {count, plural, =1{1 try left.} other{{count} tries left.}}'**
+  String pickupCodeWrongLeft(int count);
+
+  /// No description provided for @pickupCodeLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong codes. Ask the store staff or call support to hand over this order.'**
+  String get pickupCodeLocked;
+
+  /// No description provided for @pickupLockedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Code entry locked'**
+  String get pickupLockedTitle;
+
+  /// No description provided for @pickupCallStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Call store'**
+  String get pickupCallStore;
+
+  /// No description provided for @riderOfflineError.
+  ///
+  /// In en, this message translates to:
+  /// **'You are offline. Go online again to continue.'**
+  String get riderOfflineError;
+
+  /// No description provided for @failWaitNotElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Wait 10 minutes at the drop location before choosing this.'**
+  String get failWaitNotElapsed;
+
+  /// No description provided for @failNeedsCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Call the customer at least 2 times first.'**
+  String get failNeedsCalls;
+
+  /// No description provided for @codAmountChangedCollect.
+  ///
+  /// In en, this message translates to:
+  /// **'The amount changed. Collect exactly {amount}.'**
+  String codAmountChangedCollect(String amount);
+
+  /// No description provided for @codUpiNotConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'The UPI payment isn\'t confirmed yet. Wait for it, or collect cash.'**
+  String get codUpiNotConfirmed;
+
+  /// No description provided for @scanOtherOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'This bag is for order {orderNumber}, not this one.'**
+  String scanOtherOrder(String orderNumber);
+
+  /// No description provided for @taskReturnWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking with the store every few seconds…'**
+  String get taskReturnWaiting;
+
+  /// No description provided for @offerItemCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String offerItemCount(int count);
+
+  /// No description provided for @cashDepositSkippedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A cash order was not sent to you because it would take your cash over the limit of {limit}. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.'**
+  String cashDepositSkippedBody(String limit);
+
+  /// No description provided for @cashDepositWhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit cash with the store manager at {store}. It shows here once they record it.'**
+  String cashDepositWhere(String store);
+
+  /// No description provided for @earningsOrdersTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing the latest 200 orders. The totals above include all orders in these dates.'**
+  String get earningsOrdersTruncated;
+
+  /// No description provided for @historyDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order details'**
+  String get historyDetailTitle;
+
+  /// No description provided for @historyAssignedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Accepted'**
+  String get historyAssignedAt;
+
+  /// No description provided for @historyPickedUpAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Picked up'**
+  String get historyPickedUpAt;
+
+  /// No description provided for @historyDeliveredAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get historyDeliveredAt;
+
+  /// No description provided for @historyFailedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery failed'**
+  String get historyFailedAt;
+
+  /// No description provided for @historyReturnedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned to store'**
+  String get historyReturnedAt;
+
+  /// No description provided for @historyCancelledAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get historyCancelledAt;
+
+  /// No description provided for @historyItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String historyItems(int count);
+
+  /// No description provided for @historyPaymentCod.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery'**
+  String get historyPaymentCod;
+
+  /// No description provided for @historyPaymentPrepaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepaid'**
+  String get historyPaymentPrepaid;
+
+  /// No description provided for @historyCodCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected {amount}'**
+  String historyCodCollected(String amount);
+
+  /// No description provided for @historyEarned.
+  ///
+  /// In en, this message translates to:
+  /// **'You earned'**
+  String get historyEarned;
+
+  /// No description provided for @taskChipDontRingBell.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t ring the bell'**
+  String get taskChipDontRingBell;
+
+  /// No description provided for @taskChipLeaveAtDoor.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave at the door'**
+  String get taskChipLeaveAtDoor;
+
+  /// No description provided for @taskChipAvoidCalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Avoid calling'**
+  String get taskChipAvoidCalling;
+
+  /// No description provided for @helpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help and support'**
+  String get helpTitle;
+
+  /// No description provided for @helpProfileSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FAQs, tickets and legal pages'**
+  String get helpProfileSubtitle;
+
+  /// No description provided for @helpRaiseTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise a ticket'**
+  String get helpRaiseTicket;
+
+  /// No description provided for @helpFaqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions riders ask'**
+  String get helpFaqTitle;
+
+  /// No description provided for @helpFaqEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No questions here yet. Raise a ticket and our team will help.'**
+  String get helpFaqEmpty;
+
+  /// No description provided for @legalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Legal'**
+  String get legalTitle;
+
+  /// No description provided for @legalRiderAgreement.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider agreement'**
+  String get legalRiderAgreement;
+
+  /// No description provided for @legalPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get legalPrivacy;
+
+  /// No description provided for @legalLocationDisclosure.
+  ///
+  /// In en, this message translates to:
+  /// **'How we use your location'**
+  String get legalLocationDisclosure;
+
+  /// No description provided for @legalEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This page is empty.'**
+  String get legalEmpty;
+
+  /// No description provided for @legalNotPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'This page is not available yet.'**
+  String get legalNotPublished;
+
+  /// No description provided for @legalOpenInBrowser.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get legalOpenInBrowser;
+
+  /// No description provided for @legalUpdatedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {date}'**
+  String legalUpdatedOn(String date);
+
+  /// No description provided for @ticketsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My tickets'**
+  String get ticketsTitle;
+
+  /// No description provided for @ticketsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not raised any tickets.'**
+  String get ticketsEmpty;
+
+  /// No description provided for @newTicketTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Raise a ticket'**
+  String get newTicketTitle;
+
+  /// No description provided for @newTicketTopic.
+  ///
+  /// In en, this message translates to:
+  /// **'What do you need help with?'**
+  String get newTicketTopic;
+
+  /// No description provided for @ticketTopicTask.
+  ///
+  /// In en, this message translates to:
+  /// **'An order'**
+  String get ticketTopicTask;
+
+  /// No description provided for @ticketTopicPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'A payout'**
+  String get ticketTopicPayout;
+
+  /// No description provided for @ticketTopicCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash deposit'**
+  String get ticketTopicCash;
+
+  /// No description provided for @ticketTopicAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'My account'**
+  String get ticketTopicAccount;
+
+  /// No description provided for @ticketTopicOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get ticketTopicOther;
+
+  /// No description provided for @ticketLinkedOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {number}'**
+  String ticketLinkedOrder(String number);
+
+  /// No description provided for @ticketLinkedPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout {period}'**
+  String ticketLinkedPayout(String period);
+
+  /// No description provided for @ticketDescribe.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us what happened'**
+  String get ticketDescribe;
+
+  /// No description provided for @ticketTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Write at least {count} characters.'**
+  String ticketTooShort(int count);
+
+  /// No description provided for @ticketTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'This is too long. Shorten it a little.'**
+  String get ticketTooLong;
+
+  /// No description provided for @ticketSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get ticketSend;
+
+  /// No description provided for @ticketSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Ticket {number} sent. We will reply here.'**
+  String ticketSent(String number);
+
+  /// No description provided for @ticketUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last update {when}'**
+  String ticketUpdated(String when);
+
+  /// No description provided for @ticketStatusOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get ticketStatusOpen;
+
+  /// No description provided for @ticketStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get ticketStatusInProgress;
+
+  /// No description provided for @ticketStatusResolved.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get ticketStatusResolved;
+
+  /// No description provided for @ticketStatusClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get ticketStatusClosed;
+
+  /// No description provided for @ticketReplyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a reply'**
+  String get ticketReplyHint;
+
+  /// No description provided for @ticketClosedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This ticket is closed. Raise a new ticket if you still need help.'**
+  String get ticketClosedNote;
+
+  /// No description provided for @ticketFromYou.
+  ///
+  /// In en, this message translates to:
+  /// **'You'**
+  String get ticketFromYou;
+
+  /// No description provided for @ticketFromSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo support'**
+  String get ticketFromSupport;
+
+  /// No description provided for @historyGetHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Get help with this order'**
+  String get historyGetHelp;
+
+  /// No description provided for @payoutGetHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Get help'**
+  String get payoutGetHelp;
+
+  /// No description provided for @ticketAddPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a photo'**
+  String get ticketAddPhoto;
+
+  /// No description provided for @ticketPhotoCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo'**
+  String get ticketPhotoCamera;
+
+  /// No description provided for @ticketPhotoGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get ticketPhotoGallery;
+
+  /// No description provided for @ticketPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo {index}'**
+  String ticketPhoto(int index);
+
+  /// No description provided for @ticketPhotoRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove photo {index}'**
+  String ticketPhotoRemove(int index);
+
+  /// No description provided for @ticketPhotoTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo is too large. Try another photo.'**
+  String get ticketPhotoTooLarge;
+
+  /// No description provided for @ticketPhotoUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'This file is not a photo we can use. Try another photo.'**
+  String get ticketPhotoUnreadable;
+
+  /// No description provided for @ticketPhotoLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'You can add up to {count} photos to one reply.'**
+  String ticketPhotoLimit(int count);
+
+  /// No description provided for @ticketPhotoNeedsText.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a short message to send with the photo.'**
+  String get ticketPhotoNeedsText;
+
+  /// No description provided for @ratingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'My rating'**
+  String get ratingTitle;
+
+  /// No description provided for @ratingNoneYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No ratings yet. Customers can rate you after each delivery.'**
+  String get ratingNoneYet;
+
+  /// No description provided for @ratingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No ratings yet} =1{From 1 rating} other{From {count} ratings}}'**
+  String ratingCount(int count);
+
+  /// No description provided for @ratingStars.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 star} other{{count} stars}}'**
+  String ratingStars(int count);
+
+  /// No description provided for @ratingTagOnTime.
+  ///
+  /// In en, this message translates to:
+  /// **'On time'**
+  String get ratingTagOnTime;
+
+  /// No description provided for @ratingTagPolite.
+  ///
+  /// In en, this message translates to:
+  /// **'Polite'**
+  String get ratingTagPolite;
+
+  /// No description provided for @ratingTagLate.
+  ///
+  /// In en, this message translates to:
+  /// **'Late'**
+  String get ratingTagLate;
+
+  /// No description provided for @ratingTagRude.
+  ///
+  /// In en, this message translates to:
+  /// **'Rude'**
+  String get ratingTagRude;
+
+  /// No description provided for @ratingTagOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get ratingTagOther;
 }
 
 class _AppLocalizationsDelegate

@@ -52,7 +52,11 @@ RIDER_LOCATION = "rider.location"
 RIDER_STATUS = "rider.status"
 OFFER_NEW = "offer.new"
 OFFER_WITHDRAWN = "offer.withdrawn"
+OFFER_EXPIRED = "offer.expired"
 TASK_UPDATED = "task.updated"
+CASH_UPDATED = "cash.updated"
+NOTIFICATION_NEW = "notification.new"
+TASK_STATUS = "task.status"
 ALERT = "alert"
 # Control messages
 AUTH = "auth"  # client -> server
@@ -67,9 +71,38 @@ ALERT_CODES = (
     "REFUND_FAILED",  # a refund failed at the gateway: retry it
     "DELIVERY_FAILED",  # T13 (Phase 5)
     "DISPATCH_UNASSIGNED",  # no rider found (Phase 5)
+    "PICKUP_CODE_LOCKED",  # too many wrong pickup codes (Phase 5)
+    "DELIVERY_OTP_LOCKED",  # too many wrong delivery OTPs (Phase 5)
+    "STOCK_NOT_COMMITTED",  # T9 with no active stock reservation (Phase 5)
+    "ARRIVAL_GEOFENCE_OVERRIDE",  # rider marked arrival outside the drop geofence (Phase 5)
+    "MOCKED_LOCATION",  # the rider app reports mocked GPS (Phase 5)
+    "RIDER_STALE_ON_TASK",  # a rider on a task stopped sending locations (Phase 5)
 )
-OFFER_WITHDRAWN_REASONS = ("EXPIRED", "TAKEN", "ORDER_CANCELLED", "REASSIGNED")
-TASK_CHANGES = ("ORDER_PACKED", "ORDER_CANCELLED", "AMOUNT_CHANGED", "REASSIGNED", "STATUS_CHANGED")
+# EXPIRED is only sent as `offer.expired` (T-612); `offer.withdrawn` carries the others.
+OFFER_WITHDRAWN_REASONS = ("EXPIRED", "TAKEN", "ORDER_CANCELLED", "REASSIGNED", "RIDER_OFFLINE")
+TASK_CHANGES = (
+    "ORDER_PACKED",
+    "ORDER_CANCELLED",
+    "AMOUNT_CHANGED",
+    "REASSIGNED",
+    "STATUS_CHANGED",
+    "ASSIGNED",
+)
+CASH_REASONS = ("COD_COLLECTED", "DEPOSIT", "ADJUSTMENT", "DEPOSIT_REQUIRED")
+TASK_STATUSES = (
+    "SEARCHING",
+    "OFFERED",
+    "ASSIGNED",
+    "AT_STORE",
+    "PICKED_UP",
+    "AT_CUSTOMER",
+    "DELIVERED",
+    "FAILED",
+    "RETURNING",
+    "RETURNED",
+    "UNASSIGNED",
+    "CANCELLED",
+)
 
 # --------------------------------------------------------------------------- schema helpers
 DT = {"type": "string", "format": "date-time"}
@@ -189,6 +222,38 @@ OFFER_DATA = {
     "expires_at": "2026-11-10T09:30:30Z",
 }
 OFFER_WITHDRAWN_DATA = {"offer_id": 9001, "task_id": 7001, "reason": "ORDER_CANCELLED"}
+OFFER_EXPIRED_DATA = {"offer_id": 9001, "task_id": 7001, "reason": "EXPIRED"}
+CASH_UPDATED_DATA = {
+    "rider_id": 41,
+    "cash_in_hand": "1498.00",
+    "cash_limit": "2000.00",
+    "limit_reached": False,
+    "deposit_required": False,
+    "reason": "COD_COLLECTED",
+    "updated_at": "2026-11-10T09:58:10Z",
+}
+NOTIFICATION_NEW_DATA = {
+    "id": 5512,
+    "title": "Order confirmed",
+    "body": "The store has confirmed order JV-261110-001203 and will pack it now.",
+    "category": "order",
+    "link": "jivo://orders/1203",
+    "read": False,
+    "created_at": "2026-11-10T09:41:05Z",
+    "unread_count": 3,
+}
+OPS_TASK_STATUS_DATA = {
+    "task_id": 7001,
+    "order_id": 1203,
+    "order_number": "JV-261110-001203",
+    "store_id": 1,
+    "status": "ASSIGNED",
+    "previous_status": "OFFERED",
+    "rider_id": 41,
+    "assignment_mode": "AUTO",
+    "attempt_count": 1,
+    "updated_at": "2026-11-10T09:30:08Z",
+}
 TASK_UPDATED_DATA = {
     "task_id": 7001,
     "order_id": 1203,
@@ -316,6 +381,51 @@ DATA_COMPONENTS: dict[str, dict] = {
         task_id=INT,
         reason=_enum(*OFFER_WITHDRAWN_REASONS),
     ),
+    "WsCashUpdatedData": _object(
+        "The rider's cash in hand changed (COD collected, deposit, adjustment), or COD offers "
+        "now need a deposit first. Same values as `GET /rider/cash/` (`cash`).",
+        rider_id=INT,
+        cash_in_hand=MONEY,
+        cash_limit=MONEY,
+        limit_reached=BOOL,
+        deposit_required={
+            **BOOL,
+            "description": 'Show the "deposit cash" banner (08 §5, DL-61 b).',
+        },
+        reason=_enum(*CASH_REASONS),
+        updated_at=DT,
+    ),
+    "WsNotificationNewData": _object(
+        "A new inbox entry for this app (the `InboxNotification` of `GET /me/notifications/`) "
+        "and the new unread count. Sent to every open app socket of the user.",
+        id=INT,
+        title=STR,
+        body=STR,
+        category=STR,
+        link={**STR, "nullable": True},
+        read=BOOL,
+        created_at=DT,
+        unread_count={**INT, "description": "Unread inbox entries for this app now."},
+    ),
+    "WsOpsTaskStatusData": _object(
+        "A delivery task was created or changed state (dispatch board, 05 §1.4). No customer data.",
+        task_id=INT,
+        order_id=INT,
+        order_number=STR,
+        store_id=INT,
+        status=_enum(*TASK_STATUSES),
+        previous_status={
+            **_enum(*TASK_STATUSES, nullable=True),
+            "description": "null when unknown: just created, or changed twice in one transaction.",
+        },
+        rider_id=INT_NULL,
+        assignment_mode={
+            **_enum("AUTO", "MANUAL", nullable=True),
+            "description": "null before a rider is assigned.",
+        },
+        attempt_count={**INT, "description": "Offers made in the current search round."},
+        updated_at=DT,
+    ),
     "WsTaskUpdatedData": _object(
         "The rider's task changed: re-read `GET /rider/tasks/current/`.",
         task_id=INT,
@@ -389,6 +499,35 @@ MESSAGES: list[tuple[str, str, str | None, dict | None, str]] = [
         "WsOfferWithdrawnData",
         OFFER_WITHDRAWN_DATA,
         f"`{RIDER_SOCKET}`.",
+    ),
+    (
+        "WsOfferExpiredMessage",
+        OFFER_EXPIRED,
+        "WsOfferWithdrawnData",
+        OFFER_EXPIRED_DATA,
+        f"`{RIDER_SOCKET}`: the offer timed out (`reason` is EXPIRED). Close the offer screen.",
+    ),
+    (
+        "WsCashUpdatedMessage",
+        CASH_UPDATED,
+        "WsCashUpdatedData",
+        CASH_UPDATED_DATA,
+        f"`{RIDER_SOCKET}`.",
+    ),
+    (
+        "WsNotificationNewMessage",
+        NOTIFICATION_NEW,
+        "WsNotificationNewData",
+        NOTIFICATION_NEW_DATA,
+        f"`{ORDER_SOCKET}` and `{RIDER_SOCKET}`: a new inbox entry (api-requests #47). Without "
+        "an open socket the app re-reads the inbox on the FCM message.",
+    ),
+    (
+        "WsOpsTaskStatusMessage",
+        TASK_STATUS,
+        "WsOpsTaskStatusData",
+        OPS_TASK_STATUS_DATA,
+        f"`{OPS_SOCKET}`: the dispatch board (task created, offered, accepted, failed, ...).",
     ),
     (
         "WsTaskUpdatedMessage",

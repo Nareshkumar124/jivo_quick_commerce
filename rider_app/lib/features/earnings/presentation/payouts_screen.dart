@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../app/routes.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/format/ist_format.dart';
 import '../../../shared/widgets/paged_list_view.dart';
+import '../../support/domain/support_models.dart';
 import '../../task/domain/task_rules.dart';
 import '../domain/earnings.dart';
 import 'earnings_providers.dart';
 
 /// Payout history (04 §2.8): period, amount, status and the bank
-/// reference, as Finance recorded them.
+/// reference, as Finance recorded them, with "Get help" on each payout (a
+/// PAYOUT ticket linked to it).
 class PayoutsScreen extends ConsumerWidget {
   const PayoutsScreen({super.key});
 
@@ -41,45 +46,64 @@ class _PayoutTile extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final paid = payout.status == PayoutStatus.paid;
+    final period = l10n.dateRange(
+      istDate(context, payout.periodStart),
+      istDate(context, payout.periodEnd),
+    );
     return Card(
       key: Key('payout-${payout.id}'),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.dateRange(
-                      istDate(context, payout.periodStart),
-                      istDate(context, payout.periodEnd),
-                    ),
-                    style: theme.textTheme.titleMedium,
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(period, style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 4),
+                      Text(
+                        paid ? l10n.payoutPaid : l10n.payoutPending,
+                        key: Key('payout-${payout.id}-status'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: paid
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.tertiary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (payout.reference case final reference?)
+                        Text(l10n.payoutReference(reference)),
+                      if (payout.paidAt case final paidAt?)
+                        Text(l10n.payoutPaidOn(istDayOf(context, paidAt))),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    paid ? l10n.payoutPaid : l10n.payoutPending,
-                    key: Key('payout-${payout.id}-status'),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: paid
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.tertiary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                ),
+                Text(
+                  formatRupees(payout.amount),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                  if (payout.reference case final reference?)
-                    Text(l10n.payoutReference(reference)),
-                  if (payout.paidAt case final paidAt?)
-                    Text(l10n.payoutPaidOn(istDayOf(context, paidAt))),
-                ],
-              ),
+                ),
+              ],
             ),
-            Text(
-              formatRupees(payout.amount),
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                key: Key('payout-${payout.id}-help'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: () => context.push(
+                  Routes.newTicket(
+                    topic: RiderTicketTopic.payout.code,
+                    payoutId: payout.id,
+                    label: period,
+                  ),
+                ),
+                icon: const Icon(Icons.support_agent),
+                label: Text(l10n.payoutGetHelp),
               ),
             ),
           ],

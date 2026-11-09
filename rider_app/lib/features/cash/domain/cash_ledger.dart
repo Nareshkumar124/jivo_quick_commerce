@@ -42,7 +42,9 @@ class CashSummary {
     required this.cashInHand,
     required this.cashLimit,
     required this.limitReached,
-  });
+    bool? depositRequired,
+    this.homeStoreName,
+  }) : depositRequired = depositRequired ?? limitReached;
 
   final String cashInHand;
   final String cashLimit;
@@ -50,13 +52,22 @@ class CashSummary {
   /// The server's verdict: at or above the limit, the rider gets prepaid
   /// orders only and must deposit cash. The app never compares amounts.
   final bool limitReached;
+
+  /// `deposit_required` (DL-61 b): at the limit, or a COD order was skipped
+  /// because cash in hand plus its amount was over the limit.
+  final bool depositRequired;
+
+  /// Where to deposit: the rider's home store (`home_store.name`).
+  final String? homeStoreName;
 }
 
-/// `GET /rider/cash/ledger/?page=` with the summary on the first page.
+/// `GET /rider/cash/ledger/?before_id=` with the summary (from
+/// `GET /rider/me/`, api-requests #21) on the first page.
 class CashLedgerPage {
-  const CashLedgerPage({required this.summary, required this.entries});
+  const CashLedgerPage({required this.entries, this.summary});
 
-  final CashSummary summary;
+  /// Null on later pages: the screen keeps the one it has.
+  final CashSummary? summary;
   final Page<CashEntry> entries;
 }
 
@@ -73,8 +84,8 @@ List<(DateTime day, List<CashEntry> entries)> groupByIstDay(
 }
 
 /// The cash ledger (06 §3). Throws jivo_core's `ApiError`.
-///
-/// TODO(api): no rider contract yet; the fake stands in (DL-30 gating).
 abstract interface class CashRepository {
-  Future<CashLedgerPage> fetchLedger({int page = 1});
+  /// [cursor]: null for the newest entries, then the previous page's
+  /// `nextPage` (a `before_id`; api-requests #24).
+  Future<CashLedgerPage> fetchLedger({int? cursor});
 }

@@ -5,20 +5,24 @@ import '../../../app/providers.dart';
 import '../../../shared/paged_list_controller.dart';
 import '../../../shared/paging.dart';
 import '../../task/presentation/task_providers.dart';
+import '../data/api_earnings_repository.dart';
 import '../data/fake_earnings_backend.dart';
 import '../domain/earnings.dart';
 
-/// TODO(api): the fake earnings and payouts backend. Handed out only where
-/// the rider work screens run (dev flavor, DL-30/DL-32); overridden in
-/// tests.
+/// The fake earnings and payouts (`FAKE_API` builds). Overridden in tests.
 final fakeEarningsBackendProvider = Provider<FakeEarningsBackend>(
   (ref) => FakeEarningsBackend(),
 );
 
-/// TODO(api): bind to the generated client when the rider contract lands.
+/// Earnings and payouts: the generated client (P5 slice 5.4), the fake
+/// with `FAKE_API`. The screens stay where the rider work screens run (dev
+/// flavor, DL-30/DL-32).
 final earningsRepositoryProvider = Provider<EarningsRepository>((ref) {
   if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
-  return ref.watch(fakeEarningsBackendProvider);
+  if (ref.watch(appEnvProvider).useFakeApi) {
+    return ref.watch(fakeEarningsBackendProvider);
+  }
+  return ApiEarningsRepository(ref.watch(jivoApiProvider));
 });
 
 /// The chosen period and its IST dates.
@@ -60,10 +64,10 @@ final payoutsProvider =
       PagedListNotifier<Payout, void>,
       PagedListState<Payout, void>
     >(
-      () => PagedListNotifier((ref, page) async {
+      () => PagedListNotifier((ref, cursor) async {
         final result = await ref
             .read(earningsRepositoryProvider)
-            .fetchPayouts(page: page);
+            .fetchPayouts(cursor: cursor);
         return (result, null);
       }, keyOf: (payout) => payout.id),
     );
@@ -80,5 +84,5 @@ class _Unavailable implements EarningsRepository {
   Future<EarningsSummary> fetchEarnings(DateRange range) async => throw _error;
 
   @override
-  Future<Page<Payout>> fetchPayouts({int page = 1}) async => throw _error;
+  Future<Page<Payout>> fetchPayouts({int? cursor}) async => throw _error;
 }

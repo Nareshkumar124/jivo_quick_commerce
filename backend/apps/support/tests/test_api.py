@@ -216,11 +216,17 @@ class TestListAndDetail:
             (MESSAGE, False),
             ("We are on it.", True),
         ]
-        assert set(body["messages"][0]) == {"id", "body", "from_support", "created_at"}
+        assert set(body["messages"][0]) == {
+            "id",
+            "body",
+            "from_support",
+            "created_at",
+            "attachments",
+        }
 
     def test_detail_query_count(self, auth_client, django_assert_max_num_queries):
         ticket_id = create(auth_client).json()["id"]
-        with django_assert_max_num_queries(3):  # user, ticket, messages
+        with django_assert_max_num_queries(4):  # user, ticket, messages, attachments (P7)
             auth_client.get(detail(ticket_id))
 
     def test_idor_detail_is_404(self, auth_client, other_client):

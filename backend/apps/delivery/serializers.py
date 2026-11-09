@@ -90,6 +90,13 @@ class RiderCashSerializer(serializers.Serializer):
     limit_reached = serializers.BooleanField(
         help_text="True at or above the limit: only prepaid offers are sent (08 §5)."
     )
+    deposit_required = serializers.BooleanField(
+        help_text=(
+            'Show the "Deposit cash" banner (DL-61): at the limit, or a COD order was not '
+            "offered to you because cash in hand + its amount was over the limit. Cleared by a "
+            "deposit at the store. Ops cannot override the limit."
+        )
+    )
 
 
 class RiderDocumentSerializer(serializers.Serializer):
@@ -582,6 +589,15 @@ class DeliveryOtpStateSerializer(serializers.Serializer):
     )
 
 
+class PickupCodeStateSerializer(serializers.Serializer):
+    attempts_remaining = serializers.IntegerField(
+        help_text="Wrong order codes left before pickup locks (`PICKUP_CODE_MAX_ATTEMPTS`)."
+    )
+    locked = serializers.BooleanField(
+        help_text="True after too many wrong order codes: ops are alerted and can unlock it."
+    )
+
+
 class CodQrSerializer(serializers.Serializer):
     """A UPI QR for the COD amount (Razorpay QR). The server confirms payment; poll
     `tasks/current/` (or this endpoint) until `status` is PAID."""
@@ -638,6 +654,7 @@ class RiderTaskSerializer(serializers.Serializer):
     estimated_payout = money("Base + distance pay for this order (tips come on delivery).")
     geofence = TaskGeofenceSerializer()
     delivery_otp = DeliveryOtpStateSerializer()
+    pickup_code = PickupCodeStateSerializer(help_text="The order-code check at pickup (T9).")
     cod_qr = CodQrSerializer(allow_null=True, help_text="The UPI QR, once generated.")
     assigned_at = serializers.DateTimeField()
     arrived_store_at = serializers.DateTimeField(allow_null=True)
@@ -655,7 +672,11 @@ class RiderTaskSerializer(serializers.Serializer):
     fail_reason = serializers.ChoiceField(choices=DeliveryFailReason.choices, allow_null=True)
     returned_at = serializers.DateTimeField(allow_null=True)
     earnings = TaskEarningsSerializer(
-        allow_null=True, help_text="Set once DELIVERED (base, distance, tip...)."
+        allow_null=True,
+        help_text=(
+            "The pay for this task: base + distance from pickup (DL-61: paid even if the "
+            "delivery then fails), plus the tip once DELIVERED. Null before pickup."
+        ),
     )
 
 
@@ -713,10 +734,20 @@ class PickupSerializer(serializers.Serializer):
     order_code = serializers.CharField(
         max_length=64,
         help_text=(
-            "The 4-character order code typed by the rider, or the whole bag QR payload "
-            "`JQC1:<order_number>:<code>` as scanned. Case-insensitive."
+            "The 4-character order code typed by the rider (ASCII letters and digits), or the "
+            "whole bag QR payload `JQC1:<order_number>:<code>` as scanned. Case-insensitive. "
+            "Anything else (non-ASCII, wrong shape): 400 `PICKUP_CODE_INVALID`."
         ),
     )
+
+    def validate_order_code(self, value: str) -> str:
+        from apps.core.errors import ErrorCode
+        from apps.core.exceptions import ApiError
+        from apps.delivery.services.tasks import code_format_ok
+
+        if not code_format_ok(value):
+            raise ApiError(ErrorCode.PICKUP_CODE_INVALID)
+        return value.strip()
 
 
 class CodCollectionSerializer(serializers.Serializer):
@@ -852,6 +883,25 @@ class TaskHistoryItemSerializer(serializers.Serializer):
     )
     payout = money_or_null("Earned for this task (all lines); null if nothing was earned.")
     completed_at = serializers.DateTimeField(help_text="When it ended.")
+
+
+class TaskHistoryDetailSerializer(TaskHistoryItemSerializer):
+    """One past task (04 §2.8 detail). No customer personal data: the drop locality only."""
+
+    payment_type = serializers.ChoiceField(choices=PaymentType.choices)
+    cod_collected = money_or_null("COD delivered: the amount collected (cash or UPI); else null.")
+    items = TaskItemSerializer(many=True)
+    item_count = serializers.IntegerField(help_text="Units delivered or returned.")
+    assigned_at = serializers.DateTimeField(allow_null=True)
+    picked_up_at = serializers.DateTimeField(allow_null=True)
+    delivered_at = serializers.DateTimeField(allow_null=True)
+    failed_at = serializers.DateTimeField(allow_null=True)
+    fail_reason = serializers.ChoiceField(choices=DeliveryFailReason.choices, allow_null=True)
+    returned_at = serializers.DateTimeField(allow_null=True)
+    cancelled_at = serializers.DateTimeField(allow_null=True)
+    earnings = TaskEarningsSerializer(
+        allow_null=True, help_text="The pay lines for this task (from pickup); null if none."
+    )
 
 
 class BeforeIdPageSerializer(serializers.Serializer):

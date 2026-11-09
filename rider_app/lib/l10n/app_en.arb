@@ -824,6 +824,19 @@
       }
     }
   },
+  "inboxTitle": "Notifications",
+  "@inboxTitle": {"description": "Inbox screen title and the home bell tooltip."},
+  "inboxEmpty": "No notifications yet.",
+  "inboxMarkAllRead": "Mark all read",
+  "inboxMarkAllFailed": "Could not mark them read. Try again.",
+  "inboxUnreadBadge": "{count} unread",
+  "@inboxUnreadBadge": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
   "historyTitle": "History",
   "historyEmpty": "No past orders yet.",
   "historyRoute": "{store} → {drop}",
@@ -1132,5 +1145,202 @@
   },
   "taskReturnNoCash": "Don't collect any cash. Nothing is due for this order.",
   "riderTooManyTries": "Too many tries. Wait a moment, then try again.",
-  "shiftEndedByOpsBody": "Jivo operations set you offline. Go online again when you are ready, or call support."
+  "shiftEndedByOpsBody": "Jivo operations set you offline. Go online again when you are ready, or call support.",
+  "pickupCodeWrongLeft": "That code doesn't match this order. {count, plural, =1{1 try left.} other{{count} tries left.}}",
+  "@pickupCodeWrongLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pickupCodeLocked": "Too many wrong codes. Ask the store staff or call support to hand over this order.",
+  "pickupLockedTitle": "Code entry locked",
+  "pickupCallStore": "Call store",
+  "riderOfflineError": "You are offline. Go online again to continue.",
+  "failWaitNotElapsed": "Wait 10 minutes at the drop location before choosing this.",
+  "failNeedsCalls": "Call the customer at least 2 times first.",
+  "codAmountChangedCollect": "The amount changed. Collect exactly {amount}.",
+  "@codAmountChangedCollect": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "codUpiNotConfirmed": "The UPI payment isn't confirmed yet. Wait for it, or collect cash.",
+  "scanOtherOrder": "This bag is for order {orderNumber}, not this one.",
+  "@scanOtherOrder": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "taskReturnWaiting": "Checking with the store every few seconds…",
+  "offerItemCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "@offerItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cashDepositSkippedBody": "A cash order was not sent to you because it would take your cash over the limit of {limit}. Hand the cash to the store manager to get cash orders again. Until then you get prepaid orders only.",
+  "@cashDepositSkippedBody": {"placeholders": {"limit": {"type": "String"}}},
+  "cashDepositWhere": "Deposit cash with the store manager at {store}. It shows here once they record it.",
+  "@cashDepositWhere": {"placeholders": {"store": {"type": "String"}}},
+  "earningsOrdersTruncated": "Showing the latest 200 orders. The totals above include all orders in these dates.",
+  "historyDetailTitle": "Order details",
+  "historyAssignedAt": "Accepted",
+  "historyPickedUpAt": "Picked up",
+  "historyDeliveredAt": "Delivered",
+  "historyFailedAt": "Delivery failed",
+  "historyReturnedAt": "Returned to store",
+  "historyCancelledAt": "Cancelled",
+  "historyItems": "{count, plural, =1{1 item} other{{count} items}}",
+  "@historyItems": {"placeholders": {"count": {"type": "int"}}},
+  "historyPaymentCod": "Cash on delivery",
+  "historyPaymentPrepaid": "Prepaid",
+  "historyCodCollected": "Collected {amount}",
+  "@historyCodCollected": {"placeholders": {"amount": {"type": "String"}}},
+  "historyEarned": "You earned",
+  "taskChipDontRingBell": "Don't ring the bell",
+  "taskChipLeaveAtDoor": "Leave at the door",
+  "taskChipAvoidCalling": "Avoid calling",
+  "helpTitle": "Help and support",
+  "helpProfileSubtitle": "FAQs, tickets and legal pages",
+  "helpRaiseTicket": "Raise a ticket",
+  "helpFaqTitle": "Questions riders ask",
+  "helpFaqEmpty": "No questions here yet. Raise a ticket and our team will help.",
+  "legalTitle": "Legal",
+  "legalRiderAgreement": "Rider agreement",
+  "legalPrivacy": "Privacy policy",
+  "legalLocationDisclosure": "How we use your location",
+  "legalEmpty": "This page is empty.",
+  "legalNotPublished": "This page is not available yet.",
+  "legalOpenInBrowser": "Open in browser",
+  "legalUpdatedOn": "Updated {date}",
+  "@legalUpdatedOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "ticketsTitle": "My tickets",
+  "ticketsEmpty": "You have not raised any tickets.",
+  "newTicketTitle": "Raise a ticket",
+  "newTicketTopic": "What do you need help with?",
+  "ticketTopicTask": "An order",
+  "ticketTopicPayout": "A payout",
+  "ticketTopicCash": "Cash deposit",
+  "ticketTopicAccount": "My account",
+  "ticketTopicOther": "Something else",
+  "ticketLinkedOrder": "Order {number}",
+  "@ticketLinkedOrder": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "ticketLinkedPayout": "Payout {period}",
+  "@ticketLinkedPayout": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "ticketDescribe": "Tell us what happened",
+  "ticketTooShort": "Write at least {count} characters.",
+  "@ticketTooShort": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ticketTooLong": "This is too long. Shorten it a little.",
+  "ticketSend": "Send",
+  "ticketSent": "Ticket {number} sent. We will reply here.",
+  "@ticketSent": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "ticketUpdated": "Last update {when}",
+  "@ticketUpdated": {
+    "placeholders": {
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "ticketStatusOpen": "Open",
+  "ticketStatusInProgress": "In progress",
+  "ticketStatusResolved": "Resolved",
+  "ticketStatusClosed": "Closed",
+  "ticketReplyHint": "Write a reply",
+  "ticketClosedNote": "This ticket is closed. Raise a new ticket if you still need help.",
+  "ticketFromYou": "You",
+  "ticketFromSupport": "Jivo support",
+  "historyGetHelp": "Get help with this order",
+  "payoutGetHelp": "Get help",
+  "ticketAddPhoto": "Add a photo",
+  "ticketPhotoCamera": "Take a photo",
+  "ticketPhotoGallery": "Choose from gallery",
+  "ticketPhoto": "Photo {index}",
+  "@ticketPhoto": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "ticketPhotoRemove": "Remove photo {index}",
+  "@ticketPhotoRemove": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "ticketPhotoTooLarge": "This photo is too large. Try another photo.",
+  "ticketPhotoUnreadable": "This file is not a photo we can use. Try another photo.",
+  "ticketPhotoLimit": "You can add up to {count} photos to one reply.",
+  "@ticketPhotoLimit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ticketPhotoNeedsText": "Write a short message to send with the photo.",
+  "ratingTitle": "My rating",
+  "ratingNoneYet": "No ratings yet. Customers can rate you after each delivery.",
+  "ratingCount": "{count, plural, =0{No ratings yet} =1{From 1 rating} other{From {count} ratings}}",
+  "@ratingCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ratingStars": "{count, plural, =1{1 star} other{{count} stars}}",
+  "@ratingStars": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ratingTagOnTime": "On time",
+  "ratingTagPolite": "Polite",
+  "ratingTagLate": "Late",
+  "ratingTagRude": "Rude",
+  "ratingTagOther": "Other"
 }

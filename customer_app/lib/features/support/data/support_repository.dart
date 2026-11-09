@@ -24,9 +24,19 @@ abstract interface class SupportRepository {
     int? orderId,
   });
 
-  /// Adds the customer's reply. Throws [ApiError] (`VALIDATION_ERROR` on a
-  /// closed ticket).
-  Future<TicketThread> reply(int ticketId, String message);
+  /// Adds the customer's reply with up to [ticketPhotosPerMessage] photos
+  /// uploaded by [uploadPhoto] ([photoKeys]). Throws [ApiError]
+  /// (`VALIDATION_ERROR` on a closed ticket or an expired photo key).
+  Future<TicketThread> reply(
+    int ticketId,
+    String message, {
+    List<String> photoKeys = const [],
+  });
+
+  /// Uploads one photo to the ticket; send its key with the next [reply]
+  /// within an hour. Throws [TicketPhotoException] for a file the API
+  /// won't take (checked first, and HTTP 413), else [ApiError].
+  Future<TicketPhoto> uploadPhoto(int ticketId, TicketPhotoFile photo);
 }
 
 /// A build without in-app support (see `supportAvailableProvider`).
@@ -53,7 +63,14 @@ class UnavailableSupportRepository implements SupportRepository {
   }) async => throw _error;
 
   @override
-  Future<TicketThread> reply(int ticketId, String message) async =>
+  Future<TicketThread> reply(
+    int ticketId,
+    String message, {
+    List<String> photoKeys = const [],
+  }) async => throw _error;
+
+  @override
+  Future<TicketPhoto> uploadPhoto(int ticketId, TicketPhotoFile photo) async =>
       throw _error;
 }
 
@@ -106,8 +123,21 @@ class FakeSupportRepository implements SupportRepository {
 
   final Map<int, SupportTicket> _tickets = {};
   final Map<int, List<TicketMessage>> _messages = {};
+
+  /// Uploaded photos not yet sent with a reply, by key.
+  final Map<String, (int, TicketPhoto)> _unclaimed = {};
+
+  /// Every upload, in order (tests).
+  final List<(int, TicketPhotoFile)> uploads = [];
+
+  /// Every reply's photo keys, in order (tests).
+  final List<List<String>> replyPhotoKeys = [];
   int _nextTicket = 1;
   int _nextMessage = 1;
+  int _nextPhoto = 1;
+
+  /// When set, the next upload throws it once.
+  Object? failNextUpload;
 
   /// When set, the next call throws it once.
   Object? failNext;
@@ -168,6 +198,7 @@ class FakeSupportRepository implements SupportRepository {
     String body, {
     required bool fromSupport,
     required DateTime at,
+    List<TicketPhoto> photos = const [],
   }) {
     _messages[ticketId]!.add(
       TicketMessage(
@@ -175,6 +206,7 @@ class FakeSupportRepository implements SupportRepository {
         body: body,
         fromSupport: fromSupport,
         createdAt: at,
+        photos: photos,
       ),
     );
     _tickets[ticketId] = _with(_tickets[ticketId]!, at: at, last: body);
@@ -198,8 +230,10 @@ class FakeSupportRepository implements SupportRepository {
   );
 
   /// Support closes [ticketId] (tests).
-  void close(int ticketId) =>
-      _tickets[ticketId] = _with(_tickets[ticketId]!, status: TicketStatus.closed);
+  void close(int ticketId) => _tickets[ticketId] = _with(
+    _tickets[ticketId]!,
+    status: TicketStatus.closed,
+  );
 
   TicketThread _thread(int id) {
     final ticket = _tickets[id];
@@ -269,18 +303,57 @@ class FakeSupportRepository implements SupportRepository {
   }
 
   @override
-  Future<TicketThread> reply(int ticketId, String message) async {
+  Future<TicketThread> reply(
+    int ticketId,
+    String message, {
+    List<String> photoKeys = const [],
+  }) async {
     _maybeFail();
     final current = _thread(ticketId);
     final body = message.trim();
-    if (!current.canReply || body.isEmpty) {
+    if (!current.canReply ||
+        body.isEmpty ||
+        photoKeys.length > ticketPhotosPerMessage ||
+        photoKeys.any((k) => _unclaimed[k]?.$1 != ticketId)) {
       throw const ApiError(code: ApiErrorCode.validationError, statusCode: 400);
     }
-    _addMessage(ticketId, body, fromSupport: false, at: _clock().toUtc());
+    replyPhotoKeys.add(List.unmodifiable(photoKeys));
+    _addMessage(
+      ticketId,
+      body,
+      fromSupport: false,
+      at: _clock().toUtc(),
+      photos: [for (final k in photoKeys) _unclaimed.remove(k)!.$2],
+    );
     // A reply reopens a resolved ticket (as the server does).
     if (_tickets[ticketId]!.status == TicketStatus.resolved) {
-      _tickets[ticketId] = _with(_tickets[ticketId]!, status: TicketStatus.open);
+      _tickets[ticketId] = _with(
+        _tickets[ticketId]!,
+        status: TicketStatus.open,
+      );
     }
     return _thread(ticketId);
+  }
+
+  @override
+  Future<TicketPhoto> uploadPhoto(int ticketId, TicketPhotoFile photo) async {
+    final failure = failNextUpload;
+    if (failure != null) {
+      failNextUpload = null;
+      throw failure;
+    }
+    final problem = checkTicketPhoto(photo);
+    if (problem != null) throw TicketPhotoException(problem);
+    if (!_thread(ticketId).canReply) {
+      throw const ApiError(code: ApiErrorCode.validationError, statusCode: 400);
+    }
+    uploads.add((ticketId, photo));
+    final key = 'photo${_nextPhoto++}';
+    final uploaded = TicketPhoto(
+      key: key,
+      url: 'https://storage.example.com/support/$ticketId/$key.webp',
+    );
+    _unclaimed[key] = (ticketId, uploaded);
+    return uploaded;
   }
 }

@@ -1,0 +1,10 @@
+{% extends "ops/base.html" %}
+{% load static %}
+
+{% block page_scripts %}<script src="{% static 'ops/js/orders.js' %}" defer></script>{% endblock %}
+
+{% block content %}
+    {# Delivery task detail (05 §1.4, slice 5.3). Context: detail (ops_console.dispatch.TaskDetail), actions, poll_seconds. #}
+    <p class="mb-3"><a class="text-primary-600 dark:text-primary-500" href="{% url 'ops:dispatch' %}">&larr; Dispatch board</a></p>
+    {% include "ops/partials/dispatch_task.html" %}
+{% endblock %}

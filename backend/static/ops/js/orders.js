@@ -140,7 +140,24 @@
 		return active.tagName === "INPUT" && !/^(checkbox|radio|button|submit|reset|hidden)$/i.test(active.type);
 	}
 
+	// Live updates (live.js, Phase 6): a socket event refreshes the region at once ("ops:live"),
+	// with the same dialog / typing guard. While the socket is up the timed poll is only a slow
+	// safety net (one per LIVE_POLL_FLOOR_MS); while it is down the poll runs at its own rate.
+	const LIVE_POLL_FLOOR_MS = 60000;
+
+	window.opsLiveAllowed = function (regionId) {
+		return idleAllowed(regionId);
+	};
+
 	window.opsPollAllowed = function (regionId) {
+		if (window.opsLive && window.opsLive.connected) {
+			const since = Date.now() - (lastPoll[regionId] || pageLoadedAt);
+			if (since < LIVE_POLL_FLOOR_MS) return false;
+		}
+		return idleAllowed(regionId);
+	};
+
+	function idleAllowed(regionId) {
 		if (window.Alpine) {
 			for (const name of ["confirm", "cancelOrder", "cantSupply"]) {
 				const dialog = Alpine.store(name);
@@ -154,7 +171,7 @@
 			return since > POLL_PAUSE_CAP_MS; // never pause longer than the cap
 		}
 		return true;
-	};
+	}
 
 	// ------------------------------------------------------------------ audio
 	let audio = null;

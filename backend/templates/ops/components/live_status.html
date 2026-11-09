@@ -1,0 +1,36 @@
+{# Live feed indicator and ops alerts list (Phase 6; ops/js/live.js). Shown only to users the ops socket accepts (ops_live_url). The server scopes the feed to the user's stores. Every alert field is rendered with x-text (textContent), never as HTML; the order link is built from an integer id. #}
+<div class="ops-live" x-data data-testid="ops-live">
+    <span class="ops-live__status" role="status" aria-live="polite" data-testid="ops-live-status"
+          x-bind:class="'ops-live__status--' + $store.opsLive.tone"
+          x-bind:title="$store.opsLive.state === 'connected' ? 'Live updates are on' : 'Live updates are off: pages refresh on their timer'">
+        <span class="ops-live__dot" aria-hidden="true"></span>
+        <span x-text="$store.opsLive.label">Connecting</span>
+    </span>
+
+    <div class="ops-live__alerts" x-on:click.outside="$store.opsAlerts.open = false" x-on:keydown.escape="$store.opsAlerts.open = false">
+        <button type="button" class="ops-icon-button" x-on:click="$store.opsAlerts.toggle()"
+                aria-label="Ops alerts" aria-controls="ops-alerts-panel" x-bind:aria-expanded="$store.opsAlerts.open"
+                data-testid="ops-alerts-toggle">
+            <span class="material-symbols-outlined">notifications</span>
+            <span class="ops-live__badge" x-show="$store.opsAlerts.unread > 0" x-cloak x-text="$store.opsAlerts.unread"></span>
+        </button>
+        <div id="ops-alerts-panel" class="ops-live__panel bg-white border border-base-200 dark:bg-base-900 dark:border-base-700"
+             x-show="$store.opsAlerts.open" x-cloak data-testid="ops-alerts-panel">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="font-semibold text-font-important-light dark:text-font-important-dark">Alerts</h2>
+                <button type="button" class="ops-link-button" x-on:click="$store.opsAlerts.clear()" x-show="$store.opsAlerts.items.length">Clear</button>
+            </div>
+            <p class="ops-text-subtle" x-show="!$store.opsAlerts.items.length">No alerts since you opened the console. Alerts for your stores appear here as they happen.</p>
+            <ul class="ops-live__list">
+                <template x-for="item in $store.opsAlerts.items" x-bind:key="item.id">
+                    <li class="ops-live__item" x-bind:class="'ops-live__item--' + item.tone">
+                        <span class="ops-live__code" x-text="item.code"></span>
+                        <span x-text="item.message"></span>
+                        <span class="ops-text-subtle text-xs" x-text="item.at ? new Date(item.at).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : ''"></span>
+                        <a x-show="item.orderUrl" x-bind:href="item.orderUrl" class="text-primary-600 dark:text-primary-500 text-xs">Open order</a>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    </div>
+</div>

@@ -31,6 +31,8 @@ LATE_CAPTURE = "late_capture"  # T3a: captured after the order failed or was can
 DUPLICATE_CAPTURE = "duplicate_capture"  # a second capture on an order already paid
 RETRY_SUFFIX = re.compile(r":retry-(\d+)$")
 AMOUNT_MISMATCH = "amount_mismatch"  # captured amount is not the order's grand_total
+# A COD UPI QR payment that was not needed (cash taken, delivery failed, wrong amount; P5 5.4).
+COD_QR_UNUSED = "cod_qr_unused"
 
 
 def request_refund(payment: Payment, amount: Decimal, *, reason: str, key: str) -> Refund:

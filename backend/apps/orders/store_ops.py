@@ -369,6 +369,11 @@ def mark_item_unavailable(order_id: int, item_id: int, *, unavailable: int, by) 
                 key=f"t8a:{order.pk}:{item.pk}:{unavailable}",
             )
             order_refunds.alert_if_not_refunded(order, refund, context="T8a")
+        if order.payment_method == PaymentMethod.COD and difference > 0:
+            # Phase 5: the rider collects the new amount ("collect ₹X, was ₹Y") and is told.
+            from apps.delivery.services.dispatch import cod_amount_changed
+
+            cod_amount_changed(order, old_total)
         audit.record(
             by,
             "order.items_unavailable",
@@ -438,6 +443,81 @@ def cancel_by_staff(order_id: int, *, by, reason: str, note: str = "") -> Order:
             },
         )
     return order
+
+
+# --------------------------------------------------------------------------- T14 return
+
+
+MSG_RETURN_STATE = "Only an order whose delivery failed can be received back."
+MSG_RETURN_UNITS = "Damaged units must be between 0 and the units on the order line."
+
+
+def receive_return(
+    order_id: int, *, by, damaged: dict[int, int] | None = None, ip: str | None = None
+) -> Order:
+    """08 T14 (05 §1.3 "receiving returns"): the rider is at the store with the items of a
+    failed delivery (the staff confirm it by doing this). `damaged` maps order line ids to the
+    units that came back damaged (default none). Good units go back on the shelf
+    (`StockMovement(RETURN)`, `on_hand += qty`); damaged units are recorded (RETURN then DAMAGE,
+    `on_hand` unchanged). The order RETURNED, the task RETURNED, the rider freed. COD: nothing
+    to collect. DL-61 (a): `delivery.dispatch_order` (Super Admin, Ops, Store Manager own
+    stores; not Store Staff or Support) in the store scope; audited."""
+    from apps.delivery.choices import DeliveryTaskStatus
+    from apps.delivery.models import DeliveryTask
+
+    damaged = dict(damaged or {})
+    now = timezone.now()
+    with transaction.atomic():
+        order = _locked(by, order_id, roles.RIDER_DISPATCH[0])
+        task = DeliveryTask.objects.select_for_update(of=("self",)).filter(order=order).first()
+        if task is not None:
+            task.order = order  # cached for the live publish (T-612)
+        if (
+            order.status != OrderStatus.DELIVERY_FAILED
+            or task is None
+            or task.status != DeliveryTaskStatus.RETURNING
+        ):
+            raise _state_error_message(order, MSG_RETURN_STATE)
+        items = {item.pk: item for item in order.items.all()}
+        if set(damaged) - set(items):
+            raise ValidationError(MSG_LINE_NOT_FOUND)
+        returns = []
+        for item in items.values():
+            units = item.quantity - item.quantity_unavailable
+            bad = damaged.get(item.pk, 0)
+            if not isinstance(bad, int) or isinstance(bad, bool) or not 0 <= bad <= units:
+                raise ValidationError(MSG_RETURN_UNITS)
+            returns.append((item.variant_id, units - bad, bad))
+        inventory.receive_returned_units(order, returns, actor=by)
+        transition(
+            order,
+            OrderStatus.RETURNED,
+            actor=by,
+            actor_type=actor_type_for(by),
+            note="T14: items received back at the store",
+            now=now,
+        )
+        task.status = DeliveryTaskStatus.RETURNED
+        task.returned_at = now
+        task.ended_at = now
+        task.save(update_fields=["status", "returned_at", "ended_at", "updated_at"])
+        if task.rider_id:
+            from apps.delivery import hooks
+
+            hooks.task_updated(task, order, "STATUS_CHANGED")  # T-612: the return is closed
+        audit.record(
+            by,
+            "order.return_received",
+            order,
+            {"damaged": {str(k): v for k, v in damaged.items() if v}},
+            ip=ip,
+        )
+        events.emit(events.RETURNED, order.pk)
+    return order
+
+
+def _state_error_message(order: Order, message: str) -> ApiError:
+    return ApiError(ErrorCode.INVALID_STATE_TRANSITION, message, details={"status": order.status})
 
 
 def refundable_amount(order: Order) -> Decimal:

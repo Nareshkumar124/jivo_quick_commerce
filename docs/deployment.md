@@ -329,6 +329,7 @@ These are coarse per-IP limits. The backend keeps its own per-user and per-phone
 | `/api/v1/search/` (search, suggest) | 5 req/s | 20 | 16 KB |
 | `/api/v1/rider/documents/` | 20 req/s | 10 | 1200 KB (1 MB image + multipart overhead; `RIDER_DOCUMENT_MAX_BYTES`) |
 | `/api/v1/payments/razorpay/webhook/` | none (signed, idempotent, Razorpay retries) | n/a | 256 KB |
+| `/api/v1/support/tickets/<id>/attachments/` (regex location; customer and rider ticket photos) | 20 req/s | 40 | 5300 KB (5 MB photo + multipart overhead; `SUPPORT_ATTACHMENT_MAX_BYTES`) |
 | `/api/` (all other) and `/` | 20 req/s | 40 | 2560 KB (= `DATA_UPLOAD_MAX_MEMORY_SIZE`, 2.5 MB) |
 | `/admin/`, `/ops/` | 10 req/s | 40 | 6 MB (product images up to 5 MB, 09 §3.6) |
 | `/ws/` | **50 concurrent sockets** (`limit_conn`); upgrades 20 req/s | 20 | 64 KB |
@@ -339,7 +340,7 @@ Over a limit, nginx answers 429 with the JSON error envelope and `Retry-After: 6
 **Behind a load balancer, the `set_real_ip_from <lb-subnet>` block (with `real_ip_header X-Forwarded-For` and `real_ip_recursive on`) MUST be set.** Without it every request appears to come from the balancer, all clients share one OTP bucket and one 50-socket bucket, and the first busy minute locks everyone out. Leave it commented only when nginx itself faces the internet. Check after setting it: the nginx access log's `remote_addr` shows client addresses, not the balancer's.
 
 **Load-balancer equivalents,** if nginx is dropped (D-05):
-- **AWS:** WAF on the ALB with rate-based rules per IP (5-minute windows: e.g. 300 for `/api/v1/auth/otp/request/`, 6,000 for `/api/`, using URI scope-down statements) and the AWS managed core rule set. Body limits through WAF size-constraint rules (2.5 MB; 1.2 MB on `/api/v1/rider/documents/`). ALB idle timeout 3600 s for WebSockets. An ALB has no per-IP connection cap, so keep nginx in front of `/ws/` or enforce the cap in the app.
+- **AWS:** WAF on the ALB with rate-based rules per IP (5-minute windows: e.g. 300 for `/api/v1/auth/otp/request/`, 6,000 for `/api/`, using URI scope-down statements) and the AWS managed core rule set. Body limits through WAF size-constraint rules (2.5 MB; 1.2 MB on `/api/v1/rider/documents/`; 5.3 MB on `/api/v1/support/tickets/<id>/attachments/`). ALB idle timeout 3600 s for WebSockets. An ALB has no per-IP connection cap, so keep nginx in front of `/ws/` or enforce the cap in the app.
 - **Cloudflare:** rate-limiting rules per path, WAF managed rules, and a WAF rule on `http.request.body.size`.
 - **GCP:** Cloud Armor rate-based throttle or ban rules per path.
 

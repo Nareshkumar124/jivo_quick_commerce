@@ -23,7 +23,8 @@ import 'routes.dart';
 ///    the permissions gate (also reachable during a task), home or the
 ///    rider's records (earnings, cash, history, profile) in
 ///    builds that have them ([recordsEnabled]; dev flavor until the rider
-///    API lands);
+///    API lands), and help, tickets, My rating and the legal pages in
+///    every flavor;
 /// 8. signed in: the screen for `rider_status`. `PENDING_KYC` and
 ///    `REJECTED` riders may also open the application steps under it
 ///    (documents, bank details); everyone else gets exactly that screen.
@@ -78,6 +79,8 @@ String? riderRedirect({
     // Between orders: home and the rider's own records, where those routes
     // exist (a stray link elsewhere goes home, not to an error page).
     if (recordsEnabled && Routes.isAccountRoute(location)) return null;
+    // Help, tickets, My rating and the legal pages run in every flavor.
+    if (Routes.isSupportRoute(location)) return null;
   }
   final target = routeFor(destinationFor(account.riderStatus));
   if (canEditApplication(account.riderStatus) &&

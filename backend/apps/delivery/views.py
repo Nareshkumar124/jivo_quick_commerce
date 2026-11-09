@@ -1,9 +1,8 @@
 """Rider app endpoints (06 §3, 04). Phase 5 contract (T-511).
 
 Live: stores, register, me, documents, bank account (slice 5.1); shift start/end, locations,
-heartbeat (slice 5.2). The other operations exist with their full schema and request
-validation and answer 503 `SERVICE_UNAVAILABLE` until their slice lands (5.3: offers and the
-task; 5.4: cod-qr, cash, earnings, history, payouts).
+heartbeat (slice 5.2); offers and the delivery task (slice 5.3); the COD UPI QR, history, cash
+ledger, earnings and payouts (slice 5.4).
 
 Every lookup is scoped to the caller's own rider profile: another rider's offer or task id is a
 404, never fetched first and checked after.
@@ -30,12 +29,23 @@ from apps.core.schema import (
 from apps.core.throttling import RATE_LIMITED
 from apps.delivery import examples as ex
 from apps.delivery import serializers as s
-from apps.delivery.services import presenters, riders, shifts
-from apps.delivery.stubs import not_available_yet
+from apps.delivery.services import (
+    cash,
+    cod_qr,
+    dispatch,
+    earnings,
+    history,
+    payouts,
+    presenters,
+    riders,
+    shifts,
+)
+from apps.delivery.services import tasks as task_actions
 from apps.delivery.throttling import (
     RiderDocumentsThrottle,
     RiderHeartbeatThrottle,
     RiderLocationsThrottle,
+    RiderPickupThrottle,
     RiderProfileWriteThrottle,
 )
 
@@ -66,18 +76,6 @@ ACTIVE_FORBIDDEN = error_response(
     NOT_A_RIDER,
     NOT_ACTIVE,
 )
-NOT_YET = error_example(
-    ErrorCode.SERVICE_UNAVAILABLE,
-    "This feature is not available yet (Phase 5 slice 5.3).",
-    name="NOT_AVAILABLE_YET",
-    summary="Until the slice lands",
-)
-NOT_YET_RESPONSE = error_response(
-    "Maintenance (`MAINTENANCE`), or, until this operation's slice lands, "
-    "`SERVICE_UNAVAILABLE` (contract only).",
-    error_example(ErrorCode.MAINTENANCE, "Jivo is down for scheduled maintenance."),
-    NOT_YET,
-)
 OFFER_NOT_FOUND = error_response(
     "The offer does not exist or is not this rider's.",
     error_example(ErrorCode.NOT_FOUND, "Offer not found."),
@@ -93,13 +91,16 @@ def task_state_error(message: str, details: dict, *, name: str | None = None):
     return error_example(ErrorCode.INVALID_STATE_TRANSITION, message, details, name=name)
 
 
+def task_response(task) -> dict:
+    return presenters.task_body(presenters.task_queryset().get(pk=task.pk))
+
+
 def task_responses(ok, extra: dict | None = None) -> dict:
     responses = {
         200: ok,
         401: UNAUTHORIZED,
         403: ACTIVE_FORBIDDEN,
         404: TASK_NOT_FOUND,
-        503: NOT_YET_RESPONSE,
         **(extra or {}),
     }
     return app_responses(responses)
@@ -594,13 +595,15 @@ class CurrentOfferView(APIView):
                 ),
                 401: UNAUTHORIZED,
                 403: ACTIVE_FORBIDDEN,
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def get(self, request: Request) -> Response:
-        riders.require_rider(request.user, active=True)
-        not_available_yet("5.3")
+        from django.utils import timezone
+
+        rider = riders.require_rider(request.user, active=True)
+        now = timezone.now()
+        return Response(presenters.current_offer_body(dispatch.current_offer(rider, now), now))
 
 
 class OfferAcceptView(APIView):
@@ -629,8 +632,8 @@ class OfferAcceptView(APIView):
         ),
     )
     def post(self, request: Request, id: int) -> Response:
-        riders.require_rider(request.user, active=True)
-        not_available_yet("5.3")
+        task = dispatch.accept_offer(request.user, id)
+        return Response(task_response(task))
 
 
 class OfferRejectView(APIView):
@@ -657,14 +660,15 @@ class OfferRejectView(APIView):
                     "Already accepted by this rider.",
                     task_state_error("You already accepted this offer.", {"status": "ACCEPTED"}),
                 ),
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.OfferRejectSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.OfferRejectSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        dispatch.reject_offer(request.user, id, data.validated_data.get("reason"))
+        return Response(status=204)
 
 
 # --------------------------------------------------------------------------- task (5.3/5.4)
@@ -692,13 +696,14 @@ class CurrentTaskView(APIView):
                 ),
                 401: UNAUTHORIZED,
                 403: ACTIVE_FORBIDDEN,
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def get(self, request: Request) -> Response:
-        riders.require_rider(request.user, active=True)
-        not_available_yet("5.3")
+        from django.utils import timezone
+
+        rider = riders.require_rider(request.user, active=True)
+        return Response(presenters.current_task_body(rider, timezone.now()))
 
 
 GEOFENCE_ERROR = error_example(
@@ -737,11 +742,15 @@ class ArrivedStoreView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.PositionSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.PositionSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.arrived_store(request.user, id, **data.validated_data)
+        return Response(task_response(task))
 
 
 class PickupView(APIView):
+    throttle_classes = [RiderPickupThrottle]
+
     @extend_schema(
         operation_id="rider_tasks_pickup",
         tags=TAGS,
@@ -750,8 +759,8 @@ class PickupView(APIView):
             "08 T9: AT_STORE and the order PACKED -> task PICKED_UP, order OUT_FOR_DELIVERY "
             "(stock committed, the customer gets the delivery OTP). `order_code` is the "
             "4-character code or the scanned bag QR `JQC1:<order_number>:<code>` (api-requests "
-            "#15). Wrong code: 400 `PICKUP_CODE_INVALID`. Not packed yet: 409 with "
-            "`order_status`."
+            "#15). Wrong code: 400 `PICKUP_CODE_INVALID` with `attempts_remaining`; after 5 "
+            "wrong codes 423 `PICKUP_CODE_LOCKED`. Not packed yet: 409 with `order_status`."
         ),
         parameters=[ID],
         request=s.PickupSerializer,
@@ -762,10 +771,20 @@ class PickupView(APIView):
             ok_response(s.RiderTaskSerializer, "Picked up.", ("Picked up", ex.TASK_PICKED_UP)),
             {
                 400: error_response(
-                    "Wrong code.",
-                    error_example(ErrorCode.PICKUP_CODE_INVALID),
+                    "Wrong code (`details.attempts_remaining`), or not a code at all (non-ASCII, "
+                    "wrong shape: no attempt used).",
+                    error_example(ErrorCode.PICKUP_CODE_INVALID, details={"attempts_remaining": 4}),
+                    error_example(
+                        ErrorCode.PICKUP_CODE_INVALID, name="NOT_A_CODE", summary="Not a code"
+                    ),
                     validation_error({"order_code": ["This field is required."]}),
                 ),
+                423: error_response(
+                    "5 wrong codes: the pickup is locked and ops are alerted. Ask the store or "
+                    "ops (they can reassign the order).",
+                    error_example(ErrorCode.PICKUP_CODE_LOCKED, details={"attempts_remaining": 0}),
+                ),
+                429: RATE_LIMITED,
                 409: error_response(
                     "Not at the store, or the order is not packed yet.",
                     task_state_error(
@@ -784,8 +803,10 @@ class PickupView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.PickupSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.PickupSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.pickup(request.user, id, **data.validated_data)
+        return Response(task_response(task))
 
 
 class ArrivedCustomerView(APIView):
@@ -824,8 +845,10 @@ class ArrivedCustomerView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.ArrivedCustomerSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.ArrivedCustomerSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.arrived_customer(request.user, id, **data.validated_data)
+        return Response(task_response(task))
 
 
 class CodQrView(APIView):
@@ -835,10 +858,13 @@ class CodQrView(APIView):
         summary="UPI QR for the COD amount",
         description=(
             "COD tasks at the customer (api-requests #16). Returns the open QR for exactly "
-            "`cod_amount_due` (a repeat returns the same QR). The server confirms payment by "
-            "the gateway webhook: poll `tasks/current/` (`cod_qr.status`) every 3 s, then "
-            "`deliver` with `cod.mode` = upi. Delivering with cash closes the QR; a payment that "
-            "still arrives on a closed QR is refunded automatically (the cash stands)."
+            "`cod_amount_due` (the server's amount; a repeat returns the same QR, an expired one "
+            "is replaced; a repeat also checks the gateway for a payment whose webhook was "
+            "missed). The server confirms payment by the gateway webhook: poll `tasks/current/` "
+            "(`cod_qr.status`) every 3 s, then `deliver` with `cod.mode` = upi. Delivering with "
+            "cash closes the QR; a payment that still arrives on a closed or expired QR is "
+            "refunded automatically (the cash stands). Once the QR is PAID, cash is refused. "
+            "503 when UPI QR is switched off or the gateway is unreachable: take cash."
         ),
         parameters=[ID],
         request=None,
@@ -847,16 +873,26 @@ class CodQrView(APIView):
                 s.CodQrSerializer, "The QR.", ("Waiting", ex.COD_QR), ("Paid", ex.COD_QR_PAID)
             ),
             {
+                503: error_response(
+                    "UPI QR unavailable (switched off, no gateway keys, gateway down), or "
+                    "maintenance: collect cash.",
+                    error_example(
+                        ErrorCode.SERVICE_UNAVAILABLE,
+                        "UPI QR is not available right now: collect cash.",
+                        name="QR_UNAVAILABLE",
+                    ),
+                    error_example(ErrorCode.MAINTENANCE, "Jivo is down for scheduled maintenance."),
+                ),
                 409: error_response(
                     "Not a COD task at the customer.",
                     task_state_error("This order is prepaid.", {"status": "AT_CUSTOMER"}),
-                )
+                ),
             },
         ),
     )
     def post(self, request: Request, id: int) -> Response:
-        riders.require_rider(request.user, active=True)
-        not_available_yet("5.4")
+        qr = cod_qr.get_or_create(request.user, id)
+        return Response(cod_qr.body(qr))
 
 
 class DeliverView(APIView):
@@ -911,8 +947,12 @@ class DeliverView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.DeliverSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.DeliverSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.deliver(
+            request.user, id, otp=data.validated_data["otp"], cod=data.validated_data.get("cod")
+        )
+        return Response(task_response(task))
 
 
 class FailView(APIView):
@@ -959,8 +999,10 @@ class FailView(APIView):
     )
     def post(self, request: Request, id: int) -> Response:
         riders.require_rider(request.user, active=True)
-        s.DeliveryFailSerializer(data=request.data).is_valid(raise_exception=True)
-        not_available_yet("5.3")
+        data = s.DeliveryFailSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        task = task_actions.fail(request.user, id, **data.validated_data)
+        return Response(task_response(task))
 
 
 # --------------------------------------------------------------------------- records (5.4)
@@ -972,14 +1014,39 @@ BEFORE_ID_PARAMETERS = [
 ]
 
 
+def before_id_page(request: Request, queryset, before_id: int | None, render) -> dict:
+    """api-requests #24: `{count, next, previous, results}` over `queryset` ordered by `-pk`.
+    `count` ignores `before_id`; `next` carries the last id of this page as `before_id`."""
+    from rest_framework.utils.urls import replace_query_param
+
+    from apps.core.pagination import StandardPagination
+
+    size = StandardPagination().get_page_size(request)
+    count = queryset.count()
+    page_qs = queryset.filter(pk__lt=before_id) if before_id else queryset
+    rows = list(page_qs[: size + 1])
+    more = len(rows) > size
+    rows = rows[:size]
+    next_url = None
+    if more and rows:
+        next_url = replace_query_param(request.build_absolute_uri(), "before_id", rows[-1].pk)
+    return {
+        "count": count,
+        "next": next_url,
+        "previous": None,
+        "results": [render(r) for r in rows],
+    }
+
+
 class TaskHistoryView(APIView):
     @extend_schema(
         operation_id="rider_tasks_history",
         tags=TAGS,
         summary="Past tasks",
         description=(
-            "Ended tasks, newest first (04 §2.8). Paged by `before_id` (api-requests #24): "
-            "follow `next`. Any rider status."
+            "The caller's ended tasks (DELIVERED, RETURNED, CANCELLED), newest first (04 §2.8). "
+            "Paged by `before_id` (api-requests #24): follow `next`. `from`/`to` filter on the "
+            "IST day the task ended. Any rider status."
         ),
         parameters=[s.HistoryQuerySerializer, *BEFORE_ID_PARAMETERS],
         responses=app_responses(
@@ -995,14 +1062,43 @@ class TaskHistoryView(APIView):
                 ),
                 401: UNAUTHORIZED,
                 403: RIDER_FORBIDDEN,
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def get(self, request: Request) -> Response:
-        riders.require_rider(request.user)
-        s.HistoryQuerySerializer(data=request.query_params).is_valid(raise_exception=True)
-        not_available_yet("5.4")
+        rider = riders.require_rider(request.user)
+        query = s.HistoryQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        data = query.validated_data
+        tasks = history.history(rider, start=data.get("from_date"), end=data.get("to_date"))
+        return Response(before_id_page(request, tasks, data.get("before_id"), history.item_body))
+
+
+class TaskHistoryDetailView(APIView):
+    @extend_schema(
+        operation_id="rider_tasks_history_detail",
+        tags=TAGS,
+        summary="One past task",
+        description=(
+            "An ended task of the caller with its items and pay lines (04 §2.8). No customer "
+            "personal data (the drop locality only). Another rider's task, or one still active, "
+            "is 404. Any rider status."
+        ),
+        parameters=[ID],
+        responses=app_responses(
+            {
+                200: ok_response(
+                    s.TaskHistoryDetailSerializer, "The task.", ("Delivered", ex.HISTORY_DETAIL)
+                ),
+                401: UNAUTHORIZED,
+                403: RIDER_FORBIDDEN,
+                404: TASK_NOT_FOUND,
+            }
+        ),
+    )
+    def get(self, request: Request, id: int) -> Response:
+        rider = riders.require_rider(request.user)
+        return Response(history.detail(rider, id))
 
 
 class EarningsView(APIView):
@@ -1012,9 +1108,9 @@ class EarningsView(APIView):
         summary="Earnings for a date range",
         description=(
             "IST dates, inclusive, at most 366 days (api-requests #19). Every total is computed "
-            "by the server. Distance pay uses the store-to-drop route distance computed by the "
-            "server (`distance_km`), never the GPS trail. D-16 rates are settings until Jivo "
-            "decides."
+            "by the server. Pay per delivered order (D-16 default): base + distance pay on the "
+            "store-to-drop route distance computed by the server (`distance_km`), never the GPS "
+            "trail, + the customer's tip; incentives and penalties are `adjustments`."
         ),
         parameters=[s.DateRangeQuerySerializer],
         responses=app_responses(
@@ -1030,14 +1126,15 @@ class EarningsView(APIView):
                 ),
                 401: UNAUTHORIZED,
                 403: RIDER_FORBIDDEN,
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def get(self, request: Request) -> Response:
-        riders.require_rider(request.user)
-        s.DateRangeQuerySerializer(data=request.query_params).is_valid(raise_exception=True)
-        not_available_yet("5.4")
+        rider = riders.require_rider(request.user)
+        query = s.DateRangeQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        data = query.validated_data
+        return Response(earnings.summary(rider, data["from_date"], data["to_date"]))
 
 
 class CashLedgerView(APIView):
@@ -1061,14 +1158,19 @@ class CashLedgerView(APIView):
                 ),
                 401: UNAUTHORIZED,
                 403: RIDER_FORBIDDEN,
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def get(self, request: Request) -> Response:
-        riders.require_rider(request.user)
-        s.BeforeIdQuerySerializer(data=request.query_params).is_valid(raise_exception=True)
-        not_available_yet("5.4")
+        rider = riders.require_rider(request.user)
+        query = s.BeforeIdQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        entries = cash.rider_ledger(rider).order_by("-pk")
+        return Response(
+            before_id_page(
+                request, entries, query.validated_data.get("before_id"), cash.ledger_entry_body
+            )
+        )
 
 
 class PayoutsView(APIView):
@@ -1088,10 +1190,13 @@ class PayoutsView(APIView):
                 ),
                 401: UNAUTHORIZED,
                 403: RIDER_FORBIDDEN,
-                503: NOT_YET_RESPONSE,
             }
         ),
     )
     def get(self, request: Request) -> Response:
-        riders.require_rider(request.user)
-        not_available_yet("5.4")
+        from apps.core.pagination import StandardPagination
+
+        rider = riders.require_rider(request.user)
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(payouts.rider_payouts(rider), request, view=self)
+        return paginator.get_paginated_response([payouts.payout_body(p) for p in page])

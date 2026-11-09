@@ -36,11 +36,13 @@ import 'package:jivo_api/src/model/rider_bank_account_update_request.dart';
 import 'package:jivo_api/src/model/rider_document.dart';
 import 'package:jivo_api/src/model/rider_document_type_enum.dart';
 import 'package:jivo_api/src/model/rider_profile.dart';
+import 'package:jivo_api/src/model/rider_ratings_page.dart';
 import 'package:jivo_api/src/model/rider_register_request.dart';
 import 'package:jivo_api/src/model/rider_task.dart';
 import 'package:jivo_api/src/model/shift_start_request.dart';
 import 'package:jivo_api/src/model/shift_state.dart';
 import 'package:jivo_api/src/model/store_list.dart';
+import 'package:jivo_api/src/model/task_history_detail.dart';
 
 class RiderApi {
   final Dio _dio;
@@ -325,7 +327,7 @@ class RiderApi {
   }
 
   /// Earnings for a date range
-  /// IST dates, inclusive, at most 366 days (api-requests #19). Every total is computed by the server. Distance pay uses the store-to-drop route distance computed by the server (&#x60;distance_km&#x60;), never the GPS trail. D-16 rates are settings until Jivo decides.
+  /// IST dates, inclusive, at most 366 days (api-requests #19). Every total is computed by the server. Pay per delivered order (D-16 default): base + distance pay on the store-to-drop route distance computed by the server (&#x60;distance_km&#x60;), never the GPS trail, + the customer&#39;s tip; incentives and penalties are &#x60;adjustments&#x60;.
   ///
   /// Parameters:
   /// * [from] - IST calendar date, YYYY-MM-DD. Default: today.
@@ -1054,6 +1056,91 @@ class RiderApi {
     );
   }
 
+  /// My ratings
+  /// Phase 7 (rider app request). The caller&#39;s average rating (&#x60;rating_avg&#x60;, also in &#x60;GET /rider/me/&#x60;), the number of ratings, the tags customers chose for the rider (ON_TIME, POLITE_RIDER, LATE_DELIVERY, RUDE_RIDER) and the ratings themselves, newest first, paged by &#x60;before_id&#x60; (follow &#x60;next&#x60;). Customer names, phones, addresses and comments are never shown to riders. Any rider status.
+  ///
+  /// Parameters:
+  /// * [beforeId] - Return ratings older than this rating id (from `next`).
+  /// * [pageSize] - Items per page: default 20, max 100.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RiderRatingsPage] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RiderRatingsPage>> riderRatingsList({
+    int? beforeId,
+    int? pageSize,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/rider/ratings/';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (beforeId != null) r'before_id': beforeId,
+      if (pageSize != null) r'page_size': pageSize,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RiderRatingsPage? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<RiderRatingsPage, RiderRatingsPage>(
+              rawData,
+              'RiderRatingsPage',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RiderRatingsPage>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Register as a rider
   /// Creates the rider profile in PENDING_KYC (04 §2.2) for the signed-in user. Then upload the documents in &#x60;required_documents&#x60; and the bank details; when nothing is missing, &#x60;ready_for_review&#x60; is true and ops review the application. Once only: afterwards 409 &#x60;INVALID_STATE_TRANSITION&#x60; (edit with &#x60;PATCH /rider/me/&#x60;). The rider must be 18 or older (IST date); the emergency contact must not be the rider&#39;s own number; &#x60;vehicle_number&#x60; is required exactly for MOTORBIKE and SCOOTER.
   ///
@@ -1587,7 +1674,7 @@ class RiderApi {
   }
 
   /// UPI QR for the COD amount
-  /// COD tasks at the customer (api-requests #16). Returns the open QR for exactly &#x60;cod_amount_due&#x60; (a repeat returns the same QR). The server confirms payment by the gateway webhook: poll &#x60;tasks/current/&#x60; (&#x60;cod_qr.status&#x60;) every 3 s, then &#x60;deliver&#x60; with &#x60;cod.mode&#x60; &#x3D; upi. Delivering with cash closes the QR; a payment that still arrives on a closed QR is refunded automatically (the cash stands).
+  /// COD tasks at the customer (api-requests #16). Returns the open QR for exactly &#x60;cod_amount_due&#x60; (the server&#39;s amount; a repeat returns the same QR, an expired one is replaced; a repeat also checks the gateway for a payment whose webhook was missed). The server confirms payment by the gateway webhook: poll &#x60;tasks/current/&#x60; (&#x60;cod_qr.status&#x60;) every 3 s, then &#x60;deliver&#x60; with &#x60;cod.mode&#x60; &#x3D; upi. Delivering with cash closes the QR; a payment that still arrives on a closed or expired QR is refunded automatically (the cash stands). Once the QR is PAID, cash is refused. 503 when UPI QR is switched off or the gateway is unreachable: take cash.
   ///
   /// Parameters:
   /// * [id] - The offer or task id.
@@ -1949,7 +2036,7 @@ class RiderApi {
   }
 
   /// Past tasks
-  /// Ended tasks, newest first (04 §2.8). Paged by &#x60;before_id&#x60; (api-requests #24): follow &#x60;next&#x60;. Any rider status.
+  /// The caller&#39;s ended tasks (DELIVERED, RETURNED, CANCELLED), newest first (04 §2.8). Paged by &#x60;before_id&#x60; (api-requests #24): follow &#x60;next&#x60;. &#x60;from&#x60;/&#x60;to&#x60; filter on the IST day the task ended. Any rider status.
   ///
   /// Parameters:
   /// * [beforeId] - Stable paging (api-requests #24): only entries older than this id. Follow `next`, which carries it; new entries never shift what is already listed.
@@ -2039,8 +2126,90 @@ class RiderApi {
     );
   }
 
+  /// One past task
+  /// An ended task of the caller with its items and pay lines (04 §2.8). No customer personal data (the drop locality only). Another rider&#39;s task, or one still active, is 404. Any rider status.
+  ///
+  /// Parameters:
+  /// * [id] - The offer or task id.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [TaskHistoryDetail] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<TaskHistoryDetail>> riderTasksHistoryDetail({
+    required int id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/rider/tasks/history/{id}/'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    TaskHistoryDetail? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<TaskHistoryDetail, TaskHistoryDetail>(
+              rawData,
+              'TaskHistoryDetail',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<TaskHistoryDetail>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Pick up (order code or bag QR)
-  /// 08 T9: AT_STORE and the order PACKED -&gt; task PICKED_UP, order OUT_FOR_DELIVERY (stock committed, the customer gets the delivery OTP). &#x60;order_code&#x60; is the 4-character code or the scanned bag QR &#x60;JQC1:&lt;order_number&gt;:&lt;code&gt;&#x60; (api-requests #15). Wrong code: 400 &#x60;PICKUP_CODE_INVALID&#x60;. Not packed yet: 409 with &#x60;order_status&#x60;.
+  /// 08 T9: AT_STORE and the order PACKED -&gt; task PICKED_UP, order OUT_FOR_DELIVERY (stock committed, the customer gets the delivery OTP). &#x60;order_code&#x60; is the 4-character code or the scanned bag QR &#x60;JQC1:&lt;order_number&gt;:&lt;code&gt;&#x60; (api-requests #15). Wrong code: 400 &#x60;PICKUP_CODE_INVALID&#x60; with &#x60;attempts_remaining&#x60;; after 5 wrong codes 423 &#x60;PICKUP_CODE_LOCKED&#x60;. Not packed yet: 409 with &#x60;order_status&#x60;.
   ///
   /// Parameters:
   /// * [id] - The offer or task id.

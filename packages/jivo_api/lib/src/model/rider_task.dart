@@ -5,17 +5,18 @@
 
 // ignore_for_file: unused_element
 import 'package:jivo_api/src/model/delivery_otp_state.dart';
-import 'package:jivo_api/src/model/order_address.dart';
 import 'package:jivo_api/src/model/task_geofence.dart';
-import 'package:jivo_api/src/model/task_item.dart';
-import 'package:jivo_api/src/model/task_store.dart';
-import 'package:jivo_api/src/model/delivery_instructions.dart';
 import 'package:jivo_api/src/model/delivery_task_status_enum.dart';
 import 'package:jivo_api/src/model/order_status_enum.dart';
 import 'package:jivo_api/src/model/rider_payment_type_enum.dart';
 import 'package:jivo_api/src/model/task_earnings.dart';
-import 'package:jivo_api/src/model/delivery_fail_reason_enum.dart';
 import 'package:jivo_api/src/model/cod_qr.dart';
+import 'package:jivo_api/src/model/order_address.dart';
+import 'package:jivo_api/src/model/task_item.dart';
+import 'package:jivo_api/src/model/pickup_code_state.dart';
+import 'package:jivo_api/src/model/task_store.dart';
+import 'package:jivo_api/src/model/delivery_instructions.dart';
+import 'package:jivo_api/src/model/delivery_fail_reason_enum.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -66,6 +67,8 @@ class RiderTask {
     required this.geofence,
 
     required this.deliveryOtp,
+
+    required this.pickupCode,
 
     required this.codQr,
 
@@ -167,6 +170,10 @@ class RiderTask {
   @JsonKey(name: r'delivery_otp', required: true, includeIfNull: false)
   final DeliveryOtpState deliveryOtp;
 
+  /// The order-code check at pickup (T9).
+  @JsonKey(name: r'pickup_code', required: true, includeIfNull: false)
+  final PickupCodeState pickupCode;
+
   /// The UPI QR, once generated.
   @JsonKey(name: r'cod_qr', required: true, includeIfNull: true)
   final CodQr? codQr;
@@ -204,7 +211,7 @@ class RiderTask {
   @JsonKey(name: r'returned_at', required: true, includeIfNull: true)
   final DateTime? returnedAt;
 
-  /// Set once DELIVERED (base, distance, tip...).
+  /// The pay for this task: base + distance from pickup (DL-61: paid even if the delivery then fails), plus the tip once DELIVERED. Null before pickup.
   @JsonKey(name: r'earnings', required: true, includeIfNull: true)
   final TaskEarnings? earnings;
 
@@ -230,6 +237,7 @@ class RiderTask {
           other.estimatedPayout == estimatedPayout &&
           other.geofence == geofence &&
           other.deliveryOtp == deliveryOtp &&
+          other.pickupCode == pickupCode &&
           other.codQr == codQr &&
           other.assignedAt == assignedAt &&
           other.arrivedStoreAt == arrivedStoreAt &&
@@ -262,6 +270,7 @@ class RiderTask {
       estimatedPayout.hashCode +
       geofence.hashCode +
       deliveryOtp.hashCode +
+      pickupCode.hashCode +
       (codQr == null ? 0 : codQr.hashCode) +
       assignedAt.hashCode +
       (arrivedStoreAt == null ? 0 : arrivedStoreAt.hashCode) +

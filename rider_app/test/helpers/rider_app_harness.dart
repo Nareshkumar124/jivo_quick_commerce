@@ -32,9 +32,17 @@ import 'package:rider_app/features/onboarding/data/fake_rider_onboarding_backend
 import 'package:rider_app/features/onboarding/domain/image_picking.dart';
 import 'package:rider_app/features/onboarding/presentation/onboarding_providers.dart';
 import 'package:rider_app/features/notifications/data/api_device_registry.dart';
+import 'package:rider_app/features/notifications/data/fake_inbox_backend.dart';
+import 'package:rider_app/features/notifications/presentation/inbox_providers.dart';
 import 'package:rider_app/features/notifications/presentation/push_providers.dart';
 import 'package:rider_app/features/shift/data/fake_shift_backend.dart';
+import 'package:rider_app/features/legal/data/legal_repository.dart';
+import 'package:rider_app/features/legal/presentation/legal_providers.dart';
+import 'package:rider_app/features/rating/data/fake_rating_backend.dart';
+import 'package:rider_app/features/rating/presentation/rating_providers.dart';
 import 'package:rider_app/features/shift/data/fake_today_summary.dart';
+import 'package:rider_app/features/support/data/support_repository.dart';
+import 'package:rider_app/features/support/presentation/support_providers.dart';
 import 'package:rider_app/features/shift/presentation/home_providers.dart';
 import 'package:rider_app/features/shift/presentation/shift_controller.dart';
 import 'package:rider_app/features/task/data/fake_task_backend.dart';
@@ -208,6 +216,16 @@ class RiderTestHarness {
   final shift = FakeShiftBackend(delay: Duration.zero);
   final today = FakeTodaySummary(delay: Duration.zero);
   final devices = FakeDeviceRegistry();
+  late final inbox = FakeInboxBackend(delay: Duration.zero, clock: () => now);
+  late final support = FakeSupportBackend(
+    delay: Duration.zero,
+    clock: () => now,
+  );
+  late final ratings = FakeRatingBackend(
+    delay: Duration.zero,
+    clock: () => now,
+  );
+  final legal = FakeLegalBackend();
   List<String> scannerValues = const ['7K2P', 'HELLO-WORLD'];
 
   /// The test screen in physical pixels (DPR 2.625): 411×914 dp. Screens
@@ -244,6 +262,10 @@ class RiderTestHarness {
     fakeShiftBackendProvider.overrideWithValue(shift),
     fakeTodaySummaryProvider.overrideWithValue(today),
     fakeDeviceRegistryProvider.overrideWithValue(devices),
+    fakeInboxBackendProvider.overrideWithValue(inbox),
+    fakeSupportBackendProvider.overrideWithValue(support),
+    fakeRatingBackendProvider.overrideWithValue(ratings),
+    fakeLegalBackendProvider.overrideWithValue(legal),
     qrScannerBuilderProvider.overrideWith((ref) => fakeScanner(scannerValues)),
     scannerControllerProvider.overrideWith((ref) => null),
     ...extraOverrides,

@@ -15,6 +15,8 @@ abstract class _$TicketMessageCWProxy {
 
   TicketMessage createdAt(DateTime createdAt);
 
+  TicketMessage attachments(List<TicketAttachment> attachments);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TicketMessage(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -26,6 +28,7 @@ abstract class _$TicketMessageCWProxy {
     String body,
     bool fromSupport,
     DateTime createdAt,
+    List<TicketAttachment> attachments,
   });
 }
 
@@ -48,6 +51,10 @@ class _$TicketMessageCWProxyImpl implements _$TicketMessageCWProxy {
   TicketMessage createdAt(DateTime createdAt) => this(createdAt: createdAt);
 
   @override
+  TicketMessage attachments(List<TicketAttachment> attachments) =>
+      this(attachments: attachments);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TicketMessage(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -59,6 +66,7 @@ class _$TicketMessageCWProxyImpl implements _$TicketMessageCWProxy {
     Object? body = const $CopyWithPlaceholder(),
     Object? fromSupport = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
+    Object? attachments = const $CopyWithPlaceholder(),
   }) {
     return TicketMessage(
       id: id == const $CopyWithPlaceholder()
@@ -77,6 +85,10 @@ class _$TicketMessageCWProxyImpl implements _$TicketMessageCWProxy {
           ? _value.createdAt
           // ignore: cast_nullable_to_non_nullable
           : createdAt as DateTime,
+      attachments: attachments == const $CopyWithPlaceholder()
+          ? _value.attachments
+          // ignore: cast_nullable_to_non_nullable
+          : attachments as List<TicketAttachment>,
     );
   }
 }
@@ -91,31 +103,41 @@ extension $TicketMessageCopyWith on TicketMessage {
 // JsonSerializableGenerator
 // **************************************************************************
 
-TicketMessage _$TicketMessageFromJson(Map<String, dynamic> json) =>
-    $checkedCreate(
-      'TicketMessage',
+TicketMessage _$TicketMessageFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate(
+  'TicketMessage',
+  json,
+  ($checkedConvert) {
+    $checkKeys(
       json,
-      ($checkedConvert) {
-        $checkKeys(
-          json,
-          requiredKeys: const ['id', 'body', 'from_support', 'created_at'],
-        );
-        final val = TicketMessage(
-          id: $checkedConvert('id', (v) => (v as num).toInt()),
-          body: $checkedConvert('body', (v) => v as String),
-          fromSupport: $checkedConvert('from_support', (v) => v as bool),
-          createdAt: $checkedConvert(
-            'created_at',
-            (v) => DateTime.parse(v as String),
-          ),
-        );
-        return val;
-      },
-      fieldKeyMap: const {
-        'fromSupport': 'from_support',
-        'createdAt': 'created_at',
-      },
+      requiredKeys: const [
+        'id',
+        'body',
+        'from_support',
+        'created_at',
+        'attachments',
+      ],
     );
+    final val = TicketMessage(
+      id: $checkedConvert('id', (v) => (v as num).toInt()),
+      body: $checkedConvert('body', (v) => v as String),
+      fromSupport: $checkedConvert('from_support', (v) => v as bool),
+      createdAt: $checkedConvert(
+        'created_at',
+        (v) => DateTime.parse(v as String),
+      ),
+      attachments: $checkedConvert(
+        'attachments',
+        (v) => (v as List<dynamic>)
+            .map((e) => TicketAttachment.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      ),
+    );
+    return val;
+  },
+  fieldKeyMap: const {'fromSupport': 'from_support', 'createdAt': 'created_at'},
+);
 
 Map<String, dynamic> _$TicketMessageToJson(TicketMessage instance) =>
     <String, dynamic>{
@@ -123,4 +145,5 @@ Map<String, dynamic> _$TicketMessageToJson(TicketMessage instance) =>
       'body': instance.body,
       'from_support': instance.fromSupport,
       'created_at': instance.createdAt.toIso8601String(),
+      'attachments': instance.attachments.map((e) => e.toJson()).toList(),
     };

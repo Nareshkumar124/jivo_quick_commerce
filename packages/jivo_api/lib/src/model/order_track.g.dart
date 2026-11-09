@@ -15,6 +15,10 @@ abstract class _$OrderTrackCWProxy {
 
   OrderTrack etaAt(DateTime? etaAt);
 
+  OrderTrack liveEtaAt(DateTime? liveEtaAt);
+
+  OrderTrack liveEtaMinutes(int? liveEtaMinutes);
+
   OrderTrack store(TrackStore store);
 
   OrderTrack destination(TrackPoint destination);
@@ -22,6 +26,8 @@ abstract class _$OrderTrackCWProxy {
   OrderTrack rider(TrackRider? rider);
 
   OrderTrack deliveryOtp(String? deliveryOtp);
+
+  OrderTrack taskStatus(DeliveryTaskStatusEnum? taskStatus);
 
   OrderTrack serverTime(DateTime serverTime);
 
@@ -36,10 +42,13 @@ abstract class _$OrderTrackCWProxy {
     String orderNumber,
     OrderStatusEnum status,
     DateTime? etaAt,
+    DateTime? liveEtaAt,
+    int? liveEtaMinutes,
     TrackStore store,
     TrackPoint destination,
     TrackRider? rider,
     String? deliveryOtp,
+    DeliveryTaskStatusEnum? taskStatus,
     DateTime serverTime,
   });
 }
@@ -63,6 +72,13 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
   OrderTrack etaAt(DateTime? etaAt) => this(etaAt: etaAt);
 
   @override
+  OrderTrack liveEtaAt(DateTime? liveEtaAt) => this(liveEtaAt: liveEtaAt);
+
+  @override
+  OrderTrack liveEtaMinutes(int? liveEtaMinutes) =>
+      this(liveEtaMinutes: liveEtaMinutes);
+
+  @override
   OrderTrack store(TrackStore store) => this(store: store);
 
   @override
@@ -74,6 +90,10 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
 
   @override
   OrderTrack deliveryOtp(String? deliveryOtp) => this(deliveryOtp: deliveryOtp);
+
+  @override
+  OrderTrack taskStatus(DeliveryTaskStatusEnum? taskStatus) =>
+      this(taskStatus: taskStatus);
 
   @override
   OrderTrack serverTime(DateTime serverTime) => this(serverTime: serverTime);
@@ -90,10 +110,13 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
     Object? orderNumber = const $CopyWithPlaceholder(),
     Object? status = const $CopyWithPlaceholder(),
     Object? etaAt = const $CopyWithPlaceholder(),
+    Object? liveEtaAt = const $CopyWithPlaceholder(),
+    Object? liveEtaMinutes = const $CopyWithPlaceholder(),
     Object? store = const $CopyWithPlaceholder(),
     Object? destination = const $CopyWithPlaceholder(),
     Object? rider = const $CopyWithPlaceholder(),
     Object? deliveryOtp = const $CopyWithPlaceholder(),
+    Object? taskStatus = const $CopyWithPlaceholder(),
     Object? serverTime = const $CopyWithPlaceholder(),
   }) {
     return OrderTrack(
@@ -113,6 +136,14 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
           ? _value.etaAt
           // ignore: cast_nullable_to_non_nullable
           : etaAt as DateTime?,
+      liveEtaAt: liveEtaAt == const $CopyWithPlaceholder()
+          ? _value.liveEtaAt
+          // ignore: cast_nullable_to_non_nullable
+          : liveEtaAt as DateTime?,
+      liveEtaMinutes: liveEtaMinutes == const $CopyWithPlaceholder()
+          ? _value.liveEtaMinutes
+          // ignore: cast_nullable_to_non_nullable
+          : liveEtaMinutes as int?,
       store: store == const $CopyWithPlaceholder()
           ? _value.store
           // ignore: cast_nullable_to_non_nullable
@@ -129,6 +160,10 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
           ? _value.deliveryOtp
           // ignore: cast_nullable_to_non_nullable
           : deliveryOtp as String?,
+      taskStatus: taskStatus == const $CopyWithPlaceholder()
+          ? _value.taskStatus
+          // ignore: cast_nullable_to_non_nullable
+          : taskStatus as DeliveryTaskStatusEnum?,
       serverTime: serverTime == const $CopyWithPlaceholder()
           ? _value.serverTime
           // ignore: cast_nullable_to_non_nullable
@@ -158,10 +193,13 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
         'order_number',
         'status',
         'eta_at',
+        'live_eta_at',
+        'live_eta_minutes',
         'store',
         'destination',
         'rider',
         'delivery_otp',
+        'task_status',
         'server_time',
       ],
     );
@@ -180,6 +218,14 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
         'eta_at',
         (v) => v == null ? null : DateTime.parse(v as String),
       ),
+      liveEtaAt: $checkedConvert(
+        'live_eta_at',
+        (v) => v == null ? null : DateTime.parse(v as String),
+      ),
+      liveEtaMinutes: $checkedConvert(
+        'live_eta_minutes',
+        (v) => (v as num?)?.toInt(),
+      ),
       store: $checkedConvert(
         'store',
         (v) => TrackStore.fromJson(v as Map<String, dynamic>),
@@ -194,6 +240,14 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
             v == null ? null : TrackRider.fromJson(v as Map<String, dynamic>),
       ),
       deliveryOtp: $checkedConvert('delivery_otp', (v) => v as String?),
+      taskStatus: $checkedConvert(
+        'task_status',
+        (v) => $enumDecodeNullable(
+          _$DeliveryTaskStatusEnumEnumMap,
+          v,
+          unknownValue: DeliveryTaskStatusEnum.unknownDefaultOpenApi,
+        ),
+      ),
       serverTime: $checkedConvert(
         'server_time',
         (v) => DateTime.parse(v as String),
@@ -205,7 +259,10 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
     'orderId': 'order_id',
     'orderNumber': 'order_number',
     'etaAt': 'eta_at',
+    'liveEtaAt': 'live_eta_at',
+    'liveEtaMinutes': 'live_eta_minutes',
     'deliveryOtp': 'delivery_otp',
+    'taskStatus': 'task_status',
     'serverTime': 'server_time',
   },
 );
@@ -216,10 +273,13 @@ Map<String, dynamic> _$OrderTrackToJson(OrderTrack instance) =>
       'order_number': instance.orderNumber,
       'status': _$OrderStatusEnumEnumMap[instance.status]!,
       'eta_at': instance.etaAt?.toIso8601String(),
+      'live_eta_at': instance.liveEtaAt?.toIso8601String(),
+      'live_eta_minutes': instance.liveEtaMinutes,
       'store': instance.store.toJson(),
       'destination': instance.destination.toJson(),
       'rider': instance.rider?.toJson(),
       'delivery_otp': instance.deliveryOtp,
+      'task_status': _$DeliveryTaskStatusEnumEnumMap[instance.taskStatus],
       'server_time': instance.serverTime.toIso8601String(),
     };
 
@@ -236,4 +296,20 @@ const _$OrderStatusEnumEnumMap = {
   OrderStatusEnum.DELIVERY_FAILED: 'DELIVERY_FAILED',
   OrderStatusEnum.RETURNED: 'RETURNED',
   OrderStatusEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$DeliveryTaskStatusEnumEnumMap = {
+  DeliveryTaskStatusEnum.SEARCHING: 'SEARCHING',
+  DeliveryTaskStatusEnum.OFFERED: 'OFFERED',
+  DeliveryTaskStatusEnum.ASSIGNED: 'ASSIGNED',
+  DeliveryTaskStatusEnum.AT_STORE: 'AT_STORE',
+  DeliveryTaskStatusEnum.PICKED_UP: 'PICKED_UP',
+  DeliveryTaskStatusEnum.AT_CUSTOMER: 'AT_CUSTOMER',
+  DeliveryTaskStatusEnum.DELIVERED: 'DELIVERED',
+  DeliveryTaskStatusEnum.FAILED: 'FAILED',
+  DeliveryTaskStatusEnum.RETURNING: 'RETURNING',
+  DeliveryTaskStatusEnum.RETURNED: 'RETURNED',
+  DeliveryTaskStatusEnum.UNASSIGNED: 'UNASSIGNED',
+  DeliveryTaskStatusEnum.CANCELLED: 'CANCELLED',
+  DeliveryTaskStatusEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

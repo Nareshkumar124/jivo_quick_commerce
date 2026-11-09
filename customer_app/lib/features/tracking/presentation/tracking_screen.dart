@@ -9,18 +9,20 @@ import '../../../app/redirect.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../orders/domain/order_history.dart';
+import '../../orders/presentation/order_history_controllers.dart';
 import '../../orders/presentation/order_detail_screen.dart' show homeBackButton;
 import '../../orders/presentation/order_texts.dart';
 import '../../orders/presentation/order_timeline.dart';
 import '../domain/order_track.dart';
 import 'delivery_cards.dart';
+import 'tracking_map.dart';
 import 'tracking_providers.dart';
 
-/// Live tracking (`03 §2.10`, screen #28; Phase 6, built ahead on fake
-/// data): status timeline, ETA countdown, a route sketch with the store,
-/// the customer and the rider, the rider card with a call button, and the
-/// delivery OTP. The Mappls map replaces the sketch when tracking is bound
-/// (Phase 6).
+/// Live tracking (`03 §2.10`, screen #28): status timeline, ETA
+/// countdown, the Mappls map (or the route sketch without Mappls) with the
+/// store, the customer and the rider, the rider card with a call button,
+/// and the delivery OTP. Updates arrive over the order socket (`06 §4`),
+/// with `track/` polling while it is down.
 class TrackingScreen extends ConsumerWidget {
   const TrackingScreen({required this.orderId, super.key});
 
@@ -29,6 +31,16 @@ class TrackingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    // The order itself, for the payment side (COD amount due, refund note);
+    // best effort: tracking still shows without it.
+    final order = ref.watch(orderDetailProvider(orderId)).value;
+    ref.listen<AsyncValue<OrderTrack>>(trackProvider(orderId), (prev, next) {
+      final status = next.value?.status;
+      final before = prev?.value?.status;
+      if (status != null && before != null && status != before) {
+        ref.read(orderDetailProvider(orderId).notifier).refreshQuietly();
+      }
+    });
     return Scaffold(
       appBar: AppBar(
         leading: homeBackButton(context),
@@ -37,7 +49,7 @@ class TrackingScreen extends ConsumerWidget {
       body: switch (ref.watch(trackProvider(orderId))) {
         AsyncData(:final value) => RefreshIndicator(
           onRefresh: () => ref.read(trackProvider(orderId).notifier).poll(),
-          child: _TrackBody(track: value),
+          child: _TrackBody(track: value, order: order),
         ),
         AsyncError(:final error) => ErrorRetryView(
           error: error,
@@ -54,9 +66,10 @@ class TrackingScreen extends ConsumerWidget {
 List<TimelineStep> trackTimeline(OrderTrack track) => timelineFor(track.status);
 
 class _TrackBody extends ConsumerWidget {
-  const _TrackBody({required this.track});
+  const _TrackBody({required this.track, this.order});
 
   final OrderTrack track;
+  final OrderDetail? order;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,6 +78,11 @@ class _TrackBody extends ConsumerWidget {
     final rider = track.rider;
     final otp = track.deliveryOtp;
     final eta = track.etaAt;
+    final stage = track.stage;
+    final detail = order;
+    final codDue = detail != null && detail.status == track.status
+        ? detail.codAmountDue
+        : null;
     return ListView(
       key: const Key('tracking'),
       physics: const AlwaysScrollableScrollPhysics(),
@@ -81,11 +99,22 @@ class _TrackBody extends ConsumerWidget {
           ),
         ),
         if (eta != null && track.status.isActive) EtaCountdown(etaAt: eta),
+        if (stage != null) ...[
+          const SizedBox(height: JivoSpacing.md),
+          DeliveryStageCard(
+            stage: stage,
+            refundNote: detail == null ? null : refundNoteFor(l10n, detail),
+          ),
+        ],
         const SizedBox(height: JivoSpacing.lg),
-        RouteSketch(progress: track.progress),
+        TrackMap(track: track),
         const SizedBox(height: JivoSpacing.lg),
         if (otp != null) ...[
           DeliveryOtpCard(otp: otp),
+          const SizedBox(height: JivoSpacing.lg),
+        ],
+        if (codDue != null) ...[
+          CodDueCard(amount: codDue),
           const SizedBox(height: JivoSpacing.lg),
         ],
         if (rider != null)

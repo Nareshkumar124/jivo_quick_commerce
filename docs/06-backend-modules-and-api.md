@@ -157,7 +157,7 @@ Contract details (published in `backend/openapi/schema.yaml`, Phase 3 R1; exampl
 | POST | `/api/v1/orders/{id}/cancel/` | Owner | Cancel with `{reason}` (allowed states only): PAYMENT_PENDING (T5), PLACED/ACCEPTED (T11, Phase 4). |
 | POST | `/api/v1/orders/{id}/reorder/` | Owner | Add available items to the cart and return an unavailable list |
 | GET | `/api/v1/orders/{id}/invoice/` | Owner | GST invoice PDF (signed URL) |
-| POST | `/api/v1/orders/{id}/rating/` | Owner | `{order_stars, rider_stars, tags, comment}` [P7] |
+| POST / GET | `/api/v1/orders/{id}/rating/` | Owner | `{order_stars, rider_stars, tags, comment}` [P7] |
 
 Contract details for the Phase 3 rows (published in `backend/openapi/schema.yaml`, Phase 3 R1; examples for every case):
 - **operationIds:** `orders_create`, `orders_list`, `orders_retrieve`, `orders_retry_payment`, `orders_cancel` (tag `orders`); `payments_razorpay_verify`, `payments_razorpay_webhook` (tag `payments`). `orders_retrieve` (`GET /orders/{id}/`, the `Order` shape; another user's id is 404) was pulled into Phase 3 by the PM so the app can poll an order after checkout; Phase 4 adds the timeline and invoice to it. The track, reorder, invoice and rating rows are Phase 4+.
@@ -213,6 +213,8 @@ Contract details for the Phase 4 rows (published in `backend/openapi/schema.yaml
   - **Acceptance:** a PLACED order schedules `auto_accept_order` (stores with `auto_accept_orders`, after `AUTO_ACCEPT_DELAY_SECONDS`) and `store_acceptance_sla_alert` (after `STORE_ACCEPTANCE_SLA_SECONDS`, 60 s; one alert per order, event `order.acceptance_sla_breached`, logged at ERROR); the beat job `auto_accept_orders` (every minute) catches both if a countdown was lost.
   - **Domain events added:** `order.accepted`, `order.packing`, `order.packed`, `order.items_adjusted`, `order.acceptance_sla_breached` (logged; push/SMS/WebSocket in Phase 6).
 
+**Ratings (P7, api-requests #34):** `orders_rating_create` (`POST`, 201 `OrderRating {order_stars, rider_stars|null, tags[], comment, created_at}`) and `orders_rating_retrieve` (`GET`, 404 when unrated). Only a DELIVERED order of the caller, rated once (not editable): not delivered / already rated = 400 `VALIDATION_ERROR` with `details.order`, `details.reason` NOT_DELIVERED / ALREADY_RATED. Another user's order = 404. Tags `RatingTag`: ON_TIME, WELL_PACKED, FRESH_PRODUCTS, POLITE_RIDER, LATE_DELIVERY, DAMAGED_ITEMS, MISSING_ITEMS, RUDE_RIDER; POLITE_RIDER / RUDE_RIDER need `rider_stars`; `rider_stars` on an order without a rider = 400. Stored as `Rating` rows per target (ORDER, RIDER); rider tags and ON_TIME / LATE_DELIVERY go on the rider's row. `Rider.rating_avg` is recomputed on each rider rating. `Order` gains `can_rate` and `rating`. Rider: `GET /rider/ratings/?before_id=&page_size=` (`rider_ratings_list`) → `{rating_avg, ratings_count, tag_counts[{tag, count}], results[{id, stars, tags, rated_at, order_number}], next}`, own ratings only, no customer data or comments. Staff services (`apps.orders.ratings`): `staff_ratings(user, *, store_id, target, max_stars, rider_id, low_only)`, `staff_rider_summary(user, rider_id)`; permission `orders.view_rating`, store-scoped.
+
 ### 2.7 Notifications, CMS & support
 | Method | Path | Auth | Purpose | Phase |
 |--------|------|------|---------|-------|
@@ -237,7 +239,10 @@ P7 implementation (T-711, built ahead of Phase 7; app proposals api-requests #35
   - Rate limits (per user, fail open): create `SUPPORT_TICKETS_CREATE_RATE` (10/hour), reply `SUPPORT_MESSAGES_RATE` (60/hour); 429 `RATE_LIMITED`.
   - Status rules and staff services (`apps.support.services`, for the admin / Ops Console): `staff_reply(user, ticket_id, body, *, status=None)` (an OPEN ticket moves to IN_PROGRESS; replying to CLOSED is refused), `change_status` (OPEN → IN_PROGRESS/RESOLVED/CLOSED; IN_PROGRESS → OPEN/RESOLVED/CLOSED; RESOLVED → OPEN/IN_PROGRESS/CLOSED; CLOSED is terminal; anything else `INVALID_STATE_TRANSITION`), `assign(user, ticket_id, assignee_or_None)` (only to staff who may handle tickets), `set_priority` (LOW/NORMAL/HIGH/URGENT), `staff_tickets(user)`. Each checks `support.handle_ticket` (`PermissionDenied`) and writes `core.AuditLog` with ids, codes and lengths only.
   - PII (09): message bodies are never logged or audited; events (`support.ticket_created`, `support.customer_replied`, `support.staff_replied`, `support.status_changed`) log ids, codes and lengths. Push to the customer on a staff reply arrives with Phase 6/7 notifications. **Open:** account anonymisation (DPDP) should also clear ticket message bodies; that needs a hook in `apps.accounts` (not built here).
-  - **Attachments: not built.** `TicketMessage.attachments` (JSON list of storage keys) exists, always empty. Planned contract: `POST /support/tickets/{id}/attachments/` (multipart `file`; JPEG/PNG/WebP, at most 5 MB, re-encoded like catalog images, EXIF stripped) stores the file in the private bucket under `support/<ticket id>/<uuid>` and returns `{key, url (signed, short-lived)}`; a reply or create then sends `attachment_keys: [key, …]` (at most 3, only keys uploaded by the caller for that ticket in the last hour); messages return `attachments[{key, url}]` with signed URLs. Not exposed in the API until built.
+  - **Tickets per app (P7 code review):** the list, detail, reply and upload endpoints only see tickets raised from the calling app (the access token's `app` claim; a ticket's `app` is set at creation): a person who is both a customer and a rider sees customer tickets in the customer app and rider tickets in the rider app; the other app's ticket is 404.
+  - **Attachments (built in P7):** `POST /support/tickets/{id}/attachments/` (`support_tickets_attachments_create`; multipart `file`, JPEG/PNG/WebP, at most `SUPPORT_ATTACHMENT_MAX_BYTES` 5 MB; re-encoded to WebP without EXIF; private bucket `support/<ticket id>/<key>.webp`; throttle `SUPPORT_ATTACHMENTS_RATE` 30/hour; CLOSED refuses) returns `{key, url}` (signed, `SUPPORT_ATTACHMENT_URL_SECONDS` 600). A reply sends `attachment_keys` (at most 3, uploaded by the caller to that ticket in the last hour, unused); create takes none (upload after creating, then reply). Messages return `attachments[{key, url}]`.
+  - **P7 staff side additions:** SLA due times per priority (`first_response_due_at`, `resolution_due_at`; settings `SUPPORT_FIRST_RESPONSE_SLA_MINUTES` / `SUPPORT_RESOLUTION_SLA_HOURS`, ⚠ PM default 15/30/60/240 min and 4/8/24/72 h for URGENT/HIGH/NORMAL/LOW), services `sla_state`, `with_sla` (annotates `sla_breached`), `breached_tickets`; canned replies (`CannedReply`, `canned_replies`, `render_canned_reply` filling `{{ticket_number}}` / `{{order_number}}`); `staff_attachment_url` (audited `support.attachment_view`, ids only: the admin must open customer photos through it). A staff reply notifies the owner after commit: `support.ticket_replied` (customer app, category `support`, push + inbox, link `jivo://support/tickets/<id>`, FCM `{type: ticket, ticket_id}`) or `support.ticket_replied_rider` (rider app, link `jivo://rider/help/tickets/<id>`); idempotent per message; the text never quotes the reply.
+  - **Rider tickets (P7, rider app request):** categories TASK, PAYOUT, CASH only from a rider session (JWT `app` = rider, else 400 `details.category`); optional `task_id` (a task the caller was assigned) and `payout_id` (own payout), else 400 not found. Summary/detail add `task_id`, `payout_id`; `order_number` is the task's order for a task ticket.
 
 ## 3. REST endpoints: rider app [P5]
 
@@ -261,6 +266,7 @@ P7 implementation (T-711, built ahead of Phase 7; app proposals api-requests #35
 | POST | `/api/v1/rider/tasks/{id}/deliver/` | Rider | `{otp, cod: {mode: cash\|upi, amount}}`. Sets DELIVERED. |
 | POST | `/api/v1/rider/tasks/{id}/fail/` | Rider | `{reason, note, photo?}`. Sets DELIVERY_FAILED and starts the return flow. |
 | GET | `/api/v1/rider/tasks/history/?from=&to=` | Rider | Completed/failed tasks |
+| GET | `/api/v1/rider/tasks/history/{id}/` | Rider | One ended task with its pay lines, no customer personal data (added in P5 slice 5.4) |
 | GET | `/api/v1/rider/earnings/?from=&to=` | Rider | Earnings summary + lines |
 | GET | `/api/v1/rider/cash/ledger/` | Rider | Cash-in-hand ledger |
 | GET | `/api/v1/rider/payouts/` | Rider | Payout history |
@@ -274,7 +280,7 @@ Contract details (Phase 5, T-511; published in `backend/openapi/schema.yaml`, ta
   - shift and location: `rider_shift_start`, `rider_shift_end`, `rider_locations_create`, `rider_heartbeat`
   - offers: `rider_offers_current`, `rider_offers_accept`, `rider_offers_reject`
   - task: `rider_tasks_current`, `rider_tasks_arrived_store`, `rider_tasks_pickup`, `rider_tasks_arrived_customer`, `rider_tasks_cod_qr`, `rider_tasks_deliver`, `rider_tasks_fail`
-  - records: `rider_tasks_history`, `rider_earnings`, `rider_cash_ledger`, `rider_payouts_list`
+  - records: `rider_tasks_history`, `rider_tasks_history_detail` (5.4), `rider_earnings`, `rider_cash_ledger`, `rider_payouts_list`
   - customer tracking: `orders_track` (tag `orders`)
   - Live: slices 5.1 and 5.2 and `orders_track`. The rest answer 503 `SERVICE_UNAVAILABLE` until slice 5.3 or 5.4.
 - **Access:** every rider operation except stores and register needs a rider profile, else 403 `PERMISSION_DENIED` with `details.rider_status` = NONE (api-requests #8: 403, not 404, also for `/rider/me/`). Shift, location, offer and task operations need an ACTIVE rider, else 403 with `details.reason` = `RIDER_NOT_ACTIVE` and `rider_status`. Records (history, earnings, ledger, payouts) are open in any status. Another rider's offer or task id is 404.
@@ -326,12 +332,62 @@ Contract details (Phase 5, T-511; published in `backend/openapi/schema.yaml`, ta
   - register and bank account: `RIDER_PROFILE_WRITE_RATE` 20/hour
   - locations: `RIDER_LOCATIONS_RATE` 6/min
   - heartbeat: `RIDER_HEARTBEAT_RATE` 6/min
+  - pickup: `RIDER_PICKUP_RATE` 10/min (slice 5.3)
 - **Presence** uses the server's receipt time of location points (`last_location_received_at`), never the phone clock. A position time is never later than the server's now.
 - **Erasure (DPDP):** `anonymise_user` also calls `delivery.services.privacy.scrub_rider`.
   - It blanks the rider's name, date of birth, emergency contact, vehicle number and bank details.
   - It deletes the location history and the rider's simple_history rows.
   - It sets `kyc_purge_after` to today + `KYC_RETENTION_DAYS` (365, D-14 default).
   - The beat job `delivery.purge_offboarded_kyc` (daily) then deletes the KYC documents and their files.
+- **Slice 5.3 implementation (T-514a; `apps.delivery.services.dispatch` and `.tasks`):**
+  - **Dispatch** starts on the `DISPATCH_TRIGGER` event (`order.accepted` by default) and creates the order's `DeliveryTask`.
+    - **Candidates (08 §5):** ACTIVE, online, home store = the order's store, last location received within `DISPATCH_PING_MAX_AGE_SECONDS` (120), no active task, no pending offer, not offered this task before, and for COD `cash_in_hand + grand_total <= cash_limit`.
+    - **Ranking:** riders within `DISPATCH_AT_STORE_RADIUS_M` (200) of the store first, longest idle first (since their last task ended); then the rest nearest first by straight-line PostGIS distance.
+    - **Offers** last `OFFER_TIMEOUT_SECONDS` (30). An expiry or a rejection offers the next rider.
+    - **Give-up** after `MAX_OFFER_ATTEMPTS` (5) offers or `DISPATCH_TIMEOUT_SECONDS` (180): the task is UNASSIGNED with ops alert `DISPATCH_UNASSIGNED`, and auto-dispatch resumes after `DISPATCH_UNASSIGNED_PAUSE_SECONDS` (60).
+    - **Beat `delivery.dispatch_sweep`** (every 15 s) drives expiry and retries; countdown tasks (`expire_offer`, `dispatch_order`) make it faster.
+    - **T8 PACKED:** the assigned rider gets "Order ready"; a task without a rider is dispatched at once.
+    - **T8a on a COD order:** the task keeps `cod_amount_previous` and the rider gets a push.
+  - **Accept** locks the task. It is idempotent for this rider. A late accept is 409 `OFFER_EXPIRED` (the expiry is kept and the next rider is tried). A withdrawn or cancelled offer is 409 `OFFER_TAKEN`. An offline rider gets 409 `RIDER_OFFLINE`.
+  - **Going offline** (manual, auto-offline, ops, suspension) withdraws the rider's pending offer.
+  - **Cancellation (T11/T12)** cancels the task (it shows as `recent_task`), withdraws a pending offer, and the rider gets the push `rider.task_cancelled`.
+  - **Pickup (T9)** commits the stock (`inventory.commit_reservations`: `on_hand -= qty`, `reserved -= qty`, `StockMovement(SALE)` linked to the order, reservations COMMITTED) and generates the 4-digit delivery OTP, stored encrypted on the task.
+    - Codes are ASCII only and compared as ASCII bytes (non-ASCII: 400 `PICKUP_CODE_INVALID`, no attempt used).
+    - Wrong codes count per task. After `PICKUP_CODE_MAX_ATTEMPTS` (5): 423 `PICKUP_CODE_LOCKED` and ops alert `PICKUP_CODE_LOCKED`.
+    - A pickup that finds no ACTIVE reservation logs a warning and raises ops alert `STOCK_NOT_COMMITTED`.
+  - **Manual assignment** withdraws the rider's own pending offer elsewhere (after commit, in lock order). An accept that finds the rider already busy under the rider lock is 409 `OFFER_TAKEN`, never a 500.
+  - **Deliver (T10):**
+    - Order of checks: state, COD collection, OTP.
+    - 5 wrong OTPs lock it (423, ops alert `DELIVERY_OTP_LOCKED`). The rider cannot reset it and no COD path skips it.
+    - On success: COD cash goes to the `RiderCashLedger` (append-only; `cash_in_hand` is its running balance), `payment_status` becomes COD_COLLECTED, event `order.delivered`, and the invoice is generated.
+    - UPI collection: the task's QR must be PAID (slice 5.4, below).
+  - **Fail (T13):**
+    - The order goes to DELIVERY_FAILED and the task to RETURNING.
+    - **ONLINE refund (08 §6.4, D-10 default ⚠):** CUSTOMER_NOT_REACHABLE and CUSTOMER_REFUSED keep the delivery fee (customer fault); WRONG_ADDRESS and OTHER refund in full.
+    - **COD:** `payment_status` FAILED. `COD_BLOCK_AFTER_REFUSALS` (2) refused COD deliveries COD-block the customer (⚠).
+    - Event `order.delivery_failed` (ops alert).
+  - **T14** is the store action `orders.store_ops.receive_return(order_id, by=, damaged={line_id: units})`: good units `RETURN` (`on_hand += qty`); damaged units `RETURN` + `DAMAGE` (net unchanged, recorded); order and task RETURNED; event `order.returned`.
+  - **Push and realtime** go only through `apps.delivery.hooks`:
+    - `send_push` (rider, `apps.notifications.send_push`) events: `rider.offer_new`, `rider.offer_withdrawn`, `rider.task_cancelled`, `rider.task_assigned`, `rider.order_ready`, `rider.cod_amount_changed`.
+    - `notify_order` (customer, `apps.notifications.notify_order`, deduplicated per order): `order.out_for_delivery` (push + SMS with the rider name and OTP; inbox without the OTP) and `order.rider_arrived`. `order.delivered` and `order.delivery_failed` are notified by the P6 fan-out of the order domain events; `order.returned` notifies no customer (08 §9: board only).
+    - `publish_offer` and `publish_rider_location`.
+    - `ops_alert` (an `alert` on `/ws/ops/live/` to the store resolved from `store_id` / order / task / rider home store, via `apps.realtime.publish_ops_alert`; also logged at WARNING) kinds: `DISPATCH_UNASSIGNED`, `PICKUP_CODE_LOCKED`, `DELIVERY_OTP_LOCKED`, `STOCK_NOT_COMMITTED`, `ARRIVAL_GEOFENCE_OVERRIDE`, `MOCKED_LOCATION` (flag only, no block ⚠ Jivo), `RIDER_STALE_ON_TASK`.
+  - **Ops services** (05 §1.4, permission `delivery.dispatch_order`: Super Admin, Ops, Store Manager own stores; audited, `ip=`):
+    - `dispatch.manual_assign` (422 `CASH_LIMIT_EXCEEDED` for COD over the limit)
+    - `dispatch.unassign`
+    - `dispatch.retry_dispatch`
+  - **Rider pay estimate** (D-16 default ⚠): `RIDER_PAY_BASE_PER_ORDER` (30.00) + `RIDER_PAY_PER_KM` (5.00) x the route distance, or the `EarningRule` in force (slice 5.4).
+- **Slice 5.4 implementation (T-514b; `apps.delivery.services.cod_qr`, `.cash`, `.earnings`, `.payouts`, `.history`, `.ops`):**
+  - **COD UPI QR** (`cod-qr`, #16): one open Razorpay QR per task (QR Codes API: `upi_qr`, single use, fixed amount) for exactly the order's `grand_total`; a repeat returns it, an expired one (`COD_QR_EXPIRY_SECONDS`, 900) is replaced. `COD_UPI_QR_ENABLED` off, or the real gateway without the Razorpay keys, or the gateway down: 503 `SERVICE_UNAVAILABLE` (take cash). The gateway call runs outside row locks.
+    - **The server confirms payment:** webhook `qr_code.credited` (signed, idempotent per `event_id` and per payment id), or a gateway lookup (`fetch_qr_payments`) when the rider delivers with UPI or asks for the QR again (missed webhook). The payment is stored as a `Payment` (gateway `RAZORPAY_QR`). It pays the QR only when the QR is PENDING, the amount equals the QR amount and the order's `grand_total`, and the task is AT_CUSTOMER on an OUT_FOR_DELIVERY COD order.
+    - **Any other credit is refunded in full** to the UPI payment (`Refund` reason `cod_qr_unused`, key `codqr:<payment id>`, customer view `PAYMENT_ISSUE`; ops alert `COD_QR_REFUNDED`): a QR closed because cash was taken, an expired QR, a wrong amount, a delivery that failed.
+    - `deliver` with cash closes a PENDING QR (CANCELLED; `delivery.close_cod_qr` after commit). With a PAID QR, cash is refused (400 `cod`: "already paid by UPI"): no double collection. T13 closes a PENDING QR and refunds a PAID one (COD: nothing due, ⚠ PM default).
+    - Local development: `manage.py fake_cod_qr_payment <order_number> [--amount]` pays the open QR through the webhook service (fake gateway only).
+  - **Earnings** (D-16 default ⚠, DL-61 c): on T9 pickup, BASE (`base_per_order`) and DISTANCE (`per_km_rate` x (route `distance_km` - `per_km_after`), never the GPS trail); on T10 also TIP (the order's tip, passed through); at most one line of each per task. The rule in force is the newest `EarningRule` with `effective_from` <= now, else the settings `RIDER_PAY_BASE_PER_ORDER` / `RIDER_PAY_PER_KM`; the offer/task `estimated_payout` uses the same function. **Picked-up deliveries that fail, are returned or are cancelled after pickup keep BASE + DISTANCE; nothing before pickup** (DL-61 c). Staff adjustments: `earnings.add_adjustment(rider_id, type=INCENTIVE|PENALTY, amount, note, by=)` (`delivery.manage_payouts`; a penalty is stored negative). `GET /rider/me/` `today` now counts delivered orders and earnings.
+  - **History** (#22, #24): the caller's DELIVERED, RETURNED and CANCELLED tasks, `before_id` paging (newest id first), `from`/`to` on the IST end day. `payout` = the task's earning lines (null if none); `distance_km` null if never picked up. **`GET /rider/tasks/history/{id}/`** (`rider_tasks_history_detail`, added in 5.4): one ended task with items, `payment_type`, `cod_collected` and its pay lines, without customer personal data; another rider's or an active task is 404.
+  - **Cash** (05 §1.5): `RiderCashLedger` gains `store` (COD: the order's store; DEPOSIT: where handed in) and `idempotency_key`; `Rider.cash_in_hand >= 0` is a DB check. Staff services: `cash.record_deposit(rider_id, amount, by=, store_id=None, note=, idempotency_key=, ip=)` (`delivery.record_cash_deposit`, DL-61 a: Super Admin, Ops, Finance, Store Manager own stores; rider of the user's stores; 0 < amount <= cash in hand; the same key returns the first entry; rider row lock), `cash.adjust_cash(rider_id, signed amount, by=, note=)` (`delivery.adjust_cash`, Super Admin only ⚠), `cash.staff_cash_riders(user, store_id=None)`, `cash.store_day_report(user, store_id, day)` (collected vs deposited per rider and in total; Finance can view). All audited.
+  - **Payouts** (D-16: offline transfers, recorded): `payouts.create_payout(rider_id, period_start, period_end, by=)` takes the rider's unpaid lines earned in the period (IST, inclusive; not in the future) under the rider row lock; the sum must be above zero. `create_payouts_for_period` (a batch), `mark_paid(payout_id, reference=UTR, by=)` (idempotent with the same reference), `void_payout` (PENDING only; frees the lines). `delivery.manage_payouts`: Super Admin, Finance. Audited.
+  - **Ops delivery actions** (05 §1.4; `delivery.dispatch_order`, store scope, audited; ⚠ 05 §3 has no row for them, so "Manual dispatch" is used): `ops.unlock_pickup(order_id, by=)` (resets the pickup lock), `ops.unlock_delivery_otp(order_id, by=)` (5 new tries, same OTP), `ops.confirm_delivery(order_id, otp=, cod_mode=cash|upi, by=)` (ops check the OTP the customer reads to them and complete T10 for the rider, actor `ops`; a wrong OTP is refused and audited), `ops.fail_delivery(order_id, reason=, note=, by=)` (T13 without the 10-minute wait; same refunds). Read side: `ops.rider_board(user, store_id=None)` (state idle/to_store/at_store/delivering/returning, current task with lock flags, cash, last ping age) and `ops.assignable_riders(order_id, by=)` (manual dispatch candidates, nearest first, with the COD cash check). T14 stays `orders.store_ops.receive_return`.
 - **Key rotation:** `manage.py rotate_field_keys` re-encrypts every encrypted field under the newest `FIELD_ENCRYPTION_KEYS` key.
 - **Audit IPs:** staff services take `ip=` (the request IP) for the audit log.
 - **Staff services** (`apps.delivery.services.kyc`, for the Riders admin): `approve_document`, `reject_document`, `approve_rider`, `reject_rider`, `suspend_rider`, `reinstate_rider`, `set_home_store`, `set_cash_limit`, `document_file_url` and `document_number` (both audited), `staff_riders`, `online_blockers`. Also `shifts.force_offline`.
@@ -344,9 +400,9 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 
 | Path | Client | Server → client message types |
 |------|--------|-------------------------------|
-| `/ws/v1/orders/{order_id}/` | Customer (owner) | `order.status`, `rider.location`, `order.eta` |
-| `/ws/v1/rider/` | Rider | `offer.new`, `offer.withdrawn`, `task.updated` (e.g., packed / cancelled) |
-| `/ws/ops/live/` | Staff | `order.created`, `order.status`, `rider.location`, `rider.status`, `alert` (scoped to permitted stores) |
+| `/ws/v1/orders/{order_id}/` | Customer (owner) | `order.status`, `rider.location`, `order.eta`, `notification.new` |
+| `/ws/v1/rider/` | Rider | `offer.new`, `offer.expired`, `offer.withdrawn`, `task.updated` (e.g., packed / cancelled), `cash.updated`, `notification.new` |
+| `/ws/ops/live/` | Staff | `order.created`, `order.status`, `task.status`, `rider.location`, `rider.status`, `alert` (scoped to permitted stores) |
 
 ### 4.1 Connecting (Phase 6, `apps.realtime`)
 - **App sockets (`/ws/v1/`):** connect, then send `{"type": "auth", "token": "<access JWT>"}` within `WS_AUTH_TIMEOUT_SECONDS` (10 s). Or offer the subprotocols `["jivo.v1", "jivo.auth.<access JWT>"]`: the server selects `jivo.v1` and never echoes the token. The server answers `auth.ok` with the token's `expires_at`. Before then, send a new auth message with a refreshed token (same user), or the socket closes with 4401. `{"type": "ping"}` is answered with `pong`. There is no Origin check: native apps send none, and the JWT is not ambient, so a cross-site page cannot use it.
@@ -375,18 +431,27 @@ Customer, `/ws/v1/orders/{order_id}/`:
 {"type": "rider.location", "data": {"order_id": 1203, "lat": 28.4741, "lng": 77.0489, "heading": 72.5, "recorded_at": "2026-11-10T09:47:12Z"}, "sent_at": "2026-11-10T09:47:12.400000Z"}
 {"type": "order.eta", "data": {"order_id": 1203, "eta_at": "2026-11-10T09:56:00Z", "eta_minutes": 9}, "sent_at": "2026-11-10T09:47:12.400000Z"}
 ```
-Rider, `/ws/v1/rider/`. `offer.new` data is exactly the `RiderOffer` of `GET /rider/offers/current/`. On `task.updated`, re-read `GET /rider/tasks/current/`. `offer.withdrawn.reason` is EXPIRED, TAKEN, ORDER_CANCELLED or REASSIGNED. `task.updated.change` is ORDER_PACKED, ORDER_CANCELLED, AMOUNT_CHANGED, REASSIGNED or STATUS_CHANGED.
+Customer extras (T-612): `rider.location` is sent only while the order's task is ASSIGNED, AT_STORE, PICKED_UP or AT_CUSTOMER (the tracking gate), and only for a fix newer than the last one stored, so `recorded_at` only grows per rider (and per order: a rider has one task); drop older fixes. `order.eta` (08 §8, `eta_minutes` from `sent_at`) follows every order status change and every delivery-task change, and while OUT_FOR_DELIVERY at most every `WS_ETA_MIN_INTERVAL_SECONDS` (30 s) from rider pings. `GET /orders/{id}/track/` returns the same live value as `live_eta_at` / `live_eta_minutes` (`eta_at` stays the promise made at placement).
+
+Rider, `/ws/v1/rider/`. `offer.new` data is exactly the `RiderOffer` of `GET /rider/offers/current/`. On `task.updated`, re-read `GET /rider/tasks/current/`. **An offer that times out is `offer.expired`** (reason always EXPIRED); `offer.withdrawn.reason` is TAKEN (ops assigned the order to someone else), ORDER_CANCELLED, REASSIGNED (ops assigned you another order) or RIDER_OFFLINE. `task.updated.change` is ORDER_PACKED, ORDER_CANCELLED, AMOUNT_CHANGED, REASSIGNED (ops took you off), ASSIGNED (ops assigned you directly) or STATUS_CHANGED (ops unlocked a code, confirmed or failed the delivery, or the store received the return). `cash.updated` carries the same values as `cash` on `GET /rider/me/` plus `reason` (COD_COLLECTED, DEPOSIT, ADJUSTMENT, DEPOSIT_REQUIRED). The rider's own actions (accept, arrive, pickup, deliver) get their answer in the REST response, not on the socket.
 ```json
 {"type": "offer.new", "data": {"id": 9001, "task_id": 7001, "store_name": "Jivo Sector 14", "drop_locality": "Sector 21, Gurugram", "distance_km": "2.40", "payment_type": "COD", "cod_amount": "498.00", "estimated_payout": "42.00", "item_count": 3, "offered_at": "2026-11-10T09:30:00Z", "expires_at": "2026-11-10T09:30:30Z"}, "sent_at": "2026-11-10T09:30:00.120000Z"}
 {"type": "offer.withdrawn", "data": {"offer_id": 9001, "task_id": 7001, "reason": "ORDER_CANCELLED"}, "sent_at": "2026-11-10T09:30:12Z"}
 {"type": "task.updated", "data": {"task_id": 7001, "order_id": 1203, "status": "ASSIGNED", "order_status": "PACKED", "change": "ORDER_PACKED"}, "sent_at": "2026-11-10T09:41:05.120000Z"}
+{"type": "offer.expired", "data": {"offer_id": 9001, "task_id": 7001, "reason": "EXPIRED"}, "sent_at": "2026-11-10T09:30:30.200000Z"}
+{"type": "cash.updated", "data": {"rider_id": 41, "cash_in_hand": "1498.00", "cash_limit": "2000.00", "limit_reached": false, "deposit_required": false, "reason": "COD_COLLECTED", "updated_at": "2026-11-10T09:58:10Z"}, "sent_at": "2026-11-10T09:58:10.300000Z"}
 ```
-Ops, `/ws/ops/live/`. No customer data goes on this socket. `alert.code` is ACCEPTANCE_SLA_BREACHED, LATE_CAPTURE, REFUND_FAILED, DELIVERY_FAILED or DISPATCH_UNASSIGNED; more may be added, so show `message` for unknown codes.
+Every app socket (customer order sockets and the rider socket), api-requests #47: a new inbox entry for that app, with the unread count. **The customer app has no account-level socket: a customer gets `notification.new` only while one of their order sockets is open** (the rider gets it whenever the rider socket is open). Otherwise re-read the inbox (or `GET /me/notifications/unread-count/`) on the FCM message and when the app resumes.
+```json
+{"type": "notification.new", "data": {"id": 5512, "title": "Order confirmed", "body": "The store has confirmed order JV-261110-001203 and will pack it now.", "category": "order", "link": "jivo://orders/1203", "read": false, "created_at": "2026-11-10T09:41:05Z", "unread_count": 3}, "sent_at": "2026-11-10T09:41:05.300000Z"}
+```
+Ops, `/ws/ops/live/`. No customer data goes on this socket. `alert.code` is ACCEPTANCE_SLA_BREACHED, LATE_CAPTURE, REFUND_FAILED, DELIVERY_FAILED, DISPATCH_UNASSIGNED, PICKUP_CODE_LOCKED, DELIVERY_OTP_LOCKED, STOCK_NOT_COMMITTED, ARRIVAL_GEOFENCE_OVERRIDE, MOCKED_LOCATION or RIDER_STALE_ON_TASK; more may be added, so show `message` for unknown codes.
 ```json
 {"type": "order.created", "data": {"order_id": 1203, "order_number": "JV-261110-001203", "store_id": 1, "status": "PLACED", "payment_method": "COD", "item_count": 3, "grand_total": "498.00", "placed_at": "2026-11-10T09:40:31Z", "eta_at": "2026-11-10T09:58:00Z"}, "sent_at": "2026-11-10T09:40:31.300000Z"}
 {"type": "order.status", "data": {"order_id": 1203, "order_number": "JV-261110-001203", "store_id": 1, "status": "ACCEPTED", "payment_status": "PAID", "eta_at": "2026-11-10T09:58:00Z", "updated_at": "2026-11-10T09:41:04.880000Z"}, "sent_at": "2026-11-10T09:41:05.120000Z"}
 {"type": "rider.location", "data": {"rider_id": 41, "store_id": 1, "order_id": 1203, "lat": 28.4741, "lng": 77.0489, "heading": 72.5, "recorded_at": "2026-11-10T09:47:12Z"}, "sent_at": "2026-11-10T09:47:12.400000Z"}
 {"type": "rider.status", "data": {"rider_id": 41, "store_id": 1, "is_online": true, "on_task": false, "updated_at": "2026-11-10T09:30:00Z"}, "sent_at": "2026-11-10T09:30:00.200000Z"}
+{"type": "task.status", "data": {"task_id": 7001, "order_id": 1203, "order_number": "JV-261110-001203", "store_id": 1, "status": "ASSIGNED", "previous_status": "OFFERED", "rider_id": 41, "assignment_mode": "AUTO", "attempt_count": 1, "updated_at": "2026-11-10T09:30:08Z"}, "sent_at": "2026-11-10T09:30:08.200000Z"}
 {"type": "alert", "data": {"code": "ACCEPTANCE_SLA_BREACHED", "message": "Order JV-261110-001203 has not been accepted within 60 seconds.", "store_id": 1, "order_id": 1203, "rider_id": null, "at": "2026-11-10T09:41:31Z"}, "sent_at": "2026-11-10T09:41:31.100000Z"}
 ```
 Control messages, on every socket:
@@ -401,7 +466,7 @@ Control messages, on every socket:
 ### 4.3 Push data payloads (FCM `data`; every value is a string)
 FCM is sent for every important event in 08 §9, even while a socket is open. Until D-19 the push backend is disabled (`PUSH_BACKEND`), but the notification and inbox entry are still recorded. Staging and production refuse the console and locmem push backends (system check `notifications.E001`); the console backend never logs the body. Refund texts quote the stored `Refund.amount` (cancel: the `cancel:<order>` refund; `refund.processed` via `apps.notifications.notify_refund_processed(refund)`, which payments must call when a refund reaches PROCESSED). The `notification` part carries the title and body; the `data` part is what a tap routes on:
 - **Customer app** (api-requests #30): `{"type": "order", "order_id": "1203"}`. Later, `{"type": "product" | "collection" | "category", "slug": "..."}`. Or `{"link": "jivo://..."}` when no type applies.
-- **Rider app** (api-requests #41): `{"type": "offer.new", "offer_id": "9001", "task_id": "7001"}`, `{"type": "offer.withdrawn", "offer_id": "9001", "task_id": "7001"}`, `{"type": "task.updated", "task_id": "7001"}`.
+- **Rider app** (api-requests #41): `{"type": "offer.new", "offer_id": "9001", "task_id": "7001"}`, `{"type": "offer.expired" | "offer.withdrawn", "offer_id": "9001", "task_id": "7001"}`, `{"type": "task.updated", "task_id": "7001"}`, `{"type": "cash.updated"}` (staff deposits and adjustments, and the deposit-required flag; not for the rider's own COD collection). Rider inbox entries (task assigned, order ready, amount changed, task cancelled, return to store) have `link: null` in v1: route on `type` and open the current task. No rider `jivo://` links are sent yet.
 
 ### 4.4 Publishing (server side)
 The order domain events send the order messages (`apps.orders.tasks.order_event` → `realtime.publish_order_event`):
@@ -410,6 +475,8 @@ The order domain events send the order messages (`apps.orders.tasks.order_event`
 - the ops alert events send `alert`
 
 Phase 5 calls the functions in `apps.realtime`: `publish_rider_location`, `publish_offer`, `publish_offer_withdrawn`, `publish_task_updated`, `publish_rider_status` and `publish_ops_alert` (signatures in the package docstring). Each runs after commit through the `broadcast_ws` task and is best effort.
+
+T-612: every save that creates a `DeliveryTask` or changes its status or rider (`apps.delivery.live`, a `post_save` observer) sends `task.status` to the store's ops group, `rider.status` for the riders concerned and a recomputed `order.eta`. Going online/offline sends `rider.status`. Rider events with a reason (`offer.*`, `task.updated`, `cash.updated`) are sent by the delivery services through `apps.delivery.hooks`, each with its FCM push. New inbox entries send `notification.new` to the group `user.<id>.<app>`, which every app socket joins. Latency: dispatch to `offer.new` on the rider socket is under 3 s (test `test_offer_reaches_the_rider_socket_within_3_seconds`; in production add the `broadcast_ws` queue hop).
 
 ## 5. Background jobs (Celery)
 
@@ -422,15 +489,19 @@ Phase 5 calls the functions in `apps.realtime`: `publish_rider_location`, `publi
 | `sync_refund_status` | Beat, every 30 min | Poll refunds still pending: with a gateway id, ask the gateway (outside row locks) and record the answer; without one after `REFUND_STUCK_MINUTES`, send the refund again (`process_refund` adopts a refund already made for the receipt) | P4 |
 | `auto_accept_orders` | Countdown (`auto_accept_order`) + beat every minute | Auto-accept for stores with auto-accept enabled; the beat sweep also raises SLA alerts a lost countdown missed | P4 |
 | `store_acceptance_sla_alert` | Countdown | Alert ops if an order is not accepted within the SLA | P4 |
-| `dispatch_order` | Order reaches the dispatch trigger state | Pick the best rider and create an offer (see [08 §5](08-order-lifecycle.md#5-rider-dispatch-algorithm)) | P5 |
+| `dispatch_order` | Order reaches the dispatch trigger state | Pick the best rider and create an offer (see [08 §5](08-order-lifecycle.md#5-rider-dispatch-algorithm)). Implemented in P5 slice 5.3 (`delivery.dispatch_order`) | P5 |
+| `dispatch_sweep` | Beat, every 15 s | Expire due offers, run due dispatch retries, resume UNASSIGNED tasks after the pause (P5 slice 5.3) | P5 |
 | `expire_offer` | Countdown = offer timeout | If still pending: mark EXPIRED and dispatch to the next rider | P5 |
-| `unassigned_order_alert` | After N failed offers or X minutes | Alert ops for manual assignment | P5 |
+| `close_cod_qr` | After commit (cash taken, QR replaced, delivery failed) | Close a COD UPI QR at the gateway; idempotent (a closed QR is fine); retried while the gateway is unreachable (`delivery.close_cod_qr`, slice 5.4) | P5 |
+| `unassigned_order_alert` | After N failed offers or X minutes | Alert ops for manual assignment. P5: raised by dispatch itself (`hooks.ops_alert("DISPATCH_UNASSIGNED")`), no separate task | P5 |
 | `rider_heartbeat_check` | Beat, every 2 min | Auto-offline riders with no location point for `RIDER_AUTO_OFFLINE_MINUTES` (10). A rider on a task is not set offline; an ops alert is logged instead. Implemented in P5 slice 5.2 (`delivery.rider_heartbeat_check`). | P5 |
 | `send_push` / `send_sms` | Domain events | FCM / SMS delivery with retries (`notifications.send_push` / `notifications.send_sms`, 5 retries with backoff; `notifications.notify_order_event` per order event). Idempotent per (event, user, order): a `Notification` row keyed on `dedupe_key`, each channel claimed once (PENDING → SENDING → SENT/SKIPPED/FAILED). An SMS needs the event's DLT template id (`SMS_DLT_TEMPLATE_IDS`), else it is skipped and logged. An SMS rejected or with an unknown outcome is not retried (no duplicates) | P5/P6 |
 | `broadcast_ws` | Domain events | Push to channel groups (`realtime.broadcast_ws`; `realtime.publish_order_event` per order event). Best effort, retried 3x | P6 |
 | `low_stock_alert` | Stock movement | Notify the store manager when available < threshold. P2: logs a warning (re-checks current stock, so it is idempotent); P7: notification | P2/P7 |
 | `reconcile_payments` | Beat, nightly | Compare Razorpay settlements/payments with local records and flag mismatches | P7 |
-| `daily_reports_email` | Beat, daily | Store-wise daily summary to managers | P7 |
+| `daily_reports_email` | Beat, daily 08:00 IST | Store-wise summary of the previous IST day mailed to each Store Manager (their stores; `DAILY_REPORTS_EMAIL_ENABLED`). Fans out one `reports.daily_report_mail` task per manager (an SMTP error retries that manager only; a sent mail is remembered for 2 days so a redelivery does not mail twice) (`reports.daily_reports_email`) | P7 |
+| `generate_export` / `purge_old_exports` | Export request / beat daily | Build a report CSV into the private bucket (signed download, `REPORT_EXPORT_URL_SECONDS`); delete exports older than `REPORT_EXPORT_RETENTION_DAYS` (7) and fail exports stuck PENDING/RUNNING for a day (`reports.*`). An unexpected error is retried 3 times, then the export is FAILED; a deleted export is a no-op | P7 |
+| `purge_unclaimed_attachments` | Beat, daily 05:25 IST | Delete support photos (rows and files) never claimed by a reply within the 1-hour claim window (`support.purge_unclaimed_attachments`) | P7 |
 | `purge_offboarded_kyc` | Beat, daily | Delete KYC documents (rows and bucket files) of riders past `kyc_purge_after` (D-14 default: 1 year after offboarding/erasure). The file is deleted first; on failure the row stays for the next run | P5 |
 | `purge_old_locations` | Beat, daily | Delete `RiderLocation` rows older than `RIDER_LOCATION_RETENTION_DAYS` (30), in batches (`realtime.purge_old_locations`) | P6 |
 | `sweep_stuck_sends` | Beat, every 15 min | A push/SMS still SENDING after `NOTIFICATION_STUCK_SEND_MINUTES` (15; a worker died mid-send) is marked FAILED, its text blanked (it can hold an OTP) and logged at ERROR. Never resent | P6 |
@@ -475,7 +546,8 @@ All tasks are **idempotent** (safe to retry) and log with the order/rider ID for
 | `SERVICE_UNAVAILABLE` | 503 | Added in P0. `/health/ready` when the database or Redis is unreachable. |
 | `STORE_NOT_FOUND` | 404 | Added in P2. The store in `X-Store-Id` does not exist or was deactivated. `details.store_id`. The app re-checks serviceability. |
 | `RIDER_OFFLINE` | 409 | Added in P5 (api-requests #4). A location batch from a rider the server already set offline: stop the location service. |
-| `PICKUP_CODE_INVALID` | 400 | Added in P5 (api-requests #15). The order code or bag QR does not match the task's order. |
+| `PICKUP_CODE_INVALID` | 400 | Added in P5 (api-requests #15). The order code or bag QR does not match the task's order (`details.attempts_remaining`), or is not a code at all (non-ASCII or the wrong shape; no attempt used). |
+| `PICKUP_CODE_LOCKED` | 423 | Added in P5 (slice 5.3 review). `PICKUP_CODE_MAX_ATTEMPTS` (5) wrong order codes: the pickup is locked and ops are alerted. `details.attempts_remaining` is 0. Ops reassign the order (the lock resets on reassignment) or unlock it (`ops.unlock_pickup`, slice 5.4). |
 | `PAYLOAD_TOO_LARGE` | 413 | Added in P2 R3 (BUG-0001). The request body is larger than 2.5 MB (`DATA_UPLOAD_MAX_MEMORY_SIZE`). Any endpoint can return it; it is a client error, never a 500. Other malformed-request conditions Django flags (too many fields or files) are 400 `VALIDATION_ERROR`. Deployed proxies also cap bodies (nginx `client_max_body_size`). |
 
 Rules for the envelope (implemented in `apps.core.exceptions`, codes in `apps.core.errors.ErrorCode`, published as `ErrorCodeEnum` / `ErrorEnvelope` in the OpenAPI schema; the inner `error` object is the component `ErrorBody`, renamed from `ApiError` in Phase 1 R3 because it clashed with `jivo_core`'s `ApiError`; the JSON shape did not change):

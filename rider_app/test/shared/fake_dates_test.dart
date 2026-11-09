@@ -40,7 +40,7 @@ void main() {
     final entries = <TaskHistoryEntry>[];
     int? page = 1;
     while (page != null) {
-      final result = await fake.fetchHistory(page: page);
+      final result = await fake.fetchHistory(cursor: page);
       entries.addAll(result.items);
       page = result.nextPage;
     }
@@ -67,7 +67,7 @@ void main() {
     final entries = <CashEntry>[];
     int? page = 1;
     while (page != null) {
-      final result = await fake.fetchLedger(page: page);
+      final result = await fake.fetchLedger(cursor: page);
       entries.addAll(result.entries.items);
       page = result.entries.nextPage;
     }

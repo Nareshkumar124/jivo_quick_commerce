@@ -79,7 +79,10 @@ class AppConfigSerializer(serializers.Serializer):
 
 
 class PageSerializer(serializers.Serializer):
-    slug = serializers.CharField(help_text="about, terms, privacy or refund-policy.")
+    slug = serializers.CharField(
+        help_text="about, terms, privacy, refund-policy, rider-agreement or "
+        "rider-location-disclosure."
+    )
     title = serializers.CharField()
     html = serializers.CharField(
         help_text=(
