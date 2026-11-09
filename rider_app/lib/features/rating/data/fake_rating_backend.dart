@@ -1,8 +1,8 @@
 import '../../../shared/fake_api_endpoint.dart';
 import '../domain/rider_rating.dart';
 
-/// TODO(api): the rider's ratings until the P7 ratings API lands (dev
-/// flavor `FAKE_API` builds and tests only, DL-30). Pages by `before_id`.
+/// The rider's ratings in memory (dev flavor `FAKE_API` builds and tests
+/// only, DL-30/DL-32). Pages by `before_id`, like `GET /rider/ratings/`.
 class FakeRatingBackend extends FakeApiEndpoint implements RatingRepository {
   FakeRatingBackend({
     required DateTime Function() clock,

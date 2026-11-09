@@ -2,11 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../app/env.dart';
 import '../../../app/providers.dart';
 import '../../../shared/paged_list_controller.dart';
-import '../../../shared/paging.dart';
 import '../../auth/presentation/rider_account_controller.dart';
-import '../../task/presentation/task_providers.dart';
+import '../../onboarding/domain/image_compression.dart';
+import '../../onboarding/domain/image_picking.dart';
+import '../../onboarding/presentation/onboarding_providers.dart';
 import '../data/support_repository.dart';
 import '../domain/support_models.dart';
 
@@ -15,11 +17,10 @@ final fakeSupportBackendProvider = Provider<FakeSupportBackend>(
   (ref) => FakeSupportBackend(clock: ref.watch(clockProvider)),
 );
 
-/// FAQs and tickets: the shared support API, the fake with `FAKE_API`.
-/// Where the rider work screens run (dev flavor, DL-30/DL-32).
+/// FAQs and tickets: the shared support API in every flavor; the fake only
+/// in the dev flavor with `FAKE_API` (DL-30, DL-32).
 final supportRepositoryProvider = Provider<SupportRepository>((ref) {
-  if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
-  if (ref.watch(appEnvProvider).useFakeApi) {
+  if (ref.watch(appEnvProvider).useRiderFakes) {
     return ref.watch(fakeSupportBackendProvider);
   }
   return ApiSupportRepository(ref.watch(jivoApiProvider));
@@ -50,6 +51,32 @@ final ticketThreadProvider = AsyncNotifierProvider.autoDispose
       TicketThreadController.new,
     );
 
+/// Why a photo could not be attached.
+sealed class PhotoProblem {
+  const PhotoProblem();
+}
+
+/// The file is not an image the phone can read.
+class PhotoUnreadable extends PhotoProblem {
+  const PhotoUnreadable();
+}
+
+/// Even compressed, or the server/proxy refused its size (413).
+class PhotoTooLarge extends PhotoProblem {
+  const PhotoTooLarge();
+}
+
+/// The upload failed (network, closed ticket, rate limit, ...).
+class PhotoUploadFailed extends PhotoProblem {
+  const PhotoUploadFailed(this.error);
+
+  final ApiError error;
+}
+
+/// The result of [TicketThreadController.attachPhoto]: the uploaded photo,
+/// or why not. Both null when the rider cancelled the picker.
+typedef PhotoResult = ({UploadedAttachment? photo, PhotoProblem? problem});
+
 class TicketThreadController extends AsyncNotifier<TicketThread> {
   TicketThreadController(this.ticketId);
 
@@ -65,21 +92,67 @@ class TicketThreadController extends AsyncNotifier<TicketThread> {
     );
   }
 
-  /// Sends [message]. Returns null when sent (the thread is the server's
-  /// answer), else the error to show; the typed text is kept by the screen.
-  Future<ApiError?> reply(String message) async {
+  /// Sends [message] with the photos [attachmentKeys]. Returns null when
+  /// sent (the thread is the server's answer), else the error to show; the
+  /// typed text and photos are kept by the screen.
+  Future<ApiError?> reply(
+    String message, {
+    List<String> attachmentKeys = const [],
+  }) async {
     final text = message.trim();
     if (text.isEmpty) return null;
     try {
       final thread = await ref
           .read(supportRepositoryProvider)
-          .reply(ticketId, text);
+          .reply(ticketId, text, attachmentKeys: attachmentKeys);
       if (ref.mounted) state = AsyncData(thread);
       return null;
     } on Object catch (e) {
       final error = ApiError.from(e);
       if (ref.mounted) reportAppControlError(ref, error);
       return error;
+    }
+  }
+
+  /// Takes or picks a photo, compresses it on the phone (EXIF dropped, at
+  /// most [kTicketPhotoMaxBytes]) and uploads it to this ticket. The
+  /// original file is always deleted.
+  Future<PhotoResult> attachPhoto(ImagePickSource source) async {
+    final picker = ref.read(kycImagePickerProvider);
+    final codec = ref.read(imageCodecProvider);
+    final repo = ref.read(supportRepositoryProvider);
+    final PickedImage? picked;
+    try {
+      picked = await picker.pick(source, selfie: false);
+    } on Object {
+      // No camera, or the picker failed: nothing was taken.
+      return (photo: null, problem: const PhotoUnreadable());
+    }
+    if (picked == null) return (photo: null, problem: null);
+    final CompressedImage image;
+    try {
+      image = await compressToLimit(
+        codec: codec,
+        sourcePath: picked.path,
+        maxBytes: kTicketPhotoMaxBytes,
+      );
+    } on ImageTooLargeException {
+      return (photo: null, problem: const PhotoTooLarge());
+    } on Object {
+      return (photo: null, problem: const PhotoUnreadable());
+    } finally {
+      await picker.discard(picked);
+    }
+    try {
+      final photo = await repo.uploadPhoto(ticketId, image.bytes);
+      return (photo: photo, problem: null);
+    } on Object catch (e) {
+      final error = ApiError.from(e);
+      if (error.statusCode == 413) {
+        return (photo: null, problem: const PhotoTooLarge());
+      }
+      if (ref.mounted) reportAppControlError(ref, error);
+      return (photo: null, problem: PhotoUploadFailed(error));
     }
   }
 }
@@ -115,9 +188,15 @@ class NewTicketState {
   );
 }
 
-/// What the form opens with (from the help screen, or "Get help with this
-/// order" on a past task).
-typedef NewTicketArgs = ({RiderTicketTopic? topic, String? reference});
+/// What the form opens with: from the help screen (nothing), "Get help with
+/// this order" on a past task (TASK, its id and order number) or "Get help"
+/// on a payout (PAYOUT, its id and period).
+typedef NewTicketArgs = ({
+  RiderTicketTopic? topic,
+  int? taskId,
+  int? payoutId,
+  String? label,
+});
 
 final newTicketControllerProvider = NotifierProvider.autoDispose
     .family<NewTicketController, NewTicketState, NewTicketArgs>(
@@ -133,36 +212,19 @@ class NewTicketController extends Notifier<NewTicketState> {
   NewTicketState build() => NewTicketState(
     draft: TicketDraft(
       topic: args.topic ?? RiderTicketTopic.task,
-      reference: args.reference ?? '',
+      taskId: args.taskId,
+      payoutId: args.payoutId,
+      label: args.label,
     ),
   );
 
   void _edit(TicketDraft draft) =>
       state = state.copyWith(draft: draft, clearError: true);
 
-  void setTopic(RiderTicketTopic topic) => _edit(
-    TicketDraft(
-      topic: topic,
-      reference: state.draft.reference,
-      text: state.draft.text,
-    ),
-  );
+  void setTopic(RiderTicketTopic topic) =>
+      _edit(state.draft.copyWith(topic: topic));
 
-  void setReference(String reference) => _edit(
-    TicketDraft(
-      topic: state.draft.topic,
-      reference: reference,
-      text: state.draft.text,
-    ),
-  );
-
-  void setText(String text) => _edit(
-    TicketDraft(
-      topic: state.draft.topic,
-      reference: state.draft.reference,
-      text: text,
-    ),
-  );
+  void setText(String text) => _edit(state.draft.copyWith(text: text));
 
   /// Sends the ticket. Returns the new thread, or null when the form has a
   /// problem or the call failed (shown on the form).
@@ -187,27 +249,4 @@ class NewTicketController extends Notifier<NewTicketState> {
       return null;
     }
   }
-}
-
-/// Staging and prod while gated: never reached; every call fails.
-class _Unavailable implements SupportRepository {
-  const _Unavailable();
-
-  static const _error = ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-
-  @override
-  Future<List<Faq>> faqs() async => throw _error;
-
-  @override
-  Future<Page<SupportTicket>> tickets({int? page}) async => throw _error;
-
-  @override
-  Future<TicketThread> ticket(int id) async => throw _error;
-
-  @override
-  Future<TicketThread> create(TicketDraft draft) async => throw _error;
-
-  @override
-  Future<TicketThread> reply(int ticketId, String message) async =>
-      throw _error;
 }

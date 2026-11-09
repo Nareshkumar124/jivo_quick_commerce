@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/app/routes.dart';
 import 'package:rider_app/features/legal/data/legal_repository.dart';
+import 'package:rider_app/features/legal/presentation/legal_providers.dart';
 
 import '../../helpers/canned_http.dart';
 import '../../helpers/onboarding_fixtures.dart';
@@ -37,6 +38,20 @@ void main() {
     );
     expect(LegalSlug.fromSlug('privacy'), LegalSlug.privacy);
     expect(LegalSlug.fromSlug('about'), isNull);
+  });
+
+  test('the fake pages run only in the dev flavor with FAKE_API', () async {
+    // The harness sets FAKE_API in every flavor: staging must ignore it.
+    for (final flavor in [Flavor.staging, Flavor.prod]) {
+      final container = await RiderTestHarness(flavor: flavor).container();
+      expect(
+        container.read(legalRepositoryProvider),
+        isA<ApiLegalRepository>(),
+        reason: flavor.name,
+      );
+    }
+    final dev = await RiderTestHarness().container();
+    expect(dev.read(legalRepositoryProvider), isA<FakeLegalBackend>());
   });
 
   testWidgets('the agreement renders safely from Help; links open outside', (

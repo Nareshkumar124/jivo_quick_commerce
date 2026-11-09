@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jivo_core/jivo_core.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/format/ist_format.dart';
@@ -27,30 +26,15 @@ class MyRatingScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final state = ref.watch(myRatingProvider);
     final notifier = ref.read(myRatingProvider.notifier);
-    final Widget body;
-    if (!state.loaded && state.error?.code == ApiErrorCode.notFound) {
-      // No ratings API in this build yet (TODO(api)).
-      body = Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            l10n.ratingUnavailable,
-            key: const Key('rating-unavailable'),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    } else {
-      final summary = state.header;
-      body = PagedListView(
-        state: state,
-        onRefresh: notifier.refresh,
-        onLoadMore: notifier.loadMore,
-        emptyText: l10n.ratingNoneYet,
-        header: [if (summary != null) _SummaryCard(summary: summary)],
-        itemBuilder: (context, rating) => _RatingTile(rating: rating),
-      );
-    }
+    final summary = state.header;
+    final body = PagedListView(
+      state: state,
+      onRefresh: notifier.refresh,
+      onLoadMore: notifier.loadMore,
+      emptyText: l10n.ratingNoneYet,
+      header: [if (summary != null) _SummaryCard(summary: summary)],
+      itemBuilder: (context, rating) => _RatingTile(rating: rating),
+    );
     return Scaffold(
       appBar: AppBar(title: Text(l10n.ratingTitle)),
       body: body,

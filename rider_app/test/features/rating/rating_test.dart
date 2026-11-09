@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/app/routes.dart';
+import 'package:rider_app/features/rating/data/api_rating_repository.dart';
 import 'package:rider_app/features/rating/data/fake_rating_backend.dart';
 import 'package:rider_app/features/rating/domain/rider_rating.dart';
 import 'package:rider_app/features/rating/presentation/rating_providers.dart';
 
+import '../../helpers/canned_http.dart';
 import '../../helpers/records_helpers.dart';
 import '../../helpers/rider_app_harness.dart';
 
@@ -77,17 +79,99 @@ void main() {
       expect(sub.read().hasMore, isFalse);
     });
 
-    test('builds on the real API have no ratings yet (404)', () async {
-      final h = RiderTestHarness(flavor: Flavor.staging);
-      final container = await h.container();
+    test('staging and prod read GET /rider/ratings/, never the fake', () async {
+      for (final flavor in [Flavor.staging, Flavor.prod]) {
+        final container = await RiderTestHarness(flavor: flavor).container();
+        expect(
+          container.read(ratingRepositoryProvider),
+          isA<ApiRatingRepository>(),
+          reason: flavor.name,
+        );
+      }
+      final dev = await RiderTestHarness().container();
+      expect(dev.read(ratingRepositoryProvider), isA<FakeRatingBackend>());
+    });
+  });
+
+  group('ApiRatingRepository', () {
+    const path = '/api/v1/rider/ratings/';
+
+    test('maps rider_ratings_list and pages by before_id', () async {
+      final http = CannedAdapter();
+      http.answers[path] = const Canned(200, {
+        // The server's rounding: shown as is, never recomputed.
+        'rating_avg': '4.7',
+        'ratings_count': 23,
+        'tag_counts': [
+          {'tag': 'ON_TIME', 'count': 12},
+          {'tag': 'WELL_PACKED', 'count': 5},
+          {'tag': 'RUDE_RIDER', 'count': 1},
+        ],
+        'results': [
+          {
+            'id': 90,
+            'stars': 5,
+            'tags': ['ON_TIME', 'FRESH_PRODUCTS'],
+            'rated_at': '2026-11-06T10:00:00Z',
+            'order_number': 'JV-261106-000090',
+          },
+          {
+            'id': 88,
+            'stars': 3,
+            'tags': <String>[],
+            'rated_at': '2026-11-05T10:00:00Z',
+            'order_number': 'JV-261105-000088',
+          },
+        ],
+        'next': 'http://localhost:8001/api/v1/rider/ratings/?before_id=88',
+      });
+      final repo = ApiRatingRepository(cannedApi(http));
+      final summary = await repo.fetch();
+      expect(summary.average, '4.7');
+      expect(summary.count, 23);
+      // Store tags (WELL_PACKED) are not the rider's: dropped.
+      expect(summary.tagCounts.map((t) => (t.tag, t.count)), [
+        (RatingTag.onTime, 12),
+        (RatingTag.rudeRider, 1),
+      ]);
+      expect(summary.recent.map((r) => r.id), [90, 88]);
+      expect(summary.recent.first.tags, [RatingTag.onTime, RatingTag.unknown]);
+      expect(summary.recent.first.ratedAt, DateTime.utc(2026, 11, 6, 10));
+      expect(summary.recent.first.orderNumber, 'JV-261106-000090');
+      expect(summary.nextBeforeId, 88);
       expect(
-        container.read(ratingRepositoryProvider),
-        isA<UnavailableRatingRepository>(),
+        http.requests.last.queryParameters.containsKey('before_id'),
+        isFalse,
       );
+
+      await repo.fetch(beforeId: 88);
+      expect(http.requests.last.queryParameters['before_id'], 88);
+    });
+
+    test('no ratings yet: a null average; errors arrive as ApiError', () async {
+      final http = CannedAdapter();
+      http.answers[path] = const Canned(200, {
+        'rating_avg': null,
+        'ratings_count': 0,
+        'tag_counts': <Object?>[],
+        'results': <Object?>[],
+        'next': null,
+      });
+      final repo = ApiRatingRepository(cannedApi(http));
+      final empty = await repo.fetch();
+      expect(empty.average, isNull);
+      expect(empty.isEmpty, isTrue);
+      expect(empty.nextBeforeId, isNull);
+
+      http.answers[path] = Canned(403, errorBody('PERMISSION_DENIED'));
       await expectLater(
-        container.read(ratingRepositoryProvider).fetch(),
+        repo.fetch(),
         throwsA(
-          isA<ApiError>().having((e) => e.code, 'code', ApiErrorCode.notFound),
+          isA<ApiError>().having(
+            (e) => e.code,
+            'code',
+            ApiErrorCode.permissionDenied,
+          ),
         ),
       );
     });
@@ -109,16 +193,14 @@ void main() {
       expect(find.text('JV-261102-001240'), findsOneWidget);
     });
 
-    testWidgets('a failed load can be retried; no API says not available', (
-      tester,
-    ) async {
+    testWidgets('a failed load can be retried', (tester) async {
       final h = RiderTestHarness();
-      h.ratings.failNext = const ApiError(
-        code: ApiErrorCode.notFound,
-        statusCode: 404,
-      );
+      h.ratings.failNext = const ApiError(code: ApiErrorCode.network);
       await pushFromHome(tester, h, Routes.rating);
-      expect(byKey('rating-unavailable'), findsOneWidget);
+      expect(byKey('paged-error'), findsOneWidget);
+      await tester.tap(byKey('paged-retry'));
+      await tester.pumpAndSettle();
+      expect(textOf(tester, 'rating-average'), '4.6');
     });
 
     testWidgets('no ratings yet', (tester) async {

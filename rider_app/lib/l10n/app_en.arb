@@ -1236,11 +1236,23 @@
   "ticketTopicPayout": "A payout",
   "ticketTopicCash": "Cash deposit",
   "ticketTopicAccount": "My account",
-  "ticketTopicApp": "App problem",
   "ticketTopicOther": "Something else",
-  "ticketReferenceOrder": "Order number",
-  "ticketReferencePayout": "Payout dates or reference",
-  "ticketReferenceOptional": "Optional",
+  "ticketLinkedOrder": "Order {number}",
+  "@ticketLinkedOrder": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "ticketLinkedPayout": "Payout {period}",
+  "@ticketLinkedPayout": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
   "ticketDescribe": "Tell us what happened",
   "ticketTooShort": "Write at least {count} characters.",
   "@ticketTooShort": {
@@ -1277,8 +1289,38 @@
   "ticketFromYou": "You",
   "ticketFromSupport": "Jivo support",
   "historyGetHelp": "Get help with this order",
+  "payoutGetHelp": "Get help",
+  "ticketAddPhoto": "Add a photo",
+  "ticketPhotoCamera": "Take a photo",
+  "ticketPhotoGallery": "Choose from gallery",
+  "ticketPhoto": "Photo {index}",
+  "@ticketPhoto": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "ticketPhotoRemove": "Remove photo {index}",
+  "@ticketPhotoRemove": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "ticketPhotoTooLarge": "This photo is too large. Try another photo.",
+  "ticketPhotoUnreadable": "This file is not a photo we can use. Try another photo.",
+  "ticketPhotoLimit": "You can add up to {count} photos to one reply.",
+  "@ticketPhotoLimit": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ticketPhotoNeedsText": "Write a short message to send with the photo.",
   "ratingTitle": "My rating",
-  "ratingUnavailable": "Your rating details are not available yet. Your average shows on your profile.",
   "ratingNoneYet": "No ratings yet. Customers can rate you after each delivery.",
   "ratingCount": "{count, plural, =0{No ratings yet} =1{From 1 rating} other{From {count} ratings}}",
   "@ratingCount": {

@@ -1,9 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/env.dart';
 import '../../../app/providers.dart';
 import '../../../shared/paged_list_controller.dart';
 import '../../../shared/paging.dart';
-import '../../task/presentation/task_providers.dart';
+import '../data/api_rating_repository.dart';
 import '../data/fake_rating_backend.dart';
 import '../domain/rider_rating.dart';
 
@@ -12,16 +13,13 @@ final fakeRatingBackendProvider = Provider<FakeRatingBackend>(
   (ref) => FakeRatingBackend(clock: ref.watch(clockProvider)),
 );
 
-/// The rider's ratings. TODO(api): only the fake until the backend's P7
-/// ratings API merges; builds on the real API get
-/// [UnavailableRatingRepository] (the screen says "not available yet" and
-/// the profile keeps showing `rating_avg` from `GET /rider/me/`).
+/// The rider's ratings: `GET /rider/ratings/` in every flavor; the fake
+/// only in the dev flavor with `FAKE_API` (DL-30, DL-32).
 final ratingRepositoryProvider = Provider<RatingRepository>((ref) {
-  if (ref.watch(riderWorkEnabledProvider) &&
-      ref.watch(appEnvProvider).useFakeApi) {
+  if (ref.watch(appEnvProvider).useRiderFakes) {
     return ref.watch(fakeRatingBackendProvider);
   }
-  return const UnavailableRatingRepository();
+  return ApiRatingRepository(ref.watch(jivoApiProvider));
 });
 
 /// "My rating": the summary (header, from the latest page) and the recent

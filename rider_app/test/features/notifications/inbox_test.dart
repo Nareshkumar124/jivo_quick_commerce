@@ -46,6 +46,7 @@ void main() {
         'next': 'http://localhost:8001/api/v1/me/notifications/?page=2',
         'previous': null,
         'results': [_entry(2), _entry(1, read: true)],
+        'unread_count': 1,
       });
       final page = await ApiInboxRepository(cannedApi(http)).fetchPage();
       expect(page.items.map((e) => e.id), [2, 1]);

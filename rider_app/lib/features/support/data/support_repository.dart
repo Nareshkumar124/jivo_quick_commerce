@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:jivo_api/jivo_api.dart'
     as api
@@ -6,6 +8,7 @@ import 'package:jivo_api/jivo_api.dart'
         Ticket,
         TicketCategoryEnum,
         TicketCreateRequest,
+        TicketMessage,
         TicketReplyRequest,
         TicketSummary;
 import 'package:jivo_core/jivo_core.dart';
@@ -16,7 +19,9 @@ import '../domain/support_models.dart';
 
 /// FAQs and support tickets (06 §2.7). Every method throws jivo_core's
 /// [ApiError]: 400 `VALIDATION_ERROR` (message length, a reply to a CLOSED
-/// ticket), 404 for another user's ticket, 429 `RATE_LIMITED`.
+/// ticket, a task or payout that isn't the rider's), 404 for another
+/// user's ticket or a customer-app ticket (tickets are scoped to the
+/// calling app), 413 for a photo the proxy refuses, 429 `RATE_LIMITED`.
 abstract interface class SupportRepository {
   /// The rider app's FAQs in display order.
   Future<List<Faq>> faqs();
@@ -28,7 +33,16 @@ abstract interface class SupportRepository {
 
   Future<TicketThread> create(TicketDraft draft);
 
-  Future<TicketThread> reply(int ticketId, String message);
+  /// [attachmentKeys]: photos uploaded with [uploadPhoto] (at most
+  /// [maxAttachmentsPerReply]).
+  Future<TicketThread> reply(
+    int ticketId,
+    String message, {
+    List<String> attachmentKeys = const [],
+  });
+
+  /// Uploads a JPEG photo (already compressed on the phone) to [ticketId].
+  Future<UploadedAttachment> uploadPhoto(int ticketId, Uint8List jpeg);
 }
 
 /// The shared support API through the generated client.
@@ -83,22 +97,46 @@ class ApiSupportRepository implements SupportRepository {
       (await _api.getSupportApi().supportTicketsCreate(
         ticketCreateRequest: api.TicketCreateRequest(
           category: api.TicketCategoryEnum.values.firstWhere(
-            (c) => c.value == draft.topic.wireCategory,
+            (c) => c.value == draft.topic.code,
           ),
           message: draft.message,
+          taskId: draft.linkedTaskId,
+          payoutId: draft.linkedPayoutId,
         ),
       )).data!,
     ),
   );
 
   @override
-  Future<TicketThread> reply(int ticketId, String message) => _call(
+  Future<TicketThread> reply(
+    int ticketId,
+    String message, {
+    List<String> attachmentKeys = const [],
+  }) => _call(
     () async => threadOf(
       (await _api.getSupportApi().supportTicketsMessagesCreate(
         id: ticketId,
-        ticketReplyRequest: api.TicketReplyRequest(message: message.trim()),
+        ticketReplyRequest: api.TicketReplyRequest(
+          message: message.trim(),
+          attachmentKeys: attachmentKeys.isEmpty ? null : attachmentKeys,
+        ),
       )).data!,
     ),
+  );
+
+  @override
+  Future<UploadedAttachment> uploadPhoto(int ticketId, Uint8List jpeg) => _call(
+    () async {
+      final body = (await _api.getSupportApi().supportTicketsAttachmentsCreate(
+        id: ticketId,
+        file: MultipartFile.fromBytes(
+          jpeg,
+          filename: 'photo.jpg',
+          contentType: DioMediaType('image', 'jpeg'),
+        ),
+      )).data!;
+      return UploadedAttachment(key: body.key, url: Uri.parse(body.url));
+    },
   );
 }
 
@@ -108,6 +146,10 @@ SupportTicket ticketOfSummary(api.TicketSummary t) => SupportTicket(
   status: TicketStatus.fromWire(t.status.value),
   createdAt: t.createdAt,
   updatedAt: t.updatedAt,
+  topic: RiderTicketTopic.fromCode(t.category.value),
+  orderNumber: t.orderNumber,
+  taskId: t.taskId,
+  payoutId: t.payoutId,
   lastMessage: t.lastMessage,
 );
 
@@ -118,18 +160,22 @@ TicketThread threadOf(api.Ticket t) => TicketThread(
     status: TicketStatus.fromWire(t.status.value),
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
+    topic: RiderTicketTopic.fromCode(t.category.value),
+    orderNumber: t.orderNumber,
+    taskId: t.taskId,
+    payoutId: t.payoutId,
     lastMessage: t.lastMessage,
   ),
-  messages: [
-    for (final m in t.messages)
-      TicketMessage(
-        id: m.id,
-        body: m.body,
-        fromSupport: m.fromSupport,
-        createdAt: m.createdAt,
-      ),
-  ],
+  messages: [for (final m in t.messages) _messageOf(m)],
   canReply: t.canReply,
+);
+
+TicketMessage _messageOf(api.TicketMessage m) => TicketMessage(
+  id: m.id,
+  body: m.body,
+  fromSupport: m.fromSupport,
+  createdAt: m.createdAt,
+  attachments: [for (final a in m.attachments) ?Uri.tryParse(a.url)],
 );
 
 /// FAQs and tickets in memory (`FAKE_API` builds and tests, dev flavor
@@ -184,14 +230,20 @@ class FakeSupportBackend extends FakeApiEndpoint implements SupportRepository {
 
   final Map<int, SupportTicket> _tickets = {};
   final Map<int, List<TicketMessage>> _messages = {};
+
+  /// Uploaded photos not yet sent with a reply, by key.
+  final Map<String, UploadedAttachment> _uploads = {};
   int _nextTicket = 1;
   int _nextMessage = 1;
+  int _nextUpload = 1;
 
   void _seed() {
     final at = clock().toUtc().subtract(const Duration(days: 3));
     final id = _open(
-      '[PAYOUT 27 Oct - 2 Nov] My payout is ₹120 less than my earnings.',
+      'My payout is ₹120 less than my earnings.',
       at,
+      topic: RiderTicketTopic.payout,
+      payoutId: 41,
     );
     _add(
       id,
@@ -203,7 +255,14 @@ class FakeSupportBackend extends FakeApiEndpoint implements SupportRepository {
     _tickets[id] = _tickets[id]!.copyWith(status: TicketStatus.resolved);
   }
 
-  int _open(String message, DateTime at) {
+  int _open(
+    String message,
+    DateTime at, {
+    required RiderTicketTopic topic,
+    int? taskId,
+    String? orderNumber,
+    int? payoutId,
+  }) {
     final id = _nextTicket++;
     _tickets[id] = SupportTicket(
       id: id,
@@ -211,6 +270,10 @@ class FakeSupportBackend extends FakeApiEndpoint implements SupportRepository {
       status: TicketStatus.open,
       createdAt: at,
       updatedAt: at,
+      topic: topic,
+      taskId: taskId,
+      orderNumber: orderNumber,
+      payoutId: payoutId,
     );
     _messages[id] = [];
     _add(id, message, fromSupport: false, at: at);
@@ -222,6 +285,7 @@ class FakeSupportBackend extends FakeApiEndpoint implements SupportRepository {
     String body, {
     required bool fromSupport,
     required DateTime at,
+    List<Uri> attachments = const [],
   }) {
     _messages[id]!.add(
       TicketMessage(
@@ -229,6 +293,7 @@ class FakeSupportBackend extends FakeApiEndpoint implements SupportRepository {
         body: body,
         fromSupport: fromSupport,
         createdAt: at,
+        attachments: attachments,
       ),
     );
     _tickets[id] = _tickets[id]!.copyWith(updatedAt: at, lastMessage: body);
@@ -272,14 +337,27 @@ class FakeSupportBackend extends FakeApiEndpoint implements SupportRepository {
 
   @override
   Future<TicketThread> create(TicketDraft draft) async {
-    await recordCall('create ${draft.topic.wireCategory}');
+    await recordCall(
+      [
+        'create ${draft.topic.code}',
+        if (draft.linkedTaskId case final task?) 'task=$task',
+        if (draft.linkedPayoutId case final payout?) 'payout=$payout',
+      ].join(' '),
+    );
     final message = draft.message;
-    if (draft.text.trim().length < ticketMessageMinLength ||
+    if (message.length < ticketMessageMinLength ||
         message.length > ticketMessageMaxLength) {
       throw const ApiError(code: ApiErrorCode.validationError, statusCode: 400);
     }
     final now = clock().toUtc();
-    final id = _open(message, now);
+    final id = _open(
+      message,
+      now,
+      topic: draft.topic,
+      taskId: draft.linkedTaskId,
+      orderNumber: draft.linkedTaskId == null ? null : draft.label,
+      payoutId: draft.linkedPayoutId,
+    );
     _add(
       id,
       'Thanks, we got your message. Our team will reply here soon.',
@@ -290,16 +368,45 @@ class FakeSupportBackend extends FakeApiEndpoint implements SupportRepository {
   }
 
   @override
-  Future<TicketThread> reply(int ticketId, String message) async {
-    await recordCall('reply $ticketId');
+  Future<UploadedAttachment> uploadPhoto(int ticketId, Uint8List jpeg) async {
+    await recordCall('upload $ticketId');
+    if (!_thread(ticketId).canReply) {
+      throw const ApiError(code: ApiErrorCode.validationError, statusCode: 400);
+    }
+    final key = 'fake${_nextUpload++}';
+    return _uploads[key] = UploadedAttachment(
+      key: key,
+      url: Uri.parse('https://files.invalid/support/$ticketId/$key.webp'),
+    );
+  }
+
+  @override
+  Future<TicketThread> reply(
+    int ticketId,
+    String message, {
+    List<String> attachmentKeys = const [],
+  }) async {
+    await recordCall(
+      attachmentKeys.isEmpty
+          ? 'reply $ticketId'
+          : 'reply $ticketId ${attachmentKeys.join(',')}',
+    );
     final current = _thread(ticketId);
     final body = message.trim();
     if (!current.canReply ||
         body.isEmpty ||
-        body.length > ticketMessageMaxLength) {
+        body.length > ticketMessageMaxLength ||
+        attachmentKeys.length > maxAttachmentsPerReply ||
+        attachmentKeys.any((k) => !_uploads.containsKey(k))) {
       throw const ApiError(code: ApiErrorCode.validationError, statusCode: 400);
     }
-    _add(ticketId, body, fromSupport: false, at: clock().toUtc());
+    _add(
+      ticketId,
+      body,
+      fromSupport: false,
+      at: clock().toUtc(),
+      attachments: [for (final k in attachmentKeys) _uploads.remove(k)!.url],
+    );
     if (_tickets[ticketId]!.status == TicketStatus.resolved) {
       _tickets[ticketId] = _tickets[ticketId]!.copyWith(
         status: TicketStatus.open,

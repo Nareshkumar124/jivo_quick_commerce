@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../app/providers.dart';
 import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/errors/rider_error_text.dart';
 import '../../../shared/format/ist_format.dart';
 import '../../../shared/widgets/paged_list_view.dart';
+import '../../onboarding/domain/image_picking.dart';
 import '../domain/support_models.dart';
 import 'support_providers.dart';
 
@@ -17,7 +19,6 @@ String ticketTopicName(AppLocalizations l10n, RiderTicketTopic topic) =>
       RiderTicketTopic.payout => l10n.ticketTopicPayout,
       RiderTicketTopic.cash => l10n.ticketTopicCash,
       RiderTicketTopic.account => l10n.ticketTopicAccount,
-      RiderTicketTopic.app => l10n.ticketTopicApp,
       RiderTicketTopic.other => l10n.ticketTopicOther,
     };
 
@@ -30,13 +31,37 @@ String ticketStatusName(AppLocalizations l10n, TicketStatus status) =>
       TicketStatus.unknown => l10n.ticketStatusOpen,
     };
 
-/// Raise a ticket: pick a topic, an optional order number or payout
-/// reference, and describe the problem. One primary action.
+/// What a ticket is about, as one line: the topic, then the linked order
+/// number or payout period when there is one.
+String ticketSubject(
+  AppLocalizations l10n,
+  RiderTicketTopic? topic, {
+  String? orderNumber,
+  String? payoutPeriod,
+}) => [
+  if (topic != null) ticketTopicName(l10n, topic),
+  if (orderNumber != null) l10n.ticketLinkedOrder(orderNumber),
+  if (payoutPeriod != null) l10n.ticketLinkedPayout(payoutPeriod),
+].join(' · ');
+
+/// Raise a ticket: pick a topic and describe the problem. Opened from a
+/// past task or a payout, the ticket is linked to it (`task_id` /
+/// `payout_id`) while that topic stays selected. One primary action.
 class NewTicketScreen extends ConsumerStatefulWidget {
-  const NewTicketScreen({this.topic, this.reference, super.key});
+  const NewTicketScreen({
+    this.topic,
+    this.taskId,
+    this.payoutId,
+    this.label,
+    super.key,
+  });
 
   final RiderTicketTopic? topic;
-  final String? reference;
+  final int? taskId;
+  final int? payoutId;
+
+  /// How to show the linked task or payout (order number, payout period).
+  final String? label;
 
   @override
   ConsumerState<NewTicketScreen> createState() => _NewTicketScreenState();
@@ -45,14 +70,14 @@ class NewTicketScreen extends ConsumerStatefulWidget {
 class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
   late final NewTicketArgs _args = (
     topic: widget.topic,
-    reference: widget.reference,
+    taskId: widget.taskId,
+    payoutId: widget.payoutId,
+    label: widget.label,
   );
-  late final _reference = TextEditingController(text: widget.reference ?? '');
   final _text = TextEditingController();
 
   @override
   void dispose() {
-    _reference.dispose();
     _text.dispose();
     super.dispose();
   }
@@ -103,22 +128,25 @@ class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
                 ),
             ],
           ),
-          if (draft.topic.takesReference) ...[
+          if (draft.linkedLabel case final label?) ...[
             const SizedBox(height: 16),
-            TextField(
-              key: const Key('ticket-reference'),
-              controller: _reference,
-              enabled: !state.sending,
-              maxLength: ticketReferenceMaxLength,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                labelText: draft.topic == RiderTicketTopic.payout
-                    ? l10n.ticketReferencePayout
-                    : l10n.ticketReferenceOrder,
-                helperText: l10n.ticketReferenceOptional,
-                border: const OutlineInputBorder(),
+            Card(
+              margin: EdgeInsets.zero,
+              child: ListTile(
+                minTileHeight: 56,
+                leading: Icon(
+                  draft.linkedTaskId != null
+                      ? Icons.local_shipping
+                      : Icons.receipt_long,
+                ),
+                title: Text(
+                  key: const Key('ticket-linked'),
+                  draft.linkedTaskId != null
+                      ? l10n.ticketLinkedOrder(label)
+                      : l10n.ticketLinkedPayout(label),
+                  style: theme.textTheme.titleMedium,
+                ),
               ),
-              onChanged: notifier.setReference,
             ),
           ],
           const SizedBox(height: 16),
@@ -128,7 +156,7 @@ class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
             enabled: !state.sending,
             minLines: 4,
             maxLines: 8,
-            maxLength: riderTicketTextMaxLength,
+            maxLength: ticketMessageMaxLength,
             textCapitalization: TextCapitalization.sentences,
             decoration: InputDecoration(
               labelText: l10n.ticketDescribe,
@@ -139,7 +167,6 @@ class _NewTicketScreenState extends ConsumerState<NewTicketScreen> {
                   ticketMessageMinLength,
                 ),
                 TicketDraftProblem.tooLong => l10n.ticketTooLong,
-                TicketDraftProblem.referenceTooLong => l10n.ticketTooLong,
                 null => null,
               },
             ),
@@ -214,9 +241,12 @@ class _TicketTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final preview = ticket.lastMessage == null
-        ? null
-        : parseRiderMessage(ticket.lastMessage!).text;
+    final preview = ticket.lastMessage;
+    final subject = ticketSubject(
+      l10n,
+      ticket.topic,
+      orderNumber: ticket.orderNumber,
+    );
     return Card(
       key: Key('ticket-${ticket.id}'),
       clipBehavior: Clip.antiAlias,
@@ -238,6 +268,8 @@ class _TicketTile extends StatelessWidget {
                   _StatusChip(status: ticket.status),
                 ],
               ),
+              if (subject.isNotEmpty)
+                Text(subject, style: theme.textTheme.bodyMedium),
               if (preview != null) ...[
                 const SizedBox(height: 4),
                 Text(
@@ -287,8 +319,8 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// One ticket: the messages, oldest first, and a reply box while the
-/// server allows replies.
+/// One ticket: the messages, oldest first, and a reply box (with up to
+/// [maxAttachmentsPerReply] photos) while the server allows replies.
 class TicketThreadScreen extends ConsumerStatefulWidget {
   const TicketThreadScreen({required this.ticketId, super.key});
 
@@ -300,7 +332,9 @@ class TicketThreadScreen extends ConsumerStatefulWidget {
 
 class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
   final _reply = TextEditingController();
+  final List<UploadedAttachment> _photos = [];
   bool _sending = false;
+  bool _uploading = false;
 
   @override
   void dispose() {
@@ -308,20 +342,82 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
     super.dispose();
   }
 
+  TicketThreadController get _controller =>
+      ref.read(ticketThreadProvider(widget.ticketId).notifier);
+
+  void _snack(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+
   Future<void> _send() async {
-    if (_reply.text.trim().isEmpty || _sending) return;
+    if (_sending || _uploading) return;
+    if (_reply.text.trim().isEmpty) {
+      if (_photos.isNotEmpty) {
+        _snack(AppLocalizations.of(context).ticketPhotoNeedsText);
+      }
+      return;
+    }
     setState(() => _sending = true);
-    final error = await ref
-        .read(ticketThreadProvider(widget.ticketId).notifier)
-        .reply(_reply.text);
+    final error = await _controller.reply(
+      _reply.text,
+      attachmentKeys: [for (final p in _photos) p.key],
+    );
     if (!mounted) return;
     setState(() => _sending = false);
     if (error == null) {
       _reply.clear();
+      setState(_photos.clear);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(riderApiErrorMessage(context, error))),
-      );
+      _snack(riderApiErrorMessage(context, error));
+    }
+  }
+
+  Future<void> _addPhoto() async {
+    final l10n = AppLocalizations.of(context);
+    if (_photos.length >= maxAttachmentsPerReply) {
+      _snack(l10n.ticketPhotoLimit(maxAttachmentsPerReply));
+      return;
+    }
+    final source = await showModalBottomSheet<ImagePickSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const Key('ticket-photo-camera'),
+              minTileHeight: 56,
+              leading: const Icon(Icons.photo_camera),
+              title: Text(l10n.ticketPhotoCamera),
+              onTap: () => Navigator.pop(context, ImagePickSource.camera),
+            ),
+            ListTile(
+              key: const Key('ticket-photo-gallery'),
+              minTileHeight: 56,
+              leading: const Icon(Icons.photo_library),
+              title: Text(l10n.ticketPhotoGallery),
+              onTap: () => Navigator.pop(context, ImagePickSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    setState(() => _uploading = true);
+    final result = await _controller.attachPhoto(source);
+    if (!mounted) return;
+    setState(() {
+      _uploading = false;
+      if (result.photo case final photo?) _photos.add(photo);
+    });
+    switch (result.problem) {
+      case PhotoTooLarge():
+        _snack(l10n.ticketPhotoTooLarge);
+      case PhotoUnreadable():
+        _snack(l10n.ticketPhotoUnreadable);
+      case PhotoUploadFailed(:final error):
+        _snack(riderApiErrorMessage(context, error));
+      case null:
+        break;
     }
   }
 
@@ -340,8 +436,12 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
         AsyncData(:final value) => _ThreadBody(
           thread: value,
           reply: _reply,
+          photos: _photos,
           sending: _sending,
+          uploading: _uploading,
           onSend: _send,
+          onAddPhoto: _addPhoto,
+          onRemovePhoto: (photo) => setState(() => _photos.remove(photo)),
         ),
         AsyncError(:final error) => Center(
           child: Padding(
@@ -357,9 +457,7 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
                 const SizedBox(height: 16),
                 FilledButton(
                   key: const Key('ticket-retry'),
-                  onPressed: ref
-                      .read(ticketThreadProvider(widget.ticketId).notifier)
-                      .reload,
+                  onPressed: _controller.reload,
                   child: Text(l10n.retry),
                 ),
               ],
@@ -376,23 +474,29 @@ class _ThreadBody extends StatelessWidget {
   const _ThreadBody({
     required this.thread,
     required this.reply,
+    required this.photos,
     required this.sending,
+    required this.uploading,
     required this.onSend,
+    required this.onAddPhoto,
+    required this.onRemovePhoto,
   });
 
   final TicketThread thread;
   final TextEditingController reply;
+  final List<UploadedAttachment> photos;
   final bool sending;
+  final bool uploading;
   final VoidCallback onSend;
+  final VoidCallback onAddPhoto;
+  final ValueChanged<UploadedAttachment> onRemovePhoto;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final topic = thread.topic;
-    final first = thread.messages.isEmpty
-        ? null
-        : parseRiderMessage(thread.messages.first.body);
+    final ticket = thread.ticket;
+    final busy = sending || uploading;
     return Column(
       children: [
         Expanded(
@@ -404,24 +508,20 @@ class _ThreadBody extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      [
-                        if (topic != null) ticketTopicName(l10n, topic),
-                        ?first?.reference,
-                      ].join(' · '),
+                      ticketSubject(
+                        l10n,
+                        ticket.topic,
+                        orderNumber: ticket.orderNumber,
+                      ),
                       key: const Key('ticket-topic'),
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
-                  _StatusChip(status: thread.ticket.status),
+                  _StatusChip(status: ticket.status),
                 ],
               ),
               const SizedBox(height: 12),
-              for (final (index, message) in thread.messages.indexed)
-                _Bubble(
-                  message: message,
-                  // The first message is shown without its topic tag.
-                  text: index == 0 ? first!.text : message.body,
-                ),
+              for (final message in thread.messages) _Bubble(message: message),
             ],
           ),
         ),
@@ -430,41 +530,89 @@ class _ThreadBody extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: thread.canReply
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: TextField(
-                          key: const Key('ticket-reply'),
-                          controller: reply,
-                          enabled: !sending,
-                          minLines: 1,
-                          maxLines: 4,
-                          maxLength: ticketMessageMaxLength,
-                          textCapitalization: TextCapitalization.sentences,
-                          decoration: InputDecoration(
-                            hintText: l10n.ticketReplyHint,
-                            border: const OutlineInputBorder(),
-                            counterText: '',
+                      if (photos.isNotEmpty || uploading)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final (i, photo) in photos.indexed)
+                                InputChip(
+                                  key: Key('ticket-photo-${i + 1}'),
+                                  avatar: const Icon(Icons.image),
+                                  label: Text(l10n.ticketPhoto(i + 1)),
+                                  deleteButtonTooltipMessage: l10n
+                                      .ticketPhotoRemove(i + 1),
+                                  onDeleted: busy
+                                      ? null
+                                      : () => onRemovePhoto(photo),
+                                ),
+                              if (uploading)
+                                const Padding(
+                                  key: Key('ticket-photo-uploading'),
+                                  padding: EdgeInsets.all(8),
+                                  child: SizedBox.square(
+                                    dimension: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox.square(
-                        dimension: 56,
-                        child: IconButton.filled(
-                          key: const Key('ticket-reply-send'),
-                          tooltip: l10n.ticketSend,
-                          onPressed: sending ? null : onSend,
-                          icon: sending
-                              ? const SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.send),
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          SizedBox.square(
+                            dimension: 56,
+                            child: IconButton(
+                              key: const Key('ticket-add-photo'),
+                              tooltip: l10n.ticketAddPhoto,
+                              onPressed: busy ? null : onAddPhoto,
+                              icon: const Icon(Icons.add_a_photo),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: TextField(
+                              key: const Key('ticket-reply'),
+                              controller: reply,
+                              enabled: !sending,
+                              minLines: 1,
+                              maxLines: 4,
+                              maxLength: ticketMessageMaxLength,
+                              textCapitalization: TextCapitalization.sentences,
+                              decoration: InputDecoration(
+                                hintText: l10n.ticketReplyHint,
+                                border: const OutlineInputBorder(),
+                                counterText: '',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox.square(
+                            dimension: 56,
+                            child: IconButton.filled(
+                              key: const Key('ticket-reply-send'),
+                              tooltip: l10n.ticketSend,
+                              onPressed: busy ? null : onSend,
+                              icon: sending
+                                  ? const SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.send),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   )
@@ -480,14 +628,13 @@ class _ThreadBody extends StatelessWidget {
   }
 }
 
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message, required this.text});
+class _Bubble extends ConsumerWidget {
+  const _Bubble({required this.message});
 
   final TicketMessage message;
-  final String text;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final mine = !message.fromSupport;
@@ -512,7 +659,17 @@ class _Bubble extends StatelessWidget {
               style: theme.textTheme.labelLarge,
             ),
             const SizedBox(height: 4),
-            Text(text, style: theme.textTheme.bodyLarge),
+            Text(message.body, style: theme.textTheme.bodyLarge),
+            // Photos open outside the app: the signed URLs expire, so they
+            // are never cached on the phone.
+            for (final (i, url) in message.attachments.indexed)
+              TextButton.icon(
+                key: Key('ticket-message-${message.id}-photo-${i + 1}'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                onPressed: () => ref.read(urlOpenerProvider).open(url),
+                icon: const Icon(Icons.image),
+                label: Text(l10n.ticketPhoto(i + 1)),
+              ),
             const SizedBox(height: 4),
             Text(
               istDateTime(context, message.createdAt),
