@@ -22,7 +22,7 @@
 - `PM` = the main session
 - `USER` = you or Jivo
 
-Last updated: 2026-11-04 (P4 backend and customer merged, migrations applied; Phase 5 started, DL-54).
+Last updated: 2026-11-09 (P5, P6 and P7 backend/customer/rider merged; P8 security, load-test and backup/monitoring merged; staging `jqc.jivo.in` live; real oils catalog DL-67).
 
 ## Phase 1: built, awaiting QA verification
 | ID | Task | Owner | Pri | Deliverables | Acceptance criteria | Status |
@@ -32,36 +32,53 @@ Last updated: 2026-11-04 (P4 backend and customer merged, migrations applied; Ph
 | T-103 | P1 customer app: login, profile, addresses, delete account | CUS | P0 | `customer_app` P1 screens | 62 tests and the real-API itest green; QA functional check | Testing |
 | T-104 | P1 rider app: login, routing by status | RID | P0 | `rider_app` P1 screens | 112 tests and the real-API itest green; QA functional check | Testing |
 
+## Phase 8: Hardening & launch (started in part 2026-11-04, DL-58)
+| ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
+|----|------|-------|-----|-----------|--------------|---------------------|--------|
+| T-812 | Locust load-test harness + guarded load-test seed/cleanup (staging only) | BE | P1 | – | `loadtest`, seed/cleanup commands | Refuses localhost:8001 and the shared DB | Merged to develop (`842e632`); load run on staging pending |
+| T-813 | Backup/restore with guarded restore and verifier, monitoring as code, deploy-time checks, edge limits | DEVOPS | P0 | – | `infra/`, `docs/deployment.md` §7–§10 | Restore only to `test_jivo_quick_commerce_restore*` | Merged to develop (`4b30378`, CI keys `03cbd8b`, nginx upload cap `7dc9b49`); restore test on staging pending |
+| T-814 | OWASP API Top 10 fixes: refund caps (DL-59), stale-payment guard, `NUM_PROXIES`, axes per username, throttles, PII scrub | BE | P0 | – | Services, settings, tests | Review fixes applied | Merged to develop (`1015790`); QA verification pending |
+
+## Phase 7: Dashboard, promotions, support, reports
+| ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
+|----|------|-------|-----|-----------|--------------|---------------------|--------|
+| T-712 | P7 backend: ratings (order + rider), dashboard KPIs, 12 reports with CSV/async export, support SLA/canned replies/attachments, rider tickets and pages, notification links; DL-65 net revenue | BE | P0 | T-711 | Apps, migrations (DL-66), tests | Review fixes applied | Merged to develop (`18eaaef`, `10dbae4`); QA verification pending |
+| T-713 | Customer: help, tickets, FAQ, CMS on the real API | CUS | P0 | T-711 | – | Tests green | Merged to develop (`4175616`); QA verification pending |
+| T-714 | Customer P7: ratings, rate/support deep links, rated view, support photos on the real API | CUS | P0 | T-712 | – | Tests green | Merged to develop (`ce741be`, `8a3f886`); QA verification pending |
+| T-715 | Rider P7: help and support tickets, my rating, legal pages via CMS (safe HTML) on the real API | RID | P0 | T-712 | – | Tests green | Merged to develop (`695c2e5`, `130984b`); QA verification pending |
+| T-716 | Admin P7: dashboard, reports, support and ratings screens on the P7 services | ADM | P0 | T-712 | `admin.py`, ops console screens | Role matrix | Not Started (`admin/phase-7` worktree has no commits) |
+| T-717 | QA P7 | QA | P0 | T-712..T-716 | P7 reports | P7 readiness verdict | In Progress (part of the stage 2 run) |
+
 ## Phase 6: Real-time & notifications (started in part 2026-11-04, DL-55)
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
 |----|------|-------|-----|-----------|--------------|---------------------|--------|
-| T-611 | WS contract examples (`06 §4`) + inbox API; `realtime` app (order/ops consumers, first-message JWT, `broadcast_ws`); `notifications` (`08 §9` templates, `send_push` no-op until D-19, `send_sms`, retries); purge jobs | BE | P0 | – | Apps, migrations, tests | `WebsocketCommunicator` tests; IDOR/scoping | In Progress (`backend/phase-6`, `.worktrees/backend6`) |
-| T-612 | Rider location fan-out, ETA (`08 §8`), rider socket `offer.*`/`task.updated` | BE | P0 | T-611, P5 5.3 | – | Offer latency < 3 s | Testing (merged to `develop` 2026-11-06) |
-| T-613 | Customer: tracking over WS with polling fallback, inbox bind, FCM adapter (D-19) | CUS | P0 | T-611 | – | Tests green | Testing (merged to `develop` 2026-11-06) |
-| T-614 | Rider: `/ws/v1/rider/` with polling and FCM fallback, inbox | RID | P0 | T-612 | – | – | Testing (merged to `develop` 2026-11-06) |
-| T-711 | ⏩ P7 lookahead: support tickets, FAQs, CMS pages API | BE | P1 | – | `cms` and `support` apps | IDOR tests | In Progress (`backend/p7-support`) |
+| T-611 | WS contract examples (`06 §4`) + inbox API; `realtime` app (order/ops consumers, first-message JWT, `broadcast_ws`); `notifications` (`08 §9` templates, `send_push` no-op until D-19, `send_sms`, retries); purge jobs | BE | P0 | – | Apps, migrations, tests | `WebsocketCommunicator` tests; IDOR/scoping | Merged to develop (`b8eead2`); QA verification pending |
+| T-612 | Rider location fan-out, ETA (`08 §8`), rider socket `offer.*`/`task.updated` | BE | P0 | T-611, P5 5.3 | – | Offer latency < 3 s | Merged to develop (`d29ed94`); QA verification pending |
+| T-613 | Customer: tracking over WS with polling fallback, inbox bind, FCM adapter (D-19) | CUS | P0 | T-611 | – | Tests green | Merged to develop (`0e55bb4`); QA verification pending |
+| T-614 | Rider: `/ws/v1/rider/` with polling and FCM fallback, inbox | RID | P0 | T-612 | – | – | Merged to develop (`1ef1ba3`); QA verification pending |
+| T-711 | ⏩ P7 lookahead: support tickets, FAQs, CMS pages API | BE | P1 | – | `cms` and `support` apps | IDOR tests | Merged to develop (`024093c`); QA verification pending |
 
 ## Phase 5: Rider & delivery (started 2026-11-04, DL-54)
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
 |----|------|-------|-----|-----------|--------------|---------------------|--------|
-| T-511 | Final P5 rider contract (`06 §3`) + `GET /orders/{id}/track/`; answers to api-requests #2–#28 | BE | P0 | – | Serializers, routes, examples, schema | Additive; schema re-exported | Testing (contract exported; jivo_api generated into the rider and customer worktrees; full run, then review) |
-| T-512 | Slice 5.1: registration, KYC (private bucket, masked/encrypted numbers), bank, admin approval services | BE | P0 | T-511 | Models, services, migrations, tests | D-14 defaults; DPDP | In Progress |
-| T-513 | Slice 5.2: shifts, location ingestion, heartbeat auto-offline, `simulate_rider` | BE | P0 | T-512 | Services, tasks | – | Not Started |
-| T-514 | Slices 5.3/5.4: dispatch, offers, T9–T14, delivery OTP, cash ledger, earnings (D-16 defaults), payouts; invoices on DELIVERED | BE | P0 | T-513 | – | `08` exactly | Not Started |
-| T-515 | Rider P5: foreground location service, background-location disclosure, FCM plumbing; bind slices 5.1–5.4 | RID | P0 | T-511 | – | Tests green | In Progress (`rider/phase-5`) |
-| T-516 | Customer P5: FCM token, rider + delivery OTP via `track/`; ⏩ P7 rating/help/CMS on fakes | CUS | P0 | T-511 | – | Tests green | Testing (run 1 merged `efd4a1f`; tracking bound to track/ `1da5991`, merges with the P5 backend) |
-| T-517 | Admin P5: riders, KYC review, rider map, cash deposits, returns | ADM | P0 | T-512 | – | Role matrix | Not Started (after admin P4 merge and slice 5.1) |
-| T-518 | QA P5 + rider mini-UAT | QA | P0 | T-514 | – | P5 verdict | Not Started |
+| T-511 | Final P5 rider contract (`06 §3`) + `GET /orders/{id}/track/`; answers to api-requests #2–#28 | BE | P0 | – | Serializers, routes, examples, schema | Additive; schema re-exported | Merged to develop (`57e8fb0`); QA verification pending |
+| T-512 | Slice 5.1: registration, KYC (private bucket, masked/encrypted numbers), bank, admin approval services | BE | P0 | T-511 | Models, services, migrations, tests | D-14 defaults; DPDP | Merged to develop (`57e8fb0`); QA verification pending |
+| T-513 | Slice 5.2: shifts, location ingestion, heartbeat auto-offline, `simulate_rider` | BE | P0 | T-512 | Services, tasks | – | Merged to develop (`57e8fb0`); QA verification pending |
+| T-514 | Slices 5.3/5.4: dispatch, offers, T9–T14, delivery OTP, cash ledger, earnings (D-16 defaults), payouts; invoices on DELIVERED | BE | P0 | T-513 | – | `08` exactly | Merged to develop (5.3 `8566589`, 5.4 `d72bd23`; migrations DL-62/63); QA verification pending |
+| T-515 | Rider P5: foreground location service, background-location disclosure, FCM plumbing; bind slices 5.1–5.4 | RID | P0 | T-511 | – | Tests green | Merged to develop (`305942b`, `130b42a`); QA verification pending |
+| T-516 | Customer P5: FCM token, rider + delivery OTP via `track/`; ⏩ P7 rating/help/CMS on fakes | CUS | P0 | T-511 | – | Tests green | Merged to develop (`efd4a1f`, `f89f89a`, `9ce3234`); QA verification pending |
+| T-517 | Admin P5: riders, KYC review, rider map, cash deposits, returns | ADM | P0 | T-512 | – | Role matrix | Merged to develop (`680b904`); QA verification pending |
+| T-518 | QA P5 + rider mini-UAT | QA | P0 | T-514 | – | P5 verdict | In Progress (stage 1: plan and P5-TC-01..132 on `qa/phase-2`, `31a5830`/`a4a44fa`; stage 2 running for P5–P7) |
 
 ## Phase 4: Order processing & store ops (started 2026-11-04, DL-47)
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
 |----|------|-------|-----|-----------|--------------|---------------------|--------|
 | T-411 | P4 R1 contract: order list, detail, cancel, reorder, invoice (`06 §2.6`) | BE | P0 | – | Serializers, routes, examples, schema | Additive; schema re-exported | Completed (merged `ef4199f`) |
-| T-412 | P4 R2: T6–T8a/T11/T12 with partial unavailability, cancel window, refunds (`08 §6.4` defaults), `sync_refund_status`, invoices (WeasyPrint, placeholder GST), auto-accept + SLA alert, packing services; carry-overs T-401c..T-403c, T-405c, T-406c | BE | P0 | T-411 | Services, migrations, tasks, tests | `08` exactly; coverage ≥ 90% on services | Testing (merged `ef4199f`, migrations applied DL-53; 2427 passed / 96.92%; review fixes applied; open: placement gateway call under the cart lock, OBS-P3-05 → T-409c) |
-| T-413 | P4 admin + Ops Console: live board (HTMX polling), packing console (`05 §1.3`), customer detail, audit log, refund retry screen; T-304 coupon-form minors | ADM | P0 | T-412 services | Admin/ops screens and tests | Role matrix; state changes only via services | In Progress (`admin/phase-4`) |
+| T-412 | P4 R2: T6–T8a/T11/T12 with partial unavailability, cancel window, refunds (`08 §6.4` defaults), `sync_refund_status`, invoices (WeasyPrint, placeholder GST), auto-accept + SLA alert, packing services; carry-overs T-401c..T-403c, T-405c, T-406c | BE | P0 | T-411 | Services, migrations, tasks, tests | `08` exactly; coverage ≥ 90% on services | Testing (merged `ef4199f`, migrations applied DL-53; 2427 passed / 96.92%; review fixes applied; placement gateway call moved outside the lock in T-814 `1015790`; open: OBS-P3-05 → T-409c) |
+| T-413 | P4 admin + Ops Console: live board (HTMX polling), packing console (`05 §1.3`), customer detail, audit log, refund retry screen; T-304 coupon-form minors | ADM | P0 | T-412 services | Admin/ops screens and tests | Role matrix; state changes only via services | Merged to develop (`ef1426a`, `60a422f` incl. the BUG-0010/0011 fixes); QA verification pending |
 | T-414 | Customer P4: order list/detail/timeline, invoice download, cancel sheet, reorder, previously-bought rail; lookahead tracking, inbox, deep links | CUS | P0 | T-411 | Screens on fakes, then real API | No client-side money; tests green | Testing (merged `74f47d1`; 295 tests; installed on the user's phone) |
 | T-415 | Rider P4 lookahead: gaps in `04 §2.7–2.9` (documents), accept→deliver integration harness with GPX | RID | P1 | – | Screens and harness on fakes | Tests green | Testing (merged; review: Approve; 351 tests; API requests #25-#27; P5 follow-ups: guard `/profile/documents/:type` for approved docs, share the dev-tools and support-phone helpers) |
-| T-416 | QA: P4 test plan and verification; mini-UAT with store staff | QA | P0 | T-412, T-413 | P4 reports | P4 readiness verdict | In Progress (plan and 60 cases plus UAT-P4-01..13 merged `69fe035`; execution after the backend R2 and admin merges) |
+| T-416 | QA: P4 test plan and verification; mini-UAT with store staff | QA | P0 | T-412, T-413 | P4 reports | P4 readiness verdict | In Progress (stage 1 `8e7da52`, stage 2 `4d10384`: verdict Not ready on BUG-0010/0011, now fixed; re-check, device cases and store-staff mini-UAT pending) |
 
 ## Phase 3: Cart, checkout, payments (started 2026-11-03, DL-42)
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
@@ -124,15 +141,19 @@ Last updated: 2026-11-04 (P4 backend and customer merged, migrations applied; Ph
 | BUG-0005 | Production settings silently default to the console SMS backend, which would log OTPs | P3 | Completed (fixed `96a2117`; QA verified in run 2) |
 | BUG-0008 | An anonymous notify-me repeat echoes an earlier lead's stored data (privacy; details in `qa/private/`) | P2 | Testing (fixed in `89edcbb`; residual id/created_at hint in the fix run; QA to re-run its private guard test) |
 | BUG-0006 | Staff sessions last a fixed 12 h; 05 §5 needs 8 h, and 2 h idle for admin roles | P3 | Testing (fixed `96a2117`; QA re-verification pending) |
+| BUG-0010 | The panel has no manual refund (full / partial) for Super Admin, Support and Finance | P2 | Merged to develop (`60a422f`); QA re-verification pending |
+| BUG-0011 | Orders admin has no CSV export | P3 | Merged to develop (`60a422f`); QA re-verification pending |
+| BUG-0012 | Dispatch countdowns relied on the test-only `CELERY_TASK_ALWAYS_EAGER` setting | – | Fixed `f5d39ff` on develop; QA verification pending |
 | T-218 | DB connection reuse/pooling (`CONN_MAX_AGE` or a psycopg pool): new connections to the remote DB take about 99 ms, with occasional > 5 s timeouts returning 500s | P1 | In Progress (optional psycopg pool added in `96a2117`; not yet enabled or load-checked) |
 | T-219 | Enforce the token `app` claim (a customer token currently works with `X-App-Name: rider`); retest in P5 | P2 | Not Started |
 
 ### Support agents (added 2026-11-02)
 | ID | Task | Owner | Pri | Depends on | Deliverables | Acceptance criteria | Status |
 |----|------|-------|-----|-----------|--------------|---------------------|--------|
-| T-220 | Staging readiness without spending money: production image hardening, compose/IaC templates, deploy and rollback scripts, a backup/restore runbook, CI caching; recommend a least-privilege DB role | DEVOPS | P1 | – (actual hosting waits on D-05 and the user's approval) | `infra/` and runbooks in `docs/deployment.md` | Images build; scripts idempotent; no secrets | Not Started |
+| T-220 | Staging readiness without spending money: production image hardening, compose/IaC templates, deploy and rollback scripts, a backup/restore runbook, CI caching; recommend a least-privilege DB role | DEVOPS | P1 | – (actual hosting waits on D-05 and the user's approval) | `infra/` and runbooks in `docs/deployment.md` | Images build; scripts idempotent; no secrets | Merged to develop (T-813 `4b30378`, staging deploy `9e10f01`); `jqc.jivo.in` live with HTTPS (`c339294`) |
 | T-221 | Review each module branch before merge (backend, admin and customer Phase 2; rider P3 lookahead) | REVIEW | P0 | each agent's run | Review verdict and findings | No Blockers before merge | In Progress (rider P3 reviewed: Approve with fixes; all 8 fixed; merged `7dbce4f`) |
-| T-222 | Turn Jivo's real product data into import files (≈ 20 products for the P2 demo) | CATALOG | P1 | H-18 (product data from Jivo) | `data/catalog/`, report, image manifest | Validation passes; nothing raw committed | Blocked (no data yet) |
+| T-222 | Turn Jivo's real product data into import files (≈ 20 products for the P2 demo) | CATALOG | P1 | H-18 (product data from Jivo) | `data/catalog/`, report, image manifest | Validation passes; nothing raw committed | In Progress (12 oils from shop.jivo.in committed `9b58fa6`, DL-67; GST/HSN, FSSAI and SAP codes still needed from Jivo, H-18) |
+| T-226 | Bulk catalog and image loader for the shop.jivo.in data (DL-67), deactivate demo oils | BE | P1 | T-222 | Management command, `catalog 0002` migration | Idempotent; migration needs approval | In Progress (`backend/catalog-import`, uncommitted) |
 | T-223 | Design system and tokens from the brand kit; UX audit of the P1/P2 screens | DESIGN | P2 | H-19 (brand kit, D-06) for brand values; the audit can start now | `design/system`, `design/tokens`, `design/audits` | AA contrast documented; specs for every state | Not Started |
 
 ### Phase 2 dependency map
@@ -177,7 +198,7 @@ These are tracked in [`api-requests.md`](api-requests.md): rider requests #2–#
 | H-12 | Git branch strategy | Completed: module branches + `develop` (DL-24) | – |
 | H-13 | Confirm the PM defaults marked ⚠ in [`decision-log.md`](decision-log.md) | Not Started | anytime |
 | H-14 | Rotate the DB server SSH password (it was shared in chat) and prefer SSH keys | Not Started | soon |
-| H-18 | Real product data from Jivo (D-21): product list, variants, MRP/price, GST/HSN, FSSAI and label info, photos. Put it in `data/incoming/` (gitignored). | Not Started | P2 demo |
+| H-18 | Real product data from Jivo (D-21): product list, variants, MRP/price, GST/HSN, FSSAI and label info, photos. Put it in `data/incoming/` (gitignored). | Not Started | In part: 12 oils from shop.jivo.in (DL-67). Still needed: GST/HSN, FSSAI and label info, SAP item codes, printed MRPs, non-oil products |
 | H-19 | Brand kit from Jivo marketing (D-06): logo, colours, fonts. Put it in `design/incoming/` (gitignored). | Not Started | P2 brand UI |
 | H-20 | Jivo/PM: the failed-delivery rule: minimum call attempts (2 assumed) and whether the 10-minute wait starts at arrival or at the first call. Also approve adding UNASSIGNED → CANCELLED to the `08 §3` task diagram (missing today). | Not Started | P5 |
 | H-21 | Confirm that Google ML Kit's licence terms (used by the rider QR scanner) are acceptable for distribution | Not Started | P5 |
