@@ -19,7 +19,7 @@ Permission checks belong to the caller (the admin action requires `accounts.chan
 
 from django.contrib.admin.models import CHANGE, LogEntry
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
@@ -103,17 +103,43 @@ def unblock_customer(user_id: int, *, by: User) -> bool:
 LOG_COD_BLOCKED = "Cash on delivery blocked: COD is not offered at checkout."
 LOG_COD_ALLOWED = "Cash on delivery allowed again."
 MSG_COD_ANONYMISED = "This account has been anonymised; its COD setting cannot change."
+MSG_COD_LIFT_NO_PERMISSION = (
+    "Only Super Admin and Ops can allow cash on delivery again for a blocked customer."
+)
+
+AUDIT_COD_BLOCKED = "accounts.cod_blocked"
+AUDIT_COD_ALLOWED = "accounts.cod_block_lifted"  # the action `delivery.services.ops` uses too
+
+
+def can_lift_cod_block(user) -> bool:
+    """DL-61 (d), 05 §3: `delivery.lift_cod_block` (Super Admin, Ops), the same check as
+    `delivery.services.ops.lift_cod_block`."""
+    from apps.accounts.roles import COD_BLOCK_LIFT
+
+    return bool(user and user.is_active and user.is_staff and user.has_perm(COD_BLOCK_LIFT))
 
 
 def set_cod_blocked(user_id: int, blocked: bool, *, by: User) -> bool:
     """Set `User.cod_blocked` (08 T2: COD is not offered to the customer; 08 §6.4 repeated
     refusals). Moved here from the admin's interim copy (T-405c), same signature and behaviour:
     one transaction with the row locked; staff, anonymised and unknown accounts refused with a
-    `ValidationError`; True only when the flag changed; the actor recorded as an admin
-    `LogEntry` on the Customer with no personal data in it ("Customer 42"). No side effects:
-    orders already placed are not touched; the next cart read hides COD."""
+    `ValidationError`; True only when the flag changed. Recorded twice, with no personal data:
+    an admin `LogEntry` on the Customer ("Customer 42"; the admin's "Last COD change" reads it)
+    and a `core.AuditLog` entry (05 §5, like every other staff mutation).
+
+    Allowing COD again is "ops lift the block" of DL-61 (d): it needs `delivery.lift_cod_block`
+    (Super Admin, Ops; `PermissionDenied` otherwise, before anything is read or written, code
+    review of T-405c) and sets `cod_block_lifted_at`, so only refused COD deliveries after it
+    count towards the next automatic block (the count restarts), exactly as
+    `delivery.services.ops.lift_cod_block` does. Blocking keeps its rule: the caller checks the
+    Customer `change` permission. No other side effects: orders already placed are not
+    touched; the next cart read shows or hides COD."""
+    from apps.core import audit
+
     if by is None or by.pk is None:
         raise ValueError("set_cod_blocked needs the acting staff user (`by`).")
+    if not blocked and not can_lift_cod_block(by):
+        raise PermissionDenied(MSG_COD_LIFT_NO_PERMISSION)
     with transaction.atomic():
         user = User.objects.select_for_update().filter(pk=user_id).first()
         if user is None:
@@ -124,6 +150,11 @@ def set_cod_blocked(user_id: int, blocked: bool, *, by: User) -> bool:
             raise ValidationError(MSG_COD_ANONYMISED, code="anonymised")
         if user.cod_blocked == blocked:
             return False
-        User.objects.filter(pk=user.pk).update(cod_blocked=blocked, updated_at=timezone.now())
+        now = timezone.now()
+        changes = {"cod_blocked": blocked, "updated_at": now}
+        if not blocked:
+            changes["cod_block_lifted_at"] = now
+        User.objects.filter(pk=user.pk).update(**changes)
         _record(by, user, LOG_COD_BLOCKED if blocked else LOG_COD_ALLOWED)
+        audit.record(by, AUDIT_COD_BLOCKED if blocked else AUDIT_COD_ALLOWED, user, {})
     return True

@@ -63,16 +63,16 @@ GATEWAY_STATUS = {
 
 def record_refund_status(refund: Refund, gateway_status: str, gateway_refund_id: str = "") -> bool:
     """Apply what the gateway reports (task result or `refund.*` webhook). Returns True when the
-    refund reached PROCESSED now. A late-capture refund also settles the order's
-    `payment_status` (REFUNDED) and `amount_refunded`; a duplicate-capture or wrong-amount refund
-    does not touch the order (its own charge is paid, or still due)."""
-    from apps.orders.choices import PaymentStatus
+    refund reached PROCESSED now. Saving the refund settles the order's `payment_status` and
+    `amount_refunded` for order and late-capture refunds (`order_refunds.settle`, through its
+    post_save signal, in this transaction; T-402c: one rule for both). A duplicate-capture or
+    wrong-amount refund does not touch the order (its own charge is paid, or still due)."""
     from apps.orders.models import Order
 
     status = GATEWAY_STATUS.get(gateway_status, RefundStatus.PENDING)
     with transaction.atomic():
         # Lock order (apps.orders.services): the order row first, then the refund.
-        order = Order.objects.select_for_update().get(pk=refund.order_id)
+        Order.objects.select_for_update().filter(pk=refund.order_id).first()  # lock only
         refund = Refund.objects.select_for_update().get(pk=refund.pk)
         if refund.status == RefundStatus.PROCESSED:
             return False
@@ -85,10 +85,6 @@ def record_refund_status(refund: Refund, gateway_status: str, gateway_refund_id:
         if status == RefundStatus.PROCESSED:
             refund.processed_at = timezone.now()
         refund.save(update_fields=["gateway_refund_id", "status", "processed_at", "updated_at"])
-        if status == RefundStatus.PROCESSED and refund.reason == LATE_CAPTURE:
-            order.amount_refunded = min(order.amount_refunded + refund.amount, order.grand_total)
-            order.payment_status = PaymentStatus.REFUNDED
-            order.save(update_fields=["amount_refunded", "payment_status", "updated_at"])
         if became_failed:  # alert once, on the change to FAILED
             from apps.orders import events
 

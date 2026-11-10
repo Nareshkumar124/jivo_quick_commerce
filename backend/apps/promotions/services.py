@@ -16,6 +16,10 @@ or only the coupon's categories), so never above the item total.
 
 Usage limits count HELD and APPLIED redemptions. `hold_coupon()` / `apply_coupon_now()` lock the
 coupon row, so two orders racing for a coupon's last use cannot both get it.
+
+Panel edits (T-406c) go through `save_coupon()`: the code is fixed once the coupon is used, the
+total limit never goes below the uses already counted (both checked on the locked row), and a
+code taken by a concurrent save is a `ValidationError`, not a 500.
 """
 
 from collections.abc import Iterable, Sequence
@@ -24,7 +28,8 @@ from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Protocol
 
-from django.db import connection
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 
@@ -382,3 +387,99 @@ def release_coupon(order) -> bool:
 def reverse_coupon(order) -> bool:
     """08 T11/T12 (Phase 4): a cancelled order gives the coupon back."""
     return _move(order, RedemptionStatus.APPLIED, RedemptionStatus.REVERSED)
+
+
+# --------------------------------------------------------------------------- panel edits (T-406c)
+
+MSG_CODE_TAKEN = "A coupon with this code already exists (codes ignore upper and lower case)."
+MSG_CODE_LOCKED = (
+    "The code cannot change once the coupon has been used: customers and orders refer to it. "
+    "Create a new coupon instead."
+)
+MSG_LIMIT_BELOW_USES = (
+    "This coupon has already been used {uses} time(s) (orders awaiting payment included); the "
+    "total limit cannot be lower. Switch the coupon off to stop further use."
+)
+MSG_COUPON_GONE = "This coupon was deleted meanwhile: nothing was saved. Reload the list."
+# The database's case-insensitive uniqueness rule for codes (`Coupon.Meta.constraints`).
+CODE_UNIQUE_CONSTRAINT = "coupon_code_unique_ci"
+
+
+def counted_uses(coupon: Coupon) -> int:
+    """Uses that count against the coupon's limits (HELD + APPLIED), as `_use` counts them."""
+    if coupon.pk is None:
+        return 0
+    return CouponRedemption.objects.filter(coupon_id=coupon.pk, status__in=COUNTED_STATUSES).count()
+
+
+def is_used(coupon: Coupon | None) -> bool:
+    """Any redemption (any status) or order refers to the coupon: its code is then fixed."""
+    if coupon is None or coupon.pk is None:
+        return False
+    return coupon.redemptions.exists() or coupon.orders.exists()
+
+
+def coupon_edit_errors(coupon: Coupon, stored: Coupon | None = None) -> dict[str, str]:
+    """T-406c (T-304 review Minors 3-4): why `coupon` (edited, not yet saved) may not replace
+    its stored row, as {field: message}; empty when the edit is allowed. A new coupon has none.
+    - `code`: cannot change once the coupon is used (customers and orders refer to it);
+    - `usage_limit_total`: cannot go below the uses already counted (HELD + APPLIED).
+    `stored` is the current row (the caller's locked copy); read from the database if omitted.
+    Code uniqueness is the database's rule (`save_coupon` turns its refusal into an error)."""
+    if coupon.pk is None:
+        return {}
+    if stored is None:
+        stored = Coupon.objects.filter(pk=coupon.pk).first()
+        if stored is None:
+            return {}
+    errors: dict[str, str] = {}
+    if normalise_code(coupon.code) != stored.code and is_used(stored):
+        errors["code"] = MSG_CODE_LOCKED
+    if coupon.usage_limit_total is not None:
+        uses = counted_uses(stored)
+        if coupon.usage_limit_total < uses:
+            errors["usage_limit_total"] = MSG_LIMIT_BELOW_USES.format(uses=uses)
+    return errors
+
+
+def is_code_conflict(error: IntegrityError) -> bool:
+    """The database refused a coupon save because another coupon has the code (any case)."""
+    diag = getattr(error.__cause__, "diag", None)
+    name = getattr(diag, "constraint_name", None) or ""
+    return name == CODE_UNIQUE_CONSTRAINT or CODE_UNIQUE_CONSTRAINT in str(error)
+
+
+def save_coupon(coupon: Coupon) -> Coupon:
+    """The one door for creating or editing a coupon from the panel (T-406c). Raises
+    `django.core.exceptions.ValidationError` with a message per field (`code`,
+    `usage_limit_total`) and saves nothing when the change is refused:
+    - the edit guards of `coupon_edit_errors`, checked on the **locked** coupon row: the lock
+      `hold_coupon` / `apply_coupon_now` take before counting a use, so no use can slip in
+      between this check and the save (the form's own check can be raced);
+    - two staff saving the same code at once: the database refuses the second
+      (`coupon_code_unique_ci`) and that becomes an error on `code`, never a 500;
+    - a coupon deleted meanwhile (its pk has no row any more) is refused with a form-level
+      error (`NON_FIELD_ERRORS`, `MSG_COUPON_GONE`), never inserted again (code review).
+    Every refusal is a dict error, so a form takes it whole: `form.add_error(None, error)`.
+    Runs in its own transaction (a savepoint inside the caller's, e.g. the admin's request), so
+    the caller's transaction stays usable after a refusal. Saves only the row: many-to-many
+    fields (`stores`, `categories`) are the caller's to save after it (the admin's
+    `save_related`). History is recorded by the model (django-simple-history)."""
+    with transaction.atomic():
+        if coupon.pk is not None:
+            stored = Coupon.objects.select_for_update().filter(pk=coupon.pk).first()
+            if stored is None:
+                gone = ValidationError(MSG_COUPON_GONE, code="not_found")
+                raise ValidationError({NON_FIELD_ERRORS: [gone]})
+            errors = coupon_edit_errors(coupon, stored)
+            if errors:
+                raise ValidationError(errors)
+        try:
+            with transaction.atomic():
+                coupon.save()
+        except IntegrityError as error:
+            if is_code_conflict(error):
+                taken = ValidationError(MSG_CODE_TAKEN, code="code_taken")
+                raise ValidationError({"code": [taken]}) from error
+            raise
+    return coupon
