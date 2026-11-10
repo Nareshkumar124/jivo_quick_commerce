@@ -4,3 +4,13 @@ canola-oil,Canola Oil,edible-oils,1,1
 olive-oil,Olive Oil,edible-oils,2,1
 mustard-oil,Mustard Oil,edible-oils,3,1
 other-oils,"Groundnut, Sunflower & More",edible-oils,4,1
+wellness-beverages,Wellness Beverages,,2,1
+wheatgrass,Wheatgrass,wellness-beverages,2,1
+seeds-and-dry-fruits,Seeds & Dry Fruits,,3,1
+ghee-and-butter,Ghee & Butter,,4,1
+honey,Honey,,5,1
+spices-and-herbs,Spices & Herbs,,6,1
+cereals-and-grains,Cereals & Grains,,7,1
+coffee-and-tea,Coffee & Tea,,8,1
+pantry,Pantry,,9,1
+water-and-soda,Water & Soda,wellness-beverages,3,1

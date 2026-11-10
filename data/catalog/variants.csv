@@ -1,35 +1,112 @@
 sku,product_slug,name,net_quantity,unit_value,unit,mrp,selling_price,max_qty_per_order,barcode,sap_item_code,weight_grams,is_active,sort_order
-JVW-GNT-1L,jivo-cold-press-groundnut-oil,1 L,1 L,1000,ml,560.00,210.00,5,,,,1,1
-JVW-GNT-5L,jivo-cold-press-groundnut-oil,5 L,5 L,5000,ml,2800.00,1040.00,5,,,,1,2
+JVW-GNT-1L,jivo-cold-press-groundnut-oil,1 L,1 L,1000,ml,560.00,210.00,5,8905604001199,,,1,1
+JVW-GNT-5L,jivo-cold-press-groundnut-oil,5 L,5 L,5000,ml,2800.00,1040.00,5,8905604001168,,,1,2
 JVW-GNT-2X1L,jivo-cold-press-groundnut-oil,2 x 1 L,2 x 1 L,2000,ml,800.00,420.00,5,,,,0,3
 JVW-GNT-5P1L,jivo-cold-press-groundnut-oil,5 L + 1 L,5 L + 1 L,6000,ml,3360.00,1230.00,5,,,,0,4
-JVW-KGM-1L,jivo-kachi-ghani-mustard-oil,1 L,1 L,1000,ml,255.00,180.00,5,,,,1,1
-JVW-KGM-5L,jivo-kachi-ghani-mustard-oil,5 L,5 L,5000,ml,1250.00,900.00,5,,,,1,2
-JVW-SOY-1L,jivo-soyabean-oil,1 L,1 L,1000,ml,225.00,175.00,5,,,,1,1
-JVW-SOY-5L,jivo-soyabean-oil,5 L,5 L,5000,ml,1100.00,875.00,5,,,,1,2
-JVW-SUN-1L,jivo-cold-press-sunflower-oil,1 L,1 L,1000,ml,275.00,190.00,5,,,,1,1
-JVW-SUN-5L,jivo-cold-press-sunflower-oil,5 L,5 L,5000,ml,1350.00,950.00,5,,,,1,2
-JVW-CAN-1L,jivo-cold-press-canola-oil,1 L,1 L,1000,ml,375.00,220.00,5,,,,1,1
-JVW-CAN-5L,jivo-cold-press-canola-oil,5 L,5 L,5000,ml,1650.00,1099.00,5,,,,1,2
+JVW-GNT-2L,jivo-cold-press-groundnut-oil,2 L,2 L,2000,ml,800.00,800.00,5,8905604003292,,,1,5
+JVW-KGM-1L,jivo-kachi-ghani-mustard-oil,1 L,1 L,1000,ml,255.00,180.00,5,8908000258198,,,1,1
+JVW-KGM-5L,jivo-kachi-ghani-mustard-oil,5 L,5 L,5000,ml,1250.00,900.00,5,8908000258204,,,1,2
+JVW-KGM-1LP,jivo-kachi-ghani-mustard-oil,1 L Pouch,1 L,1000,ml,250.00,250.00,5,8905604000444,,,1,3
+JVW-KGM-3L,jivo-kachi-ghani-mustard-oil,3 L,3 L,3000,ml,765.00,765.00,5,8908000258945,,,1,4
+JVW-KGM-4L,jivo-kachi-ghani-mustard-oil,4 L,4 L,4000,ml,1000.00,1000.00,5,8905604003070,,,1,5
+JVW-SOY-1L,jivo-soyabean-oil,1 L,1 L,1000,ml,225.00,175.00,5,8908000258464,,,1,1
+JVW-SOY-5L,jivo-soyabean-oil,5 L,5 L,5000,ml,1100.00,875.00,5,8905604003179,,,1,2
+JVW-SOY-1LP,jivo-soyabean-oil,1 L Pouch,1 L,1000,ml,199.00,199.00,5,8905604000642,,,1,3
+JVW-SUN-1L,jivo-cold-press-sunflower-oil,1 L,1 L,1000,ml,275.00,190.00,5,8908000258235,,,1,1
+JVW-SUN-5L,jivo-cold-press-sunflower-oil,5 L,5 L,5000,ml,1350.00,950.00,5,8908000258983,,,1,2
+JVW-SUN-3L,jivo-cold-press-sunflower-oil,3 L,3 L,3000,ml,825.00,825.00,5,8905604003827,,,1,3
+JVW-SUN-4L,jivo-cold-press-sunflower-oil,4 L,4 L,4000,ml,1038.00,1038.00,5,8905604003056,,,1,4
+JVW-CAN-1L,jivo-cold-press-canola-oil,1 L,1 L,1000,ml,375.00,220.00,5,8908000258181,,,1,1
+JVW-CAN-5L,jivo-cold-press-canola-oil,5 L,5 L,5000,ml,1650.00,1099.00,5,8908000258365,,,1,2
 JVW-CAN-2X1L,jivo-cold-press-canola-oil,2 x 1 L,2 x 1 L,2000,ml,750.00,440.00,5,,,,0,3
 JVW-CAN-5X1L,jivo-cold-press-canola-oil,5 x 1 L,5 x 1 L,5000,ml,1875.00,1099.00,5,,,,0,4
 JVW-CAN-5P1L,jivo-cold-press-canola-oil,5 L + 1 L,5 L + 1 L,6000,ml,2025.00,1299.00,5,,,,0,5
 JVW-CAN-2X5L,jivo-cold-press-canola-oil,2 x 5 L,2 x 5 L,10000,ml,3300.00,2199.00,5,,,,0,6
-JVW-POM-1L,jivo-pomace-olive-oil,1 L,1 L,1000,ml,1049.00,399.00,5,,,,1,1
-JVW-POM-5L,jivo-pomace-olive-oil,5 L,5 L,5000,ml,4999.00,1995.00,5,,,,1,2
-JVW-YMU-1L,jivo-first-pressed-yellow-mustard-oil,1 L,1 L,1000,ml,375.00,259.00,5,,,,1,1
+JVW-CAN-3L,jivo-cold-press-canola-oil,3 L,3 L,3000,ml,690.00,690.00,5,8908000258112,,,1,7
+JVW-CAN-4L,jivo-cold-press-canola-oil,4 L,4 L,4000,ml,1199.00,1199.00,5,8905604001106,,,1,8
+JVW-POM-1L,jivo-pomace-olive-oil,1 L,1 L,1000,ml,1049.00,399.00,5,8908000258549,,,1,1
+JVW-POM-5L,jivo-pomace-olive-oil,5 L,5 L,5000,ml,4999.00,1995.00,5,8908000258457,,,1,2
+JVW-POM-2L,jivo-pomace-olive-oil,2 L,2 L,2000,ml,1600.00,1600.00,5,8905604000703,,,1,3
+JVW-POM-3L,jivo-pomace-olive-oil,3 L,3 L,3000,ml,3050.00,3050.00,5,8905604003414,,,1,4
+JVW-YMU-1L,jivo-first-pressed-yellow-mustard-oil,1 L,1 L,1000,ml,375.00,259.00,5,8905604002653,,,1,1
 JVW-YMU-2X1L,jivo-first-pressed-yellow-mustard-oil,2 x 1 L,2 x 1 L,2000,ml,790.00,469.00,5,,,,0,2
-JVW-XLO-1L,jivo-extra-light-olive-oil,1 L,1 L,1000,ml,1499.00,500.00,5,,,,1,1
-JVW-XLO-5L,jivo-extra-light-olive-oil,5 L,5 L,5000,ml,6499.00,2500.00,5,,,,1,2
+JVW-YMU-5L,jivo-first-pressed-yellow-mustard-oil,5 L,5 L,5000,ml,2000.00,2000.00,5,8905604003667,,,1,3
+JVW-XLO-1L,jivo-extra-light-olive-oil,1 L,1 L,1000,ml,1499.00,500.00,5,8908000258211,,,1,1
+JVW-XLO-5L,jivo-extra-light-olive-oil,5 L,5 L,5000,ml,6499.00,2500.00,5,8908000258228,,,1,2
 JVW-XLO-2X1L,jivo-extra-light-olive-oil,2 x 1 L,2 x 1 L,2000,ml,2998.00,1000.00,5,,,,0,3
 JVW-XLO-5P1L,jivo-extra-light-olive-oil,5 L + 1 L,5 L + 1 L,6000,ml,7998.00,2969.00,5,,,,0,4
-JVW-EVO-1L,jivo-extra-virgin-olive-oil,1 L,1 L,1000,ml,1799.00,725.00,5,,,,1,1
-JVW-EVO-2L,jivo-extra-virgin-olive-oil,2 L,2 L,2000,ml,2700.00,1450.00,5,,,,1,2
+JVW-XLO-500,jivo-extra-light-olive-oil,500 ml,500 ml,500,ml,499.00,499.00,5,8908000258570,,,1,5
+JVW-XLO-2L,jivo-extra-light-olive-oil,2 L,2 L,2000,ml,2799.00,2799.00,5,8908000258402,,,1,6
+JVW-XLO-3L,jivo-extra-light-olive-oil,3 L,3 L,3000,ml,2200.00,2200.00,5,8905604000154,,,1,7
+JVW-EVO-1L,jivo-extra-virgin-olive-oil,1 L,1 L,1000,ml,1799.00,725.00,5,8908000258723,,,1,1
+JVW-EVO-2L,jivo-extra-virgin-olive-oil,2 L,2 L,2000,ml,2700.00,1450.00,5,8905604001144,,,1,2
 JVW-EVO-5L,jivo-extra-virgin-olive-oil,5 L,5 L,5000,ml,7999.00,3625.00,5,,,,1,3
 JVW-EVO-2X1L,jivo-extra-virgin-olive-oil,2 x 1 L,2 x 1 L,2000,ml,2998.00,1450.00,5,,,,0,4
 JVW-EVO-5X1L,jivo-extra-virgin-olive-oil,5 x 1 L,5 x 1 L,5000,ml,8995.00,3625.00,5,,,,0,5
-JVW-RBO-1L,jivo-rice-bran-oil,1 L,1 L,1000,ml,285.00,189.00,5,,,,1,1
-JVW-RBO-5L,jivo-rice-bran-oil,5 L,5 L,5000,ml,1425.00,949.00,5,,,,1,2
-JVW-GLD-1L,jivo-gold-refined-oil,1 L,1 L,1000,ml,225.00,167.00,5,,,,1,1
-JVW-GLD-5L,jivo-gold-refined-oil,5 L,5 L,5000,ml,1050.00,815.00,5,,,,1,2
-JVW-COC-500,jivo-extra-virgin-coconut-oil,500 ml,500 ml,500,ml,399.00,269.00,5,,,,1,1
+JVW-EVO-200,jivo-extra-virgin-olive-oil,200 ml,200 ml,200,ml,350.00,350.00,5,8905604000598,,,1,6
+JVW-EVO-250,jivo-extra-virgin-olive-oil,250 ml,250 ml,250,ml,450.00,450.00,5,8905604000710,,,1,7
+JVW-EVO-500,jivo-extra-virgin-olive-oil,500 ml,500 ml,500,ml,675.00,675.00,5,8905604001113,,,1,8
+JVW-EVO-3L,jivo-extra-virgin-olive-oil,3 L,3 L,3000,ml,4000.00,4000.00,5,8905604003407,,,1,9
+JVW-RBO-1L,jivo-rice-bran-oil,1 L,1 L,1000,ml,285.00,189.00,5,8905604002059,,,1,1
+JVW-RBO-5L,jivo-rice-bran-oil,5 L,5 L,5000,ml,1425.00,949.00,5,8905604002066,,,1,2
+JVW-RBO-4L,jivo-rice-bran-oil,4 L,4 L,4000,ml,1140.00,1140.00,5,8905604003063,,,1,3
+JVW-GLD-1L,jivo-gold-refined-oil,1 L,1 L,1000,ml,225.00,167.00,5,8905604001076,,,1,1
+JVW-GLD-5L,jivo-gold-refined-oil,5 L,5 L,5000,ml,1050.00,815.00,5,8905604000086,,,1,2
+JVW-COC-500,jivo-extra-virgin-coconut-oil,500 ml,500 ml,500,ml,399.00,269.00,5,8905604001120,,,1,1
+JVW-COC-200,jivo-extra-virgin-coconut-oil,200 ml,200 ml,200,ml,285.00,285.00,5,8905604001137,,,1,2
+JVW-COC-1L,jivo-extra-virgin-coconut-oil,1 L,1 L,1000,ml,700.00,700.00,5,8905604000666,,,1,3
+JVW-FPM-1L,jivo-first-pressed-mustard-oil,1 L,1 L,1000,ml,500.00,500.00,5,8905604002660,,,1,1
+JVW-FPS-1L,jivo-first-pressed-sunflower-oil,1 L,1 L,1000,ml,600.00,600.00,5,8905604004015,,,1,1
+JVW-SES-1L,jivo-first-pressed-sesame-oil,1 L,1 L,1000,ml,600.00,600.00,5,8905604002677,,,1,1
+JVW-SOL-1L,jivo-so-olive-oil,1 L,1 L,1000,ml,325.00,325.00,5,8905604002080,,,1,1
+JVW-SOL-5L,jivo-so-olive-oil,5 L,5 L,5000,ml,1385.00,1385.00,5,8905604002073,,,1,2
+JVW-PRO-200,jivo-premium-olive-oil,200 ml,200 ml,200,ml,399.00,399.00,5,8905604003940,,,1,1
+JVW-PRO-500,jivo-premium-olive-oil,500 ml,500 ml,500,ml,1089.00,1089.00,5,8905604003933,,,1,2
+JVW-PRO-1L,jivo-premium-olive-oil,1 L,1 L,1000,ml,2119.00,2119.00,5,8905604003926,,,1,3
+JVW-CAN-1LP,jivo-refined-canola-oil,1 L Pouch,1 L,1000,ml,299.00,299.00,5,8908000258129,,,1,1
+SNO-SUN-5L,sano-sunflower-oil,5 L,5 L,5000,ml,1475.00,1475.00,5,8905604000901,,,1,1
+SNO-SOY-5L,sano-soyabean-oil,5 L,5 L,5000,ml,1450.00,1450.00,5,8905604000871,,,1,1
+SNO-CAN-1L,sano-canola-oil,1 L,1 L,1000,ml,475.00,475.00,5,8905604000932,,,1,1
+SNO-CAN-5L,sano-canola-oil,5 L,5 L,5000,ml,1950.00,1950.00,5,8905604000949,,,1,2
+SNO-CLO-1L,sano-classic-olive-oil,1 L,1 L,1000,ml,1299.00,1299.00,5,8905604001052,,,1,1
+SNO-CLO-5L,sano-classic-olive-oil,5 L,5 L,5000,ml,6499.00,6499.00,5,8905604001045,,,1,2
+SNO-KGM-1L,sano-kachi-ghani-mustard-oil,1 L,1 L,1000,ml,235.00,235.00,5,8905604000925,,,1,1
+SNO-POM-1L,sano-pomace-olive-oil,1 L,1 L,1000,ml,999.00,999.00,5,8905604001069,,,1,1
+SNO-POM-5L,sano-pomace-olive-oil,5 L,5 L,5000,ml,4599.00,4599.00,5,8905604001038,,,1,2
+SNO-EVO-1L,sano-extra-virgin-olive-oil,1 L,1 L,1000,ml,1799.00,1799.00,5,8905604003858,,,1,1
+SNO-HON-1KG,sano-pure-honey,1 kg,1 kg,1000,g,599.00,599.00,5,8905604000987,,,1,1
+JVW-PMP-200G,jivo-pumpkin-seeds,200 g,200 g,200,g,299.00,299.00,5,8905604001700,,,1,1
+JVW-PMP-400G,jivo-pumpkin-seeds,400 g,400 g,400,g,599.00,599.00,5,8905604001694,,,1,2
+JVW-PMP-800G,jivo-pumpkin-seeds,800 g,800 g,800,g,1299.00,1299.00,5,8905604001687,,,1,3
+JVW-SFS-200G,jivo-sunflower-seeds,200 g,200 g,200,g,299.00,299.00,5,8905604001762,,,1,1
+JVW-SFS-400G,jivo-sunflower-seeds,400 g,400 g,400,g,599.00,599.00,5,8905604001755,,,1,2
+JVW-SFS-800G,jivo-sunflower-seeds,800 g,800 g,800,g,899.00,899.00,5,8905604001748,,,1,3
+JVW-CHA-200G,jivo-chia-seeds,200 g,200 g,200,g,299.00,299.00,5,8905604001205,,,1,1
+JVW-CHA-400G,jivo-chia-seeds,400 g,400 g,400,g,599.00,599.00,5,8905604001212,,,1,2
+JVW-CHA-800G,jivo-chia-seeds,800 g,800 g,800,g,899.00,899.00,5,8905604001267,,,1,3
+JVW-FLX-200G,jivo-flax-seeds,200 g,200 g,200,g,299.00,299.00,5,8905604001717,,,1,1
+JVW-FLX-400G,jivo-flax-seeds,400 g,400 g,400,g,499.00,499.00,5,8905604001724,,,1,2
+JVW-FLX-800G,jivo-flax-seeds,800 g,800 g,800,g,599.00,599.00,5,8905604001731,,,1,3
+JVW-BSL-200G,jivo-basil-seeds,200 g,200 g,200,g,299.00,299.00,5,8905604001656,,,1,1
+JVW-BSL-400G,jivo-basil-seeds,400 g,400 g,400,g,599.00,599.00,5,8905604001663,,,1,2
+JVW-GFT-360G,jivo-dry-fruits-gift-box,360 g,360 g,360,g,1999.00,1999.00,5,8905604003476,,,1,1
+JVW-FZL-750,jivo-fizzy-soda-lemon,750 ml,750 ml,750,ml,55.00,55.00,5,8905604001847,,,1,1
+JVW-FZP-750,jivo-fizzy-soda-peach,750 ml,750 ml,750,ml,55.00,55.00,5,8905604001830,,,1,1
+JVW-XFZ-750,jivo-extra-fizzy-soda,750 ml,750 ml,750,ml,30.00,30.00,5,8905604000758,,,1,1
+JVW-WGG-200,jivo-wheatgrass-juice-ginger-ale,200 ml,200 ml,200,ml,100.00,100.00,5,8905604001793,,,0,1
+JVW-WGM-500,jivo-wheatgrass-juice-mango,500 ml,500 ml,500,ml,100.00,100.00,5,8905604001861,,,1,1
+JVW-KOF-100G,jivo-koffie-instant-coffee,100 g,100 g,100,g,350.00,350.00,5,8905604000659,,,1,1
+JVW-QNA-200G,jivo-premium-quinoa,200 g,200 g,200,g,199.00,199.00,5,8905604002226,,,1,1
+JVW-QNA-400G,jivo-premium-quinoa,400 g,400 g,400,g,299.00,299.00,5,8905604002202,,,1,2
+JVW-QNA-800G,jivo-premium-quinoa,800 g,800 g,800,g,399.00,399.00,5,8905604002219,,,1,3
+JVW-A2G-500,jivo-a2-cow-ghee,500 ml,500 ml,500,ml,2200.00,2200.00,5,8905604000291,,,1,1
+JVW-A2G-1L,jivo-a2-cow-ghee,1 L,1 L,1000,ml,4000.00,4000.00,5,8905604000307,,,1,2
+JVW-DSG-500,jivo-desi-ghee,500 ml,500 ml,500,ml,849.00,849.00,5,8905604001298,,,1,1
+JVW-CUM-100G,jivo-cumin-seeds,100 g,100 g,100,g,249.00,249.00,5,8905604001588,,,1,1
+JVW-BCD-100G,jivo-whole-black-cardamom,100 g,100 g,100,g,549.00,549.00,5,8905604001502,,,1,1
+JVW-BPR-100G,jivo-whole-black-pepper,100 g,100 g,100,g,399.00,399.00,5,8905604001519,,,1,1
+JVW-GCD-100G,jivo-green-cardamom,100 g,100 g,100,g,799.00,799.00,5,8905604001533,,,1,1
+JVW-CLV-100G,jivo-whole-clove,100 g,100 g,100,g,349.00,349.00,5,8905604001557,,,1,1
+JVW-CIN-100G,jivo-cinnamon-bark,100 g,100 g,100,g,399.00,399.00,5,8905604001540,,,1,1
+JVW-SAF-1G,jivo-kashmiri-saffron,1 g,1 g,1,g,899.00,899.00,5,8905604003421,,,1,1
+JVW-BSO-470G,jivo-black-sliced-olives,470 g,470 g,470,g,399.00,399.00,5,8905604002752,,,1,1

@@ -1,0 +1,197 @@
+sheet,row,sku,sort_order,drive_path,kind,file
+Template-EDIBLE_OIL_VEGETABLE,12,JVW-EVO-200,1,JIVO/Oil's/Extra Virgin Olive Oil/200ml/200ml Extra Virgin Olive Oil Front.jpg,front,jivo-extra-virgin-olive-oil-200/01-200ml-extra-virgin-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,12,JVW-EVO-200,2,JIVO/Oil's/Extra Virgin Olive Oil/200ml/200ml Extra Virgin Olive Oil Back.jpg,back,jivo-extra-virgin-olive-oil-200/02-200ml-extra-virgin-olive-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,12,JVW-EVO-200,3,JIVO/Oil's/Extra Virgin Olive Oil/200ml/Lifestyle/Lifestyle 1.png,lifestyle,jivo-extra-virgin-olive-oil-200/03-lifestyle-1.png
+Template-EDIBLE_OIL_VEGETABLE,12,JVW-EVO-200,4,JIVO/Oil's/Extra Virgin Olive Oil/200ml/Lifestyle/Lifestyle 2.png,lifestyle,jivo-extra-virgin-olive-oil-200/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,13,JVW-SUN-4L,1,JIVO/Oil's/Sunflower Oil/4L/4L Sunflower Refined Front.jpg,front,jivo-cold-press-sunflower-oil-4l/01-4l-sunflower-refined-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,13,JVW-SUN-4L,2,JIVO/Oil's/Sunflower Oil/4L/4L Sunflower Refined Back.jpg,back,jivo-cold-press-sunflower-oil-4l/02-4l-sunflower-refined-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,13,JVW-SUN-4L,3,JIVO/Oil's/Sunflower Oil/4L/Lifestyle/Artboard 1.jpg,lifestyle,jivo-cold-press-sunflower-oil-4l/03-artboard-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,13,JVW-SUN-4L,4,JIVO/Oil's/Sunflower Oil/4L/Lifestyle/Artboard 2.jpg,lifestyle,jivo-cold-press-sunflower-oil-4l/04-artboard-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,14,JVW-KGM-1LP,1,JIVO/Oil's/pouch/Mustard Pouch/Mustard pouch mockup new front.jpg,front,jivo-kachi-ghani-mustard-oil-1lp/01-mustard-pouch-mockup-new-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,14,JVW-KGM-1LP,2,JIVO/Oil's/pouch/Mustard Pouch/Mustard pouch mockup new BACK.jpg,back,jivo-kachi-ghani-mustard-oil-1lp/02-mustard-pouch-mockup-new-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,16,SNO-SUN-5L,1,SANO/Oil's/Sunflower/5l/5L Sano Sunlower Front.jpg,front,sano-sunflower-oil-5l/01-5l-sano-sunlower-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,16,SNO-SUN-5L,2,SANO/Oil's/Sunflower/5l/5L Sano Sunlower BAck.jpg,back,sano-sunflower-oil-5l/02-5l-sano-sunlower-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,16,SNO-SUN-5L,3,SANO/Oil's/Sunflower/5l/Lifestyle/Lifestyle 1.jpg,lifestyle,sano-sunflower-oil-5l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,16,SNO-SUN-5L,4,SANO/Oil's/Sunflower/5l/Lifestyle/Lifestyle 2.jpg,lifestyle,sano-sunflower-oil-5l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,17,JVW-EVO-500,1,JIVO/Oil's/Extra Virgin Olive Oil/500ml/500Ml Extra Virgin Olive oil Front.jpg,front,jivo-extra-virgin-olive-oil-500/01-500ml-extra-virgin-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,17,JVW-EVO-500,2,JIVO/Oil's/Extra Virgin Olive Oil/500ml/500Ml Extra Virgin Olive oil Back.jpg,back,jivo-extra-virgin-olive-oil-500/02-500ml-extra-virgin-olive-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,17,JVW-EVO-500,3,JIVO/Oil's/Extra Virgin Olive Oil/500ml/Lifestyle/Lifestyle 1.png,lifestyle,jivo-extra-virgin-olive-oil-500/03-lifestyle-1.png
+Template-EDIBLE_OIL_VEGETABLE,17,JVW-EVO-500,4,JIVO/Oil's/Extra Virgin Olive Oil/500ml/Lifestyle/Lifestyle 2.png,lifestyle,jivo-extra-virgin-olive-oil-500/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,18,JVW-EVO-2L,1,JIVO/Oil's/Extra Virgin Olive Oil/2L/Extra virgin 2L Front.jpg,front,jivo-extra-virgin-olive-oil-2l/01-extra-virgin-2l-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,18,JVW-EVO-2L,2,JIVO/Oil's/Extra Virgin Olive Oil/2L/Extra virgin 2L Back.jpg,back,jivo-extra-virgin-olive-oil-2l/02-extra-virgin-2l-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,18,JVW-EVO-2L,3,JIVO/Oil's/Extra Virgin Olive Oil/2L/Lifestyle/Lifestyle 1.png,lifestyle,jivo-extra-virgin-olive-oil-2l/03-lifestyle-1.png
+Template-EDIBLE_OIL_VEGETABLE,18,JVW-EVO-2L,4,JIVO/Oil's/Extra Virgin Olive Oil/2L/Lifestyle/Lifestyle 2.png,lifestyle,jivo-extra-virgin-olive-oil-2l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,19,SNO-SOY-5L,1,SANO/Oil's/Soyabean/5L/5L Sano Soyabean Front.jpg,front,sano-soyabean-oil-5l/01-5l-sano-soyabean-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,19,SNO-SOY-5L,2,SANO/Oil's/Soyabean/5L/5L Sano Soyabean Back.jpg,back,sano-soyabean-oil-5l/02-5l-sano-soyabean-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,19,SNO-SOY-5L,3,SANO/Oil's/Soyabean/5L/Lifestyle/Lifestyle 1.jpg,lifestyle,sano-soyabean-oil-5l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,19,SNO-SOY-5L,4,SANO/Oil's/Soyabean/5L/Lifestyle/Lifestyle 2.jpg,lifestyle,sano-soyabean-oil-5l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,20,JVW-XLO-500,1,JIVO/Oil's/Extra Light Olive Oil/500ml/500Ml Extra Light Olive oil Front.jpg,front,jivo-extra-light-olive-oil-500/01-500ml-extra-light-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,20,JVW-XLO-500,2,JIVO/Oil's/Extra Light Olive Oil/500ml/500Ml Extra Light Olive oil Back.jpg,back,jivo-extra-light-olive-oil-500/02-500ml-extra-light-olive-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,20,JVW-XLO-500,3,JIVO/Oil's/Extra Light Olive Oil/500ml/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-extra-light-olive-oil-500/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,20,JVW-XLO-500,4,JIVO/Oil's/Extra Light Olive Oil/500ml/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-extra-light-olive-oil-500/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,21,JVW-CAN-3L,1,JIVO/Oil's/Extra Virgin Canola oil/3L/3L Extra Virgin Canola oil front.jpg,front,jivo-cold-press-canola-oil-3l/01-3l-extra-virgin-canola-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,21,JVW-CAN-3L,2,JIVO/Oil's/Extra Virgin Canola oil/3L/3L Extra Virgin Canola oil Side 1.jpg,side,jivo-cold-press-canola-oil-3l/02-3l-extra-virgin-canola-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,21,JVW-CAN-3L,3,JIVO/Oil's/Extra Virgin Canola oil/3L/3L Extra Virgin Canola oil Side.jpg,side,jivo-cold-press-canola-oil-3l/03-3l-extra-virgin-canola-oil-side.jpg
+Template-EDIBLE_OIL_VEGETABLE,21,JVW-CAN-3L,4,JIVO/Oil's/Extra Virgin Canola oil/3L/Lifestyel/Artboard 6.png,lifestyle,jivo-cold-press-canola-oil-3l/04-artboard-6.png
+Template-EDIBLE_OIL_VEGETABLE,21,JVW-CAN-3L,5,JIVO/Oil's/Extra Virgin Canola oil/3L/Lifestyel/Artboard 7.jpg,lifestyle,jivo-cold-press-canola-oil-3l/05-artboard-7.jpg
+Template-EDIBLE_OIL_VEGETABLE,22,JVW-KGM-4L,1,JIVO/Oil's/Mustard Oil/4L/front.jpg,front,jivo-kachi-ghani-mustard-oil-4l/01-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,22,JVW-KGM-4L,2,JIVO/Oil's/Mustard Oil/4L/Back.jpg,back,jivo-kachi-ghani-mustard-oil-4l/02-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,22,JVW-KGM-4L,3,JIVO/Oil's/Mustard Oil/4L/LIfestyle/4L Table Image.jpg,lifestyle,jivo-kachi-ghani-mustard-oil-4l/03-4l-table-image.jpg
+Template-EDIBLE_OIL_VEGETABLE,22,JVW-KGM-4L,4,JIVO/Oil's/Mustard Oil/4L/LIfestyle/Lifestyle 1.jpg,lifestyle,jivo-kachi-ghani-mustard-oil-4l/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,23,SNO-CAN-1L,1,SANO/Oil's/Canola Oil/1L/1L Sano Canola Front.jpg,front,sano-canola-oil-1l/01-1l-sano-canola-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,23,SNO-CAN-1L,2,SANO/Oil's/Canola Oil/1L/1L Sano Canola Back.jpg,back,sano-canola-oil-1l/02-1l-sano-canola-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,23,SNO-CAN-1L,3,SANO/Oil's/Canola Oil/1L/Lifestyle/Lifestyle 1.jpg,lifestyle,sano-canola-oil-1l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,23,SNO-CAN-1L,4,SANO/Oil's/Canola Oil/1L/Lifestyle/Lifestyle 2.jpg,lifestyle,sano-canola-oil-1l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,24,SNO-CLO-5L,1,SANO/Oil's/Classic Olive Oil/5L Sano Classic Olive Oil Front.jpg,front,sano-classic-olive-oil-5l/01-5l-sano-classic-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,24,SNO-CLO-5L,2,SANO/Oil's/Classic Olive Oil/5L Sano Classic Olive Oil Side 1.jpg,side,sano-classic-olive-oil-5l/02-5l-sano-classic-olive-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,24,SNO-CLO-5L,3,SANO/Oil's/Classic Olive Oil/5L Sano Classic Olive Oil Side 2.jpg,side,sano-classic-olive-oil-5l/03-5l-sano-classic-olive-oil-side-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,24,SNO-CLO-5L,4,SANO/Oil's/Classic Olive Oil/Lifestyle/Lifestyle 1.jpg,lifestyle,sano-classic-olive-oil-5l/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,24,SNO-CLO-5L,5,SANO/Oil's/Classic Olive Oil/Lifestyle/Lifestyle 2.jpg,lifestyle,sano-classic-olive-oil-5l/05-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,25,JVW-COC-1L,1,JIVO/Oil's/Coconut oil/1L/New Coconut Label/1L Coconut New Front.jpg,front,jivo-extra-virgin-coconut-oil-1l/01-1l-coconut-new-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,25,JVW-COC-1L,2,JIVO/Oil's/Coconut oil/1L/New Coconut Label/1L Coconut New Back.jpg,back,jivo-extra-virgin-coconut-oil-1l/02-1l-coconut-new-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,26,JVW-POM-2L,1,JIVO/Oil's/Pomace Olive Oil/2L/2L Pomace Olive Oil Front.jpg,front,jivo-pomace-olive-oil-2l/01-2l-pomace-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,26,JVW-POM-2L,2,JIVO/Oil's/Pomace Olive Oil/2L/2L Pomace Olive Oil Back.jpg,back,jivo-pomace-olive-oil-2l/02-2l-pomace-olive-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,26,JVW-POM-2L,3,JIVO/Oil's/Pomace Olive Oil/2L/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-pomace-olive-oil-2l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,26,JVW-POM-2L,4,JIVO/Oil's/Pomace Olive Oil/2L/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-pomace-olive-oil-2l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,27,JVW-POM-3L,1,JIVO/Oil's/Pomace Olive Oil/3L/3L Pomace Olive Oil Front.jpg,front,jivo-pomace-olive-oil-3l/01-3l-pomace-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,27,JVW-POM-3L,2,JIVO/Oil's/Pomace Olive Oil/3L/3L Pomace Olive Oil Side 1.jpg,side,jivo-pomace-olive-oil-3l/02-3l-pomace-olive-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,27,JVW-POM-3L,3,JIVO/Oil's/Pomace Olive Oil/3L/3L Pomace Olive Oil Side 2.jpg,side,jivo-pomace-olive-oil-3l/03-3l-pomace-olive-oil-side-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,27,JVW-POM-3L,4,JIVO/Oil's/Pomace Olive Oil/3L/LIfestyle Image/Lifestyle 1.jpg,lifestyle,jivo-pomace-olive-oil-3l/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,27,JVW-POM-3L,5,JIVO/Oil's/Pomace Olive Oil/3L/LIfestyle Image/Lifestyle 2.jpg,lifestyle,jivo-pomace-olive-oil-3l/05-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,28,JVW-SES-1L,1,JIVO/Oil's/Sesame oil/1L First Pressed Sesame oil front.jpg,front,jivo-first-pressed-sesame-oil-1l/01-1l-first-pressed-sesame-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,28,JVW-SES-1L,2,JIVO/Oil's/Sesame oil/1L First Pressed Sesame oil Back.jpg,back,jivo-first-pressed-sesame-oil-1l/02-1l-first-pressed-sesame-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,28,JVW-SES-1L,3,JIVO/Oil's/Sesame oil/Lifestyle/Artboard 5.jpg,lifestyle,jivo-first-pressed-sesame-oil-1l/03-artboard-5.jpg
+Template-EDIBLE_OIL_VEGETABLE,28,JVW-SES-1L,4,JIVO/Oil's/Sesame oil/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-first-pressed-sesame-oil-1l/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,30,JVW-XLO-3L,1,JIVO/Oil's/Extra Light Olive Oil/3L/3L Extra Light Olive Oil Front.jpg,front,jivo-extra-light-olive-oil-3l/01-3l-extra-light-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,30,JVW-XLO-3L,2,JIVO/Oil's/Extra Light Olive Oil/3L/3L Extra Light Olive Oil Side 1.jpg,side,jivo-extra-light-olive-oil-3l/02-3l-extra-light-olive-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,30,JVW-XLO-3L,3,JIVO/Oil's/Extra Light Olive Oil/3L/3L Extra Light Olive Oil Side 2.jpg,side,jivo-extra-light-olive-oil-3l/03-3l-extra-light-olive-oil-side-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,30,JVW-XLO-3L,4,JIVO/Oil's/Extra Light Olive Oil/3L/Lifestyle/Lifestyle 6.jpg,lifestyle,jivo-extra-light-olive-oil-3l/04-lifestyle-6.jpg
+Template-EDIBLE_OIL_VEGETABLE,31,SNO-KGM-1L,1,SANO/Oil's/Mustard Oil/1L/1L Sano Mustard Oil Front.jpg,front,sano-kachi-ghani-mustard-oil-1l/01-1l-sano-mustard-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,31,SNO-KGM-1L,2,SANO/Oil's/Mustard Oil/1L/1L Sano Mustard Oil Back.jpg,back,sano-kachi-ghani-mustard-oil-1l/02-1l-sano-mustard-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,31,SNO-KGM-1L,3,SANO/Oil's/Mustard Oil/1L/Lifestyle/Artboard 1.jpg,lifestyle,sano-kachi-ghani-mustard-oil-1l/03-artboard-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,31,SNO-KGM-1L,4,SANO/Oil's/Mustard Oil/1L/Lifestyle/Lifestyle 1.jpg,lifestyle,sano-kachi-ghani-mustard-oil-1l/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,33,JVW-FPM-1L,1,JIVO/Oil's/Firste Pressed Mustard Oil/1L/1L First Mustard Oil Front.jpg,front,jivo-first-pressed-mustard-oil-1l/01-1l-first-mustard-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,33,JVW-FPM-1L,2,JIVO/Oil's/Firste Pressed Mustard Oil/1L/1L First Mustard Oil Back.jpg,back,jivo-first-pressed-mustard-oil-1l/02-1l-first-mustard-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,33,JVW-FPM-1L,3,JIVO/Oil's/Firste Pressed Mustard Oil/1L/Lifestyle/Artboard 6.png,lifestyle,jivo-first-pressed-mustard-oil-1l/03-artboard-6.png
+Template-EDIBLE_OIL_VEGETABLE,33,JVW-FPM-1L,4,JIVO/Oil's/Firste Pressed Mustard Oil/1L/Lifestyle/Lifestyle 1.png,lifestyle,jivo-first-pressed-mustard-oil-1l/04-lifestyle-1.png
+Template-EDIBLE_OIL_VEGETABLE,34,JVW-SOL-1L,1,JIVO/Oil's/So Olive/1L/so olive front.jpg,front,jivo-so-olive-oil-1l/01-so-olive-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,34,JVW-SOL-1L,2,JIVO/Oil's/So Olive/1L/so olive Back.jpg,back,jivo-so-olive-oil-1l/02-so-olive-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,34,JVW-SOL-1L,3,JIVO/Oil's/So Olive/1L/LIfestyle/Lifestyle 1.jpg,lifestyle,jivo-so-olive-oil-1l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,34,JVW-SOL-1L,4,JIVO/Oil's/So Olive/1L/LIfestyle/Lifestyle 2.jpg,lifestyle,jivo-so-olive-oil-1l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,35,JVW-FPS-1L,1,JIVO/Oil's/First Pressed Sunflower Oil/1L/1L First Pressed Sunflower Oil front.jpg,front,jivo-first-pressed-sunflower-oil-1l/01-1l-first-pressed-sunflower-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,35,JVW-FPS-1L,2,JIVO/Oil's/First Pressed Sunflower Oil/1L/1L First Pressed Sunflower Oil Back.jpg,back,jivo-first-pressed-sunflower-oil-1l/02-1l-first-pressed-sunflower-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,35,JVW-FPS-1L,3,JIVO/Oil's/First Pressed Sunflower Oil/1L/Lifestyle/Artboard 5.jpg,lifestyle,jivo-first-pressed-sunflower-oil-1l/03-artboard-5.jpg
+Template-EDIBLE_OIL_VEGETABLE,35,JVW-FPS-1L,4,JIVO/Oil's/First Pressed Sunflower Oil/1L/Lifestyle/Artboard 6.jpg,lifestyle,jivo-first-pressed-sunflower-oil-1l/04-artboard-6.jpg
+Template-EDIBLE_OIL_VEGETABLE,37,JVW-SOL-5L,1,JIVO/Oil's/So Olive/5L/5L So Olive Front.jpg,front,jivo-so-olive-oil-5l/01-5l-so-olive-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,37,JVW-SOL-5L,2,JIVO/Oil's/So Olive/5L/5L So Olive Back.jpg,back,jivo-so-olive-oil-5l/02-5l-so-olive-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,37,JVW-SOL-5L,3,JIVO/Oil's/So Olive/5L/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-so-olive-oil-5l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,37,JVW-SOL-5L,4,JIVO/Oil's/So Olive/5L/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-so-olive-oil-5l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,38,SNO-POM-1L,1,SANO/Oil's/Pomace Olive Oil/1L/1L Sano pomace Front.jpg,front,sano-pomace-olive-oil-1l/01-1l-sano-pomace-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,38,SNO-POM-1L,2,SANO/Oil's/Pomace Olive Oil/1L/1L Sano pomace Back.jpg,back,sano-pomace-olive-oil-1l/02-1l-sano-pomace-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,38,SNO-POM-1L,3,SANO/Oil's/Pomace Olive Oil/1L/Lifestyle/Lifestyle 1.jpg,lifestyle,sano-pomace-olive-oil-1l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,38,SNO-POM-1L,4,SANO/Oil's/Pomace Olive Oil/1L/Lifestyle/Lifestyle 2.jpg,lifestyle,sano-pomace-olive-oil-1l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,41,SNO-POM-5L,1,SANO/Oil's/Pomace Olive Oil/5L/5L Sano Pomace Olive Oil Front.jpg,front,sano-pomace-olive-oil-5l/01-5l-sano-pomace-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,41,SNO-POM-5L,2,SANO/Oil's/Pomace Olive Oil/5L/5L Sano Pomace Olive Oil Side 1.jpg,side,sano-pomace-olive-oil-5l/02-5l-sano-pomace-olive-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,41,SNO-POM-5L,3,SANO/Oil's/Pomace Olive Oil/5L/5L Sano Pomace Olive Oil Side.jpg,side,sano-pomace-olive-oil-5l/03-5l-sano-pomace-olive-oil-side.jpg
+Template-EDIBLE_OIL_VEGETABLE,41,SNO-POM-5L,4,SANO/Oil's/Pomace Olive Oil/5L/Lifestyle/Lifestyle 1.jpg,lifestyle,sano-pomace-olive-oil-5l/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,41,SNO-POM-5L,5,SANO/Oil's/Pomace Olive Oil/5L/Lifestyle/Lifestyle 2.jpg,lifestyle,sano-pomace-olive-oil-5l/05-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,42,JVW-EVO-1L,1,JIVO/Oil's/Extra Virgin Olive Oil/1L/1L Extra Virgin Olive Oil Front.jpg,front,jivo-extra-virgin-olive-oil-1l/01-1l-extra-virgin-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,42,JVW-EVO-1L,2,JIVO/Oil's/Extra Virgin Olive Oil/1L/1L Extra Virgin Olive Oil Back.jpg,back,jivo-extra-virgin-olive-oil-1l/02-1l-extra-virgin-olive-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,42,JVW-EVO-1L,3,JIVO/Oil's/Extra Virgin Olive Oil/1L/Lifestyle/Lifestyle 1.png,lifestyle,jivo-extra-virgin-olive-oil-1l/03-lifestyle-1.png
+Template-EDIBLE_OIL_VEGETABLE,42,JVW-EVO-1L,4,JIVO/Oil's/Extra Virgin Olive Oil/1L/Lifestyle/Lifestyle 2.png,lifestyle,jivo-extra-virgin-olive-oil-1l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,44,JVW-XLO-2L,1,JIVO/Oil's/Extra Light Olive Oil/2L/2L Extra Light Olive Oil Front.jpg,front,jivo-extra-light-olive-oil-2l/01-2l-extra-light-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,44,JVW-XLO-2L,2,JIVO/Oil's/Extra Light Olive Oil/2L/2L Extra Light Olive Oil BAck.jpg,back,jivo-extra-light-olive-oil-2l/02-2l-extra-light-olive-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,44,JVW-XLO-2L,3,JIVO/Oil's/Extra Light Olive Oil/2L/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-extra-light-olive-oil-2l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,44,JVW-XLO-2L,4,JIVO/Oil's/Extra Light Olive Oil/2L/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-extra-light-olive-oil-2l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,45,JVW-YMU-5L,1,JIVO/Oil's/Yellow Mustard/5L/5L Yellow Mustard Tin Front.jpg,front,jivo-first-pressed-yellow-mustard-oil-5l/01-5l-yellow-mustard-tin-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,45,JVW-YMU-5L,2,JIVO/Oil's/Yellow Mustard/5L/Side 1.jpg,side,jivo-first-pressed-yellow-mustard-oil-5l/02-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,45,JVW-YMU-5L,3,JIVO/Oil's/Yellow Mustard/5L/Side 2.jpg,side,jivo-first-pressed-yellow-mustard-oil-5l/03-side-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,45,JVW-YMU-5L,4,JIVO/Oil's/Yellow Mustard/5L/Lifestyle/Artboard 5.jpg,lifestyle,jivo-first-pressed-yellow-mustard-oil-5l/04-artboard-5.jpg
+Template-EDIBLE_OIL_VEGETABLE,45,JVW-YMU-5L,5,JIVO/Oil's/Yellow Mustard/5L/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-first-pressed-yellow-mustard-oil-5l/05-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,60,SNO-CAN-5L,1,SANO/Oil's/Canola Oil/5L/5L Sano Canola Front.jpg,front,sano-canola-oil-5l/01-5l-sano-canola-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,60,SNO-CAN-5L,2,SANO/Oil's/Canola Oil/5L/5L Sano Canola BAck.jpg,back,sano-canola-oil-5l/02-5l-sano-canola-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,60,SNO-CAN-5L,3,SANO/Oil's/Canola Oil/5L/Lifestyle/Lifestyle 1.jpg,lifestyle,sano-canola-oil-5l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,60,SNO-CAN-5L,4,SANO/Oil's/Canola Oil/5L/Lifestyle/Lifestyle 2.jpg,lifestyle,sano-canola-oil-5l/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,61,JVW-EVO-5L,1,JIVO/Oil's/Extra Virgin Olive Oil/5L/5L Extra Virgin Olive Oil Front.jpg,front,jivo-extra-virgin-olive-oil-5l/01-5l-extra-virgin-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,61,JVW-EVO-5L,2,JIVO/Oil's/Extra Virgin Olive Oil/5L/5L Extra Virgin Olive Oil Side 1.jpg,side,jivo-extra-virgin-olive-oil-5l/02-5l-extra-virgin-olive-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,61,JVW-EVO-5L,3,JIVO/Oil's/Extra Virgin Olive Oil/5L/5L Extra Virgin Olive Oil Side 2.jpg,side,jivo-extra-virgin-olive-oil-5l/03-5l-extra-virgin-olive-oil-side-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,61,JVW-EVO-5L,4,JIVO/Oil's/Extra Virgin Olive Oil/5L/Lifestyle/Lifestyle 1.png,lifestyle,jivo-extra-virgin-olive-oil-5l/04-lifestyle-1.png
+Template-EDIBLE_OIL_VEGETABLE,61,JVW-EVO-5L,5,JIVO/Oil's/Extra Virgin Olive Oil/5L/Lifestyle/Lifestyle 2.png,lifestyle,jivo-extra-virgin-olive-oil-5l/05-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,62,JVW-KGM-3L,1,JIVO/Oil's/Mustard Oil/3L/3L Mustard Front.jpg,front,jivo-kachi-ghani-mustard-oil-3l/01-3l-mustard-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,62,JVW-KGM-3L,2,JIVO/Oil's/Mustard Oil/3L/3L Mustard Back.jpg,back,jivo-kachi-ghani-mustard-oil-3l/02-3l-mustard-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,62,JVW-KGM-3L,3,JIVO/Oil's/Mustard Oil/3L/LIfestyle/3L Table Image.jpg,lifestyle,jivo-kachi-ghani-mustard-oil-3l/03-3l-table-image.jpg
+Template-EDIBLE_OIL_VEGETABLE,62,JVW-KGM-3L,4,JIVO/Oil's/Mustard Oil/3L/LIfestyle/Lifestyle 1.jpg,lifestyle,jivo-kachi-ghani-mustard-oil-3l/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,67,JVW-COC-200,1,JIVO/Oil's/Coconut oil/200ML/200ML Coconut Oil Front.jpg,front,jivo-extra-virgin-coconut-oil-200/01-200ml-coconut-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,67,JVW-COC-200,2,JIVO/Oil's/Coconut oil/200ML/200ML Coconut Oil Back.jpg,back,jivo-extra-virgin-coconut-oil-200/02-200ml-coconut-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,67,JVW-COC-200,3,JIVO/Oil's/Coconut oil/200ML/Lifestyle/Artboard 1.jpg,lifestyle,jivo-extra-virgin-coconut-oil-200/03-artboard-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,67,JVW-COC-200,4,JIVO/Oil's/Coconut oil/200ML/Lifestyle/Artboard 2.jpg,lifestyle,jivo-extra-virgin-coconut-oil-200/04-artboard-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,70,JVW-CAN-4L,1,JIVO/Oil's/Canola Oil/4L/4L Canola Oil Front.jpg,front,jivo-cold-press-canola-oil-4l/01-4l-canola-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,70,JVW-CAN-4L,2,JIVO/Oil's/Canola Oil/4L/4L Canola Oil 2026 BAck.jpg,back,jivo-cold-press-canola-oil-4l/02-4l-canola-oil-2026-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,70,JVW-CAN-4L,3,JIVO/Oil's/Canola Oil/4L/Lifestyle/4L Canola Table.jpg,lifestyle,jivo-cold-press-canola-oil-4l/03-4l-canola-table.jpg
+Template-EDIBLE_OIL_VEGETABLE,70,JVW-CAN-4L,4,JIVO/Oil's/Canola Oil/4L/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-cold-press-canola-oil-4l/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,72,JVW-EVO-3L,1,JIVO/Oil's/Extra Virgin Olive Oil/3L/3L Extra Virgin Olive Oil Front.jpg,front,jivo-extra-virgin-olive-oil-3l/01-3l-extra-virgin-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,72,JVW-EVO-3L,2,JIVO/Oil's/Extra Virgin Olive Oil/3L/3L Extra Virgin Olive Oil Side 1.jpg,side,jivo-extra-virgin-olive-oil-3l/02-3l-extra-virgin-olive-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,72,JVW-EVO-3L,3,JIVO/Oil's/Extra Virgin Olive Oil/3L/3L Extra Virgin Olive Oil Side 2.jpg,side,jivo-extra-virgin-olive-oil-3l/03-3l-extra-virgin-olive-oil-side-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,72,JVW-EVO-3L,4,JIVO/Oil's/Extra Virgin Olive Oil/3L/Lifestyle/Lifestyle 1.png,lifestyle,jivo-extra-virgin-olive-oil-3l/04-lifestyle-1.png
+Template-EDIBLE_OIL_VEGETABLE,72,JVW-EVO-3L,5,JIVO/Oil's/Extra Virgin Olive Oil/3L/Lifestyle/Lifestyle 2.png,lifestyle,jivo-extra-virgin-olive-oil-3l/05-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,74,JVW-EVO-250,1,JIVO/Oil's/Extra Virgin Olive Oil/250ml/250ml Extra virgin Olive oil Front.jpg,front,jivo-extra-virgin-olive-oil-250/01-250ml-extra-virgin-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,74,JVW-EVO-250,2,JIVO/Oil's/Extra Virgin Olive Oil/250ml/250ml Extra virgin Olive oil Back.jpg,back,jivo-extra-virgin-olive-oil-250/02-250ml-extra-virgin-olive-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,74,JVW-EVO-250,3,JIVO/Oil's/Extra Virgin Olive Oil/250ml/Lifestyle/Lifestyle 1.png,lifestyle,jivo-extra-virgin-olive-oil-250/03-lifestyle-1.png
+Template-EDIBLE_OIL_VEGETABLE,74,JVW-EVO-250,4,JIVO/Oil's/Extra Virgin Olive Oil/250ml/Lifestyle/Lifestyle 2.png,lifestyle,jivo-extra-virgin-olive-oil-250/04-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,76,JVW-RBO-4L,1,JIVO/Oil's/Rice Bran Oil/4L/4L Rice Bran Oil Front.jpg,front,jivo-rice-bran-oil-4l/01-4l-rice-bran-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,76,JVW-RBO-4L,2,JIVO/Oil's/Rice Bran Oil/4L/4L Rice Bran Oil Back.jpg,back,jivo-rice-bran-oil-4l/02-4l-rice-bran-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,76,JVW-RBO-4L,3,JIVO/Oil's/Rice Bran Oil/4L/Lifestyle/Artboard 1.jpg,lifestyle,jivo-rice-bran-oil-4l/03-artboard-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,76,JVW-RBO-4L,4,JIVO/Oil's/Rice Bran Oil/4L/Lifestyle/Artboard 2.jpg,lifestyle,jivo-rice-bran-oil-4l/04-artboard-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,78,JVW-SUN-3L,1,JIVO/Oil's/Sunflower Oil/3L/3L Sunflower Oil Front.jpg,front,jivo-cold-press-sunflower-oil-3l/01-3l-sunflower-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,78,JVW-SUN-3L,2,JIVO/Oil's/Sunflower Oil/3L/3L Sunflower Oil Back.jpg,back,jivo-cold-press-sunflower-oil-3l/02-3l-sunflower-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,78,JVW-SUN-3L,3,JIVO/Oil's/Sunflower Oil/3L/Lifestyle/Artboard 1.jpg,lifestyle,jivo-cold-press-sunflower-oil-3l/03-artboard-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,78,JVW-SUN-3L,4,JIVO/Oil's/Sunflower Oil/3L/Lifestyle/Artboard 2.jpg,lifestyle,jivo-cold-press-sunflower-oil-3l/04-artboard-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,149,SNO-EVO-1L,1,SANO/Oil's/Extra  Virgin Olive Oil/Sano 1L Extra Virgin Olive Oil Front.jpg,front,sano-extra-virgin-olive-oil-1l/01-sano-1l-extra-virgin-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,149,SNO-EVO-1L,2,SANO/Oil's/Extra  Virgin Olive Oil/Sano 1L Extra Virgin Olive Oil Back.jpg,back,sano-extra-virgin-olive-oil-1l/02-sano-1l-extra-virgin-olive-oil-back.jpg
+Template-EDIBLE_OIL_VEGETABLE,149,SNO-EVO-1L,3,SANO/Oil's/Extra  Virgin Olive Oil/Lifestyle/Artboard 1.jpg,lifestyle,sano-extra-virgin-olive-oil-1l/03-artboard-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,149,SNO-EVO-1L,4,SANO/Oil's/Extra  Virgin Olive Oil/Lifestyle/Artboard 2.jpg,lifestyle,sano-extra-virgin-olive-oil-1l/04-artboard-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,152,JVW-PRO-500,1,JIVO/Oil's/Premum Olive Oil/500ML/500ML Premium Olive Oil front.jpg,front,jivo-premium-olive-oil-500/01-500ml-premium-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,152,JVW-PRO-500,2,JIVO/Oil's/Premum Olive Oil/500ML/500ML Premium Olive Oil side 1.jpg,side,jivo-premium-olive-oil-500/02-500ml-premium-olive-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,152,JVW-PRO-500,3,JIVO/Oil's/Premum Olive Oil/500ML/500ML Premium Olive Oil side.jpg,side,jivo-premium-olive-oil-500/03-500ml-premium-olive-oil-side.jpg
+Template-EDIBLE_OIL_VEGETABLE,152,JVW-PRO-500,4,JIVO/Oil's/Premum Olive Oil/500ML/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-premium-olive-oil-500/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,152,JVW-PRO-500,5,JIVO/Oil's/Premum Olive Oil/500ML/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-premium-olive-oil-500/05-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,153,JVW-PRO-200,1,JIVO/Oil's/Premum Olive Oil/200ML/200ML Premium Olive Oil front.jpg,front,jivo-premium-olive-oil-200/01-200ml-premium-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,153,JVW-PRO-200,2,JIVO/Oil's/Premum Olive Oil/200ML/200ML Premium Olive Oil Side 1.jpg,side,jivo-premium-olive-oil-200/02-200ml-premium-olive-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,153,JVW-PRO-200,3,JIVO/Oil's/Premum Olive Oil/200ML/200ML Premium Olive Oil Side 2.jpg,side,jivo-premium-olive-oil-200/03-200ml-premium-olive-oil-side-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,153,JVW-PRO-200,4,JIVO/Oil's/Premum Olive Oil/200ML/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-premium-olive-oil-200/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,153,JVW-PRO-200,5,JIVO/Oil's/Premum Olive Oil/200ML/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-premium-olive-oil-200/05-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,154,JVW-PRO-1L,1,JIVO/Oil's/Premum Olive Oil/1L/1L Premium Olive Oil front.jpg,front,jivo-premium-olive-oil-1l/01-1l-premium-olive-oil-front.jpg
+Template-EDIBLE_OIL_VEGETABLE,154,JVW-PRO-1L,2,JIVO/Oil's/Premum Olive Oil/1L/1L Premium Olive Oil Side 1.jpg,side,jivo-premium-olive-oil-1l/02-1l-premium-olive-oil-side-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,154,JVW-PRO-1L,3,JIVO/Oil's/Premum Olive Oil/1L/1L Premium Olive Oil Side 2.jpg,side,jivo-premium-olive-oil-1l/03-1l-premium-olive-oil-side-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,154,JVW-PRO-1L,4,JIVO/Oil's/Premum Olive Oil/1L/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-premium-olive-oil-1l/04-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,154,JVW-PRO-1L,5,JIVO/Oil's/Premum Olive Oil/1L/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-premium-olive-oil-1l/05-lifestyle-2.jpg
+Template-EDIBLE_OIL_VEGETABLE,164,JVW-GNT-2L,1,JIVO/Oil's/GroundNut Oil/2L/2L GroundNut Front.png,front,jivo-cold-press-groundnut-oil-2l/01-2l-groundnut-front.png
+Template-EDIBLE_OIL_VEGETABLE,164,JVW-GNT-2L,2,JIVO/Oil's/GroundNut Oil/2L/2L GroundNut Back.png,back,jivo-cold-press-groundnut-oil-2l/02-2l-groundnut-back.png
+Template-EDIBLE_OIL_VEGETABLE,164,JVW-GNT-2L,3,JIVO/Oil's/GroundNut Oil/2L/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-cold-press-groundnut-oil-2l/03-lifestyle-1.jpg
+Template-EDIBLE_OIL_VEGETABLE,164,JVW-GNT-2L,4,JIVO/Oil's/GroundNut Oil/2L/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-cold-press-groundnut-oil-2l/04-lifestyle-2.jpg
+Template-COFFEE,7,JVW-KOF-100G,1,JIVO/Foods/Coffee/100gm/100g Koffie Mockup front.jpg,front,jivo-koffie-instant-coffee-100g/01-100g-koffie-mockup-front.jpg
+Template-COFFEE,7,JVW-KOF-100G,2,JIVO/Foods/Coffee/100gm/100g Koffie Mockup Side 1.jpg,side,jivo-koffie-instant-coffee-100g/02-100g-koffie-mockup-side-1.jpg
+Template-COFFEE,7,JVW-KOF-100G,3,JIVO/Foods/Coffee/100gm/100g Koffie Mockup Side.jpg,side,jivo-koffie-instant-coffee-100g/03-100g-koffie-mockup-side.jpg
+Template-COFFEE,7,JVW-KOF-100G,4,JIVO/Foods/Coffee/100gm/Lifestyle/Artboard 1.jpg,lifestyle,jivo-koffie-instant-coffee-100g/04-artboard-1.jpg
+Template-COFFEE,7,JVW-KOF-100G,5,JIVO/Foods/Coffee/100gm/Lifestyle/Artboard 2.jpg,lifestyle,jivo-koffie-instant-coffee-100g/05-artboard-2.jpg
+Template-DAIRY_BASED_BUTTER,7,JVW-A2G-500,1,JIVO/Foods/Ghee/A2/500ml/A2 Ghee New 500ml Front.jpg,front,jivo-a2-cow-ghee-500/01-a2-ghee-new-500ml-front.jpg
+Template-DAIRY_BASED_BUTTER,7,JVW-A2G-500,2,JIVO/Foods/Ghee/A2/500ml/Nutrition Facts.jpg,label,jivo-a2-cow-ghee-500/02-nutrition-facts.jpg
+Template-DAIRY_BASED_BUTTER,7,JVW-A2G-500,3,JIVO/Foods/Ghee/A2/500ml/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-a2-cow-ghee-500/03-lifestyle-1.jpg
+Template-DAIRY_BASED_BUTTER,7,JVW-A2G-500,4,JIVO/Foods/Ghee/A2/500ml/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-a2-cow-ghee-500/04-lifestyle-2.jpg
+Template-DAIRY_BASED_BUTTER,8,JVW-A2G-1L,1,JIVO/Foods/Ghee/A2/1L/A2 Ghee New Front.jpg,front,jivo-a2-cow-ghee-1l/01-a2-ghee-new-front.jpg
+Template-DAIRY_BASED_BUTTER,8,JVW-A2G-1L,2,JIVO/Foods/Ghee/A2/1L/Nutrition Facts.jpg,label,jivo-a2-cow-ghee-1l/02-nutrition-facts.jpg
+Template-DAIRY_BASED_BUTTER,8,JVW-A2G-1L,3,JIVO/Foods/Ghee/A2/1L/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-a2-cow-ghee-1l/03-lifestyle-1.jpg
+Template-DAIRY_BASED_BUTTER,8,JVW-A2G-1L,4,JIVO/Foods/Ghee/A2/1L/Lifestyle/Lifestyle 2.jpg,lifestyle,jivo-a2-cow-ghee-1l/04-lifestyle-2.jpg
+Template-DAIRY_BASED_BUTTER,10,JVW-DSG-500,1,JIVO/Foods/Ghee/Desi Ghee/500ml/Kripa Ghee 500ml front.jpg,front,jivo-desi-ghee-500/01-kripa-ghee-500ml-front.jpg
+Template-DAIRY_BASED_BUTTER,10,JVW-DSG-500,2,JIVO/Foods/Ghee/Desi Ghee/500ml/Kripa Ghee 500ml Back.jpg,back,jivo-desi-ghee-500/02-kripa-ghee-500ml-back.jpg
+Template-DAIRY_BASED_BUTTER,10,JVW-DSG-500,3,JIVO/Foods/Ghee/Desi Ghee/500ml/Nutrition Facts.jpg,label,jivo-desi-ghee-500/03-nutrition-facts.jpg
+Template-DAIRY_BASED_BUTTER,10,JVW-DSG-500,4,JIVO/Foods/Ghee/Desi Ghee/Lifestyle/Artboard 1.jpg,lifestyle,jivo-desi-ghee-500/04-artboard-1.jpg
+Template-DAIRY_BASED_BUTTER,10,JVW-DSG-500,5,JIVO/Foods/Ghee/Desi Ghee/Lifestyle/Artboard 2.jpg,lifestyle,jivo-desi-ghee-500/05-artboard-2.jpg
+Template-JUICE_AND_JUICE_DRINK,8,JVW-WGG-200,1,JIVO/Beverages/Wheatgrass/Zero Sugar/Gingre ale 200ml/gigre ale front.png.png,front,jivo-wheatgrass-juice-ginger-ale-200/01-gigre-ale-front.png.jpg
+Template-JUICE_AND_JUICE_DRINK,8,JVW-WGG-200,2,JIVO/Beverages/Wheatgrass/Zero Sugar/Gingre ale 200ml/gigre ale Back.png,back,jivo-wheatgrass-juice-ginger-ale-200/02-gigre-ale-back.jpg
+Template-JUICE_AND_JUICE_DRINK,8,JVW-WGG-200,3,JIVO/Beverages/Wheatgrass/Zero Sugar/Gingre ale 200ml/4.png,label,jivo-wheatgrass-juice-ginger-ale-200/03-4.jpg
+Template-JUICE_AND_JUICE_DRINK,9,JVW-WGM-500,1,JIVO/Beverages/Wheatgrass/Mango 500ML/Front.jpg,front,jivo-wheatgrass-juice-mango-500/01-front.jpg
+Template-JUICE_AND_JUICE_DRINK,9,JVW-WGM-500,2,JIVO/Beverages/Wheatgrass/Mango 500ML/Back.jpg,back,jivo-wheatgrass-juice-mango-500/02-back.jpg
+Template-JUICE_AND_JUICE_DRINK,9,JVW-WGM-500,3,JIVO/Beverages/Wheatgrass/Mango 500ML/Side.jpg,side,jivo-wheatgrass-juice-mango-500/03-side.jpg
+Template-JUICE_AND_JUICE_DRINK,9,JVW-WGM-500,4,JIVO/Beverages/Wheatgrass/Mango 500ML/Lifestyle/Artboard 1.jpg,lifestyle,jivo-wheatgrass-juice-mango-500/04-artboard-1.jpg
+Template-JUICE_AND_JUICE_DRINK,9,JVW-WGM-500,5,JIVO/Beverages/Wheatgrass/Mango 500ML/Lifestyle/Lifestyle 1.jpg,lifestyle,jivo-wheatgrass-juice-mango-500/05-lifestyle-1.jpg
