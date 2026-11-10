@@ -12,6 +12,7 @@ is invalid, so it never gets a profile. C (R1) and D (R2) are the QA riders.
 from __future__ import annotations
 
 from datetime import date, timedelta
+import os
 from pathlib import Path
 
 import httpx
@@ -69,10 +70,15 @@ def years_ago(n: int, d: date) -> date:
         return d.replace(year=d.year - n, day=28)
 
 
+# Stage 3 (2026-11-10): the PENDING_KYC flow cases can target a fresh QA rider instead of R1/R2,
+# which are ACTIVE after the first run. Opt-in; the defaults keep the original R1/R2 design.
+KYC_PHONE = os.environ.get("QA_P5_KYC_PHONE") or R1_PHONE
+KYC2_PHONE = os.environ.get("QA_P5_KYC2_PHONE") or R2_PHONE
+
 @pytest.fixture
 def r1p(api):
     """R1 still PENDING_KYC (first run only; afterwards the review fixtures activate R1)."""
-    rider = RiderClient(api, R1_PHONE)
+    rider = RiderClient(api, KYC_PHONE)
     me = rider.me()
     if me.status_code != 200 or me.json()["status"] not in ("PENDING_KYC", "REJECTED"):
         pytest.skip("R1 is no longer PENDING_KYC (approved by an earlier run)")
@@ -97,7 +103,7 @@ def spare(api):
 def test_p5_tc01_register_and_stores(api):
     """P5-TC-01 🔥 stores list (active only); register R1 → 201 PENDING_KYC, home_store null,
     required documents for a SCOOTER, strict schema. If R1 already exists, the profile is read."""
-    rider = RiderClient(api, R1_PHONE)
+    rider = RiderClient(api, KYC_PHONE)
     stores = rider.get("stores/")
     validate_response(stores, "rider_stores_list")
     ids = {s["id"] for s in (stores.json() if isinstance(stores.json(), list) else stores.json()["results"])}
@@ -186,7 +192,7 @@ def test_p5_tc04_upload_strips_exif(r1p):
     r = r1.upload("PHOTO", EXIF_JPEG, name="me.jpg", mime="image/jpeg")
     validate_response(r, "rider_documents_create")
     assert r.status_code == 201 and r.json()["status"] == "PENDING", describe(r)
-    out = rider_op(op="document_url", **{"as": SUPER}, phone=R1_PHONE, doc_type="PHOTO")
+    out = rider_op(op="document_url", **{"as": SUPER}, phone=KYC_PHONE, doc_type="PHOTO")
     assert out["ok"], out
     url = out["result"]["url"]
     assert "X-Amz-Signature" in url or "Signature" in url, "KYC link must be signed"
@@ -227,7 +233,7 @@ def test_p5_tc05_upload_rejections(r1p, label, case):
 def test_p5_tc05_three_mb_body(r1p):
     """P5-TC-05 a 3 MB body → 413 PAYLOAD_TOO_LARGE or 400, never 500."""
     clear_throttle("rider_documents")
-    r = r1.upload("PHOTO", b"\xff\xd8" + b"\x00" * 3_000_000, name="big.jpg", mime="image/jpeg")
+    r = r1p.upload("PHOTO", b"\xff\xd8" + b"\x00" * 3_000_000, name="big.jpg", mime="image/jpeg")
     assert r.status_code in (400, 413), describe(r)
 
 
@@ -256,7 +262,7 @@ def test_p5_tc06_document_number_formats(r1p, doc_type, number):
 
 def test_p5_tc08_vehicle_change_changes_required_documents(api):
     """P5-TC-08 BICYCLE → base docs; MOTORBIKE (with number) → + DL, RC. On R1 while PENDING_KYC."""
-    rider = RiderClient(api, R1_PHONE)
+    rider = RiderClient(api, KYC_PHONE)
     me = rider.me()
     if me.status_code != 200 or me.json()["status"] not in ("PENDING_KYC", "REJECTED"):
         pytest.skip("R1 not editable (already approved)")
@@ -376,8 +382,8 @@ def test_p5_tc11_rider_cannot_patch_privileged_fields(r1):
 def test_p5_tc13_reject_and_resubmit(api):
     """P5-TC-13 OPS rejects R2 (PENDING_KYC) with a reason (empty reason refused); R2 sees it;
     R2 re-uploads a rejected document and goes back to PENDING_KYC by itself (#9)."""
-    reset_rider(R2_PHONE) if _rider_exists(R2_PHONE) else None
-    rider = RiderClient(api, R2_PHONE)
+    reset_rider(KYC2_PHONE) if _rider_exists(KYC2_PHONE) else None
+    rider = RiderClient(api, KYC2_PHONE)
     if rider.me().status_code == 403:
         clear_throttle("rider_profile_write")
         assert rider.register().status_code == 201
@@ -389,11 +395,11 @@ def test_p5_tc13_reject_and_resubmit(api):
         assert rider.upload(doc).status_code == 201
     if not me["bank_account"]:
         assert rider.bank().status_code == 200
-    out = rider_op(op="reject_rider", **{"as": OPS}, phone=R2_PHONE, reason="")
+    out = rider_op(op="reject_rider", **{"as": OPS}, phone=KYC2_PHONE, reason="")
     assert not out["ok"], out
-    out = rider_ops({"op": "reject_document", "as": OPS, "phone": R2_PHONE, "doc_type": "PAN",
+    out = rider_ops({"op": "reject_document", "as": OPS, "phone": KYC2_PHONE, "doc_type": "PAN",
                      "note": "QA blurry"},
-                    {"op": "reject_rider", "as": OPS, "phone": R2_PHONE, "reason": "QA: PAN unreadable"})
+                    {"op": "reject_rider", "as": OPS, "phone": KYC2_PHONE, "reason": "QA: PAN unreadable"})
     assert all(o["ok"] for o in out), out
     me = rider.me().json()
     assert me["status"] == "REJECTED" and me["rejection_reason"] == "QA: PAN unreadable"

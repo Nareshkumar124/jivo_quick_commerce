@@ -74,9 +74,9 @@ case "$cmd" in
     log="$LOG_DIR/instance-$profile-$(date +%Y%m%d-%H%M%S).log"
 
     env_vars=(
-      "REDIS_URL=redis://localhost:6380/5"
-      "CHANNELS_REDIS_URL=redis://localhost:6380/6"
-      "CELERY_BROKER_URL=redis://localhost:6380/7"
+      "REDIS_URL=redis://127.0.0.1:6380/5"
+      "CHANNELS_REDIS_URL=redis://127.0.0.1:6380/6"
+      "CELERY_BROKER_URL=redis://127.0.0.1:6380/7"
       "OTP_TEST_NUMBERS=$QA_OTP_NUMBERS"
       "DJANGO_SETTINGS_MODULE=config.settings.local"
       "PYTHONUNBUFFERED=1"

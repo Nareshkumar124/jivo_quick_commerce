@@ -295,6 +295,8 @@ def test_p6_tc11_tc30_tc31_live_status_and_ops_scope(qa_worker, p5_shop_a):  # n
     for m in mine:
         assert_shape(m)
         assert m["data"]["store_id"] == QA02_ID
+        if m["type"] not in ("order.created", "order.status"):
+            continue  # T-612 adds task.status to the ops feed; its keys are P6-TC-34's oracle
         keys = CREATED_KEYS if m["type"] == "order.created" else STATUS_KEYS
         assert set(m["data"]) == keys, m["data"]
     leak = [m for m in sm_msgs + ss_msgs if m.get("data", {}).get("store_id") == QA02_ID
@@ -594,7 +596,7 @@ def test_p6_tc40_page_cap_and_links(a):
     rows = r.json()["results"]
     assert len(rows) <= 100
     for x in rows:
-        assert x["link"] is None or re.fullmatch(r"jivo://orders/\d+(/detail)?", x["link"]), x["link"]
+        assert x["link"] is None or re.fullmatch(r"jivo://orders/\d+(/detail|/rate)?", x["link"]), x["link"]  # /rate: api-requests #55 (P7)
 
 
 # =========================================================================== notifications

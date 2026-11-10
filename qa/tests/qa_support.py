@@ -65,7 +65,7 @@ BASE_URL = os.environ.get("QA_BASE_URL", "http://127.0.0.1:8004")
 if urlsplit(BASE_URL).port == 8001:
     raise SystemExit("Refusing to run against 8001 (the shared dev server). Use the QA instance.")
 
-QA_REDIS_URL = os.environ.get("QA_REDIS_URL", "redis://localhost:6380/5")
+QA_REDIS_URL = os.environ.get("QA_REDIS_URL", "redis://127.0.0.1:6380/5")
 
 # QA fixed-OTP numbers (role definition). Never +919000000001..003 (user / other agents).
 TEST_OTP = "123456"

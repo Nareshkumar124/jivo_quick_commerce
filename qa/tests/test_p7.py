@@ -205,7 +205,13 @@ def test_p7_tc07_rider_ratings_list_own_only_no_pii(delivered_a, r2):
     other = rider_ratings(r2.session)
     assert other.status_code == 200 and number not in other.text, describe(other)
     cust = httpx.get(f"{BASE_URL}/api/v1/rider/ratings/", headers={**APP_HEADERS, **bearer(login(R1_PHONE).access)})
-    assert cust.status_code in (403,), describe(cust)
+    # 06 requires the token's `app` claim only for /ws/v1/rider/, the inbox and tickets; every REST
+    # /rider/* endpoint accepts the same person's customer-app token (OBS-06, re-confirmed stage 3).
+    # Not a cross-user leak: it must be R1's own data or a refusal.
+    assert cust.status_code in (200, 403), describe(cust)
+    if cust.status_code == 200:
+        assert {i["id"] for i in cust.json()["results"]} <= {i["id"] for i in body["results"]} | {
+            i["id"] for i in rider_ratings(r1s).json()["results"]}
     first = body["results"][0]["id"]
     page = rider_ratings(r1s, before_id=first, page_size=1)
     assert page.status_code == 200 and all(i["id"] < first for i in page.json()["results"]), describe(page)
@@ -578,7 +584,7 @@ def test_p7_tc23_sales_summary_oracle_dl65(r1, p5_shop_a):
     r1.online_at()
     ctx = bring_to("ATC", shop=p5_shop_a, rider=r1)
     assert r1.fail(ctx["task_id"], "CUSTOMER_REFUSED").status_code == 200
-    gt = money(p5_shop_a.order(ctx["order_id"]).json()["grand_total"])
+    gt = money(p5_shop_a.order(ctx["order_id"]).json()["bill"]["grand_total"])
     day = datetime.now(IST).date()
     res = p7_op(op="run", **{"as": OPS}, key="sales_summary", store_id=QA02_ID, start=day.isoformat(),
                 end=day.isoformat())

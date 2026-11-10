@@ -21,9 +21,9 @@ import sys
 sys.path.insert(0, os.getcwd())
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
 for k, v in {
-    "REDIS_URL": "redis://localhost:6380/5",
-    "CHANNELS_REDIS_URL": "redis://localhost:6380/6",
-    "CELERY_BROKER_URL": "redis://localhost:6380/7",
+    "REDIS_URL": "redis://127.0.0.1:6380/5",
+    "CHANNELS_REDIS_URL": "redis://127.0.0.1:6380/6",
+    "CELERY_BROKER_URL": "redis://127.0.0.1:6380/7",
 }.items():
     if os.environ.get(k) != v:
         sys.exit(f"refusing to run: {k} must be the QA Redis DB")

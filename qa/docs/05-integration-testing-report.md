@@ -57,3 +57,15 @@
 | Refunds admin action + one-time token → `retry_refund` → worker | ✅ | TC-34c |
 | PLACED event → `schedule_acceptance` → `auto_accept_order` (QA worker) on QA-02 | ✅ | TC-36 |
 | Accepting switch → `set_accepting_orders` → serviceability | ✅ | TC-39 (QA-02) |
+
+## QA stage 3 (2026-11-10, `efb3c3d`)
+| Integration | Result | Evidence |
+|---|---|---|
+| Delivery services → `apps.delivery.hooks` → realtime (rider socket offer/task/cash) | ✅ | P6-TC-21–26 |
+| `apps.delivery.live` observer → ops `task.status`, `rider.status`, `order.eta` | ✅ | P6-TC-34, TC-15 |
+| T9 pickup → order event → `order.status` on order socket / ops feed | ❌ | BUG-0021 (P6-TC-59) |
+| Location ingest → `rider.location` (customer gate, ops map) | ✅ except `heading` | BUG-0022 (P6-TC-14) |
+| Inbox entry → `notification.new` + unread count | ✅ | P6-TC-58 |
+| Ratings → `Rider.rating_avg`; reports / dashboard ↔ SQL | ✅ | P7-TC-01–08, 23, 31 |
+| QR webhook / `fake_cod_qr_payment` → CodQr PAID → deliver UPI, no ledger row | ✅ | P5-TC-89, 90, 91 |
+| Rider document upload → MinIO (private, signed links) | ✅ (with MinIO up); with MinIO down the upload hangs to the client timeout (OBS-S3-03) | P5-TC-04, 14, 20 |

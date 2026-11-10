@@ -109,19 +109,22 @@ def test_p6_tc14_tc15_tc16_location_gate_eta_and_scope(r1, p5_shop_a, p5_shop_b)
     order gets nothing); P6-TC-16 none while the task is only OFFERED and none after DELIVERED
     (06 §4.2 tracking gate = ASSIGNED..AT_CUSTOMER); P6-TC-15 order.eta while OUT_FOR_DELIVERY
     = ceil(km × 1.3 / 20 × 60 + 2) from the ping, at most one per 30 s from pings."""
-    b_order = p5_shop_b.place_cod()
     r1.online_at()
     ctx = bring_to("OFR", shop=p5_shop_a, rider=r1)
     oid = ctx["order_id"]
     a_ws = Listener(f"/ws/v1/orders/{oid}/", p5_shop_a.session.access)
-    b_ws = Listener(f"/ws/v1/orders/{b_order['id']}/", p5_shop_b.session.access)
+    b_ws = None
     try:
-        assert a_ws.wait("auth.ok", 5) and b_ws.wait("auth.ok", 5)
+        assert a_ws.wait("auth.ok", 5)
         t0 = time.monotonic()
         ping_at(r1, offset(QA02, north_m=25))  # OFFERED: gate closed
         time.sleep(2)
         assert a_ws.of("rider.location", t0) == [], "rider.location before the task is ASSIGNED"
         assert r1.accept(ctx["offer"]["id"]).status_code == 200
+        # B's order only now (stage 3): placed earlier, its task could take R1's only offer slot first.
+        b_order = p5_shop_b.place_cod()
+        b_ws = Listener(f"/ws/v1/orders/{b_order['id']}/", p5_shop_b.session.access)
+        assert b_ws.wait("auth.ok", 5)
         t1 = time.monotonic()
         pt = offset(QA02, north_m=40)
         ping_at(r1, pt, heading=72.5)
@@ -129,7 +132,8 @@ def test_p6_tc14_tc15_tc16_location_gate_eta_and_scope(r1, p5_shop_a, p5_shop_b)
         assert got, "no rider.location for an ASSIGNED task"
         data = got[1]["data"]
         assert set(data) == {"order_id", "lat", "lng", "heading", "recorded_at"}, data
-        assert data["order_id"] == oid and abs(data["lat"] - pt[0]) < 1e-6 and data["heading"] == 72.5
+        assert data["order_id"] == oid and abs(data["lat"] - pt[0]) < 1e-6
+        heading_dropped = data["heading"] != 72.5  # BUG-0022: checked last so the rest still runs
         # pickup → OUT_FOR_DELIVERY
         assert r1.arrived_store(ctx["task_id"]).status_code == 200
         pack(oid)
@@ -160,14 +164,19 @@ def test_p6_tc14_tc15_tc16_location_gate_eta_and_scope(r1, p5_shop_a, p5_shop_b)
         ping_at(r1, offset(DROP, north_m=10))
         time.sleep(3)
         assert a_ws.of("rider.location", t4) == [], "rider.location after DELIVERED"
+        # B's own order has no rider: any rider.location is a leak; order.eta only when it is A's
+        # (B's own order legitimately gets ETAs; stage 3 oracle fix).
         leak = [m for _, m in b_ws.msgs if m.get("data", {}).get("order_id") == oid
-                or m.get("type") in ("rider.location", "order.eta")]
+                or m.get("type") == "rider.location"]
         assert leak == [], f"B's socket got A's live data: {leak[:2]}"
         for _, m in a_ws.msgs:
             assert "delivery_otp" not in json.dumps(m) and otp not in json.dumps(m.get("data", {}).get("body", "")), m
+        if heading_dropped:
+            pytest.xfail(f"BUG-0022: rider.location heading {data['heading']!r}, the ping sent 72.5")
     finally:
         a_ws.close()
-        b_ws.close()
+        if b_ws is not None:
+            b_ws.close()
 
 
 @pytest.mark.smoke
@@ -234,8 +243,12 @@ def test_p6_tc23_offer_timeout_is_offer_expired(r1, p5_shop_a):
         assert s1.wait("auth.ok", 5)
         r1.online_at()
         ctx = bring_to("OFR", shop=p5_shop_a, rider=r1)
+        # Stage 3: expire_offer() before expires_at is a no-op ("not_due"), so wait the 30 s offer
+        # timeout out; the countdown task may expire it first ("skipped"), which is equally valid.
+        due = datetime.fromisoformat(ctx["offer"]["expires_at"].replace("Z", "+00:00"))
+        time.sleep(max(0.0, (due - datetime.now(due.tzinfo)).total_seconds()) + 1)
         out = rider_op(op="expire_offer", **{"as": SUPER}, offer_id=ctx["offer"]["id"])
-        assert out["ok"], out
+        assert out["ok"] and out["result"]["outcome"] in ("expired", "skipped"), out
         got = s1.wait("offer.expired", 10, offer_id=ctx["offer"]["id"])
         assert got and got[1]["data"] == {"offer_id": ctx["offer"]["id"], "task_id": ctx["task_id"],
                                           "reason": "EXPIRED"}, got
@@ -349,7 +362,7 @@ def test_p6_tc59_polling_fallback_matches_socket(r1, p5_shop_a):
         assert r1.arrived_store(tid).status_code == 200
         pack(oid)
         assert r1.pickup(tid, pickup_code(oid)).status_code == 200
-        assert a_ws.wait("order.status", 10, status="OUT_FOR_DELIVERY"), "no OUT_FOR_DELIVERY on the socket"
+        ofd_pushed = bool(a_ws.wait("order.status", 10, status="OUT_FOR_DELIVERY"))  # BUG-0021, checked last
         time.sleep(31)  # ETA throttle (30 s) after the status-change ETA
         t1 = time.monotonic()
         pt = offset(DROP, north_m=800)
@@ -360,7 +373,8 @@ def test_p6_tc59_polling_fallback_matches_socket(r1, p5_shop_a):
         track = httpx.get(track_url, headers=p5_shop_a.h, timeout=30)
         assert track.status_code == 200, describe(track)
         tr = track.json()
-        assert tr["status"] == last["order.status"]["status"] == "OUT_FOR_DELIVERY", (tr["status"], last["order.status"])
+        assert tr["status"] == "OUT_FOR_DELIVERY", tr["status"]
+        assert not ofd_pushed or last["order.status"]["status"] == "OUT_FOR_DELIVERY", last["order.status"]
         assert tr["task_status"] == "PICKED_UP", tr["task_status"]
         assert abs(tr["rider"]["lat"] - last["rider.location"]["lat"]) < 1e-6
         assert abs(tr["rider"]["lng"] - last["rider.location"]["lng"]) < 1e-6
@@ -370,8 +384,10 @@ def test_p6_tc59_polling_fallback_matches_socket(r1, p5_shop_a):
         assert upd, "no task.updated on the rider socket"
         assert rest_task["id"] == tid and rest_task["status"] == "PICKED_UP", rest_task.get("status")
         assert upd[-1]["data"].get("task_id", tid) == tid
-        if "status" in upd[-1]["data"]:
-            assert upd[-1]["data"]["status"] == rest_task["status"], upd[-1]["data"]
+        # 06 §4.2: task.updated covers changes the rider did not make (ORDER_PACKED, ...); the rider's
+        # own pickup is not pushed, so the last one may predate PICKED_UP (stage 3 oracle fix).
+        allowed = {"ORDER_PACKED", "ORDER_CANCELLED", "AMOUNT_CHANGED", "REASSIGNED", "ASSIGNED", "STATUS_CHANGED"}
+        assert all(m["data"].get("change") in allowed for m in upd), [m["data"] for m in upd]
         otp = tr["delivery_otp"]
     finally:
         a_ws.close()
@@ -384,3 +400,5 @@ def test_p6_tc59_polling_fallback_matches_socket(r1, p5_shop_a):
     assert tr["status"] == "DELIVERED" and tr["delivery_otp"] is None and tr["live_eta_minutes"] is None, tr
     assert tr["rider"] is None or tr["rider"].get("phone") is None, tr["rider"]
     assert r1.task().json()["task"] is None
+    if not ofd_pushed:
+        pytest.xfail("BUG-0021: T9 pickup sends no order.status OUT_FOR_DELIVERY on the order socket")

@@ -62,3 +62,9 @@ Guard tests for **open security bugs** live in the gitignored `qa/private/tests/
 **Known open bugs** are `xfail(strict=True)` with the bug ID. When a fix lands, the test XPASSes and fails the run, which is the cue to verify the fix and remove the marker.
 
 **Phase 5** (`tests/test_p5_*.py`, helpers in `p5_support.py`, staff/system actions through `tools/rider_ops_driver.py`) uses the QA-only store QA-02 and QA users C and D as riders. The slice 5.3 cases are marked `p5_53` and skip themselves until commit `fd1490c` is an ancestor of the commit under test **and** the shared DB has `delivery.0002` (`QA_P5_53=1` forces them). They need the QA Celery worker on DB 7 (started by the `qa_worker` fixture). Timer cases use the `dispatchfast`, `riderclock` and `triggerplaced` instance profiles (environment only; see `docs/01-test-plan.md` §9.2).
+
+**Stage 3 options (2026-11-10):**
+- Redis URLs use `127.0.0.1`, not `localhost`. On Windows, `localhost` tries IPv6 first and costs 2 s per new connection.
+- `QA_WORKER_CONCURRENCY=16` sets the QA worker's thread count (default 4). The 3 s socket-latency cases need it on this machine.
+- `QA_P5_KYC_PHONE=+919000000107` and `QA_P5_KYC2_PHONE=+919000000106` run the PENDING_KYC registration cases (P5-TC-01, 04, 05, 06, 08, 13) on fresh QA riders, now that R1 and R2 are ACTIVE.
+- Start MinIO first (`infra/scripts/windows/dev-services.ps1 -Action start`). The KYC uploads need it.

@@ -32,9 +32,9 @@ QA02_MANAGER = "qa02.manager@jivo.test"
 CATALOG = "catalog@jivo.test"
 
 _ENV = {
-    "REDIS_URL": "redis://localhost:6380/5",
-    "CHANNELS_REDIS_URL": "redis://localhost:6380/6",
-    "CELERY_BROKER_URL": "redis://localhost:6380/7",
+    "REDIS_URL": "redis://127.0.0.1:6380/5",
+    "CHANNELS_REDIS_URL": "redis://127.0.0.1:6380/6",
+    "CELERY_BROKER_URL": "redis://127.0.0.1:6380/7",
     "DJANGO_SETTINGS_MODULE": os.environ.get("QA_DJANGO_SETTINGS", "config.settings.local"),
     **({"PYTHONPATH": os.environ["QA_PYTHONPATH"]} if os.environ.get("QA_PYTHONPATH") else {}),
     "SMS_BACKEND": "apps.notifications.sms.ConsoleSmsBackend",
@@ -158,7 +158,8 @@ def stop_worker() -> None:
 
 # Threads pool (P5 stage 2): with --pool=solo the slow socket fan-out tasks (2-6 s each against the
 # remote DB) queue ahead of auto-accept and dispatch countdowns. QA_WORKER_POOL=solo restores it.
-_POOL = "--pool=solo" if os.environ.get("QA_WORKER_POOL") == "solo" else "--pool=threads --concurrency=4"
+_POOL = ("--pool=solo" if os.environ.get("QA_WORKER_POOL") == "solo"
+         else f"--pool=threads --concurrency={os.environ.get('QA_WORKER_CONCURRENCY', '4')}")
 
 
 def start_worker(log_name: str) -> None:

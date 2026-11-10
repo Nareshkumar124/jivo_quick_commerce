@@ -81,3 +81,24 @@ Verified fixes: none yet (first run).
 
 **Open by severity:** P0 0 · P1 0 · P2 1 (BUG-0010) · P3 5 (BUG-0006, 0008, 0011, 0013, 0020).
 
+
+## QA stage 3: P5 finish, P6, P7 rest (2026-11-10, develop `efb3c3d` in QA worktree `b87eb5f`; backend delivery/realtime/orders code unchanged on develop `3f6fc42`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0021](../bugs/BUG-0021.md) | Rider pickup (T9) sends no `order.status` OUT_FOR_DELIVERY to the order socket or the ops feed | backend: delivery task flow / order events | P2 Major (Medium) | P1 | django-backend-dev | Open | P6-TC-59 (and the socket part of P6-TC-14) |
+| [BUG-0022](../bugs/BUG-0022.md) | `rider.location` always carries `heading: null` although the rider sends a heading | backend: rider location ingest | P3 Minor (Low) | P3 | django-backend-dev | Open | P6-TC-14 |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open (xfail still holds) | P5-TC-16 |
+| [BUG-0020](../bugs/BUG-0020.md) | Oversized socket message → 1011 instead of 1009 on daphne | backend: realtime consumers | P3 Minor (Low) | P2 | django-backend-dev | Open (xfail still holds) | P6-TC-50 |
+
+**The 2026-11-09 "to investigate" items are closed, with no bug:**
+- **The 5 `test_p5_cash` failures (TC-88 ×2, TC-89 ×2, TC-93).** Rerun with `-k "tc88 or tc89 or tc93"`: **6 passed**. Cause: R1 had reached ₹4,560 of the ₹5,000 cash limit, so COD offers were skipped by design (DL-61b) and the first COD-flow tests waited for an offer in vain. `cleanup_rider` now deposits leftover cash.
+- **The ~2 s per broadcast.** Found and explained; see OBS-S3-01/02.
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| OBS-S3-01 | On this Windows host `localhost` resolves to `::1` first. Redis 6380 listens only on IPv4, so every **new** Redis connection to `redis://localhost:6380` costs **2.04 s** (`socket.create_connection(("localhost", 6380))` 2.038 s vs `127.0.0.1` 0.001 s). The Celery publish path opens a new channel-layer connection per send, so each `broadcast_ws` / `publish_*` took ~2 s, and an order event 4–8 s. | Environment, not product. QA moved its instance, worker and drivers to `redis://127.0.0.1:6380/…`: publish tasks now take 0.14–0.2 s. **PM / DevOps:** the :8001 stack (`backend/.env`, `local.py` defaults `redis://localhost:6380`, `docs/dev-environment.md`) very likely has the same 2 s per live event on the user's phone. Use `127.0.0.1`. |
+| OBS-S3-02 | With `--pool=threads --concurrency=4`, `PREFETCH_MULTIPLIER=1` and `ACKS_LATE`, the Windows worker (synchronous consumer loop, no event hub) stops fetching while 4 messages are reserved, so tasks reached the worker in ~4 s bursts (cancel response 12:49:27.77 → tasks received 12:49:33.61). The broker itself is instant (probe: 1–2 ms). | Local worker configuration. With 16 threads, P6-TC-11 passes (≤ 3 s). Staging and production run prefork workers with the event loop; the 09 §1 latency targets must be measured there (Phase 8). |
+| OBS-S3-03 | With MinIO stopped (it was down at the start of this session), a rider document upload did not fail fast: the request hung until the client's read timeout (P5-TC-14, `httpx.ReadTimeout`) instead of answering 503 `SERVICE_UNAVAILABLE`. | Seen once in an unplanned outage; not reproduced deliberately (stopping MinIO would affect other agents). Recheck with a storage-fault profile; suggest short S3 connect/read timeouts in settings. |
+| OBS-S3-04 | `order.delivered` now links to `jivo://orders/{id}/rate` (P7, api-requests #55). | Intended. QA's P6-TC-40 oracle updated. |
+
+**Open by severity (2026-11-10):** P0 0 · P1 0 · P2 2 (BUG-0010, **BUG-0021**) · P3 6 (BUG-0006, 0008, 0011, 0013, 0020, **0022**).

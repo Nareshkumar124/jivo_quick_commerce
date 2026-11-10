@@ -85,3 +85,11 @@ Exploit-level details of open security findings are in `qa/private/` (gitignored
 - **CSRF (TC-42):** POST without the token 403 and nothing changes; GET on action URLs 405 ✅.
 - **PII (TC-43):** full phone for Super/Ops/Support on the customer page; SM/SS cannot open Customers and see no phone on the order detail; no phone on the board, queues or slip ✅.
 - **Audit log:** read-only (no add, no save, no delete) ✅.
+
+## QA stage 3 (2026-11-10, `efb3c3d`)
+- **IDOR / scoping:** another rider's offer or task (ASG, PKD, ATC) → 404; id enumeration reveals nothing; ratings own-only, no comment and no customer data; tickets per app; reports and dashboard store-scoped (GGN-01 Store Manager refused QA-02) ✅ (P5-TC-104–109, P7-TC-04, 07, 08, 13, 22b).
+- **Sockets:** owner-only order socket; rider events never reach another rider; no OTP on any socket message; ops feed has no customer data ✅ (P6-TC-14, 21, 31).
+- **KYC:** numbers encrypted at rest, masked in the API, EXIF/GPS stripped, private bucket with signed links ✅ (P5-TC-04, 07, 20).
+- **Erasure:** anonymisation erases rating comments and ticket text ✅ (P7-TC-30).
+- **OBS-06 (open, doc decision):** REST `/rider/*` accepts the same person's customer-app token. No cross-user access.
+- No new security bug; nothing new in `qa/private/`.

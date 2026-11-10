@@ -179,3 +179,59 @@ Stage 1 was test design only. The plan is `01-test-plan.md` §9 and the 132 case
 4. P6: `uv run pytest tests/test_p6_ws.py tests/test_p6_t612.py`.
 5. P7: the remaining `tests/test_p7.py` cases (ratings, TC-22b, 23, 30, 31, 33, 34).
 6. 🔥 smoke P0–P7, then update 03–09.
+
+## Phases 5, 6 and 7: QA stage 3 (2026-11-10, develop `efb3c3d` in QA worktree `b87eb5f`, QA instance :8004)
+**Environment:** as in stage 2, with three changes:
+- Redis URLs moved from `localhost` to `127.0.0.1` in the instance, the worker and the drivers (OBS-S3-01: `localhost` costs 2 s per new connection on this host).
+- QA worker at 16 threads (`QA_WORKER_CONCURRENCY=16`; OBS-S3-02).
+- MinIO and Mailpit were stopped at the start and were started through `infra/scripts/windows/dev-services.ps1`.
+
+Backend code for delivery, realtime and orders is unchanged on develop `3f6fc42`. Admin P7 merged there (`6f92706`) but is not in the QA build.
+
+**What ran (all output in `qa/private/runs/s3-*`):**
+| Run | Result |
+|---|---|
+| `pytest tests/test_p5_cash.py -k "tc88 or tc89 or tc93" -rfE` | **6 passed** (the stage 2 failures were R1's cash at ₹4,560 of ₹5,000, so COD offers were skipped by DL-61b; no bug) |
+| `test_p5_kyc.py` | 44 passed, 18 skipped, 3 xfailed, 2 failed (TC-14, TC-20: MinIO down). After restarting MinIO: **2 passed**. The 18 skipped + TC-01 run on a fresh rider (`QA_P5_KYC_PHONE=+919000000107`, `QA_P5_KYC2_PHONE=+919000000106`): **19 passed** |
+| `test_p5_security.py` | first try 5 failed (R2 left with a rejected document by the TC-14 failure); after the repair, **24 passed** |
+| `test_p5_shift.py` / `ops` / `task_flow` / `final` / `db` | **12 / 26 / 38 (+1 skip, riderclock) / 5 / 3 passed** |
+| TC-79 on the `riderclock` profile | **1 passed** |
+| `test_p6_ws.py` | **48 passed, 17 skipped** (profile/device stubs), **2 xfailed** (BUG-0020) |
+| `test_p6_t612.py` | **6 passed, 2 xfailed** (BUG-0021 TC-59, BUG-0022 TC-14). Every other check in those two tests passes |
+| `test_p7.py` rest (ratings TC-01…08, TC-13, 14, 22b, 23, 30, 31, 33, 34) | 22 passed, 2 failed (test defects); rerun **2 passed** |
+| No 500 or traceback in the instance log; the worker log has no task errors (only the intended `qa.probe_latency` unregistered-task probes) | ✅ |
+| 🔥 smoke P0–P4 + P6 + P7 (`-m smoke`, P5 files excluded: run in full above) | 109 passed, 2 failed, 27 errors (QA throttle state and 2 stale P1 oracles; see 09) → rerun of the 29: **29 passed**. Total **138 passed, 1 skipped, 2 xfailed (BUG-0021/0022)** |
+
+**Test defects fixed (QA suite only):**
+- P6-TC-40 oracle (`/rate` link, api-requests #55)
+- P6-TC-31 (`task.status` on the ops feed)
+- P6-TC-14 order race (B's order took R1's offer slot)
+- P6-TC-14 leak filter (B's own ETAs)
+- P6-TC-23 (expired the offer before `expires_at`)
+- P6-TC-59 (`task.updated` is not sent for the rider's own actions, 06 §4.2)
+- P5-TC-05 (`r1` fixture name)
+- P7-TC-23 (`bill.grand_total`)
+- P7-TC-07 (the customer-token oracle went beyond 06; OBS-06)
+
+**Case status (`02`):**
+| Phase | ✅ | ❌ | ⬜ | ⏭ | P0/P1 passed |
+|---|---|---|---|---|---|
+| 5 (132) | 105 | 1 (TC-16, BUG-0013) | 21 | 5 | 103 / 129 |
+| 6 (59) | 47 | 3 (TC-14 BUG-0022, TC-50 BUG-0020, TC-59 BUG-0021) | 0 | 9 | 45 / 57 |
+| 7 (38) | 34 | 0 | 0 | 4 (device ×3, TC-40 admin screens) | 33 / 37 |
+
+**New bugs:** BUG-0021 (P2 Major, owner django-backend-dev): T9 pickup sends no `order.status` OUT_FOR_DELIVERY on the order socket or the ops feed. BUG-0022 (P3 Minor, django-backend-dev): `rider.location` heading always null. **No P0/P1 bug open.**
+
+| Phase | Verdict | Why |
+|---|---|---|
+| **5** | **Not ready (gate incomplete)** | Every automated P5 case passes on the QA instance: no unauthorised access (IDOR TC-104…109 ✅), no stock or cash corruption (TC-66, 98, 128 SQL ✅), no duplicate payment (TC-90 ✅). But 21 cases have no execution yet, including P0 TC-12 (admin approval UI), TC-42 / 45 (accept races), TC-51 (T8a during a task) and TC-110 (signed links). The device cases (TC-19, 33, 124, 131) are with the PM. BUG-0013 (P3) is open. |
+| **6** | **Not ready** | BUG-0021 (P2) breaks the live status at the hand-over: the customer's open order screen is not told OUT_FOR_DELIVERY (the push and SMS with the OTP still go). P0 cases TC-14 and TC-59 fail on BUG-0022 / BUG-0021, and TC-50 on BUG-0020. Device cases TC-17 and TC-57 are pending; profile cases TC-09, 20, 32, 33, 44 are ⏭. The 3 s live-latency targets (TC-11) pass only with the worker tuned (OBS-S3-02); confirm on staging. |
+| **7** | **Ready for sign-off on the QA instance for the backend; formal gate pending** | 34/34 executable cases pass (ratings, support, reports incl. the DL-65 SQL oracle, dashboard KPIs/alerts/charts, erasure). Open: TC-40 (admin P7 screens: merged in develop `6f92706`, not yet tested by QA) and device cases TC-37–39. |
+
+**For the PM:**
+1. Send BUG-0021 and BUG-0022 to django-backend-dev. Both are one-line fixes with a test.
+2. **OBS-S3-01: the :8001 stack and `docs/dev-environment.md` should use `redis://127.0.0.1:6380`.** Otherwise every live event on the user's phone pays about 2 s per Redis connection.
+3. OBS-06: decide whether REST `/rider/*` must refuse a customer-app token (06 is silent).
+4. The QA build needs develop `3f6fc42` merged for TC-40.
+
+**Next QA session:** merge develop into the QA worktree; P7-TC-40; the remaining P5 ⬜ cases (P0 first: TC-12, 42, 45, 51, 110); the P6 profile cases; verify BUG-0021/0022 when fixed.
