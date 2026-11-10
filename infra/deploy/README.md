@@ -37,6 +37,17 @@ Docker: project jqc, network jqc_net, volumes jqc_pgdata / jqc_redisdata / jqc_m
    `nginx -t`, reload, report.**
 5. `nginx -T` diff must show only our file.
 
+**Other sites on the host.** The repo keeps no fixed list: `check_sites.sh` must build its list of
+`server_name`s from the current `nginx -T` on every run, because sites change without notice.
+Sites seen so far (for reviewing its output, not as the source):
+
+| Seen | `server_name` | Note |
+|---|---|---|
+| 2026-11-10 | `einvoice.jivo.in` | New since the first deploy; found by the 2026-11-10 update |
+
+Add each newly seen name here. A name that appears or disappears between the before and after
+runs of the same check is still a failure of step 4.
+
 ## Secrets (generated on the server, never printed)
 
 Generated once by a script run on the server that writes `env/backend.env`, `env/postgres.env`
@@ -56,12 +67,34 @@ Staging values (non-secret): `DJANGO_SETTINGS_MODULE=config.settings.staging`,
 To read the staff password on the server without printing other values:
 `sudo grep '^SEED_DEMO_STAFF_PASSWORD=' /srv/jqc/env/backend.env` (run it yourself; never paste it).
 
+## Shipping the source from Windows (line endings)
+
+`git archive` applies the local `core.autocrlf` to its output. On a Windows machine
+(`core.autocrlf=true`, the Git for Windows default) a commit **older than the `.gitattributes`
+LF rules** ships CRLF files: the Dockerfile's heredoc scripts then get a `#!/bin/sh\r` shebang and
+every container fails with `exec /usr/local/bin/jqc-entrypoint: no such file or directory`
+(staging, 2026-11-10). Commits that contain the rules (`Dockerfile`, `.dockerignore`, `*.py`,
+`*.sh`, `infra/deploy/**`, ... are `eol=lf`) are safe either way, but always archive with
+autocrlf off so that any commit, including a rollback target, ships exactly what is in git:
+
+```bash
+git -c core.autocrlf=false archive "$SHA" backend | ssh <server> "mkdir -p /srv/jqc/src/$SHA && tar -x -C /srv/jqc/src/$SHA"
+# check on the server before building (prints nothing when clean):
+ssh <server> "grep -lr \$'\r' /srv/jqc/src/$SHA/backend/Dockerfile /srv/jqc/src/$SHA/backend/.dockerignore"
+```
+
+From PowerShell, run the same line in Git Bash, or pipe through a file
+(`git -c core.autocrlf=false archive --format=tar -o jqc-$SHA.tar $SHA backend`, then `scp` and
+`tar -x` on the server): PowerShell 5.1 pipes re-encode binary output and corrupt the tar.
+Copying files with `scp` from a Windows **working tree** (instead of `git archive`) has the same
+CRLF problem for older commits; don't.
+
 ## First deploy (plan.md §6)
 
 ```bash
 SHA=<pushed develop commit>
-# 1. source of that commit only (from a machine with the repo):
-git archive "$SHA" backend | ssh <server> "mkdir -p /srv/jqc/src/$SHA && tar -x -C /srv/jqc/src/$SHA"
+# 1. source of that commit only (from a machine with the repo; Windows: see above):
+git -c core.autocrlf=false archive "$SHA" backend | ssh <server> "mkdir -p /srv/jqc/src/$SHA && tar -x -C /srv/jqc/src/$SHA"
 # 2. image
 cd /srv/jqc/src/$SHA/backend && docker build -t jqc-backend:$SHA .
 # 3. infra services
@@ -95,7 +128,8 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ## Update (plan.md §9)
 
-1. `git archive` the new pushed commit, build `jqc-backend:<new>`.
+1. `git -c core.autocrlf=false archive` the new pushed commit (see "Shipping the source from
+   Windows"), build `jqc-backend:<new>`.
 2. Pre-deploy dump: `docker compose -p jqc -f compose.prod.yml exec -T postgres pg_dump -Fc -U jqc jivo_quick_commerce > /srv/jqc/backups/pre-<new>.dump`.
 3. `JQC_IMAGE=jqc-backend:<new> docker compose ... run --rm release`.
 4. Copy static files (step 6 above).

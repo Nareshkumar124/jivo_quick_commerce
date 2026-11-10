@@ -113,7 +113,8 @@ services:
     <<: *app
     command: ["gunicorn", "config.asgi:application",
               "--worker-class", "jqc_asgi_worker.JqcUvicornWorker",
-              "--bind", "0.0.0.0:8000", "--workers", "3", "--graceful-timeout", "30"]
+              "--bind", "0.0.0.0:8000", "--workers", "3", "--graceful-timeout", "30",
+              "--no-control-socket"]   # as the image CMD: no writable $HOME (backend/Dockerfile)
     environment:
       POSTGRES_POOL: "true"
       POSTGRES_CONN_MAX_AGE: "0"
