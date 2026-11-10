@@ -52,7 +52,8 @@ def main() -> int:
     cats = rows(CAT / "categories.csv")
     prods = rows(CAT / "products.csv")
     vars_ = rows(CAT / "variants.csv")
-    man = rows(ROOT / "data/manifests/shop_jivo_in_images.csv")
+    man = [r for f in sorted((ROOT / "data/manifests").glob("*_images.csv")) for r in rows(f)]
+    images_pending = "--images-pending" in sys.argv
     cat_slugs = {c["slug"]: c for c in cats}
     if len(cat_slugs) != len(cats):
         err("identity", "categories.csv", "duplicate slugs")
@@ -95,6 +96,8 @@ def main() -> int:
                   "country_of_origin", "manufacturer", "marketer", "consumer_care"):
             if not p[k]:
                 gap(f"compliance: {k} missing", p["slug"])
+        if p["manufacturer"] and not re.search(r"\b\d{6}\b", p["manufacturer"]):
+            warn("compliance: manufacturer has no address/pincode", ref, p["manufacturer"][:50])
         if not p["nutrition"]:
             gap("compliance: nutrition missing", p["slug"])
         if not p["is_veg"]:
@@ -102,6 +105,7 @@ def main() -> int:
         if p["brand"] != "Jivo":
             warn("identity", ref, f"brand {p['brand']}")
     skus = Counter(v["sku"] for v in vars_)
+    barcodes = Counter(v["barcode"] for v in vars_ if v["barcode"])
     saps = Counter(v["sap_item_code"] for v in vars_ if v["sap_item_code"])
     by_prod = defaultdict(list)
     for v in vars_:
@@ -136,6 +140,11 @@ def main() -> int:
             err("text", ref, "size text not in '1 L' / '500 ml' style")
         if len(v["name"]) > 40 or len(v["net_quantity"]) > 40:
             err("text", ref, "name or net_quantity over 40 chars")
+        if v["barcode"]:
+            if not re.fullmatch(r"\d{13}", v["barcode"]):
+                err("identity", ref, f"barcode {v['barcode']!r} is not 13 digits")
+            elif barcodes[v["barcode"]] > 1:
+                err("identity", ref, "duplicate barcode")
         if not v["net_quantity"]:
             err("compliance", ref, "net quantity missing")
     for p in prods:
@@ -166,12 +175,23 @@ def main() -> int:
     for v in vars_:
         key_p, key_v = (v["product_slug"], ""), (v["product_slug"], v["sku"])
         if v["is_active"] == "1" and not (has_img[key_p] or has_img[key_v]):
-            err("images", f"variant {v['sku']}", "active variant has no image")
+            if images_pending:
+                gap("images: active variant has no image yet (--images-pending)", v["sku"])
+            else:
+                err("images", f"variant {v['sku']}", "active variant has no image")
+    stock_file = CAT / "stock_test_store.csv"
+    if stock_file.exists():
+        for i, st in enumerate(rows(stock_file), start=2):
+            ref = f"stock_test_store.csv line {i}"
+            if st["sku"] not in skus:
+                err("limits", ref, f"unknown SKU {st['sku']}")
+            if not st["quantity"].isdigit():
+                err("limits", ref, "quantity is not a non-negative integer")
     return report()
 
 
 def report() -> int:
-    lines = ["# Catalog validation (shop.jivo.in import)", "", "## Hard errors (rule: count)"]
+    lines = ["# Catalog validation (shop.jivo.in + Amazon Excel import)", "", "## Hard errors (rule: count)"]
     lines += [f"- {k}: {len(v)}" for k, v in errors.items()] or ["- none"]
     for v in errors.values():
         lines += [f"  - {m}" for m in v[:50]]
