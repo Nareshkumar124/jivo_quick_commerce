@@ -47,3 +47,6 @@ design/incoming/
 
 # Redis snapshot written by a locally started redis-server
 dump.rdb
+
+# Personal Claude Code permissions (deploy server access)
+.claude/settings.local.json

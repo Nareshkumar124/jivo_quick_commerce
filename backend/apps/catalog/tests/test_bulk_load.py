@@ -9,11 +9,13 @@ import csv
 import hashlib
 import io
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from django.core.management import CommandError, call_command
 from PIL import Image
 
+from apps.catalog.bulk_load import MANIFEST_REQUIRED, import_catalog, read_sku_list
 from apps.catalog.models import Category, Product, ProductImage, ProductVariant
 from apps.catalog.tests.factories import ProductFactory, VariantFactory
 
@@ -175,6 +177,27 @@ def test_import_catalog_applies_admin_upload_limits(catalog_dir):
     output, _ = run_failing("import_catalog", "--dir", str(catalog_dir), "--commit")
     assert "categories.csv The file is larger than 1 MB" in output
     assert not Product.objects.filter(slug="jivo-olive").exists()
+
+
+REAL_CATALOG = Path(__file__).resolve().parents[4] / "data" / "catalog"
+
+
+@pytest.mark.skipif(not REAL_CATALOG.is_dir(), reason="data/catalog not in this checkout")
+def test_import_catalog_accepts_the_real_catalog_files():
+    """The catalog-data agent's real files (data/catalog, DL-67) pass the loader cleanly, so the
+    two never drift apart. Dry run: nothing is saved."""
+    result = import_catalog(REAL_CATALOG, commit=False)
+    assert [error for item in result.files for error in item.errors] == []
+    assert all(item.found for item in result.files)
+    assert not result.committed
+    assert not ProductVariant.objects.filter(sku="JVW-CAN-1L").exists()
+    skus, errors = read_sku_list(REAL_CATALOG / "deactivate_demo_skus.csv")
+    assert errors == []
+    assert skus
+    manifest = REAL_CATALOG.parent / "manifests" / "shop_jivo_in_images.csv"
+    with manifest.open(encoding="utf-8-sig", newline="") as handle:
+        header = next(csv.reader(handle))
+    assert set(MANIFEST_REQUIRED) | {"sku", "sort_order", "sha256", "alt_text"} <= set(header)
 
 
 # --------------------------------------------------------------------------- images

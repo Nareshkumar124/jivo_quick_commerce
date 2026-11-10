@@ -1,0 +1,6 @@
+slug,name,parent_slug,sort_order,is_active
+edible-oils,Edible Oils,,1,1
+canola-oil,Canola Oil,edible-oils,1,1
+olive-oil,Olive Oil,edible-oils,2,1
+mustard-oil,Mustard Oil,edible-oils,3,1
+other-oils,"Groundnut, Sunflower & More",edible-oils,4,1
