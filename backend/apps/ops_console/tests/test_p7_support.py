@@ -1,7 +1,14 @@
 """P7 support ticket console (05 §2 Support; §3 "Support tickets": Super Admin, Ops, Support).
-Every action goes through `apps.support.services`; other roles get 403 and change nothing."""
+Every action goes through `apps.support.services`; other roles get 403 and change nothing.
+
+Test cases (qa/docs/02-test-case-repository.md): P7-TC-18 (staff reply, status rules, Finance
+refused), P7-TC-35 (priority), P7-TC-40 (the ticket queue and detail in the console, role
+matrix enforced), P7-TC-08 (ratings admin registered)."""
+
+import re
 
 import pytest
+from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
@@ -21,6 +28,7 @@ from apps.support.models import SupportTicket, TicketMessage
 pytestmark = pytest.mark.django_db
 
 SUPPORT_ROLES = frozenset({roles.SUPER_ADMIN, SUPERUSER, roles.OPS, roles.SUPPORT})
+CSRF_FIELD = re.compile(r'name="csrfmiddlewaretoken" value="([^"]+)"')
 
 
 def make_ticket(status=TicketStatus.OPEN, **kwargs):
@@ -46,6 +54,7 @@ def action_url(ticket, action):
 class TestRoleMatrix:
     @pytest.mark.parametrize("principal", PRINCIPALS)
     def test_list_and_detail(self, client, principal):
+        """P7-TC-40: queue, HTMX list and detail for the "Support tickets" roles only."""
         ticket = make_ticket()
         login_as(client, principal)
         expected = expected_status(principal, SUPPORT_ROLES)
@@ -60,6 +69,8 @@ class TestRoleMatrix:
 
     @pytest.mark.parametrize("principal", PRINCIPALS)
     def test_reply_refused_for_other_roles(self, client, principal):
+        """P7-TC-18: Support (and Super Admin, Ops) reply; Finance and the rest are refused and
+        no message is stored."""
         ticket = make_ticket()
         login_as(client, principal)
         response = client.post(action_url(ticket, "reply"), {"body": "Refund is on its way."})
@@ -71,6 +82,7 @@ class TestRoleMatrix:
             assert ticket.messages.filter(is_staff=True).count() == 0
 
     def test_unknown_ticket_is_404(self, client):
+        """P7-TC-40: an unknown ticket id is a 404 for the page and the actions."""
         login_as(client, roles.SUPPORT)
         assert client.get(reverse("ops:support-ticket", args=[999999])).status_code == 404
         assert (
@@ -82,18 +94,40 @@ class TestRoleMatrix:
         )
 
     def test_get_on_action_is_refused(self, client):
+        """P7-TC-40: actions are POST only."""
         ticket = make_ticket()
         login_as(client, roles.SUPPORT)
         assert client.get(action_url(ticket, "status")).status_code == 405
 
     def test_unknown_action_is_404(self, client):
+        """P7-TC-40: only reply, status, priority and assign exist."""
         ticket = make_ticket()
         login_as(client, roles.SUPPORT)
         assert client.post(action_url(ticket, "delete"), {}).status_code == 404
 
+    def test_action_needs_the_csrf_token(self):
+        """P7-TC-40 (review fix, T-716): with CSRF checks on, a reply without the token is a 403
+        from the middleware (not a role refusal) and stores nothing; the same POST with the
+        token from the page works."""
+        ticket = make_ticket()
+        strict = Client(enforce_csrf_checks=True)
+        strict.force_login(staff_in_role(roles.SUPPORT))
+        url = action_url(ticket, "reply")
+        refused = strict.post(url, {"body": "Refund is on its way."})
+        assert refused.status_code == 403
+        assert "X-Ops-Refused" not in refused
+        assert ticket.messages.filter(is_staff=True).count() == 0
+
+        page = strict.get(reverse("ops:support-ticket", args=[ticket.pk]))
+        token = CSRF_FIELD.search(page.content.decode()).group(1)
+        sent = strict.post(url, {"body": "Refund is on its way.", "csrfmiddlewaretoken": token})
+        assert sent.status_code == 302
+        assert ticket.messages.filter(is_staff=True).count() == 1
+
 
 class TestActions:
     def test_reply_moves_open_to_in_progress_and_audits(self, client):
+        """P7-TC-18: a staff reply moves OPEN to IN_PROGRESS and is audited (no body)."""
         ticket = make_ticket()
         login_as(client, roles.SUPPORT)
         response = client.post(action_url(ticket, "reply"), {"body": "Looking into it."})
@@ -103,6 +137,7 @@ class TestActions:
         assert AuditLog.objects.filter(action="support.reply").count() == 1
 
     def test_reply_and_resolve(self, client):
+        """P7-TC-18: reply with a status."""
         ticket = make_ticket()
         login_as(client, roles.OPS)
         client.post(action_url(ticket, "reply"), {"body": "Done.", "status": "RESOLVED"})
@@ -110,6 +145,7 @@ class TestActions:
         assert ticket.status == TicketStatus.RESOLVED
 
     def test_closed_ticket_reply_is_refused(self, client):
+        """P7-TC-18: CLOSED refuses replies; the message is shown, nothing stored."""
         ticket = make_ticket(status=TicketStatus.CLOSED)
         login_as(client, roles.SUPPORT)
         response = client.post(action_url(ticket, "reply"), {"body": "Hello"}, follow=True)
@@ -117,6 +153,7 @@ class TestActions:
         assert "closed" in response.content.decode().lower()
 
     def test_invalid_transition_shows_error(self, client):
+        """P7-TC-18: CLOSED -> OPEN is refused by the status table."""
         ticket = make_ticket(status=TicketStatus.CLOSED)
         login_as(client, roles.SUPPORT)
         client.post(action_url(ticket, "status"), {"status": "OPEN"})
@@ -124,6 +161,7 @@ class TestActions:
         assert ticket.status == TicketStatus.CLOSED
 
     def test_priority(self, client):
+        """P7-TC-35: Support sets the priority through `set_priority`."""
         ticket = make_ticket()
         login_as(client, roles.SUPPORT)
         client.post(action_url(ticket, "priority"), {"priority": TicketPriority.URGENT})
@@ -131,6 +169,7 @@ class TestActions:
         assert ticket.priority == TicketPriority.URGENT
 
     def test_assign_only_to_handlers(self, client):
+        """P7-TC-40: the assignee must be a ticket handler; empty unassigns."""
         ticket = make_ticket()
         handler = staff_in_role(roles.SUPPORT)
         finance = staff_in_role(roles.FINANCE)
@@ -146,6 +185,7 @@ class TestActions:
         assert ticket.assigned_to is None
 
     def test_empty_reply_is_refused(self, client):
+        """P7-TC-40: an empty reply is a form error; nothing stored."""
         ticket = make_ticket()
         login_as(client, roles.SUPPORT)
         client.post(action_url(ticket, "reply"), {"body": ""})
@@ -154,6 +194,7 @@ class TestActions:
 
 class TestList:
     def test_filters_and_search(self, client):
+        """P7-TC-40: queue filters (assigned to me, status)."""
         mine = make_ticket(priority=TicketPriority.HIGH)
         other = make_ticket(status=TicketStatus.RESOLVED)
         user = login_as(client, roles.SUPPORT)
@@ -167,6 +208,7 @@ class TestList:
         assert mine.number not in body
 
     def test_query_count_does_not_grow(self, client, django_assert_max_num_queries):
+        """P7-TC-40 (09 §1): the queue's query count does not grow with the tickets."""
         for _ in range(3):
             make_ticket()
         login_as(client, roles.SUPPORT)
@@ -183,6 +225,7 @@ class TestList:
         assert len(many) == len(few)
 
     def test_full_phone_for_support(self, client):
+        """P7-TC-40: Support holds full customer PII (05 §3 "Customers (PII)")."""
         ticket = make_ticket(user=UserFactory(name="Asha Verma", phone="+919811122233"))
         login_as(client, roles.SUPPORT)
         body = client.get(reverse("ops:support-ticket", args=[ticket.pk])).content.decode()
@@ -190,6 +233,7 @@ class TestList:
 
 
 def test_ratings_admin_is_registered():
+    """P7-TC-08: the staff ratings admin is registered once."""
     from django.contrib import admin
 
     from apps.ops_console import ratings_admin

@@ -6,6 +6,7 @@ list or search (search is by ticket id or order number).
 """
 
 from django.contrib import admin
+from django.db.models import BooleanField, Value
 from django.urls import reverse
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
@@ -13,6 +14,9 @@ from unfold.decorators import display
 
 from apps.ops_console import status
 from apps.support.models import CannedReply, SupportTicket, TicketAttachment, TicketMessage
+
+# The Customers admin's view permission (05 §3 "Customers (PII)").
+VIEW_CUSTOMER = "accounts.view_customer"
 
 
 class ReadOnlyMixin:
@@ -107,13 +111,27 @@ class SupportTicketAdmin(ReadOnlyMixin, ModelAdmin):
             return "Unassigned"
         return (user.name or "").strip() or user.email or f"User {user.pk}"
 
+    def get_queryset(self, request):
+        """Display methods do not get the request: whether the viewer may open the Customers
+        admin travels on each row (like `orders.admin.with_pii_flag`)."""
+        may_open = request.user.has_perm(VIEW_CUSTOMER)
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(can_open_customer=Value(may_open, output_field=BooleanField()))
+        )
+
     @display(description="Customer")
     def customer(self, obj):
-        """By id, linked to the Customers admin, which applies its own PII rules (05 §3)."""
+        """By id. Linked to the Customers admin (which applies its own PII rules, 05 §3) only
+        for staff who may open it; plain text for anyone else."""
+        label = f"Customer {obj.user_id}"
+        if not getattr(obj, "can_open_customer", False):
+            return label
         return format_html(
-            '<a href="{}">Customer {}</a>',
+            '<a href="{}">{}</a>',
             reverse("admin:accounts_customer_change", args=[obj.user_id]),
-            obj.user_id,
+            label,
         )
 
     @display(description="Support console")
