@@ -7,11 +7,11 @@ from decimal import Decimal
 
 import pytest
 from django.contrib.gis.geos import Point
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.management import call_command
 from django.utils import timezone
 
-from apps.accounts.tests.factories import StaffUserFactory, UserFactory
+from apps.accounts.tests.factories import StaffUserFactory, SuperUserFactory, UserFactory
 from apps.core.models import AuditLog
 from apps.inventory.models import StoreInventory, stock_write
 from apps.orders import invoices, services
@@ -216,6 +216,58 @@ class TestExpiry:
         cache.delete("orders:expire_unpaid_orders")
         assert services.expire_unpaid_orders(later) == {"failed": 1}
 
+    def test_a_run_that_outlived_its_lock_keeps_the_newer_runs_lock(self, caplog):
+        """Code review (T-403c): the lock holds a unique token and is released by an atomic
+        compare-and-delete, so a run that ran past the lock's timeout never frees the lock a
+        newer run took after it expired."""
+        from django.core.cache import cache
+
+        key = "orders:test-run-lock"
+        first = services._run_lock(key)
+        assert first.__enter__() is True
+        client = cache._cache.get_client(None, write=True)
+        ttl = client.pttl(cache.make_and_validate_key(key))
+        assert 0 < ttl <= services.EXPIRY_LOCK_SECONDS * 1000  # a crashed run frees it
+        cache.delete(key)  # the first run's lock expired (it ran longer than 5 minutes)
+        second = services._run_lock(key)
+        assert second.__enter__() is True
+        with caplog.at_level("WARNING"):
+            first.__exit__(None, None, None)  # must not free the second run's lock
+        assert "the newer lock is kept" in caplog.text
+        assert services._run_lock(key).__enter__() is False
+        second.__exit__(None, None, None)
+        third = services._run_lock(key)
+        assert third.__enter__() is True
+        third.__exit__(None, None, None)
+        assert cache.get(key) is None
+
+    def test_runs_without_the_lock_when_redis_is_down(self, monkeypatch, caplog):
+        from django.core.cache import cache
+
+        def down(*args, **kwargs):
+            raise ConnectionError("redis down")
+
+        monkeypatch.setattr(cache._cache, "get_client", down)
+        lock = services._run_lock("orders:test-run-lock")
+        with caplog.at_level("WARNING"):
+            assert lock.__enter__() is True
+            lock.__exit__(None, None, None)
+        assert "running without it" in caplog.text
+
+    def test_release_error_is_only_logged(self, caplog):
+        lock = services._run_lock("orders:test-run-lock")
+        assert lock.__enter__() is True
+
+        class Broken:
+            def release(self):
+                raise ConnectionError("redis down")
+
+        real, lock.lock = lock.lock, Broken()
+        with caplog.at_level("WARNING"):
+            lock.__exit__(None, None, None)
+        assert "expires by itself" in caplog.text
+        real.release()
+
 
 class TestCodBlocked:
     def test_service(self):
@@ -226,7 +278,9 @@ class TestCodBlocked:
         assert set_cod_blocked(customer.pk, True, by=staff) is False
         customer.refresh_from_db()
         assert customer.cod_blocked is True
-        assert set_cod_blocked(customer.pk, False, by=staff) is True
+        with pytest.raises(PermissionDenied):  # lifting needs delivery.lift_cod_block (DL-61 d)
+            set_cod_blocked(customer.pk, False, by=staff)
+        assert set_cod_blocked(customer.pk, False, by=SuperUserFactory()) is True
         with pytest.raises(ValidationError):
             set_cod_blocked(staff.pk, True, by=staff)
         with pytest.raises(ValidationError):

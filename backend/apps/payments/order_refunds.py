@@ -17,9 +17,14 @@ gateway by the same `payments.process_refund` task, so retries and idempotency w
   order reason is saved (signal below), so the gateway result, the webhook and
   `sync_refund_status` all settle the order the same way.
 
-The automatic refunds of Phase 3 (`late_capture`, `duplicate_capture`, `amount_mismatch`) keep
-their own rules in `apps.payments.refunds` (DL-45): they are not order refunds and are never
-counted here.
+The automatic refunds of Phase 3 are not order refunds and never count towards `refundable()`.
+- `late_capture` (T3a: a capture on a failed or cancelled order) **is** settled here too
+  (T-402c): the order shows REFUND_PENDING until every late-capture and order refund on it is
+  processed, and `amount_refunded` includes it. Before, the late-capture refund set REFUNDED on
+  its own, even while the order's cancel refund was still open or had failed.
+- `duplicate_capture` and `amount_mismatch` never touch the order (DL-45, 06 §2.6): the order's
+  own payment is intact (duplicate) or nothing was paid against it (wrong amount). They are
+  listed to the customer in `Order.refunds[]` (`PAYMENT_ISSUE`).
 """
 
 import logging
@@ -63,6 +68,8 @@ MANUAL = "manual"  # staff refund from the admin (05 §3 Refund)
 ORDER_REASONS = frozenset(
     {CUSTOMER_CANCEL, STAFF_CANCEL, ITEM_UNAVAILABLE, DELIVERY_FAILED, MANUAL}
 )
+# Refunds that set the order's `payment_status` and `amount_refunded` (`settle()`, T-402c).
+SETTLED_REASONS = ORDER_REASONS | {LATE_CAPTURE}
 
 # The customer's view of a refund (`Order.refunds[].reason`).
 PUBLIC_REASON = {
@@ -242,18 +249,32 @@ def alert_if_not_refunded(order, refund: Refund | None, *, context: str) -> None
 
 
 def settle(order) -> None:
-    """Order `payment_status` and `amount_refunded` from its standing order refunds (08 §4 rule
-    4). No-op for an order without order refunds. The caller holds the order row lock."""
+    """Order `payment_status` and `amount_refunded` from its standing order refunds and T3a
+    late-capture refunds (08 §4 rule 4, T-402c). No-op for an order without any. The caller
+    holds the order row lock.
+    - REFUND_PENDING while any of them is not processed (a FAILED one counts until retried);
+    - then REFUNDED when the order refunds give back everything paid for the order
+      (`amount_paid`; 0 for an order that never had a sale, so its late captures alone make it
+      REFUNDED), else PARTIALLY_REFUNDED;
+    - `amount_refunded` = all of them processed, capped by `max(amount_paid, grand_total)` (the
+      `order_refund_within_paid` constraint; OBS-P3-05 / T-409c: a second late capture on an
+      order is not shown in full until an `amount_captured` field exists).
+    Edge case (kept on purpose): a paid order whose cancel refund was never created (e.g. no
+    sale payment found; `alert_if_not_refunded` raises the ops alert) plus a processed
+    late-capture refund of L ends PARTIALLY_REFUNDED with `amount_refunded` = L: the late
+    capture is back, the sale is not. An order already REFUNDED goes back to REFUND_PENDING
+    when a late capture arrives, then REFUNDED again (08 §4 rule 4)."""
     from apps.orders.choices import PaymentStatus
 
-    refunds = live_refunds(list(Refund.objects.filter(order=order, reason__in=ORDER_REASONS)))
+    refunds = live_refunds(list(Refund.objects.filter(order=order, reason__in=SETTLED_REASONS)))
     if not refunds:
         return
-    processed = sum((r.amount for r in refunds if r.status == RefundStatus.PROCESSED), ZERO)
-    pending = any(r.status != RefundStatus.PROCESSED for r in refunds)
-    if pending:
+    done = [r for r in refunds if r.status == RefundStatus.PROCESSED]
+    processed = sum((r.amount for r in done), ZERO)
+    returned = sum((r.amount for r in done if r.reason in ORDER_REASONS), ZERO)
+    if len(done) < len(refunds):
         status = PaymentStatus.REFUND_PENDING
-    elif processed >= order.amount_paid:
+    elif returned >= order.amount_paid:
         status = PaymentStatus.REFUNDED
     else:
         status = PaymentStatus.PARTIALLY_REFUNDED
@@ -266,9 +287,10 @@ def settle(order) -> None:
 
 @receiver(post_save, sender=Refund, dispatch_uid="payments.settle_order_refund")
 def _settle_on_refund_change(sender, instance: Refund, **kwargs) -> None:
-    """Any save of an order refund (created, processed, failed: by the task, the webhook or the
-    sync job) settles its order under the order row lock (lock order: order, then refund)."""
-    if instance.reason not in ORDER_REASONS:
+    """Any save of an order or late-capture refund (created, processed, failed: by the task, the
+    webhook or the sync job) settles its order under the order row lock (lock order: order,
+    then refund)."""
+    if instance.reason not in SETTLED_REASONS:
         return
     from apps.orders.models import Order
 

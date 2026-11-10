@@ -345,3 +345,167 @@ class TestTwoLateCaptures:
         order_id, gateway_order_id = self.place_and_cancel(checkout, shop)
         self.capture_twice(order_id, gateway_order_id, django_capture_on_commit_callbacks)
         assert Order.objects.get(pk=order_id).amount_refunded == D("1116.00")
+
+
+class TestLateCaptureSettles:
+    """T-402c: a T3a late-capture refund and the order's own refunds settle `payment_status` by
+    one rule (08 §4 rule 4): REFUND_PENDING until every one of them is processed. Before, a
+    processed late-capture refund set REFUNDED on its own, even while the order's cancel refund
+    was still open or had failed. Duplicate and wrong-amount capture refunds still never touch
+    the order (DL-45; `test_lifecycle` `test_second_capture_on_a_paid_order_is_refunded` and
+    `test_amount_mismatch_is_refunded_and_not_placed`)."""
+
+    def paid_cancelled_then_captured_again(self, checkout, shop):
+        """A paid order (₹558) with a second gateway order, cancelled by the customer (T11:
+        cancel refund PENDING; callbacks are not run, so refunds wait for the task), then a
+        capture on the second gateway order (T3a: late-capture refund PENDING)."""
+        from apps.orders import services
+        from apps.orders.tests.conftest import new_key
+
+        checkout.fill((shop.canola_1l, 2))
+        placement = checkout.place("ONLINE")
+        order_id = placement["order"]["id"]
+        retried = checkout.client.post(
+            f"{ORDERS}{order_id}/retry-payment/", headers={"Idempotency-Key": new_key()}
+        ).json()
+        checkout.verify(placement, "pay_SaleCapture001")
+        response = checkout.client.post(f"{ORDERS}{order_id}/cancel/", {"reason": "OTHER"})
+        assert response.status_code == 200
+        outcome = services.capture_payment(
+            order_id,
+            gateway_order_id=retried["razorpay"]["order_id"],
+            payment_id="pay_LateSecond0001",
+            amount_paise=55800,
+        ).outcome
+        assert outcome == "late_capture"
+        order = Order.objects.get(pk=order_id)
+        assert (order.payment_status, order.amount_refunded) == ("REFUND_PENDING", D("0.00"))
+        cancel = Refund.objects.get(order=order, reason=order_refunds.CUSTOMER_CANCEL)
+        late = Refund.objects.get(order=order, reason=order_refunds.LATE_CAPTURE)
+        return order, cancel, late
+
+    def test_late_refund_done_first_keeps_the_order_pending(self, checkout, shop):
+        from apps.payments.tasks import process_refund
+
+        order, cancel, late = self.paid_cancelled_then_captured_again(checkout, shop)
+        assert process_refund.run(late.pk) == "processed"
+        order.refresh_from_db()
+        assert order.payment_status == "REFUND_PENDING"  # the sale's refund is still open
+        assert order.amount_refunded == D("558.00")  # what came back so far (capped, T-409c)
+        assert process_refund.run(cancel.pk) == "processed"
+        order.refresh_from_db()
+        assert (order.payment_status, order.amount_refunded) == ("REFUNDED", D("558.00"))
+
+    def test_failed_cancel_refund_is_never_shown_as_refunded(self, checkout, shop, superuser):
+        from apps.payments.refunds import record_refund_status
+        from apps.payments.tasks import process_refund
+
+        order, cancel, late = self.paid_cancelled_then_captured_again(checkout, shop)
+        record_refund_status(cancel, "failed")
+        process_refund.run(late.pk)
+        order.refresh_from_db()
+        assert order.payment_status == "REFUND_PENDING"  # ops retry the failed one (T-401c)
+        retry = order_refunds.retry_refund(cancel.pk, by=superuser)
+        assert process_refund.run(retry.pk) == "processed"
+        order.refresh_from_db()
+        assert (order.payment_status, order.amount_refunded) == ("REFUNDED", D("558.00"))
+
+    def test_second_late_capture_keeps_the_order_pending(self, checkout, shop):
+        """Two late captures on an unpaid, cancelled order (T5): REFUNDED only when both are
+        back (before: REFUNDED as soon as the first one was)."""
+        from apps.orders import services
+        from apps.payments.tasks import process_refund
+
+        order_id, gateway_order_id = TestTwoLateCaptures().place_and_cancel(checkout, shop)
+        for payment_id in ("pay_LateCaptureC001", "pay_LateCaptureD001"):
+            services.capture_payment(
+                order_id,
+                gateway_order_id=gateway_order_id,
+                payment_id=payment_id,
+                amount_paise=55800,
+            )
+        first, second = Refund.objects.filter(order_id=order_id).order_by("pk")
+        process_refund.run(first.pk)
+        order = Order.objects.get(pk=order_id)
+        assert (order.payment_status, order.amount_refunded) == ("REFUND_PENDING", D("558.00"))
+        process_refund.run(second.pk)
+        order.refresh_from_db()
+        assert order.payment_status == "REFUNDED"
+
+    def test_refunded_order_goes_back_to_pending_for_a_late_capture(
+        self, checkout, shop, django_capture_on_commit_callbacks
+    ):
+        """Code review: an order already REFUNDED (paid, cancelled, refund processed) gets a
+        late capture: REFUND_PENDING until that refund is back, then REFUNDED (08 §4 rule 4)."""
+        from apps.orders import services
+        from apps.orders.tests.conftest import new_key
+        from apps.payments.tasks import process_refund
+
+        checkout.fill((shop.canola_1l, 2))
+        placement = checkout.place("ONLINE")
+        order_id = placement["order"]["id"]
+        retried = checkout.client.post(
+            f"{ORDERS}{order_id}/retry-payment/", headers={"Idempotency-Key": new_key()}
+        ).json()
+        checkout.verify(placement, "pay_SaleCapture002")
+        with django_capture_on_commit_callbacks(execute=True):
+            response = checkout.client.post(f"{ORDERS}{order_id}/cancel/", {"reason": "OTHER"})
+        assert response.status_code == 200
+        order = Order.objects.get(pk=order_id)
+        assert (order.payment_status, order.amount_refunded) == ("REFUNDED", D("558.00"))
+        outcome = services.capture_payment(
+            order_id,
+            gateway_order_id=retried["razorpay"]["order_id"],
+            payment_id="pay_LateAfterRfnd1",
+            amount_paise=55800,
+        ).outcome
+        assert outcome == "late_capture"
+        order.refresh_from_db()
+        assert (order.payment_status, order.amount_refunded) == ("REFUND_PENDING", D("558.00"))
+        late = Refund.objects.get(order=order, reason=order_refunds.LATE_CAPTURE)
+        assert process_refund.run(late.pk) == "processed"
+        order.refresh_from_db()
+        assert (order.payment_status, order.amount_refunded) == ("REFUNDED", D("558.00"))
+
+    def test_rejected_late_refund_waits_for_the_ops_retry(
+        self, checkout, shop, superuser, monkeypatch
+    ):
+        """Code review: the gateway refuses a late-capture refund for good (a 4xx; the task does
+        not retry). The order stays REFUND_PENDING until ops retry it (a new refund keyed
+        `capture:<payment id>:retry-1`, T-401c), then settles REFUNDED."""
+        from apps.orders import services
+        from apps.payments.gateways import PaymentGatewayRejected
+        from apps.payments.tasks import process_refund
+
+        order_id, gateway_order_id = TestTwoLateCaptures().place_and_cancel(checkout, shop)
+        services.capture_payment(
+            order_id,
+            gateway_order_id=gateway_order_id,
+            payment_id="pay_LateRejected1",
+            amount_paise=55800,
+        )
+        late = Refund.objects.get(order_id=order_id)
+
+        def refused(self, **kwargs):
+            raise PaymentGatewayRejected("HTTP 400", description="The payment is not refundable")
+
+        with monkeypatch.context() as gateway:
+            gateway.setattr(FakeRazorpayGateway, "refund", refused)
+            assert process_refund.run(late.pk) == "rejected"
+        late.refresh_from_db()
+        assert late.status == RefundStatus.FAILED
+        order = Order.objects.get(pk=order_id)
+        assert (order.payment_status, order.amount_refunded) == ("REFUND_PENDING", D("0.00"))
+        assert process_refund.run(late.pk) == "skipped"  # a FAILED refund is never re-sent
+        order.refresh_from_db()
+        assert order.payment_status == "REFUND_PENDING"
+        retry = order_refunds.retry_refund(late.pk, by=superuser)
+        assert (retry.idempotency_key, retry.reason) == (
+            "capture:pay_LateRejected1:retry-1",
+            order_refunds.LATE_CAPTURE,
+        )
+        order.refresh_from_db()
+        assert order.payment_status == "REFUND_PENDING"
+        assert process_refund.run(retry.pk) == "processed"
+        order.refresh_from_db()
+        assert (order.payment_status, order.amount_refunded) == ("REFUNDED", D("558.00"))
