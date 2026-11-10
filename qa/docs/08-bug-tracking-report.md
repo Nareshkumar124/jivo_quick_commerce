@@ -1,20 +1,22 @@
 # 08: Bug Tracking Report
 
-**Updated:** 2026-11-02 (QA run 1). **Build:** backend `4960527`.
+**Updated:** 2026-11-04 (Phase 3 QA stage 1). **Builds:** backend `4960527` (run 1), `0b801d1` (run 2: BUG-0008), `c2c153a` (P3 stage 1: BUG-0009).
 
 Severity uses `docs/10-testing-strategy.md` §5.3, with the brief's equivalent in brackets: P0 Blocker = Critical · P1 Critical = High · P2 Major = Medium · P3/P4 = Low. Security bugs keep their exploit detail in `qa/private/` (gitignored) until fixed.
 
 | ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
 |---|---|---|---|---|---|---|---|
-| [BUG-0001](../bugs/BUG-0001.md) | Request body over 2.5 MB returns 500 SERVER_ERROR instead of a 4xx | backend: core error envelope | P3 Minor (Low) | P2 | django-backend-dev | Open | P0-TC-08b |
-| [BUG-0002](../bugs/BUG-0002.md) | Numeric input validators accept non-ASCII characters (data integrity; security aspect private) | backend: accounts validators | P2 Major (Medium) | P1 | django-backend-dev | Open | P1-TC-04, 13, 14b, 52 |
-| [BUG-0003](../bugs/BUG-0003.md) | The refresh-token single-use rule is not enforced in all conditions (security; details private) | backend: token refresh | P2 Major (Medium) | P2 | django-backend-dev | Open | P1-TC-24c |
-| [BUG-0007](../bugs/BUG-0007.md) | Concurrent set-default calls can leave a user with no default address (all return 200 `is_default: true`) | backend: addresses service | P2 Major (Medium) | P3 | django-backend-dev | Open | P1-TC-57 |
-| [BUG-0004](../bugs/BUG-0004.md) | `addresses_list` returns 404 for an invalid page, but the contract doesn't document it | backend: OpenAPI contract | P3 Minor (Low) | P3 | django-backend-dev | Open | P1-TC-48, P1-TC-79 |
-| [BUG-0005](../bugs/BUG-0005.md) | Production settings silently default to the console SMS backend, which logs OTP codes | backend: settings / checks | P3 Minor (Low) | P2 | django-backend-dev | Open | P1-TC-96 |
+| [BUG-0001](../bugs/BUG-0001.md) | Request body over 2.5 MB returns 500 SERVER_ERROR instead of a 4xx | backend: core error envelope | P3 Minor (Low) | P2 | django-backend-dev | Verified (run 2, `0b801d1`) | P0-TC-08b |
+| [BUG-0002](../bugs/BUG-0002.md) | Numeric input validators accept non-ASCII characters (data integrity; security aspect private) | backend: accounts validators | P2 Major (Medium) | P1 | django-backend-dev | Verified (run 2, `0b801d1`) | P1-TC-04, 13, 14b, 52 |
+| [BUG-0003](../bugs/BUG-0003.md) | The refresh-token single-use rule is not enforced in all conditions (security; details private) | backend: token refresh | P2 Major (Medium) | P2 | django-backend-dev | Verified (run 2, `0b801d1`) | P1-TC-24c |
+| [BUG-0007](../bugs/BUG-0007.md) | Concurrent set-default calls can leave a user with no default address (all return 200 `is_default: true`) | backend: addresses service | P2 Major (Medium) | P3 | django-backend-dev | Verified (run 2, `0b801d1`) | P1-TC-57 |
+| [BUG-0008](../bugs/BUG-0008.md) | An anonymous notify-me repeat returns data from an earlier lead (privacy; details private) | backend: serviceability notify-me | P3 Minor (Low) | P2 | django-backend-dev | Open (status as filed in run 2; not re-verified in P3 stage 1) | P2-TC-18 |
+| [BUG-0009](../bugs/BUG-0009.md) | A signed webhook with an over-long payment id returns 500 instead of `ignored` (refund key overflow too) | backend: payments webhook | P3 Minor (Low) | P3 | django-backend-dev | Verified (stage 2, `f84482f`, fix `41f02f6`) | P3-TC-57 |
+| [BUG-0004](../bugs/BUG-0004.md) | `addresses_list` returns 404 for an invalid page, but the contract doesn't document it | backend: OpenAPI contract | P3 Minor (Low) | P3 | django-backend-dev | Verified (run 2, `0b801d1`) | P1-TC-48, P1-TC-79 |
+| [BUG-0005](../bugs/BUG-0005.md) | Production settings silently default to the console SMS backend, which logs OTP codes | backend: settings / checks | P3 Minor (Low) | P2 | django-backend-dev | Verified (run 2, `0b801d1`) | P1-TC-96 |
 | [BUG-0006](../bugs/BUG-0006.md) | Staff session lasts a fixed 12 hours; the doc requires 8 hours, and 2 hours idle for admin roles | backend: settings (staff sessions) | P3 Minor (Low) | P3 | django-backend-dev | Open | P1-TC-95 |
 
-**Open by severity:** P0: 0 · P1: 0 · P2: 3 · P3: 4 · P4: 0.
+**Open by severity (2026-11-04):** P0: 0 · P1: 0 · P2: 0 · P3: 2 (BUG-0006, BUG-0008; BUG-0008's residual fix landed in `41f02f6` but has not been re-verified by QA yet) · P4: 0. The statuses were synced with the bug files: run 2 verified BUG-0001…0005 and BUG-0007. Phase 3 stage 1 added BUG-0009, and stage 2 verified it.
 
 Verified fixes: none yet (first run).
 
@@ -29,3 +31,74 @@ Verified fixes: none yet (first run).
 | OBS-06 | The JWT `app` claim is set and survives rotation, but nothing enforces it yet (a customer-app token works with `X-App-Name: rider`). | No rider-only endpoint exists in P1. Re-test when the Phase 5 rider endpoints ship (02 §6: "header and token claims decide which app context applies"). |
 | OBS-07 | The local dev fallback `SECRET_KEY` (in the public repo's `config/settings/local.py`) signs the JWTs and OTP hashes of every server running local settings, including :8001. Anyone with the repo can mint tokens for any user id on such a server (verified on the QA instance, P1-TC-26b). | Dev-only by design; staging and production refuse it (P1-TC-26c). Keep :8001 bound to 127.0.0.1 or adb-reverse only; never expose a local-settings server on a network. |
 | OBS-08 | A user without a name gets addresses with an empty `receiver_name`. | The app forces the complete-profile step first (03 §2.2). Confirm on device (P1-TC-84/89). |
+| OBS-P3-01 (doc fixed in `41f02f6`) | 06 §2.6 says a capture of the wrong amount "is recorded nowhere and the order is not placed". The code (R2b) records it as a CAPTURED `Payment` and refunds it in full (`amount_mismatch`). The order's `amount_refunded` stays 0, so the money returned is visible only on the `Refund`. Duplicate-capture refunds behave the same way, and that is by design (DL-45: "without touching the order"). | The behaviour (refund) is the safer choice. The 06 wording should be aligned by the backend agent, and Finance should be told to read refunds from the `Refund` rows. Re-check after the R2b merge. |
+| OBS-P3-02 | Lenient type coercion: `POST /cart/items/ {"quantity": "2"}` is accepted as 2. `expected_grand_total: "-0"` gives 409 PRICE_CHANGED rather than 400. | DRF coercion, like OBS-03. P4. |
+| OBS-P3-03 | An `X-Razorpay-Event-Id` longer than 64 characters gets 400 "This header is required.", which is a misleading message (the header was sent). | P4 copy. The contract behaviour (400, nothing stored) is fine. |
+| OBS-P3-04 | Refunds stay `REFUND_PENDING` until a Celery worker consumes the broker. The QA instance has no worker by default; a QA worker on DB 7 settled every queued refund to `REFUNDED` correctly. | Environment only. Recorded so that REFUND_PENDING on the QA instance is not mistaken for a defect. |
+| OBS-P3-05 (2026-11-04, `9ed7ffc`) | Order 18 (a stage-1 QA order, PAYMENT_FAILED) had two separate late captures of ₹508. Each was refunded in full: two PROCESSED `late_capture` refunds, ₹1,016 in total. `amount_refunded` shows ₹508, because `record_refund_status` caps it at `grand_total` (`min(...)`). The money is correct: each charge was refunded once. Only the order-level total understates what went back. | By design today (one charge per order assumed). Raised for P4: with `amount_paid` arriving (backend R2, migration 0003), `amount_refunded` should be bounded by what was paid against the order, and Finance should reconcile from `Refund` rows. P4-TC-44/47 check it. |
+
+## Phase 4 stage 1 (2026-11-04, `1b3552d`)
+**No new bugs.** Every failure in the run was a QA test defect (fixed; listed in 03). Known open items not re-filed: OBS-P3-05, T-403c.
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| OBS-P4-01 | `manual_refund` keys each refund `manual:<order>:<n+1>`, so two submits make two refunds (each still capped by what is refundable). | No over-refund is possible, but a double click could refund twice. Check the console form's double-submit protection when admin P4 merges (TC-27/33). |
+| OBS-P4-02 | Late-capture (P3) orders have `amount_paid` 0 and `amount_refunded` = the late capture (e.g. ₹190), so `amount_refunded > amount_paid` on 26 old orders. | Consistent with DL-45 (a late capture is not a sale). Finance should read refunds from `Refund` rows; QA's P4-TC-44 bound is now `max(grand_total, amount_paid)`. Suggest that 07 says so. |
+| OBS-P4-03 | The :8001 beat (`sweep_placed_orders`, `sync_refund_status`) also acts on QA orders on the shared DB. | Environment only; all such actions are idempotent. |
+| OBS-P4-04 | T8a recomputes fees from the store's **current** `PricingConfig` (capped at the order's fees). | It never raises the amount (cap); if the config is lowered the customer benefits. Confirm intent with D-10. |
+
+## Phase 4 stage 2 (2026-11-04, `f744508`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0010](../bugs/BUG-0010.md) | The panel has no manual refund (full / partial) for Super Admin, Support and Finance | admin panel: Orders / Refunds | P2 Major (Medium) | P1 | admin-panel-dev | Open | P4-TC-32, 33, 40 |
+| [BUG-0011](../bugs/BUG-0011.md) | Orders admin has no CSV export | admin panel: Orders | P3 Minor (Low) | P3 | admin-panel-dev | Open | P4-TC-40 |
+
+**OBS-P4-01: resolved** (one-time token on the refund-retry form): the identical retry form posted twice makes one retry (TC-34c). The same protection must be on the manual refund form when BUG-0010 is built.
+
+**Open by severity:** P0 0 · P1 0 · P2 1 (BUG-0010) · P3 3 (BUG-0006, BUG-0008, BUG-0011).
+
+## Phase 5 stage 2 (2026-11-06, develop `999ef38` → `f5d39ff` → `680b904`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0012](../bugs/BUG-0012.md) | Dispatch crashes outside test settings (`CELERY_TASK_ALWAYS_EAGER` read from settings), so no rider is ever offered an order | backend: delivery dispatch | **P0 Blocker (Critical)** | P0 | django-backend-dev | **Verified** (fix `f5d39ff`) | P5-TC-34, 39 and every 5.3 flow |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 `rider_status NONE` (documents, bank-account) | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open | P5-TC-16 |
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| O-P5-01 | A BICYCLE registration with a vehicle number is refused ("Only motorbikes and scooters have a number here"). | 06 §3 only says the number is *required* for motorised vehicles; the test case assumed "optional". Doc ambiguity: PM to confirm, then 06 states it. |
+| O-P5-02 | Rejecting an already-EXPIRED offer returns 204 (no-op; the offer stays EXPIRED). | 06/08 are silent on a late reject. The state is not rewritten (checked), so harmless. Suggest 06 states "late reject is a no-op 204". |
+| O-P5-03 | `shift/start` accepts numeric strings for lat/lng (DRF FloatField coercion); the location batch contract says "JSON numbers". | No harm (judged on the position). Align the contract text or make the field strict. |
+| O-P5-04 | `PUT /rider/bank-account/` normalises a lowercase IFSC to upper case; the response has `upi_id: null` although the schema types it as a non-null string. | Normalising is fine. `null` vs schema: check `RiderBankAccount.upi_id` nullability on the next schema export (strict validation did not fail because the op validated a 200 with upi_id set). |
+| O-P5-05 | `shift/end` with an active task answers code `INVALID_STATE_TRANSITION` with `details.reason = ACTIVE_TASK` (06 §3 wording "409 `ACTIVE_TASK`" reads like a code). | Code is in the doc-06 §6 set; QA oracle updated. Suggest 06 says "reason". |
+
+## Phases 6 and 7, and P5 stage 2 rerun (2026-11-09, develop `efb3c3d`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0020](../bugs/BUG-0020.md) | An oversized socket message closes with 1011 instead of 1009 on the dev server | backend: realtime consumers | P3 Minor (Low) | P2 | django-backend-dev | Open (code unchanged at `efb3c3d`) | P6-TC-50 |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open (xfail still holds at `efb3c3d`) | P5-TC-16 |
+
+**No new bug filed on 2026-11-09.** To investigate (not bugs yet): 5 P5 failures in `test_p5_cash.py` (TC-88 ×2, TC-89 ×2, TC-93), details not captured before the run was stopped; per-broadcast ~2 s latency in the QA worker (performance observation).
+
+**Open by severity:** P0 0 · P1 0 · P2 1 (BUG-0010) · P3 5 (BUG-0006, 0008, 0011, 0013, 0020).
+
+
+## QA stage 3: P5 finish, P6, P7 rest (2026-11-10, develop `efb3c3d` in QA worktree `b87eb5f`; backend delivery/realtime/orders code unchanged on develop `3f6fc42`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0021](../bugs/BUG-0021.md) | Rider pickup (T9) sends no `order.status` OUT_FOR_DELIVERY to the order socket or the ops feed | backend: delivery task flow / order events | P2 Major (Medium) | P1 | django-backend-dev | Open | P6-TC-59 (and the socket part of P6-TC-14) |
+| [BUG-0022](../bugs/BUG-0022.md) | `rider.location` always carries `heading: null` although the rider sends a heading | backend: rider location ingest | P3 Minor (Low) | P3 | django-backend-dev | Open | P6-TC-14 |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open (xfail still holds) | P5-TC-16 |
+| [BUG-0020](../bugs/BUG-0020.md) | Oversized socket message → 1011 instead of 1009 on daphne | backend: realtime consumers | P3 Minor (Low) | P2 | django-backend-dev | Open (xfail still holds) | P6-TC-50 |
+
+**The 2026-11-09 "to investigate" items are closed, with no bug:**
+- **The 5 `test_p5_cash` failures (TC-88 ×2, TC-89 ×2, TC-93).** Rerun with `-k "tc88 or tc89 or tc93"`: **6 passed**. Cause: R1 had reached ₹4,560 of the ₹5,000 cash limit, so COD offers were skipped by design (DL-61b) and the first COD-flow tests waited for an offer in vain. `cleanup_rider` now deposits leftover cash.
+- **The ~2 s per broadcast.** Found and explained; see OBS-S3-01/02.
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| OBS-S3-01 | On this Windows host `localhost` resolves to `::1` first. Redis 6380 listens only on IPv4, so every **new** Redis connection to `redis://localhost:6380` costs **2.04 s** (`socket.create_connection(("localhost", 6380))` 2.038 s vs `127.0.0.1` 0.001 s). The Celery publish path opens a new channel-layer connection per send, so each `broadcast_ws` / `publish_*` took ~2 s, and an order event 4–8 s. | Environment, not product. QA moved its instance, worker and drivers to `redis://127.0.0.1:6380/…`: publish tasks now take 0.14–0.2 s. **PM / DevOps:** the :8001 stack (`backend/.env`, `local.py` defaults `redis://localhost:6380`, `docs/dev-environment.md`) very likely has the same 2 s per live event on the user's phone. Use `127.0.0.1`. |
+| OBS-S3-02 | With `--pool=threads --concurrency=4`, `PREFETCH_MULTIPLIER=1` and `ACKS_LATE`, the Windows worker (synchronous consumer loop, no event hub) stops fetching while 4 messages are reserved, so tasks reached the worker in ~4 s bursts (cancel response 12:49:27.77 → tasks received 12:49:33.61). The broker itself is instant (probe: 1–2 ms). | Local worker configuration. With 16 threads, P6-TC-11 passes (≤ 3 s). Staging and production run prefork workers with the event loop; the 09 §1 latency targets must be measured there (Phase 8). |
+| OBS-S3-03 | With MinIO stopped (it was down at the start of this session), a rider document upload did not fail fast: the request hung until the client's read timeout (P5-TC-14, `httpx.ReadTimeout`) instead of answering 503 `SERVICE_UNAVAILABLE`. | Seen once in an unplanned outage; not reproduced deliberately (stopping MinIO would affect other agents). Recheck with a storage-fault profile; suggest short S3 connect/read timeouts in settings. |
+| OBS-S3-04 | `order.delivered` now links to `jivo://orders/{id}/rate` (P7, api-requests #55). | Intended. QA's P6-TC-40 oracle updated. |
+
+**Open by severity (2026-11-10):** P0 0 · P1 0 · P2 2 (BUG-0010, **BUG-0021**) · P3 6 (BUG-0006, 0008, 0011, 0013, 0020, **0022**).

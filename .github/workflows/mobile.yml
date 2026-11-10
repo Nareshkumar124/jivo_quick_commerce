@@ -3,7 +3,7 @@
 #   customer_app/  rider_app/  packages/jivo_core/  packages/jivo_api/
 #
 # - consistency: packages shared by several projects resolve to the same
-#   version everywhere, and generated code (jivo_api from
+#   version everywhere, the Razorpay SDK pins have not drifted, and generated code (jivo_api from
 #   backend/openapi/schema.yaml, gen-l10n output) matches the commit.
 # - project (matrix): pub get with the committed lockfile, analyze, test.
 # - build-android (matrix): the dev-flavor APK of each app.
@@ -17,6 +17,7 @@ on:
       - "rider_app/**"
       - "packages/**"
       - "backend/openapi/schema.yaml"
+      - "infra/scripts/check_razorpay_pins.py"
       - ".github/workflows/mobile.yml"
   pull_request:
     paths:
@@ -24,6 +25,7 @@ on:
       - "rider_app/**"
       - "packages/**"
       - "backend/openapi/schema.yaml"
+      - "infra/scripts/check_razorpay_pins.py"
       - ".github/workflows/mobile.yml"
   workflow_dispatch:
 
@@ -61,13 +63,19 @@ jobs:
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          cache: true      # Flutter SDK
+          pub-cache: true  # ~/.pub-cache, keyed on every pubspec.lock
 
       - name: Check the pinned Flutter version
         run: flutter --version | grep -q "Flutter ${FLUTTER_VERSION} "
 
       - name: Shared packages resolve to the same version in every lockfile
         run: python3 packages/tool/check_shared_versions.py
+
+      # razorpay_flutter in pubspec.yaml/pubspec.lock and the Android SDK set forced in
+      # customer_app/android/app/build.gradle.kts must match the verified pins.
+      - name: Razorpay SDK pins have not drifted
+        run: python3 infra/scripts/check_razorpay_pins.py
 
       - name: Resolve every project (also regenerates l10n)
         run: |
@@ -108,7 +116,8 @@ jobs:
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          cache: true      # Flutter SDK
+          pub-cache: true  # ~/.pub-cache, keyed on every pubspec.lock
 
       - name: Resolve dependencies (lockfile must be up to date)
         run: flutter pub get --enforce-lockfile
@@ -143,6 +152,11 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
+          # ~/.gradle caches and wrapper, keyed on this app's Gradle files.
+          cache: gradle
+          cache-dependency-path: |
+            ${{ matrix.app }}/android/**/*.gradle*
+            ${{ matrix.app }}/android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Install the Android platform the apps compile against
         run: yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install "${ANDROID_PLATFORM}" > /dev/null
@@ -151,7 +165,8 @@ jobs:
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          cache: true      # Flutter SDK
+          pub-cache: true  # ~/.pub-cache, keyed on every pubspec.lock
 
       - name: Resolve dependencies
         run: flutter pub get --enforce-lockfile

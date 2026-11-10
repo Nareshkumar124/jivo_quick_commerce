@@ -32,6 +32,9 @@ REFUND = "refund"
 REDEMPTION = "redemption"  # CouponRedemption.status (07 §2.5)
 COUPON = "coupon"  # derived: coupon_state()
 COD = "cod"  # User.cod_blocked
+TICKET = "ticket"  # SupportTicket.status (P7)
+TICKET_PRIORITY = "ticket_priority"  # SupportTicket.priority (P7)
+TICKET_SLA = "ticket_sla"  # support.services.with_sla (P7)
 
 BADGES: dict[str, dict[str, Badge]] = {
     CUSTOMER: {
@@ -109,6 +112,19 @@ BADGES: dict[str, dict[str, Badge]] = {
     COD: {
         "allowed": Badge("COD allowed", SUCCESS),
         "blocked": Badge("COD blocked", DANGER),
+    },
+    TICKET: {
+        "OPEN": Badge("Open", WARNING),
+        "IN_PROGRESS": Badge("In progress", INFO),
+        "RESOLVED": Badge("Resolved", SUCCESS),
+        "CLOSED": Badge("Closed", NEUTRAL),
+    },
+    TICKET_SLA: {"breached": Badge("SLA breached", DANGER)},
+    TICKET_PRIORITY: {
+        "LOW": Badge("Low", NEUTRAL),
+        "NORMAL": Badge("Normal", INFO),
+        "HIGH": Badge("High", WARNING),
+        "URGENT": Badge("Urgent", DANGER),
     },
 }
 

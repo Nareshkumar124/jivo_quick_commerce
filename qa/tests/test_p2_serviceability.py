@@ -304,9 +304,9 @@ def test_p2_tc17_notify_me_validation(api, no_notify_throttle, patch, field):
 
 @pytest.mark.db
 def test_p2_tc18_notify_me_dedupe(api, no_notify_throttle):
-    """P2-TC-18 The same person repeating within 24 h and 100 m gets the same lead back (201,
-    same id); a point 1 km away is a new lead. (What a merged anonymous repeat returns is checked
-    by a private guard test, BUG-0008.)"""
+    """P2-TC-18 Anonymous repeats are never merged (06 §2.3 after the BUG-0008 fix, verified
+    2026-11-09): a repeat within 24 h and 100 m gets a lead of its own that echoes only its own
+    values; a point 1 km away is a new lead too. (Signed-in merging: P2-TC-18b.)"""
     lat, lng = _random_unserviced_point()
     phone = QA_PHONES["e"]
     first = api.post(NOTIFY, json={"lat": lat, "lng": lng, "phone": phone, "address_text": "QA first"})
@@ -315,7 +315,8 @@ def test_p2_tc18_notify_me_dedupe(api, no_notify_throttle):
         NOTIFY, json={"lat": lat + 0.00045, "lng": lng, "phone": phone, "address_text": "QA second"}
     )
     assert near.status_code == 201, describe(near)
-    assert near.json()["id"] == first.json()["id"]
+    assert near.json()["id"] != first.json()["id"]  # BUG-0008: an anonymous repeat is never merged
+    assert near.json()["address_text"] == "QA second"  # echoes only the caller's own values
     far = api.post(NOTIFY, json={"lat": lat + 0.009, "lng": lng, "phone": phone})  # ~1 km
     assert far.status_code == 201 and far.json()["id"] != first.json()["id"]
     (( n,),) = db_query(
@@ -324,7 +325,18 @@ def test_p2_tc18_notify_me_dedupe(api, no_notify_throttle):
         "ST_SetSRID(ST_MakePoint(%s, %s), 4326), 0.02)",
         (phone, lng, lat),
     )
-    assert n == 2
+    assert n == 3
+
+
+@pytest.mark.db
+def test_p2_tc18b_notify_me_signed_in_merge(api, no_notify_throttle):
+    """P2-TC-18b A signed-in user's repeat within 24 h and 100 m merges into their own lead (same id)."""
+    lat, lng = _random_unserviced_point()
+    s = login(QA_PHONES["d"])
+    first = api.post(NOTIFY, json={"lat": lat, "lng": lng, "phone": QA_PHONES["d"]}, headers=s.headers)
+    near = api.post(NOTIFY, json={"lat": lat + 0.00045, "lng": lng, "phone": QA_PHONES["d"]}, headers=s.headers)
+    assert first.status_code == 201 and near.status_code == 201, describe(near)
+    assert near.json()["id"] == first.json()["id"]
 
 
 @pytest.mark.limits

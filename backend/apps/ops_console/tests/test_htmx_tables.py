@@ -121,7 +121,12 @@ def test_table_queries_do_not_grow_with_rows(client, django_assert_max_num_queri
 
 
 # Measured 2026-11-03 with every Phase 2 card (Super Admin: 19 queries); budget = measured + 2.
-DASHBOARD_QUERY_BUDGET = 21
+# P7 (2026-11-06): + the order section, a fixed 12 (scope, store choices, 3 KPI aggregates,
+# 4 charts, 4 alerts; none grows with rows; test_p7_reports pins it with 10 orders x 3 lines).
+# On the backend's apps.reports.dashboard (backend/phase-7): measured 44 (its alerts run a
+# count and an items query per block); still fixed, not per row. +1 for the low-ratings alert
+# (one items query; the count runs only when the list is full).
+DASHBOARD_QUERY_BUDGET = 45 + 2
 
 
 def test_dashboard_query_budget(client, django_assert_max_num_queries):

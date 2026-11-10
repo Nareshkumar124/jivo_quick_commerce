@@ -1,0 +1,20 @@
+# Fixtures compared byte-for-byte in tests: keep LF on every OS (core.autocrlf on Windows).
+*.gpx text eol=lf
+*.sh text eol=lf
+
+# Linux build and deploy inputs: LF in every checkout AND in `git archive` output, whatever
+# core.autocrlf says. A Windows `git archive` (autocrlf=true) once shipped a CRLF Dockerfile: its
+# heredoc scripts (jqc-entrypoint, jqc-release) got a `#!/bin/sh\r` shebang and the container died
+# with "exec /usr/local/bin/jqc-entrypoint: no such file or directory" (docs/deployment.md).
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+*.dockerfile text eol=lf
+.dockerignore text eol=lf
+.python-version text eol=lf
+# Python runs in the image (manage.py and tool scripts carry a shebang and the executable bit).
+*.py text eol=lf
+# Shell and config files that go to the server as-is.
+*.bash text eol=lf
+infra/deploy/** text eol=lf
+infra/nginx/** text eol=lf
+infra/docker-compose*.yml text eol=lf

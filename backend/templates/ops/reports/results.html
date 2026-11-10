@@ -1,0 +1,47 @@
+{# Report results region (also the HTMX partial). Context: report, form, table (None on a filter error; table.column_notes explain reconciliation-only columns), filter_error, params, too_many, export_query, dated, exports, export_form_query. #}
+<div id="report-region" data-testid="report-region">
+    {% if table %}
+        <div class="flex flex-wrap items-center gap-3 mb-3">
+            <span class="text-xs text-font-subtle-light dark:text-font-subtle-dark">{% if dated %}{{ params.start|date:"d M Y" }} to {{ params.end|date:"d M Y" }} (IST){% else %}Current snapshot: the dates do not apply.{% endif %}</span>
+            {% if too_many %}
+                <span class="ml-auto text-xs ops-tone-warning" data-testid="report-too-many">Too many rows to show or download here: request an export.</span>
+            {% elif table.paginator.count %}
+                <a class="ml-auto ops-button ops-button--secondary" href="{% url 'ops:report' report.slug %}?{{ export_query }}" hx-boost="false" download data-testid="report-export">
+                    <span class="material-symbols-outlined md-18" aria-hidden="true">download</span> Download CSV
+                </a>
+            {% endif %}
+            <form method="post" action="{% url 'ops:report-export' report.slug %}" data-testid="report-export-request">
+                {% csrf_token %}
+                <input type="hidden" name="date_from" value="{{ params.start|date:'Y-m-d' }}">
+                <input type="hidden" name="date_to" value="{{ params.end|date:'Y-m-d' }}">
+                <input type="hidden" name="store" value="{{ params.store_id|default_if_none:'' }}">
+                <input type="hidden" name="query" value="{{ export_form_query }}">
+                <button type="submit" class="ops-button ops-button--secondary">Export in background</button>
+            </form>
+        </div>
+        {% include "ops/components/data_table_results.html" %}
+        {% if table.column_notes %}
+            <dl class="mt-3 flex flex-col gap-1 text-xs ops-text-secondary" data-testid="report-column-notes">
+                {% for note in table.column_notes %}
+                    <div><dt class="inline font-semibold">{{ note.title }}:</dt> <dd class="inline">{{ note.help }}</dd></div>
+                {% endfor %}
+            </dl>
+        {% endif %}
+    {% else %}
+        {% include "ops/components/error_state.html" with title="Check the filters" message=filter_error %}
+    {% endif %}
+    {% if exports %}
+        <section class="mt-6" aria-labelledby="exports-heading" data-testid="report-exports">
+            <h2 id="exports-heading" class="font-semibold mb-2 text-font-important-light dark:text-font-important-dark">Your recent exports</h2>
+            <ul class="flex flex-col gap-1">
+                {% for export in exports %}
+                    <li class="flex gap-3 text-xs">
+                        <span>{{ export.created_at|date:"d M Y, H:i" }} IST</span>
+                        <span>{{ export.get_status_display }}</span>
+                        {% if export.status == "DONE" %}<a class="text-primary-600 dark:text-primary-500" href="{% url 'ops:report-export-download' export.pk %}">Download ({{ export.row_count }} rows)</a>{% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+</div>

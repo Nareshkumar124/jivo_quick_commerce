@@ -10,6 +10,8 @@ import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../../offers/domain/delivery_offer.dart';
 import '../../offers/presentation/offer_alert_providers.dart';
+import '../../realtime/presentation/rider_socket_providers.dart';
+import '../data/api_task_repository.dart';
 import '../data/fake_task_backend.dart';
 import '../data/platform_task_services.dart';
 import '../domain/rider_task.dart';
@@ -20,10 +22,10 @@ import '../domain/task_rules.dart';
 /// in P3) and the rider's records (earnings, payouts, cash, history,
 /// profile; built ahead in P4).
 ///
-/// TODO(api): no rider API until the end of P4, so they run only against the
-/// fakes, gated like onboarding (DL-30, DL-32): the dev flavor only (also
-/// with the real login). Staging and prod keep the Phase 1 home, even with
-/// `FAKE_API`.
+/// Bound to the generated client (P5 slices 5.3/5.4; the fakes with
+/// `FAKE_API`), still gated like onboarding (DL-30, DL-32): the dev flavor
+/// only, until the PM opens them for staging. Staging and prod keep the
+/// Phase 1 home, even with `FAKE_API`.
 final riderWorkEnabledProvider = Provider<bool>(
   (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
 );
@@ -36,25 +38,45 @@ final riderWorkActiveProvider = Provider<bool>((ref) {
       account.riderStatus == RiderStatusEnum.ACTIVE;
 });
 
-/// TODO(api): the fake offer and task backend. Overridden in tests.
+/// The fake offer and task backend (`FAKE_API` builds). Overridden in
+/// tests.
 final fakeTaskBackendProvider = Provider<FakeTaskBackend>(
   (ref) => FakeTaskBackend(clock: ref.watch(clockProvider)),
 );
 
-final offerRepositoryProvider = Provider<OfferRepository>((ref) {
-  if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
-  return ref.watch(fakeTaskBackendProvider);
-});
+/// The offer and task endpoints through the generated client (T-515b).
+final apiTaskRepositoryProvider = Provider<ApiTaskRepository>(
+  (ref) => ApiTaskRepository(ref.watch(jivoApiProvider)),
+);
 
+/// Offers, offer events and the task: the generated client, or the fake
+/// with `FAKE_API`. Only where the rider work screens run (dev flavor,
+/// DL-30/DL-32).
+T _taskBackend<T extends Object>(Ref ref, T unavailable) {
+  if (!ref.watch(riderWorkEnabledProvider)) return unavailable;
+  if (ref.watch(appEnvProvider).useFakeApi) {
+    return ref.watch(fakeTaskBackendProvider) as T;
+  }
+  return ref.watch(apiTaskRepositoryProvider) as T;
+}
+
+final offerRepositoryProvider = Provider<OfferRepository>(
+  (ref) => _taskBackend<OfferRepository>(ref, const _Unavailable()),
+);
+
+/// Pushed offer events: the fake's in `FAKE_API` builds, otherwise the
+/// rider socket's (`/ws/v1/rider/`, P6).
 final offerEventSourceProvider = Provider<OfferEventSource>((ref) {
   if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
-  return ref.watch(fakeTaskBackendProvider);
+  if (ref.watch(appEnvProvider).useFakeApi) {
+    return ref.watch(fakeTaskBackendProvider);
+  }
+  return ref.watch(socketOfferEventsProvider);
 });
 
-final taskRepositoryProvider = Provider<TaskRepository>((ref) {
-  if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
-  return ref.watch(fakeTaskBackendProvider);
-});
+final taskRepositoryProvider = Provider<TaskRepository>(
+  (ref) => _taskBackend<TaskRepository>(ref, const _Unavailable()),
+);
 
 final navigationLauncherProvider = Provider<NavigationLauncher>(
   (ref) => GeoIntentNavigationLauncher(ref.watch(urlOpenerProvider)),
@@ -73,7 +95,7 @@ final offerAlerterProvider = Provider<OfferAlerter>(
   ),
 );
 
-/// Staging and prod until the rider API lands: never reached (the
+/// Staging and prod while gated: never reached (the
 /// controllers do nothing there), every call fails with `NOT_FOUND`.
 class _Unavailable
     implements OfferRepository, OfferEventSource, TaskRepository {
@@ -95,7 +117,7 @@ class _Unavailable
       throw _error;
 
   @override
-  Future<RiderTask?> fetchCurrentTask() async => throw _error;
+  Future<CurrentTask> fetchCurrentTask() async => throw _error;
 
   @override
   Future<RiderTask> arrivedAtStore(int taskId, GeoPoint at) async =>

@@ -276,8 +276,9 @@ def test_p1_tc13_verify_validation(api, patch):
 @pytest.mark.smoke
 def test_p1_tc21_rider_app_login(api):
     """P1-TC-21 🔥 Rider-app login (X-App-Name: rider, app=rider) -> rider_status NONE (no rider
-    profile until Phase 5), the token app claim is rider."""
-    s = login(QA_PHONES["c"], app="rider")
+    profile until Phase 5), the token app claim is rider. Since P5, C is rider R1, so this uses E
+    (no rider profile; stage 3)."""
+    s = login(QA_PHONES["e"], app="rider")
     assert s.body["rider_status"] == "NONE"
     assert s.user["rider_status"] == "NONE"
     assert jwt_claims(s.refresh)["app"] == "rider"

@@ -8,7 +8,13 @@ from django.utils import timezone
 
 from apps.accounts.models import OTPRequest
 from apps.accounts.services import auth, otp
-from apps.notifications.sms import SmsError, mask_phone, send_sms
+from apps.notifications.sms import (
+    SmsError,
+    SmsOutcomeUnknown,
+    SmsRejected,
+    mask_phone,
+    send_sms,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +31,29 @@ def send_otp_sms(otp_request_id: int, code: str) -> str:
     now = timezone.now()
     if request is None or request.sms_sent_at or request.verified_at or request.expires_at <= now:
         return "skipped"
-    send_sms(
-        request.phone,
-        otp.render_otp_sms(code, request.app),
-        settings.SMS_OTP_DLT_TEMPLATE_ID,
-    )
+    try:
+        send_sms(
+            request.phone,
+            otp.render_otp_sms(code, request.app),
+            settings.SMS_OTP_DLT_TEMPLATE_ID,
+        )
+    except SmsRejected:
+        # The gateway refused this number (e.g. unverified on a Twilio trial account): a retry
+        # cannot help. The backend has logged the reason; the user can request a new OTP.
+        logger.warning(
+            "OTP SMS rejected by the gateway: otp_request=%s phone=%s",
+            request.pk,
+            mask_phone(request.phone),
+        )
+        return "rejected"
+    except SmsOutcomeUnknown:
+        # Twilio may have sent it; a retry could send a duplicate OTP (no idempotency key).
+        logger.warning(
+            "OTP SMS outcome unknown, not retried: otp_request=%s phone=%s",
+            request.pk,
+            mask_phone(request.phone),
+        )
+        return "unknown"
     OTPRequest.objects.filter(pk=request.pk, sms_sent_at__isnull=True).update(sms_sent_at=now)
     logger.info("OTP SMS sent: otp_request=%s phone=%s", request.pk, mask_phone(request.phone))
     return "sent"
@@ -47,3 +71,22 @@ def anonymise_deleted_accounts() -> int:
 def purge_old_otp_requests() -> int:
     """07 §4, beat daily: OTP requests are kept 30 days."""
     return otp.purge_old_otp_requests()
+
+
+@shared_task(name="accounts.flush_expired_tokens")
+def flush_expired_tokens() -> str:
+    """T-814 (M2), beat daily: deletes expired outstanding/blacklisted refresh tokens
+    (simplejwt's `flushexpiredtokens`). Idempotent."""
+    from django.core.management import call_command
+
+    call_command("flushexpiredtokens", verbosity=0)
+    return "done"
+
+
+@shared_task(name="accounts.clear_expired_sessions")
+def clear_expired_sessions() -> str:
+    """T-814 (M2), beat daily: deletes expired staff sessions (`clearsessions`). Idempotent."""
+    from django.core.management import call_command
+
+    call_command("clearsessions", verbosity=0)
+    return "done"

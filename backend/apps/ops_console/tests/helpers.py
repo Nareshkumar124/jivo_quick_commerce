@@ -147,3 +147,35 @@ def admin_form_data(response) -> dict:
             _form_values(form, data)
     data["_save"] = "Save"
     return data
+
+
+# Phase 4 (05 §3 rows; apps/ops_console/capabilities.py). Support retries refunds through
+# `payments.issue_refund` (up to SUPPORT_REFUND_LIMIT, enforced by the service).
+LIVE_BOARD_ROLES = frozenset({*_SA, roles.OPS, roles.STORE_MANAGER, roles.SUPPORT})
+PACKING_ROLES = frozenset({*_SA, roles.OPS, roles.STORE_MANAGER, roles.STORE_STAFF})
+CANCEL_ORDER_ROLES = frozenset({*_SA, roles.OPS, roles.STORE_MANAGER, roles.SUPPORT})
+RETRY_REFUND_ROLES = frozenset({*_SA, roles.FINANCE, roles.SUPPORT})
+TOGGLE_STORE_ROLES = frozenset({*_SA, roles.STORE_MANAGER})  # 05 §1.3 "Store Manager can toggle"
+AUDIT_LOG_ROLES = frozenset({*_SA, roles.FINANCE})
+
+# Phase 5 (05 §3 "Manual dispatch"; DL-61, user 2026-11-05): every ops delivery action, receive
+# return included, is Super Admin, Ops and Store Manager (own store). Finance only records cash
+# deposits (slice 5.4). Support and Store Staff: none.
+DISPATCH_ROLES = frozenset({*_SA, roles.OPS, roles.STORE_MANAGER})
+RECEIVE_RETURN_ROLES = DISPATCH_ROLES
+
+
+# SLICE 5.4 (DL-61 a; 05 §3 "Cash deposit entry", "Payouts"). Only once the 5.4 services are on
+# the branch; before that the screens are hidden from everyone (capabilities.SERVICE_GATED).
+def _has_54(module: str) -> bool:
+    import importlib.util
+
+    return importlib.util.find_spec(module) is not None
+
+
+HAS_CASH_54 = _has_54("apps.delivery.services.cash")
+HAS_PAYOUTS_54 = _has_54("apps.delivery.services.payouts")
+CASH_ROLES = frozenset(
+    {*_SA, roles.OPS, roles.STORE_MANAGER, roles.FINANCE} if HAS_CASH_54 else set()
+)
+PAYOUT_ROLES = frozenset({*_SA, roles.FINANCE} if HAS_PAYOUTS_54 else set())

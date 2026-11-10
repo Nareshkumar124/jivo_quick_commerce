@@ -4,6 +4,10 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Jivo uses your location to set the delivery point of your address.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Jivo uses the camera to take a photo for your support ticket.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Jivo lets you choose a photo to add to your support ticket.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

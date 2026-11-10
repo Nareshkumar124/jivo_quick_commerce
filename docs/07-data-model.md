@@ -174,9 +174,9 @@ Phase 3 R2a additions to Order: `payment_expires_at` (PAYMENT_PENDING only: the 
 
 **OrderStatusHistory**: `order`, `from_status`, `to_status`, `actor` (user nullable), `actor_type` (customer/store/rider/ops/system), `note`, `created_at`. Append-only (the model and its queryset refuse updates and deletes, like `StockMovement`).
 
-**Invoice**: `order` (1:1), `invoice_number` (per store GSTIN, per financial year sequence, e.g., `DEL01/26-27/000123`), `issued_at`, `pdf`, `taxable_value`, `cgst`, `sgst`, `igst`, `total`. Credit notes for refunds after invoicing: `CreditNote` with the same structure (Phase 4).
+**Invoice**: `order` (1:1), `invoice_number` (per store GSTIN, per financial year sequence, e.g., `DEL01/26-27/000123`), `issued_at`, `pdf`, `taxable_value`, `cgst`, `sgst`, `igst`, `total`. Credit notes for refunds after invoicing: `CreditNote` with the same structure (Phase 4). Phase 4 built `Invoice` with `seller_gstin`, `is_placeholder` (placeholder GST data, D-12) and `pdf` (private bucket), numbered through `InvoiceSequence (store, financial_year, last_number)`; `CreditNote` is deferred (invoices exist only for DELIVERED orders, and post-delivery refunds arrive with returns in Phase 5). `Order` gains `amount_paid` (the sale capture; refunds are bounded by it, constraint `order_refund_within_paid`) and the permissions `process_order` / `cancel_order`.
 
-**Rating**: `order`, `user`, `target` (ORDER/RIDER), `rider` (nullable), `stars` (1–5), `tags` (JSON), `comment`.
+**Rating**: `order`, `user`, `target` (ORDER/RIDER), `rider` (nullable), `stars` (1–5), `tags` (JSON), `comment`. Built in P7 (`orders.0005`): unique (`order`, `target`); checks stars 1–5 and `rider` set exactly for RIDER rows; indexes (`rider`, −created_at), (`target`, `stars`, −created_at); `comment` ≤ 500.
 
 ### 2.7 Payments (`payments`)
 
@@ -189,6 +189,41 @@ Phase 3 R2a additions to Order: `payment_expires_at` (PAYMENT_PENDING only: the 
 ### 2.8 Delivery (`delivery`)
 
 **Rider** (1:1 User): `home_store`, `status` (PENDING_KYC / ACTIVE / REJECTED / SUSPENDED), `rejection_reason`, `vehicle_type`, `vehicle_number`, `dob`, `emergency_contact`, `photo`, `is_online`, `current_location` (Point, mirrored in Redis), `last_location_at`, `cash_in_hand`, `cash_limit`, `rating_avg`, `bank_account_name`, `bank_account_number` (encrypted), `ifsc`, `upi_id`.
+
+Phase 5 implementation (slices 5.1/5.2, migration `delivery.0001`):
+- **Rider:**
+  - `full_name` is the legal name.
+  - The emergency contact is split into `emergency_contact_name` and `emergency_contact_phone`.
+  - `preferred_store` is the store chosen at registration; `home_store` is set by ops on approval.
+  - Added: `suspension_reason`, `last_heartbeat_at`, `submitted_at`, `approved_at` and `approved_by`.
+  - Bank fields are `bank_account_name`, `bank_account_number_encrypted` (Fernet, `FIELD_ENCRYPTION_KEYS`), `bank_account_last4`, `ifsc`, `upi_id` and `bank_updated_at`.
+  - There is no `photo` field: the photo is the PHOTO document.
+  - The rider has simple_history, without the location fields.
+  - Check constraints: an ACTIVE rider has a home store; only an ACTIVE rider can be online; `cash_limit` >= 0.
+- **RiderDocument:**
+  - One row per (rider, `doc_type`). Adds `number_encrypted`, `reviewed_at` and `uploaded_at`.
+  - Aadhaar is stored masked only (never the full number); PAN, DL and RC are encrypted plus masked.
+- **Rider, review additions:**
+  - `last_location_received_at`: server time, used for presence.
+  - `kyc_purge_after` and `anonymised_at`.
+  - `dob` is nullable (blanked on erasure).
+- **RiderShift** adds `ended_by`, with at most one open shift per rider.
+- **DeliveryTask** (slice 5.3, migration `delivery.0002`):
+  - One per order (OneToOne).
+  - Adds `search_started_at`, `unassigned_at`, `next_dispatch_at` (dispatch rounds), `cod_amount_previous`, `arrival_override_reason`, `fail_note`, `fail_call_attempts`, `fail_photo` (private bucket), `cancelled_at` and `ended_at`.
+  - The delivery OTP is per task: `delivery_otp_encrypted` (shown to the order's owner), `otp_attempts` and `otp_locked_at`. `Order.delivery_otp_hash` / `delivery_otp_attempts` are unused.
+  - Partial unique: one active task per rider.
+- **DeliveryOffer:** partial unique PENDING per task and per rider.
+- **RiderCashLedger:** append-only; one COD_COLLECTED per order.
+- **RiderLocation.task** is now linked.
+- **Slice 5.4** (migration `delivery.0003_cod_qr_earnings_payouts_cash_deposits`, additive):
+  - **Rider:** check `cash_in_hand >= 0`.
+  - **RiderCashLedger** adds `store` (nullable; COD: the order's store, DEPOSIT: where handed in) and `idempotency_key` (unique per rider when set), an index (`store`, `entry_type`, `recorded_at`) for the day-end report, and the permissions `record_cash_deposit` and `adjust_cash`.
+  - **CodQr** (new): `task`, `order`, `gateway_qr_id` (unique), `image_url`, `amount` (> 0), `status` (PENDING/PAID/EXPIRED/CANCELLED), `expires_at`, `paid_at`, `closed_at`, `payment` (1:1 `payments.Payment`, gateway `RAZORPAY_QR`). At most one PENDING or PAID per task.
+  - **EarningRule** as specified, without `peak_hour_bonus` (no peak windows are defined: ⚠ D-16), plus `note`, `created_by`; `effective_from` unique.
+  - **RiderEarning** adds `earned_at` (the delivery time; ranges and payout periods use it), `recorded_by`; one line per (`task`, `type`); PENALTY < 0, every other type > 0.
+  - **Payout** adds `created_by`, `paid_by`, `created_at`; `amount` > 0; a PAID payout has `paid_at` and a `reference`; permission `manage_payouts`.
+- **RiderLocation** adds `is_mocked`, `received_at` and `shift`. It is unique on (`rider`, `recorded_at`) and has no spatial index. Its `task` FK arrives with slice 5.3.
 
 **RiderDocument**: `rider`, `doc_type` (PHOTO/AADHAAR_FRONT/AADHAAR_BACK/PAN/DL/RC), `file` (private storage), `doc_number_masked`, `status` (PENDING/APPROVED/REJECTED), `reviewed_by`, `review_note`.
 
@@ -210,12 +245,14 @@ Phase 3 R2a additions to Order: `payment_expires_at` (PAYMENT_PENDING only: the 
 
 ### 2.9 Notifications, support, CMS
 
-**NotificationTemplate**: `event` (e.g., `order.out_for_delivery`), `channel` (PUSH/SMS), `app`, `title`, `body` (with `{{placeholders}}`), `dlt_template_id` (SMS), `is_active`.
-**Notification**: `user`, `app`, `title`, `body`, `data` (JSON deep link), `category` (order/promo/system), `sent_at`, `read_at`.
+**NotificationTemplate**: `event` (e.g., `order.out_for_delivery`), `channel` (PUSH/SMS), `app`, `title`, `body` (with `{{placeholders}}`), `dlt_template_id` (SMS), `is_active`. Unique (`event`, `channel`, `app`). Optional: an active row overrides the built-in text in `apps.notifications.catalog` (Phase 6).
+**Notification**: `user`, `app`, `event`, `title`, `body`, `data` (JSON: FCM data payload fields and the `link`), `category` (order/promo/system), `order_id` (nullable, no FK), `dedupe_key` (unique: event + user + order, so an event notifies once), `in_inbox`, `read_at`. Per channel: `push_status` / `sms_status` (NONE, PENDING, SENDING, SENT, SKIPPED, FAILED), `push_title`, `push_body`, `sms_body`, `sms_dlt_template_id`, `push_sent_at` / `sms_sent_at` (07's original `sent_at`). The push and SMS bodies are blanked once their channel is final, because they can hold a delivery OTP; the inbox `body` never does. Indexed by (`user`, `app`, `-created_at`) where `in_inbox`. Retention: `NOTIFICATION_RETENTION_DAYS` (90) (Phase 6).
 **SupportTicket**: `user`, `app`, `order` (nullable), `category`, `subject`, `status` (OPEN/IN_PROGRESS/RESOLVED/CLOSED), `priority`, `assigned_to`.
 **TicketMessage**: `ticket`, `sender` (user), `is_staff`, `body`, `attachments` (JSON of file keys).
 **FAQ**: `app`, `category`, `question`, `answer`, `sort_order`, `is_active`.
 **Page**: `slug`, `title`, `body_html`, `is_published`.
+
+P7 implementation (T-711): `cms.Page` (`slug` unique, `title`, `body_html` sanitised on save, `is_published`, timestamps) and `cms.FAQ` (`app` customer/rider, `category` heading text, `question`, `answer` plain text up to 2000 characters, `sort_order`, `is_active`; index `(app, is_active, sort_order)`), migration `cms.0004`. New app `support`, migration `support.0001`: `SupportTicket` adds to the fields above `last_activity_at` (list order), `resolved_at`, `closed_at` and timestamps; `number` is derived (`TK-` + 6-digit id), not stored; `priority` LOW/NORMAL/HIGH/URGENT (default NORMAL); `order` PROTECT, `assigned_to` SET_NULL; check constraint `support_ticket_order_required` (the four order categories need an order); indexes `(user, -last_activity_at)` and `(status, -last_activity_at)`; custom permission `support.handle_ticket`. `TicketMessage`: `sender` SET_NULL, `body` up to 2000 (customers 1000 via the API, never empty: constraint `support_message_body_not_empty`), `attachments` JSON list (unused yet), `created_at`; index `(ticket, created_at)`. P7 (`support.0002`, `0003`): `SupportTicket.first_response_at`, `first_response_due_at`, `resolution_due_at` (backfilled), `task` / `payout` (rider tickets, PROTECT); `TicketAttachment` (`key` unique hex, `ticket`, `message` nullable, `uploaded_by`, `file` private, `size`, `created_at`; `TicketMessage.attachments` holds the claimed keys); `CannedReply` (`title` unique, `body`, `category` optional, `sort_order`, `is_active`). `reports.ReportExport` (`report`, `params`, `requested_by`, `status` PENDING/RUNNING/DONE/FAILED, `file` private, `row_count`, `error`, `created_at`, `finished_at`) carries the report permissions. `notifications.0002`: category `support`.
 **AppConfig** (singleton / key-value): app versions per app+platform, maintenance flag + message, support contacts, global settings (payment window, cancel window, offer timeout, max offer attempts, geofence radii, OTP length/expiry, location intervals).
 
 Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, support phone/email, terms/privacy/refund URLs, `terms_version`, rider location intervals, `feature_flags` JSON); `cms.AppVersionPolicy` holds one row per (app, platform): `min_supported_version`, `latest_version`, `store_url`. Later phases add their global settings as fields on `AppConfig`: Phase 3 adds `payment_window_minutes` (default 15, 5–60; applies to orders placed after a change). OTP length (6) and expiry (5 min) stay fixed in code because the API contract validates them.
@@ -240,5 +277,7 @@ Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, 
 | Orders, invoices, payments | 8 years (GST record-keeping) |
 | Rider location history | 30 days |
 | OTP requests | 30 days |
-| KYC documents | While the rider is active + period mandated by policy (D-14). Then deleted. |
-| Deleted customer accounts | PII anonymised after a 30-day grace period. Order financial records are kept without PII. |
+| KYC documents | While the rider is active + period mandated by policy (D-14). Then deleted. P5 default: 365 days after offboarding or account erasure (`KYC_RETENTION_DAYS`, `purge_offboarded_kyc`). |
+| Deleted customer accounts | PII anonymised after a 30-day grace period. Order financial records are kept without PII. T-814 (DL-60): anonymisation also blanks the user's `Order.instructions` and the bodies of the support messages they sent (staff replies and ticket rows stay). **⚠ Jivo:** `Order.address_snapshot` is **kept** on invoiced orders (the invoice's place of supply, GST record-keeping) until Jivo confirms its tax-retention period; files attached to support messages are not yet purged. |
+| Gateway payloads (`Payment.raw`, `PaymentWebhookEvent.payload`) | T-814 (DL-60, ⚠ Jivo): after `PAYMENT_PAYLOAD_RETENTION_DAYS` (default 90) the personal fields (`contact`, `email`, `vpa`, `upi`, `card`, `customer_details`, billing/shipping address, `phone`, `name`, at any depth) are removed by the beat job `scrub_payment_payloads`; ids, amounts, statuses, methods and error codes stay. Each row is stamped `pii_scrubbed_at` (payments migration 0003). |
+| Refresh tokens, staff sessions | T-814: expired ones are deleted daily (`flush_expired_tokens`, `clear_expired_sessions`). |

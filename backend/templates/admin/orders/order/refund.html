@@ -1,0 +1,44 @@
+{% extends "admin/base_site.html" %}
+{% load static unfold %}
+{# Manual refund for one order (05 §2 Orders "refund (full/partial, within role limit)", QA BUG-0010). Posts to the same URL; the view calls payments.order_refunds.manual_refund through ops_console.order_actions. Amounts are the server's; nothing is computed here. Context: order, form, refundable, refundable_display, grand_total, amount_paid, amount_refunded, is_online, back. #}
+
+{% block extrahead %}{{ block.super }}<script src="{% static 'ops/js/submit_once.js' %}" defer></script>{% endblock %}
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} change-form{% endblock %}
+
+{% block content %}
+    <section class="bg-white border border-base-200 max-w-2xl rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" data-testid="manual-refund">
+        <div class="border-b border-base-200 px-4 py-3 dark:border-base-800">
+            <h2 class="font-semibold text-font-important-light dark:text-font-important-dark">Issue refund: {{ order.order_number }}</h2>
+            <p class="text-xs text-font-subtle-light dark:text-font-subtle-dark">{{ order.store.code }} · {% if is_online %}Paid online{% else %}Cash on delivery{% endif %}</p>
+        </div>
+        <dl class="grid grid-cols-2 gap-4 p-4 sm:grid-cols-4">
+            <div><dt class="text-xs text-font-subtle-light dark:text-font-subtle-dark">Bill (grand total)</dt><dd class="font-semibold">{{ grand_total }}</dd></div>
+            <div><dt class="text-xs text-font-subtle-light dark:text-font-subtle-dark">Paid</dt><dd class="font-semibold">{{ amount_paid }}</dd></div>
+            <div><dt class="text-xs text-font-subtle-light dark:text-font-subtle-dark">Refunded so far</dt><dd class="font-semibold">{{ amount_refunded }}</dd></div>
+            <div><dt class="text-xs text-font-subtle-light dark:text-font-subtle-dark">Can still be refunded</dt><dd class="font-semibold text-lg" data-testid="refundable">{{ refundable_display }}</dd></div>
+        </dl>
+
+        {% if not is_online %}
+            <p class="border-t border-base-200 p-4 dark:border-base-800" data-testid="cod-note">Cash on delivery orders have no online payment to refund.</p>
+        {% endif %}
+
+        <form method="post" novalidate class="border-t border-base-200 p-4 dark:border-base-800">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="mb-4 text-red-700 dark:text-red-400" role="alert" data-testid="refund-errors">
+                    {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+                </div>
+            {% endif %}
+            {{ form.once }}
+            {% include "unfold/helpers/field.html" with field=form.amount %}
+            {% include "unfold/helpers/field.html" with field=form.note %}
+            <p class="mb-4 text-xs text-font-subtle-light dark:text-font-subtle-dark">
+                Refunds go back to the original payment. Support can refund up to the role limit per refund; larger refunds need Finance. The refund is recorded in the audit log with your name.
+            </p>
+            <div class="flex gap-3 items-center">
+                {% component "unfold/components/button.html" with submit=1 %}Refund this order{% endcomponent %}
+                <a href="{{ back }}" class="text-primary-600 dark:text-primary-500">Back to the order</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}

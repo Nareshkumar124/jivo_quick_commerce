@@ -6,6 +6,8 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../auth/presentation/rider_account_controller.dart';
+import '../../realtime/presentation/rider_socket_providers.dart';
+import '../../shift/presentation/shift_controller.dart';
 import '../../task/domain/task_repositories.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
@@ -55,6 +57,19 @@ class OfferState {
       phase == OfferPhase.withdrawn;
 }
 
+/// `GET /rider/offers/current/` every 5 s while online, idle, in the
+/// foreground and the rider socket is down (the contract's polling
+/// fallback, 06 §4.1).
+const kOfferPollInterval = Duration(seconds: 5);
+
+/// The poll interval ([kOfferPollInterval]); shortened in tests.
+final offerPollIntervalProvider = Provider<Duration>(
+  (ref) => kOfferPollInterval,
+);
+
+/// Tests that do not exercise the offer poll may turn it off.
+final offerPollingEnabledProvider = Provider<bool>((ref) => true);
+
 final offerControllerProvider = NotifierProvider<OfferController, OfferState>(
   OfferController.new,
 );
@@ -75,24 +90,51 @@ class OfferController extends Notifier<OfferState> {
         .events
         .listen(_onEvent);
     final lifecycle = AppLifecycleListener(
-      onResume: () => unawaited(refresh()),
+      onResume: () {
+        _startPolling();
+        unawaited(refresh());
+      },
+      onHide: _stopPolling,
+      onPause: _stopPolling,
     );
     ref.onDispose(() {
       subscription.cancel();
       lifecycle.dispose();
+      _stopPolling();
     });
+    _startPolling();
     // Polls once when the rider becomes active (app start, including a
     // start from an offer notification).
     Future.microtask(refresh);
     return const OfferState();
   }
 
+  Timer? _poll;
+
+  void _startPolling() {
+    _poll?.cancel();
+    if (!ref.read(offerPollingEnabledProvider)) return;
+    _poll = Timer.periodic(ref.read(offerPollIntervalProvider), (_) {
+      if (!ref.mounted) return;
+      // Online only: an offline rider gets no offers (and is not tracked).
+      if (!ref.read(shiftControllerProvider).isOnline) return;
+      // The socket delivers offers while it is up.
+      if (ref.read(riderSocketConnectedProvider)) return;
+      unawaited(refresh());
+    });
+  }
+
+  void _stopPolling() {
+    _poll?.cancel();
+    _poll = null;
+  }
+
   void _onEvent(OfferEvent event) {
     switch (event) {
       case OfferArrived(:final received):
         present(received);
-      case OfferWithdrawn(:final offerId):
-        withdrawn(offerId);
+      case OfferWithdrawn(:final offerId, :final reason):
+        withdrawn(offerId, reason: reason);
     }
   }
 
@@ -221,13 +263,21 @@ class OfferController extends Notifier<OfferState> {
     if (ref.mounted) state = const OfferState();
   }
 
-  /// `offer.withdrawn`: the order was cancelled before pickup.
-  void withdrawn(int offerId) {
+  /// `offer.withdrawn` / `offer.expired`: the offer ended on the server.
+  /// The text follows the reason: expired, taken, or cancelled.
+  void withdrawn(
+    int offerId, {
+    OfferEndReason reason = OfferEndReason.cancelled,
+  }) {
     if (state.offer?.id != offerId) return;
     // An accept in flight gets its own answer (OFFER_TAKEN or a task).
     if (state.phase == OfferPhase.showing ||
         state.phase == OfferPhase.rejecting) {
-      _end(OfferPhase.withdrawn);
+      _end(switch (reason) {
+        OfferEndReason.cancelled => OfferPhase.withdrawn,
+        OfferEndReason.expired => OfferPhase.expired,
+        OfferEndReason.taken => OfferPhase.taken,
+      });
     }
   }
 

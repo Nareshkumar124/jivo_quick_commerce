@@ -34,3 +34,59 @@ Not executed on a device this run: no Flutter commands, phone or emulator allowe
 - rider login and `rider_status` routing
 
 The dev agents report 62 customer, 112 rider and 75 `jivo_core` tests plus real-API integration tests. QA has **not** verified these (no Flutter this run).
+
+## Phase 3 stage 1 (2026-11-04, `c2c153a`, executed black-box on :8004)
+| Feature (doc) | Result | Notes |
+|---|---|---|
+| Cart bill = 08 §6.2 (fees and thresholds on item_total, half-up, 2-dp strings) | ✅ | An independent oracle from DB prices; 5 cart shapes, plus coupon cases |
+| Cart set-quantity, max qty, stock flags, never reserves | ✅ | P3-TC-04…06 |
+| Tip (0–500), instructions, address serviceability, preview | ✅ | P3-TC-07/08 |
+| Coupons FLAT / PERCENT / cap / category eligible subtotal / min order / first order / stops applying / sheet | ✅ | Usage exhaustion and expiry ⏭ (QA coupon needed, T-304) |
+| COD placement (T2) and ONLINE placement (T1), snapshot, reservation, cart handling | ✅ | R2b re-run |
+| Idempotency-Key replay, reuse, parallel; PRICE_CHANGED; one unpaid order (DL-44) | ✅ | |
+| Verify (T3), webhook (T3), payment.failed, retry-payment, duplicate capture (DL-45) | ✅ | |
+| Cancel unpaid (T5); expiry (T4, :8001 beat); late capture (T3a) and auto-refund | ✅ | T4 was observed 45 s after the window ended |
+| Store closed blocks checkout | ✅ | Clock profile |
+| COD blocked user / COD disabled; gateway down 503 | ⏭ | Admin/shared config; fault injection |
+| Admin P3 screens and roles (05 §3, DL-46) | ⏭ | T-304 in progress |
+| Customer app P3 screens | ⬜ | No device this run |
+
+## Phase 3 stage 2 (2026-11-04, `f84482f`)
+| Feature | Result |
+|---|---|
+| Admin P3 role matrix (coupons, redemptions, orders, payments, refunds, webhook events; 7 roles) | ✅ |
+| Order/payment admin screens read-only; PII masked for roles without PII | ✅ |
+| Coupon creation in admin; validity (expired / not started / inactive); usage limits incl. holds; last-use race | ✅ |
+| COD blocked customer (admin action) | ✅. Store COD disabled ⏭ (PM: demo store in use) |
+| Webhook malformed ids (BUG-0009) | ✅ fixed |
+| Customer app P3 | ⬜ the user's phone test |
+
+## Phase 3 refund re-check (2026-11-04, `9ed7ffc`, T-310)
+- Refund behaviour after the T-303 fixes, black-box on :8004: T3a late capture, wrong-amount capture and duplicate capture (DL-45) each make exactly one refund that settles to PROCESSED; the T4 expiry plus late capture (P3-TC-47) settles to REFUNDED. Results: P3-TC-37/38/39/47/58 ✅. Details and commands are in 03.
+- Phase 4 functional cases P4-TC-01…60 are written (02, plan in 01 §8). They are not executed yet: they are awaiting the P4 R2 merge.
+
+## Phase 4 stage 1 (2026-11-04, `1b3552d`, T-416)
+**Store and ops actions** (T6/T7/T8/T8a/T12, manual refund, retry, `sync_refund_status`, SLA alert) were driven through the **backend services** (`apps.orders.store_ops`, `apps.payments.order_refunds`) by `qa/tools/store_ops_driver.py`, run in the QA worktree backend with the QA environment, as the seeded staff users, because the Ops Console (admin P4) is not merged. The driver refuses any order that is not a QA customer's. Console pages, HTMX, CSRF and hidden-button checks stay ⏭.
+
+- **Customer cancel (08 §7, T11):** PLACED and ACCEPTED cancel (COD → `FAILED`, nothing due; ONLINE → one full ORDER_CANCELLED refund, REFUNDED after the worker); PACKING/PACKED → 409 `{status}`, `can_cancel` false, nothing released. `CUSTOMER_CANCEL_UNTIL=PLACED` respected.
+- **Store flow (T6/T7/T8):** accept assigns a 4-character pickup code; history actor_type `store`; customer timeline "Order confirmed" → packing → packed; out-of-order actions refused with no history change (incl. PAYMENT_PENDING and CANCELLED).
+- **T8a (08 §6.3)** matches QA's independent oracle on every field (2×Sun+Canola ONLINE and COD; Sun + 3 sachets below both thresholds: fees stay 0.00; JIVO50 coupon kept at 50.00 below its minimum). Refund = old − new; the same value submitted twice refunds once; all units unavailable → CANCELLED (ITEMS_UNAVAILABLE, store), refunds total = amount paid.
+- **T12** in PLACED, ACCEPTED, PACKING, PACKED: full refund, reservation released, **no StockMovement, no on_hand change**; customer-only / empty reasons refused.
+- **Reorder:** raise-to-ordered (never on top, never lowered), idempotent, no reservation; OUT_OF_STOCK / LIMITED_STOCK with `added_quantity`.
+- **Refunds:** Support limit 500.00 ok / 500.01 refused; Finance no limit; cap ("At most …") enforced; manual partial → PARTIALLY_REFUNDED → REFUNDED; FAILED (refund.failed webhook) shown to the customer as PENDING; retry → `cancel:<id>:retry-1`; a second retry refused; the original queued task never resent the FAILED refund; `sync_refund_status` re-queued a stuck refund twice and exactly one gateway refund resulted.
+- **Hygiene:** the 38 QA orders left PLACED by P3 were cancelled with T11 (31 ONLINE → REFUNDED, ₹6,249 = Σ amount_paid; 7 COD → FAILED; the 5 with an earlier duplicate-capture refund got exactly one more refund, so each capture was refunded once). 9 more left by the smoke run and order 280 (PACKING, T12) were cancelled at the end. No QA order is open; the remaining reservations (variant 1: 7, variant 3: 1) are not QA orders'.
+
+## Phase 4 stage 2 (2026-11-04, `f744508`): Ops Console
+- **Packing console:** the QA order appears with Accept; Accept / Start packing / Mark packed answer 204 with a toast; a repeat Accept is 409 "Only a newly placed order can be accepted."; the slip shows order number, pickup code, QR and the units still coming ("2 items", with "(2 ordered, 1 unavailable)" on the struck line).
+- **"Can't supply":** matches the §6.3 oracle; posting the same quantity again says "already marked; nothing changed" and makes no second refund; bad quantities 400, another order's line 404, PACKED 409.
+- **Live board:** Placed, Accepted, Packing, Packed, Out for delivery and the Exceptions lane; card = number, store, timer, items, payment (no customer name or phone); store / payment / SLA-breach filters; 10 s HTMX poll; the columns partial is a fragment.
+- **Accepting switch** (QA-02 only): pausing makes serviceability report the store closed; resuming reopens it. Offered to the Store Manager on GGN-01, not to Store Staff. GGN-01 was never changed.
+- **QA-02:** auto-accept moves a COD order to ACCEPTED by `system` within seconds (TC-36); a GGN-01 order reordered at QA-02 lists Chia as NOT_AVAILABLE (TC-12).
+- **Refund retry (OBS-P4-01 re-check):** Finance's "Retry failed refund" sends one retry; the identical form posted again is refused ("This form was already sent…"); one `:retry-1` row, settled once.
+- **Gaps:** no manual refund anywhere in the panel (BUG-0010, P2); no CSV export on Orders (BUG-0011, P3).
+- **Hygiene:** 4 QA orders left by the smoke run cancelled (T11); no QA order open; no PENDING refund left.
+
+## QA stage 3 (2026-11-10, `efb3c3d`): P5 finish, P6, P7 rest
+- **P5 riders and delivery:** KYC registration, documents (EXIF stripped, formats, size), vehicle change, reject/resubmit (fresh QA riders 106/107); shifts; dispatch and offers; the T9/T10/T13/T14 task flow with pickup code and delivery OTP and their locks/unlocks; COD cash and COD UPI QR (paid, replayed, wrong amount, cash-then-QR refund); ledger, deposits, earnings, history, payouts; DL-61 rules. Every automated case ✅. 21 cases have no automated test yet (01 §9; P0: TC-12, 42, 45, 51, 110).
+- **P6 real-time:** order socket (snapshot, status, ETA, gate ASSIGNED…AT_CUSTOMER, owner-only), rider socket (offer.new / expired / withdrawn, task.updated, cash.updated), ops feed (order.created / status, task.status, rider.status / location, store scoping), inbox (`notification.new`, unread count), polling-fallback parity ✅. **Gaps:** no OUT_FOR_DELIVERY `order.status` at T9 (BUG-0021); heading null (BUG-0022).
+- **P7:** ratings (rate once, parallel, not delivered, IDOR, validation, order-only, rider list without PII, staff scope), ticket per-app scoping and rider categories, store-manager reports, sales summary = SQL oracle incl. DL-65 uncollected COD, dashboard KPIs / no-rider alert / charts, erasure of comments and ticket text ✅. TC-40 (admin screens) not run.

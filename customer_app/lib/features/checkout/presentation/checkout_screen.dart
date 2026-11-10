@@ -54,7 +54,18 @@ class CheckoutScreen extends ConsumerWidget {
       })
       ..listen(checkoutProvider.select((s) => s.error), (_, error) {
         if (error == null) return;
+        final online = ref.read(checkoutProvider).method == PaymentMethod.online;
         controller.acknowledge();
+        // M6: the payment gateway is down at placement. The server created
+        // the order and ended it PAYMENT_FAILED (it shows in My orders);
+        // the cart is kept, so the customer can retry or pick COD.
+        if (online && error.code == ApiErrorCode.serviceUnavailable) {
+          showMessage(
+            context,
+            AppLocalizations.of(context).onlinePaymentUnavailable,
+          );
+          return;
+        }
         // What changed, from the error's details; the cart was reloaded.
         showMessage(context, cartErrorText(context, error, cart: snapshot));
         // Flagged lines are fixed on the cart screen.
@@ -95,8 +106,11 @@ class CheckoutScreen extends ConsumerWidget {
     final addressId = location?.addressId;
     // The server decides (`Cart.checkout`); the order also needs a saved
     // address id and an offered method.
+    // A total that can't be shown can't be paid (RD-02).
+    final grandTotal = formatRupeesOrNull(bill.grandTotal);
     final canPlace =
         !checkout.busy &&
+        grandTotal != null &&
         addressId != null &&
         snapshot.checkout.canPlaceOrder &&
         offered.contains(method);
@@ -205,7 +219,7 @@ class CheckoutScreen extends ConsumerWidget {
                   BusyButton(
                     key: const Key('place-order'),
                     label: method == PaymentMethod.online
-                        ? l10n.payAmount(formatRupees(bill.grandTotal))
+                        ? l10n.payAmount(grandTotal ?? '')
                         : l10n.placeOrder,
                     busy: checkout.busy,
                     onPressed: canPlace

@@ -66,6 +66,11 @@ def _fresh_counters():
     """Start every run with no QA rate-limit counters (QA Redis DB only)."""
     if os.environ.get("QA_KEEP_COUNTERS") != "1" and profile() != "redis-down":
         clear_rate_limits()
+        # Stage 3: a day of P5–P7 order flows used up customer A's hourly address_write throttle
+        # (DRF, `jqc:1:throttle_address_write_<uid>`), which errored 27 smoke cases.
+        from qa_support import clear_throttle
+
+        clear_throttle("address_write")
     yield
 
 
@@ -166,6 +171,11 @@ def make_address(api):
     created: list[tuple[int, dict]] = []
 
     def make(session: Session, **overrides) -> dict:
+        # T-814 address_write = 30/hour per user (create + delete both count): one smoke pass uses
+        # more than that for customer A. No QA test measures this limit, so reset it (QA Redis only).
+        from qa_support import clear_throttle
+
+        clear_throttle("address_write")
         r = api.post("/api/v1/addresses/", json={**ADDRESS, **overrides}, headers=session.headers)
         assert r.status_code == 201, describe(r)
         body = r.json()
@@ -175,3 +185,70 @@ def make_address(api):
     yield make
     for address_id, headers in created:  # soft-delete what the test created
         api.delete(f"/api/v1/addresses/{address_id}/", headers=headers)
+
+
+# --------------------------------------------------------------------------- Phase 3 fixtures
+
+MUMBAI_ADDRESS = {**ADDRESS, "lat": 19.076, "lng": 72.8777, "city": "Mumbai", "state": "Maharashtra", "pincode": "400001", "area": "Fort"}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _fresh_p3_throttles():
+    """Phase 3 per-user limits (30/h placement, 60/h payments) on the QA Redis DB only."""
+    from qa_support import clear_throttle
+
+    if profile() != "redis-down":
+        for scope in ("orders_create", "payments"):
+            clear_throttle(scope)
+    yield
+
+
+def _make_shop(api, phone_key: str, make_address):
+    from p3_support import Shop
+    from qa_support import clear_throttle
+
+    # The suite itself places more than 30 orders/hour per QA user: start each P3 test with no
+    # placement/payment throttle history (QA Redis DB 5 only). P3-TC-46 tests the limit.
+    for scope in ("orders_create", "payments"):
+        clear_throttle(scope)
+    session = login(QA_PHONES[phone_key])
+    shop = Shop(api, session)
+    shop.cancel_pending()
+    shop.remove_coupon()
+    shop.clear()
+    shop.address = make_address(session)  # serviceable from GGN-01
+    return shop
+
+
+@pytest.fixture
+def shop_a(api, make_address):
+    shop = _make_shop(api, "a", make_address)
+    yield shop
+    shop.cancel_pending()
+    shop.remove_coupon()
+    shop.clear()
+
+
+@pytest.fixture
+def shop_b(api, make_address):
+    shop = _make_shop(api, "b", make_address)
+    yield shop
+    shop.cancel_pending()
+    shop.remove_coupon()
+    shop.clear()
+
+
+@pytest.fixture
+def shop_factory(api, make_address):
+    shops = []
+
+    def make(phone_key: str):
+        shop = _make_shop(api, phone_key, make_address)
+        shops.append(shop)
+        return shop
+
+    yield make
+    for shop in shops:
+        shop.cancel_pending()
+        shop.remove_coupon()
+        shop.clear()

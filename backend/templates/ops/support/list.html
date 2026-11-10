@@ -1,0 +1,7 @@
+{% extends "ops/base.html" %}
+
+{% block content %}
+    {# Support ticket console list (05 §2 Support; Super Admin, Ops, Support). Context: table (tables.DataTable). #}
+    <p class="mb-4 ops-text-secondary">Newest activity first. Open a ticket to reply, change its status or priority, or assign it.</p>
+    {% include "ops/components/data_table.html" with table=table %}
+{% endblock %}

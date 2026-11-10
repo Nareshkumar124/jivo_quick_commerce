@@ -2,8 +2,12 @@
 {% load ops %}
 
 {% block content %}
-    {% if not customers and not staff_roles and not app_config and not operations %}
+    {% if not customers and not staff_roles and not app_config and not operations and not orders_section %}
         {% include "ops/components/empty_state.html" with icon="space_dashboard" title="No dashboard cards for your role yet" message="Your modules are in the menu. Cards for orders and riders appear here as those modules go live." %}
+    {% endif %}
+
+    {% if orders_section %}
+        {% include "ops/partials/order_dashboard.html" %}
     {% endif %}
 
     {% if operations %}

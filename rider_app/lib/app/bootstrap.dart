@@ -13,6 +13,7 @@ import '../features/offers/data/offer_alert_notifications.dart';
 import '../features/offers/presentation/offer_alert_providers.dart';
 import '../features/offers/presentation/offer_controller.dart';
 import '../l10n/app_localizations.dart';
+import '../shared/session/store_synced_token_refresher.dart';
 import 'app.dart';
 import 'env.dart';
 import 'providers.dart';
@@ -35,9 +36,17 @@ Future<void> bootstrap(Flavor flavor) async {
 
   // jivo_core session: restored before the first redirect, so the router
   // starts from signedIn / signedOut, never unknown.
+  // The location service isolate will refresh tokens too (TODO(api): once
+  // its uploader is bound): both sides go through the shared store so a
+  // rotation by one never ends the other's session.
+  final secureStore = SecureTokenStore();
+  final tokenStore = GuardedTokenStore(secureStore);
   final session = SessionManager(
-    store: SecureTokenStore(),
-    refresher: ApiTokenRefresher.forEnv(env: env, clientInfo: clientInfo),
+    store: tokenStore,
+    refresher: StoreSyncedTokenRefresher(
+      inner: ApiTokenRefresher.forEnv(env: env, clientInfo: clientInfo),
+      store: secureStore,
+    ),
   );
   await session.restore();
   final signals = AppControlSignals();
@@ -78,6 +87,7 @@ Future<void> bootstrap(Flavor flavor) async {
         signals: signals,
       ),
       offerAlertNotificationsProvider.overrideWithValue(offerAlerts),
+      sharedTokenStoreProvider.overrideWithValue(tokenStore),
       if (launchPayload == OfferAlertNotifications.testPayload &&
           env.showDevTools)
         initialLocationProvider.overrideWithValue(Routes.offerPreview),

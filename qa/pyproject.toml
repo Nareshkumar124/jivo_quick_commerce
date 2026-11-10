@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml==6.0.3",
     "redis==6.4.0",
     "schemathesis==4.33.0",
+    "websockets==15.0.1",
 ]
 
 [tool.uv]
@@ -30,7 +31,15 @@ markers = [
     "profile_shortsession: needs the instance started with the shortsession profile (BUG-0006)",
     "profile_clock: needs the instance started with the clock profile (QA_FAKE_NOW)",
     "profile_db_down: needs the instance started with the db-down profile (500 trigger)",
+    "profile_refundwindow: needs the instance started with REFUND_WEBHOOK_RETRY_WINDOW_SECONDS=20 (P3-TC-69)",
+    "profile_gwdown: needs the instance started with FAKE_GATEWAY_DOWN=1 (P4-TC-50)",
+    "profile_cancelplaced: needs the instance started with CUSTOMER_CANCEL_UNTIL=PLACED (P4-TC-10)",
     "any_profile: runs on every instance profile",
+    "p5_53: Phase 5 slice 5.3 cases (skip until fd1490c is on develop and delivery.0002 is applied; QA_P5_53=1 forces)",
+    "profile_dispatchfast: needs the instance started with short dispatch timers (OFFER_TIMEOUT_SECONDS=10, DISPATCH_TIMEOUT_SECONDS=60, DISPATCH_UNASSIGNED_PAUSE_SECONDS=15, DISPATCH_RETRY_SECONDS=5)",
+    "profile_riderclock: needs the instance started with RIDER_NOT_REACHABLE_WAIT_SECONDS=20, RIDER_RECENT_TASK_SECONDS=60",
+    "profile_triggerplaced: needs the instance started with DISPATCH_TRIGGER=PLACED",
     "db: read-only SQL checks against the shared database",
+    "slow: long-running (minutes); runs only with QA_SLOW=1 (e.g. the P3 15-minute payment-window expiry)",
     "fuzz: schemathesis property-based fuzzing (low example counts)",
 ]

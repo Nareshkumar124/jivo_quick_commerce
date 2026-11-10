@@ -1,0 +1,40 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="NONE,NOARCHIVE">
+    <title>{{ order.order_number }} slip | {{ store.code }}</title>
+    <link href="{% static 'ops/css/slip.css' %}" rel="stylesheet">
+    {# Pinned, vendored QR generator (docs/admin-panel-architecture.md §6), then the drawing script. #}
+    <script src="{% static 'ops/vendor/qrcode-generator-1.4.4.js' %}" defer></script>
+    <script src="{% static 'ops/js/slip.js' %}" defer></script>
+</head>
+<body>
+    {# Order slip and bag label (05 §1.3 "Print"): order number, 4-character pickup code, QR of that code, item count. No customer phone or address. #}
+    <div class="slip-actions"><button type="button" data-print>Print</button></div>
+
+    <section class="slip" aria-label="Bag label" data-testid="bag-label">
+        <div class="slip__store">{{ store.code }} · {{ store.name }}</div>
+        <div class="slip__number">{{ order.order_number }}</div>
+        <div class="slip__code" data-testid="pickup-code">{{ order.pickup_code|default:"-" }}</div>
+        {% if order.pickup_code %}<div class="slip__qr" data-qr="{{ order.pickup_code }}" role="img" aria-label="QR code of the pickup code"></div>{% endif %}
+        <div class="slip__count" data-testid="item-count">{{ order.units }} item{{ order.units|pluralize }} · {% if order.payment_method == "COD" %}Cash on delivery{% else %}Paid online{% endif %}</div>
+    </section>
+
+    <section class="slip slip--list" aria-label="Order slip">
+        <h1>Order slip {{ order.order_number }}</h1>
+        <table>
+            <thead><tr><th scope="col">Item</th><th scope="col">SKU</th><th scope="col">Pack</th><th scope="col"></th></tr></thead>
+            <tbody>
+                {% for line in order.lines %}
+                    {% if not line.not_in_order %}
+                        <tr><td>{{ line.product_name }} {{ line.variant_name }}</td><td>{{ line.sku }}</td><td class="slip__pack" data-testid="slip-pack-{{ line.sku }}">Pack {{ line.to_pack }}</td><td>{% if line.quantity_unavailable %}({{ line.quantity }} ordered, {{ line.quantity_unavailable }} unavailable){% endif %}</td></tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if order.lines_not_in_order %}<p class="slip__footer" data-testid="slip-gone">{{ order.lines_not_in_order }} line{{ order.lines_not_in_order|pluralize }} not in this order</p>{% endif %}
+    </section>
+</body>
+</html>

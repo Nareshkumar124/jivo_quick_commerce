@@ -1,0 +1,167 @@
+# JQC backend on the shared server behind the host nginx (plan.md §4, rules R6, R7, R9).
+#
+# Compose project `jqc`, network `jqc_net`, volumes `jqc_*`. No nginx container: the host nginx
+# proxies jqc.jivo.in to 127.0.0.1:18001 (web) and /media/ to 127.0.0.1:19000 (MinIO, public bucket
+# only). Postgres, Redis and the MinIO console are not published at all.
+#
+# Lives on the server as /srv/jqc/compose/compose.prod.yml. Secrets live only in /srv/jqc/env/*.env
+# (mode 600, generated on the server, never in git). See infra/deploy/README.md.
+#
+#   cd /srv/jqc/compose
+#   JQC_IMAGE=jqc-backend:<sha> docker compose -p jqc -f compose.prod.yml up -d postgres redis minio
+#   JQC_IMAGE=jqc-backend:<sha> docker compose -p jqc -f compose.prod.yml run --rm release
+#   JQC_IMAGE=jqc-backend:<sha> docker compose -p jqc -f compose.prod.yml up -d web worker beat
+
+name: jqc
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app: &app
+  image: ${JQC_IMAGE:?set JQC_IMAGE=jqc-backend:<git-sha>}
+  env_file:
+    - path: ${JQC_ENV_DIR:-/srv/jqc/env}/backend.env
+      required: true
+  networks: [jqc_net]
+  restart: unless-stopped
+  logging: *logging
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    env_file:
+      - path: ${JQC_ENV_DIR:-/srv/jqc/env}/postgres.env
+        required: true
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=100"]
+    volumes:
+      - jqc_pgdata:/var/lib/postgresql/data
+    networks: [jqc_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 1536m
+    cpus: 2
+    shm_size: 256m
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    image: redis:7.4.12-alpine
+    # Cache, broker and channel layer: no persistence needed (docs/deployment.md §7.5).
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "384mb",
+              "--maxmemory-policy", "noeviction"]
+    volumes:
+      - jqc_redisdata:/data
+    networks: [jqc_net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    cpus: 1
+    restart: unless-stopped
+    logging: *logging
+
+  minio:
+    # Same server build as infra/docker-compose.yml. Staging on a shared host only (plan.md §1.2).
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    env_file:
+      - path: ${JQC_ENV_DIR:-/srv/jqc/env}/minio.env
+        required: true
+    volumes:
+      - jqc_miniodata:/data
+    networks: [jqc_net]
+    ports:
+      # The host nginx proxies /media/ to the public bucket only. Console (9001) is not published.
+      - "127.0.0.1:19000:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 768m
+    cpus: 1
+    restart: unless-stopped
+    logging: *logging
+
+  # One-off per deploy: check --deploy against the real env, then migrate (docs/deployment.md §8).
+  release:
+    <<: *app
+    command: ["jqc-release"]
+    restart: "no"
+    profiles: ["release"]
+    environment:
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "0"
+    mem_limit: 1024m
+
+  web:
+    <<: *app
+    command: ["gunicorn", "config.asgi:application",
+              "--worker-class", "jqc_asgi_worker.JqcUvicornWorker",
+              "--bind", "0.0.0.0:8000", "--workers", "3", "--graceful-timeout", "30",
+              "--no-control-socket"]   # as the image CMD: no writable $HOME (backend/Dockerfile)
+    environment:
+      POSTGRES_POOL: "true"
+      POSTGRES_CONN_MAX_AGE: "0"
+    ports:
+      - "127.0.0.1:18001:8000"
+    healthcheck:
+      # Host header: DJANGO_ALLOWED_HOSTS lists only jqc.jivo.in.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/health/ready', headers={'Host': 'jqc.jivo.in'}), timeout=5)"
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 40s
+    mem_limit: 1536m
+    cpus: 2
+
+  worker:
+    <<: *app
+    command: ["celery", "-A", "config", "worker", "-l", "INFO", "--concurrency", "4"]
+    environment:
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "60"
+    mem_limit: 1024m
+    cpus: 2
+
+  # Exactly ONE beat (docs/deployment.md §4). Never scale it.
+  beat:
+    <<: *app
+    command: ["celery", "-A", "config", "beat", "-l", "INFO",
+              "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    environment:
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "60"
+    mem_limit: 384m
+    cpus: 0.5
+
+networks:
+  jqc_net:
+    name: jqc_net
+
+volumes:
+  jqc_pgdata:
+    name: jqc_pgdata
+  jqc_redisdata:
+    name: jqc_redisdata
+  jqc_miniodata:
+    name: jqc_miniodata

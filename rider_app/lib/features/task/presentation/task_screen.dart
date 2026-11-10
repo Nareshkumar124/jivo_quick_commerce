@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/env.dart';
 import '../../../app/providers.dart';
 import '../../../app/routes.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/primary_action_bar.dart';
 import '../../../shared/widgets/sensitive_number_field.dart';
@@ -16,7 +19,9 @@ import '../data/fake_task_backend.dart';
 import '../domain/rider_task.dart';
 import '../domain/task_rules.dart';
 import '../domain/task_status.dart';
+import '../../../shared/errors/rider_error_codes.dart';
 import 'at_customer_step.dart';
+import 'cod_amount_changed_notice.dart';
 import 'task_flow_controller.dart';
 import 'task_providers.dart';
 import 'task_text.dart';
@@ -58,9 +63,11 @@ class TaskScreen extends ConsumerWidget {
       TaskStatus.delivered => _EndScreen(
         icon: Icons.check_circle,
         title: l10n.taskDeliveredTitle,
-        body: task.payout == null
-            ? l10n.taskDeliveredBody
-            : l10n.taskDeliveredEarned(formatRupees(task.payout!)),
+        // Earned (`earnings.total`) once DELIVERED; else the estimate.
+        body: switch (task.earningsTotal ?? task.payout) {
+          null => l10n.taskDeliveredBody,
+          final amount => l10n.taskDeliveredEarned(formatRupees(amount)),
+        },
         onDone: controller.finish,
       ),
       TaskStatus.failed || TaskStatus.returning => _ReturnStep(task: task),
@@ -87,8 +94,11 @@ class TaskScreen extends ConsumerWidget {
   }
 }
 
-/// Scaffold shared by the steps: title and order number, a refresh action,
-/// pull to refresh, and the actions pinned at the bottom.
+/// Scaffold shared by the steps (`design/screens/rider/task-step-shell.md`):
+/// title and order number (18 sp / 700), the offline banner after a network
+/// error, a refresh action, pull to refresh, and the actions pinned at the
+/// bottom. After a network error the primary reads "Try again: {label}"
+/// until the next success (shell §3).
 class TaskStepScaffold extends ConsumerWidget {
   const TaskStepScaffold({
     required this.task,
@@ -111,6 +121,9 @@ class TaskStepScaffold extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final controller = ref.read(taskFlowControllerProvider.notifier);
+    final offline = ref.watch(
+      taskFlowControllerProvider.select((s) => isNetworkError(s.error)),
+    );
     final list = RefreshIndicator(
       onRefresh: controller.load,
       child: ListView(
@@ -120,7 +133,8 @@ class TaskStepScaffold extends ConsumerWidget {
         children: [
           Text(
             l10n.taskOrderNumber(task.orderNumber),
-            style: Theme.of(context).textTheme.labelLarge,
+            key: const Key('task-order-number'),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           ...content,
@@ -143,15 +157,62 @@ class TaskStepScaffold extends ConsumerWidget {
             ),
           ],
         ),
-        body: bottomInBody
-            ? Column(
-                children: [
-                  Expanded(child: list),
-                  actions,
-                ],
-              )
-            : list,
-        bottomNavigationBar: bottomInBody ? null : actions,
+        body: Column(
+          children: [
+            if (offline) const _OfflineBanner(),
+            Expanded(child: list),
+            if (bottomInBody)
+              PrimaryActionRetry(retrying: offline, child: actions),
+          ],
+        ),
+        bottomNavigationBar: bottomInBody
+            ? null
+            : PrimaryActionRetry(retrying: offline, child: actions),
+      ),
+    );
+  }
+}
+
+/// The last request failed for lack of network (shell §3).
+bool isNetworkError(ApiError? error) =>
+    error != null &&
+    (error.code == ApiErrorCode.network || error.code == ApiErrorCode.timeout);
+
+/// "No internet. Your progress is saved on Jivo's server; ..." (shell §3).
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = RiderColors.of(context);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        key: const Key('task-offline-banner'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colors.codBg,
+          border: Border(
+            bottom: BorderSide(
+              color: colors.codBorder,
+              width: RiderColors.borderWidth,
+            ),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.wifi_off, color: colors.codText),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                AppLocalizations.of(context).taskOfflineBanner,
+                style: TextStyle(fontSize: 16, color: colors.codText),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -203,17 +264,22 @@ class _GoToStoreStep extends ConsumerWidget {
           icon: Icons.store,
           title: task.store.name,
           lines: [task.store.address],
-          navigateKey: const Key('navigate-store'),
-          onNavigate: () => openNavigation(
-            context,
-            ref,
-            task.store.location,
-            task.store.name,
-          ),
         ),
-        _ProgressChip(progress: task.storeProgress),
+        StoreStatusBanner(progress: task.storeProgress),
       ],
       actions: PrimaryActionBar(
+        // Navigate sits in the sticky quick row (pickup.md §1, RD-07).
+        quickRow: [
+          _NavigateButton(
+            buttonKey: const Key('navigate-store'),
+            onPressed: () => openNavigation(
+              context,
+              ref,
+              task.store.location,
+              task.store.name,
+            ),
+          ),
+        ],
         buttonKey: const Key('task-arrived-store'),
         label: l10n.taskArrivedStore,
         busy: state.busy != null,
@@ -236,10 +302,12 @@ class _PickupStep extends ConsumerStatefulWidget {
 
 class _PickupStepState extends ConsumerState<_PickupStep> {
   final _code = TextEditingController();
+  final _focus = FocusNode();
 
   @override
   void dispose() {
     _code.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -247,70 +315,243 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
     ref.read(taskFlowControllerProvider.notifier).clearError();
     final code = await context.push<String>(Routes.taskScan);
     if (code == null || !mounted) return;
-    _code.text = code;
-    await ref.read(taskFlowControllerProvider.notifier).pickup(code);
+    setState(() => _code.text = pickupCodeFromPayload(code) ?? '');
+    await _confirm(code);
+  }
+
+  Future<void> _confirm(String code) async {
+    final controller = ref.read(taskFlowControllerProvider.notifier);
+    await controller.pickup(code);
+    if (!mounted) return;
+    final error = ref.read(taskFlowControllerProvider).error;
+    if (error != null &&
+        (error.riderCode == RiderErrorCode.pickupCodeInvalid ||
+            error.code == ApiErrorCode.validationError)) {
+      // Wrong code: select it all so typing replaces it (pickup.md §2).
+      unawaited(HapticFeedback.mediumImpact());
+      _code.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _code.text.length,
+      );
+      _focus.requestFocus();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final colors = RiderColors.of(context);
     final task = widget.task;
     final state = ref.watch(taskFlowControllerProvider);
     final controller = ref.read(taskFlowControllerProvider.notifier);
-    return TaskStepScaffold(
-      task: task,
-      title: l10n.taskPickupTitle,
-      bottomInBody: true,
-      content: [
-        _ProgressChip(progress: task.storeProgress),
-        const SizedBox(height: 16),
-        Text(l10n.taskItemsTitle, style: theme.textTheme.titleMedium),
-        for (final item in task.items)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Text(
-              '${item.quantity} ×',
-              style: theme.textTheme.titleLarge,
-            ),
-            title: Text(item.name),
-            subtitle: item.unit == null ? null : Text(item.unit!),
-          ),
-        const SizedBox(height: 16),
-        Text(l10n.pickupCodeHelp, style: theme.textTheme.bodyLarge),
-        const SizedBox(height: 8),
-        TextField(
-          key: const Key('pickup-code'),
-          controller: _code,
-          textCapitalization: TextCapitalization.characters,
-          autocorrect: false,
-          enableSuggestions: false,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineMedium?.copyWith(letterSpacing: 8),
-          inputFormatters: [
-            const UpperCaseTextFormatter(),
-            FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
-            LengthLimitingTextInputFormatter(kPickupCodeLength),
-          ],
-          decoration: InputDecoration(labelText: l10n.pickupCodeLabel),
-          onChanged: (_) => controller.clearError(),
-          onSubmitted: (_) => controller.pickup(_code.text),
-        ),
-      ],
-      actions: PrimaryActionBar(
+    final busy = state.busy != null;
+    final length = _code.text.length;
+    final complete = length == kPickupCodeLength;
+
+    if (state.pickupLocked) return _PickupLocked(task: task);
+
+    final scanButtonLabel = Text(l10n.pickupScan);
+    const scanIcon = Icon(Icons.qr_code_scanner);
+
+    final PrimaryActionBar actions;
+    if (complete) {
+      actions = PrimaryActionBar(
         buttonKey: const Key('task-pickup'),
         label: l10n.taskPickup,
-        busy: state.busy != null,
-        onPressed: () => controller.pickup(_code.text),
+        busy: busy,
+        onPressed: () => _confirm(_code.text),
         errorKey: const Key('task-error'),
         error: taskStepError(context, state, action: TaskAction.pickup),
         secondary: [
           OutlinedButton.icon(
             key: const Key('pickup-scan'),
-            onPressed: state.busy != null ? null : _scan,
-            icon: const Icon(Icons.qr_code_scanner),
-            label: Text(l10n.pickupScan),
+            onPressed: busy ? null : _scan,
+            icon: scanIcon,
+            label: scanButtonLabel,
           ),
+        ],
+      );
+    } else {
+      final error = taskStepError(context, state, action: TaskAction.pickup);
+      actions = PrimaryActionBar(
+        buttonKey: const Key('pickup-scan'),
+        label: l10n.pickupScan,
+        busy: busy,
+        onPressed: _scan,
+        errorKey: const Key('task-error'),
+        error: error,
+        hint: length > 0
+            ? l10n.pickupEnterAll
+            : (task.storeProgress == StoreOrderProgress.packing
+                  ? l10n.pickupNotPacked
+                  : null),
+        secondary: [
+          if (length == 0)
+            OutlinedButton(
+              key: const Key('pickup-type'),
+              onPressed: busy ? null : _focus.requestFocus,
+              child: Text(l10n.pickupTypeCode),
+            ),
+        ],
+      );
+    }
+
+    return TaskStepScaffold(
+      task: task,
+      title: l10n.taskPickupTitle,
+      bottomInBody: true,
+      content: [
+        StoreStatusBanner(progress: task.storeProgress),
+        const SizedBox(height: 16),
+        Text(l10n.pickupCodeHelp, style: theme.textTheme.bodyLarge),
+        const SizedBox(height: 8),
+        if (state.pickupAttemptsRemaining case final left?
+            when left < kMaxPickupAttempts)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              l10n.pickupCodeWrongLeft(left),
+              key: const Key('pickup-attempts-left'),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+        SizedBox(
+          height: 64,
+          child: TextField(
+            key: const Key('pickup-code'),
+            controller: _code,
+            focusNode: _focus,
+            textCapitalization: TextCapitalization.characters,
+            autocorrect: false,
+            enableSuggestions: false,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'monospace',
+              letterSpacing: 8,
+            ),
+            inputFormatters: [
+              const UpperCaseTextFormatter(),
+              FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
+              LengthLimitingTextInputFormatter(kPickupCodeLength),
+            ],
+            decoration: InputDecoration(labelText: l10n.pickupCodeLabel),
+            onChanged: (_) {
+              controller.clearError();
+              setState(() {});
+            },
+            onSubmitted: (value) {
+              if (value.length == kPickupCodeLength) _confirm(value);
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          l10n.pickupCheckBag(task.items.length),
+          style: theme.textTheme.titleMedium,
+        ),
+        for (final item in task.items)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 56,
+                  child: Text(
+                    '${item.quantity} ×',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.name, style: const TextStyle(fontSize: 18)),
+                      if (item.unit != null)
+                        Text(
+                          item.unit!,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+      actions: actions,
+    );
+  }
+}
+
+/// `PICKUP_CODE_LOCKED`: 5 wrong codes. No more tries from the phone; the
+/// store staff or ops hand the order over (the task then moves on by
+/// polling). Call the store, or check again.
+class _PickupLocked extends ConsumerWidget {
+  const _PickupLocked({required this.task});
+
+  final RiderTask task;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final state = ref.watch(taskFlowControllerProvider);
+    final controller = ref.read(taskFlowControllerProvider.notifier);
+    final phone = task.store.phone;
+    return TaskStepScaffold(
+      task: task,
+      title: l10n.pickupLockedTitle,
+      content: [
+        Container(
+          key: const Key('pickup-locked'),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.errorContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.lock_outline, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  l10n.pickupCodeLocked,
+                  style: const TextStyle(fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      actions: PrimaryActionBar(
+        buttonKey: const Key('task-check'),
+        label: l10n.taskCheckStatus,
+        busy: state.refreshing,
+        onPressed: controller.load,
+        secondary: [
+          if (phone != null && phone.trim().isNotEmpty)
+            OutlinedButton.icon(
+              key: const Key('pickup-call-store'),
+              onPressed: () => ref
+                  .read(urlOpenerProvider)
+                  .open(Uri(scheme: 'tel', path: phone)),
+              icon: const Icon(Icons.call),
+              label: Text(l10n.pickupCallStore),
+            ),
         ],
       ),
     );
@@ -370,37 +611,60 @@ class _GoToCustomerStep extends ConsumerWidget {
               customer.address,
               if (customer.landmark != null)
                 l10n.taskLandmark(customer.landmark!),
+              for (final chip in customer.chips)
+                switch (chip) {
+                  DeliveryChip.dontRingBell => l10n.taskChipDontRingBell,
+                  DeliveryChip.leaveAtDoor => l10n.taskChipLeaveAtDoor,
+                  DeliveryChip.avoidCalling => l10n.taskChipAvoidCalling,
+                },
               if (customer.instructions != null)
                 l10n.taskInstructions(customer.instructions!),
             ],
-            navigateKey: const Key('navigate-customer'),
-            onNavigate: () => openNavigation(
-              context,
-              ref,
-              customer.location,
-              customer.address,
-            ),
-            trailing: OutlinedButton.icon(
-              key: const Key('call-customer'),
-              onPressed: controller.callCustomer,
-              icon: const Icon(Icons.call),
-              label: Text(l10n.taskCallCustomer),
-            ),
           ),
-        if (task.isCod)
-          Card(
+        if (task.isCod) ...[
+          CodAmountChangedNotice(task: task),
+          Container(
             key: const Key('cod-banner'),
-            color: Theme.of(context).colorScheme.tertiaryContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                l10n.taskCollectCash(formatRupees(task.codAmountDue ?? '')),
-                style: Theme.of(context).textTheme.titleLarge,
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.all(16),
+            decoration: riderCodDecoration(context),
+            child: Text(
+              switch (codAmountText(task)) {
+                final amount? => l10n.taskCollectCash(amount),
+                null => l10n.codAmountMissing,
+              },
+              style: TextStyle(
+                fontSize: 22,
+                color: RiderColors.of(context).codText,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
+        ],
       ],
       actions: PrimaryActionBar(
+        // Navigate and Call in the sticky quick row (RD-07).
+        quickRow: [
+          if (customer != null)
+            _NavigateButton(
+              buttonKey: const Key('navigate-customer'),
+              onPressed: () => openNavigation(
+                context,
+                ref,
+                customer.location,
+                customer.address,
+              ),
+            ),
+          OutlinedButton.icon(
+            key: const Key('call-customer'),
+            onPressed: controller.callCustomer,
+            icon: const Icon(Icons.call),
+            label: Text(l10n.taskCallCustomer),
+          ),
+        ],
+        exitLink: CantDeliverLink(
+          onPressed: () => context.push(Routes.taskFail),
+        ),
         buttonKey: const Key('task-arrived-customer'),
         label: l10n.taskArrivedCustomer,
         busy: state.busy != null,
@@ -418,11 +682,6 @@ class _GoToCustomerStep extends ConsumerWidget {
               onPressed: () => _override(context, ref),
               child: Text(l10n.arrivedOverride),
             ),
-          TextButton(
-            key: const Key('task-cant-deliver'),
-            onPressed: () => context.push(Routes.taskFail),
-            child: Text(l10n.taskCantDeliver),
-          ),
         ],
       ),
     );
@@ -443,22 +702,70 @@ class _ReturnStep extends ConsumerWidget {
       task: task,
       title: l10n.taskReturnTitle,
       content: [
-        Text(l10n.taskReturnBody, style: Theme.of(context).textTheme.bodyLarge),
+        Container(
+          key: const Key('return-notice'),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: RiderColors.of(context).neutralContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.assignment_return, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.taskReturnBody,
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    // Just at the door with a COD amount (fail-and-return.md
+                    // §2): say so plainly.
+                    if (task.isCod) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        l10n.taskReturnNoCash,
+                        key: const Key('return-no-cash'),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 16),
         _PlaceCard(
           icon: Icons.store,
           title: task.store.name,
           lines: [task.store.address],
-          navigateKey: const Key('navigate-store'),
-          onNavigate: () => openNavigation(
-            context,
-            ref,
-            task.store.location,
-            task.store.name,
-          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          l10n.taskReturnWaiting,
+          key: const Key('return-waiting'),
+          style: const TextStyle(fontSize: 16),
         ),
       ],
       actions: PrimaryActionBar(
+        quickRow: [
+          _NavigateButton(
+            buttonKey: const Key('navigate-store'),
+            onPressed: () => openNavigation(
+              context,
+              ref,
+              task.store.location,
+              task.store.name,
+            ),
+          ),
+        ],
         buttonKey: const Key('task-check'),
         label: l10n.taskCheckStatus,
         busy: state.refreshing,
@@ -548,27 +855,22 @@ class _EndScreen extends StatelessWidget {
   );
 }
 
+/// A store or customer: name 20 sp / 600, address lines 18 sp. Navigate and
+/// Call live in the step's quick row, not in the card (RD-07).
 class _PlaceCard extends StatelessWidget {
   const _PlaceCard({
     required this.icon,
     required this.title,
     required this.lines,
-    required this.navigateKey,
-    required this.onNavigate,
-    this.trailing,
   });
 
   final IconData icon;
   final String title;
   final List<String> lines;
-  final Key navigateKey;
-  final VoidCallback onNavigate;
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = AppLocalizations.of(context);
+    final colors = RiderColors.of(context);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -577,25 +879,25 @@ class _PlaceCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, size: 32, color: theme.colorScheme.primary),
+                Icon(icon, size: 28, color: colors.textPrimary),
                 const SizedBox(width: 12),
-                Expanded(child: Text(title, style: theme.textTheme.titleLarge)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
             for (final line in lines)
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
-                child: Text(line, style: theme.textTheme.bodyLarge),
+                child: Text(line, style: const TextStyle(fontSize: 18)),
               ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              key: navigateKey,
-              onPressed: onNavigate,
-              icon: const Icon(Icons.navigation),
-              label: Text(l10n.taskNavigate),
-            ),
-            if (trailing != null) ...[const SizedBox(height: 8), trailing!],
           ],
         ),
       ),
@@ -603,21 +905,84 @@ class _PlaceCard extends StatelessWidget {
   }
 }
 
-class _ProgressChip extends StatelessWidget {
-  const _ProgressChip({required this.progress});
+class _NavigateButton extends StatelessWidget {
+  const _NavigateButton({required this.buttonKey, required this.onPressed});
+
+  final Key buttonKey;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    key: buttonKey,
+    onPressed: onPressed,
+    icon: const Icon(Icons.navigation),
+    label: Text(AppLocalizations.of(context).taskNavigate),
+  );
+}
+
+/// "Can't deliver…" (task-step shell §1): a 48 dp text button with the
+/// `report` icon, kept 24 dp away from the primary action.
+class CantDeliverLink extends StatelessWidget {
+  const CantDeliverLink({required this.onPressed, super.key});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    key: const Key('task-cant-deliver'),
+    style: TextButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+    onPressed: onPressed,
+    icon: const Icon(Icons.report),
+    label: Text(AppLocalizations.of(context).taskCantDeliver),
+  );
+}
+
+/// "Store is packing: wait here" / "Ready for pickup" (pickup.md §3), in
+/// words with an icon. Announced when it changes (the push arrives too).
+class StoreStatusBanner extends StatelessWidget {
+  const StoreStatusBanner({required this.progress, super.key});
 
   final StoreOrderProgress progress;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colors = RiderColors.of(context);
     final ready = progress != StoreOrderProgress.packing;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Chip(
+    final (bg, fg) = ready
+        ? (colors.onlineBg, colors.onlineFg)
+        : (colors.neutralContainer, colors.textPrimary);
+    return Semantics(
+      liveRegion: true,
+      child: Container(
         key: const Key('task-store-progress'),
-        avatar: Icon(ready ? Icons.inventory_2 : Icons.hourglass_top),
-        label: Text(ready ? l10n.taskOrderReady : l10n.taskOrderPacking),
+        margin: const EdgeInsets.only(top: 8),
+        constraints: const BoxConstraints(minHeight: 56),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              ready ? Icons.inventory_2 : Icons.hourglass_top,
+              size: 28,
+              color: fg,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                ready ? l10n.taskOrderReady : l10n.taskOrderPacking,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -656,6 +1021,11 @@ class _DevTaskTools extends ConsumerWidget {
             key: const Key('dev-cancel'),
             onPressed: () => act(repository.cancelOrder),
             child: Text(l10n.devCancelOrder),
+          ),
+          TextButton(
+            key: const Key('dev-cod-changed'),
+            onPressed: () => act(repository.changeCodAmount),
+            child: Text(l10n.devCodAmountChanged),
           ),
           TextButton(
             key: const Key('dev-returned'),

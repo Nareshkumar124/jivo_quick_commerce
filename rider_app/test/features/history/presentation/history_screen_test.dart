@@ -71,4 +71,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Order JQ-10501'), findsOneWidget);
   });
+
+  testWidgets('a past task opens its details: times, items, cash collected '
+      'and pay lines', (tester) async {
+    await openFromHome(tester, h, 'home-history');
+    await tester.tap(byKey('history-600'));
+    await tester.pumpAndSettle();
+
+    expect(byKey('history-detail'), findsOneWidget);
+    expect(h.history.calls.last, 'fetchDetail 600');
+    expect(textOf(tester, 'history-detail-status'), 'Delivered');
+    expect(textOf(tester, 'history-detail-cod'), 'Collected ₹349');
+    expect(textOf(tester, 'history-detail-earned'), '₹40');
+    expect(find.text('2 × Jivo Canola Oil · 1 L'), findsOneWidget);
+    expect(find.text('3 items'), findsOneWidget);
+  });
+
+  testWidgets('details that fail to load offer a retry', (tester) async {
+    await openFromHome(tester, h, 'home-history');
+    h.history.failNext = const ApiError(code: ApiErrorCode.network);
+    await tester.tap(byKey('history-600'));
+    await tester.pumpAndSettle();
+    expect(byKey('history-detail-error'), findsOneWidget);
+
+    await tester.tap(byKey('history-detail-retry'));
+    await tester.pumpAndSettle();
+    expect(byKey('history-detail'), findsOneWidget);
+  });
 }

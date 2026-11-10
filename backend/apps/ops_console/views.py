@@ -5,8 +5,8 @@ admin)."""
 from django.contrib import admin
 from django.shortcuts import render
 
+from apps.ops_console import capabilities, dashboard_orders, selectors
 from apps.ops_console import dashboard as dashboard_blocks
-from apps.ops_console import selectors
 from apps.ops_console.access import ops_view
 from apps.ops_console.navigation import visible_sections
 
@@ -22,9 +22,21 @@ def ops_context(request, **extra) -> dict:
     context.update(
         ops_nav=visible_sections(request.user),
         user_roles=selectors.role_names(request.user),
+        ops_live_url=live_feed_url(request.user),
         **extra,
     )
     return context
+
+
+def live_feed_url(user) -> str:
+    """The ops socket path for users the socket accepts (`orders.view_order`; the consumer also
+    needs a store and re-checks everything itself), else "" (no live client, polling only)."""
+    from apps.realtime import contract
+    from apps.realtime.consumers import LIVE_BOARD_PERMISSION
+
+    if user.is_active and user.is_staff and user.has_perm(LIVE_BOARD_PERMISSION):
+        return contract.OPS_SOCKET
+    return ""
 
 
 @ops_view()
@@ -44,7 +56,19 @@ def dashboard(request):
     operations = selectors.operations_stats(user)
     if operations.any:
         context["operations"] = operations
+    if capabilities.allowed(user, capabilities.REPORTS):
+        context["orders_section"] = dashboard_orders.build(request)
     return render(request, "ops/dashboard.html", context)
+
+
+@ops_view(capability=capabilities.REPORTS)
+def dashboard_orders_partial(request):
+    """HTMX partial: the order KPIs, charts and alerts for the chosen day and store (05 §1.1)."""
+    return render(
+        request,
+        "ops/partials/order_dashboard.html",
+        {"orders_section": dashboard_orders.build(request)},
+    )
 
 
 @ops_view()

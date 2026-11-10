@@ -12,8 +12,8 @@ Showing a link is never the permission check: every target view and ModelAdmin e
 from dataclasses import dataclass
 from functools import partial
 
-from django.urls import reverse, reverse_lazy
-from django.utils.text import format_lazy
+from django.urls import NoReverseMatch, reverse
+from django.utils.functional import lazy
 
 ADMIN = "admin"
 OPS = "ops"
@@ -28,18 +28,40 @@ class NavItem:
     perms: tuple[str, ...] = ()
     query: str = ""
     surface: str = ADMIN  # ADMIN (/admin/) or OPS (/ops/)
+    # A 05 §3 capability (apps.ops_console.capabilities) instead of / on top of `perms`.
+    capability: str = ""
 
     def url(self) -> str:
         base = reverse(self.url_name)
         return f"{base}?{self.query}" if self.query else base
 
     def lazy_url(self):
-        base = reverse_lazy(self.url_name)
-        return format_lazy("{}?{}", base, self.query) if self.query else base
+        """For the unfold sidebar (built at settings time). A target that is not installed
+        resolves to "#"; `allowed()` hides such an item anyway."""
+        return lazy(self._url_or_hash, str)()
+
+    def _url_or_hash(self) -> str:
+        try:
+            return self.url()
+        except NoReverseMatch:
+            return "#"
+
+    def exists(self) -> bool:
+        """The target is installed (a module whose backend model is not merged yet is not)."""
+        try:
+            reverse(self.url_name)
+        except NoReverseMatch:
+            return False
+        return True
 
     def allowed(self, user) -> bool:
-        if not (user.is_active and user.is_staff):
+        if not (user.is_active and user.is_staff) or not self.exists():
             return False
+        if self.capability:
+            from apps.ops_console.capabilities import allowed
+
+            if not allowed(user, self.capability):
+                return False
         return not self.perms or any(user.has_perm(perm) for perm in self.perms)
 
 
@@ -148,10 +170,107 @@ MODULES: tuple[NavSection, ...] = (
         "Orders",
         (
             NavItem(
+                "Live order board",
+                "view_kanban",
+                "ops:live-board",
+                surface=OPS,
+                capability="live_board",
+            ),
+            NavItem(
+                "Packing console",
+                "package_2",
+                "ops:packing-index",
+                surface=OPS,
+                capability="packing",
+            ),
+            NavItem(
                 "Orders",
                 "receipt",
                 "admin:orders_order_changelist",
                 ("orders.view_order",),
+            ),
+        ),
+    ),
+    NavSection(
+        "Riders",
+        (
+            NavItem(
+                "Dispatch",
+                "route",
+                "ops:dispatch",
+                surface=OPS,
+                capability="dispatch",
+            ),
+            NavItem(
+                "Riders",
+                "two_wheeler",
+                "admin:delivery_rider_changelist",
+                ("delivery.view_rider",),
+            ),
+            NavItem(
+                "KYC documents",
+                "badge",
+                "admin:delivery_riderdocument_changelist",
+                ("delivery.view_riderdocument",),
+                query="status__exact=PENDING",
+            ),
+            NavItem(
+                "Shifts",
+                "schedule",
+                "admin:delivery_ridershift_changelist",
+                ("delivery.view_ridershift",),
+            ),
+            NavItem(
+                "Delivery tasks",
+                "local_shipping",
+                "admin:delivery_deliverytask_changelist",
+                ("delivery.view_deliverytask",),
+            ),
+            NavItem(
+                "Rider offers",
+                "notifications",
+                "admin:delivery_deliveryoffer_changelist",
+                ("delivery.view_deliveryoffer",),
+            ),
+            NavItem(
+                "Location history",
+                "location_on",
+                "admin:delivery_riderlocation_changelist",
+                ("delivery.view_riderlocation",),
+            ),
+            # Slice 5.4 (hidden until its services / models are merged: capability service gate,
+            # admin URL not installed).
+            NavItem(
+                "Cash deposits",
+                "account_balance_wallet",
+                "ops:cash",
+                surface=OPS,
+                capability="cash_deposit",
+            ),
+            NavItem(
+                "Cash ledger",
+                "receipt_long",
+                "admin:delivery_ridercashledger_changelist",
+                ("delivery.view_ridercashledger",),
+            ),
+            NavItem(
+                "Payouts",
+                "payments",
+                "ops:payouts",
+                surface=OPS,
+                capability="payouts",
+            ),
+            NavItem(
+                "Rider earnings",
+                "savings",
+                "admin:delivery_riderearning_changelist",
+                ("delivery.view_riderearning",),
+            ),
+            NavItem(
+                "Earning rules",
+                "rule",
+                "admin:delivery_earningrule_changelist",
+                ("delivery.view_earningrule",),
             ),
         ),
     ),
@@ -213,6 +332,69 @@ MODULES: tuple[NavSection, ...] = (
         ),
     ),
     NavSection(
+        "Notifications",
+        (
+            NavItem(
+                "Sent notifications",
+                "notifications",
+                "admin:notifications_notification_changelist",
+                ("notifications.view_notification",),
+            ),
+            NavItem(
+                "Notification templates",
+                "edit_notifications",
+                "admin:notifications_notificationtemplate_changelist",
+                ("notifications.view_notificationtemplate",),
+            ),
+        ),
+    ),
+    NavSection(
+        "Support",
+        (
+            NavItem(
+                "Support tickets",
+                "support_agent",
+                "ops:support",
+                surface=OPS,
+                capability="support_tickets",
+            ),
+            NavItem(
+                "Ticket records",
+                "confirmation_number",
+                "admin:support_supportticket_changelist",
+                ("support.view_supportticket",),
+            ),
+            NavItem("FAQs", "quiz", "admin:cms_faq_changelist", ("cms.view_faq",)),
+            NavItem(
+                "Canned replies",
+                "quickreply",
+                "admin:support_cannedreply_changelist",
+                ("support.view_cannedreply",),
+            ),
+            # P7: hidden until the backend's Rating model is merged (admin URL not installed).
+            NavItem("Ratings", "star", "admin:orders_rating_changelist", ("orders.view_rating",)),
+        ),
+    ),
+    NavSection(
+        "Reports",
+        (
+            # `product_report` is the widest reports row (05 §3: also Catalog Manager).
+            NavItem(
+                "Reports",
+                "monitoring",
+                "ops:reports",
+                surface=OPS,
+                capability="product_report",
+            ),
+            NavItem(
+                "Report exports",
+                "file_download",
+                "admin:reports_reportexport_changelist",
+                ("reports.view_reportexport",),
+            ),
+        ),
+    ),
+    NavSection(
         "Admin settings",
         (
             NavItem(
@@ -234,11 +416,24 @@ MODULES: tuple[NavSection, ...] = (
                 "admin:cms_appconfig_changelist",
                 ("cms.view_appconfig",),
             ),
+            NavItem("CMS pages", "article", "admin:cms_page_changelist", ("cms.view_page",)),
             NavItem(
                 "Login lockouts",
                 "lock_person",
                 "admin:axes_accessattempt_changelist",
                 ("axes.view_accessattempt",),
+            ),
+            NavItem(
+                "Audit log",
+                "history",
+                "admin:core_auditlog_changelist",
+                ("core.view_auditlog",),
+            ),
+            NavItem(
+                "Admin history",
+                "manage_history",
+                "admin:admin_logentry_changelist",
+                capability="audit_log",
             ),
             NavItem(
                 "Scheduled jobs",

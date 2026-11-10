@@ -265,8 +265,9 @@ def test_expiry_and_expiry(shop):
 
 
 def test_capture_and_cancel(shop):
-    """Either the capture wins (PLACED, the cancel is refused) or the cancel wins (CANCELLED, the
-    late capture is refunded once); never both, never neither."""
+    """Either the capture wins (PLACED, then the cancel is a T11 cancellation of a paid order,
+    refunded in full; Phase 4) or the cancel wins (T5 CANCELLED, the late capture is refunded
+    once). Both ways: cancelled, refunded exactly once, stock released."""
     from apps.payments.models import Refund
 
     user, order, gateway_order_id = pending_order(shop)
@@ -282,18 +283,254 @@ def test_capture_and_cancel(shop):
 
     results = race(capture, cancel)
     order.refresh_from_db()
-    if order.status == "PLACED":
-        assert results[0] == "placed"
-        assert isinstance(results[1], ApiError)
-        assert results[1].error_code == "INVALID_STATE_TRANSITION"
-        assert transitions(order) == ["PAYMENT_PENDING", "PLACED"]
-        assert Refund.objects.count() == 0
-        assert reserved(shop) == 2
+    assert order.status == "CANCELLED"
+    assert results[1] == "CANCELLED"
+    assert reserved(shop) == 0
+    refunds = list(Refund.objects.values_list("idempotency_key", "reason", "amount"))
+    if results[0] == "placed":
+        assert transitions(order) == ["PAYMENT_PENDING", "PLACED", "CANCELLED"]
+        assert refunds == [(f"cancel:{order.pk}", "customer_cancel", Decimal("558.00"))]
     else:
-        assert order.status == "CANCELLED"
-        assert results == ["late_capture", "CANCELLED"]
+        assert results[0] == "late_capture"
         assert transitions(order) == ["PAYMENT_PENDING", "CANCELLED"]
-        assert list(Refund.objects.values_list("idempotency_key", "reason")) == [
-            (f"capture:{payment_id}", "late_capture")
-        ]
-        assert reserved(shop) == 0
+        assert refunds == [(f"capture:{payment_id}", "late_capture", Decimal("558.00"))]
+
+
+def test_refund_task_delivered_twice(shop, monkeypatch):
+    """Code review M1: two workers run `process_refund` for one refund at once (a redelivery);
+    exactly one calls the gateway. Since P4 (T-403c) that is the per-refund advisory lock, not
+    a row lock held across the call."""
+    import time
+
+    from apps.payments.gateways import FakeRazorpayGateway
+    from apps.payments.models import Refund
+    from apps.payments.tasks import process_refund
+
+    user, order, gateway_order_id = pending_order(shop)
+    services.cancel_order(user, order.pk, reason="OTHER")
+    payment_id = "pay_RaceRefund001"
+    with monkeypatch.context() as queued:  # tests run Celery eagerly: keep the task queued
+        queued.setattr(process_refund, "delay", lambda refund_id: None)
+        outcome = services.capture_payment(
+            order.pk, gateway_order_id=gateway_order_id, payment_id=payment_id, amount_paise=55800
+        ).outcome
+    assert outcome == "late_capture"
+    refund = Refund.objects.get()
+    assert (refund.status, refund.gateway_refund_id) == ("PENDING", "")
+
+    calls: list[str] = []
+    original = FakeRazorpayGateway.refund
+
+    def slow_refund(self, **kwargs):
+        calls.append(kwargs["receipt"])
+        time.sleep(0.3)  # still sending while the other worker arrives
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(FakeRazorpayGateway, "refund", slow_refund)
+    results = race(*(lambda: process_refund.run(refund.pk) for _ in range(2)))
+    assert sorted(results) == ["processed", "skipped"], results
+    assert calls == [f"capture:{payment_id}"]
+    refund.refresh_from_db()
+    assert refund.status == "PROCESSED"
+    assert Refund.objects.count() == 1
+
+
+def test_refund_gateway_call_holds_no_row_lock(shop, monkeypatch):
+    """T-403c (P4 review Major 1): while `process_refund` waits on the gateway, the order and
+    refund rows are not locked: another transaction can lock both at once (NOWAIT)."""
+    import threading
+
+    from django.db import connection
+
+    from apps.orders.models import Order
+    from apps.payments.gateways import FakeRazorpayGateway
+    from apps.payments.models import Refund
+    from apps.payments.tasks import process_refund
+
+    user, order, gateway_order_id = pending_order(shop)
+    services.cancel_order(user, order.pk, reason="OTHER")
+    with monkeypatch.context() as queued:
+        queued.setattr(process_refund, "delay", lambda refund_id: None)
+        services.capture_payment(
+            order.pk,
+            gateway_order_id=gateway_order_id,
+            payment_id="pay_NoLockRefund01",
+            amount_paise=55800,
+        )
+    refund = Refund.objects.get()
+    in_call, release = threading.Event(), threading.Event()
+    original = FakeRazorpayGateway.refund
+
+    def waiting_refund(self, **kwargs):
+        in_call.set()
+        release.wait(10)
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(FakeRazorpayGateway, "refund", waiting_refund)
+    outcome = {}
+
+    def worker():
+        try:
+            outcome["result"] = process_refund.run(refund.pk)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    try:
+        assert in_call.wait(10)
+        with transaction.atomic():
+            Order.objects.select_for_update(nowait=True).get(pk=order.pk)
+            Refund.objects.select_for_update(nowait=True).get(pk=refund.pk)
+    finally:
+        release.set()
+        thread.join(10)
+    assert outcome["result"] == "processed"
+    refund.refresh_from_db()
+    assert refund.status == "PROCESSED"
+
+
+def test_slow_gateway_at_placement_holds_no_lock(shop, monkeypatch):
+    """T-814 (M6): while the placement waits on a slow gateway, the customer's cart, the coupon
+    and the stock rows are not locked (another transaction locks them NOWAIT), the order is
+    already committed with its stock reserved, and the attempt is attached when the call
+    returns."""
+    from apps.payments.gateways import FakeRazorpayGateway
+
+    user = UserFactory()
+    address = make_address(user)
+    cart = Cart.objects.create(user=user, store=shop.store_model, address=address)
+    CartItem.objects.create(cart=cart, variant=shop.canola_1l, quantity=2)
+    in_call, release = threading.Event(), threading.Event()
+    original = FakeRazorpayGateway.create_order
+
+    def slow_create_order(self, **kwargs):
+        in_call.set()
+        release.wait(10)
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(FakeRazorpayGateway, "create_order", slow_create_order)
+    outcome = {}
+
+    def worker():
+        try:
+            outcome["placement"] = services.place_order(
+                user,
+                shop.store,
+                address_id=address.pk,
+                payment_method="ONLINE",
+                expected_grand_total=Decimal("558.00"),
+                idempotency_key=str(uuid.uuid4()),
+            )
+        except Exception as exc:  # pragma: no cover - reported by the assert below
+            outcome["error"] = exc
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    try:
+        assert in_call.wait(10)
+        with transaction.atomic():
+            Cart.objects.select_for_update(nowait=True).get(pk=cart.pk)
+            list(
+                StoreInventory.objects.select_for_update(nowait=True).filter(store=shop.store_model)
+            )
+        pending = Order.objects.get(user=user)
+        assert pending.status == "PAYMENT_PENDING"
+        assert not pending.payments.exists()
+        assert reserved(shop) == 2
+    finally:
+        release.set()
+        thread.join(15)
+    assert "error" not in outcome, outcome
+    order = outcome["placement"].order
+    assert outcome["placement"].created
+    assert order.payments.get().status == "CREATED"
+    assert reserved(shop) == 2
+
+
+def test_gateway_failure_at_placement_races_a_replay(shop, monkeypatch):
+    """T-814 (M6): the creating request's gateway call fails while a replay of the same key
+    succeeds: the order keeps the replay's attempt (not ended), and stock stays reserved once."""
+    from apps.payments.gateways import FakeRazorpayGateway, PaymentGatewayError
+
+    user = UserFactory()
+    address = make_address(user)
+    cart = Cart.objects.create(user=user, store=shop.store_model, address=address)
+    CartItem.objects.create(cart=cart, variant=shop.canola_1l, quantity=2)
+    key = str(uuid.uuid4())
+    calls = {"n": 0}
+    lock = threading.Lock()
+    original = FakeRazorpayGateway.create_order
+
+    def first_fails(self, **kwargs):
+        with lock:
+            calls["n"] += 1
+            first = calls["n"] == 1
+        if first:
+            raise PaymentGatewayError("timeout")
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(FakeRazorpayGateway, "create_order", first_fails)
+
+    def place():
+        return services.place_order(
+            user,
+            shop.store,
+            address_id=address.pk,
+            payment_method="ONLINE",
+            expected_grand_total=Decimal("558.00"),
+            idempotency_key=key,
+        )
+
+    results = race(place, place)
+    orders = Order.objects.filter(user=user)
+    live = [o for o in orders if o.status == "PAYMENT_PENDING"]
+    # Either the replay attached first (one live order, one attempt) or the failure ended the
+    # order first (then the replay placed a fresh one, or got 503): never a stuck reservation.
+    assert len(live) <= 1
+    assert reserved(shop) == 2 * len(live)
+    for order in live:
+        assert order.payments.count() == 1
+    assert any(not isinstance(r, Exception) for r in results) or not live
+
+
+def test_concurrent_ratings_of_one_rider_keep_the_average():
+    """P7-TC-04 (code review): two customers rate the same rider at once. The rider row lock in
+    `refresh_rider_average` makes the second average see the first rating: (5 + 1) / 2 = 3.0,
+    never 5.0 or 1.0 (a lost update)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.delivery.models import DeliveryTask, Rider
+    from apps.delivery.tests.factories import RiderFactory
+    from apps.orders import ratings
+
+    rider = RiderFactory()
+    now = timezone.now()
+    jobs = []
+    for stars in (5, 1):
+        customer = UserFactory()
+        order = OrderFactory(
+            user=customer, status="DELIVERED", payment_status="COD_COLLECTED", delivered_at=now
+        )
+        DeliveryTask.objects.create(
+            order=order,
+            store=order.store,
+            status="DELIVERED",
+            rider=rider,
+            search_started_at=now - timedelta(minutes=20),
+            delivered_at=now,
+            distance_km=Decimal("2.00"),
+            payout_amount=Decimal("30.00"),
+        )
+
+        def job(customer=customer, order=order, stars=stars):
+            return ratings.rate_order(customer, order.pk, order_stars=5, rider_stars=stars)
+
+        jobs.append(job)
+    results = race(*jobs)
+    assert not [r for r in results if isinstance(r, Exception)], results
+    assert Rider.objects.get(pk=rider.pk).rating_avg == Decimal("3.0")

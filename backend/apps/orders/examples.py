@@ -40,6 +40,7 @@ ORDER_LINES = [
         "mrp": "349.00",
         "selling_price": "279.00",
         "quantity": 2,
+        "quantity_unavailable": 0,
         "line_mrp_total": "698.00",
         "line_total": "558.00",
     },
@@ -53,6 +54,7 @@ ORDER_LINES = [
         "mrp": "250.00",
         "selling_price": "225.00",
         "quantity": 1,
+        "quantity_unavailable": 0,
         "line_mrp_total": "250.00",
         "line_total": "225.00",
     },
@@ -68,7 +70,22 @@ _ORDER = {
     "address": ORDER_ADDRESS,
     "instructions": cart.INSTRUCTIONS,
     "created_at": PLACED_AT,
+    # Phase 4 (additive)
+    "cancellation": None,
+    "amount_refunded": "0.00",
+    "refunds": [],
+    "can_download_invoice": False,
+    # Phase 7 (additive)
+    "can_rate": False,
+    "rating": None,
 }
+
+
+def step(status: str, title: str, at: str) -> dict:
+    return {"status": status, "title": title, "at": at}
+
+
+PENDING_STEP = step("PAYMENT_PENDING", "Completing payment…", PLACED_AT)
 
 ORDER_COD_PLACED = {
     "id": 5011,
@@ -80,8 +97,9 @@ ORDER_COD_PLACED = {
     "placed_at": PLACED_AT,
     "payment_expires_at": None,
     "eta_at": "2026-11-03T06:44:00Z",
-    "can_cancel": False,  # Phase 3: only unpaid orders; Phase 4 allows PLACED/ACCEPTED (08 §7)
+    "can_cancel": True,  # 08 §7: PLACED and ACCEPTED too (Phase 4)
     "can_retry_payment": False,
+    "timeline": [step("PLACED", "Order placed", PLACED_AT)],
 }
 ORDER_ONLINE_PENDING = {
     "id": 5012,
@@ -95,6 +113,7 @@ ORDER_ONLINE_PENDING = {
     "eta_at": None,
     "can_cancel": True,
     "can_retry_payment": True,
+    "timeline": [PENDING_STEP],
 }
 # After `POST /payments/razorpay/verify/` (or the payment.captured webhook) at 06:32:10.
 ORDER_ONLINE_PLACED = {
@@ -104,8 +123,9 @@ ORDER_ONLINE_PLACED = {
     "placed_at": "2026-11-03T06:32:10Z",
     "payment_expires_at": None,
     "eta_at": "2026-11-03T06:46:00Z",
-    "can_cancel": False,
+    "can_cancel": True,
     "can_retry_payment": False,
+    "timeline": [PENDING_STEP, step("PLACED", "Order placed", "2026-11-03T06:32:10Z")],
 }
 # T5: the customer gave up on paying ("Cancel order" on the payment-failed screen).
 ORDER_PAYMENT_CANCELLED = {
@@ -115,13 +135,220 @@ ORDER_PAYMENT_CANCELLED = {
     "payment_expires_at": None,
     "can_cancel": False,
     "can_retry_payment": False,
+    "timeline": [PENDING_STEP, step("CANCELLED", "Cancelled", "2026-11-03T06:40:00Z")],
+    "cancellation": {
+        "reason": "CHANGE_PAYMENT_METHOD",
+        "message": "I want to pay another way",
+        "cancelled_by": "customer",
+        "cancelled_at": "2026-11-03T06:40:00Z",
+    },
+}
+
+# --------------------------------------------------------------------------- Phase 4 states
+
+# T6: the store accepted the paid order at 06:32:40.
+ORDER_ACCEPTED = {
+    **ORDER_ONLINE_PLACED,
+    "status": "ACCEPTED",
+    "timeline": [
+        *ORDER_ONLINE_PLACED["timeline"],
+        step("ACCEPTED", "Order confirmed", "2026-11-03T06:32:40Z"),
+    ],
+}
+# T7 + T8a: while packing (06:33:30) the store found only one 1 L canola (06:34:05). The bill is
+# recomputed (08 §6.3): items ₹504, JIVO50 kept (₹50), delivery still free, tip ₹20 -> ₹474.
+# The difference (₹753 - ₹474 = ₹279) is being refunded to the original payment.
+ORDER_ITEM_UNAVAILABLE = {
+    **ORDER_ACCEPTED,
+    "status": "PACKING",
+    "payment_status": "REFUND_PENDING",
+    "items": [
+        {
+            **ORDER_LINES[0],
+            "quantity_unavailable": 1,
+            "line_mrp_total": "349.00",
+            "line_total": "279.00",
+        },
+        ORDER_LINES[1],
+    ],
+    "item_count": 2,
+    "bill": {
+        "mrp_total": "599.00",
+        "item_total": "504.00",
+        "product_discount": "95.00",
+        "coupon_discount": "50.00",
+        "delivery_fee": "0.00",
+        "small_cart_fee": "0.00",
+        "handling_fee": "0.00",
+        "tip": "20.00",
+        "grand_total": "474.00",
+        "total_savings": "145.00",
+    },
+    "can_cancel": False,
+    "timeline": [
+        *ORDER_ACCEPTED["timeline"],
+        step("PACKING", "Packing your order", "2026-11-03T06:33:30Z"),
+    ],
+    "refunds": [
+        {
+            "id": 7101,
+            "amount": "279.00",
+            "status": "PENDING",
+            "reason": "ITEMS_UNAVAILABLE",
+            "created_at": "2026-11-03T06:34:05Z",
+            "processed_at": None,
+        }
+    ],
+}
+# T11: the customer cancelled the accepted order at 06:35:00; the full ₹753 was refunded.
+ORDER_CANCELLED_REFUNDED = {
+    **ORDER_ACCEPTED,
+    "status": "CANCELLED",
+    "payment_status": "REFUNDED",
+    "can_cancel": False,
+    "timeline": [
+        *ORDER_ACCEPTED["timeline"],
+        step("CANCELLED", "Cancelled", "2026-11-03T06:35:00Z"),
+    ],
+    "cancellation": {
+        "reason": "CHANGED_MIND",
+        "message": "I changed my mind",
+        "cancelled_by": "customer",
+        "cancelled_at": "2026-11-03T06:35:00Z",
+    },
+    "amount_refunded": "753.00",
+    "refunds": [
+        {
+            "id": 7102,
+            "amount": "753.00",
+            "status": "PROCESSED",
+            "reason": "ORDER_CANCELLED",
+            "created_at": "2026-11-03T06:35:00Z",
+            "processed_at": "2026-11-03T06:35:04Z",
+        }
+    ],
+}
+# T12: the store cancelled a COD order (nothing was due, nothing to refund).
+ORDER_CANCELLED_BY_STORE = {
+    **ORDER_COD_PLACED,
+    "status": "CANCELLED",
+    "payment_status": "FAILED",
+    "can_cancel": False,
+    "timeline": [
+        *ORDER_COD_PLACED["timeline"],
+        step("CANCELLED", "Cancelled", "2026-11-03T06:31:30Z"),
+    ],
+    "cancellation": {
+        "reason": "ITEMS_UNAVAILABLE",
+        "message": "Items are not available at the store",
+        "cancelled_by": "store",
+        "cancelled_at": "2026-11-03T06:31:30Z",
+    },
+}
+# Delivered (T9/T10 arrive in Phase 5): the GST invoice can be downloaded.
+ORDER_DELIVERED = {
+    **ORDER_COD_PLACED,
+    "status": "DELIVERED",
+    "payment_status": "COD_COLLECTED",
+    "can_cancel": False,
+    "can_download_invoice": True,
+    "can_rate": True,
+    "timeline": [
+        *ORDER_COD_PLACED["timeline"],
+        step("ACCEPTED", "Order confirmed", "2026-11-03T06:30:20Z"),
+        step("PACKING", "Packing your order", "2026-11-03T06:31:00Z"),
+        step("PACKED", "Packed, rider on the way to store", "2026-11-03T06:34:00Z"),
+        step("OUT_FOR_DELIVERY", "On the way", "2026-11-03T06:35:30Z"),
+        step("DELIVERED", "Delivered", "2026-11-03T06:43:10Z"),
+    ],
+}
+PHASE4_ORDERS = (
+    ORDER_ACCEPTED,
+    ORDER_ITEM_UNAVAILABLE,
+    ORDER_CANCELLED_REFUNDED,
+    ORDER_CANCELLED_BY_STORE,
+    ORDER_DELIVERED,
+)
+# Phase 7: ratings.
+RATING_REQUEST = {
+    "order_stars": 5,
+    "rider_stars": 5,
+    "tags": ["ON_TIME", "WELL_PACKED", "POLITE_RIDER"],
+    "comment": "Quick delivery, thank you!",
+}
+RATING_ORDER_ONLY_REQUEST = {"order_stars": 2, "tags": ["DAMAGED_ITEMS"], "comment": ""}
+RATING = {
+    "order_stars": 5,
+    "rider_stars": 5,
+    "tags": ["ON_TIME", "WELL_PACKED", "POLITE_RIDER"],
+    "comment": "Quick delivery, thank you!",
+    "created_at": "2026-11-03T07:02:00Z",
+}
+RATING_ORDER_ONLY = {
+    "order_stars": 2,
+    "rider_stars": None,
+    "tags": ["DAMAGED_ITEMS"],
+    "comment": "",
+    "created_at": "2026-11-03T07:02:00Z",
+}
+ORDER_DELIVERED_RATED = {**ORDER_DELIVERED, "can_rate": False, "rating": RATING}
+RIDER_RATINGS = {
+    "rating_avg": "4.8",
+    "ratings_count": 41,
+    "tag_counts": [{"tag": "POLITE_RIDER", "count": 30}, {"tag": "ON_TIME", "count": 22}],
+    "results": [
+        {
+            "id": 812,
+            "stars": 5,
+            "tags": ["ON_TIME", "POLITE_RIDER"],
+            "rated_at": "2026-11-03T07:02:00Z",
+            "order_number": "JV-261103-000123",
+        }
+    ],
+    "next": "https://api.jivo.example/api/v1/rider/ratings/?before_id=812",
+}
+RIDER_RATINGS_EMPTY = {
+    "rating_avg": None,
+    "ratings_count": 0,
+    "tag_counts": [],
+    "results": [],
+    "next": None,
+}
+ORDER_CANCEL_CHANGED_MIND_REQUEST = {"reason": "CHANGED_MIND"}
+
+INVOICE = {
+    "invoice_number": "GGN01/26-27/000122",
+    "issued_at": "2026-11-03T06:43:10Z",
+    "url": (
+        "https://media.jivo.example/jivo-media/invoices/1/GGN01-26-27-000122.pdf"
+        "?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=600&X-Amz-Signature=3b1f0c"
+    ),
+    "expires_at": "2026-11-03T07:00:00Z",
+}
+
+REORDER_ALL_ADDED = {"cart": cart.CART_READY, "added_count": 2, "unavailable": []}
+# A past order of canola 1 L x 2, wheatgrass x 1 and chia x 2: the first two are back in the
+# cart (CART_READY), chia is out of stock.
+REORDER_SOME_UNAVAILABLE = {
+    "cart": cart.CART_READY,
+    "added_count": 2,
+    "unavailable": [
+        {
+            "variant_id": 3001,
+            "product_name": "Jivo Chia Seeds",
+            "variant_name": "100 g",
+            "requested_quantity": 2,
+            "added_quantity": 0,
+            "reason": "OUT_OF_STOCK",
+        },
+    ],
 }
 
 # --------------------------------------------------------------------------- checkout
 
 GATEWAY_ORDER_ID = "order_Nq3uVxY7kL9pQe"
 RAZORPAY_CHECKOUT = {
-    "key_id": "rzp_test_Jv7x2QmP9kLs4T",
+    "key_id": "rzp_test_EXAMPLEEXAMPLE",
     "order_id": GATEWAY_ORDER_ID,
     "amount": 75300,
     "currency": "INR",
@@ -184,11 +411,12 @@ ORDERS_ACTIVE = {
     "results": [summary(ORDER_ONLINE_PENDING), summary(ORDER_COD_PLACED)],
 }
 ORDERS_PAST = {
-    "count": 1,
+    "count": 2,
     "next": None,
     "previous": None,
     "results": [
-        summary({**ORDER_PAYMENT_CANCELLED, "id": 4870, "order_number": "JV-261101-000057"})
+        summary({**ORDER_DELIVERED, "id": 4901, "order_number": "JV-261102-000088"}),
+        summary({**ORDER_PAYMENT_CANCELLED, "id": 4870, "order_number": "JV-261101-000057"}),
     ],
 }
 ORDERS_EMPTY = {"count": 0, "next": None, "previous": None, "results": []}
@@ -209,3 +437,65 @@ MIN_ORDER_DETAILS = {
 }
 COD_ABOVE_LIMIT_DETAILS = {"reason": "ABOVE_LIMIT", "cod_max_order_value": "2000.00"}
 STORE_CLOSED_DETAILS = {"store_id": 1, "opens_at": "2026-11-03T01:30:00Z"}
+
+
+# --------------------------------------------------------------------------- tracking (Phase 5)
+
+_TRACK = {
+    "order_id": 1203,
+    "order_number": "JV-261110-001203",
+    "store": {"id": 1, "name": "Jivo Sector 14", "lat": 28.4718, "lng": 77.0436},
+    "destination": {"lat": 28.5012, "lng": 77.0688},
+    "server_time": "2026-11-10T09:45:00.000000Z",
+}
+TRACK_PACKING = {
+    **_TRACK,
+    "status": "PACKING",
+    "eta_at": "2026-11-10T09:58:00Z",
+    "live_eta_at": "2026-11-10T09:57:00Z",
+    "live_eta_minutes": 12,
+    "rider": {
+        "name": "Ravi K.",
+        "phone": None,
+        "photo": (
+            "https://jivo-media.s3.ap-south-1.amazonaws.com/kyc/42/photo-5f1c2a9be03d47a1.jpg"
+            "?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=3b1f0c"
+        ),
+        "lat": 28.4702,
+        "lng": 77.0411,
+        "updated_at": "2026-11-10T09:44:55Z",
+    },
+    "delivery_otp": None,
+    "task_status": "ASSIGNED",
+}
+TRACK_NO_RIDER = {
+    **TRACK_PACKING,
+    "status": "ACCEPTED",
+    "rider": None,
+    "task_status": "SEARCHING",
+    "live_eta_at": "2026-11-10T10:00:00Z",
+    "live_eta_minutes": 15,
+}
+TRACK_OUT_FOR_DELIVERY = {
+    **TRACK_PACKING,
+    "status": "OUT_FOR_DELIVERY",
+    "rider": {
+        **TRACK_PACKING["rider"],
+        "phone": "+919811122233",
+        "lat": 28.4890,
+        "lng": 77.0570,
+    },
+    "delivery_otp": "4821",
+    "task_status": "PICKED_UP",
+    "live_eta_at": "2026-11-10T09:52:00Z",
+    "live_eta_minutes": 7,
+}
+TRACK_DELIVERED = {
+    **TRACK_PACKING,
+    "status": "DELIVERED",
+    "eta_at": None,
+    "live_eta_at": None,
+    "live_eta_minutes": None,
+    "rider": None,
+    "task_status": "DELIVERED",
+}

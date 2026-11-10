@@ -16,7 +16,7 @@
                 <table class="mt-2 text-xs w-full">
                     <tbody>
                         {% for label, value in chart.rows %}
-                            <tr><td class="py-0.5">{{ label|date:"D d M" }}</td><td class="py-0.5 text-right">{{ value }}</td></tr>
+                            <tr><td class="py-0.5">{% if label.year %}{{ label|date:"D d M" }}{% else %}{{ label }}{% endif %}</td><td class="py-0.5 text-right">{{ value }}</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

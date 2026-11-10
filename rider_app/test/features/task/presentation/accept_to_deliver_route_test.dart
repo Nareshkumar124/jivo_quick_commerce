@@ -76,5 +76,39 @@ void main() {
       expectBothGeofencesChecked();
       expect(h.tasks.calls.last, 'deliver cash ${FakeTaskBackend.codAmount}');
     });
+
+    testWidgets('pickup by scanning the bag QR', (tester) async {
+      await h.pump(tester);
+      await driveAcceptToDeliver(tester, h, pickupByQr: true);
+
+      expectBothGeofencesChecked();
+      expect(h.tasks.calls, contains('pickup'));
+    });
+
+    testWidgets('the app is killed on the way to the customer: it resumes '
+        'the same step from the server and the ride finishes', (tester) async {
+      await h.pump(tester);
+      await driveAcceptToDeliver(
+        tester,
+        h,
+        cod: true,
+        restartAfterPickup: true,
+      );
+
+      expectBothGeofencesChecked();
+      expect(h.tasks.calls.last, 'deliver cash ${FakeTaskBackend.codAmount}');
+    });
+
+    testWidgets('customer refuses: failed delivery, ride back, the store '
+        'receives the items', (tester) async {
+      await h.pump(tester);
+      await driveAcceptToReturn(tester, h);
+
+      // The ended task was shown once ("Items returned") and the server
+      // no longer lists it.
+      expect(h.tasks.task, isNull);
+      expect(h.tasks.calls, contains('fail CUSTOMER_REFUSED'));
+      expect(h.tasks.calls, isNot(contains(startsWith('deliver'))));
+    });
   });
 }

@@ -38,10 +38,25 @@ def ip_verify_limit() -> Limit:
     return Limit("otp-verify-ip-hour", settings.OTP_VERIFY_LIMIT_PER_IP_PER_HOUR, 60 * 60)
 
 
+def otp_hash_key() -> bytes:
+    """T-814 (L3): `OTP_HASH_KEY`, or a key derived from SECRET_KEY under its own label (so the
+    OTP hashes never use the raw SECRET_KEY, which also signs sessions)."""
+    if settings.OTP_HASH_KEY:
+        return settings.OTP_HASH_KEY.encode()
+    return hmac.new(
+        settings.SECRET_KEY.encode(), b"jivo-quick-commerce:otp-hash-key", hashlib.sha256
+    ).digest()
+
+
 def hash_code(phone: str, app: str, purpose: str, code: str) -> str:
-    """HMAC-SHA256 keyed with SECRET_KEY: a database leak alone does not reveal codes."""
+    """HMAC-SHA256 keyed with `otp_hash_key()`: a database leak alone does not reveal codes."""
     message = f"{phone}|{app}|{purpose}|{code}".encode()
-    return hmac.new(settings.SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()
+    return hmac.new(otp_hash_key(), message, hashlib.sha256).hexdigest()
+
+
+# T-814 (L4): requests whose client IP cannot be parsed share one IP bucket instead of skipping
+# the per-IP limits.
+UNKNOWN_IP = "unknown"
 
 
 def test_code_for(phone: str) -> str | None:
@@ -76,9 +91,8 @@ def request_otp(
     """Create an OTP and queue its SMS. The response never reveals whether the phone exists."""
     test_code = test_code_for(phone)
     if test_code is None:
-        checks = [(limit, phone) for limit in send_limits()]
-        if ip:
-            checks.insert(0, (ip_send_limit(), ip))
+        checks = [(ip_send_limit(), ip or UNKNOWN_IP)]
+        checks += [(limit, phone) for limit in send_limits()]
         _enforce(checks)
 
     if (
@@ -115,8 +129,8 @@ def verify_otp(
 ) -> OTPRequest:
     """Consume the newest active OTP. Wrong codes count attempts; the attempt is committed even
     though the call fails."""
-    if ip and test_code_for(phone) is None:  # test numbers: repeatable integration runs
-        _enforce([(ip_verify_limit(), ip)])
+    if test_code_for(phone) is None:  # test numbers: repeatable integration runs
+        _enforce([(ip_verify_limit(), ip or UNKNOWN_IP)])
 
     now = timezone.now()
     error: ApiError | None = None

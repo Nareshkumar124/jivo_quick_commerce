@@ -10,14 +10,25 @@ import copy
 from rest_framework import serializers
 
 from apps.accounts.serializers import AddressSerializer
-from apps.cart.serializers import BillSerializer, DeliveryInstructionsSerializer
+from apps.cart.serializers import (
+    BillSerializer,
+    CartSerializer,
+    DeliveryInstructionsSerializer,
+)
 from apps.catalog.serializers import ImageSetSerializer, money
+from apps.delivery.choices import DeliveryTaskStatus
 from apps.orders.choices import (
+    ActorType,
     CancelReason,
+    OrderCancelReason,
     OrderListStatus,
+    OrderRefundReason,
+    OrderRefundStatus,
     OrderStatus,
     PaymentMethod,
     PaymentStatus,
+    RatingTag,
+    ReorderIssueReason,
 )
 
 CANCEL_NOTE_MAX_LENGTH = 250
@@ -84,9 +95,128 @@ class OrderLineSerializer(serializers.Serializer):
     image = ImageSetSerializer(allow_null=True)
     mrp = money("Unit MRP at order time.")
     selling_price = money("Unit price paid at order time.")
-    quantity = serializers.IntegerField(min_value=1)
-    line_mrp_total = money("`mrp` x `quantity`.")
-    line_total = money("`selling_price` x `quantity`.")
+    quantity = serializers.IntegerField(min_value=1, help_text="Units ordered.")
+    quantity_unavailable = serializers.IntegerField(
+        min_value=0,
+        help_text=(
+            "Units the store could not supply (08 T8a, Phase 4): removed from the order and "
+            "the bill (refunded if paid online). 0 normally. Units coming = `quantity` - "
+            "`quantity_unavailable`; show the removed ones struck through."
+        ),
+    )
+    line_mrp_total = money("`mrp` x the units coming (`quantity` - `quantity_unavailable`).")
+    line_total = money("`selling_price` x the units coming (`quantity` - `quantity_unavailable`).")
+
+
+class OrderTimelineEntrySerializer(serializers.Serializer):
+    """A state the order reached (08 §1), oldest first."""
+
+    status = serializers.ChoiceField(choices=OrderStatus.choices)
+    title = serializers.CharField(
+        help_text='The customer label of the state, e.g. "Order confirmed".'
+    )
+    at = serializers.DateTimeField()
+
+
+class OrderCancellationSerializer(serializers.Serializer):
+    reason = serializers.ChoiceField(choices=OrderCancelReason.choices)
+    message = serializers.CharField(help_text="The reason as text to show.")
+    cancelled_by = serializers.ChoiceField(
+        choices=ActorType.choices,
+        help_text="`customer`, `store`, `ops` (Jivo support) or `system` (payment window).",
+    )
+    cancelled_at = serializers.DateTimeField()
+
+
+class OrderRefundSerializer(serializers.Serializer):
+    """Money going back to the original payment method (08 §4 rule 4, §6.4)."""
+
+    id = serializers.IntegerField()
+    amount = money("Amount refunded.")
+    status = serializers.ChoiceField(
+        choices=OrderRefundStatus.choices,
+        help_text=(
+            "PENDING: started; banks usually take 5-7 working days. PROCESSED: the gateway "
+            "has sent it. A refund the gateway refused is retried by Jivo's team and stays "
+            "PENDING here (never FAILED)."
+        ),
+    )
+    reason = serializers.ChoiceField(choices=OrderRefundReason.choices)
+    created_at = serializers.DateTimeField()
+    processed_at = serializers.DateTimeField(allow_null=True)
+
+
+class OrderRatingSerializer(serializers.Serializer):
+    """The customer's rating of a delivered order (Phase 7)."""
+
+    order_stars = serializers.IntegerField(min_value=1, max_value=5)
+    rider_stars = serializers.IntegerField(
+        min_value=1, max_value=5, allow_null=True, help_text="Null when the rider was not rated."
+    )
+    tags = serializers.ListField(child=serializers.ChoiceField(choices=RatingTag.choices))
+    comment = serializers.CharField(allow_blank=True, help_text="Plain text; may be empty.")
+    created_at = serializers.DateTimeField()
+
+
+class OrderRatingCreateSerializer(serializers.Serializer):
+    order_stars = serializers.IntegerField(min_value=1, max_value=5, help_text="1 to 5 stars.")
+    rider_stars = serializers.IntegerField(
+        min_value=1,
+        max_value=5,
+        required=False,
+        allow_null=True,
+        help_text="Optional: 1 to 5 stars for the rider who delivered the order.",
+    )
+    tags = serializers.ListField(
+        child=serializers.ChoiceField(choices=RatingTag.choices),
+        required=False,
+        max_length=len(RatingTag.choices),
+        help_text=(
+            "Optional tags. The app offers ON_TIME, WELL_PACKED, FRESH_PRODUCTS and "
+            "POLITE_RIDER for 4-5 stars and LATE_DELIVERY, DAMAGED_ITEMS, MISSING_ITEMS and "
+            "RUDE_RIDER for 1-3 (not enforced). POLITE_RIDER and RUDE_RIDER need `rider_stars`."
+        ),
+    )
+    comment = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=500,
+        trim_whitespace=True,
+        help_text="Optional, plain text, at most 500 characters.",
+    )
+
+
+class RiderRatingTagCountSerializer(serializers.Serializer):
+    tag = serializers.ChoiceField(choices=RatingTag.choices)
+    count = serializers.IntegerField()
+
+
+class RiderRatingItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField(help_text="Use as `before_id` for older ratings.")
+    stars = serializers.IntegerField(min_value=1, max_value=5)
+    tags = serializers.ListField(child=serializers.ChoiceField(choices=RatingTag.choices))
+    rated_at = serializers.DateTimeField()
+    order_number = serializers.CharField()
+
+
+class RiderRatingsPageSerializer(serializers.Serializer):
+    """The rider's own ratings (Phase 7, rider app request). No customer details, no comments."""
+
+    rating_avg = serializers.DecimalField(
+        max_digits=2,
+        decimal_places=1,
+        allow_null=True,
+        coerce_to_string=True,
+        help_text='Average stars, one decimal ("4.8"); null until the first rating.',
+    )
+    ratings_count = serializers.IntegerField()
+    tag_counts = RiderRatingTagCountSerializer(
+        many=True, help_text="Tags customers chose for the rider, most frequent first."
+    )
+    results = RiderRatingItemSerializer(many=True, help_text="Newest first.")
+    next = serializers.URLField(
+        allow_null=True, help_text="The next (older) page, `?before_id=`; null at the end."
+    )
 
 
 class OrderSerializer(serializers.Serializer):
@@ -125,8 +255,8 @@ class OrderSerializer(serializers.Serializer):
     )
     can_cancel = serializers.BooleanField(
         help_text=(
-            "True when `POST /orders/{id}/cancel/` is allowed now (08 §7). Phase 3: only in "
-            "PAYMENT_PENDING; from Phase 4 also PLACED and ACCEPTED."
+            "True when `POST /orders/{id}/cancel/` is allowed now (08 §7): PAYMENT_PENDING, "
+            "PLACED or ACCEPTED (from PACKING on, show 'Contact support')."
         )
     )
     can_retry_payment = serializers.BooleanField(
@@ -134,6 +264,32 @@ class OrderSerializer(serializers.Serializer):
             "True when `POST /orders/{id}/retry-payment/` is allowed now: an ONLINE order in "
             "PAYMENT_PENDING before `payment_expires_at`."
         )
+    )
+    # Phase 4 (additive)
+    timeline = OrderTimelineEntrySerializer(
+        many=True, help_text="Every state reached, oldest first (Phase 4)."
+    )
+    cancellation = OrderCancellationSerializer(
+        allow_null=True, help_text="Set when the order is CANCELLED; null otherwise (Phase 4)."
+    )
+    amount_refunded = money(
+        "Refunded so far (processed refunds), Phase 4. `bill` is always the current bill: "
+        "after items were found unavailable it is the reduced one."
+    )
+    refunds = OrderRefundSerializer(
+        many=True, help_text="Refunds of this order, oldest first; [] when none (Phase 4)."
+    )
+    can_download_invoice = serializers.BooleanField(
+        help_text=(
+            "True when `GET /orders/{id}/invoice/` has an invoice: DELIVERED orders (Phase 4)."
+        )
+    )
+    # Phase 7 (additive)
+    can_rate = serializers.BooleanField(
+        help_text="True when `POST /orders/{id}/rating/` is allowed: DELIVERED and not rated yet."
+    )
+    rating = OrderRatingSerializer(
+        allow_null=True, help_text="The customer's rating once given; null before (Phase 7)."
     )
 
 
@@ -259,3 +415,128 @@ class OrderCancelSerializer(serializers.Serializer):
         allow_blank=True,
         help_text="Optional free text, e.g. for OTHER.",
     )
+
+
+class OrderInvoiceSerializer(serializers.Serializer):
+    """`GET /orders/{id}/invoice/`: a short-lived link to the GST invoice PDF."""
+
+    invoice_number = serializers.CharField(help_text='e.g. "GGN01/26-27/000123".')
+    issued_at = serializers.DateTimeField()
+    url = serializers.URLField(
+        help_text="Signed link to the PDF; open or download it before `expires_at`."
+    )
+    expires_at = serializers.DateTimeField()
+
+
+class ReorderIssueSerializer(serializers.Serializer):
+    variant_id = serializers.IntegerField()
+    product_name = serializers.CharField()
+    variant_name = serializers.CharField()
+    requested_quantity = serializers.IntegerField(
+        min_value=1, help_text="Units in the past order (those that were delivered or coming)."
+    )
+    added_quantity = serializers.IntegerField(
+        min_value=0, help_text="Units now in the cart for this variant (0 = not added)."
+    )
+    reason = serializers.ChoiceField(choices=ReorderIssueReason.choices)
+
+
+class ReorderResultSerializer(serializers.Serializer):
+    cart = CartSerializer(help_text="The whole cart after the items were added.")
+    added_count = serializers.IntegerField(
+        min_value=0,
+        help_text=(
+            "How many of the order's lines now have at least one unit in the cart (e.g. for "
+            '"3 items added"). 0: nothing could be added.'
+        ),
+    )
+    unavailable = ReorderIssueSerializer(
+        many=True,
+        help_text="Lines that could not be added in full; [] when everything was added.",
+    )
+
+
+# --------------------------------------------------------------------------- tracking (Phase 5)
+
+
+class TrackPointSerializer(serializers.Serializer):
+    lat = serializers.FloatField(help_text="Latitude (WGS84).")
+    lng = serializers.FloatField(help_text="Longitude (WGS84).")
+
+
+class TrackStoreSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    lat = serializers.FloatField()
+    lng = serializers.FloatField()
+
+
+class TrackRiderSerializer(serializers.Serializer):
+    """The assigned rider, shown from assignment until the order ends (08 §9)."""
+
+    name = serializers.CharField(help_text="The rider's first name and last initial.")
+    phone = serializers.CharField(
+        allow_null=True,
+        help_text=(
+            "E.164. Only while the order is OUT_FOR_DELIVERY (and only to the order's owner); "
+            "null otherwise. Masked/proxy calling is planned."
+        ),
+    )
+    photo = serializers.URLField(
+        allow_null=True,
+        help_text=(
+            "Signed https link to the rider's photo, valid about an hour (re-read `track/` "
+            "for a fresh one); null without a photo."
+        ),
+    )
+    lat = serializers.FloatField(allow_null=True, help_text="Last known position; null if none.")
+    lng = serializers.FloatField(allow_null=True)
+    updated_at = serializers.DateTimeField(
+        allow_null=True, help_text="When that position was recorded."
+    )
+
+
+class OrderTrackSerializer(serializers.Serializer):
+    """`GET /orders/{id}/track/` (api-requests #28): poll every 10 s while the tracking screen is
+    open (WebSocket from Phase 6)."""
+
+    order_id = serializers.IntegerField()
+    order_number = serializers.CharField(help_text='e.g. "JV-261110-001203".')
+    status = serializers.ChoiceField(choices=OrderStatus.choices)
+    eta_at = serializers.DateTimeField(
+        allow_null=True, help_text="Promised delivery time (08 §8); null once the order ended."
+    )
+    live_eta_at = serializers.DateTimeField(
+        allow_null=True,
+        help_text=(
+            "The live ETA (08 §8), recomputed now from the order and task status and the "
+            "rider's latest position; the same value `order.eta` pushes on the order socket. "
+            "Null once the order ended."
+        ),
+    )
+    live_eta_minutes = serializers.IntegerField(
+        allow_null=True, help_text="Minutes from `server_time` to `live_eta_at`, at least 1."
+    )
+    store = TrackStoreSerializer()
+    destination = TrackPointSerializer(help_text="The delivery pin.")
+    rider = TrackRiderSerializer(
+        allow_null=True,
+        help_text="Null until a rider accepts, and again once the order is finished.",
+    )
+    delivery_otp = serializers.CharField(
+        allow_null=True,
+        help_text=(
+            "The 4-digit OTP to give the rider, only while OUT_FOR_DELIVERY; null otherwise. "
+            "Never share it before the rider arrives."
+        ),
+    )
+    task_status = serializers.ChoiceField(
+        choices=DeliveryTaskStatus.choices,
+        allow_null=True,
+        help_text=(
+            "The order's delivery task status (SEARCHING, OFFERED, ASSIGNED, AT_STORE, "
+            "PICKED_UP, AT_CUSTOMER, DELIVERED, FAILED, ...); null while no task exists "
+            "(before dispatch starts)."
+        ),
+    )
+    server_time = serializers.DateTimeField()

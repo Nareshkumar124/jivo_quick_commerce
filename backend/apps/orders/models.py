@@ -15,15 +15,17 @@ from django.contrib.gis.db import models as gis_models
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
+from django.db.models.functions import Greatest
 
 from apps.core.models import TimeStampedModel
 from apps.orders.choices import (
     ACTIVE_STATUSES,
     ActorType,
-    CancelReason,
+    OrderCancelReason,
     OrderStatus,
     PaymentMethod,
     PaymentStatus,
+    RatingTarget,
 )
 
 MONEY = {"max_digits": 12, "decimal_places": 2}
@@ -76,6 +78,12 @@ class Order(TimeStampedModel):
     tip = _money()
     grand_total = _money(help_text="Amount payable.")
     amount_refunded = _money()
+    amount_paid = _money(
+        help_text=(
+            "ONLINE: what the customer paid for this order (grand_total at capture, T3). "
+            "Stays the same when T8a lowers grand_total; refunds are capped by it."
+        )
+    )
     coupon = models.ForeignKey(
         "promotions.Coupon",
         on_delete=models.PROTECT,
@@ -107,7 +115,7 @@ class Order(TimeStampedModel):
     delivery_failed_at = models.DateTimeField(null=True, blank=True)
     returned_at = models.DateTimeField(null=True, blank=True)
 
-    cancel_reason = models.CharField(max_length=30, blank=True, choices=CancelReason.choices)
+    cancel_reason = models.CharField(max_length=30, blank=True, choices=OrderCancelReason.choices)
     cancel_note = models.CharField(max_length=250, blank=True)
     cancelled_by_type = models.CharField(max_length=10, blank=True, choices=ActorType.choices)
 
@@ -133,7 +141,12 @@ class Order(TimeStampedModel):
                 name="order_active_pickup_code_unique",
             ),
             models.CheckConstraint(
-                condition=Q(**{f"{field}__gte": 0 for field in (*BILL_FIELDS, "amount_refunded")}),
+                condition=Q(
+                    **{
+                        f"{field}__gte": 0
+                        for field in (*BILL_FIELDS, "amount_refunded", "amount_paid")
+                    }
+                ),
                 name="order_money_not_negative",
             ),
             models.CheckConstraint(
@@ -155,9 +168,11 @@ class Order(TimeStampedModel):
                 condition=Q(coupon_discount__lte=F("item_total")),
                 name="order_coupon_within_item_total",
             ),
+            # Phase 4: T8a lowers grand_total after payment, so refunds are bounded by what was
+            # paid (or by grand_total for orders without a recorded payment, T3a).
             models.CheckConstraint(
-                condition=Q(amount_refunded__lte=F("grand_total")),
-                name="order_refund_within_grand_total",
+                condition=Q(amount_refunded__lte=Greatest(F("amount_paid"), F("grand_total"))),
+                name="order_refund_within_paid",
             ),
         ]
         indexes = [
@@ -167,6 +182,10 @@ class Order(TimeStampedModel):
             models.Index(
                 fields=["status", "payment_expires_at"], name="order_status_payment_exp_idx"
             ),
+        ]
+        permissions = [
+            ("process_order", "Can accept and pack orders (packing console)"),
+            ("cancel_order", "Can cancel orders as store, ops or support"),
         ]
 
     def __str__(self) -> str:
@@ -269,3 +288,99 @@ class OrderStatusHistory(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Order status history is append-only.")
+
+
+def invoice_upload_to(instance, filename: str) -> str:
+    return f"invoices/{instance.order.store_id}/{instance.invoice_number.replace('/', '-')}.pdf"
+
+
+class Invoice(TimeStampedModel):
+    """The GST tax invoice of a delivered order (07 §2.6, 09 §4). Amounts are GST-inclusive
+    splits of the order's final bill. `is_placeholder` marks invoices made with the placeholder
+    seller GST data of settings (D-12 not decided): never a valid tax invoice."""
+
+    order = models.OneToOneField(Order, on_delete=models.PROTECT, related_name="invoice")
+    invoice_number = models.CharField(max_length=40, unique=True)
+    issued_at = models.DateTimeField()
+    seller_gstin = models.CharField(max_length=15)
+    is_placeholder = models.BooleanField(default=True)
+    taxable_value = models.DecimalField(**MONEY)
+    cgst = models.DecimalField(**MONEY)
+    sgst = models.DecimalField(**MONEY)
+    igst = models.DecimalField(**MONEY)
+    total = models.DecimalField(**MONEY)
+    pdf = models.FileField(upload_to=invoice_upload_to, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(total=F("taxable_value") + F("cgst") + F("sgst") + F("igst")),
+                name="invoice_total_formula",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.invoice_number
+
+
+class InvoiceSequence(models.Model):
+    """The next invoice number per store and financial year (07 §2.6: `DEL01/26-27/000123`)."""
+
+    store = models.ForeignKey("stores.DarkStore", on_delete=models.PROTECT)
+    financial_year = models.CharField(max_length=5, help_text='e.g. "26-27".')
+    last_number = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["store", "financial_year"], name="invoicesequence_unique"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.store_id} {self.financial_year}: {self.last_number}"
+
+
+class Rating(TimeStampedModel):
+    """A customer's rating of a delivered order (07 §2.6, 06 §2.6 `POST /orders/{id}/rating/`,
+    Phase 7): one ORDER row and, when the rider was rated, one RIDER row. Written once (not
+    editable); only through `apps.orders.ratings.rate_order`. `comment` is personal data: never
+    logged or audited."""
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="ratings")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="ratings"
+    )
+    target = models.CharField(max_length=5, choices=RatingTarget.choices)
+    rider = models.ForeignKey(
+        "delivery.Rider",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="ratings",
+        help_text="The rider who delivered the order (RIDER ratings only).",
+    )
+    stars = models.PositiveSmallIntegerField()
+    tags = models.JSONField(default=list, blank=True)
+    comment = models.TextField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(fields=["order", "target"], name="rating_unique_order_target"),
+            models.CheckConstraint(
+                condition=Q(stars__gte=1) & Q(stars__lte=5), name="rating_stars_1_to_5"
+            ),
+            models.CheckConstraint(
+                condition=Q(target=RatingTarget.ORDER, rider__isnull=True)
+                | Q(target=RatingTarget.RIDER, rider__isnull=False),
+                name="rating_rider_iff_rider_target",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["rider", "-created_at"], name="rating_rider_created"),
+            models.Index(fields=["target", "stars", "-created_at"], name="rating_target_stars"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.target} rating {self.stars} for order {self.order_id}"

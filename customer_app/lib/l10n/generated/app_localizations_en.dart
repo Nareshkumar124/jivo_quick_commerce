@@ -1170,4 +1170,700 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get checkingPayment => 'Checking the payment status…';
+
+  @override
+  String get myOrders => 'My orders';
+
+  @override
+  String get ordersActive => 'Active orders';
+
+  @override
+  String get ordersPast => 'Past orders';
+
+  @override
+  String get ordersEmpty =>
+      'You haven\'t placed an order yet. Your orders will show up here.';
+
+  @override
+  String get ordersLoadMoreFailed => 'Couldn\'t load more orders.';
+
+  @override
+  String orderItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String orderPlacedOn(String date) {
+    return 'Placed on $date';
+  }
+
+  @override
+  String get orderStatusPaymentPending => 'Completing payment…';
+
+  @override
+  String get orderStatusPlaced => 'Order placed';
+
+  @override
+  String get orderStatusAccepted => 'Order confirmed';
+
+  @override
+  String get orderStatusPacking => 'Packing your order';
+
+  @override
+  String get orderStatusPacked => 'Packed, rider on the way to store';
+
+  @override
+  String get orderStatusOutForDelivery => 'On the way';
+
+  @override
+  String get orderStatusDelivered => 'Delivered';
+
+  @override
+  String get orderStatusCancelled => 'Cancelled';
+
+  @override
+  String get orderStatusPaymentFailed => 'Payment failed';
+
+  @override
+  String get orderStatusDeliveryFailed => 'Delivery unsuccessful';
+
+  @override
+  String get orderStatusUnknown => 'Status unavailable';
+
+  @override
+  String orderTitle(String number) {
+    return 'Order $number';
+  }
+
+  @override
+  String get orderStageConfirmed => 'Confirmed';
+
+  @override
+  String get orderStagePacking => 'Packing';
+
+  @override
+  String get orderStageOnTheWay => 'On the way';
+
+  @override
+  String get orderStagePlaced => 'Placed';
+
+  @override
+  String get orderStageDelivered => 'Delivered';
+
+  @override
+  String get orderTimelineTitle => 'Order status';
+
+  @override
+  String get orderStepDone => 'done';
+
+  @override
+  String get orderStepCurrent => 'current';
+
+  @override
+  String get orderStepUpcoming => 'upcoming';
+
+  @override
+  String get orderItemsTitle => 'Items';
+
+  @override
+  String orderLineQuantity(int quantity, String price) {
+    return '$quantity × $price';
+  }
+
+  @override
+  String get orderPaymentTitle => 'Payment';
+
+  @override
+  String get paymentMethodOnline => 'Paid online';
+
+  @override
+  String get paymentMethodCod => 'Cash on delivery';
+
+  @override
+  String get paymentStatusPending => 'Payment not completed';
+
+  @override
+  String get paymentStatusPaid => 'Paid';
+
+  @override
+  String get paymentStatusFailed => 'Payment failed';
+
+  @override
+  String get paymentStatusRefundPending => 'Refund initiated';
+
+  @override
+  String get paymentStatusRefunded => 'Refunded';
+
+  @override
+  String get paymentStatusPartiallyRefunded => 'Partly refunded';
+
+  @override
+  String get paymentStatusCodPending => 'Pay on delivery';
+
+  @override
+  String get paymentStatusCodCollected => 'Paid on delivery';
+
+  @override
+  String get noPaymentTaken => 'No payment was taken for this order.';
+
+  @override
+  String get nothingToPay => 'Nothing to pay for this order.';
+
+  @override
+  String refundInProgress(String amount) {
+    return 'Refund of $amount initiated. It reaches your original payment method in 5–7 working days.';
+  }
+
+  @override
+  String refundCompleted(String amount) {
+    return '$amount refunded to your original payment method.';
+  }
+
+  @override
+  String refundFailedNote(String amount) {
+    return 'Your refund of $amount is delayed. Our team is on it; contact support if you need help.';
+  }
+
+  @override
+  String refundedOn(String date) {
+    return 'Refunded on $date';
+  }
+
+  @override
+  String get orderDeliveryTo => 'Delivery address';
+
+  @override
+  String orderArrivingBy(String time) {
+    return 'Arriving by $time';
+  }
+
+  @override
+  String get orderAwaitingPayment => 'This order is waiting for payment.';
+
+  @override
+  String get completePayment => 'Complete payment';
+
+  @override
+  String get downloadInvoice => 'Download invoice';
+
+  @override
+  String get invoiceOpenFailed =>
+      'Couldn\'t open the invoice. Install a PDF viewer or browser and try again.';
+
+  @override
+  String get reorder => 'Order again';
+
+  @override
+  String get reorderAllAdded => 'Items added to your cart.';
+
+  @override
+  String get reorderNothingAdded =>
+      'None of these items can be ordered right now.';
+
+  @override
+  String get reorderSomeUnavailableTitle => 'Some items were not added';
+
+  @override
+  String reorderOutOfStock(String name) {
+    return '$name is out of stock';
+  }
+
+  @override
+  String reorderDiscontinued(String name) {
+    return '$name is no longer sold';
+  }
+
+  @override
+  String reorderReduced(int count, String name) {
+    return 'Only $count of $name added';
+  }
+
+  @override
+  String get cannotCancelTitle => 'Need to cancel?';
+
+  @override
+  String get cannotCancelBody =>
+      'Your order is already being packed, so it can no longer be cancelled in the app. Contact support for help.';
+
+  @override
+  String get contactSupport => 'Contact support';
+
+  @override
+  String get cancelSheetTitle => 'Why are you cancelling?';
+
+  @override
+  String get cancelReasonOrderedByMistake => 'Ordered by mistake';
+
+  @override
+  String get cancelReasonChangedMind => 'Changed my mind';
+
+  @override
+  String get cancelReasonDeliveryTooSlow => 'Delivery is taking too long';
+
+  @override
+  String get cancelReasonChangePaymentMethod =>
+      'Want to change the payment method';
+
+  @override
+  String get cancelReasonPaymentProblem => 'Problem with the payment';
+
+  @override
+  String get cancelReasonOther => 'Other';
+
+  @override
+  String cancelRefundOnline(String amount) {
+    return 'You will get a full refund of $amount to your original payment method in 5–7 working days.';
+  }
+
+  @override
+  String get cancelRefundCod => 'Nothing is due for a cash-on-delivery order.';
+
+  @override
+  String get cancelRefundUnpaid =>
+      'No payment was taken for this order, so there is nothing to refund.';
+
+  @override
+  String get cancelConfirmAction => 'Cancel order';
+
+  @override
+  String get cancelChooseReason => 'Choose a reason to continue.';
+
+  @override
+  String orderStoreName(String store) {
+    return 'From $store';
+  }
+
+  @override
+  String couponUsed(String code) {
+    return 'Coupon $code';
+  }
+
+  @override
+  String trackingEtaMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: 'Arriving in $minutes mins',
+      one: 'Arriving in 1 min',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get trackingArrivingNow => 'Arriving any moment';
+
+  @override
+  String get trackingRiderAssigning => 'Assigning a delivery partner…';
+
+  @override
+  String get trackingRiderLabel => 'Your delivery partner';
+
+  @override
+  String trackingCallRider(String name) {
+    return 'Call $name';
+  }
+
+  @override
+  String get trackingOtpTitle => 'Delivery OTP';
+
+  @override
+  String get trackingOtpHint =>
+      'Share this with your rider at the door, only when you receive your order.';
+
+  @override
+  String get trackingMapStore => 'Store';
+
+  @override
+  String get trackingMapHome => 'You';
+
+  @override
+  String trackingMapSemantics(int percent) {
+    return 'The rider is $percent percent of the way to you.';
+  }
+
+  @override
+  String get trackingViewDetails => 'Order details';
+
+  @override
+  String get notificationsTitle => 'Notifications';
+
+  @override
+  String get notificationsEmpty =>
+      'No notifications yet. Order updates and offers will show up here.';
+
+  @override
+  String get notificationUnread => 'Unread';
+
+  @override
+  String get notificationsMarkAllRead => 'Mark all as read';
+
+  @override
+  String notificationsUnreadCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread notifications',
+      one: '1 unread notification',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsLoadMoreFailed =>
+      'Couldn\'t load more notifications.';
+
+  @override
+  String orderLineUnavailable(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count units were unavailable and are not charged',
+      one: '1 unit was unavailable and is not charged',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get orderCancelledTitle => 'Why this order was cancelled';
+
+  @override
+  String trackingOtpSemantics(String digits) {
+    return 'Delivery OTP $digits';
+  }
+
+  @override
+  String get rateOrderTitle => 'Rate your order';
+
+  @override
+  String get rateOrderQuestion => 'How was your order?';
+
+  @override
+  String get rateTagsPositive => 'What went well?';
+
+  @override
+  String get rateTagsNegative => 'What went wrong?';
+
+  @override
+  String get rateRiderQuestion => 'Rate your delivery partner';
+
+  @override
+  String get rateRiderOptional => 'Optional';
+
+  @override
+  String get rateCommentLabel => 'Tell us more';
+
+  @override
+  String get rateCommentHint => 'Anything we should know? (optional)';
+
+  @override
+  String get rateChooseStars => 'Pick a star rating to submit.';
+
+  @override
+  String get rateSubmit => 'Submit';
+
+  @override
+  String rateStars(int stars) {
+    String _temp0 = intl.Intl.pluralLogic(
+      stars,
+      locale: localeName,
+      other: '$stars stars',
+      one: '1 star',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get rateTagOnTime => 'On time';
+
+  @override
+  String get rateTagWellPacked => 'Well packed';
+
+  @override
+  String get rateTagFresh => 'Fresh products';
+
+  @override
+  String get rateTagPoliteRider => 'Polite delivery partner';
+
+  @override
+  String get rateTagLate => 'Late delivery';
+
+  @override
+  String get rateTagDamaged => 'Damaged items';
+
+  @override
+  String get rateTagMissing => 'Missing items';
+
+  @override
+  String get rateTagRudeRider => 'Rude delivery partner';
+
+  @override
+  String get ratingThanks => 'Thanks for your feedback!';
+
+  @override
+  String ratedOrder(int stars) {
+    String _temp0 = intl.Intl.pluralLogic(
+      stars,
+      locale: localeName,
+      other: 'You rated this order $stars stars',
+      one: 'You rated this order 1 star',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String ratedRider(int stars) {
+    String _temp0 = intl.Intl.pluralLogic(
+      stars,
+      locale: localeName,
+      other: 'You rated the delivery partner $stars stars',
+      one: 'You rated the delivery partner 1 star',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get helpTitle => 'Help & support';
+
+  @override
+  String get helpWithOrder => 'Get help with an order';
+
+  @override
+  String get helpWithOrderSubtitle =>
+      'Missing, damaged or wrong items, refunds and more';
+
+  @override
+  String get helpWithThisOrder => 'Get help with this order';
+
+  @override
+  String get myTickets => 'My tickets';
+
+  @override
+  String get callSupport => 'Call support';
+
+  @override
+  String get helpComingSoon => 'Support is coming soon to the app.';
+
+  @override
+  String get faqTitle => 'Frequently asked questions';
+
+  @override
+  String get faqEmpty => 'No FAQs yet.';
+
+  @override
+  String get newTicket => 'New ticket';
+
+  @override
+  String get ticketsEmpty => 'You have no support tickets.';
+
+  @override
+  String get ticketCreated => 'Ticket created. We\'ll reply here soon.';
+
+  @override
+  String get ticketOrderLabel => 'Order';
+
+  @override
+  String get ticketChooseOrder => 'Choose an order (optional)';
+
+  @override
+  String get ticketRemoveOrder => 'Remove order';
+
+  @override
+  String get ticketIssueLabel => 'What\'s the issue?';
+
+  @override
+  String get ticketChooseIssue => 'Choose an issue type.';
+
+  @override
+  String get ticketMessageLabel => 'Describe the issue';
+
+  @override
+  String get ticketMessageHint => 'Tell us what happened';
+
+  @override
+  String ticketMessageTooShort(int min) {
+    return 'Please write at least $min characters.';
+  }
+
+  @override
+  String get ticketSubmit => 'Create ticket';
+
+  @override
+  String get ticketClosedNote =>
+      'This ticket is closed. Create a new ticket if you still need help.';
+
+  @override
+  String get ticketYou => 'You';
+
+  @override
+  String get ticketSupport => 'Jivo support';
+
+  @override
+  String get ticketReplyHint => 'Write a reply';
+
+  @override
+  String get ticketSend => 'Send';
+
+  @override
+  String get ticketAddPhoto => 'Add photo';
+
+  @override
+  String ticketPhotosHint(int max) {
+    return 'Photos (optional, up to $max)';
+  }
+
+  @override
+  String get ticketPhotoCamera => 'Take a photo';
+
+  @override
+  String get ticketPhotoGallery => 'Choose from gallery';
+
+  @override
+  String ticketPhotoRemove(int number) {
+    return 'Remove photo $number';
+  }
+
+  @override
+  String ticketPhotoOpen(int number) {
+    return 'Photo $number';
+  }
+
+  @override
+  String get ticketPhotoUnavailable =>
+      'Photo unavailable. Pull down to refresh.';
+
+  @override
+  String get ticketPhotoUnsupported =>
+      'This file type isn\'t supported. Choose a JPEG, PNG or WebP photo.';
+
+  @override
+  String ticketPhotoTooLarge(int mb) {
+    return 'This photo is larger than $mb MB. Choose a smaller one.';
+  }
+
+  @override
+  String ticketPhotoTooMany(int max) {
+    return 'You can add up to $max photos to a message.';
+  }
+
+  @override
+  String get ticketPhotoRejectedSize =>
+      'This photo is too large to upload. Try a smaller photo or a screenshot of it.';
+
+  @override
+  String get ticketPhotoPickFailed =>
+      'Couldn\'t open the camera or gallery. Check the app\'s permissions and try again.';
+
+  @override
+  String get ticketPhotosMessage => 'Photos of the issue';
+
+  @override
+  String ticketPhotosNotAdded(String reason) {
+    return 'Ticket created, but the photos weren\'t added. $reason You can add them from the ticket.';
+  }
+
+  @override
+  String get ticketMissingItems => 'Missing items';
+
+  @override
+  String get ticketDamagedItems => 'Damaged items';
+
+  @override
+  String get ticketWrongItems => 'Wrong items';
+
+  @override
+  String get ticketLateDelivery => 'Late delivery';
+
+  @override
+  String get ticketPaymentRefund => 'Payment or refund';
+
+  @override
+  String get ticketAccount => 'My account';
+
+  @override
+  String get ticketOther => 'Something else';
+
+  @override
+  String get ticketStatusOpen => 'Open';
+
+  @override
+  String get ticketStatusInProgress => 'In progress';
+
+  @override
+  String get ticketStatusResolved => 'Resolved';
+
+  @override
+  String get ticketStatusClosed => 'Closed';
+
+  @override
+  String get aboutJivo => 'About Jivo';
+
+  @override
+  String get cmsPageEmpty => 'This page has no content yet.';
+
+  @override
+  String cmsUpdatedOn(String date) {
+    return 'Last updated $date';
+  }
+
+  @override
+  String get cmsPageUnavailable =>
+      'This page isn\'t available in the app right now. You can read it in your browser.';
+
+  @override
+  String get openInBrowser => 'Open in browser';
+
+  @override
+  String get onlinePaymentUnavailable =>
+      'Payment service is unavailable right now. Try again, or choose Cash on Delivery.';
+
+  @override
+  String get deliveryStagePickedUpTitle => 'Order picked up';
+
+  @override
+  String get deliveryStagePickedUpBody =>
+      'Your rider has your order and is on the way.';
+
+  @override
+  String get deliveryStageArrivingTitle => 'Rider is arriving';
+
+  @override
+  String get deliveryStageArrivingBody =>
+      'Your rider has reached your location. Keep your delivery OTP ready.';
+
+  @override
+  String get deliveryStageFailedTitle => 'Delivery failed';
+
+  @override
+  String get deliveryStageFailedBody =>
+      'We couldn\'t deliver your order. The items are going back to the store.';
+
+  @override
+  String get deliveryStageReturnedTitle => 'Order returned';
+
+  @override
+  String get deliveryStageReturnedBody => 'Your items are back at the store.';
+
+  @override
+  String get refundNoteStarted =>
+      'Your refund has started. It goes back to your original payment method.';
+
+  @override
+  String refundNoteDone(String amount) {
+    return '$amount refunded to your original payment method.';
+  }
+
+  @override
+  String codPayRiderTitle(String amount) {
+    return 'Pay $amount to the rider';
+  }
+
+  @override
+  String get codPayRiderHint =>
+      'Cash on delivery. Pay by cash or UPI when your order arrives.';
 }

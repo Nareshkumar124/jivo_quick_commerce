@@ -2,10 +2,10 @@ import '../../../shared/fake_api_endpoint.dart';
 import '../../onboarding/domain/validators.dart';
 import '../domain/cash_ledger.dart';
 
-/// TODO(api): stands in for `GET /rider/cash/ledger/` (06 §3) until the
-/// rider contract lands (end of P4). The summary (cash in hand, limit and
-/// the server's `limit_reached`) rides on every page here; where the real
-/// API puts it is an open request (`/rider/me/` per 06 §3, or the ledger).
+/// Stands in for `GET /rider/cash/ledger/` and the `cash` of
+/// `GET /rider/me/` in `FAKE_API` builds and tests. The cursor is a page
+/// number here (the API's is a `before_id`); the summary rides on the
+/// first page only, like the API repository.
 ///
 /// Cash in hand and every running balance are fixed strings, as the server
 /// would send them: the app never adds the entries up.
@@ -21,8 +21,12 @@ class FakeCashBackend extends FakeApiEndpoint implements CashRepository {
   /// The rider is at or above the cash limit (the server's verdict).
   bool limitReached = false;
 
+  /// A COD order was skipped below the limit (DL-61 b).
+  bool codSkipped = false;
+
   @override
-  Future<CashLedgerPage> fetchLedger({int page = 1}) async {
+  Future<CashLedgerPage> fetchLedger({int? cursor}) async {
+    final page = cursor ?? 1;
     await recordCall('fetchLedger $page');
     final today = istToday(_clock());
     final yesterday = today.subtract(const Duration(days: 1));
@@ -75,11 +79,15 @@ class FakeCashBackend extends FakeApiEndpoint implements CashRepository {
         ),
     ];
     return CashLedgerPage(
-      summary: CashSummary(
-        cashInHand: limitReached ? '5249.00' : '2149.00',
-        cashLimit: '5000.00',
-        limitReached: limitReached,
-      ),
+      summary: page != 1
+          ? null
+          : CashSummary(
+              cashInHand: limitReached ? '5249.00' : '2149.00',
+              cashLimit: '5000.00',
+              limitReached: limitReached,
+              depositRequired: limitReached || codSkipped,
+              homeStoreName: 'Jivo Sector 18',
+            ),
       entries: pageOf(all, page),
     );
   }

@@ -149,5 +149,8 @@ const _$ErrorCodeEnumEnumMap = {
   ErrorCodeEnum.SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
   ErrorCodeEnum.STORE_NOT_FOUND: 'STORE_NOT_FOUND',
   ErrorCodeEnum.PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
+  ErrorCodeEnum.RIDER_OFFLINE: 'RIDER_OFFLINE',
+  ErrorCodeEnum.PICKUP_CODE_INVALID: 'PICKUP_CODE_INVALID',
+  ErrorCodeEnum.PICKUP_CODE_LOCKED: 'PICKUP_CODE_LOCKED',
   ErrorCodeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

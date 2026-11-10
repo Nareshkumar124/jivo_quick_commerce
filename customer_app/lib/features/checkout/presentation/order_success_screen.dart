@@ -134,9 +134,9 @@ class _Confirmed extends StatelessWidget {
               width: double.infinity,
               child: FilledButton(
                 key: const Key('track-order'),
-                // Until order detail (Phase 4) and live tracking (Phase 6)
-                // exist, this says tracking arrives later.
-                onPressed: () => showMessage(context, l10n.trackingComingSoon),
+                // The order detail (Phase 4); live tracking opens from
+                // there once it is available (Phase 6).
+                onPressed: () => context.go(Routes.order(order.id)),
                 child: Text(l10n.trackOrder),
               ),
             ),

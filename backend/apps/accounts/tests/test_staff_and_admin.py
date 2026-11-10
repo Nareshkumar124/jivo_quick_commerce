@@ -32,7 +32,11 @@ class TestRoles:
         assert set(roles.ROLE_PERMISSIONS) <= names
         support = {p.codename for p in Group.objects.get(name=roles.SUPPORT).permissions.all()}
         assert {"view_customer", "change_customer", "view_product"} <= support
-        assert not any(code.startswith(("add_", "delete_")) for code in support)
+        # P7 PM default: Support edits FAQs (05 §2 Support module); nothing else.
+        assert not any(
+            code.startswith(("add_", "delete_")) and code not in {"add_faq", "delete_faq"}
+            for code in support
+        )
         admin_perms = Group.objects.get(name=roles.SUPER_ADMIN).permissions
         assert admin_perms.filter(codename="change_user").exists()
         assert admin_perms.filter(codename="change_appconfig").exists()
@@ -51,6 +55,21 @@ class TestRoles:
             "view_payment",
             "view_refund",
             "view_paymentwebhookevent",
+            # Phase 4: invoices, refunds (05 §3 Refund ✔), the audit log (view)
+            "view_invoice",
+            "issue_refund",
+            "view_auditlog",
+            # Phase 5 slice 5.4 (05 §3 Payouts ✔; DL-61 a: Finance records cash deposits)
+            "record_cash_deposit",
+            "view_ridercashledger",
+            "manage_payouts",
+            "view_payout",
+            "view_riderearning",
+            "view_earningrule",
+            # Phase 7 (05 §3 Reports row, ⚠ PM default): all three report families
+            "view_reports",
+            "view_catalog_reports",
+            "view_finance_reports",
         }
 
     @pytest.mark.parametrize(
@@ -196,7 +215,9 @@ class TestStaffLoginThrottling:
             {"username": "ops@jivo.test", "password": "a-strong-pass-1"},
             REMOTE_ADDR="203.0.113.9",
         )
-        assert other_ip.status_code == 302  # lockout is per username + IP (no staff DoS)
+        # T-814 (H2, DL-59): the lockout is also per username, whatever the IP, so rotating
+        # IPs cannot brute-force one staff account (cool-off AXES_COOLOFF_MINUTES).
+        assert other_ip.status_code == 429
 
     def test_success_logs_in(self, client):
         StaffUserFactory(email="ops@jivo.test", password="a-strong-pass-1")
@@ -271,6 +292,7 @@ class TestOtpTestNumberSafety:
         settings.APP_ENVIRONMENT = "production"
         # Production's SMS default (the test settings' locmem backend is E003, BUG-0005).
         settings.SMS_BACKEND = "apps.notifications.sms.UnconfiguredSmsBackend"
+        settings.SIMPLE_JWT = {**settings.SIMPLE_JWT, "SIGNING_KEY": "j" * 64}  # T-814 (L3)
         ids = {error.id for error in run_checks() if error.id.startswith("accounts.")}
         assert ids == {"accounts.E001"}
 

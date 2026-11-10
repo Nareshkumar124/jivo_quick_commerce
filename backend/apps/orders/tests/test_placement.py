@@ -68,7 +68,7 @@ class TestCashOnDelivery:
         assert order["placed_at"]
         assert order["eta_at"]
         assert order["payment_expires_at"] is None
-        assert order["can_cancel"] is False  # Phase 3: only unpaid orders can be cancelled
+        assert order["can_cancel"] is True  # 08 §7: PLACED is cancellable (Phase 4)
         assert [(i["variant_id"], i["quantity"]) for i in order["items"]] == [
             (shop.canola_1l.pk, 2),
             (shop.chia.pk, 1),
@@ -147,19 +147,91 @@ class TestOnline:
         order = Order.objects.get(pk=checkout.place("ONLINE")["order"]["id"])
         assert timedelta(minutes=10) <= order.payment_expires_at - before < timedelta(minutes=11)
 
-    def test_gateway_down_creates_nothing(self, checkout, shop, monkeypatch):
+    def test_gateway_down_leaves_nothing_held(self, checkout, shop, monkeypatch):
+        """T-814 (M6): the gateway is called after the placement commits. When it fails, the
+        order is ended (T4), nothing stays reserved, and the same Idempotency-Key places afresh
+        once the gateway is back."""
+
         def down(self, **kwargs):
             raise PaymentGatewayError("timeout")
 
-        monkeypatch.setattr(FakeRazorpayGateway, "create_order", down)
         checkout.fill((shop.canola_1l, 2))
-        body = checkout.place("ONLINE", status=503)
+        key = new_key()
+        expected = checkout.cart()["bill"]["grand_total"]
+        with monkeypatch.context() as patch:
+            patch.setattr(FakeRazorpayGateway, "create_order", down)
+            body = checkout.place("ONLINE", key=key, expected=expected, status=503)
         assert body["error"]["code"] == "SERVICE_UNAVAILABLE"
-        assert not Order.objects.exists()
+        failed = Order.objects.get()
+        assert (failed.status, failed.payment_status) == ("PAYMENT_FAILED", "FAILED")
+        assert not failed.payments.exists()
+        assert failed.idempotency_key != key
         assert reserved(shop, shop.canola_1l) == 0
+        assert not Order.objects.filter(status="PAYMENT_PENDING").exists()
+
+        again = checkout.place("ONLINE", key=key, expected=expected)
+        assert again["order"]["id"] != failed.pk
+        assert again["razorpay"]["order_id"]
+        assert reserved(shop, shop.canola_1l) == 2
+
+    def test_replay_completes_an_order_left_without_an_attempt(self, checkout, shop):
+        """T-814 (M6): a crash between the placement commit and the gateway call leaves the
+        order PAYMENT_PENDING without an attempt; a replay of its key attaches one."""
+        checkout.fill((shop.canola_1l, 2))
+        key = new_key()
+        expected = checkout.cart()["bill"]["grand_total"]
+        first = checkout.place("ONLINE", key=key, expected=expected)
+        order = Order.objects.get(pk=first["order"]["id"])
+        order.payments.all().delete()
+        again = checkout.place("ONLINE", key=key, expected=expected, status=200)
+        assert again["order"]["id"] == order.pk
+        assert again["razorpay"]["order_id"]
+        assert order.payments.count() == 1
+        assert reserved(shop, shop.canola_1l) == 2
 
 
 class TestIdempotency:
+    def test_stale_replay_makes_no_gateway_call(self, checkout, shop, monkeypatch):
+        """T-814 review: a replay after the payment window, of an order still without an
+        attempt, never calls the gateway; the order is left for expiry."""
+        checkout.fill((shop.canola_1l, 2))
+        key = new_key()
+        expected = checkout.cart()["bill"]["grand_total"]
+        order = Order.objects.get(
+            pk=checkout.place("ONLINE", key=key, expected=expected)["order"]["id"]
+        )
+        order.payments.all().delete()
+        Order.objects.filter(pk=order.pk).update(
+            payment_expires_at=timezone.now() - timedelta(seconds=1)
+        )
+
+        def must_not_be_called(self, **kwargs):
+            raise AssertionError("gateway called for a stale replay")
+
+        monkeypatch.setattr(FakeRazorpayGateway, "create_order", must_not_be_called)
+        again = checkout.place("ONLINE", key=key, expected=expected, status=200)
+        assert again["order"]["id"] == order.pk
+        assert again["razorpay"] is None
+        assert not order.payments.exists()
+
+    def test_expiry_fails_an_order_without_an_attempt(self, checkout, shop):
+        """T-814 review: an order left without a payment attempt (a crash after the placement
+        commit) is failed by `expire_unpaid_orders`: T4, nothing reserved, coupon released."""
+        from apps.orders import services
+
+        coupon()
+        checkout.fill((shop.canola_1l, 2))
+        checkout.client.post("/api/v1/cart/coupon/", {"code": "JIVO50"}, headers=checkout.headers)
+        order = Order.objects.get(pk=checkout.place("ONLINE")["order"]["id"])
+        order.payments.all().delete()
+        assert reserved(shop, shop.canola_1l) == 2
+        assert CouponRedemption.objects.get(order=order).status == RedemptionStatus.HELD
+        services.expire_unpaid_orders(now=order.payment_expires_at + timedelta(seconds=1))
+        order.refresh_from_db()
+        assert (order.status, order.payment_status) == ("PAYMENT_FAILED", "FAILED")
+        assert reserved(shop, shop.canola_1l) == 0
+        assert CouponRedemption.objects.get(order=order).status == RedemptionStatus.RELEASED
+
     def test_replay_returns_the_first_order(self, checkout, shop):
         checkout.fill((shop.canola_1l, 2))
         key = new_key()

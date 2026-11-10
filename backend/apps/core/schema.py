@@ -77,9 +77,23 @@ MAINTENANCE = error_response(
 )
 
 
+# T-814 (H3): every app endpoint is rate limited (a baseline per user or IP, stricter scopes on
+# some), so every app endpoint documents 429.
+TOO_MANY_REQUESTS = error_response(
+    "Too many requests. Wait `details.retry_after_seconds` (also in `Retry-After`), then retry.",
+    error_example(
+        ErrorCode.RATE_LIMITED,
+        "Request was throttled. Expected available in 30 seconds.",
+        {"retry_after_seconds": 30},
+    ),
+)
+
+
 def app_responses(responses: Mapping[int, Any]) -> dict[int, Any]:
-    """``responses`` plus the force-update (426) and maintenance (503) errors of app endpoints."""
+    """``responses`` plus the rate-limit (429), force-update (426) and maintenance (503) errors
+    of app endpoints."""
     result = dict(responses)
+    result.setdefault(429, TOO_MANY_REQUESTS)
     result.setdefault(426, APP_UPDATE_REQUIRED)
     result.setdefault(503, MAINTENANCE)
     return result
