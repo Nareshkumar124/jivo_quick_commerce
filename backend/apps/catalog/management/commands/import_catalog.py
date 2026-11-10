@@ -1,14 +1,19 @@
 """`manage.py import_catalog --dir <folder> [--commit]`: load categories.csv, products.csv and
 variants.csv (the admin import format, docs/admin-panel-architecture.md §10) from a folder on the
 server. Dry run unless --commit; one transaction; nothing is saved if any row fails; never
-deletes. See apps.catalog.bulk_load."""
+deletes. --commit to a database that is not on this machine also needs --yes. See
+apps.catalog.bulk_load."""
 
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.catalog.bulk_load import import_catalog
-from apps.catalog.management.commands._common import add_commit_arguments, finish
+from apps.catalog.management.commands._common import (
+    add_commit_arguments,
+    check_database,
+    finish,
+)
 
 
 class Command(BaseCommand):
@@ -25,6 +30,7 @@ class Command(BaseCommand):
         directory: Path = options["dir"]
         if not directory.is_dir():
             raise CommandError(f"Not a folder: {directory}")
+        check_database(self, options)
         result = import_catalog(directory, commit=options["commit"])
         if not any(item.found for item in result.files):
             raise CommandError(f"No categories.csv, products.csv or variants.csv in {directory}")

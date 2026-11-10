@@ -112,7 +112,7 @@ erDiagram
 
 **ProductVariant (SKU)**: `product`, `sku` (unique), `name` (e.g., "1 L"), `net_quantity` (as on the pack, e.g. "2 x 1 L"; Legal Metrology, added in Phase 2 R1), `unit_value` + `unit` (for "₹/100 ml" display: the API's `unit_price {amount, per}`), `mrp`, `selling_price` (≤ mrp), `max_qty_per_order`, `barcode`, `sap_item_code` (nullable), `weight_grams`, `is_active`, `sort_order`.
 
-**ProductImage**: `product`, `variant` (nullable), `image`, `alt_text`, `sort_order`.
+**ProductImage**: `product`, `variant` (nullable), `image`, `alt_text`, `sort_order`, `source_sha256` (SHA-256 of the source file, set only by `import_catalog_images`; empty for admin uploads). Unique (`product`, `variant`, `source_sha256`) where `source_sha256` is not empty, with NULL variants counted as equal (`productimage_source_unique`, PostgreSQL 15+ `NULLS NOT DISTINCT`).
 
 **Collection**: `name`, `slug`, `show_on_home`, `sort_order`, `is_active`, `stores` (M2M, empty = all). At most 100 items (the collection page is not paginated).
 **CollectionItem**: `collection`, `variant`, `sort_order`.

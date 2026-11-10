@@ -244,6 +244,17 @@ class ProductImage(ProcessedImageMixin, TimeStampedModel):
 
     class Meta:
         ordering = ["sort_order", "id"]
+        constraints = [
+            # One loaded file per product (or variant), even when two loader runs overlap.
+            # Admin uploads leave source_sha256 empty and are not limited. NULL variants count
+            # as equal (NULLS NOT DISTINCT, PostgreSQL 15+), so product-level images are covered.
+            models.UniqueConstraint(
+                fields=["product", "variant", "source_sha256"],
+                condition=~models.Q(source_sha256=""),
+                nulls_distinct=False,
+                name="productimage_source_unique",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Image {self.pk} of {self.product_id}"
