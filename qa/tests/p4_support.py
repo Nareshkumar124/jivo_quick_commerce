@@ -12,12 +12,13 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from pathlib import Path
 from decimal import Decimal
 
 from p3_support import money
 from qa_support import QA_DIR, STORE_ID, db_query
 
-BACKEND = QA_DIR.parent / "backend"
+BACKEND = Path(os.environ["QA_BACKEND_DIR"]) if os.environ.get("QA_BACKEND_DIR") else QA_DIR.parent / "backend"
 DRIVER = QA_DIR / "tools" / "store_ops_driver.py"
 
 STAFF = "store.staff@jivo.test"
@@ -26,13 +27,16 @@ OPS = "ops@jivo.test"
 SUPPORT = "support@jivo.test"
 FINANCE = "finance@jivo.test"
 SUPER = "superadmin@jivo.test"
+# QA-only Store Manager scoped to QA-02 (PM-approved, created by QA through the admin 2026-11-09)
+QA02_MANAGER = "qa02.manager@jivo.test"
 CATALOG = "catalog@jivo.test"
 
 _ENV = {
-    "REDIS_URL": "redis://localhost:6380/5",
-    "CHANNELS_REDIS_URL": "redis://localhost:6380/6",
-    "CELERY_BROKER_URL": "redis://localhost:6380/7",
-    "DJANGO_SETTINGS_MODULE": "config.settings.local",
+    "REDIS_URL": "redis://127.0.0.1:6380/5",
+    "CHANNELS_REDIS_URL": "redis://127.0.0.1:6380/6",
+    "CELERY_BROKER_URL": "redis://127.0.0.1:6380/7",
+    "DJANGO_SETTINGS_MODULE": os.environ.get("QA_DJANGO_SETTINGS", "config.settings.local"),
+    **({"PYTHONPATH": os.environ["QA_PYTHONPATH"]} if os.environ.get("QA_PYTHONPATH") else {}),
     "SMS_BACKEND": "apps.notifications.sms.ConsoleSmsBackend",
     "OTP_TEST_NUMBERS": "+919000000101:123456,+919000000102:123456,+919000000103:123456,+919000000104:123456,+919000000105:123456",
     "PYTHONIOENCODING": "utf-8",
@@ -140,7 +144,7 @@ def t8a_oracle(old: dict, lines: list[tuple[Decimal, Decimal, int]]) -> dict:
 def _qa_worker_pids() -> list[int]:
     ps = (
         "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'celery.exe' -and "
-        "$_.CommandLine -like '*worktrees?qa?backend*' -and $_.CommandLine -like '*worker*' } "
+        "($_.CommandLine -like '*worktrees?qa?backend*' -or $_.CommandLine -like '*qa-dev?backend*') -and $_.CommandLine -like '*worker*' } "
         "| ForEach-Object { $_.ProcessId }"
     )
     out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout
@@ -150,6 +154,12 @@ def _qa_worker_pids() -> list[int]:
 def stop_worker() -> None:
     for pid in _qa_worker_pids():
         subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
+
+
+# Threads pool (P5 stage 2): with --pool=solo the slow socket fan-out tasks (2-6 s each against the
+# remote DB) queue ahead of auto-accept and dispatch countdowns. QA_WORKER_POOL=solo restores it.
+_POOL = ("--pool=solo" if os.environ.get("QA_WORKER_POOL") == "solo"
+         else f"--pool=threads --concurrency={os.environ.get('QA_WORKER_CONCURRENCY', '4')}")
 
 
 def start_worker(log_name: str) -> None:
@@ -162,7 +172,7 @@ def start_worker(log_name: str) -> None:
     envs = " ".join(f"{k}={v!r}" if " " in v else f"{k}='{v}'" for k, v in _ENV.items())
     log = (QA_DIR / "private" / "logs" / log_name).as_posix()
     cmd = (f"cd '{BACKEND.as_posix()}' && unset POSTGRES_HOST POSTGRES_PORT POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD VIRTUAL_ENV; "
-           f"{envs} nohup uv run celery -A config worker --pool=solo --without-heartbeat --without-mingle "
+           f"{envs} nohup uv run celery -A config worker {_POOL} --without-heartbeat --without-mingle "
            f"--without-gossip --loglevel INFO >> '{log}' 2>&1 &")
     subprocess.run(["C:/Program Files/Git/bin/bash.exe", "-c", cmd], timeout=30)
     _t.sleep(12)

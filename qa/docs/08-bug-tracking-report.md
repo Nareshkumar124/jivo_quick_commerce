@@ -56,3 +56,49 @@ Verified fixes: none yet (first run).
 **OBS-P4-01: resolved** (one-time token on the refund-retry form): the identical retry form posted twice makes one retry (TC-34c). The same protection must be on the manual refund form when BUG-0010 is built.
 
 **Open by severity:** P0 0 · P1 0 · P2 1 (BUG-0010) · P3 3 (BUG-0006, BUG-0008, BUG-0011).
+
+## Phase 5 stage 2 (2026-11-06, develop `999ef38` → `f5d39ff` → `680b904`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0012](../bugs/BUG-0012.md) | Dispatch crashes outside test settings (`CELERY_TASK_ALWAYS_EAGER` read from settings), so no rider is ever offered an order | backend: delivery dispatch | **P0 Blocker (Critical)** | P0 | django-backend-dev | **Verified** (fix `f5d39ff`) | P5-TC-34, 39 and every 5.3 flow |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 `rider_status NONE` (documents, bank-account) | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open | P5-TC-16 |
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| O-P5-01 | A BICYCLE registration with a vehicle number is refused ("Only motorbikes and scooters have a number here"). | 06 §3 only says the number is *required* for motorised vehicles; the test case assumed "optional". Doc ambiguity: PM to confirm, then 06 states it. |
+| O-P5-02 | Rejecting an already-EXPIRED offer returns 204 (no-op; the offer stays EXPIRED). | 06/08 are silent on a late reject. The state is not rewritten (checked), so harmless. Suggest 06 states "late reject is a no-op 204". |
+| O-P5-03 | `shift/start` accepts numeric strings for lat/lng (DRF FloatField coercion); the location batch contract says "JSON numbers". | No harm (judged on the position). Align the contract text or make the field strict. |
+| O-P5-04 | `PUT /rider/bank-account/` normalises a lowercase IFSC to upper case; the response has `upi_id: null` although the schema types it as a non-null string. | Normalising is fine. `null` vs schema: check `RiderBankAccount.upi_id` nullability on the next schema export (strict validation did not fail because the op validated a 200 with upi_id set). |
+| O-P5-05 | `shift/end` with an active task answers code `INVALID_STATE_TRANSITION` with `details.reason = ACTIVE_TASK` (06 §3 wording "409 `ACTIVE_TASK`" reads like a code). | Code is in the doc-06 §6 set; QA oracle updated. Suggest 06 says "reason". |
+
+## Phases 6 and 7, and P5 stage 2 rerun (2026-11-09, develop `efb3c3d`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0020](../bugs/BUG-0020.md) | An oversized socket message closes with 1011 instead of 1009 on the dev server | backend: realtime consumers | P3 Minor (Low) | P2 | django-backend-dev | Open (code unchanged at `efb3c3d`) | P6-TC-50 |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open (xfail still holds at `efb3c3d`) | P5-TC-16 |
+
+**No new bug filed on 2026-11-09.** To investigate (not bugs yet): 5 P5 failures in `test_p5_cash.py` (TC-88 ×2, TC-89 ×2, TC-93), details not captured before the run was stopped; per-broadcast ~2 s latency in the QA worker (performance observation).
+
+**Open by severity:** P0 0 · P1 0 · P2 1 (BUG-0010) · P3 5 (BUG-0006, 0008, 0011, 0013, 0020).
+
+
+## QA stage 3: P5 finish, P6, P7 rest (2026-11-10, develop `efb3c3d` in QA worktree `b87eb5f`; backend delivery/realtime/orders code unchanged on develop `3f6fc42`)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0021](../bugs/BUG-0021.md) | Rider pickup (T9) sends no `order.status` OUT_FOR_DELIVERY to the order socket or the ops feed | backend: delivery task flow / order events | P2 Major (Medium) | P1 | django-backend-dev | Open | P6-TC-59 (and the socket part of P6-TC-14) |
+| [BUG-0022](../bugs/BUG-0022.md) | `rider.location` always carries `heading: null` although the rider sends a heading | backend: rider location ingest | P3 Minor (Low) | P3 | django-backend-dev | Open | P6-TC-14 |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open (xfail still holds) | P5-TC-16 |
+| [BUG-0020](../bugs/BUG-0020.md) | Oversized socket message → 1011 instead of 1009 on daphne | backend: realtime consumers | P3 Minor (Low) | P2 | django-backend-dev | Open (xfail still holds) | P6-TC-50 |
+
+**The 2026-11-09 "to investigate" items are closed, with no bug:**
+- **The 5 `test_p5_cash` failures (TC-88 ×2, TC-89 ×2, TC-93).** Rerun with `-k "tc88 or tc89 or tc93"`: **6 passed**. Cause: R1 had reached ₹4,560 of the ₹5,000 cash limit, so COD offers were skipped by design (DL-61b) and the first COD-flow tests waited for an offer in vain. `cleanup_rider` now deposits leftover cash.
+- **The ~2 s per broadcast.** Found and explained; see OBS-S3-01/02.
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| OBS-S3-01 | On this Windows host `localhost` resolves to `::1` first. Redis 6380 listens only on IPv4, so every **new** Redis connection to `redis://localhost:6380` costs **2.04 s** (`socket.create_connection(("localhost", 6380))` 2.038 s vs `127.0.0.1` 0.001 s). The Celery publish path opens a new channel-layer connection per send, so each `broadcast_ws` / `publish_*` took ~2 s, and an order event 4–8 s. | Environment, not product. QA moved its instance, worker and drivers to `redis://127.0.0.1:6380/…`: publish tasks now take 0.14–0.2 s. **PM / DevOps:** the :8001 stack (`backend/.env`, `local.py` defaults `redis://localhost:6380`, `docs/dev-environment.md`) very likely has the same 2 s per live event on the user's phone. Use `127.0.0.1`. |
+| OBS-S3-02 | With `--pool=threads --concurrency=4`, `PREFETCH_MULTIPLIER=1` and `ACKS_LATE`, the Windows worker (synchronous consumer loop, no event hub) stops fetching while 4 messages are reserved, so tasks reached the worker in ~4 s bursts (cancel response 12:49:27.77 → tasks received 12:49:33.61). The broker itself is instant (probe: 1–2 ms). | Local worker configuration. With 16 threads, P6-TC-11 passes (≤ 3 s). Staging and production run prefork workers with the event loop; the 09 §1 latency targets must be measured there (Phase 8). |
+| OBS-S3-03 | With MinIO stopped (it was down at the start of this session), a rider document upload did not fail fast: the request hung until the client's read timeout (P5-TC-14, `httpx.ReadTimeout`) instead of answering 503 `SERVICE_UNAVAILABLE`. | Seen once in an unplanned outage; not reproduced deliberately (stopping MinIO would affect other agents). Recheck with a storage-fault profile; suggest short S3 connect/read timeouts in settings. |
+| OBS-S3-04 | `order.delivered` now links to `jivo://orders/{id}/rate` (P7, api-requests #55). | Intended. QA's P6-TC-40 oracle updated. |
+
+**Open by severity (2026-11-10):** P0 0 · P1 0 · P2 2 (BUG-0010, **BUG-0021**) · P3 6 (BUG-0006, 0008, 0011, 0013, 0020, **0022**).

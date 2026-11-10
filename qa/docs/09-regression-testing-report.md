@@ -64,3 +64,18 @@ The smoke set was unaffected.
 
 ## Phase 4 stage 2 (2026-11-04, `f744508`)
 `uv run pytest -m smoke` (P0–P4 🔥, now including the console and QA-02 cases): `98 passed, 2 skipped, 418 deselected in 807.71s`. P3 + P4 SQL invariants after cleanup: `8 passed`.
+
+## P5–P7 stage 2 (2026-11-09, `efb3c3d`): partial
+Smoke P0–P7 not run as a set this session (stopped for a PC shutdown). Regression evidence: P5 partial run 122 passed / 5 failed of 148 (`qa/private/runs/s2-p5-partial-map.txt`), P7 subset 30/30, P6-TC-13 1/1. Re-run the full smoke set next session.
+
+## QA stage 3 (2026-11-10, develop `efb3c3d` in QA worktree `b87eb5f`, QA instance :8004)
+**🔥 smoke, P0–P4 + P6 + P7:**
+- **Command:** `uv run pytest -m smoke tests/ --ignore=tests/test_p5_*.py -rfEsx` with `QA_WORKER_CONCURRENCY=16`.
+- **First pass:** `2 failed, 109 passed, 1 skipped, 509 deselected, 2 xfailed, 27 errors in 755.87s`. None of these were product regressions:
+  - **27 errors:** customer A's `address_write` throttle (T-814, 30/hour per user; create and delete both count) was exhausted. The QA fixture now resets it in QA Redis before each create; no QA test measures that limit.
+  - **P1-TC-21:** stale oracle. QA user C has been rider R1 since P5, so the test now uses user E.
+  - **P1-TC-24:** stale oracle. T-814 (06 §2.1) revokes all of a user's refresh tokens when a revoked one is reused, so the rotated token now gets 401 by design.
+- **Rerun of the 29 failed and errored cases:** `29 passed in 292.61s`.
+- **Total:** **138 passed, 1 skipped** (P0 staging profile), **2 xfailed** (BUG-0021, BUG-0022).
+
+**P5 🔥 cases:** all passed inside today's full P5 runs (see 10, stage 3). **Regression found:** none in P0–P4. The two new bugs are P6 functionality (BUG-0021, BUG-0022). BUG-0013 and BUG-0020 xfails still hold (not fixed).

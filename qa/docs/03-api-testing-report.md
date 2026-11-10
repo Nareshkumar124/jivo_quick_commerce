@@ -231,3 +231,19 @@ Every P4 response was validated strictly against `schema.yaml` @ `1b3552d` (`ord
 | SQL (P3 + P4) after cleanup | `8 passed in 12.74s` |
 
 Console poll latency (TC-60, 20 sequential each): live-board columns p50 253 ms / p95 278 ms; packing queues p50 264 ms / p95 310 ms (remote DB ~10 ms/query).
+
+## QA stage 3: P5 finish, P6, P7 rest (2026-11-10, develop `efb3c3d` in QA worktree `b87eb5f`)
+**Environment:** QA instance `127.0.0.1:8004` (local settings, runserver/daphne), Redis `127.0.0.1:6380` DB 5/6/7, QA worker (16 threads), shared remote DB, QA numbers `+9190000001xx` only. Commands from `qa/`: `uv run pytest tests/<file> -rfEx --tb=short -p no:cacheprovider` with `QA_P5_53=1 QA_WORKER_CONCURRENCY=16`.
+
+| Suite | Result (final) |
+|---|---|
+| `test_p5_cash.py -k "tc88 or tc89 or tc93"` | 6 passed (325 s) |
+| `test_p5_kyc.py` | 44 passed / 18 skipped / 3 xfailed / 2 failed (MinIO down) → reruns 2 + 19 passed |
+| `test_p5_security.py` | 24 passed (744 s) |
+| `test_p5_shift.py` / `test_p5_ops.py` / `test_p5_task_flow.py` / `test_p5_final.py` / `test_p5_db.py` | 12 / 26 / 38 + 1 skip / 5 / 3 passed |
+| `test_p5_task_flow.py -k tc79` (riderclock profile) | 1 passed |
+| `test_p6_ws.py` | 48 passed, 17 skipped, 2 xfailed (BUG-0020) |
+| `test_p6_t612.py` | 6 passed, 2 xfailed (BUG-0021, BUG-0022) |
+| `test_p7.py` (16 remaining cases) | 24 passed after 2 test fixes |
+
+Contract checks in these runs (strict schema validation of every 2xx body the suites read): no mismatch with `backend/openapi/schema.yaml`. API findings: BUG-0021 (no `order.status` at T9), BUG-0022 (`rider.location.heading` null). OBS-06 re-confirmed: every REST `/rider/*` endpoint (me, tasks/current, offers/current, cash/ledger, earnings, ratings) answers 200 to the same person's customer-app token; 06 requires the `app` claim only on `/ws/v1/rider/`, the inbox and tickets.

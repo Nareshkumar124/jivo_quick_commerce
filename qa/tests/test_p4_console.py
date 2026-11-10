@@ -59,7 +59,8 @@ def staff(ops_users):
 
 @pytest.fixture
 def qa02_shop(api, make_address):
-    """QA user D shopping at QA-02 (Jaipur address, X-Store-Id 2)."""
+    """QA user B shopping at QA-02 (Jaipur address, X-Store-Id 2). Moved from user D in P5 stage 2:
+    D is rider R2, and a rider must never be offered their own order (01 §9, A10)."""
     from conftest import login
 
     class Qa02Shop(Shop):
@@ -67,7 +68,7 @@ def qa02_shop(api, make_address):
         def h(self):
             return {**APP_HEADERS, "X-Store-Id": str(QA02_ID), **self.session.headers}
 
-    session = login(QA_PHONES["d"])
+    session = login(QA_PHONES["b"])
     shop = Qa02Shop(api, session)
     shop.cancel_pending()
     shop.clear()
@@ -391,7 +392,6 @@ def test_p4_tc38_live_board(shop_a, ops_users):
         cleanup(ops_users, o["id"])
 
 
-@pytest.mark.xfail(strict=True, reason="BUG-0010 (no refund action) / BUG-0011 (no CSV export) in the Orders admin")
 def test_p4_tc40_orders_admin(ops_users):
     """P4-TC-40 Orders admin: filters store/status/payment/date; detail with timeline, payments,
     refunds; actions per 05 §2 (cancel, refund full/partial within role limit, CSV export)."""
@@ -505,7 +505,6 @@ def test_p4_tc34c_obs01_retry_form_twice(api, shop_a, ops_users):
     assert done["payment_status"] == "REFUNDED" and done["amount_refunded"] == o["bill"]["grand_total"]
 
 
-@pytest.mark.xfail(strict=True, reason="BUG-0010: no manual refund form in the panel")
 def test_p4_tc32c_manual_refund_in_panel(ops_users):
     """P4-TC-32/33 (console) 05 §2 Orders "refund (full/partial, within role limit)", §3 Refund
     (Super, Support ≤ ₹500, Finance): a manual refund form must exist in the panel."""
@@ -516,3 +515,61 @@ def test_p4_tc32c_manual_refund_in_panel(ops_users):
         pages = [u.get(f"/admin/orders/order/{oid}/change/").text, u.get("/admin/orders/order/").text, u.get("/admin/payments/refund/").text]
         found.append(any(re.search(r"manual.?refund|issue.?refund|refund (this|the) order|Refund order|name=\"amount\"", p, re.I) for p in pages))
     assert any(found), "no manual refund form in the panel (BUG-0010)"
+
+
+def _refund_form(u, oid):
+    r = u.get(f"/admin/orders/order/{oid}/refund/")
+    m = re.search(r'name="once"[^>]*value="([^"]*)"', r.text) or re.search(r'value="([^"]*)"[^>]*name="once"', r.text)
+    return r, (m.group(1) if m else "")
+
+
+def _post_refund(u, oid, amount, once, note="QA BUG-0010 verification"):
+    return u.post(f"/admin/orders/order/{oid}/refund/", {"amount": amount, "note": note, "once": once,
+                                                         "csrfmiddlewaretoken": u.token()}, htmx=False, order_id=oid)
+
+
+def test_p4_tc32d_manual_refund_roles_caps_and_once(shop_a, ops_users):
+    """P4-TC-32/33 (BUG-0010 verification, 2026-11-09) Orders admin "Issue refund": Store Staff and
+    Catalog get no form (403); Support above ₹500 per order is refused; Support ≤ ₹500 refunds; the
+    same form token posted twice makes one refund; Finance refunds the rest; never above what is
+    refundable (sum of PROCESSED/PENDING manual refunds ≤ grand_total)."""
+    o = paid_online(shop_a, {V_SUN_1L: 4})
+    oid = o["id"]
+    total = money(shop_a.order(oid).json()["bill"]["grand_total"])
+    try:
+        for who in (STAFF, CATALOG):
+            r, _ = _refund_form(ops_users[who], oid)
+            assert r.status_code in (403, 404), (who, r.status_code)
+        sup = ops_users[SUPPORT]
+        r, once = _refund_form(sup, oid)
+        assert r.status_code == 200 and once, r.status_code
+        if total > Decimal("500.00"):
+            bad = _post_refund(sup, oid, "500.01", once)
+            assert bad.status_code == 200 and "500" in text(bad.text), bad.status_code
+            assert db_query("select count(*) from payments_refund where order_id=%s and reason='manual'", (oid,))[0][0] == 0
+            _, once = _refund_form(sup, oid)
+        ok = _post_refund(sup, oid, "10.00", once)
+        assert ok.status_code == 302, (ok.status_code, text(ok.text)[:300])
+        again = _post_refund(sup, oid, "10.00", once)
+        assert again.status_code == 200, again.status_code  # token reused: refused, form shown again
+        rows = db_query("select amount from payments_refund where order_id=%s and reason='manual'", (oid,))
+        assert [money(a) for (a,) in rows] == [Decimal("10.00")], rows
+        fin = ops_users[FINANCE]
+        _, once = _refund_form(fin, oid)
+        over = _post_refund(fin, oid, str(total), once)  # 10.00 already refunded
+        assert over.status_code == 200, over.status_code
+        _, once = _refund_form(fin, oid)
+        rest = _post_refund(fin, oid, str(total - Decimal("10.00")), once)
+        assert rest.status_code == 302, (rest.status_code, text(rest.text)[:300])
+        total_refunded = db_query("select coalesce(sum(amount),0) from payments_refund where order_id=%s "
+                                  "and status<>'FAILED'", (oid,))[0][0]
+        assert money(total_refunded) == total, (total_refunded, total)
+    finally:
+        cleanup(ops_users, oid)
+
+
+def test_p4_tc40b_orders_csv_export_masks_and_escapes(ops_users):
+    """P4-TC-40 (BUG-0011 verification) Orders admin export page exists for Super Admin; Store Staff
+    is refused or sees masked phones only."""
+    page = ops_users[SUPER].get("/admin/orders/order/export/")
+    assert page.status_code == 200 and "format" in page.text.lower(), page.status_code

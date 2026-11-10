@@ -33,9 +33,9 @@ from p3_support import V_SUN_1L, captured_event, fake_id, send_webhook
 from qa_support import REPO, PRIVATE, assert_error, db_query, describe
 
 QA_WORKER_ENV = {
-    "REDIS_URL": "redis://localhost:6380/5",
-    "CHANNELS_REDIS_URL": "redis://localhost:6380/6",
-    "CELERY_BROKER_URL": "redis://localhost:6380/7",
+    "REDIS_URL": "redis://127.0.0.1:6380/5",
+    "CHANNELS_REDIS_URL": "redis://127.0.0.1:6380/6",
+    "CELERY_BROKER_URL": "redis://127.0.0.1:6380/7",
     "DJANGO_SETTINGS_MODULE": "config.settings.local",
     "SMS_BACKEND": "apps.notifications.sms.ConsoleSmsBackend",
     "PYTHONUNBUFFERED": "1",

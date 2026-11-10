@@ -57,3 +57,9 @@ Not measured: the P4 load-relevant paths are the console polls (TC-60), which ar
 
 ## Phase 4 stage 2 (2026-11-04, `f744508`)
 P4-TC-60, 20 sequential HTMX polls each against :8004 (remote DB): live-board columns (Ops) p50 253 ms, p95 278 ms; packing queues (Store Staff, GGN-01) p50 264 ms, p95 310 ms. Within the 10 s poll budget; not representative of production (remote DB, `runserver`). The fixed-query-count check is white-box (admin tests).
+
+## QA stage 3 (2026-11-10, `efb3c3d`): real-time latency on the local stack
+Not a load test (09 §1 load belongs to Phase 8 on staging). Findings while running P6:
+- **OBS-S3-01:** `redis://localhost:6380` costs **2.04 s** per new connection on this Windows host (IPv6 `::1` tried first; Redis listens on IPv4 only); `127.0.0.1` costs 0.001 s. Before the switch each `publish_*` / `broadcast_ws` task took ~2–8 s; after, 0.14–0.2 s.
+- **OBS-S3-02:** with 4 worker threads, `PREFETCH_MULTIPLIER=1` and `ACKS_LATE`, tasks reached the Windows worker in ~4 s bursts (cancel response → task received 5.8 s), while a raw broker probe takes 1–2 ms. With 16 threads: P6-TC-11 cancel → `order.status` on the socket within 3 s ✅; offer.new within 3 s of `offered_at` ✅ (P6-TC-21).
+- These are local-environment effects. Measure the 09 §1 targets (offer < 3 s, store alert < 3 s, location → map < 5 s) on staging (prefork workers, Linux).

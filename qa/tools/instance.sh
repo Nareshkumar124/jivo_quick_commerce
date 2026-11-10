@@ -37,7 +37,7 @@ MAIN_CHECKOUT="$(cd "$(git -C "$REPO" rev-parse --path-format=absolute --git-com
 PORT=8004
 HOST=127.0.0.1
 LOG_DIR="$QA_DIR/private/logs"
-QA_OTP_NUMBERS="+919000000101:123456,+919000000102:123456,+919000000103:123456,+919000000104:123456,+919000000105:123456"
+QA_OTP_NUMBERS="+919000000101:123456,+919000000102:123456,+919000000103:123456,+919000000104:123456,+919000000105:123456,+919000000106:123456,+919000000107:123456,+919000000108:123456,+919000000109:123456,+919000000110:123456"
 
 backend_env() {  # $1 = .env | .env.localdb
   local override="${2:-}"
@@ -74,9 +74,9 @@ case "$cmd" in
     log="$LOG_DIR/instance-$profile-$(date +%Y%m%d-%H%M%S).log"
 
     env_vars=(
-      "REDIS_URL=redis://localhost:6380/5"
-      "CHANNELS_REDIS_URL=redis://localhost:6380/6"
-      "CELERY_BROKER_URL=redis://localhost:6380/7"
+      "REDIS_URL=redis://127.0.0.1:6380/5"
+      "CHANNELS_REDIS_URL=redis://127.0.0.1:6380/6"
+      "CELERY_BROKER_URL=redis://127.0.0.1:6380/7"
       "OTP_TEST_NUMBERS=$QA_OTP_NUMBERS"
       "DJANGO_SETTINGS_MODULE=config.settings.local"
       "PYTHONUNBUFFERED=1"

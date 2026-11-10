@@ -21,9 +21,9 @@ import sys
 sys.path.insert(0, os.getcwd())
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.local")
 for k, v in {
-    "REDIS_URL": "redis://localhost:6380/5",
-    "CHANNELS_REDIS_URL": "redis://localhost:6380/6",
-    "CELERY_BROKER_URL": "redis://localhost:6380/7",
+    "REDIS_URL": "redis://127.0.0.1:6380/5",
+    "CHANNELS_REDIS_URL": "redis://127.0.0.1:6380/6",
+    "CELERY_BROKER_URL": "redis://127.0.0.1:6380/7",
 }.items():
     if os.environ.get(k) != v:
         sys.exit(f"refusing to run: {k} must be the QA Redis DB")
@@ -100,6 +100,19 @@ def run(step: dict) -> dict:
         return {"ok": True, "result": order_refunds.sync_refund_status()}
     elif op == "sla_alert":
         return {"ok": True, "result": store_ops.acceptance_sla_alert(oid)}
+    elif op == "inward_qa02":
+        # QA-02 (QA-only store, id 2) restock through the inventory service, as staff: P5 runs
+        # commit stock at every pickup (T9), so the QA store runs dry. Never any other store.
+        from apps.catalog.models import ProductVariant
+        from apps.inventory.services import adjust_stock
+        from apps.stores.models import DarkStore
+
+        store = DarkStore.objects.get(pk=2)
+        if store.code != "QA-02":
+            raise SystemExit("refusing: store 2 is not QA-02")
+        mv = adjust_stock(store=store, variant=ProductVariant.objects.get(pk=step["variant_id"]),
+                          delta=int(step["qty"]), movement_type="INWARD", reason="QA P5 restock", actor=by)
+        return {"ok": True, "result": {"movement": mv.pk}}
     elif op == "refundable":
         return {"ok": True, "result": str(order_refunds.refundable(Order.objects.get(pk=oid)))}
     else:

@@ -66,7 +66,9 @@ def test_p1_tc24_refresh_rotation_and_reuse(api, user_a):
     validate_response(reuse, "auth_token_refresh")
     assert "blacklisted" in err["message"].lower()
     assert api.get("/api/v1/me/", headers=bearer(pair["access"])).status_code == 200
-    assert _refresh(api, pair["refresh"]).status_code == 200
+    # T-814 (06 §2.1 "Refresh-token reuse"): reusing a revoked token revokes ALL the user's refresh
+    # tokens, so the rotated one is refused too (oracle updated in stage 3; before T-814 it was 200).
+    assert_error(_refresh(api, pair["refresh"]), 401, "TOKEN_INVALID")
 
 
 @pytest.mark.db

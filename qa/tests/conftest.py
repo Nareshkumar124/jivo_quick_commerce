@@ -66,6 +66,11 @@ def _fresh_counters():
     """Start every run with no QA rate-limit counters (QA Redis DB only)."""
     if os.environ.get("QA_KEEP_COUNTERS") != "1" and profile() != "redis-down":
         clear_rate_limits()
+        # Stage 3: a day of P5–P7 order flows used up customer A's hourly address_write throttle
+        # (DRF, `jqc:1:throttle_address_write_<uid>`), which errored 27 smoke cases.
+        from qa_support import clear_throttle
+
+        clear_throttle("address_write")
     yield
 
 
@@ -166,6 +171,11 @@ def make_address(api):
     created: list[tuple[int, dict]] = []
 
     def make(session: Session, **overrides) -> dict:
+        # T-814 address_write = 30/hour per user (create + delete both count): one smoke pass uses
+        # more than that for customer A. No QA test measures this limit, so reset it (QA Redis only).
+        from qa_support import clear_throttle
+
+        clear_throttle("address_write")
         r = api.post("/api/v1/addresses/", json={**ADDRESS, **overrides}, headers=session.headers)
         assert r.status_code == 201, describe(r)
         body = r.json()
