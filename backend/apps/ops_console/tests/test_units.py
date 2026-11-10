@@ -142,6 +142,14 @@ class TestNavigation:
         except LookupError:
             for model in ("ridercashledger", "riderearning", "earningrule"):
                 pending.add(f"admin:delivery_{model}_changelist")
+        try:
+            apps.get_model("reports", "ReportExport")
+        except LookupError:
+            pending.add("admin:reports_reportexport_changelist")
+        try:
+            apps.get_model("support", "CannedReply")
+        except LookupError:
+            pending.add("admin:support_cannedreply_changelist")
         for section in navigation.MODULES:
             for item in section.items:
                 if item.url_name in pending:

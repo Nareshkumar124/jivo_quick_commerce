@@ -210,8 +210,11 @@ def test_role_without_permissions_gets_the_empty_state(client):
     assert 'data-testid="operations-kpis"' not in html
 
 
-def test_no_fake_kpis_before_their_phase(client):
-    client.force_login(staff_in_role(roles.SUPER_ADMIN))
+@pytest.mark.parametrize("role", [roles.SUPPORT, roles.STORE_STAFF, roles.CATALOG_MANAGER])
+def test_no_order_kpis_without_the_reports_row(client, role):
+    """Order and money KPIs (P7) appear only for the 05 §3 "Reports" roles
+    (test_p7_reports.TestDashboardOrders); nobody else sees them, real or fake."""
+    client.force_login(staff_in_role(role))
     html = client.get(reverse("ops:dashboard")).content.decode().lower()
     html = re.sub(r"[a-z0-9]{32,}", " ", html)  # CSRF tokens: random letters could spell "aov"
     for word in ("gmv", "revenue", "orders today", "online riders", "aov"):

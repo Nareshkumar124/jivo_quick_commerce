@@ -1,0 +1,91 @@
+{% extends "ops/base.html" %}
+
+{% block content %}
+    {# Support ticket detail. Context: ticket, customer (masked per role), status_badge, priority_badge, assignee, thread, closed, reply_form, status_form (None when terminal), priority_form, assign_form, order_url. Every action posts to apps.support.services through support_views.ticket_action. #}
+    <p class="mb-4"><a class="text-primary-600 dark:text-primary-500" href="{% url 'ops:support' %}">All tickets</a></p>
+    <div class="ops-grid-2">
+        <section class="ops-card bg-white border border-base-200 flex flex-col rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-labelledby="thread-heading" data-testid="ticket-thread">
+            <div class="border-b border-base-200 px-4 py-3 dark:border-base-800">
+                <h2 id="thread-heading" class="font-semibold text-[15px] text-font-important-light dark:text-font-important-dark">{{ ticket.subject }}</h2>
+                <p class="text-xs text-font-subtle-light dark:text-font-subtle-dark">{{ ticket.get_category_display }} · raised {{ ticket.created_at|date:"d M Y, H:i" }} IST from the {{ ticket.get_app_display }} app</p>
+            </div>
+            <ol class="flex flex-col gap-3 p-4">
+                {% for message in thread %}
+                    <li class="border border-base-200 p-3 rounded-default dark:border-base-800{% if message.is_staff %} bg-base-50 dark:bg-base-800{% endif %}" data-staff="{{ message.is_staff|yesno:'1,0' }}">
+                        <div class="flex gap-2 mb-1 text-xs text-font-subtle-light dark:text-font-subtle-dark">
+                            <span class="font-semibold">{{ message.who }}</span>
+                            <span class="ml-auto">{{ message.at|date:"d M, H:i" }}</span>
+                        </div>
+                        <p class="whitespace-pre-line break-words">{{ message.body }}</p>
+                        {% if message.attachments %}
+                            <ul class="flex flex-wrap gap-2 mt-2 text-xs" data-testid="attachments">
+                                {% for key in message.attachments %}
+                                    <li><a class="text-primary-600 dark:text-primary-500" href="{% url 'ops:support-attachment' ticket.pk key %}" target="_blank" rel="noopener noreferrer">Photo {{ forloop.counter }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </li>
+                {% empty %}
+                    <li>{% include "ops/components/empty_state.html" with title="No messages yet" compact=1 %}</li>
+                {% endfor %}
+            </ol>
+            {% if closed %}
+                <p class="border-t border-base-200 p-4 text-font-subtle-light dark:border-base-800 dark:text-font-subtle-dark" data-testid="ticket-closed">This ticket is closed. The customer can open a new one.</p>
+            {% else %}
+                <form class="border-t border-base-200 flex flex-col gap-3 p-4 dark:border-base-800" method="post" action="{% url 'ops:support-ticket-action' ticket.pk 'reply' %}" data-testid="reply-form">
+                    {% csrf_token %}
+                    {% if canned %}
+                        <div class="ops-field flex flex-col">
+                            <label for="canned-reply" class="block font-semibold mb-1.5 text-font-important-light text-xs dark:text-font-important-dark">Insert a canned reply</label>
+                            <select id="canned-reply" name="reply" class="bg-white border border-base-200 px-3 py-2 rounded-default w-full dark:bg-base-900 dark:border-base-700"
+                                    hx-get="{% url 'ops:support-canned-reply' ticket.pk %}" hx-target="#reply-body" hx-swap="outerHTML" hx-trigger="change" data-testid="canned-select">
+                                <option value="">Choose…</option>
+                                {% for reply in canned %}<option value="{{ reply.pk }}">{{ reply.title }}</option>{% endfor %}
+                            </select>
+                        </div>
+                    {% endif %}
+                    {% include "ops/support/reply_body.html" %}
+                    {% include "ops/components/form_field.html" with field=reply_form.status %}
+                    <div><button type="submit" class="ops-button">Send reply</button></div>
+                </form>
+            {% endif %}
+        </section>
+
+        <section class="ops-card bg-white border border-base-200 flex flex-col gap-4 p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-label="Ticket details">
+            <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+                <dt class="font-semibold">Status</dt><dd>{% include "ops/components/status_badge.html" with badge=status_badge %}</dd>
+                <dt class="font-semibold">Priority</dt><dd>{% include "ops/components/status_badge.html" with badge=priority_badge %}</dd>
+                <dt class="font-semibold">Assigned to</dt><dd data-testid="ticket-assignee">{{ assignee }}</dd>
+                <dt class="font-semibold">Customer</dt><dd data-testid="ticket-customer">{{ customer }}</dd>
+                <dt class="font-semibold">Order</dt>
+                <dd>{% if ticket.order_id %}{% if order_url %}<a class="text-primary-600 dark:text-primary-500" href="{{ order_url }}">{{ ticket.order.order_number }}</a>{% else %}{{ ticket.order.order_number }}{% endif %}{% else %}-{% endif %}</dd>
+                <dt class="font-semibold">Last activity</dt><dd>{{ ticket.last_activity_at|date:"d M Y, H:i" }} IST</dd>
+                {% if sla %}
+                    <dt class="font-semibold">First response due</dt>
+                    <dd data-testid="sla-first">{% if sla.first_response_due_at %}{{ sla.first_response_due_at|date:"d M, H:i" }} IST{% else %}-{% endif %}{% if sla.first_response_breached %} <span class="ops-tone-danger font-semibold">late</span>{% endif %}</dd>
+                    <dt class="font-semibold">Resolution due</dt>
+                    <dd data-testid="sla-resolution">{% if sla.resolution_due_at %}{{ sla.resolution_due_at|date:"d M, H:i" }} IST{% else %}-{% endif %}{% if sla.resolution_breached %} <span class="ops-tone-danger font-semibold">late</span>{% endif %}</dd>
+                {% endif %}
+            </dl>
+            {% if status_form %}
+                <form class="flex flex-wrap gap-3 items-end" method="post" action="{% url 'ops:support-ticket-action' ticket.pk 'status' %}" data-testid="status-form">
+                    {% csrf_token %}
+                    {% include "ops/components/form_field.html" with field=status_form.status %}
+                    <div><button type="submit" class="ops-button ops-button--secondary">Set status</button></div>
+                </form>
+            {% endif %}
+            <form class="flex flex-wrap gap-3 items-end" method="post" action="{% url 'ops:support-ticket-action' ticket.pk 'priority' %}" data-testid="priority-form">
+                {% csrf_token %}
+                {% include "ops/components/form_field.html" with field=priority_form.priority %}
+                <div><button type="submit" class="ops-button ops-button--secondary">Set priority</button></div>
+            </form>
+            {% if not closed %}
+                <form class="flex flex-wrap gap-3 items-end" method="post" action="{% url 'ops:support-ticket-action' ticket.pk 'assign' %}" data-testid="assign-form">
+                    {% csrf_token %}
+                    {% include "ops/components/form_field.html" with field=assign_form.assignee %}
+                    <div><button type="submit" class="ops-button ops-button--secondary">Assign</button></div>
+                </form>
+            {% endif %}
+        </section>
+    </div>
+{% endblock %}

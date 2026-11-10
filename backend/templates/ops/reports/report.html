@@ -1,0 +1,15 @@
+{% extends "ops/base.html" %}
+
+{% block content %}
+    {# One report (05 §4). Context: report, form (ReportFilterForm), table (None when the filters are invalid), export_query, too_many. #}
+    <p class="mb-4 ops-text-secondary">{{ report.description }} <a class="text-primary-600 dark:text-primary-500" href="{% url 'ops:reports' %}">All reports</a></p>
+    <form id="report-filters" class="flex flex-wrap gap-3 items-end mb-4" method="get" action="{% url 'ops:report' report.slug %}"
+          hx-get="{% url 'ops:report' report.slug %}" hx-target="#report-region" hx-swap="outerHTML" hx-trigger="change" hx-push-url="true" hx-indicator="#report-loading">
+        {% include "ops/components/form_field.html" with field=form.date_from %}
+        {% include "ops/components/form_field.html" with field=form.date_to %}
+        {% include "ops/components/form_field.html" with field=form.store %}
+        <noscript><button type="submit" class="ops-button ops-button--secondary">Apply</button></noscript>
+        {% include "ops/components/loading.html" with id="report-loading" label="Updating" %}
+    </form>
+    {% include "ops/reports/results.html" %}
+{% endblock %}

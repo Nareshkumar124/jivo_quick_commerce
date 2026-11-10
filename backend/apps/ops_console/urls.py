@@ -1,6 +1,15 @@
 from django.urls import path
 
-from apps.ops_console import csp, delivery_ops_views, dispatch_views, mfa, order_views, views
+from apps.ops_console import (
+    csp,
+    delivery_ops_views,
+    dispatch_views,
+    mfa,
+    order_views,
+    report_views,
+    support_views,
+    views,
+)
 
 app_name = "ops"
 
@@ -9,6 +18,35 @@ urlpatterns = [
     path("dashboard/customer-kpis/", views.dashboard_customer_kpis, name="dashboard-kpis"),
     path("dashboard/signups/", views.dashboard_signups, name="dashboard-signups"),
     path("dashboard/operations/", views.dashboard_operations, name="dashboard-operations"),
+    path("dashboard/orders/", views.dashboard_orders_partial, name="dashboard-orders"),
+    # Reports (05 §4, P7)
+    path("reports/", report_views.index, name="reports"),
+    path(
+        "reports/exports/<int:export_id>/download/",
+        report_views.export_download,
+        name="report-export-download",
+    ),
+    path("reports/<slug:slug>/", report_views.report, name="report"),
+    path("reports/<slug:slug>/export/", report_views.report_export, name="report-export"),
+    # Support ticket console (05 §2 Support, §3 "Support tickets", P7)
+    path("support/", support_views.ticket_list, name="support"),
+    path("support/tickets/", support_views.ticket_list_partial, name="support-tickets"),
+    path("support/tickets/<int:ticket_id>/", support_views.ticket_detail, name="support-ticket"),
+    path(
+        "support/tickets/<int:ticket_id>/canned/",
+        support_views.canned_reply,
+        name="support-canned-reply",
+    ),
+    path(
+        "support/tickets/<int:ticket_id>/attachments/<str:key>/",
+        support_views.attachment,
+        name="support-attachment",
+    ),
+    path(
+        "support/tickets/<int:ticket_id>/<slug:action>/",
+        support_views.ticket_action,
+        name="support-ticket-action",
+    ),
     # Staff two-step sign-in (H2) and CSP reports (L7)
     path("mfa/setup/", mfa.setup, name="mfa-setup"),
     path("mfa/verify/", mfa.verify, name="mfa-verify"),

@@ -5,8 +5,8 @@ admin)."""
 from django.contrib import admin
 from django.shortcuts import render
 
+from apps.ops_console import capabilities, dashboard_orders, selectors
 from apps.ops_console import dashboard as dashboard_blocks
-from apps.ops_console import selectors
 from apps.ops_console.access import ops_view
 from apps.ops_console.navigation import visible_sections
 
@@ -56,7 +56,19 @@ def dashboard(request):
     operations = selectors.operations_stats(user)
     if operations.any:
         context["operations"] = operations
+    if capabilities.allowed(user, capabilities.REPORTS):
+        context["orders_section"] = dashboard_orders.build(request)
     return render(request, "ops/dashboard.html", context)
+
+
+@ops_view(capability=capabilities.REPORTS)
+def dashboard_orders_partial(request):
+    """HTMX partial: the order KPIs, charts and alerts for the chosen day and store (05 §1.1)."""
+    return render(
+        request,
+        "ops/partials/order_dashboard.html",
+        {"orders_section": dashboard_orders.build(request)},
+    )
 
 
 @ops_view()

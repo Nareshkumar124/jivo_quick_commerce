@@ -361,10 +361,25 @@ def test_csp_report_oversize_is_refused_before_reading(client):
     assert response.status_code == 413
 
 
-def test_csp_report_flood_is_dropped(client, caplog):
+@pytest.fixture
+def _csp_private_cache(settings):
+    """The CSP flood counter lives in the default cache. Give these tests a private in-process
+    cache so the count never depends on the shared test Redis or on other xdist workers."""
+    settings.CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "csp-report-tests",
+        }
+    }
     from django.core.cache import cache
 
-    cache.delete("ops-csp-report:127.0.0.1")
+    cache.clear()
+    yield
+    cache.clear()
+
+
+@pytest.mark.usefixtures("_csp_private_cache")
+def test_csp_report_flood_is_dropped(client, caplog):
     caplog.set_level(logging.INFO, logger="apps.ops_console.csp")
     body = json.dumps({"csp-report": {"violated-directive": "img-src", "blocked-uri": "x"}})
     for _ in range(40):
@@ -373,13 +388,10 @@ def test_csp_report_flood_is_dropped(client, caplog):
         )
         assert response.status_code == 204
     assert caplog.text.count("CSP violation") == 30
-    cache.delete("ops-csp-report:127.0.0.1")
 
 
+@pytest.mark.usefixtures("_csp_private_cache")
 def test_csp_report_cannot_inject_log_lines(client, caplog):
-    from django.core.cache import cache
-
-    cache.delete("ops-csp-report:127.0.0.1")
     caplog.set_level(logging.INFO, logger="apps.ops_console.csp")
     body = json.dumps(
         {
@@ -398,4 +410,3 @@ def test_csp_report_cannot_inject_log_lines(client, caplog):
     assert "script-srcFAKE LOG LINE" in message
     assert "secret" not in message
     assert record.levelno == logging.INFO
-    cache.delete("ops-csp-report:127.0.0.1")

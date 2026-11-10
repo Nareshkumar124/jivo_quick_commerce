@@ -349,6 +349,52 @@ MODULES: tuple[NavSection, ...] = (
         ),
     ),
     NavSection(
+        "Support",
+        (
+            NavItem(
+                "Support tickets",
+                "support_agent",
+                "ops:support",
+                surface=OPS,
+                capability="support_tickets",
+            ),
+            NavItem(
+                "Ticket records",
+                "confirmation_number",
+                "admin:support_supportticket_changelist",
+                ("support.view_supportticket",),
+            ),
+            NavItem("FAQs", "quiz", "admin:cms_faq_changelist", ("cms.view_faq",)),
+            NavItem(
+                "Canned replies",
+                "quickreply",
+                "admin:support_cannedreply_changelist",
+                ("support.view_cannedreply",),
+            ),
+            # P7: hidden until the backend's Rating model is merged (admin URL not installed).
+            NavItem("Ratings", "star", "admin:orders_rating_changelist", ("orders.view_rating",)),
+        ),
+    ),
+    NavSection(
+        "Reports",
+        (
+            # `product_report` is the widest reports row (05 §3: also Catalog Manager).
+            NavItem(
+                "Reports",
+                "monitoring",
+                "ops:reports",
+                surface=OPS,
+                capability="product_report",
+            ),
+            NavItem(
+                "Report exports",
+                "file_download",
+                "admin:reports_reportexport_changelist",
+                ("reports.view_reportexport",),
+            ),
+        ),
+    ),
+    NavSection(
         "Admin settings",
         (
             NavItem(
@@ -370,6 +416,7 @@ MODULES: tuple[NavSection, ...] = (
                 "admin:cms_appconfig_changelist",
                 ("cms.view_appconfig",),
             ),
+            NavItem("CMS pages", "article", "admin:cms_page_changelist", ("cms.view_page",)),
             NavItem(
                 "Login lockouts",
                 "lock_person",

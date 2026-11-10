@@ -14,9 +14,7 @@ Capabilities map onto them (`DEDICATED`):
   Admin): `stores.change_darkstore`, or store view + stock adjustment, which only Store Manager
   (and Super Admin) hold. No dedicated permission exists yet (reported).
 
-Before the backend's roles are on this branch (`roles.ORDER_PROCESS` missing) the same rows are
-selected from the Phase 3 grants (`INTERIM`), so the screens work either way. Checks are by
-permission, never by group name. The role sets are pinned in `tests/helpers.py`.
+Checks are by permission, never by group name. The role sets are pinned in `tests/helpers.py`.
 """
 
 LIVE_BOARD = "live_board"
@@ -40,7 +38,26 @@ RECEIVE_RETURN = "receive_return"
 CASH_DEPOSIT = "cash_deposit"
 PAYOUTS = "payouts"
 
+# Phase 7 (05 §3 "Reports": Super Admin, Ops, Store Manager own store, Finance; Catalog Mgr
+# "catalog" = the product sales report only; §1.1 dashboard order cards use the same row). The
+# backend's report permissions: `reports.view_reports` (Super Admin, Ops, Store Manager own,
+# Finance) for the dashboard and REPORTS; "any report" (PRODUCT_REPORT: the index and the
+# sidebar link) adds `view_catalog_reports` (Catalog Manager) and `view_finance_reports`
+# (Finance). Each report re-checks its own permission and the store scope in the service.
+REPORTS = "reports"
+PRODUCT_REPORT = "product_report"
+# 05 §3 "Support tickets" (Super Admin, Ops, Support; T-711 `support.handle_ticket`).
+SUPPORT_TICKETS = "support_tickets"
+
 Rule = tuple[tuple[str, ...], ...]  # any of (all of (...))
+
+_REPORTS: Rule = (("reports.view_reports",),)
+_PRODUCT_REPORT: Rule = (
+    ("reports.view_reports",),
+    ("reports.view_catalog_reports",),
+    ("reports.view_finance_reports",),
+)
+_SUPPORT: Rule = (("support.handle_ticket", "support.view_supportticket"),)
 
 _DISPATCH: Rule = (("delivery.dispatch_order", "delivery.view_deliverytask"),)
 
@@ -72,34 +89,10 @@ DEDICATED: dict[str, Rule] = {
     RECEIVE_RETURN: _RECEIVE_RETURN,
     CASH_DEPOSIT: _CASH,
     PAYOUTS: _PAYOUTS,
+    REPORTS: _REPORTS,
+    PRODUCT_REPORT: _PRODUCT_REPORT,
+    SUPPORT_TICKETS: _SUPPORT,
 }
-
-INTERIM: dict[str, Rule] = {
-    LIVE_BOARD: (
-        ("orders.view_order", "stores.view_darkstore"),
-        ("orders.view_order", "accounts.view_customer"),
-    ),
-    PACKING: (("orders.view_order", "catalog.view_product", "inventory.view_storeinventory"),),
-    CANCEL_ORDER: (
-        ("orders.view_order", "stores.view_darkstore"),
-        ("orders.view_order", "accounts.view_customer"),
-    ),
-    RETRY_REFUND: (("payments.view_refund", "payments.view_paymentwebhookevent"),),
-    ISSUE_REFUND: (("payments.view_refund", "payments.view_paymentwebhookevent"),),
-    TOGGLE_STORE: _TOGGLE,
-    AUDIT_LOG: (("payments.view_paymentwebhookevent",),),
-    DISPATCH: _DISPATCH,
-    RECEIVE_RETURN: _RECEIVE_RETURN,
-    CASH_DEPOSIT: _CASH,
-    PAYOUTS: _PAYOUTS,
-}
-
-
-def dedicated_active() -> bool:
-    """True once the backend's Phase 4 roles are on this branch."""
-    from apps.accounts import roles
-
-    return hasattr(roles, "ORDER_PROCESS")
 
 
 def service_present(capability: str) -> bool:
@@ -109,17 +102,13 @@ def service_present(capability: str) -> bool:
     return callable(_lookup(*SERVICE_GATED[capability]))
 
 
-def rules() -> dict[str, Rule]:
-    return DEDICATED if dedicated_active() else INTERIM
-
-
 def allowed(user, capability: str) -> bool:
     """True when the active staff `user` holds `capability` (05 §3)."""
     if not (user.is_authenticated and user.is_active and user.is_staff):
         return False
     if capability in SERVICE_GATED and not service_present(capability):
         return False
-    return any(user.has_perms(perms) for perms in rules()[capability])
+    return any(user.has_perms(perms) for perms in DEDICATED[capability])
 
 
 def capability_flags(user) -> dict[str, bool]:

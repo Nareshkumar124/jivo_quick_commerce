@@ -9,6 +9,7 @@ from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import ValidationError as DrfValidationError
 
+from apps.accounts import roles
 from apps.ops_console import capabilities, order_actions
 from apps.ops_console.tests.helpers import (
     AUDIT_LOG_ROLES,
@@ -45,12 +46,29 @@ EXPECTED = {
     capabilities.RECEIVE_RETURN: RECEIVE_RETURN_ROLES,
     capabilities.CASH_DEPOSIT: CASH_ROLES,
     capabilities.PAYOUTS: PAYOUT_ROLES,
+    # P7 (05 §3 "Reports", "Support tickets"); also pinned in test_p7_reports / test_p7_support.
+    capabilities.REPORTS: frozenset(
+        {roles.SUPER_ADMIN, "superuser flag", roles.OPS, roles.STORE_MANAGER, roles.FINANCE}
+    ),
+    capabilities.PRODUCT_REPORT: frozenset(
+        {
+            roles.SUPER_ADMIN,
+            "superuser flag",
+            roles.OPS,
+            roles.STORE_MANAGER,
+            roles.FINANCE,
+            roles.CATALOG_MANAGER,
+        }
+    ),
+    capabilities.SUPPORT_TICKETS: frozenset(
+        {roles.SUPER_ADMIN, "superuser flag", roles.OPS, roles.SUPPORT}
+    ),
 }
 
 
 @pytest.mark.parametrize("principal", [p for p in PRINCIPALS if p != "anonymous"])
 def test_capability_matrix(principal):
-    """The interim permission combinations select exactly the 05 §3 roles."""
+    """The permission combinations select exactly the 05 §3 roles."""
     user = make_principal(principal)
     for capability, allowed in EXPECTED.items():
         assert capabilities.allowed(user, capability) is (principal in allowed), (
@@ -68,8 +86,8 @@ def test_inactive_staff_has_no_capability():
 # --------------------------------------------------------------------------- adapter
 
 
-def test_every_capability_has_both_rule_sets():
-    assert set(capabilities.DEDICATED) == set(capabilities.INTERIM) == set(EXPECTED)
+def test_every_capability_has_a_rule():
+    assert set(capabilities.DEDICATED) == set(EXPECTED)
 
 
 def test_missing_order_services_are_unavailable(monkeypatch):
