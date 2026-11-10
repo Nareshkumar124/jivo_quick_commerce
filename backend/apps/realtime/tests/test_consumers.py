@@ -408,6 +408,9 @@ def test_ops_role_sees_every_store(make_staff):
 
     async def scenario():
         socket, _, _ = await open_socket("/ws/ops/live/", headers=headers)
+        # connect() accepts first and joins the store groups after: let it finish (a fast
+        # Redis connection on 127.0.0.1 exposed this race, OBS-S3-01).
+        await expect_silence(socket)
         for store in (first, second):
             body = {"type": "alert", "data": {"store_id": store.pk}, "sent_at": "x"}
             await group_send(store_group(store.pk), body)

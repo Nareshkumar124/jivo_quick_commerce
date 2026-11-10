@@ -255,6 +255,9 @@ def _commit_pickup(rider: Rider, order: Order, task: DeliveryTask, now) -> None:
     # 08 §9 T9: push (+SMS) with the OTP, through the P6 notifications (deduplicated per order).
     extra = {"rider_name": rider.user.name or "Your rider", "otp": otp}
     transaction.on_commit(lambda: hooks.notify_order(order, "order.out_for_delivery", **extra))
+    # BUG-0021: `order.status` OUT_FOR_DELIVERY (+ ETA) to the order socket and the ops feed.
+    # The handler sends no second push: OUT_FOR_DELIVERY is not in ORDER_EVENT_NOTIFICATIONS.
+    events.emit(events.OUT_FOR_DELIVERY, order.pk)
 
 
 # --------------------------------------------------------------------------- customer

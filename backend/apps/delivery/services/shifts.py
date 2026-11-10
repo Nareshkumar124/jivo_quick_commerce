@@ -313,7 +313,11 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
 
             transaction.on_commit(
                 lambda: hooks.publish_rider_location(
-                    rider.pk, latest["lat"], latest["lng"], latest_at
+                    rider.pk,
+                    latest["lat"],
+                    latest["lng"],
+                    latest_at,
+                    heading=latest.get("heading"),  # BUG-0022
                 )
             )
             _remember_location(
