@@ -84,8 +84,8 @@ Rules:
 - **Database.** The remote PostgreSQL server is **shared** with other projects. Never drop or flush databases, never run DDL, and never run migrations or `seed_demo`. Read-only SQL for database testing (consistency, constraints, duplicates) is allowed; take credentials from the environment loaded from `backend/.env`, and never print them. Writes happen only through the application (API, admin) using test accounts.
 - **Your own backend instance.** For anything stateful or destructive (rate limits, lockouts, fuzzing, concurrency), run a **separate** backend instance with its own Redis slots and test numbers:
   ```bash
-  cd backend && REDIS_URL=redis://localhost:6380/5 CHANNELS_REDIS_URL=redis://localhost:6380/6 \
-    CELERY_BROKER_URL=redis://localhost:6380/7 \
+  cd backend && REDIS_URL=redis://127.0.0.1:6380/5 CHANNELS_REDIS_URL=redis://127.0.0.1:6380/6 \
+    CELERY_BROKER_URL=redis://127.0.0.1:6380/7 \
     OTP_TEST_NUMBERS="+919000000101:123456,+919000000102:123456,+919000000103:123456,+919000000104:123456,+919000000105:123456" \
     uv run python manage.py runserver 127.0.0.1:8004 --noreload
   ```
