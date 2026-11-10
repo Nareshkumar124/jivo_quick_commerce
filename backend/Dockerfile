@@ -130,5 +130,10 @@ ENTRYPOINT ["/usr/local/bin/jqc-entrypoint"]
 #   beat:    celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
 #            exactly one replica per environment
 # Web: set POSTGRES_POOL=true (T-218). No app-server access log (see jqc_asgi_worker above).
+# --no-control-socket: gunicorn >= 25.1 opens a control socket for `gunicornc` at
+# $XDG_RUNTIME_DIR/gunicorn.ctl, else $HOME/.gunicorn/gunicorn.ctl. The `jivo` user has no home
+# directory, so startup logged "Control server error: Permission denied". A container does not
+# need it (the orchestrator scales and restarts). Keep the flag on every command override
+# (infra/deploy/compose.prod.yml).
 CMD ["gunicorn", "config.asgi:application", "--worker-class", "jqc_asgi_worker.JqcUvicornWorker", \
-     "--bind", "0.0.0.0:8000", "--workers", "3", "--graceful-timeout", "30"]
+     "--bind", "0.0.0.0:8000", "--workers", "3", "--graceful-timeout", "30", "--no-control-socket"]

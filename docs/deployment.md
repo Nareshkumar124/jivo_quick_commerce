@@ -147,7 +147,7 @@ There is one image (`backend/Dockerfile`) and three process types (doc 02). **Al
 | Process | Command | Replicas | DB connections (T-218) |
 |---|---|---|---|
 | `release` (one-off, once per deploy) | `jqc-release`: `check --deploy --fail-level ERROR`, then `migrate` (§8) | 1 task, before the others roll | as `worker` |
-| `web` (ASGI) | image default: `gunicorn config.asgi:application -k jqc_asgi_worker.JqcUvicornWorker` (uvicorn with `ws_max_size` and no access log, §9.4) | 2+ (rolling) | `POSTGRES_POOL=true`, `POSTGRES_CONN_MAX_AGE=0` |
+| `web` (ASGI) | image default: `gunicorn config.asgi:application -k jqc_asgi_worker.JqcUvicornWorker --no-control-socket` (uvicorn with `ws_max_size` and no access log, §9.4; no `gunicornc` control socket, the non-root user has no writable `$HOME`) | 2+ (rolling) | `POSTGRES_POOL=true`, `POSTGRES_CONN_MAX_AGE=0` |
 | `worker` | `celery -A config worker -l INFO` | 1+ | `POSTGRES_POOL=false`, `POSTGRES_CONN_MAX_AGE=60` |
 | `beat` | `celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler` | **exactly 1** | same as `worker` |
 
