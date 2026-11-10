@@ -1,0 +1,5 @@
+title,image_file,link_type,link_value,sort_order,is_active
+Bestsellers,bestsellers.jpg,collection,bestsellers,1,1
+Cold pressed oils,cold-pressed-oils.jpg,collection,cold-pressed-oils,2,1
+Olive oils from Spain,olive-oils.jpg,category,olive-oil,3,1
+Mustard oils,mustard-oils.jpg,category,mustard-oil,4,1

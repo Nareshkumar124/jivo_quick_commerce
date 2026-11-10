@@ -1,0 +1,26 @@
+sku,is_active,replaced_by_sku,note
+JV-CAN-CP-1L,0,JVW-CAN-1L,product replaced by the shop.jivo.in product
+JV-CAN-CP-2L,0,,product replaced by the shop.jivo.in product; this pack is not sold on the site
+JV-CAN-CP-5L,0,JVW-CAN-5L,product replaced by the shop.jivo.in product
+JV-CAN-RF-1L,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-OLV-POM-1L,0,JVW-POM-1L,product replaced by the shop.jivo.in product
+JV-OLV-POM-5L,0,JVW-POM-5L,product replaced by the shop.jivo.in product
+JV-OLV-XL-1L,0,JVW-XLO-1L,product replaced by the shop.jivo.in product
+JV-OLV-EV-500,0,,product replaced by the shop.jivo.in product; this pack is not sold on the site
+JV-MUS-KG-1L,0,JVW-KGM-1L,product replaced by the shop.jivo.in product
+JV-MUS-KG-5L,0,JVW-KGM-5L,product replaced by the shop.jivo.in product
+JV-MUS-YL-1L,0,JVW-YMU-1L,product replaced by the shop.jivo.in product
+JV-GNT-1L,0,JVW-GNT-1L,product replaced by the shop.jivo.in product
+JV-SUN-1L,0,JVW-SUN-1L,product replaced by the shop.jivo.in product
+JV-RBO-1L,0,JVW-RBO-1L,product replaced by the shop.jivo.in product
+JV-WG-JC-500,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-ALO-1L,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-AML-1L,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-KJ-1L,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-WG-PW-100,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-WG-PW-10S,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-WG-TB-60,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-CHIA-200,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-FLAX-250,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-QUI-500,0,,"demo/seed item, not sold on shop.jivo.in"
+JV-PMP-200,0,,"demo/seed item, not sold on shop.jivo.in"

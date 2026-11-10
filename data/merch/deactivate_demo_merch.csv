@@ -1,0 +1,22 @@
+type,slug_or_title,is_active,note
+product,jivo-cold-pressed-canola-oil,0,"demo product, not on shop.jivo.in"
+product,jivo-canola-oil,0,"demo product, not on shop.jivo.in"
+product,jivo-yellow-mustard-oil,0,"demo product, not on shop.jivo.in"
+product,jivo-groundnut-oil,0,"demo product, not on shop.jivo.in"
+product,jivo-sunflower-oil,0,"demo product, not on shop.jivo.in"
+product,jivo-wheatgrass-juice,0,"demo product, not on shop.jivo.in"
+product,jivo-aloe-vera-juice,0,"demo product, not on shop.jivo.in"
+product,jivo-amla-juice,0,"demo product, not on shop.jivo.in"
+product,jivo-karela-jamun-juice,0,"demo product, not on shop.jivo.in"
+product,jivo-wheatgrass-powder,0,"demo product, not on shop.jivo.in"
+product,jivo-wheatgrass-tablets,0,"demo product, not on shop.jivo.in"
+product,jivo-chia-seeds,0,"demo product, not on shop.jivo.in"
+product,jivo-flax-seeds,0,"demo product, not on shop.jivo.in"
+product,jivo-quinoa,0,"demo product, not on shop.jivo.in"
+product,jivo-pumpkin-seeds,0,"demo product, not on shop.jivo.in"
+collection,bestsellers,0,demo collection (slug bestsellers is reused by the real collection: load collections.csv instead of deactivating)
+collection,offers,0,demo collection
+collection,new-launches,0,demo collection
+banner,Cold pressed canola oil: up to 21% off,0,demo placeholder banner (match by title)
+banner,Start your day with wheatgrass,0,demo placeholder banner (match by title)
+banner,Healthy cooking tips,0,demo placeholder banner (match by title)

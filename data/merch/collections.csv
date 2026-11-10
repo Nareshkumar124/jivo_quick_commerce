@@ -1,0 +1,27 @@
+collection_slug,name,sort_order,sku,item_sort
+bestsellers,Bestsellers,1,JVW-CAN-1L,1
+bestsellers,Bestsellers,1,JVW-EVO-1L,2
+bestsellers,Bestsellers,1,JVW-GNT-1L,3
+bestsellers,Bestsellers,1,JVW-KGM-1L,4
+bestsellers,Bestsellers,1,JVW-POM-1L,5
+bestsellers,Bestsellers,1,JVW-SUN-1L,6
+bestsellers,Bestsellers,1,JVW-RBO-1L,7
+bestsellers,Bestsellers,1,JVW-SOY-1L,8
+bestsellers,Bestsellers,1,JVW-GLD-1L,9
+bestsellers,Bestsellers,1,JVW-XLO-1L,10
+olive-oils,Olive oils,2,JVW-EVO-1L,1
+olive-oils,Olive oils,2,JVW-EVO-2L,2
+olive-oils,Olive oils,2,JVW-EVO-5L,3
+olive-oils,Olive oils,2,JVW-XLO-1L,4
+olive-oils,Olive oils,2,JVW-XLO-5L,5
+olive-oils,Olive oils,2,JVW-POM-1L,6
+olive-oils,Olive oils,2,JVW-POM-5L,7
+cold-pressed-oils,Cold pressed oils,3,JVW-CAN-1L,1
+cold-pressed-oils,Cold pressed oils,3,JVW-CAN-5L,2
+cold-pressed-oils,Cold pressed oils,3,JVW-GNT-1L,3
+cold-pressed-oils,Cold pressed oils,3,JVW-GNT-5L,4
+cold-pressed-oils,Cold pressed oils,3,JVW-SUN-1L,5
+cold-pressed-oils,Cold pressed oils,3,JVW-SUN-5L,6
+cold-pressed-oils,Cold pressed oils,3,JVW-KGM-1L,7
+cold-pressed-oils,Cold pressed oils,3,JVW-KGM-5L,8
+cold-pressed-oils,Cold pressed oils,3,JVW-YMU-1L,9
