@@ -1,0 +1,207 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$description": "Customer app tokens. Source: design/audits/2026-11-10-customer-app.md. The colours are the roles the customer app already uses today: jivo_core JivoTheme.light() builds ColorScheme.fromSeed(#2E7D32) (Material 3 tonal-spot scheme) plus JivoColors (success #1B5E20, warning #8A5300). The scheme hex values below were recomputed from the seed with a CAM16/HCT re-implementation and match Material's published baseline within about 2 units per channel, so Flutter's own output may differ by 1-2 units. To make the contrast records exact, flutter-customer-dev should pin these values in jivo_core (ColorScheme.fromSeed(...).copyWith(...) or a full ColorScheme) instead of relying on the seed algorithm. Every value marked placeholder in $extensions.status is derived from the placeholder seed and changes when the Jivo brand kit arrives (placeholder until H-19, D-06). Error, white, the veg marks and the rating star are not brand values. Dimensions are logical pixels (dp), font sizes are sp. CSS custom property for the admin panel = the token path with dots replaced by dashes, prefixed '--' (e.g. customer.color.text.primary -> --customer-color-text-primary).",
+  "customer": {
+    "color": {
+      "brand": {
+        "seed": { "$type": "color", "$value": "#2E7D32", "$description": "JivoBrandColors.seed. Input to the scheme only; no widget paints this colour.", "$extensions": { "status": "placeholder until H-19 (D-06)" } },
+        "primary": { "$type": "color", "$value": "#3C6939", "$description": "colorScheme.primary (primary tone 40). FilledButton, cart bar, ADD stepper fill, ADD outline and label, TextButtons, links, selected rail border.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.primary" } },
+        "onPrimary": { "$type": "color", "$value": "#FFFFFF", "$extensions": { "flutter": "colorScheme.onPrimary" } },
+        "primaryContainer": { "$type": "color", "$value": "#BDF0B4", "$description": "In-progress status chip, delivery OTP card, my ticket bubble, selected sub-category in the rail, banner fallback.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.primaryContainer" } },
+        "onPrimaryContainer": { "$type": "color", "$value": "#002202", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.onPrimaryContainer" } },
+        "secondaryContainer": { "$type": "color", "$value": "#D6E8CF", "$description": "Navigation bar indicator, delivery stage card (picked up, arriving), session-expired card on login.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.secondaryContainer" } },
+        "onSecondaryContainer": { "$type": "color", "$value": "#101F0F", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.onSecondaryContainer" } }
+      },
+      "surface": {
+        "base": { "$type": "color", "$value": "#F7FAF1", "$description": "Scaffold, app bar, bottom bars (cart checkout bar, checkout bar).", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.surface" } },
+        "lowest": { "$type": "color", "$value": "#FFFFFF", "$extensions": { "flutter": "colorScheme.surfaceContainerLowest" } },
+        "card": { "$type": "color", "$value": "#F1F5EB", "$description": "Material 3 Card default: product tiles, cart lines card, coupon cards, address card, order cards.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.surfaceContainerLow" } },
+        "container": { "$type": "color", "$value": "#EBEFE5", "$description": "NavigationBar background.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.surfaceContainer" } },
+        "high": { "$type": "color", "$value": "#E6EAE0", "$description": "Home search field.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.surfaceContainerHigh" } },
+        "highest": { "$type": "color", "$value": "#E0E4DA", "$description": "Skeletons, image placeholders, refund line, cancel refund info, support ticket bubble, proposed out-of-stock pill.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.surfaceContainerHighest" } }
+      },
+      "text": {
+        "primary": { "$type": "color", "$value": "#181D17", "$description": "Body and title text. (The rider sunlight token rider.color.text.primary is #1A1C19; both are about 16-17:1, align them when the brand kit lands.)", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.onSurface" } },
+        "secondary": { "$type": "color", "$value": "#424840", "$description": "Helper text, variant names, MRP, dates, muted lines. Nothing lighter is allowed for text that carries information.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.onSurfaceVariant" } },
+        "onInverse": { "$type": "color", "$value": "#EEF2E8", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.onInverseSurface" } }
+      },
+      "inverse": {
+        "surface": { "$type": "color", "$value": "#2D322B", "$description": "Offline banner, snackbars.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.inverseSurface" } }
+      },
+      "outline": {
+        "default": { "$type": "color", "$value": "#73796F", "$description": "Text-field borders, OutlinedButton borders, and (proposed, CA-29) the 'upcoming' timeline icon and connector.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.outline" } },
+        "decorative": { "$type": "color", "$value": "#C2C8BD", "$description": "Dividers and decoration only. Fails 3:1, so never for an icon or border that carries meaning.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "colorScheme.outlineVariant" } }
+      },
+      "success": {
+        "fg": { "$type": "color", "$value": "#1B5E20", "$description": "Discount rows, FREE delivery, You save, coupon applied, delivered chip text, check icons.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "context.jivoColors.success (JivoBrandColors.success)" } },
+        "on": { "$type": "color", "$value": "#FFFFFF", "$extensions": { "flutter": "context.jivoColors.onSuccess" } },
+        "tint": { "$type": "color", "$value": "#E1EADC", "$description": "success.fg at 10% over surface.base: free-delivery nudge, savings banner. Pin as an opaque colour so the ratio is fixed.", "$extensions": { "status": "placeholder until H-19 (D-06)" } },
+        "chipBg": { "$type": "color", "$value": "#D7E3D3", "$description": "success.fg at 12% over surface.card: the Delivered status chip.", "$extensions": { "status": "placeholder until H-19 (D-06)" } }
+      },
+      "warning": {
+        "fg": { "$type": "color", "$value": "#8A5300", "$description": "Store-closed banner background, rating stars, icons and 2 dp borders of warning notices.", "$extensions": { "status": "placeholder until H-19 (D-06)", "flutter": "context.jivoColors.warning (JivoBrandColors.warning)" } },
+        "on": { "$type": "color", "$value": "#FFFFFF", "$extensions": { "flutter": "context.jivoColors.onWarning" } },
+        "tint": { "$type": "color", "$value": "#FFF4D6", "$description": "Notice background for non-error attention states (proposed): pending-payment banner (CA-23), 'Can't update live' tracking line (CA-26), price-changed notice (CA-19), partial-unavailability notice (CA-27). Same value as rider.color.cod.bg.", "$extensions": { "status": "placeholder until H-19 (D-06)" } }
+      },
+      "danger": {
+        "fg": { "$type": "color", "$value": "#BA1A1A", "$description": "Errors, 'Only 2 left', cart line issues, checkout blocker reason, Delete account.", "$extensions": { "flutter": "colorScheme.error" } },
+        "on": { "$type": "color", "$value": "#FFFFFF", "$extensions": { "flutter": "colorScheme.onError" } },
+        "container": { "$type": "color", "$value": "#FFDAD6", "$description": "Ended status chips (Cancelled, Payment failed, Delivery unsuccessful), delivery-failed card, location error card.", "$extensions": { "flutter": "colorScheme.errorContainer" } },
+        "onContainer": { "$type": "color", "$value": "#410002", "$extensions": { "flutter": "colorScheme.onErrorContainer" } },
+        "tint": { "$type": "color", "$value": "#F1E4DC", "$description": "danger.fg at 10% over surface.base: cart refresh-failed and cart-problems notices.", "$extensions": {} }
+      },
+      "status": {
+        "$description": "Order status chips (labels from docs/08 §1, always text plus colour).",
+        "inProgress": { "bg": { "$type": "color", "$value": "#BDF0B4" }, "fg": { "$type": "color", "$value": "#002202" }, "$extensions": { "status": "placeholder until H-19 (D-06)" } },
+        "pendingPayment": { "bg": { "$type": "color", "$value": "#FFF4D6" }, "fg": { "$type": "color", "$value": "#181D17" }, "icon": { "$type": "color", "$value": "#8A5300" }, "$description": "Proposed (CA-23): 'Completing payment…' is not an error, so it leaves the red error container.", "$extensions": { "status": "placeholder until H-19 (D-06)" } },
+        "delivered": { "bg": { "$type": "color", "$value": "#D7E3D3" }, "fg": { "$type": "color", "$value": "#1B5E20" }, "$extensions": { "status": "placeholder until H-19 (D-06)" } },
+        "ended": { "bg": { "$type": "color", "$value": "#FFDAD6" }, "fg": { "$type": "color", "$value": "#410002" } },
+        "unknown": { "bg": { "$type": "color", "$value": "#E0E4DA" }, "fg": { "$type": "color", "$value": "#424840" }, "$extensions": { "status": "placeholder until H-19 (D-06)" } }
+      },
+      "stock": {
+        "outBg": { "$type": "color", "$value": "#E0E4DA", "$description": "Proposed (CA-11) 'Out of stock' pill. The tile's text keeps full contrast; only the image is greyed.", "$extensions": { "status": "placeholder until H-19 (D-06)" } },
+        "outFg": { "$type": "color", "$value": "#181D17", "$extensions": { "status": "placeholder until H-19 (D-06)" } },
+        "lowFg": { "$type": "color", "$value": "#BA1A1A", "$description": "'Only 2 left' (server units_left)." }
+      },
+      "discountBadge": {
+        "bg": { "$type": "color", "$value": "#1B5E20", "$extensions": { "status": "placeholder until H-19 (D-06)" } },
+        "fg": { "$type": "color", "$value": "#FFFFFF" }
+      },
+      "dietMark": {
+        "$description": "FSSAI veg / non-veg marks. Regulatory colours, not brand. Shape carries the meaning too (CA-12: non-veg is a triangle).",
+        "veg": { "$type": "color", "$value": "#138808" },
+        "nonVeg": { "$type": "color", "$value": "#8B4513" }
+      },
+      "rating": {
+        "star": { "$type": "color", "$value": "#8A5300", "$description": "Filled stars (= warning.fg). Empty stars use text.secondary, read-only empty stars too (not the 38% disabled colour).", "$extensions": { "status": "placeholder until H-19 (D-06)" } }
+      }
+    },
+    "space": {
+      "xs": { "$type": "dimension", "$value": "4px", "$extensions": { "flutter": "JivoSpacing.xs" } },
+      "sm": { "$type": "dimension", "$value": "8px", "$extensions": { "flutter": "JivoSpacing.sm" } },
+      "md": { "$type": "dimension", "$value": "12px", "$extensions": { "flutter": "JivoSpacing.md" } },
+      "lg": { "$type": "dimension", "$value": "16px", "$extensions": { "flutter": "JivoSpacing.lg" } },
+      "xl": { "$type": "dimension", "$value": "24px", "$extensions": { "flutter": "JivoSpacing.xl" } },
+      "xxl": { "$type": "dimension", "$value": "32px", "$extensions": { "flutter": "JivoSpacing.xxl" } },
+      "gutter": { "$type": "dimension", "$value": "16px", "$extensions": { "flutter": "JivoSpacing.gutter" } }
+    },
+    "radius": {
+      "sm": { "$type": "dimension", "$value": "8px", "$extensions": { "flutter": "JivoRadii.sm" } },
+      "md": { "$type": "dimension", "$value": "12px", "$extensions": { "flutter": "JivoRadii.md" } },
+      "lg": { "$type": "dimension", "$value": "16px", "$extensions": { "flutter": "JivoRadii.lg" } }
+    },
+    "size": {
+      "minTarget": { "$type": "dimension", "$value": "48px", "$description": "Every tappable thing: buttons, chips (padded), icon buttons, stepper halves, list rows.", "$extensions": { "flutter": "kJivoMinTouchTarget" } },
+      "cartBar": { "$type": "dimension", "$value": "56px", "$description": "Minimum height of the floating cart bar." },
+      "pdpActionBar": { "$type": "dimension", "$value": "72px", "$description": "Proposed (CA-13) sticky price + ADD bar on product detail, above the cart bar." },
+      "pdpStepperWidth": { "$type": "dimension", "$value": "160px" },
+      "productTileImage": { "$type": "dimension", "$value": "110px", "$description": "Product tile image height (product_tile.dart _imageHeight)." },
+      "productRailTileWidth": { "$type": "dimension", "$value": "150px" },
+      "productGridMaxExtent": { "$type": "dimension", "$value": "200px", "$description": "Grows to 200 x textScale at >= 1.5x so the grid becomes one column (CA-14)." },
+      "categoryTileMaxExtent": { "$type": "dimension", "$value": "96px" },
+      "subCategoryRail": { "$type": "dimension", "$value": "76px", "$description": "Replaced by a horizontal chip row at >= 1.5x text (CA-14)." },
+      "cartLineImage": { "$type": "dimension", "$value": "56px" },
+      "cartLineStepperWidth": { "$type": "dimension", "$value": "112px" },
+      "variantPickerStepperWidth": { "$type": "dimension", "$value": "128px" },
+      "orderLineImage": { "$type": "dimension", "$value": "48px" },
+      "orderThumb": { "$type": "dimension", "$value": "40px" },
+      "riderAvatar": { "$type": "dimension", "$value": "40px" },
+      "starTarget": { "$type": "dimension", "$value": "48px" },
+      "starIcon": { "$type": "dimension", "$value": "36px" },
+      "trackingMap": { "$type": "dimension", "$value": "220px", "$description": "Placed after the OTP and COD cards (CA-25)." },
+      "bannerHeightFallback": { "$type": "dimension", "$value": "150px", "$description": "Today's fixed height; replaced by image.bannerAspect (CA-15)." },
+      "vegMark": { "$type": "dimension", "$value": "16px", "$description": "18 dp on product detail." }
+    },
+    "font": {
+      "$description": "Material 3 text roles as used by the app (no hard-coded font sizes exist, so everything scales). Minimum for information is 12 sp; 11 sp (labelSmall) only for badges that repeat information shown elsewhere.",
+      "tileName": { "$type": "typography", "$value": { "fontSize": "14px", "fontWeight": 600 }, "$description": "bodyMedium w600, max 2 lines, ellipsis." },
+      "tileVariant": { "$type": "typography", "$value": { "fontSize": "12px", "fontWeight": 400 }, "$description": "bodySmall in text.secondary, 1 line." },
+      "tilePrice": { "$type": "typography", "$value": { "fontSize": "14px", "fontWeight": 700 }, "$description": "titleSmall w700." },
+      "tileMrp": { "$type": "typography", "$value": { "fontSize": "12px", "fontWeight": 400 }, "$description": "bodySmall, text.secondary, line-through; screen reader says 'MRP ₹X'." },
+      "pdpPrice": { "$type": "typography", "$value": { "fontSize": "22px", "fontWeight": 700 }, "$description": "titleLarge w700." },
+      "stockLabel": { "$type": "typography", "$value": { "fontSize": "14px", "fontWeight": 600 } },
+      "subCategoryLabel": { "$type": "typography", "$value": { "fontSize": "12px", "fontWeight": 500 }, "$description": "Proposed (CA-14): up from labelSmall 11 sp." },
+      "discountBadge": { "$type": "typography", "$value": { "fontSize": "11px", "fontWeight": 700 }, "$description": "labelSmall w700; the same percentage is also in the price semantics." },
+      "billRow": { "$type": "typography", "$value": { "fontSize": "14px", "fontWeight": 400 } },
+      "billToPay": { "$type": "typography", "$value": { "fontSize": "16px", "fontWeight": 700 }, "$extensions": { "fontFeatures": "tabular-figures" } },
+      "blockerReason": { "$type": "typography", "$value": { "fontSize": "14px", "fontWeight": 500 }, "$description": "Proposed (CA-20): up from bodySmall 12 sp, with an info icon." },
+      "statusHeadline": { "$type": "typography", "$value": { "fontSize": "24px", "fontWeight": 700 }, "$description": "headlineSmall w700 on order detail and tracking." },
+      "eta": { "$type": "typography", "$value": { "fontSize": "16px", "fontWeight": 500 } },
+      "deliveryOtp": { "$type": "typography", "$value": { "fontSize": "36px", "fontWeight": 700, "letterSpacing": "8px" }, "$extensions": { "fontFeatures": "tabular-figures" }, "$description": "displaySmall; screen reader reads the digits one by one." },
+      "homeHeadline": { "$type": "typography", "$value": { "fontSize": "22px", "fontWeight": 800 }, "$description": "'Delivery in 14 mins' (titleLarge w800)." }
+    },
+    "image": {
+      "productAspect": { "$type": "string", "$value": "1:1", "$description": "Product and category images; export 1000x1000 px, product centred on white or transparent (catalog-data). Shown with BoxFit.contain." },
+      "bannerAspect": { "$type": "string", "$value": "2:1", "$description": "Proposed (CA-15): home banners in an AspectRatio(2) box with BoxFit.cover; export 1200x600 px, keep text inside the middle 80%." },
+      "decodeAtLayoutSize": { "$type": "string", "$value": "cacheWidth = layoutWidth x devicePixelRatio", "$description": "Image.network decode size (CA-15), so budget phones never decode full-size photos for 56-150 dp tiles." },
+      "placeholder": { "$type": "string", "$value": "surface.highest box, radius.sm, 32 dp icon in text.secondary", "$description": "Missing URL, loading or load error (ProductImage)." }
+    },
+    "motion": {
+      "searchDebounce": { "$type": "duration", "$value": "300ms" },
+      "bannerAdvance": { "$type": "duration", "$value": "4000ms", "$description": "Off when MediaQuery.disableAnimations; proposed (CA-16): also paused while touched and when a screen reader is on (MediaQuery.accessibleNavigation)." },
+      "bannerSlide": { "$type": "duration", "$value": "400ms" },
+      "successPop": { "$type": "duration", "$value": "600ms", "$description": "Order-placed icon. Proposed: skip it under reduced motion (CA-23)." },
+      "pendingSpinnerDelay": { "$type": "duration", "$value": "300ms", "$description": "Proposed (CA-17): a cart change in flight longer than this shows a spinner in the stepper." },
+      "trackPoll": { "$type": "duration", "$value": "10000ms", "$description": "track/ polling while the order socket is down." },
+      "etaTick": { "$type": "duration", "$value": "30000ms" },
+      "ticketPoll": { "$type": "duration", "$value": "15000ms", "$description": "Proposed (CA-30): open ticket thread refresh while not CLOSED." },
+      "etaLateAfter": { "$type": "duration", "$value": "300000ms", "$description": "Proposed (CA-26): 5 min past the server ETA switches 'Arriving any moment' to the late copy." }
+    },
+    "textScale": {
+      "stackRowsFrom": { "$type": "number", "$value": 1.3, "$description": "From this scale, label/value rows that hold two variable texts (status chip + date, cart line info + stepper, address label + chips) stack or wrap (CA-08, CA-18, CA-24)." },
+      "singleColumnFrom": { "$type": "number", "$value": 1.5, "$description": "Product grid one column, sub-category rail becomes chips, checkout bars stack the total above the button (CA-14, CA-20)." },
+      "testScales": { "$type": "string", "$value": "1.0, 1.3, 2.0 on a 360x640 dp surface" }
+    }
+  },
+  "contrast": {
+    "$description": "WCAG 2.x contrast ratios, computed exactly from the hex values above. Text needs 4.5:1 (3:1 only for 18 sp+, or 14 sp bold and larger); icons and borders that carry meaning need 3:1. 'Where' names the main uses in customer_app/lib.",
+    "pairs": [
+      { "fg": "customer.color.text.primary", "bg": "customer.color.surface.base", "fgHex": "#181D17", "bgHex": "#F7FAF1", "ratio": 16.22, "level": "AA text", "where": "body text on every screen" },
+      { "fg": "customer.color.text.primary", "bg": "customer.color.surface.card", "fgHex": "#181D17", "bgHex": "#F1F5EB", "ratio": 15.49, "level": "AA text", "where": "text in cards: product tiles, cart lines, order cards" },
+      { "fg": "customer.color.text.primary", "bg": "customer.color.surface.high", "fgHex": "#181D17", "bgHex": "#E6EAE0", "ratio": 14.03, "level": "AA text", "where": "home search field" },
+      { "fg": "customer.color.text.primary", "bg": "customer.color.surface.highest", "fgHex": "#181D17", "bgHex": "#E0E4DA", "ratio": 13.27, "level": "AA text", "where": "refund line, cancel refund info, support bubble, proposed out-of-stock pill" },
+      { "fg": "customer.color.text.primary", "bg": "customer.color.brand.primaryContainer", "fgHex": "#181D17", "bgHex": "#BDF0B4", "ratio": 13.27, "level": "AA text", "where": "delivery OTP card, my ticket bubble, selected rail item" },
+      { "fg": "customer.color.text.primary", "bg": "customer.color.brand.secondaryContainer", "fgHex": "#181D17", "bgHex": "#D6E8CF", "ratio": 13.29, "level": "AA text", "where": "session-expired card on login" },
+      { "fg": "customer.color.text.primary", "bg": "customer.color.warning.tint", "fgHex": "#181D17", "bgHex": "#FFF4D6", "ratio": 15.62, "level": "AA text", "where": "proposed notices: pending payment, price changed, item unavailable, can't update live" },
+      { "fg": "customer.color.text.secondary", "bg": "customer.color.surface.base", "fgHex": "#424840", "bgHex": "#F7FAF1", "ratio": 8.91, "level": "AA text", "where": "helper text, dates" },
+      { "fg": "customer.color.text.secondary", "bg": "customer.color.surface.card", "fgHex": "#424840", "bgHex": "#F1F5EB", "ratio": 8.51, "level": "AA text", "where": "variant name, MRP, 'Out of stock' label in tiles (at full opacity)" },
+      { "fg": "customer.color.text.secondary", "bg": "customer.color.surface.container", "fgHex": "#424840", "bgHex": "#EBEFE5", "ratio": 8.07, "level": "AA text", "where": "unselected navigation bar labels and icons" },
+      { "fg": "customer.color.text.secondary", "bg": "customer.color.surface.high", "fgHex": "#424840", "bgHex": "#E6EAE0", "ratio": 7.71, "level": "AA text", "where": "search hint text and icon" },
+      { "fg": "customer.color.text.secondary", "bg": "customer.color.surface.highest", "fgHex": "#424840", "bgHex": "#E0E4DA", "ratio": 7.29, "level": "AA text", "where": "image placeholder icon, unknown status chip" },
+      { "fg": "customer.color.text.secondary", "bg": "customer.color.warning.tint", "fgHex": "#424840", "bgHex": "#FFF4D6", "ratio": 8.58, "level": "AA text", "where": "secondary lines in the proposed notices" },
+      { "fg": "customer.color.brand.primary", "bg": "customer.color.surface.base", "fgHex": "#3C6939", "bgHex": "#F7FAF1", "ratio": 6.08, "level": "AA text", "where": "TextButtons, links, 'Detect my location', See all" },
+      { "fg": "customer.color.brand.primary", "bg": "customer.color.surface.card", "fgHex": "#3C6939", "bgHex": "#F1F5EB", "ratio": 5.81, "level": "AA text; border (non-text)", "where": "ADD label and outline in product tiles" },
+      { "fg": "customer.color.brand.onPrimary", "bg": "customer.color.brand.primary", "fgHex": "#FFFFFF", "bgHex": "#3C6939", "ratio": 6.42, "level": "AA text", "where": "FilledButton, cart bar, stepper digits and +/- icons" },
+      { "fg": "customer.color.brand.onPrimaryContainer", "bg": "customer.color.brand.primaryContainer", "fgHex": "#002202", "bgHex": "#BDF0B4", "ratio": 13.24, "level": "AA text", "where": "in-progress status chips, banner fallback title" },
+      { "fg": "customer.color.brand.primary", "bg": "customer.color.brand.primaryContainer", "fgHex": "#3C6939", "bgHex": "#BDF0B4", "ratio": 4.98, "level": "non-text (3 dp selected-rail border)", "where": "product list sub-category rail" },
+      { "fg": "customer.color.brand.onSecondaryContainer", "bg": "customer.color.brand.secondaryContainer", "fgHex": "#101F0F", "bgHex": "#D6E8CF", "ratio": 13.31, "level": "AA text", "where": "navigation bar selected icon, delivery stage card" },
+      { "fg": "customer.color.text.onInverse", "bg": "customer.color.inverse.surface", "fgHex": "#EEF2E8", "bgHex": "#2D322B", "ratio": 11.54, "level": "AA text", "where": "offline banner, snackbars" },
+      { "fg": "customer.color.success.fg", "bg": "customer.color.surface.base", "fgHex": "#1B5E20", "bgHex": "#F7FAF1", "ratio": 7.46, "level": "AA text", "where": "bill discount rows, FREE, You save (cart)" },
+      { "fg": "customer.color.success.fg", "bg": "customer.color.surface.card", "fgHex": "#1B5E20", "bgHex": "#F1F5EB", "ratio": 7.12, "level": "AA text", "where": "bill inside the checkout card, coupon saves" },
+      { "fg": "customer.color.success.fg", "bg": "customer.color.success.tint", "fgHex": "#1B5E20", "bgHex": "#E1EADC", "ratio": 6.37, "level": "AA text", "where": "free-delivery nudge, savings banner" },
+      { "fg": "customer.color.success.fg", "bg": "customer.color.success.chipBg", "fgHex": "#1B5E20", "bgHex": "#D7E3D3", "ratio": 5.93, "level": "AA text", "where": "Delivered status chip" },
+      { "fg": "customer.color.success.on", "bg": "customer.color.success.fg", "fgHex": "#FFFFFF", "bgHex": "#1B5E20", "ratio": 7.87, "level": "AA text", "where": "discount badge" },
+      { "fg": "customer.color.warning.on", "bg": "customer.color.warning.fg", "fgHex": "#FFFFFF", "bgHex": "#8A5300", "ratio": 6.33, "level": "AA text", "where": "store-closed banner" },
+      { "fg": "customer.color.warning.fg", "bg": "customer.color.surface.base", "fgHex": "#8A5300", "bgHex": "#F7FAF1", "ratio": 6.0, "level": "non-text (filled stars); AA text if used", "where": "rating stars" },
+      { "fg": "customer.color.warning.fg", "bg": "customer.color.warning.tint", "fgHex": "#8A5300", "bgHex": "#FFF4D6", "ratio": 5.78, "level": "non-text (icon, 2 dp border)", "where": "proposed notices" },
+      { "fg": "customer.color.danger.fg", "bg": "customer.color.surface.base", "fgHex": "#BA1A1A", "bgHex": "#F7FAF1", "ratio": 6.12, "level": "AA text", "where": "error texts, checkout blocker reason, Delete account" },
+      { "fg": "customer.color.danger.fg", "bg": "customer.color.surface.card", "fgHex": "#BA1A1A", "bgHex": "#F1F5EB", "ratio": 5.85, "level": "AA text", "where": "'Only 2 left' in tiles, cart line issue" },
+      { "fg": "customer.color.danger.fg", "bg": "customer.color.danger.tint", "fgHex": "#BA1A1A", "bgHex": "#F1E4DC", "ratio": 5.19, "level": "AA text", "where": "cart refresh-failed and problems notices" },
+      { "fg": "customer.color.danger.on", "bg": "customer.color.danger.fg", "fgHex": "#FFFFFF", "bgHex": "#BA1A1A", "ratio": 6.46, "level": "AA text", "where": "Delete my account button" },
+      { "fg": "customer.color.danger.onContainer", "bg": "customer.color.danger.container", "fgHex": "#410002", "bgHex": "#FFDAD6", "ratio": 13.26, "level": "AA text", "where": "ended status chips, delivery-failed card, location error card" },
+      { "fg": "customer.color.outline.default", "bg": "customer.color.surface.base", "fgHex": "#73796F", "bgHex": "#F7FAF1", "ratio": 4.24, "level": "non-text (borders, proposed upcoming timeline icon)", "where": "text fields, outlined buttons" },
+      { "fg": "customer.color.outline.default", "bg": "customer.color.surface.card", "fgHex": "#73796F", "bgHex": "#F1F5EB", "ratio": 4.05, "level": "non-text", "where": "outlined buttons inside cards" },
+      { "fg": "customer.color.dietMark.veg", "bg": "customer.color.surface.base", "fgHex": "#138808", "bgHex": "#F7FAF1", "ratio": 4.37, "level": "non-text (mark)", "where": "veg mark on product detail" },
+      { "fg": "customer.color.dietMark.veg", "bg": "customer.color.surface.lowest", "fgHex": "#138808", "bgHex": "#FFFFFF", "ratio": 4.61, "level": "non-text (mark)", "where": "veg mark over product photos (white plate)" },
+      { "fg": "customer.color.dietMark.nonVeg", "bg": "customer.color.surface.base", "fgHex": "#8B4513", "bgHex": "#F7FAF1", "ratio": 6.73, "level": "non-text (mark)", "where": "non-veg mark" }
+    ],
+    "rejected": [
+      { "pair": "text.secondary #424840 at 60% opacity over surface.card (effective #888D84)", "ratio": 3.07, "reason": "Fails AA text. Out-of-stock tiles: variant, MRP and the 'Out of stock' label itself (product_tile.dart:102-103). Replaced by full-opacity text and the stock.out pill (CA-11)." },
+      { "pair": "text.primary #181D17 at 60% opacity over surface.card (effective #6F736C)", "ratio": 4.37, "reason": "Fails AA for 14 sp text. Out-of-stock product names (CA-11)." },
+      { "pair": "danger.fg #BA1A1A at 60% opacity over surface.card (effective #D0726E)", "ratio": 3.01, "reason": "Fails AA text. 'Only N left' inside a dimmed tile (CA-11)." },
+      { "pair": "outline.decorative #C2C8BD on surface.base", "ratio": 1.62, "reason": "Fails 3:1 for meaningful icons. 'Upcoming' timeline icons and connector (order_timeline.dart:42). Use outline.default, 4.24:1 (CA-29)." },
+      { "pair": "text.primary at 38% (disabled) #A2A69E on surface.base", "ratio": 2.35, "reason": "Allowed for disabled controls only (WCAG exempts inactive components). Read-only rating stars must not use it (CA-34)." }
+    ],
+    "notes": "No pair in use falls below AA except the rejected ones. The brand seed #2E7D32 itself would be 5.13:1 for white text if a widget ever painted it; widgets paint brand.primary #3C6939 instead. When the brand kit arrives (H-19, D-06), recompute every 'placeholder' value and every pair in this list before changing jivo_core."
+  }
+}
