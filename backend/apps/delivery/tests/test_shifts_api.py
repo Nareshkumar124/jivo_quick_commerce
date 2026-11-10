@@ -318,13 +318,16 @@ def test_new_position_is_published_through_the_p6_hook(
     from apps.delivery import hooks
 
     calls = []
-    monkeypatch.setattr(hooks, "publish_rider_location", lambda *args: calls.append(args))
+    monkeypatch.setattr(
+        hooks, "publish_rider_location", lambda *args, **kwargs: calls.append((args, kwargs))
+    )
     client.post(START, AT_STORE, format="json")
     Rider.objects.filter(pk=rider.pk).update(last_location_at=timezone.now() - timedelta(minutes=1))
     with django_capture_on_commit_callbacks(execute=True):
         client.post(LOC, {"points": [point(1)]}, format="json")
     assert len(calls) == 1
-    assert calls[0][0] == rider.pk
+    assert calls[0][0][0] == rider.pk
+    assert calls[0][1] == {"heading": 90.0}  # BUG-0022: the ping's heading is passed through
 
 
 def test_hook_stubs_do_not_raise(rider):

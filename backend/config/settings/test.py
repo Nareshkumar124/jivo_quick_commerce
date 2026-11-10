@@ -58,7 +58,7 @@ POSTGRES_POOL = False
 # channels) and are refused.
 TEST_REDIS_DB = env_test_redis_db()
 REDIS_TEST_URL = (
-    urlsplit(env_str("REDIS_TEST_URL", default="redis://localhost:6380/15"))
+    urlsplit(env_str("REDIS_TEST_URL", default="redis://127.0.0.1:6380/15"))
     ._replace(path=f"/{TEST_REDIS_DB}")
     .geturl()
 )

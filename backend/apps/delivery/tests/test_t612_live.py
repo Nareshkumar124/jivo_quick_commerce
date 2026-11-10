@@ -654,3 +654,59 @@ def test_cash_flag_pushes_once_per_rider_with_a_stable_ref(
     assert pushes == [] or all(p[1] == "rider.cash_updated" for p in pushes)
     refs = [p[2]["ref"] for p in pushes if p[1] == "rider.cash_updated"]
     assert refs == [f"deposit:{rider.pk}:{flagged_at.isoformat()}"]
+
+
+# --------------------------------------------------------------------------- QA bug fixes
+
+
+def test_pickup_sends_out_for_delivery_status_once(flow, sent, pushes, commit, components):
+    """BUG-0021 (P6-TC-14, P6-TC-59): T9 sends `order.status` OUT_FOR_DELIVERY once to the
+    order socket and once to the store's ops feed, and still exactly one T9 notification."""
+    from apps.notifications.models import Notification
+
+    f = flow()
+    f.accept()
+    f.at_store()
+    f.steps.pack(f.order)
+    sent.items.clear()
+    with commit():
+        assert f.pickup().status_code == 200
+    customer = [
+        m
+        for m in sent.to(order_group(f.order.pk), "order.status")
+        if m["data"]["status"] == "OUT_FOR_DELIVERY"
+    ]
+    ops = [
+        m
+        for m in sent.to(store_group(f.order.store_id), "order.status")
+        if m["data"]["status"] == "OUT_FOR_DELIVERY"
+    ]
+    assert len(customer) == 1
+    assert len(ops) == 1
+    assert sent.to(order_group(f.order.pk), "order.eta")
+    assert (
+        Notification.objects.filter(user=f.order.user, event="order.out_for_delivery").count() == 1
+    )
+    sent.validate(components)
+
+
+def test_location_fan_out_keeps_the_heading(flow, sent, commit, components):
+    """BUG-0022 (P6-TC-14): `rider.location` carries the ping's heading to the customer and ops."""
+    f = flow()
+    f.accept()
+    sent.items.clear()
+    point = {
+        "lat": 28.4502,
+        "lng": 77.0503,
+        "accuracy": 8.0,
+        "heading": 72.5,
+        "recorded_at": timezone.now().isoformat(),
+    }
+    with commit():
+        response = f.client.post("/api/v1/rider/locations/", {"points": [point]}, format="json")
+    assert response.status_code in (200, 201), response.json()
+    [customer] = sent.to(order_group(f.order.pk), "rider.location")
+    assert customer["data"]["heading"] == 72.5
+    [ops] = sent.to(store_group(f.rider.home_store_id), "rider.location")
+    assert ops["data"]["heading"] == 72.5
+    sent.validate(components)

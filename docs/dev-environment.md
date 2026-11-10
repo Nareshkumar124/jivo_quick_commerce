@@ -6,6 +6,7 @@ Every development agent reads this before running anything. It records how the s
 - Windows 11. The user folder is `C:\Users\89 USER`, which contains a space.
 - Shells: Git Bash (POSIX) and PowerShell 5.1. Use forward slashes in Bash.
 - **No Docker.** Redis runs natively on `127.0.0.1:6380`. MinIO (the pgsty community build; local dev only) on 9000/9001 and Mailpit on 1025/8025 run natively through `infra/scripts/windows/dev-services.ps1 -Action start|stop|status|init`. Tests must still not need them; test settings use their own storage.
+- **Use `127.0.0.1`, never `localhost`, in Redis URLs** (`REDIS_URL`, `CELERY_BROKER_URL`, `CHANNELS_REDIS_URL`, `REDIS_TEST_URL`). On Windows `localhost` tries IPv6 first and each new connection costs about 2 s (OBS-S3-01). The settings defaults and `infra/env/backend.env.example` use `redis://127.0.0.1:6380/<db>`.
 - Never use port 6379 or the `redis-chai` / `mongo-chai` containers. Don't touch the :8001 dev server; the PM runs it from the main tree on `develop`.
 
 ## Backend

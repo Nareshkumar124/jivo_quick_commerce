@@ -299,7 +299,7 @@ STORAGES = {
 
 # --------------------------------------------------------------------------- redis
 # Port 6380 is this project's Redis (infra/docker-compose.yml). Separate DB numbers per use.
-REDIS_URL = env_str("REDIS_URL", default="redis://localhost:6380/0")
+REDIS_URL = env_str("REDIS_URL", default="redis://127.0.0.1:6380/0")
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -311,7 +311,7 @@ CACHES = {
 }
 
 # --------------------------------------------------------------------------- channels
-CHANNELS_REDIS_URL = env_str("CHANNELS_REDIS_URL", default="redis://localhost:6380/2")
+CHANNELS_REDIS_URL = env_str("CHANNELS_REDIS_URL", default="redis://127.0.0.1:6380/2")
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -320,7 +320,7 @@ CHANNEL_LAYERS = {
 }
 
 # --------------------------------------------------------------------------- celery
-CELERY_BROKER_URL = env_str("CELERY_BROKER_URL", default="redis://localhost:6380/1")
+CELERY_BROKER_URL = env_str("CELERY_BROKER_URL", default="redis://127.0.0.1:6380/1")
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": 60 * 60}
 CELERY_TASK_IGNORE_RESULT = True
