@@ -63,6 +63,7 @@ from apps.ops_console.admin_support import (
     add_service_errors,
     dry_run,
 )
+from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin, visible_stores
 from apps.ops_console.selectors import ON_SALE
 
@@ -692,15 +693,17 @@ class MovementVariantFilter(admin.SimpleListFilter):
         if not value:
             return []
         variant = None
-        if value.isdigit():
-            variant = ProductVariant.objects.filter(pk=int(value)).only("sku").first()
+        variant_id = parse_ascii_id(value)
+        if variant_id is not None:
+            variant = ProductVariant.objects.filter(pk=variant_id).only("sku").first()
         return [(value, variant.sku if variant else f"#{value}")]
 
     def queryset(self, request, queryset):
         value = self.value()
         if not value:
             return queryset
-        return queryset.filter(variant_id=int(value)) if value.isdigit() else queryset.none()
+        variant_id = parse_ascii_id(value)
+        return queryset.none() if variant_id is None else queryset.filter(variant_id=variant_id)
 
 
 @admin.register(StockMovement)

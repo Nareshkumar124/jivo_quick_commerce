@@ -26,6 +26,7 @@ from unfold.decorators import display
 from apps.ops_console import status
 from apps.ops_console.admin_support import ReadOnlyHistoryAdmin
 from apps.ops_console.money import RupeeInput, inr
+from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.pii import can_view_full_phone, customer_label
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin
 from apps.promotions.choices import DiscountType
@@ -382,9 +383,10 @@ class RedemptionCouponFilter(admin.SimpleListFilter):
         value = self.value()
         if not value:
             return queryset
-        if not value.isdigit():
+        coupon_id = parse_ascii_id(value)
+        if coupon_id is None:
             return queryset.none()
-        return queryset.filter(coupon_id=int(value))
+        return queryset.filter(coupon_id=coupon_id)
 
 
 @admin.register(CouponRedemption)

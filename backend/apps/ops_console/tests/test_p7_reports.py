@@ -307,6 +307,9 @@ class TestDashboardOrders:
                 low_rating(stores[0])
 
         add_orders(1)
+        # Warm-up (review minor): a cold process-wide cache (content types, settings rows)
+        # would add queries to the first request only and make `few` differ from `many`.
+        assert client.get(url, HTTP_HX_REQUEST="true").status_code == 200
         with CaptureQueriesContext(connection) as few:
             assert client.get(url, HTTP_HX_REQUEST="true").status_code == 200
         add_orders(3)  # 4 of each: the low-ratings alert stays under ALERT_ITEMS_SHOWN

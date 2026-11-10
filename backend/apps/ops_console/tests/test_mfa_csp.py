@@ -1,4 +1,4 @@
-"""Staff two-step sign-in (OWASP H2, DL-59) and the report-only CSP (L7).
+"""Staff two-step sign-in (OWASP H2, DL-59, DL-70) and the report-only CSP (L7).
 
 MFA is off in the test settings (the suite uses force_login); these tests turn it on.
 """
@@ -9,18 +9,24 @@ import time
 
 import pytest
 from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
+from django.core.management import CommandError, call_command
 from django.urls import reverse
 from django_otp.oath import totp
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from apps.accounts import roles
+from apps.accounts.tests.factories import UserFactory
 from apps.core.models import AuditLog
+from apps.ops_console import mfa
 from apps.ops_console.tests.helpers import login_as, staff_in_role
 
 pytestmark = pytest.mark.django_db
 
 HX = {"HTTP_HX_REQUEST": "true"}
+USERS = "admin:accounts_user_changelist"
 
 
 @pytest.fixture(autouse=True)
@@ -33,19 +39,42 @@ def code_for(device: TOTPDevice) -> str:
     return f"{totp(device.bin_key, device.step, device.t0, device.digits, device.drift):06d}"
 
 
+def signed_in(client):
+    return get_user_model().objects.get(pk=client.session["_auth_user_id"])
+
+
 def enrol(client, next_url="/admin/") -> TOTPDevice:
+    """A Super Admin allows the setup (DL-70), then the signed-in person scans and confirms."""
+    user = signed_in(client)
+    assert mfa.allow_setup(user, by=None)
     client.get(reverse("ops:mfa-setup"))
-    device = TOTPDevice.objects.get(confirmed=False)
+    device = TOTPDevice.objects.get(user=user, confirmed=False)
     response = client.post(reverse("ops:mfa-setup"), {"code": code_for(device), "next": next_url})
     assert response.status_code == 302, response.content[:300]
     return TOTPDevice.objects.get(pk=device.pk)
+
+
+def run_action(client, action: str, *users, follow=True):
+    return client.post(
+        reverse(USERS),
+        {"action": action, "index": "0", ACTION_CHECKBOX_NAME: [str(user.pk) for user in users]},
+        follow=follow,
+    )
 
 
 # --------------------------------------------------------------------------- who is asked
 
 
 @pytest.mark.parametrize(
-    "role", [roles.SUPER_ADMIN, roles.FINANCE, roles.SUPPORT, "superuser flag"]
+    "role",
+    [
+        roles.SUPER_ADMIN,
+        roles.FINANCE,
+        roles.SUPPORT,
+        roles.CATALOG_MANAGER,  # DL-70
+        roles.STORE_MANAGER,  # DL-70
+        "superuser flag",
+    ],
 )
 @pytest.mark.parametrize("path", ["/admin/", "/ops/"])
 def test_unenrolled_privileged_staff_must_enrol(client, role, path):
@@ -55,11 +84,41 @@ def test_unenrolled_privileged_staff_must_enrol(client, role, path):
     assert response["Location"].startswith(reverse("ops:mfa-setup"))
 
 
-@pytest.mark.parametrize("role", [roles.STORE_MANAGER, roles.STORE_STAFF, roles.CATALOG_MANAGER])
-def test_other_roles_are_not_asked(client, role):
-    login_as(client, role)
+def test_mfa_roles_follow_dl70(settings):
+    """DL-70: Catalog Manager and Store Manager join DL-59's roles; Store Staff stays out."""
+    settings.STAFF_MFA_INCLUDE_OPS = False
+    assert mfa.mfa_roles() == {
+        roles.SUPER_ADMIN,
+        roles.FINANCE,
+        roles.SUPPORT,
+        roles.CATALOG_MANAGER,
+        roles.STORE_MANAGER,
+    }
+    settings.STAFF_MFA_INCLUDE_OPS = True
+    assert roles.OPS in mfa.mfa_roles()
+    assert roles.STORE_STAFF not in mfa.mfa_roles()
+
+
+def test_store_staff_is_not_asked(client):
+    """DL-70: Store Staff (packing only) keeps password-only sign-in."""
+    login_as(client, roles.STORE_STAFF)
     assert client.get("/ops/").status_code == 200
     assert client.get("/admin/").status_code == 200
+
+
+def test_store_staff_opening_the_setup_page_goes_back_to_the_panel(client):
+    login_as(client, roles.STORE_STAFF)
+    response = client.get(reverse("ops:mfa-setup"), {"next": "/ops/"})
+    assert response.status_code == 302
+    assert response["Location"] == "/ops/"
+    assert not TOTPDevice.objects.exists()
+
+
+def test_store_staff_who_is_also_a_store_manager_is_asked(client):
+    user = staff_in_role(roles.STORE_STAFF)
+    user.groups.add(Group.objects.get(name=roles.STORE_MANAGER))
+    client.force_login(user)
+    assert client.get("/ops/")["Location"].startswith(reverse("ops:mfa-setup"))
 
 
 def test_ops_is_asked_by_default_and_can_be_left_out(client, settings):
@@ -184,7 +243,8 @@ def test_off_switch(client, settings):
 
 
 def test_enrolment_shows_qr_and_key_and_recovery_codes_once(client, caplog):
-    login_as(client, roles.SUPER_ADMIN)
+    user = login_as(client, roles.SUPER_ADMIN)
+    mfa.allow_setup(user, by=None)
     caplog.set_level(logging.DEBUG)
     page = client.get(reverse("ops:mfa-setup"))
     html = page.content.decode()
@@ -216,7 +276,8 @@ def test_enrolment_shows_qr_and_key_and_recovery_codes_once(client, caplog):
 
 
 def test_wrong_code_is_refused_on_enrolment(client):
-    login_as(client, roles.FINANCE)
+    user = login_as(client, roles.FINANCE)
+    mfa.allow_setup(user, by=None)
     client.get(reverse("ops:mfa-setup"))
     response = client.post(reverse("ops:mfa-setup"), {"code": "000000"})
     assert response.status_code == 200
@@ -303,6 +364,190 @@ def test_otp_device_admins_are_not_exposed(client):
     client.force_login(user)
     enrol(client)
     assert client.get("/admin/otp_totp/totpdevice/").status_code == 404
+
+
+# --------------------------------------------------------------------------- first setup (DL-70)
+# PM default: knowing the password is not enough to enrol. A Super Admin allows the setup.
+
+
+@pytest.mark.parametrize("role", [roles.CATALOG_MANAGER, roles.STORE_MANAGER, roles.SUPER_ADMIN])
+def test_setup_is_refused_without_a_super_admin_allowed_device(client, role):
+    login_as(client, role)
+    setup = reverse("ops:mfa-setup")
+    page = client.get(setup)
+    assert page.status_code == 403
+    html = page.content.decode()
+    assert "Ask a Super Admin to set up two-step sign-in" in html
+    assert 'data-testid="mfa-not-allowed"' in html
+    assert "otpauth://" not in html
+    assert 'data-testid="mfa-key"' not in html
+    assert not TOTPDevice.objects.exists()  # nothing created for whoever has the password
+    posted = client.post(setup, {"code": "123456"})
+    assert posted.status_code == 403
+    assert not TOTPDevice.objects.exists()
+    assert client.get("/ops/")["Location"].startswith(setup)  # the panel stays closed
+    assert client.get(setup, **HX).status_code == 403
+
+
+def test_old_self_made_unconfirmed_device_does_not_count(client):
+    """Unconfirmed devices left by the old self-enrolment (before DL-70) cannot be confirmed."""
+    user = login_as(client, roles.FINANCE)
+    old = TOTPDevice.objects.create(user=user, name=mfa.DEVICE_NAME, confirmed=False)
+    assert client.get(reverse("ops:mfa-setup")).status_code == 403
+    response = client.post(reverse("ops:mfa-setup"), {"code": code_for(old)})
+    assert response.status_code == 403
+    old.refresh_from_db()
+    assert old.confirmed is False
+    assert client.get("/ops/")["Location"].startswith(reverse("ops:mfa-setup"))
+
+
+@pytest.mark.parametrize("role", [roles.CATALOG_MANAGER, roles.STORE_MANAGER])
+def test_super_admin_allows_setup_and_the_person_enrols(client, role):
+    member = staff_in_role(role)
+    admin_user = staff_in_role(roles.SUPER_ADMIN)
+    client.force_login(admin_user)
+    enrol(client)
+    response = run_action(client, "allow_mfa_setup", member)
+    html = response.content.decode()
+    assert "Allowed two-step sign-in setup for 1 staff member(s)." in html
+    device = TOTPDevice.objects.get(user=member)
+    assert device.confirmed is False
+    assert device.name == mfa.ALLOWED_NAME
+    assert device.key not in html  # the Super Admin never sees the key
+    entry = AuditLog.objects.get(action="staff.mfa_setup_allowed", object_id=str(member.pk))
+    assert entry.actor == admin_user
+    assert entry.changes == {}
+    # The person signs in: the setup page shows the allowed device's QR code.
+    client.logout()
+    client.force_login(member)
+    assert client.get("/ops/")["Location"].startswith(reverse("ops:mfa-setup"))
+    page = client.get(reverse("ops:mfa-setup"))
+    assert page.status_code == 200
+    assert 'data-testid="mfa-qr"' in page.content.decode()
+    confirmed = client.post(reverse("ops:mfa-setup"), {"code": code_for(device), "next": "/ops/"})
+    assert confirmed["Location"].startswith(reverse("ops:mfa-recovery"))
+    device.refresh_from_db()
+    assert device.confirmed is True
+    assert device.name == mfa.DEVICE_NAME
+    assert StaticToken.objects.filter(device__user=member).count() == 10
+    assert client.get("/ops/").status_code == 200
+
+
+def test_allow_skips_enrolled_staff_and_keeps_their_device(client):
+    member = staff_in_role(roles.FINANCE)
+    client.force_login(member)
+    kept = enrol(client)
+    admin_user = staff_in_role(roles.SUPER_ADMIN)
+    client.force_login(admin_user)
+    enrol(client)
+    allowed_rows = AuditLog.objects.filter(
+        action="staff.mfa_setup_allowed", object_id=str(member.pk)
+    )
+    before = allowed_rows.count()  # the first setup (in `enrol`) was allowed and audited
+    html = run_action(client, "allow_mfa_setup", member).content.decode()
+    assert "Allowed two-step sign-in setup for 0 staff member(s)." in html
+    assert "Skipped 1 staff member(s) who already have two-step sign-in set up." in html
+    assert list(TOTPDevice.objects.filter(user=member).values_list("pk", "key", "confirmed")) == [
+        (kept.pk, kept.key, True)
+    ]
+    assert allowed_rows.count() == before  # a skipped person gets no new audit row
+
+
+def test_existing_enrolled_staff_are_unaffected(client):
+    """A device confirmed before DL-70 (made by the old self-enrolment) keeps working."""
+    user = staff_in_role(roles.SUPPORT)
+    device = TOTPDevice.objects.create(user=user, name=mfa.DEVICE_NAME, confirmed=True)
+    client.force_login(user)
+    response = client.get("/admin/")
+    assert response["Location"].startswith(reverse("ops:mfa-verify"))
+    setup = client.get(reverse("ops:mfa-setup"))
+    assert setup.status_code == 302
+    assert setup["Location"].startswith(reverse("ops:mfa-verify"))
+    ok = client.post(reverse("ops:mfa-verify"), {"code": code_for(device), "next": "/ops/"})
+    assert ok.status_code == 302
+    assert client.get("/ops/").status_code == 200
+
+
+def test_allowing_again_replaces_the_waiting_device(client):
+    member = staff_in_role(roles.STORE_MANAGER)
+    assert mfa.allow_setup(member, by=None)
+    first = TOTPDevice.objects.get(user=member)
+    assert mfa.allow_setup(member, by=None)
+    second = TOTPDevice.objects.get(user=member)
+    assert second.pk != first.pk
+    assert second.key != first.key
+    assert mfa.setup_state(member) == "allowed"
+
+
+def test_reset_then_a_new_setup_must_be_allowed_again(client):
+    member = staff_in_role(roles.CATALOG_MANAGER)
+    client.force_login(member)
+    enrol(client)
+    admin_user = staff_in_role(roles.SUPER_ADMIN)
+    client.force_login(admin_user)
+    enrol(client)
+    html = run_action(client, "reset_mfa", member).content.decode()
+    assert "Allow two-step sign-in setup" in html
+    client.force_login(member)
+    assert client.get(reverse("ops:mfa-setup")).status_code == 403
+    assert mfa.setup_state(member) == "none"
+
+
+@pytest.mark.parametrize("action", ["allow_mfa_setup", "reset_mfa"])
+def test_only_a_super_admin_may_allow_or_reset(client, action):
+    """Even a custom group holding every user permission cannot run them."""
+    member = staff_in_role(roles.FINANCE)
+    actor = staff_in_role(roles.STORE_STAFF)  # not an MFA role: no second step needed here
+    group = Group.objects.create(name="User editors")
+    group.permissions.add(
+        *Permission.objects.filter(content_type__app_label="accounts", codename__endswith="_user")
+    )
+    actor.groups.add(group)
+    client.force_login(actor)
+    assert client.get(reverse(USERS)).status_code == 200
+    response = run_action(client, action, member, follow=False)
+    assert response.status_code == 403
+    assert not TOTPDevice.objects.filter(user=member).exists()
+    assert not AuditLog.objects.filter(object_id=str(member.pk)).exists()
+
+
+def test_staff_user_page_shows_the_setup_state(client):
+    member = staff_in_role(roles.STORE_MANAGER)
+    admin_user = staff_in_role(roles.SUPER_ADMIN)
+    client.force_login(admin_user)
+    enrol(client)
+    url = reverse("admin:accounts_user_change", args=[member.pk])
+    assert "Not set up." in client.get(url).content.decode()
+    mfa.allow_setup(member, by=admin_user)
+    assert "Setup allowed: waiting for them" in client.get(url).content.decode()
+    own = reverse("admin:accounts_user_change", args=[admin_user.pk])
+    assert "Set up (authenticator app confirmed)" in client.get(own).content.decode()
+
+
+def test_command_allows_the_first_super_admin(capsys):
+    user = staff_in_role(roles.SUPER_ADMIN, email="first.admin@jivo.in")
+    call_command("allow_mfa_setup", "  First.Admin@Jivo.in ")
+    device = TOTPDevice.objects.get(user=user)
+    assert device.name == mfa.ALLOWED_NAME
+    assert device.confirmed is False
+    out = capsys.readouterr().out
+    assert f"allowed for user {user.pk}" in out
+    assert device.key not in out
+    entry = AuditLog.objects.get(action="staff.mfa_setup_allowed", object_id=str(user.pk))
+    assert entry.actor is None
+
+
+def test_command_refuses_unknown_non_staff_and_enrolled_users():
+    customer = UserFactory(email="customer@example.com")
+    with pytest.raises(CommandError, match="No active staff user"):
+        call_command("allow_mfa_setup", "nobody@jivo.in")
+    with pytest.raises(CommandError, match="No active staff user"):
+        call_command("allow_mfa_setup", customer.email)
+    member = staff_in_role(roles.FINANCE, email="fin@jivo.in")
+    TOTPDevice.objects.create(user=member, name=mfa.DEVICE_NAME, confirmed=True)
+    with pytest.raises(CommandError, match="already has two-step sign-in"):
+        call_command("allow_mfa_setup", "fin@jivo.in")
+    assert TOTPDevice.objects.filter(user=member).count() == 1
 
 
 # --------------------------------------------------------------------------- CSP (L7)

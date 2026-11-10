@@ -27,6 +27,7 @@ from apps.ops_console import dispatch as data
 from apps.ops_console.access import ops_view
 from apps.ops_console.forms import AssignRiderForm, ReceiveReturnForm
 from apps.ops_console.order_views import _form_message, _refused, _run, poll_seconds
+from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.scoping import visible_stores
 from apps.ops_console.views import ops_context
 from apps.stores.services import stores_for
@@ -40,10 +41,10 @@ DISPATCH_ACTIONS = (
 
 def _store_id(request) -> int | None:
     """The `store` filter, only if it is one of the user's stores (else no filter)."""
-    value = request.GET.get("store", "")
-    if not value.isdigit():
+    store_id = parse_ascii_id(request.GET.get("store", ""))
+    if store_id is None:
         return None
-    return int(value) if stores_for(request.user).filter(pk=int(value)).exists() else None
+    return store_id if stores_for(request.user).filter(pk=store_id).exists() else None
 
 
 def _board_context(request) -> dict:

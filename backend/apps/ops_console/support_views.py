@@ -39,6 +39,7 @@ from apps.core.net import client_ip
 from apps.ops_console import capabilities, status
 from apps.ops_console.access import forbidden, ops_view
 from apps.ops_console.dates import DISPLAY_TZ
+from apps.ops_console.params import has_nul, parse_ascii_id
 from apps.ops_console.pii import can_view_full_phone, customer_label, person_label
 from apps.ops_console.tables import Column, DataTable, Filter
 from apps.ops_console.views import ops_context
@@ -301,11 +302,11 @@ def canned_reply(request, ticket_id: int):
     """HTMX: the reply box filled with a canned reply for this ticket (render_canned_reply);
     the agent edits it, then sends it with the reply form."""
     ticket = _ticket(request.user, ticket_id)
-    reply_id = request.GET.get("reply", "")
+    reply_id = parse_ascii_id(request.GET.get("reply", ""))
     body = ""
-    if reply_id.isdigit():
+    if reply_id is not None:
         try:
-            body = services.render_canned_reply(request.user, int(reply_id), ticket.pk)
+            body = services.render_canned_reply(request.user, reply_id, ticket.pk)
         except PermissionDenied:
             return forbidden(request)
         except ValidationError:
@@ -322,7 +323,7 @@ def attachment(request, ticket_id: int, key: str):
     another ticket is a 404, before the service is called. The service re-checks the handler
     permission and writes the `support.attachment_view` audit entry (ids and client IP only)."""
     ticket = _ticket(request.user, ticket_id)
-    if not ticket.uploads.filter(key=key).exists():
+    if has_nul(key) or not ticket.uploads.filter(key=key).exists():
         raise Http404("No such attachment.")
     try:
         url = services.staff_attachment_url(request.user, key, ip=client_ip(request))

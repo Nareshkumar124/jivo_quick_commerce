@@ -1,0 +1,9 @@
+{% extends "ops/mfa/base.html" %}
+{# DL-70: no authenticator set up and no setup allowed by a Super Admin. Knowing the password is not enough to enrol, so nothing is created here (403). No context beyond the title. #}
+{% block content %}
+    <div data-testid="mfa-not-allowed">
+        <p class="mb-3">Your role needs a second step at sign-in (a code from an authenticator app on your phone), and it is not set up for you yet.</p>
+        <p class="mb-3">Ask a Super Admin to allow two-step sign-in setup for your account. Then sign in again: you will see a QR code to scan with Google Authenticator, Microsoft Authenticator or a similar app.</p>
+        <p class="ops-text-secondary">Lost or changed your phone? A Super Admin resets your two-step sign-in first, then allows a new setup.</p>
+    </div>
+{% endblock %}

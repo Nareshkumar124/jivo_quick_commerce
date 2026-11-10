@@ -1,20 +1,30 @@
-"""Staff two-factor authentication (OWASP review H2, DL-59): TOTP for privileged staff on the
-panel (`/admin/` and `/ops/`). Interim until Jivo SSO (D-04) replaces staff login.
+"""Staff two-factor authentication (OWASP review H2, DL-59, DL-70): TOTP for privileged staff
+on the panel (`/admin/` and `/ops/`). Interim until Jivo SSO (D-04) replaces staff login.
 
-- **Who:** superusers and the Super Admin, Finance and Support roles; Ops / Dispatch too when
-  `STAFF_MFA_INCLUDE_OPS` is on. Other roles are not asked. Off when `STAFF_MFA_ENFORCED` is
-  off (the test settings; the MFA tests turn it on).
+- **Who:** superusers and the Super Admin, Finance, Support, Catalog Manager and Store Manager
+  roles (DL-70); Ops / Dispatch too when `STAFF_MFA_INCLUDE_OPS` is on. Store Staff is not
+  asked (packing only). Off when `STAFF_MFA_ENFORCED` is off (the test settings; the MFA tests
+  turn it on). The ops live WebSocket checks the same `requires_mfa()` (backend, audit M1).
 - **Library:** django-otp 1.7.5 (`otp_totp` devices, `otp_static` recovery codes). Its
   `OTPMiddleware` gives `request.user.is_verified()`; verifying a code stores the device in the
   session (the "verified" flag), so it holds for the rest of that login only.
+- **First setup needs a Super Admin (DL-70, PM default):** knowing the password is not enough
+  to enrol. A Super Admin runs "Allow two-step sign-in setup" (Staff users admin) or, for the
+  very first Super Admin, `manage.py allow_mfa_setup <email>`: `allow_setup()` creates an
+  unconfirmed `TOTPDevice` named `ALLOWED_NAME` (no new model field; django-otp's own
+  `confirmed` flag plus the name mark it). Only such a device can be confirmed on the setup
+  page; with none, the page says "Ask a Super Admin" (403) and creates nothing. Unconfirmed
+  devices made by the old self-enrolment (named `DEVICE_NAME`) do not count.
 - **Flow:** a privileged staff member who is signed in but not verified is sent to
   `/ops/mfa/setup/` (no confirmed device: QR code plus the key to type by hand, then a code to
   confirm; 10 recovery codes shown once) or `/ops/mfa/verify/` (an authenticator code or a
   recovery code, each recovery code works once). HTMX requests get 401 + `HX-Redirect`.
 - **Reset:** Super Admin, from the Staff users admin ("Reset two-factor device"), through
-  `reset_devices()`, which deletes the devices and writes the audit log.
-- **Secrets:** the TOTP key is shown only on the setup page (never cached) and is never logged;
-  recovery codes are shown once and kept by django-otp, as it stores them.
+  `reset_devices()`, which deletes the devices and writes the audit log. The person then needs
+  "Allow two-step sign-in setup" again before they can sign in.
+- **Secrets:** the TOTP key is shown only on the setup page, to the person signing in (never to
+  the Super Admin, never cached) and is never logged; recovery codes are shown once and kept by
+  django-otp, as it stores them.
 """
 
 from urllib.parse import urlencode
@@ -51,9 +61,16 @@ EXEMPT_URL_NAMES = (
 RECOVERY_CODES = 10
 SESSION_CODES = "ops_mfa_new_recovery_codes"
 DEVICE_NAME = "Authenticator app"
+# An unconfirmed device a Super Admin allowed (DL-70); renamed to DEVICE_NAME once confirmed.
+ALLOWED_NAME = "Authenticator app (setup allowed by a Super Admin)"
 RECOVERY_NAME = "Recovery codes"
 
 MSG_WRONG = "That code is not right. Check the time on your phone and try the newest code."
+
+# DL-59 (a) + DL-70: every role that touches money or customer data. Store Staff stays out.
+BASE_MFA_ROLES = frozenset(
+    {roles.SUPER_ADMIN, roles.FINANCE, roles.SUPPORT, roles.CATALOG_MANAGER, roles.STORE_MANAGER}
+)
 
 
 def enforced() -> bool:
@@ -61,7 +78,7 @@ def enforced() -> bool:
 
 
 def mfa_roles() -> frozenset[str]:
-    base = {roles.SUPER_ADMIN, roles.FINANCE, roles.SUPPORT}
+    base = set(BASE_MFA_ROLES)
     if getattr(settings, "STAFF_MFA_INCLUDE_OPS", False):
         base.add(roles.OPS)
     return frozenset(base)
@@ -81,6 +98,15 @@ def exempt_paths() -> frozenset[str]:
 
 def has_device(user) -> bool:
     return TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+
+
+def allowed_device(user) -> TOTPDevice | None:
+    """The unconfirmed device a Super Admin allowed (DL-70), if any. Never creates one."""
+    return (
+        TOTPDevice.objects.filter(user=user, confirmed=False, name=ALLOWED_NAME)
+        .order_by("-pk")
+        .first()
+    )
 
 
 def _is_verified(request) -> bool:
@@ -146,9 +172,9 @@ def _staff_only(view):
     return never_cache(wrapper)
 
 
-def _page(request, template: str, **context):
+def _page(request, template: str, *, status: int = 200, **context):
     context.setdefault("title", "Two-step sign-in")
-    return render(request, template, context)
+    return render(request, template, context, status=status)
 
 
 def _key_groups(device: TOTPDevice) -> str:
@@ -170,19 +196,28 @@ def _new_recovery_codes(user) -> list[str]:
 @_staff_only
 @sensitive_post_parameters("code")
 def setup(request):
-    """Enrol an authenticator app: QR code (or the key typed by hand), then one code."""
+    """Enrol an authenticator app: QR code (or the key typed by hand), then one code. Only for
+    a device a Super Admin allowed (DL-70); without one, nothing is created (403)."""
     user = request.user
     if has_device(user):
         return redirect(f"{reverse('ops:mfa-verify')}?{urlencode({'next': _next(request, '')})}")
-    device = TOTPDevice.objects.filter(user=user, confirmed=False).order_by("pk").first()
+    device = allowed_device(user)
     if device is None:
-        device = TOTPDevice.objects.create(user=user, name=DEVICE_NAME, confirmed=False)
+        if not requires_mfa(user):  # e.g. Store Staff: never asked, nothing to set up here
+            return redirect(_next(request, reverse("admin:index")))
+        return _page(
+            request,
+            "ops/mfa/not_allowed.html",
+            status=403,
+            title="Ask a Super Admin to set up two-step sign-in",
+        )
     form = CodeForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         if device.verify_token(form.cleaned_data["code"].replace(" ", "")):
             with transaction.atomic():
                 device.confirmed = True
-                device.save(update_fields=["confirmed"])
+                device.name = DEVICE_NAME
+                device.save(update_fields=["confirmed", "name"])
                 TOTPDevice.objects.filter(user=user, confirmed=False).delete()
                 codes = _new_recovery_codes(user)
             otp_login(request, device)
@@ -235,12 +270,40 @@ def recovery(request):
     )
 
 
-# --------------------------------------------------------------------------- reset
+# --------------------------------------------------------------------------- Super Admin
+
+
+def is_super_admin(user) -> bool:
+    """Who may allow or reset someone's two-step sign-in: superusers and the Super Admin role,
+    whatever model permissions a custom group holds (review)."""
+    return bool(
+        user.is_active
+        and user.is_staff
+        and (user.is_superuser or user.groups.filter(name=roles.SUPER_ADMIN).exists())
+    )
+
+
+def allow_setup(user, *, by, ip: str | None = None) -> bool:
+    """Super Admin (DL-70): let a staff member set up their authenticator at their next sign-in.
+    Creates an unconfirmed device named `ALLOWED_NAME` (a fresh key; an earlier allowed or
+    self-made unconfirmed device is replaced). False, changing nothing, if they already have a
+    confirmed device (reset it first). The key is never shown here: only the person signing in
+    sees it, on the setup page. Audited (`staff.mfa_setup_allowed`, no key)."""
+    from apps.core import audit
+
+    with transaction.atomic():
+        if has_device(user):
+            return False
+        TOTPDevice.objects.filter(user=user, confirmed=False).delete()
+        TOTPDevice.objects.create(user=user, name=ALLOWED_NAME, confirmed=False)
+        audit.record(by, "staff.mfa_setup_allowed", user, {}, ip=ip)
+    return True
 
 
 def reset_devices(user, *, by, ip: str | None = None) -> int:
-    """Super Admin: remove a staff member's authenticator and recovery codes (lost phone); they
-    enrol again at their next sign-in. Audited (`staff.mfa_reset`, device count only)."""
+    """Super Admin: remove a staff member's authenticator and recovery codes (lost phone). They
+    cannot open the panel until a Super Admin allows a new setup (`allow_setup`, DL-70).
+    Audited (`staff.mfa_reset`, device count only)."""
     from apps.core import audit
 
     with transaction.atomic():
@@ -248,3 +311,10 @@ def reset_devices(user, *, by, ip: str | None = None) -> int:
         static, _ = StaticDevice.objects.filter(user=user).delete()
         audit.record(by, "staff.mfa_reset", user, {"devices": totp + static}, ip=ip)
     return totp + static
+
+
+def setup_state(user) -> str:
+    """For the Staff users admin: "set_up", "allowed" (waiting for the person) or "none"."""
+    if has_device(user):
+        return "set_up"
+    return "allowed" if allowed_device(user) is not None else "none"

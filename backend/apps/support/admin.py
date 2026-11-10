@@ -6,17 +6,26 @@ list or search (search is by ticket id or order number).
 """
 
 from django.contrib import admin
+from django.contrib.admin.exceptions import NotRegistered
 from django.db.models import BooleanField, Value
 from django.urls import reverse
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import display
 
+from apps.accounts.models import Customer
 from apps.ops_console import status
 from apps.support.models import CannedReply, SupportTicket, TicketAttachment, TicketMessage
 
-# The Customers admin's view permission (05 §3 "Customers (PII)").
-VIEW_CUSTOMER = "accounts.view_customer"
+
+def can_open_customers(admin_site, request) -> bool:
+    """Whether the Customers admin would open for this viewer (05 §3 "Customers (PII)"): the
+    registered admin's own view check, never a copy of its rule."""
+    try:
+        customer_admin = admin_site.get_model_admin(Customer)
+    except NotRegistered:
+        return False
+    return bool(customer_admin.has_view_permission(request))
 
 
 class ReadOnlyMixin:
@@ -113,8 +122,10 @@ class SupportTicketAdmin(ReadOnlyMixin, ModelAdmin):
 
     def get_queryset(self, request):
         """Display methods do not get the request: whether the viewer may open the Customers
-        admin travels on each row (like `orders.admin.with_pii_flag`)."""
-        may_open = request.user.has_perm(VIEW_CUSTOMER)
+        admin travels on each row (like `orders.admin.with_pii_flag`). Asked of the Customers
+        admin itself (its `has_view_permission`: `can_view_full_phone` and the view
+        permission), so the link can never drift into one that answers 403 (review minor)."""
+        may_open = can_open_customers(self.admin_site, request)
         return (
             super()
             .get_queryset(request)

@@ -166,7 +166,14 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     search_help_text = "Email, phone or name"
     ordering = ("-created_at",)
     list_per_page = 50
-    readonly_fields = ("auth_id", "last_login", "created_at", "updated_at", "deleted_at")
+    readonly_fields = (
+        "auth_id",
+        "mfa_status",
+        "last_login",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+    )
     filter_horizontal = ("groups", "user_permissions")
 
     fieldsets = (
@@ -180,6 +187,17 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
                     "Staff need “Staff status” and one role (group) from 05 §3. Prefer roles "
                     "over individual permissions. Store Manager and Store Staff see only the "
                     "stores listed under Store access below; every other role sees all stores."
+                ),
+            },
+        ),
+        (
+            "Two-step sign-in",
+            {
+                "fields": ("mfa_status",),
+                "description": (
+                    "Super Admin, Finance, Support, Catalog Manager, Store Manager (and Ops) "
+                    "need a code from an authenticator app at sign-in. A first setup, or a new "
+                    "phone after a reset, needs the list action “Allow two-step sign-in setup”."
                 ),
             },
         ),
@@ -197,7 +215,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     )
 
     inlines = [StaffStoreAccessInline]
-    actions = ["reset_mfa"]
+    actions = ["allow_mfa_setup", "reset_mfa"]
 
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related("groups")
@@ -227,25 +245,70 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
                 formset.new_objects.append(StaffStoreAccess.objects.get(user=user, store=store))
         return None
 
+    @action(
+        description="Allow two-step sign-in setup (first time or new phone)", permissions=["change"]
+    )
+    def allow_mfa_setup(self, request, queryset):
+        """DL-70: knowing the password is not enough to enrol. Lets the selected staff set up
+        their authenticator at their next sign-in (`ops_console.mfa.allow_setup`, audited).
+        Staff who already have one are skipped (reset it first)."""
+        from apps.core.net import client_ip
+        from apps.ops_console import mfa
+
+        if not mfa.is_super_admin(request.user):  # Super Admin only, whatever the group perms
+            raise PermissionDenied
+        allowed = skipped = 0
+        for user in queryset.filter(is_staff=True, is_active=True).order_by("pk"):
+            if mfa.allow_setup(user, by=request.user, ip=client_ip(request)):
+                allowed += 1
+            else:
+                skipped += 1
+        self.message_user(
+            request,
+            f"Allowed two-step sign-in setup for {allowed} staff member(s). They scan the QR "
+            "code at their next sign-in.",
+            messages.SUCCESS,
+        )
+        if skipped:
+            self.message_user(
+                request,
+                f"Skipped {skipped} staff member(s) who already have two-step sign-in set up. "
+                "Reset it first if they changed their phone.",
+                messages.WARNING,
+            )
+
     @action(description="Reset two-factor device (lost phone)", permissions=["change"])
     def reset_mfa(self, request, queryset):
-        """H2: remove the authenticator and recovery codes of the selected staff; they enrol
-        again at their next sign-in. Audited by `ops_console.mfa.reset_devices`."""
+        """H2: remove the authenticator and recovery codes of the selected staff. Audited by
+        `ops_console.mfa.reset_devices`. They need "Allow two-step sign-in setup" (DL-70)
+        before they can sign in again."""
         from apps.core.net import client_ip
-        from apps.ops_console.mfa import reset_devices
+        from apps.ops_console import mfa
 
-        actor = request.user
-        if not (
-            actor.is_superuser or actor.groups.filter(name=roles.SUPER_ADMIN).exists()
-        ):  # review: Super Admin only, whatever model permissions a custom group holds
+        if not mfa.is_super_admin(request.user):  # Super Admin only, whatever the group perms
             raise PermissionDenied
         done = 0
         for user in queryset.filter(is_staff=True).order_by("pk"):
-            if reset_devices(user, by=request.user, ip=client_ip(request)):
+            if mfa.reset_devices(user, by=request.user, ip=client_ip(request)):
                 done += 1
         self.message_user(
-            request, f"Reset two-factor sign-in for {done} staff member(s).", messages.SUCCESS
+            request,
+            f"Reset two-factor sign-in for {done} staff member(s). Use “Allow two-step sign-in "
+            "setup” when they are ready to set up their new phone.",
+            messages.SUCCESS,
         )
+
+    @display(description="Two-step sign-in")
+    def mfa_status(self, obj) -> str:
+        from apps.ops_console import mfa
+
+        if obj is None or obj.pk is None or not obj.is_staff:
+            return "-"
+        return {
+            "set_up": "Set up (authenticator app confirmed)",
+            "allowed": "Setup allowed: waiting for them to scan the QR code at sign-in",
+            "none": "Not set up. Use the list action “Allow two-step sign-in setup”.",
+        }[mfa.setup_state(obj)]
 
     @display(description="Roles")
     def role_list(self, obj) -> str:
