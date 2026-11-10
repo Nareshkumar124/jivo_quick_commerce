@@ -1,4 +1,4 @@
-{# Report results region (also the HTMX partial). Context: report, form, table (None on a filter error; table.column_notes explain reconciliation-only columns), filter_error, params, too_many, export_query, dated, exports, export_form_query. #}
+{# Report results region (also the HTMX partial). Context: report, form, table (None on a filter error; table.column_notes explain reconciliation-only columns), filter_error, params, too_many, export_query, dated, exports. #}
 <div id="report-region" data-testid="report-region">
     {% if table %}
         <div class="flex flex-wrap items-center gap-3 mb-3">
@@ -15,7 +15,6 @@
                 <input type="hidden" name="date_from" value="{{ params.start|date:'Y-m-d' }}">
                 <input type="hidden" name="date_to" value="{{ params.end|date:'Y-m-d' }}">
                 <input type="hidden" name="store" value="{{ params.store_id|default_if_none:'' }}">
-                <input type="hidden" name="query" value="{{ export_form_query }}">
                 <button type="submit" class="ops-button ops-button--secondary">Export in background</button>
             </form>
         </div>

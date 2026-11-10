@@ -20,6 +20,7 @@ from django.core.paginator import Paginator
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
 from apps.ops_console.access import forbidden, is_htmx, ops_view
@@ -30,6 +31,7 @@ from apps.reports.registry import REPORTS
 
 PER_PAGE = 50
 RECENT_EXPORTS = 10
+FILTER_FIELDS = ("date_from", "date_to", "store")
 NUMERIC = re.compile(r"^-?\d+(\.\d+)?$")
 
 # Column headings: the service's snake_case keys, humanised; acronyms kept upper case.
@@ -67,6 +69,25 @@ def _query(request, **extra) -> str:
     for key, value in extra.items():
         query[key] = value
     return query.urlencode()
+
+
+def _report_url(slug: str, form: ReportFilterForm) -> str:
+    """The report page with the filters the export form posted. Built only from the form's own
+    fields and percent-encoded (never from a client-supplied query string, where a CR/LF would
+    break the Location header). A valid form uses its cleaned values; an invalid one keeps the
+    raw ones, so the page shows the same filter error next to the fields."""
+    if form.is_valid():
+        data = form.cleaned_data
+        params = {
+            "date_from": data["date_from"].isoformat(),
+            "date_to": data["date_to"].isoformat(),
+        }
+        if data.get("store") is not None:
+            params["store"] = data["store"]
+    else:
+        params = {key: form.data.get(key) for key in FILTER_FIELDS if form.data.get(key)}
+    url = reverse("ops:report", args=[slug])
+    return f"{url}?{urlencode(params)}" if params else url
 
 
 def _first_error(form) -> str:
@@ -210,7 +231,6 @@ def report(request, slug: str):
         params=params,
         too_many=result.truncated,
         export_query=_query(request, export="csv"),
-        export_form_query=_query(request),
     )
     return _render(request, spec.title, context)
 
@@ -228,7 +248,7 @@ def report_export(request, slug: str):
     if spec is None:
         return forbidden(request)
     form = ReportFilterForm(request.POST, user=user)
-    target = f"{reverse('ops:report', args=[slug])}?{request.POST.get('query', '')}"
+    target = _report_url(slug, form)
     if not form.is_valid():
         messages.error(request, _first_error(form))
         return redirect(target)

@@ -1,12 +1,16 @@
 """P7 support ticket records in the admin (05 §2 Support): read-only for Super Admin, Ops and
-Support; changes happen only in the Ops support console through apps.support.services."""
+Support; changes happen only in the Ops support console through apps.support.services.
+
+Test cases (qa/docs/02-test-case-repository.md): P7-TC-40 (admin P7 screens: the ticket
+records, role matrix enforced), P7-TC-18 (Finance and the other roles refused)."""
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts import roles
-from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.factories import StaffUserFactory, UserFactory
 from apps.ops_console.tests.helpers import PRINCIPALS, SUPERUSER, expected_status, login_as
 from apps.support.choices import TicketCategory, TicketStatus
 from apps.support.models import SupportTicket, TicketMessage
@@ -36,6 +40,8 @@ def ticket():
 
 @pytest.mark.parametrize("principal", PRINCIPALS)
 def test_view_matrix(client, principal, ticket):
+    """P7-TC-40, P7-TC-18: 05 §3 "Support tickets" (Super Admin, Ops, Support); every other
+    role, a customer and a visitor are refused."""
     login_as(client, principal)
     expected = expected_status(principal, VIEW_ROLES)
     assert client.get(reverse("admin:support_supportticket_changelist")).status_code == expected
@@ -46,10 +52,33 @@ def test_view_matrix(client, principal, ticket):
         assert "Help me" in html
         assert "+919811122233" not in html  # customer shown by id only
         assert reverse("ops:support-ticket", args=[ticket.pk]) in html
+        # These roles also hold `accounts.view_customer` (05 §3 "Customers (PII)").
+        assert reverse("admin:accounts_customer_change", args=[ticket.user_id]) in html
+
+
+def test_customer_link_needs_customer_view(client, ticket):
+    """P7-TC-40 (review fix, T-716): the customer is linked to the Customers admin only for
+    staff who may open it (`accounts.view_customer`); anyone else sees plain text."""
+    user = StaffUserFactory()
+    user.user_permissions.add(
+        *Permission.objects.filter(
+            content_type__app_label="support",
+            codename__in=("view_supportticket", "view_ticketmessage"),
+        )
+    )
+    client.force_login(user)
+    response = client.get(reverse("admin:support_supportticket_change", args=[ticket.pk]))
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert f"Customer {ticket.user_id}" in html
+    assert reverse("admin:accounts_customer_change", args=[ticket.user_id]) not in html
+    assert "+919811122233" not in html
 
 
 @pytest.mark.parametrize("principal", [roles.SUPER_ADMIN, SUPERUSER, roles.SUPPORT])
 def test_read_only_even_for_superusers(client, principal, ticket):
+    """P7-TC-40: no add, change or delete in the admin, even for a superuser; replies and
+    status changes go through the support console and `apps.support.services`."""
     login_as(client, principal)
     url = reverse("admin:support_supportticket_change", args=[ticket.pk])
     response = client.post(url, {"status": TicketStatus.CLOSED})
@@ -63,6 +92,7 @@ def test_read_only_even_for_superusers(client, principal, ticket):
 
 
 def test_search_by_order_number_and_id(client, ticket):
+    """P7-TC-40: search by ticket id or order number only (no message bodies)."""
     login_as(client, roles.SUPPORT)
     url = reverse("admin:support_supportticket_changelist")
     assert client.get(url, {"q": str(ticket.pk)}).status_code == 200
