@@ -32,7 +32,7 @@ Services emit internal events (e.g., `order_placed`, `order_status_changed`, `ta
 
 ## 2. REST endpoints: shared & customer app
 
-Auth column: **Public** = no token. **Customer** = any authenticated user. **Rider** = active rider. **Owner** = object belongs to the caller.
+Auth column: **Public** = no token. **Customer** = any authenticated user. **Rider** = active rider. **Owner** = object belongs to the caller. Which app's token each endpoint takes (customer app, rider app or both) is listed in §2.1 "App tokens" (T-219).
 
 ### 2.0 Health & API schema [P0]
 | Method | Path | Auth | Purpose |
@@ -69,6 +69,32 @@ Contract details (published in `backend/openapi/schema.yaml`, Phase 1 R1; the sc
 - **Config** `GET /config/app/`: versions and `store_url` are for the `X-App-Name` + `X-Platform` of the request (null without those headers), plus `maintenance`, `maintenance_message`, `support {phone, email}`, `policy_urls {terms, privacy, refund}`, `terms_version`, `otp {length, resend_after_seconds}`, `rider_location {active_interval_seconds, idle_interval_seconds}` (04 §3) and `feature_flags` (name → bool; ignore unknown keys).
 - **Redis outage (09 §2):** `config/app` and the 426/503 guard fall back to the database when the cache is down. OTP rate limiting is **fail-closed**: `otp/request`, `otp/verify` and `me/delete` answer 503 `SERVICE_UNAVAILABLE` ("Sign-in is temporarily unavailable…") instead of sending or checking OTPs without counters. Fixed-OTP test numbers skip the counters and keep working.
 - **426 / 503 on app endpoints:** every `/api/v1/` endpoint except `config/app` and `auth/token/refresh` can answer 426 `APP_UPDATE_REQUIRED` (`details: {min_supported_version, latest_version, store_url}`) and 503 `MAINTENANCE`. 426 is sent only when `X-App-Name`, `X-Platform` and `X-App-Version` are all present and the version is below the minimum; requests without them never get 426.
+
+#### App tokens (T-219, P2 follow-up)
+The access token's `app` claim (`customer`/`rider`) decides which app a session belongs to. It is set at OTP verify from the body `app`, copied into every access token and kept on every refresh (every token issued since Phase 1 carries it). `X-App-Name` only names the calling app and must agree with the claim. One check runs for every token-authenticated request (`apps.accounts.app_access`, called by the JWT authentication class), so no view can skip it:
+- **Header mismatch:** `X-App-Name` names the other app → 403 `PERMISSION_DENIED`, `details: {reason: "APP_HEADER_MISMATCH", header_app, token_app}`. An absent, empty or unknown header names no app and is ignored (unknown client-info values are never an error, P0-TC-13).
+- **Wrong app's token:** an app-only endpoint called with the other app's token → 403 `PERMISSION_DENIED`, `details: {reason: "WRONG_APP_TOKEN", required_app, token_app}`. This runs before the endpoint's own checks, so a customer-app token on `/rider/me/` gets this error, not `rider_status`.
+- **No claim:** a token without a valid `app` claim fits no app-only endpoint and no `X-App-Name` value. None is issued.
+- **Not affected:** public endpoints (they never read a token), staff sessions (admin, Ops Console) and the sockets (the rider socket keeps its own rule, §4.1).
+
+| Endpoint group | Paths under `/api/v1/` | Token class |
+|---|---|---|
+| OTP login, token refresh | `auth/otp/request/`, `auth/otp/verify/`, `auth/token/refresh/` | Public (no access token) |
+| Logout | `auth/logout/` | Shared |
+| Profile, account deletion, devices | `me/`, `me/delete/`, `me/devices/` | Shared |
+| Notification inbox | `me/notifications/…` | Shared, entries scoped by the claim |
+| Addresses | `addresses/…` | Shared (open question: customer only?) |
+| App config, CMS pages, FAQs | `config/app/`, `pages/{slug}/`, `faqs/` | Public |
+| Serviceability | `serviceability/`, `serviceability/notify-me/` | Public (notify-me: optional token, checked as shared) |
+| Catalog | `home/`, `categories/`, `products/…`, `search/…`, `collections/{slug}/` | Public (home: optional token, checked as shared) |
+| Support tickets | `support/tickets/…` | Shared, tickets scoped by the claim |
+| Cart and coupons | `cart/…` | Customer app |
+| Orders: place, list, detail, retry payment, cancel, reorder, invoice, track, rating | `orders/…` | Customer app |
+| Payment verify | `payments/razorpay/verify/` | Customer app |
+| Gateway webhook | `payments/razorpay/webhook/` | Public, server to server (never checked) |
+| Rider app: stores, register, profile, documents, bank, shift, locations, heartbeat, offers, tasks, history, earnings, cash ledger, payouts, ratings | `rider/…` | Rider app |
+
+The app-only groups are the path prefixes in `apps.accounts.app_access.APP_ONLY_PREFIXES`; every other path is shared. `apps/accounts/tests/test_app_claim.py` walks the URLconf: a new top-level group fails it until it is classified here, and every app-only route is called with the other app's token. Every token-authenticated operation in `openapi/schema.yaml` documents these 403 examples.
 
 ### 2.2 Addresses [P1]
 | Method | Path | Auth | Purpose |
@@ -248,7 +274,7 @@ P7 implementation (T-711, built ahead of Phase 7; app proposals api-requests #35
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| POST | `/api/v1/rider/register/` | Customer (any logged-in user) | Create a rider profile (personal + vehicle + preferred store) |
+| POST | `/api/v1/rider/register/` | Any logged-in user, rider-app token (§2.1 "App tokens") | Create a rider profile (personal + vehicle + preferred store) |
 | GET / PATCH | `/api/v1/rider/me/` | Rider (any status) | Profile, KYC status, home store, cash in hand, limits |
 | POST | `/api/v1/rider/documents/` | Rider (any status) | Upload a KYC document (multipart; type + file + number) |
 | PUT | `/api/v1/rider/bank-account/` | Rider (any status) | Set bank/UPI details |
@@ -271,7 +297,7 @@ P7 implementation (T-711, built ahead of Phase 7; app proposals api-requests #35
 | GET | `/api/v1/rider/cash/ledger/` | Rider | Cash-in-hand ledger |
 | GET | `/api/v1/rider/payouts/` | Rider | Payout history |
 | DELETE | `/api/v1/me/devices/` | Any logged-in user | Unregister a push token `{fcm_token}` (204, own devices only; added in P5, #39) |
-| GET | `/api/v1/rider/stores/` | Any logged-in user | Active stores for the registration dropdown (added in P5, api-requests #6) |
+| GET | `/api/v1/rider/stores/` | Any logged-in user, rider-app token | Active stores for the registration dropdown (added in P5, api-requests #6) |
 | POST | `/api/v1/rider/heartbeat/` | Rider | App alive + status check: `is_online`, pending offer, active task, shift (added in P5) |
 
 Contract details (Phase 5, T-511; published in `backend/openapi/schema.yaml`, tag `rider`, with examples for every case):
@@ -283,7 +309,7 @@ Contract details (Phase 5, T-511; published in `backend/openapi/schema.yaml`, ta
   - records: `rider_tasks_history`, `rider_tasks_history_detail` (5.4), `rider_earnings`, `rider_cash_ledger`, `rider_payouts_list`
   - customer tracking: `orders_track` (tag `orders`)
   - Live: slices 5.1 and 5.2 and `orders_track`. The rest answer 503 `SERVICE_UNAVAILABLE` until slice 5.3 or 5.4.
-- **Access:** every rider operation except stores and register needs a rider profile, else 403 `PERMISSION_DENIED` with `details.rider_status` = NONE (api-requests #8: 403, not 404, also for `/rider/me/`). Shift, location, offer and task operations need an ACTIVE rider, else 403 with `details.reason` = `RIDER_NOT_ACTIVE` and `rider_status`. Records (history, earnings, ledger, payouts) are open in any status. Another rider's offer or task id is 404.
+- **Access:** every rider operation needs a rider-app token (a customer-app token is 403 `WRONG_APP_TOKEN` before anything else, §2.1 "App tokens", T-219). Every rider operation except stores and register needs a rider profile, else 403 `PERMISSION_DENIED` with `details.rider_status` = NONE (api-requests #8: 403, not 404, also for `/rider/me/`). Shift, location, offer and task operations need an ACTIVE rider, else 403 with `details.reason` = `RIDER_NOT_ACTIVE` and `rider_status`. Records (history, earnings, ledger, payouts) are open in any status. Another rider's offer or task id is 404.
 - **Registration and KYC** (`apps.delivery.services.riders`):
   - Register once (409 `INVALID_STATE_TRANSITION` after that).
   - Age 18 or older on the IST date. The emergency contact is a +91 mobile that is not the rider's own. `vehicle_number` is required for MOTORBIKE/SCOOTER only.

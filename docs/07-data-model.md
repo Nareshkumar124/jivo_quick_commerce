@@ -5,60 +5,91 @@ Money fields: `DecimalField(max_digits=12, decimal_places=2)`. Geo fields: SRID 
 
 ## 1. Entity-relationship overview
 
-Updated in Phase 2 (T-204): Phase 1 entities (`OTP_REQUEST`, `APP_CONFIG`, `APP_VERSION_POLICY`) and the Phase 2 additions (`SERVICEABILITY_REQUEST`, `TRENDING_SEARCH`, variant images, collection/banner store scoping). `OTPRequest` has no foreign key: it is linked to a user by phone. Built so far: accounts, cms, stores, catalog, inventory; Phase 3 R2a adds cart, promotions, orders, payments and `STOCK_RESERVATION` (models and migrations; the order and payment flows land in R2b).
+Updated in Phase 2 (T-204), refreshed in the P2 follow-ups (2026-11-10) to match the models of every app built so far (P0-P8): key relations only. Not shown: the simple-history `Historical*` tables, the `Customer` proxy of `User`, and the many staff `User` foreign keys (`created_by`, `reviewed_by`, `approved_by`, `recorded_by` and so on). `OTPRequest` has no foreign key: it is linked to a user by phone (dotted line). Entities without lines stand alone (configuration, logs, templates).
 
 ```mermaid
 erDiagram
+    %% accounts, cms (P1)
     USER ||--o{ ADDRESS : has
     USER ||--o{ DEVICE : registers
-    USER ||--o{ OTP_REQUEST : "phone verified by"
+    USER |o..o{ OTP_REQUEST : "same phone (no FK)"
     APP_CONFIG ||--o{ APP_VERSION_POLICY : "per app + platform"
     USER ||--o| RIDER : "may be"
-    USER ||--o{ SERVICEABILITY_REQUEST : "notify me"
     USER ||--o{ STAFF_STORE_ACCESS : "staff scoped to"
     DARK_STORE ||--o{ STAFF_STORE_ACCESS : ""
+    %% stores, catalog, inventory (P2)
+    USER |o--o{ SERVICEABILITY_REQUEST : "notify me"
     DARK_STORE ||--|| PRICING_CONFIG : has
     DARK_STORE ||--o{ STORE_TIMING : opens
     DARK_STORE ||--o{ STORE_INVENTORY : stocks
-    CATEGORY ||--o{ CATEGORY : parent
+    CATEGORY |o--o{ CATEGORY : parent
     CATEGORY ||--o{ PRODUCT : contains
     PRODUCT ||--o{ PRODUCT_VARIANT : "sold as"
     PRODUCT ||--o{ PRODUCT_IMAGE : shows
+    PRODUCT_VARIANT |o--o{ PRODUCT_IMAGE : "own images"
     PRODUCT_VARIANT ||--o{ STORE_INVENTORY : ""
-    STORE_INVENTORY ||--o{ STOCK_MOVEMENT : ledger
+    DARK_STORE ||--o{ STOCK_MOVEMENT : "ledger (store + variant)"
+    PRODUCT_VARIANT ||--o{ STOCK_MOVEMENT : ""
     COLLECTION ||--o{ COLLECTION_ITEM : lists
     PRODUCT_VARIANT ||--o{ COLLECTION_ITEM : ""
-    PRODUCT_VARIANT ||--o{ PRODUCT_IMAGE : "own images"
     DARK_STORE }o--o{ COLLECTION : "shown at (empty = all)"
     DARK_STORE }o--o{ BANNER : "shown at (empty = all)"
     TRENDING_SEARCH
-    USER ||--o{ CART : owns
-    CART ||--o{ CART_ITEM : contains
+    %% cart, promotions, orders, payments (P3-P4)
+    USER ||--o| CART : owns
     DARK_STORE ||--o{ CART : "scoped to"
+    CART ||--o{ CART_ITEM : contains
+    PRODUCT_VARIANT ||--o{ CART_ITEM : ""
+    COUPON |o--o{ CART : "applied to"
+    DARK_STORE }o--o{ COUPON : "valid at (empty = all)"
     COUPON ||--o{ COUPON_REDEMPTION : used
     USER ||--o{ ORDER : places
     DARK_STORE ||--o{ ORDER : fulfils
     ORDER ||--o{ ORDER_ITEM : contains
+    PRODUCT_VARIANT ||--o{ ORDER_ITEM : ""
     ORDER ||--o{ ORDER_STATUS_HISTORY : logs
     ORDER ||--o{ STOCK_RESERVATION : holds
+    ORDER |o--o{ STOCK_MOVEMENT : "sale / return"
+    ORDER ||--o| COUPON_REDEMPTION : applies
     ORDER ||--o{ PAYMENT : "paid by"
     PAYMENT ||--o{ REFUND : "refunded by"
     ORDER ||--o| INVOICE : billed
-    ORDER ||--o| COUPON_REDEMPTION : applies
-    ORDER ||--o{ DELIVERY_TASK : "delivered via"
-    RIDER ||--o{ DELIVERY_TASK : performs
+    DARK_STORE ||--o{ INVOICE_SEQUENCE : "numbers invoices"
+    PAYMENT_WEBHOOK_EVENT
+    %% delivery (P5)
+    DARK_STORE ||--o{ RIDER : "preferred / home store"
+    ORDER ||--o| DELIVERY_TASK : "delivered via"
+    DARK_STORE ||--o{ DELIVERY_TASK : dispatches
+    RIDER |o--o{ DELIVERY_TASK : performs
     DELIVERY_TASK ||--o{ DELIVERY_OFFER : offered
     RIDER ||--o{ DELIVERY_OFFER : receives
+    DELIVERY_TASK ||--o{ COD_QR : "COD UPI QR"
+    PAYMENT |o--o| COD_QR : "paid through"
     RIDER ||--o{ RIDER_DOCUMENT : uploads
     RIDER ||--o{ RIDER_SHIFT : works
     RIDER ||--o{ RIDER_LOCATION : pings
     RIDER ||--o{ RIDER_CASH_LEDGER : holds
     RIDER ||--o{ RIDER_EARNING : earns
+    DELIVERY_TASK |o--o{ RIDER_EARNING : "pays for"
     RIDER ||--o{ PAYOUT : "paid via"
+    PAYOUT |o--o{ RIDER_EARNING : settles
+    EARNING_RULE
+    %% ratings, support, notifications, CMS, reports, audit (P6-P8)
     ORDER ||--o{ RATING : rated
+    RIDER |o--o{ RATING : "rider stars"
     USER ||--o{ SUPPORT_TICKET : raises
+    ORDER |o--o{ SUPPORT_TICKET : about
+    DELIVERY_TASK |o--o{ SUPPORT_TICKET : "rider ticket"
+    PAYOUT |o--o{ SUPPORT_TICKET : "rider ticket"
     SUPPORT_TICKET ||--o{ TICKET_MESSAGE : thread
+    SUPPORT_TICKET ||--o{ TICKET_ATTACHMENT : photos
+    CANNED_REPLY
     USER ||--o{ NOTIFICATION : receives
+    NOTIFICATION_TEMPLATE
+    PAGE
+    FAQ
+    USER ||--o{ REPORT_EXPORT : requests
+    USER |o--o{ AUDIT_LOG : actor
 ```
 
 ## 2. Entities

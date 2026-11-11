@@ -10,7 +10,16 @@ def user_can_authenticate(user) -> bool:
 
 class JWTAuthentication(BaseJWTAuthentication):
     """simplejwt, plus: an account in its deletion grace period cannot use its access tokens
-    (refresh tokens are already revoked by the deletion)."""
+    (refresh tokens are already revoked by the deletion), and the token's `app` claim must fit
+    the request (`apps.accounts.app_access`, T-219: 403 `PERMISSION_DENIED`)."""
+
+    def authenticate(self, request):
+        result = super().authenticate(request)
+        if result is not None:
+            from apps.accounts import app_access  # lazy: DRF imports this module from APIView
+
+            app_access.check(request, result[1])
+        return result
 
     def get_user(self, validated_token):
         user = super().get_user(validated_token)

@@ -102,6 +102,7 @@ class TestSmsBackendInDeployedEnvironments:
         monkeypatch.setenv("NUM_PROXIES", "1")
         monkeypatch.delenv("SMS_BACKEND", raising=False)
         monkeypatch.delenv("OTP_TEST_NUMBERS", raising=False)
+        monkeypatch.delenv("SEED_DEMO_ALLOWED", raising=False)  # m8: production refuses it
         monkeypatch.delenv("SENTRY_DSN", raising=False)
         for name in ("config.settings.production", "config.settings.deployed"):
             sys.modules.pop(name, None)

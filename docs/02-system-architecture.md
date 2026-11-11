@@ -224,7 +224,7 @@ Each environment has its own database, buckets, Firebase project (or app IDs), R
 | Rider | Phone number + OTP (`app: rider`). **Any phone can log in** (decided in Phase 1, following 04 §1 and 06 §3): the verify response carries `rider_status` (`NONE` without a profile → registration). Access to orders requires an `ACTIVE` rider (KYC approved). | JWT |
 | Staff (admin/ops/store) | Email/username + password with Django sessions, **or** Jivo Auth SSO if adopted (D-04) | Django session cookie, CSRF protected |
 
-One `User` table holds everyone. A user is a customer by default. A `Rider` profile marks a rider, and Django Groups plus per-store assignment mark staff roles. The same phone number may be both a customer and a rider. The `X-App-Name` header and token claims decide which app context applies.
+One `User` table holds everyone. A user is a customer by default. A `Rider` profile marks a rider, and Django Groups plus per-store assignment mark staff roles. The same phone number may be both a customer and a rider. The access token's `app` claim (set at OTP verify, kept on refresh) decides which app context applies; the `X-App-Name` header must agree with it. Rider endpoints need a rider-app token and cart, order and payment endpoints a customer-app token (T-219; endpoint classes in 06 §2.1 "App tokens").
 
 ## 7. Real-time design
 

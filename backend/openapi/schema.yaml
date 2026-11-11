@@ -5,7 +5,7 @@ info:
   description: |-
     REST API for the Jivo customer and rider apps.
 
-    Conventions (docs/02-system-architecture.md §5): JSON with snake_case keys; money as 2-decimal strings; times in UTC ISO 8601; pagination with `page`/`page_size` (default 20, max 100). Apps send `X-App-Name`, `X-App-Version` and `X-Platform` on every request. Errors use the envelope `{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema). Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`.
+    Conventions (docs/02-system-architecture.md §5): JSON with snake_case keys; money as 2-decimal strings; times in UTC ISO 8601; pagination with `page`/`page_size` (default 20, max 100). Apps send `X-App-Name`, `X-App-Version` and `X-Platform` on every request. The access token's `app` claim decides which app a session belongs to: `X-App-Name` must agree with it, `/rider/` endpoints need a rider-app token and the cart, order and payment endpoints a customer-app token, else 403 `PERMISSION_DENIED` (`details.reason` `APP_HEADER_MISMATCH` or `WRONG_APP_TOKEN`). Errors use the envelope `{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema). Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`.
 paths:
   /api/v1/addresses/:
     get:
@@ -102,6 +102,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -280,6 +299,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -395,6 +433,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -559,6 +616,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -664,6 +740,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -794,6 +889,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -923,6 +1037,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -2463,6 +2596,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '400':
           content:
             application/json:
@@ -2770,6 +2935,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '422':
           content:
             application/json:
@@ -3003,6 +3200,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '400':
           content:
             application/json:
@@ -3287,6 +3516,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '422':
           content:
             application/json:
@@ -3585,6 +3846,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '400':
           content:
             application/json:
@@ -3806,6 +4099,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '400':
           content:
             application/json:
@@ -4097,6 +4422,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '409':
           content:
             application/json:
@@ -4433,6 +4790,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '409':
           content:
             application/json:
@@ -4727,6 +5116,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '400':
           content:
             application/json:
@@ -6634,6 +7055,25 @@ paths:
           description: Only when an `Authorization` header is sent and the token is
             invalid, expired or revoked. Anonymous calls (no header) never get 401.
             Refresh once and retry, or retry without the header after logout.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '400':
           content:
             application/json:
@@ -6798,6 +7238,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -6941,6 +7400,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -7094,7 +7572,20 @@ paths:
                       message: Staff accounts are deleted by an administrator.
                       details: {}
                   summary: PERMISSION_DENIED
-          description: Staff accounts cannot be deleted from the app.
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'Staff accounts cannot be deleted from the app. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -7236,6 +7727,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -7349,6 +7859,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -7484,6 +8013,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -7606,6 +8154,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -7713,6 +8280,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -7808,6 +8394,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -8058,6 +8663,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -8730,6 +9367,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '409':
           content:
             application/json:
@@ -9956,6 +10625,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -10319,6 +11020,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -10456,6 +11189,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -10612,6 +11377,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -10838,6 +11635,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -11237,6 +12066,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '400':
           content:
             application/json:
@@ -11531,6 +12392,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -11775,6 +12668,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -12116,6 +13041,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -13331,7 +14288,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '426':
           content:
             application/json:
@@ -13462,7 +14444,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -13652,7 +14659,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '409':
           content:
             application/json:
@@ -13845,7 +14877,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -14028,7 +15085,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '426':
           content:
             application/json:
@@ -14213,8 +15295,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '409':
           content:
             application/json:
@@ -14730,7 +15837,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -14955,7 +16087,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -15147,8 +16304,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -15327,8 +16509,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -15494,8 +16701,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -15632,7 +16864,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -15809,7 +17066,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: NOT_A_RIDER
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -16053,7 +17335,32 @@ paths:
                       message: Staff accounts cannot register as riders.
                       details: {}
                   summary: PERMISSION_DENIED
-          description: Staff accounts cannot register.
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'Staff accounts cannot register. Only rider-app tokens may
+            call this: a token issued to the customer app gets `details.reason` =
+            `WRONG_APP_TOKEN`. `X-App-Name` names a different app than the access
+            token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '409':
           content:
             application/json:
@@ -16180,7 +17487,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '409':
           content:
             application/json:
@@ -16389,8 +17721,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '409':
           content:
             application/json:
@@ -16526,6 +17883,38 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'Only rider-app tokens may call this: a token issued to the
+            customer app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names
+            a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -16736,8 +18125,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -16986,8 +18400,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -17176,8 +18615,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -17442,8 +18906,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -17723,8 +19212,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -17980,8 +19494,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -18273,8 +19812,33 @@ paths:
                         reason: RIDER_NOT_ACTIVE
                         rider_status: PENDING_KYC
                   summary: 'Not ACTIVE: route on rider_status'
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
           description: 'No rider profile, or the rider is not ACTIVE: `details.rider_status`
-            says which; route on it (04 §1).'
+            says which; route on it (04 §1). Only rider-app tokens may call this:
+            a token issued to the customer app gets `details.reason` = `WRONG_APP_TOKEN`.
+            `X-App-Name` names a different app than the access token''s `app` claim:
+            `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -18453,7 +20017,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -18603,7 +20192,32 @@ paths:
                       details:
                         rider_status: NONE
                   summary: 'No rider profile: show registration'
-          description: The caller has no rider profile (`details.rider_status` = NONE).
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo Rider app. Sign in to the rider
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: rider
+                        token_app: customer
+                  summary: A token issued to the customer app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: 'The caller has no rider profile (`details.rider_status` =
+            NONE). Only rider-app tokens may call this: a token issued to the customer
+            app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name` names a different
+            app than the access token''s `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -19421,6 +21035,25 @@ paths:
           description: Only when an `Authorization` header is sent and the token is
             invalid, expired or revoked. Anonymous calls (no header) never get 401.
             Refresh once and retry, or retry without the header after logout.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -19561,6 +21194,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -19771,6 +21423,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -19922,6 +21593,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -20076,6 +21766,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:
@@ -20277,6 +21986,25 @@ paths:
           description: No access token (`AUTH_REQUIRED`), or the token is invalid,
             expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
             and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
         '404':
           content:
             application/json:

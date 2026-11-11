@@ -245,7 +245,7 @@ class TestPaymentGatewayCheck:
         monkeypatch.setenv("DJANGO_SECRET_KEY", "x" * 64)
         monkeypatch.setenv("DJANGO_ALLOWED_HOSTS", "api.example.test")
         monkeypatch.setenv("NUM_PROXIES", "1")
-        for name in ("PAYMENT_GATEWAY", "OTP_TEST_NUMBERS", "SENTRY_DSN"):
+        for name in ("PAYMENT_GATEWAY", "OTP_TEST_NUMBERS", "SEED_DEMO_ALLOWED", "SENTRY_DSN"):
             monkeypatch.delenv(name, raising=False)
         modules = (
             "config.settings.production",
