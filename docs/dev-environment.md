@@ -39,6 +39,7 @@ Every development agent reads this before running anything. It records how the s
 - Run Flutter as **`C:\dev\flutter\bin\flutter`**, a junction to the SDK. The normal path contains a space, which breaks native-asset build hooks (`objective_c`).
 - Flutter 3.47.9 / Dart 3.13.7. Use `flutter pub get --enforce-lockfile`, and keep shared versions identical (`python3 packages/tool/check_shared_versions.py`).
 - **No emulator.** Don't touch the user's USB phone (`9TY5KF8H49Z5YDON`): no `adb install` and no `flutter run`. The PM does device builds and installs.
+- **Customer dev flavor is HTTPS-only for LAN IPs** (T-230, `abd2c6d`): plain HTTP to a LAN IP (e.g. `http://192.168.x.x:8001`) is refused. On the phone use `adb reverse tcp:8001 tcp:<local port>` and `--dart-define=API_BASE_URL=http://localhost:8001`.
 - Don't run `flutter test` or `pub get` while a `flutter build` is running in the same checkout.
 
 ## Git
