@@ -1,7 +1,7 @@
 {% load ops %}
 {# Packing queues of one store (05 §1.3; UX audit 2026-11-04 PC-02..06). Context: store, console (packing.Console), caps, actions, poll_seconds. Polls itself (pauses only while typing in a text field, at most 30 s, or while a dialog is open). data-new-orders / data-oldest-* feed the new-order banner and sound, which live OUTSIDE this region (#ops-alerts, orders.js). Money is shown as stored on the order, never computed. #}
 <div id="packing-queues" hx-get="{% url 'ops:packing-queues' store.code %}" hx-swap="outerHTML"
-     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('packing-queues')], ops:live from:body[opsLiveAllowed('packing-queues')], ops:refresh from:body"
+     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('packing-queues')], ops:live[opsLiveAllowed('packing-queues')] from:body, ops:refresh from:body"
      data-new-orders="{{ console.new_order_ids }}" data-new-count="{{ console.new_count }}"
      {% with oldest=console.oldest_new %}data-oldest-deadline="{{ oldest.timer.deadline|iso }}" data-oldest-warn="{{ oldest.timer.warn_at|iso }}" data-oldest-number="{{ oldest.order.order_number }}"{% endwith %} data-store="{{ store.code }}" data-store-name="{{ store.name }}"
      data-testid="packing-queues">

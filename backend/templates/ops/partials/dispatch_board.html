@@ -1,7 +1,7 @@
 {% load ops %}
 {# Dispatch board sections (05 §1.4). Context: board, poll_seconds. Polls with the store filter of #dispatch-filters and reloads at once on ops:refresh. No customer data; riders by name only. #}
 <div id="dispatch-board" hx-get="{% url 'ops:dispatch-board' %}" hx-include="#dispatch-filters" hx-swap="outerHTML"
-     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('dispatch-board')], ops:live from:body[opsLiveAllowed('dispatch-board')], ops:refresh from:body" data-testid="dispatch-board">
+     hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('dispatch-board')], ops:live[opsLiveAllowed('dispatch-board')] from:body, ops:refresh from:body" data-testid="dispatch-board">
     <p class="mb-3 ops-board-summary" data-testid="dispatch-summary">
         {{ board.waiting|length }} waiting for a rider{% if board.unassigned %}, <strong class="ops-tone-danger">{{ board.unassigned }} unassigned</strong>{% endif %};
         {{ board.offers|length }} offer{{ board.offers|length|pluralize }} in flight; {{ board.riders|length }} rider{{ board.riders|length|pluralize }} online.
