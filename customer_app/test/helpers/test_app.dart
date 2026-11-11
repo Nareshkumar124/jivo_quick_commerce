@@ -10,6 +10,7 @@ import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/data/fake_token_refresher.dart';
 import 'package:customer_app/features/cart/data/cart_repository.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
+import 'package:customer_app/features/catalog/data/catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
 import 'package:customer_app/features/checkout/data/fake_payment_launcher.dart';
 import 'package:customer_app/features/checkout/data/payment_launcher.dart';
@@ -56,6 +57,7 @@ class TestApp {
     String? autofillCode,
     FakeCommerceBackend? commerce,
     this.cartRepository,
+    this.catalogRepository,
     this.realtime = const DisabledOrderRealtime(),
     this.notifications = const UnavailableNotificationRepository(),
   }) : autofill = FakeOtpAutofill(autofillCode),
@@ -91,6 +93,10 @@ class TestApp {
 
   /// Replaces [cart] as the cart repository only (orders stay on [cart]).
   final CartRepository? cartRepository;
+
+  /// Replaces [catalog] (e.g. the API repository over fake HTTP with
+  /// server-shaped payloads).
+  final CatalogRepository? catalogRepository;
 
   /// How the fake payment sheet answers (no sheet in widget tests).
   FakePaymentChoice Function(PaymentRequest request) onPay = (_) =>
@@ -140,7 +146,9 @@ class TestApp {
           otpAutofillProvider.overrideWithValue(autofill),
           urlOpenerProvider.overrideWithValue(urls),
           connectivityStreamProvider.overrideWithValue(connectivity.stream),
-          catalogRepositoryProvider.overrideWithValue(catalog),
+          catalogRepositoryProvider.overrideWithValue(
+            catalogRepository ?? catalog,
+          ),
           serviceabilityRepositoryProvider.overrideWithValue(serviceability),
           cartRepositoryProvider.overrideWithValue(cartRepository ?? cart),
           orderRepositoryProvider.overrideWithValue(cart),

@@ -40,6 +40,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get offlineBanner => 'No internet connection';
 
   @override
+  String get offlineBannerHint =>
+      'We\'ll update as soon as you\'re back online.';
+
+  @override
+  String get refreshFailed => 'Couldn\'t refresh. Check your connection.';
+
+  @override
   String get onboardingTitle1 => 'Wellness, delivered fast';
 
   @override
@@ -310,6 +317,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'We need your location to deliver to this address. Stand at the address and tap \"Use my current location\".';
 
   @override
+  String get setLocationOnMap => 'Set location on map';
+
+  @override
+  String get adjustPin => 'Adjust pin';
+
+  @override
+  String get gpsOnlyAtAddress =>
+      'Use this only when you are at this address now.';
+
+  @override
+  String get pinNeededMap => 'Set the delivery location on the map first.';
+
+  @override
+  String get pinNeededNoMap => 'Set the delivery location first.';
+
+  @override
+  String get saveThisLocation => 'Save this location as an address';
+
+  @override
   String get locationDenied =>
       'Location permission is off. Allow location access so we can find your address.';
 
@@ -378,6 +404,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addToCart => 'ADD';
+
+  @override
+  String get updatingQuantity => 'Updating quantity';
 
   @override
   String addToCartSemantics(String name) {
@@ -1342,6 +1371,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String orderArrivingBy(String time) {
     return 'Arriving by $time';
   }
+
+  @override
+  String get activeOrderTrack => 'Track';
+
+  @override
+  String get activeOrderDetails => 'Details';
+
+  @override
+  String get activeOrderOtpReady => 'Delivery OTP ready';
+
+  @override
+  String get activeOrderDeliveryFailedBody =>
+      'We couldn\'t deliver it. See what happens next.';
+
+  @override
+  String activeOrderMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '+$count more orders in progress',
+      one: '+1 more order in progress',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get activeOrderSeeAll => 'See all';
+
+  @override
+  String activeOrderSemantics(String summary, String destination) {
+    return '$summary. Opens $destination.';
+  }
+
+  @override
+  String get activeOrderOpensTracking => 'tracking';
+
+  @override
+  String get activeOrderOpensDetails => 'the order details';
 
   @override
   String get orderAwaitingPayment => 'This order is waiting for payment.';

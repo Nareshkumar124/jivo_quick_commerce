@@ -24,6 +24,7 @@ import '../features/launch/presentation/onboarding_screen.dart';
 import '../features/launch/presentation/splash_screen.dart';
 import '../features/location/presentation/location_flow.dart';
 import '../features/location/presentation/location_screen.dart';
+import '../features/location/domain/delivery_location.dart';
 import '../features/location/presentation/map_picker_screen.dart';
 import '../features/location/presentation/not_serviceable_screen.dart';
 import '../features/orders/domain/order.dart';
@@ -234,7 +235,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       route(
         Routes.mapPicker,
         'map_picker',
-        (state) => MapPickerScreen(initial: state.extra as GeoPoint?),
+        (state) => switch (state.extra) {
+          final MapPickerArgs args => MapPickerScreen(
+            initial: args.initial,
+            fromAddressForm: args.fromAddressForm,
+          ),
+          final extra => MapPickerScreen(initial: extra as GeoPoint?),
+        },
       ),
       route(
         Routes.notServiceable,
@@ -248,7 +255,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         (_) => const EditProfileScreen(),
       ),
       route(Routes.addresses, 'addresses', (_) => const AddressListScreen()),
-      route(Routes.newAddress, 'address_new', (_) => const AddressFormScreen()),
+      route(
+        Routes.newAddress,
+        'address_new',
+        // "Save this location" carries the chosen pin over (CA-07).
+        (state) => AddressFormScreen(initial: state.extra as DeliveryLocation?),
+      ),
       route(
         '${Routes.addresses}/:id',
         'address_edit',

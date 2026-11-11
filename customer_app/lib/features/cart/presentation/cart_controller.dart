@@ -140,6 +140,14 @@ class CartController extends Notifier<CartState> {
     }
   }
 
+  /// [refresh] for the delivery location's saved address [addressId], or
+  /// for none (a pin, the current location, or a deleted address). Unlike
+  /// [refresh], null forgets the remembered address instead of keeping it.
+  Future<void> refreshForAddress(int? addressId) {
+    _addressId = addressId;
+    return refresh();
+  }
+
   /// Adds one of [variant]. Throws [CartLimitException] at the cap, or the
   /// repository's `ApiError`. [productName] only feeds the dev fake cart.
   Future<void> increment(CatalogVariant variant, {String? productName}) async {

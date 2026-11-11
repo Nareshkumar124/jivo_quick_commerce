@@ -67,6 +67,11 @@ class DiscountBadge extends StatelessWidget {
 
 /// Selling price and, when different, the struck-out MRP. Both are server
 /// decimal strings, only formatted here.
+///
+/// Each amount stays on one line and shrinks if it is wider than the space
+/// (a narrow tile at a large text size): an amount broken over two lines
+/// is hard to read and would push a tile past the height
+/// `productTileExtent` reserves (price and MRP: at most one line each).
 class PriceLine extends StatelessWidget {
   const PriceLine({
     required this.price,
@@ -86,27 +91,40 @@ class PriceLine extends StatelessWidget {
     final selling = formatRupees(price);
     final listed = formatRupees(mrp);
     final showMrp = listed != selling;
+    Widget oneLine(Widget amount) => FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: AlignmentDirectional.centerStart,
+      child: amount,
+    );
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: JivoSpacing.xs,
       children: [
-        Text(
-          selling,
-          semanticsLabel: l10n.priceSemantics(selling),
-          style:
-              (large ? theme.textTheme.titleLarge : theme.textTheme.titleSmall)
-                  ?.copyWith(fontWeight: FontWeight.w700),
+        oneLine(
+          Text(
+            selling,
+            semanticsLabel: l10n.priceSemantics(selling),
+            style:
+                (large
+                        ? theme.textTheme.titleLarge
+                        : theme.textTheme.titleSmall)
+                    ?.copyWith(fontWeight: FontWeight.w700),
+          ),
         ),
         if (showMrp)
-          Text(
-            listed,
-            semanticsLabel: l10n.mrpSemantics(listed),
-            style:
-                (large ? theme.textTheme.bodyMedium : theme.textTheme.bodySmall)
-                    ?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      decoration: TextDecoration.lineThrough,
-                    ),
+          oneLine(
+            Text(
+              listed,
+              semanticsLabel: l10n.mrpSemantics(listed),
+              style:
+                  (large
+                          ? theme.textTheme.bodyMedium
+                          : theme.textTheme.bodySmall)
+                      ?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+            ),
           ),
       ],
     );

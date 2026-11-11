@@ -142,6 +142,36 @@ class DeliveryController extends Notifier<DeliveryState> {
     );
     await ref.read(deliveryLocationStoreProvider).write(location);
   }
+
+  /// The saved address [addressId] was deleted. If it is the delivery
+  /// location, keep shopping at the same point but drop the id: the server
+  /// refuses a deleted address (`VALIDATION_ERROR` on `GET /cart/`), and
+  /// checkout asks for a saved address again.
+  Future<void> forgetAddress(int addressId) async {
+    final location = state.location;
+    if (location == null || location.addressId != addressId) return;
+    final unsaved = DeliveryLocation(
+      point: location.point,
+      title: location.title,
+      subtitle: location.subtitle,
+    );
+    final wasChecking = state.checking;
+    state = DeliveryState(
+      location: unsaved,
+      serviceability: state.serviceability,
+      storeGeneration: state.storeGeneration,
+    );
+    await ref.read(deliveryLocationStoreProvider).write(unsaved);
+    // A check that was running for the old location is ignored on return.
+    if (wasChecking) await refresh();
+  }
+
+  /// Sign-out: the location (often a saved address, with its id and street)
+  /// belongs to the user who left (`03 §2.2`: logout clears local data).
+  Future<void> clearForSignOut() async {
+    await ref.read(deliveryLocationStoreProvider).clear();
+    state = DeliveryState(storeGeneration: state.storeGeneration);
+  }
 }
 
 final deliveryProvider = NotifierProvider<DeliveryController, DeliveryState>(

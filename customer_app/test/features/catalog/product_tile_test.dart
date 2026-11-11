@@ -210,6 +210,42 @@ void main() {
     expect(qty(tester, 101), '1');
   });
 
+  testWidgets('CA-17: a slow change shows a spinner after 300 ms, never '
+      'before, and the number only from the server', (tester) async {
+    final slow = SlowCartRepository();
+    await pumpTile(tester, product(), repository: slow);
+    final add = find.byKey(const ValueKey('add-101'));
+    Finder spinnerIn(Finder of) => find.descendant(
+      of: of,
+      matching: find.byType(CircularProgressIndicator),
+    );
+
+    await tester.tap(find.text('ADD'));
+    // pump(d) advances time BEFORE drawing, so draw the pending frame first:
+    // on a device it follows the tap within one frame.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(spinnerIn(add), findsNothing, reason: 'no flash on a fast answer');
+    expect(find.text('ADD'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(spinnerIn(add), findsOneWidget);
+    expect(find.text('ADD'), findsNothing);
+
+    slow.release();
+    await tester.pumpAndSettle();
+    expect(qty(tester, 101), '1');
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('inc-101')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(find.byKey(const ValueKey('qty-busy-101')), findsOneWidget);
+    expect(find.byKey(const ValueKey('qty-101')), findsNothing);
+    slow.release();
+    await tester.pumpAndSettle();
+    expect(qty(tester, 101), '2');
+  });
+
   testWidgets('a server error is shown as a friendly message', (tester) async {
     final cart = FakeCommerceBackend(latency: Duration.zero);
     await pumpTile(tester, product(), repository: cart);

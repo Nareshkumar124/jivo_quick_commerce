@@ -6,7 +6,8 @@ import '../../l10n/generated/app_localizations.dart';
 import '../connectivity/connectivity.dart';
 
 /// Wraps every screen and shows "No internet connection" on top while the
-/// device is offline (`03 §2.1`). Installed via `MaterialApp.builder`.
+/// device is offline, or after requests keep failing for lack of a
+/// connection (`03 §2.1`, CA-02). Installed via `MaterialApp.builder`.
 class OfflineBanner extends ConsumerWidget {
   const OfflineBanner({required this.child, super.key});
 
@@ -14,7 +15,7 @@ class OfflineBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final offline = ref.watch(isOfflineProvider).value ?? false;
+    final offline = ref.watch(connectionLostProvider);
     final theme = Theme.of(context);
     return Column(
       children: [
@@ -39,11 +40,23 @@ class OfflineBanner extends ConsumerWidget {
                       ),
                       const SizedBox(width: JivoSpacing.sm),
                       Expanded(
-                        child: Text(
-                          AppLocalizations.of(context).offlineBanner,
-                          style: TextStyle(
-                            color: theme.colorScheme.onInverseSurface,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              AppLocalizations.of(context).offlineBanner,
+                              style: TextStyle(
+                                color: theme.colorScheme.onInverseSurface,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              AppLocalizations.of(context).offlineBannerHint,
+                              style: TextStyle(
+                                color: theme.colorScheme.onInverseSurface,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

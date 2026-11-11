@@ -20,6 +20,7 @@ import '../../location/domain/delivery_location.dart';
 import '../../location/presentation/delivery_controller.dart';
 import '../../location/presentation/location_options.dart';
 import '../../location/presentation/store_closed_banner.dart';
+import '../../orders/presentation/active_order_card.dart';
 import '../../orders/presentation/pending_payment.dart';
 import 'banner_carousel.dart';
 
@@ -64,6 +65,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final delivery = ref.watch(deliveryProvider);
+    // CA-03: a failed pull-to-refresh keeps the feed and says so. Only with
+    // a store: listening starts the feed, and there is none to load without.
+    if (delivery.store != null) {
+      ref.listen(homeFeedProvider, (previous, next) {
+        if (isFailedRefresh(previous, next) &&
+            next.value?.store?.id == ref.read(currentStoreIdProvider)) {
+          showRefreshFailed(context, () => ref.invalidate(homeFeedProvider));
+        }
+      });
+    }
     // The feed carries the store's live status; until it loads, the
     // serviceability check's.
     final store = delivery.store == null
@@ -90,6 +101,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SliverToBoxAdapter(child: _UpdatePrompt()),
               const SliverToBoxAdapter(child: PendingPaymentBanner()),
+              const SliverToBoxAdapter(child: ActiveOrderCard()),
               if (store != null && !store.isOpen)
                 SliverToBoxAdapter(child: StoreClosedBanner(store: store)),
               ..._content(context, delivery),
@@ -154,6 +166,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         fill(EmptyView(message: l10n.homeEmpty)),
       ],
       AsyncData(:final value) => _sections(context, value),
+      // A failed refresh of this store's feed keeps it on screen (CA-03).
+      // Another store's feed (a failed reload after a store change) never
+      // stays: its prices and stock are not this store's.
+      AsyncError(:final value?)
+          when delivery.storeId != null &&
+              value.store?.id == delivery.storeId =>
+        value.isEmpty
+            ? [fill(EmptyView(message: l10n.homeEmpty))]
+            : _sections(context, value),
       AsyncError(:final error) => [
         fill(
           ErrorRetryView(

@@ -102,20 +102,26 @@ class CartLineTile extends ConsumerWidget {
               if (!outOfStock)
                 SizedBox(
                   width: 112,
-                  child: QuantityStepper(
-                    id: 'line-$id',
-                    quantity: line.quantity,
-                    productName: line.productName,
-                    onDecrement: pending
-                        ? null
-                        : () => run(
-                            () => cart.setLineQuantity(line, line.quantity - 1),
-                          ),
-                    onIncrement: pending
-                        ? null
-                        : () => run(
-                            () => cart.setLineQuantity(line, line.quantity + 1),
-                          ),
+                  child: DelayedPending(
+                    pending: pending,
+                    builder: (context, slow) => QuantityStepper(
+                      id: 'line-$id',
+                      quantity: line.quantity,
+                      productName: line.productName,
+                      busy: slow,
+                      onDecrement: pending
+                          ? null
+                          : () => run(
+                              () =>
+                                  cart.setLineQuantity(line, line.quantity - 1),
+                            ),
+                      onIncrement: pending
+                          ? null
+                          : () => run(
+                              () =>
+                                  cart.setLineQuantity(line, line.quantity + 1),
+                            ),
+                    ),
                   ),
                 ),
               const SizedBox(height: JivoSpacing.xs),
