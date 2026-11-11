@@ -40,8 +40,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     Future.microtask(_refresh);
   }
 
+  /// Priced for the delivery location's saved address, or for none: a pin
+  /// or a deleted address must not leave the last id behind.
   Future<void> _refresh() =>
-      ref.read(cartProvider.notifier).refresh(addressId: _addressId);
+      ref.read(cartProvider.notifier).refreshForAddress(_addressId);
 
   /// Re-validates stock and the bill, then opens checkout (`03 §2.8`).
   Future<void> _proceed() async {
@@ -76,7 +78,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       next,
     ) {
       if (previous != next) {
-        ref.read(cartProvider.notifier).refresh(addressId: next);
+        ref.read(cartProvider.notifier).refreshForAddress(next);
       }
     });
 

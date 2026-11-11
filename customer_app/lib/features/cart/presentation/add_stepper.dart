@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
@@ -53,33 +55,97 @@ class AddStepper extends ConsumerWidget {
     if (quantity == 0 && !variant.inStock) {
       return const OutOfStockLabel();
     }
-    if (quantity == 0) {
-      return AddButton(
-        key: ValueKey('add-${variant.id}'),
-        semanticsLabel: l10n.addToCartSemantics(productName),
-        onPressed: pending
-            ? null
-            : () => _run(
-                context,
-                () => cart.increment(variant, productName: productName),
-              ),
-      );
-    }
-    return QuantityStepper(
-      id: '${variant.id}',
-      quantity: quantity,
-      productName: productName,
-      onDecrement: pending
-          ? null
-          : () => _run(context, () => cart.decrement(variant)),
-      onIncrement: pending
-          ? null
-          : () => _run(
-              context,
-              () => cart.increment(variant, productName: productName),
+    return DelayedPending(
+      pending: pending,
+      builder: (context, slow) => quantity == 0
+          ? AddButton(
+              key: ValueKey('add-${variant.id}'),
+              semanticsLabel: l10n.addToCartSemantics(productName),
+              busy: slow,
+              onPressed: pending
+                  ? null
+                  : () => _run(
+                      context,
+                      () => cart.increment(variant, productName: productName),
+                    ),
+            )
+          : QuantityStepper(
+              id: '${variant.id}',
+              quantity: quantity,
+              productName: productName,
+              busy: slow,
+              onDecrement: pending
+                  ? null
+                  : () => _run(context, () => cart.decrement(variant)),
+              onIncrement: pending
+                  ? null
+                  : () => _run(
+                      context,
+                      () => cart.increment(variant, productName: productName),
+                    ),
             ),
     );
   }
+}
+
+/// How long a cart change may run before the stepper shows a spinner
+/// (CA-17, `customer.motion.pendingSpinnerDelay`).
+const kPendingSpinnerDelay = Duration(milliseconds: 300);
+
+/// Builds with `slow: true` once [pending] has lasted [kPendingSpinnerDelay]
+/// (CA-17): on slow data the stepper shows progress instead of only dimming,
+/// and a fast answer never flashes a spinner.
+class DelayedPending extends StatefulWidget {
+  const DelayedPending({
+    required this.pending,
+    required this.builder,
+    super.key,
+  });
+
+  final bool pending;
+  final Widget Function(BuildContext context, bool slow) builder;
+
+  @override
+  State<DelayedPending> createState() => _DelayedPendingState();
+}
+
+class _DelayedPendingState extends State<DelayedPending> {
+  Timer? _timer;
+  bool _slow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(DelayedPending oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pending != widget.pending) _sync();
+  }
+
+  void _sync() {
+    _timer?.cancel();
+    _timer = null;
+    if (widget.pending) {
+      _timer = Timer(kPendingSpinnerDelay, () {
+        if (mounted) setState(() => _slow = true);
+      });
+    } else {
+      _slow = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(context, widget.pending && _slow);
 }
 
 /// Runs a cart change and shows the cap or server error as a message, with
@@ -154,11 +220,15 @@ class AddButton extends StatelessWidget {
   const AddButton({
     required this.semanticsLabel,
     required this.onPressed,
+    this.busy = false,
     super.key,
   });
 
   final String semanticsLabel;
   final VoidCallback? onPressed;
+
+  /// A slow change is running: a 16 dp spinner instead of "ADD" (CA-17).
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -172,14 +242,27 @@ class AddButton extends StatelessWidget {
           side: BorderSide(color: theme.colorScheme.primary),
           padding: EdgeInsets.zero,
         ),
-        child: Semantics(
-          label: semanticsLabel,
-          excludeSemantics: true,
-          child: Text(
-            AppLocalizations.of(context).addToCart,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
+        child: busy
+            ? Semantics(
+                liveRegion: true,
+                label: AppLocalizations.of(context).updatingQuantity,
+                excludeSemantics: true,
+                child: SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              )
+            : Semantics(
+                label: semanticsLabel,
+                excludeSemantics: true,
+                child: Text(
+                  AppLocalizations.of(context).addToCart,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
       ),
     );
   }
@@ -193,11 +276,16 @@ class QuantityStepper extends StatelessWidget {
     required this.productName,
     required this.onDecrement,
     required this.onIncrement,
+    this.busy = false,
     super.key,
   });
 
   /// Key suffix: `dec-<id>`, `qty-<id>`, `inc-<id>`.
   final String id;
+
+  /// A slow change is running: a 16 dp spinner instead of the number,
+  /// which changes only when the server answers (CA-17).
+  final bool busy;
   final int quantity;
   final String productName;
   final VoidCallback? onDecrement;
@@ -239,19 +327,32 @@ class QuantityStepper extends StatelessWidget {
             Expanded(
               child: Semantics(
                 liveRegion: true,
-                label: l10n.stepperQuantity(quantity),
+                label: busy
+                    ? l10n.updatingQuantity
+                    : l10n.stepperQuantity(quantity),
                 excludeSemantics: true,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    '$quantity',
-                    key: ValueKey('qty-$id'),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: onPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+                child: busy
+                    ? Center(
+                        key: ValueKey('qty-busy-$id'),
+                        child: SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: onPrimary,
+                          ),
+                        ),
+                      )
+                    : FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '$quantity',
+                          key: ValueKey('qty-$id'),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: onPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
               ),
             ),
             button(

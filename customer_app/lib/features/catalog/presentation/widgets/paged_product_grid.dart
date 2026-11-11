@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../../l10n/generated/app_localizations.dart';
+import '../../../location/presentation/delivery_controller.dart';
 import '../../../../shared/widgets/skeletons.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../catalog_controllers.dart';
@@ -25,24 +26,39 @@ class PagedProductGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = pagedProductsProvider(query);
-    return switch (ref.watch(provider)) {
-      AsyncData(:final value) when value.items.isEmpty => EmptyView(
+    final storeId = ref.watch(currentStoreIdProvider);
+    ref.listen(provider, (previous, next) {
+      if (isFailedRefresh(previous, next) &&
+          next.value?.storeId == ref.read(currentStoreIdProvider)) {
+        showRefreshFailed(context, () => ref.invalidate(provider));
+      }
+    });
+    final state = ref.watch(provider);
+    // This store's products, also when a refresh failed (CA-03); never
+    // another store's (prices and stock are per store).
+    final shown = switch (state) {
+      AsyncData(:final value) => value,
+      AsyncError(:final value?) when value.storeId == storeId => value,
+      _ => null,
+    };
+    return switch (state) {
+      _ when shown != null && shown.items.isEmpty => EmptyView(
         message: emptyMessage,
         icon: Icons.search_off,
         action: emptyAction,
       ),
-      AsyncData(:final value) => RefreshIndicator(
-        onRefresh: () => ref.refresh(provider.future),
+      _ when shown != null => RefreshIndicator(
+        onRefresh: () => refreshQuietly(ref.refresh(provider.future)),
         child: CustomScrollView(
           key: const Key('product-grid'),
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.all(JivoSpacing.sm),
-              sliver: SliverProductGrid(items: value.items),
+              sliver: SliverProductGrid(items: shown.items),
             ),
             SliverToBoxAdapter(
               child: _LoadMoreFooter(
-                state: value,
+                state: shown,
                 onLoadMore: () => ref.read(provider.notifier).loadMore(),
               ),
             ),

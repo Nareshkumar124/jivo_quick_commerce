@@ -6,7 +6,9 @@ import 'package:jivo_core/jivo_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/location/presentation/delivery_controller.dart';
+import '../shared/connectivity/connectivity.dart';
 import '../shared/links/url_opener.dart';
+import '../shared/network/network_health_interceptor.dart';
 import '../shared/network/store_header.dart';
 import '../shared/storage/app_flags.dart';
 
@@ -57,6 +59,11 @@ final dioProvider = Provider<Dio>((ref) {
     interceptors: [
       AuthInterceptor(ref.watch(sessionProvider)),
       AppControlInterceptor(ref.watch(appControlProvider)),
+      // "No internet" from failures, not only the device state (CA-02).
+      NetworkHealthInterceptor(
+        onFailed: () => ref.read(networkHealthProvider.notifier).failed(),
+        onAnswered: () => ref.read(networkHealthProvider.notifier).answered(),
+      ),
     ],
   );
   ref.onDispose(dio.close);

@@ -154,6 +154,18 @@ abstract class AppLocalizations {
   /// **'No internet connection'**
   String get offlineBanner;
 
+  /// Second line of the offline banner (CA-02).
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll update as soon as you\'re back online.'**
+  String get offlineBannerHint;
+
+  /// Snackbar when a refresh failed but the earlier content stays on screen (CA-03).
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t refresh. Check your connection.'**
+  String get refreshFailed;
+
   /// Onboarding slide 1 title.
   ///
   /// In en, this message translates to:
@@ -664,6 +676,42 @@ abstract class AppLocalizations {
   /// **'We need your location to deliver to this address. Stand at the address and tap \"Use my current location\".'**
   String get locationNeeded;
 
+  /// Address form (CA-07): opens the map picker when the address has no pin yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Set location on map'**
+  String get setLocationOnMap;
+
+  /// Address form (CA-07): opens the map picker at the address's pin.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust pin'**
+  String get adjustPin;
+
+  /// Address form without a map (CA-07): warning under "Use my current location".
+  ///
+  /// In en, this message translates to:
+  /// **'Use this only when you are at this address now.'**
+  String get gpsOnlyAtAddress;
+
+  /// Address form (CA-07): why Save is disabled, with a map.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the delivery location on the map first.'**
+  String get pinNeededMap;
+
+  /// Address form (CA-07): why Save is disabled, without a map.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the delivery location first.'**
+  String get pinNeededNoMap;
+
+  /// Address switcher (CA-07): opens the address form with the selected pin.
+  ///
+  /// In en, this message translates to:
+  /// **'Save this location as an address'**
+  String get saveThisLocation;
+
   /// Location permission denied.
   ///
   /// In en, this message translates to:
@@ -783,6 +831,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'ADD'**
   String get addToCart;
+
+  /// Screen reader: a cart change is still running (CA-17 spinner).
+  ///
+  /// In en, this message translates to:
+  /// **'Updating quantity'**
+  String get updatingQuantity;
 
   /// Screen-reader label of the ADD button.
   ///
@@ -2367,6 +2421,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Arriving by {time}'**
   String orderArrivingBy(String time);
+
+  /// Home active-order card (CA-10): the trailing label when it opens tracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Track'**
+  String get activeOrderTrack;
+
+  /// Home active-order card (CA-10): the trailing label when it opens the order detail.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get activeOrderDetails;
+
+  /// Home active-order card (CA-10) while out for delivery. Never shows the OTP itself.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery OTP ready'**
+  String get activeOrderOtpReady;
+
+  /// Home active-order card (CA-10) for DELIVERY_FAILED.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t deliver it. See what happens next.'**
+  String get activeOrderDeliveryFailedBody;
+
+  /// Home (CA-10): under the card when there are more active orders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{+1 more order in progress} other{+{count} more orders in progress}}'**
+  String activeOrderMore(int count);
+
+  /// Home (CA-10): opens My orders.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get activeOrderSeeAll;
+
+  /// Home active-order card (CA-10): its screen-reader label.
+  ///
+  /// In en, this message translates to:
+  /// **'{summary}. Opens {destination}.'**
+  String activeOrderSemantics(String summary, String destination);
+
+  /// Destination in activeOrderSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'tracking'**
+  String get activeOrderOpensTracking;
+
+  /// Destination in activeOrderSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'the order details'**
+  String get activeOrderOpensDetails;
 
   /// Order detail of a PAYMENT_PENDING order.
   ///

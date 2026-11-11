@@ -7,6 +7,7 @@ import '../../../app/redirect.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../domain/order.dart';
+import 'active_order_card.dart';
 
 /// The order still waiting for payment, if any (`03 §2.9` edge case: the app
 /// was killed mid-payment). Home asks on start and on refresh
@@ -25,6 +26,8 @@ class PendingPaymentController extends Notifier<PlacedOrder?> {
     try {
       final orders = await ref.read(orderRepositoryProvider).activeOrders();
       if (!ref.mounted) return;
+      // The same answer feeds Home's active-order card (CA-10).
+      ref.read(activeOrdersProvider.notifier).set(orders);
       state = orders
           .where((order) => order.status == OrderStatus.paymentPending)
           .firstOrNull;
