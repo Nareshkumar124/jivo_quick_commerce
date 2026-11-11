@@ -104,6 +104,9 @@ class FakeLocationServiceClient implements LocationServiceClient {
   @override
   Stream<TrackerStats> get stats => _stats.stream;
 
+  /// Stats as the service pushes them after an upload.
+  void emitStats(TrackerStats stats) => _stats.add(stats);
+
   final _serverStops = StreamController<String>.broadcast();
 
   /// A server stop left by the service while the app was closed.

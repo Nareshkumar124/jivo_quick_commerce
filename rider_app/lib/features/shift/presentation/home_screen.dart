@@ -9,6 +9,7 @@ import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/dev_tools_button.dart';
+import '../../../shared/widgets/offline_banner.dart';
 import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/logout_button.dart';
 import '../../auth/presentation/rider_account_controller.dart';
@@ -17,6 +18,7 @@ import '../../notifications/presentation/inbox_screen.dart';
 import '../../task/data/fake_task_backend.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
+import 'connection_providers.dart';
 import 'home_providers.dart';
 import 'online_toggle.dart';
 import 'shift_controller.dart';
@@ -85,6 +87,7 @@ class HomeScreen extends ConsumerWidget {
     final hasTask = ref.watch(
       taskFlowControllerProvider.select((s) => s.task != null),
     );
+    final connectionLost = ref.watch(riderConnectionLostProvider);
 
     Future<void> refresh() async {
       ref
@@ -113,34 +116,47 @@ class HomeScreen extends ConsumerWidget {
             onPressed: () => context.push(Routes.profile),
             icon: const Icon(Icons.person),
           ),
-          const LogoutButton(),
+          // RA-11: logout lives in Profile (with a confirmation).
         ],
       ),
       body: SafeArea(
         bottom: false,
-        child: RefreshIndicator(
-          onRefresh: refresh,
-          child: SingleChildScrollView(
-            key: const Key('home-list'),
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const ShiftStatusCard(),
-                const GuardCard(),
-                const CashLimitBanner(),
-                const SizedBox(height: 16),
-                const TodaySummaryTiles(),
-                const SizedBox(height: 16),
-                const _RecordsMenu(),
-                const _DevOfferButtons(),
-                const DevToolsButton(),
-                const SizedBox(height: 8),
-                buildLabel,
-              ],
+        child: Column(
+          children: [
+            // RA-10, home spec §8: the rider stays online; orders can't
+            // reach the phone until the connection is back.
+            if (connectionLost)
+              OfflineBanner(
+                key: const Key('home-offline-banner'),
+                message: l10n.homeOfflineBanner,
+              ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: refresh,
+                child: SingleChildScrollView(
+                  key: const Key('home-list'),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const ShiftStatusCard(),
+                      const GuardCard(),
+                      const CashLimitBanner(),
+                      const SizedBox(height: 16),
+                      const TodaySummaryTiles(),
+                      const SizedBox(height: 16),
+                      const _RecordsMenu(),
+                      const _DevOfferButtons(),
+                      const DevToolsButton(),
+                      const SizedBox(height: 8),
+                      buildLabel,
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
       bottomNavigationBar: SafeArea(

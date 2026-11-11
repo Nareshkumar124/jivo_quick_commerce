@@ -148,7 +148,16 @@ class CaptureState {
     this.problem,
     this.uploadError,
     this.uploaded,
+    this.uploadPercent,
+    this.uploadSlow = false,
   });
+
+  /// While uploading: the share of the photo sent, 0–100 (RA-04).
+  final int? uploadPercent;
+
+  /// While uploading: nothing moved for [kUploadStallHint] (RA-04: "Slow
+  /// connection. Keep this screen open").
+  final bool uploadSlow;
 
   final CaptureStep step;
 
@@ -159,6 +168,9 @@ class CaptureState {
   final ApiError? uploadError;
   final RiderDocument? uploaded;
 }
+
+/// No upload progress for this long: the "slow connection" hint (RA-04).
+const kUploadStallHint = Duration(seconds: 15);
 
 final documentCaptureControllerProvider = NotifierProvider.autoDispose
     .family<DocumentCaptureController, CaptureState, KycDocumentType>(
@@ -240,6 +252,12 @@ class DocumentCaptureController extends Notifier<CaptureState> {
     }
   }
 
+  /// The rider is fixing what the server refused (RA-04): the message goes.
+  void clearUploadError() {
+    if (state.uploadError == null || state.step != CaptureStep.preview) return;
+    state = CaptureState(step: state.step, image: state.image);
+  }
+
   /// Drop the photo and choose again.
   void retake() {
     if (state.step == CaptureStep.uploading) return;
@@ -251,7 +269,42 @@ class DocumentCaptureController extends Notifier<CaptureState> {
   Future<bool> upload({String? number}) async {
     final image = state.image;
     if (image == null || state.step != CaptureStep.preview) return false;
-    state = CaptureState(step: CaptureStep.uploading, image: image);
+    state = CaptureState(
+      step: CaptureStep.uploading,
+      image: image,
+      uploadPercent: 0,
+    );
+    // RA-04: on 2G a 1 MB photo takes a while; say how far it got, and
+    // say so when it stalls, so the rider does not give up.
+    Timer? stall;
+    void armStall() {
+      stall?.cancel();
+      stall = Timer(kUploadStallHint, () {
+        if (!ref.mounted || state.step != CaptureStep.uploading) return;
+        state = CaptureState(
+          step: CaptureStep.uploading,
+          image: image,
+          uploadPercent: state.uploadPercent,
+          uploadSlow: true,
+        );
+      });
+    }
+
+    void progress(int sent, int total) {
+      if (!ref.mounted || total <= 0 || state.step != CaptureStep.uploading) {
+        return;
+      }
+      armStall();
+      final percent = (sent * 100 ~/ total).clamp(0, 100);
+      if (percent == state.uploadPercent && !state.uploadSlow) return;
+      state = CaptureState(
+        step: CaptureStep.uploading,
+        image: image,
+        uploadPercent: percent,
+      );
+    }
+
+    armStall();
     try {
       final document = await ref
           .read(riderOnboardingRepositoryProvider)
@@ -261,7 +314,9 @@ class DocumentCaptureController extends Notifier<CaptureState> {
               image: image.bytes,
               number: number == null ? null : normaliseDocumentNumber(number),
             ),
+            onProgress: progress,
           );
+      stall?.cancel();
       if (!ref.mounted) return true;
       state = CaptureState(step: CaptureStep.done, uploaded: document);
       ref
@@ -277,6 +332,7 @@ class DocumentCaptureController extends Notifier<CaptureState> {
       );
       return true;
     } on Object catch (e) {
+      stall?.cancel();
       final error = ApiError.from(e);
       final blocking = reportAppControlError(ref, error);
       if (ref.mounted) {

@@ -69,6 +69,13 @@ void main() {
     );
     expect(
       parse({
+        'type': 'notification.new',
+        'data': {'id': 77, 'unread_count': 3},
+      }),
+      isA<SocketNotificationNew>(),
+    );
+    expect(
+      parse({
         'type': 'auth.ok',
         'data': {'user_id': 1, 'expires_at': '2026-11-10T09:55:00Z'},
       }),

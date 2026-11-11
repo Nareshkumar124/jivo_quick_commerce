@@ -52,11 +52,17 @@ enum OfferEndReason {
   expired,
 
   /// TAKEN: "Order taken".
-  taken;
+  taken,
+
+  /// RIDER_OFFLINE: the server set the rider offline (auto-offline, ops,
+  /// suspension). Not "Order cancelled": the offer closes and the shift is
+  /// checked, so home says why (06 §4.2).
+  riderOffline;
 
   static OfferEndReason fromWire(String? reason) => switch (reason) {
     'EXPIRED' => expired,
     'TAKEN' => taken,
+    'RIDER_OFFLINE' => riderOffline,
     _ => cancelled,
   };
 }

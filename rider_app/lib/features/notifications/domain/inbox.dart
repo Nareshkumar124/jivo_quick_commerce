@@ -50,14 +50,23 @@ abstract interface class InboxRepository {
 
   /// `POST /me/notifications/read-all/`: how many were unread.
   Future<int> markAllRead();
+
+  /// `GET /me/notifications/unread-count/` (`me_notifications_unread_count`,
+  /// api-requests #45/#50): every unread entry of the rider app.
+  Future<int> fetchUnreadCount();
 }
 
-/// The badge number from the first page. There is no unread-count field in
-/// the contract (reported), so the badge counts the unread entries of page
-/// 1 and shows "N+" when the whole page is unread and more pages exist.
+/// The home bell's badge. [count] is the server's unread count (P8; the
+/// home badge uses it). [of] counts the unread entries of a page and shows
+/// "N+" when the whole page is unread and more pages exist (kept for a
+/// list on screen).
 @immutable
 class InboxBadge {
   const InboxBadge({required this.unread, required this.more});
+
+  /// The server's unread count.
+  factory InboxBadge.count(int unread) =>
+      InboxBadge(unread: unread < 0 ? 0 : unread, more: false);
 
   static const none = InboxBadge(unread: 0, more: false);
 

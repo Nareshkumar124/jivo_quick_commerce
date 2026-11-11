@@ -1513,7 +1513,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String profileRatingValue(String rating) {
-    return '$rating ★';
+    return '$rating out of 5';
   }
 
   @override
@@ -2275,4 +2275,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ratingTagOther => 'Other';
+
+  @override
+  String get shiftOnlineNoInternetTitle =>
+      'You\'re online, but there\'s no internet';
+
+  @override
+  String get shiftOnlineNoInternetBody =>
+      'New orders can\'t reach you until the connection is back. Your location is saved and sent when you\'re back online.';
+
+  @override
+  String get homeOfflineBanner =>
+      'No internet. You stay online; orders arrive when you\'re back.';
+
+  @override
+  String get logoutConfirmTitle => 'Log out of Jivo Rider?';
+
+  @override
+  String get logoutConfirmBody => 'You\'ll need a new OTP to log in again.';
+
+  @override
+  String get logoutConfirmCancel => 'Cancel';
+
+  @override
+  String captureUploadingPercent(int percent) {
+    return 'Uploading… $percent%';
+  }
+
+  @override
+  String get captureUploadSlow =>
+      'Slow connection. Keep this screen open; the upload continues.';
+
+  @override
+  String captureNumberNotAccepted(String document) {
+    return 'Jivo couldn\'t accept this $document number. Check it against the card.';
+  }
+
+  @override
+  String get capturePhotoNotAccepted =>
+      'This photo wasn\'t accepted. Take a new photo.';
+
+  @override
+  String ratingOutOfFive(int stars) {
+    return '$stars/5';
+  }
+
+  @override
+  String ratingAverageSemantics(String average) {
+    return 'Average rating $average out of 5';
+  }
 }

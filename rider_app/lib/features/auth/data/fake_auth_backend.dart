@@ -117,10 +117,30 @@ class FakeAuthBackend implements AuthRepository, AccountRepository {
     _currentUser = null;
   }
 
+  /// Dev and tests: a review result ops recorded meanwhile; every later
+  /// `GET /me/` reports it.
+  RiderStatusEnum? riderStatusChange;
+
+  /// Thrown (once) by the next [fetchMe].
+  ApiError? fetchMeError;
+
   @override
   Future<Me> fetchMe() async {
     calls.add('fetchMe');
     await _wait();
+    final error = fetchMeError;
+    if (error != null) {
+      fetchMeError = null;
+      throw error;
+    }
+    final changed = riderStatusChange;
+    final signedIn = _currentUser;
+    if (changed != null && signedIn != null) {
+      _currentUser = Me.fromJson({
+        ...signedIn.toJson(),
+        'rider_status': changed.value,
+      });
+    }
     final user = _currentUser;
     if (user == null) {
       throw const ApiError(

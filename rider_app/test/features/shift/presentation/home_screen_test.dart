@@ -104,6 +104,39 @@ void main() {
     expect(find.text('Before you go online'), findsOneWidget);
   });
 
+  // UX audit RA-12: "Try again" on the general guard only hid the card.
+  testWidgets('an unexpected refusal: "Try again" goes online again; the '
+      'close button only dismisses', (tester) async {
+    h.shift.nextStartError = const ApiError(
+      code: ApiErrorCode.serverError,
+      statusCode: 500,
+    );
+    await pumpActiveHome(tester, h);
+    await tapToggle(tester);
+    expect(byKey('shift-problem'), findsOneWidget);
+    expect(h.shift.calls, hasLength(1));
+
+    await tester.ensureVisible(byKey('shift-problem-action'));
+    await tester.tap(byKey('shift-problem-action'));
+    await tester.pumpAndSettle();
+    expect(h.shift.calls, hasLength(2), reason: 'shift/start sent again');
+    expect(textOf(tester, 'shift-status'), "You're online");
+
+    // A refusal again; this time the rider closes the card.
+    await tester.tap(byKey('shift-toggle')); // go offline
+    await tester.pumpAndSettle();
+    h.shift.nextStartError = const ApiError(
+      code: ApiErrorCode.serverError,
+      statusCode: 500,
+    );
+    await tapToggle(tester);
+    final calls = h.shift.calls.length;
+    await tester.tap(byKey('shift-problem-close'));
+    await tester.pumpAndSettle();
+    expect(byKey('shift-problem'), findsNothing);
+    expect(h.shift.calls, hasLength(calls), reason: 'nothing retried');
+  });
+
   testWidgets('too far: the distances from the server error', (tester) async {
     h.shift.nextStartError = const ApiError(
       code: ApiErrorCode.outsideGeofence,

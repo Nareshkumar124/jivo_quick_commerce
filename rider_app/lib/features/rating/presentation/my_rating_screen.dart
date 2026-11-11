@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/format/ist_format.dart';
 import '../../../shared/widgets/paged_list_view.dart';
@@ -51,7 +52,9 @@ class _Stars extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const color = Color(0xFFF2A100);
+    // RA-21: the amber #F2A100 was 2.13:1 on white (non-text needs 3:1);
+    // rider.color.cod.border is 6.33:1, also for the empty outlines.
+    final color = RiderColors.of(context).codBorder;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -85,14 +88,29 @@ class _SummaryCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            Text(
-              summary.average ?? '–',
-              key: const Key('rating-average'),
-              style: theme.textTheme.displaySmall?.copyWith(
-                fontWeight: FontWeight.w800,
+            // RA-21: read as "Average rating 4.6 out of 5", not "4.6" plus
+            // five unlabelled icons.
+            Semantics(
+              container: true,
+              label: summary.average == null
+                  ? null
+                  : l10n.ratingAverageSemantics(summary.average!),
+              child: ExcludeSemantics(
+                excluding: summary.average != null,
+                child: Column(
+                  children: [
+                    Text(
+                      summary.average ?? '–',
+                      key: const Key('rating-average'),
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    _Stars(halfStars: summary.halfStars, size: 32),
+                  ],
+                ),
               ),
             ),
-            _Stars(halfStars: summary.halfStars, size: 32),
             const SizedBox(height: 4),
             Text(
               l10n.ratingCount(summary.count),
@@ -155,7 +173,22 @@ class _RatingTile extends StatelessWidget {
                 Semantics(
                   label: l10n.ratingStars(rating.stars),
                   child: ExcludeSemantics(
-                    child: _Stars(halfStars: rating.stars.clamp(0, 5) * 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _Stars(halfStars: rating.stars.clamp(0, 5) * 2),
+                        const SizedBox(width: 8),
+                        // RA-21: the value in words too, not only stars.
+                        Text(
+                          l10n.ratingOutOfFive(rating.stars.clamp(0, 5)),
+                          key: Key('rating-${rating.id}-value'),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: RiderColors.of(context).textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const Spacer(),

@@ -44,6 +44,13 @@ class ApiInboxRepository implements InboxRepository {
         .data!
         .updated,
   );
+
+  @override
+  Future<int> fetchUnreadCount() => _call(
+    () async => (await _api.getNotificationsApi().meNotificationsUnreadCount())
+        .data!
+        .unread,
+  );
 }
 
 InboxEntry inboxEntryOf(InboxNotification entry) => InboxEntry(

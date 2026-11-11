@@ -73,8 +73,10 @@ class ApiRiderOnboardingRepository implements RiderOnboardingRepository {
   /// which guarantees a JPEG of at most [kKycImageMaxBytes]. The size is
   /// checked again here, cheaply, so nothing larger ever leaves the phone.
   @override
-  Future<RiderDocument> uploadDocument(DocumentUpload upload) =>
-      _call(() async {
+  Future<RiderDocument> uploadDocument(
+    DocumentUpload upload, {
+    UploadProgress? onProgress,
+  }) => _call(() async {
         if (upload.image.length > kKycImageMaxBytes) {
           throw const ApiError(
             code: ApiErrorCode.validationError,
@@ -93,6 +95,7 @@ class ApiRiderOnboardingRepository implements RiderOnboardingRepository {
             contentType: DioMediaType('image', 'jpeg'),
           ),
           number: upload.number,
+          onSendProgress: onProgress,
         )).data!;
         return documentFromApi(document)!;
       });

@@ -22,7 +22,7 @@ void main() {
     expect(find.text('Jivo Sector 18, Noida'), findsOneWidget);
     expect(find.text('Motorbike · DL3CAB1234'), findsOneWidget);
     expect(find.text('Verified'), findsOneWidget);
-    expect(find.text('4.8 ★'), findsOneWidget);
+    expect(find.text('4.8 out of 5'), findsOneWidget);
     expect(byKey('profile-photo'), findsOneWidget);
 
     await tester.tap(byKey('profile-documents'));
@@ -163,6 +163,8 @@ void main() {
       listKey: const Key('profile-list'),
     );
     await tester.tap(byKey('profile-logout'));
+    await tester.pumpAndSettle();
+    await tester.tap(byKey('logout-confirm'));
     await tester.pumpAndSettle();
     expect(find.text('Log in to Jivo Rider'), findsOneWidget);
   });

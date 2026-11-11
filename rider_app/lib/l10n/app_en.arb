@@ -861,7 +861,7 @@
   "profileKycStatus": "KYC status",
   "profileKycApproved": "Verified",
   "profileRating": "Rating",
-  "profileRatingValue": "{rating} ★",
+  "profileRatingValue": "{rating} out of 5",
   "@profileRatingValue": {
     "placeholders": {
       "rating": {
@@ -1342,5 +1342,45 @@
   "ratingTagPolite": "Polite",
   "ratingTagLate": "Late",
   "ratingTagRude": "Rude",
-  "ratingTagOther": "Other"
+  "ratingTagOther": "Other",
+  "shiftOnlineNoInternetTitle": "You're online, but there's no internet",
+  "shiftOnlineNoInternetBody": "New orders can't reach you until the connection is back. Your location is saved and sent when you're back online.",
+  "homeOfflineBanner": "No internet. You stay online; orders arrive when you're back.",
+  "logoutConfirmTitle": "Log out of Jivo Rider?",
+  "logoutConfirmBody": "You'll need a new OTP to log in again.",
+  "logoutConfirmCancel": "Cancel",
+  "captureUploadingPercent": "Uploading… {percent}%",
+  "@captureUploadingPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "captureUploadSlow": "Slow connection. Keep this screen open; the upload continues.",
+  "captureNumberNotAccepted": "Jivo couldn't accept this {document} number. Check it against the card.",
+  "@captureNumberNotAccepted": {
+    "placeholders": {
+      "document": {
+        "type": "String"
+      }
+    }
+  },
+  "capturePhotoNotAccepted": "This photo wasn't accepted. Take a new photo.",
+  "ratingOutOfFive": "{stars}/5",
+  "@ratingOutOfFive": {
+    "placeholders": {
+      "stars": {
+        "type": "int"
+      }
+    }
+  },
+  "ratingAverageSemantics": "Average rating {average} out of 5",
+  "@ratingAverageSemantics": {
+    "placeholders": {
+      "average": {
+        "type": "String"
+      }
+    }
+  }
 }

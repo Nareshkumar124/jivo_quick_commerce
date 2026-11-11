@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/features/auth/data/fake_auth_backend.dart';
 
+import '../../../helpers/onboarding_fixtures.dart';
 import '../../../helpers/rider_app_harness.dart';
 
 Finder phoneField() => find.byKey(const Key('login-phone'));
@@ -244,12 +245,34 @@ void main() {
       expect(find.text('Documents not approved'), findsOneWidget);
     });
 
-    testWidgets('logout from home goes back to login', (tester) async {
+    testWidgets('logout from the profile, confirmed, goes back to login', (
+      tester,
+    ) async {
       await h.signedInBefore('+919811122231');
       await h.pump(tester);
       expect(find.byKey(const Key('home-flavor')), findsOneWidget);
+      // RA-11: no one-tap logout next to Profile on the work home.
+      expect(find.byKey(const Key('logout')), findsNothing);
 
-      await tester.tap(find.byKey(const Key('logout')));
+      await tester.tap(find.byKey(const Key('home-appbar-profile')));
+      await tester.pumpAndSettle();
+      await scrollTo(
+        tester,
+        find.byKey(const Key('profile-logout')),
+        listKey: const Key('profile-list'),
+      );
+      await tester.tap(find.byKey(const Key('profile-logout')));
+      await tester.pumpAndSettle();
+
+      // Cancel keeps the rider signed in.
+      expect(find.text('Log out of Jivo Rider?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('logout-cancel')));
+      await tester.pumpAndSettle();
+      expect(h.session.isSignedIn, isTrue);
+
+      await tester.tap(find.byKey(const Key('profile-logout')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('logout-confirm')));
       await tester.pumpAndSettle();
 
       expect(find.text('Log in to Jivo Rider'), findsOneWidget);
@@ -268,6 +291,8 @@ void main() {
       await tester.tap(find.byKey(const Key('logout')));
       await tester.pumpAndSettle();
 
+      // Refused before any "Log out?" question.
+      expect(find.byKey(const Key('logout-confirm')), findsNothing);
       expect(find.text('Go offline before logging out.'), findsOneWidget);
       expect(find.text('Become a Jivo rider'), findsOneWidget);
       expect(h.session.isSignedIn, isTrue);

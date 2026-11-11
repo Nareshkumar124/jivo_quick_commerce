@@ -70,6 +70,10 @@ class FakeTaskBackend
   /// with it, like a response lost on a bad network.
   ApiError? applyThenFailNext;
 
+  /// When set, `fetchCurrentTask` reads the task at once but answers only
+  /// once this completes: a slow response that an action overtakes.
+  Completer<void>? holdFetches;
+
   /// The next arrived-at-store / arrived-at-customer is outside the geofence.
   bool outsideGeofenceNext = false;
 
@@ -230,7 +234,7 @@ class FakeTaskBackend
         returnsEndedTasks &&
         recent != null &&
         now.difference(recent.endedAt ?? now) < const Duration(minutes: 10);
-    return CurrentTask(
+    final answer = CurrentTask(
       task: switch (_task) {
         final task? => _withPickupState(task),
         null => null,
@@ -238,6 +242,9 @@ class FakeTaskBackend
       recentTask: showRecent ? recent : null,
       serverTime: now,
     );
+    final hold = holdFetches;
+    if (hold != null) await hold.future;
+    return answer;
   }
 
   @override

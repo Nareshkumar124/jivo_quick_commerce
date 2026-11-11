@@ -172,9 +172,82 @@ class ShiftController extends Notifier<ShiftState> {
       stops.cancel();
       lifecycle.dispose();
     });
+    // A task restored while this phone is not tracking (P8).
+    ref.listen(taskBlocksGoingOfflineProvider, (_, onTask) {
+      if (onTask) unawaited(_resumeForTask());
+    });
     Future.microtask(sync);
     return const ShiftState.unknown();
   }
+
+  /// A task is active but this phone does not track: Android stopped the
+  /// app together with its service mid-delivery (OEM battery manager, force
+  /// stop) and the rider opened it again. Home's toggle is out of reach
+  /// during a task, so tracking resumes here, but only when the server
+  /// still has the rider online on a task (`rider_heartbeat`): never
+  /// without the server saying online (agent rule 1).
+  Future<void> _resumeForTask() async {
+    // A private flag, not a busy phase: the toggles and their refusals
+    // ("finish the task first") keep working while this runs.
+    if (_resuming || state.phase != ShiftPhase.offline) return;
+    _resuming = true;
+    try {
+      if (await _client.isRunning()) {
+        // It runs after all: the usual check decides.
+        if (ref.mounted) unawaited(sync());
+        return;
+      }
+      final status = await _repo.status();
+      if (!ref.mounted || state.phase != ShiftPhase.offline) return;
+      if (!status.isOnline) {
+        // The shift ended on the server: say why, as on any start.
+        await _client.takeServerStop();
+        if (ref.mounted && state.phase == ShiftPhase.offline) {
+          state = ShiftState(
+            problem: status.endedBy == null
+                ? state.problem
+                : _problemForEnd(status.endedBy),
+          );
+        }
+        return;
+      }
+      if (status.activeTaskId == null) {
+        if (!state.synced) state = state.withSynced();
+        return;
+      }
+      await _client.takeServerStop(); // A stale marker from an old shift.
+      await _client.start(
+        config: _config ?? _baseConfig(),
+        mode: TrackingMode.onTask,
+        simulateOffline: false,
+        text: _text ?? _defaultText(lookupAppLocalizations(const Locale('en'))),
+      );
+      if (ref.mounted && state.phase == ShiftPhase.offline) {
+        state = const ShiftState(phase: ShiftPhase.online);
+      }
+    } on Object catch (error) {
+      // No network: the next resume tries again (sync). A service that
+      // cannot start says so.
+      debugPrint('ShiftController: resume for task failed: $error');
+      if (ref.mounted && state.phase == ShiftPhase.offline) {
+        state = error is LocationServiceException
+            ? const ShiftState(problem: ShiftProblem.serviceFailed)
+            : state.withSynced();
+      }
+    } finally {
+      _resuming = false;
+    }
+  }
+
+  bool _resuming = false;
+
+  /// The notice for a shift the server ended (`shift.ended_by`, #42).
+  static ShiftProblem? _problemForEnd(ShiftEndedBy? endedBy) =>
+      switch (endedBy) {
+        ShiftEndedBy.rider => null,
+        ShiftEndedBy.ops => ShiftProblem.endedByOps,
+        _ => ShiftProblem.autoOffline,
+      };
 
   /// Reads whether the service runs (the app was reopened while online), and
   /// whether the server stopped it while the app was closed.
@@ -201,6 +274,10 @@ class ShiftController extends Notifier<ShiftState> {
       // The service died while the shift is still on (OEM battery killer,
       // force stop). Start it again rather than silently stop tracking.
       await _restartService();
+    } else if (ref.read(taskBlocksGoingOfflineProvider)) {
+      // On a task without tracking (an earlier resume found no network):
+      // ask the server again.
+      await _resumeForTask();
     } else if (state.problem == ShiftProblem.permissionsMissing) {
       // Back from Settings: clear the guard once the gate passes.
       try {
@@ -234,13 +311,7 @@ class ShiftController extends Notifier<ShiftState> {
     }
     if (ref.mounted) {
       // The reason comes from `shift.ended_by` (#42).
-      state = ShiftState(
-        problem: switch (status.endedBy) {
-          ShiftEndedBy.rider => null,
-          ShiftEndedBy.ops => ShiftProblem.endedByOps,
-          _ => ShiftProblem.autoOffline,
-        },
-      );
+      state = ShiftState(problem: _problemForEnd(status.endedBy));
     }
   }
 
@@ -267,6 +338,19 @@ class ShiftController extends Notifier<ShiftState> {
     if (!ref.mounted) return;
     unawaited(_client.takeServerStop());
     state = const ShiftState(problem: ShiftProblem.autoOffline);
+    // 403: most likely no longer ACTIVE (suspended). The heartbeat's 403
+    // carries `rider_status`, which the router follows (P8).
+    if (code == ApiErrorCode.permissionDenied.wireValue) {
+      unawaited(_checkRiderStatus());
+    }
+  }
+
+  Future<void> _checkRiderStatus() async {
+    try {
+      await _repo.status();
+    } on Object catch (e) {
+      if (ref.mounted) reportAppControlError(ref, ApiError.from(e));
+    }
   }
 
   TrackingMode _mode() => ref.read(taskBlocksGoingOfflineProvider)
