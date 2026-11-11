@@ -417,11 +417,14 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
   - 4404: the order does not exist **or is another user's** (the same code, so ids leak nothing)
   - 4408: auth timeout
   - 4429: the user already has `WS_MAX_SOCKETS_PER_USER` (5) sockets open
-  - 1009: an inbound message over `WS_MAX_MESSAGE_BYTES` (4096)
+  - 1009: an inbound message over `WS_MAX_MESSAGE_BYTES` (4096). The message is not processed, and the server logs a WARNING, not an error. uvicorn sends 1009 as it is. daphne (`runserver`, local dev and QA) refuses RFC codes from an application, so `apps.realtime.daphne_compat` lets it send this one (BUG-0020; before the fix daphne sent 1011).
   - 4400 also after more than `WS_MAX_BAD_MESSAGES` (10) malformed or unknown messages
 
   On any close the app falls back to polling (`GET /orders/{id}/track/` every 10 s, `GET /rider/offers/current/`) and reconnects with backoff.
-- **Abuse limits (P8 review L5, `apps.realtime.limits`):** sockets per user are counted in Redis as leases (`WS_SOCKET_LEASE_SECONDS`, 1200 s, renewed on auth, ping and re-check), so a socket lost with a crashed server stops counting when its lease ends; the count fails open if Redis is down (the channel layer is down then anyway). **Frame size is capped by the ASGI server before the app sees it (DevOps):** uvicorn `--ws-max-size 65536` (default 16 MiB), daphne `--websocket_max_size 65536`; the app closes anything over 4096 bytes with 1009.
+- **No event is lost while a socket starts (review of `ca8e69c`):** a socket is "live" from `auth.ok` (app sockets) or from `open` (ops socket). Every event published after that moment is delivered; anything earlier is in the REST state, so re-read it at that moment.
+  - App sockets join their groups before the server sends `auth.ok`. An event published while the auth is being handled waits and is sent right after `auth.ok` (and after the order snapshot). The rider app re-reads the current offer and task on `auth.ok`.
+  - The ops socket checks access and joins its store groups **before** it accepts the connection, so the page's `open` event already means "joined". A refused ops socket is still accepted first, so its close code arrives.
+- **Abuse limits (P8 review L5, `apps.realtime.limits`):** sockets per user are counted in Redis as leases (`WS_SOCKET_LEASE_SECONDS`, 1200 s, renewed on auth, ping and re-check), so a socket lost with a crashed server stops counting when its lease ends; the count fails open if Redis is down (the channel layer is down then anyway). **Frame size is capped by the ASGI server before the app sees it (DevOps):** uvicorn `--ws-max-size 65536` (default 16 MiB); daphne `--websocket-max-message-size` or the `DAPHNE_WEBSOCKET_MAX_MESSAGE_SIZE` setting (default 1 MiB, local dev only; daphne drops a connection over it, so the client sees 1006). The app closes anything over 4096 bytes with 1009.
 - **Message shape:** every server message is `{"type", "data", "sent_at"}` and carries the current state, not a diff, so a duplicate or missed message is harmless. On reconnect, re-read the REST endpoint. Each message is published in `openapi/schema.yaml` as a `Ws...Message` component with its `Ws...Data` (`apps.realtime.contract`), so the generated client has the models.
 
 ### 4.2 Message examples

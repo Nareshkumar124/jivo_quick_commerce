@@ -407,10 +407,9 @@ def test_ops_role_sees_every_store(make_staff):
     headers = session_headers(Client(), staff)
 
     async def scenario():
+        # No wait after connecting: the socket joins its store groups before it is accepted
+        # (it used to accept first, and an event right after `open` was lost; OBS-S3-01).
         socket, _, _ = await open_socket("/ws/ops/live/", headers=headers)
-        # connect() accepts first and joins the store groups after: let it finish (a fast
-        # Redis connection on 127.0.0.1 exposed this race, OBS-S3-01).
-        await expect_silence(socket)
         for store in (first, second):
             body = {"type": "alert", "data": {"store_id": store.pk}, "sent_at": "x"}
             await group_send(store_group(store.pk), body)
@@ -708,12 +707,108 @@ def test_too_many_bad_messages_close_with_4400(order, settings):
     run(scenario)
 
 
-def test_oversized_message_closes_with_1009(order, settings):
-    settings.WS_MAX_MESSAGE_BYTES = 100
+def test_ops_socket_over_the_socket_limit_closes_with_4429(make_staff, settings):
+    """L5 on the ops socket: the slot is taken before accepting, the refusal still arrives as a
+    close code, and the refused socket leaves its store groups."""
+    settings.WS_MAX_SOCKETS_PER_USER = 1
+    store = DarkStoreFactory()
+    staff = make_staff(roles.OPS)
+    headers = session_headers(Client(), staff)
+
+    async def scenario():
+        first, _, _ = await open_socket("/ws/ops/live/", headers=headers)
+        second, connected, _ = await open_socket("/ws/ops/live/", headers=headers)
+        assert connected
+        await expect_close(second, contract.CLOSE_TOO_MANY_SOCKETS)
+        body = {"type": "alert", "data": {"store_id": store.pk}, "sent_at": "x"}
+        await group_send(store_group(store.pk), body)
+        assert await receive(first) == body
+        await first.disconnect()
+
+    run(scenario)
+
+
+# --------------------------------------------------------------------------- no event lost at start
+# Review of ca8e69c: can a client miss an event published while its socket is starting?
+
+
+def test_ops_event_published_right_after_open_is_delivered(make_staff, monkeypatch):
+    """The ops socket joins its store groups before it accepts. Before the fix it accepted
+    first, so with a slow access check (the remote DB) an event sent right after the page's
+    `open` event went to a group the socket had not joined yet, and was lost."""
+    store = DarkStoreFactory()
+    staff = make_staff(roles.STORE_MANAGER, store)
+    headers = session_headers(Client(), staff)
+    real = consumers.ops_store_ids
+
+    def slow(*args):
+        import time
+
+        time.sleep(0.3)
+        return real(*args)
+
+    monkeypatch.setattr(consumers, "ops_store_ids", slow)
+
+    async def scenario():
+        socket, connected, _ = await open_socket("/ws/ops/live/", headers=headers)
+        assert connected
+        body = {"type": "order.created", "data": {"store_id": store.pk}, "sent_at": "x"}
+        await group_send(store_group(store.pk), body)  # at once, no wait after `open`
+        assert await receive(socket) == body
+        await socket.disconnect()
+
+    run(scenario)
+
+
+def test_order_event_published_before_auth_ok_reaches_the_app_after_it(order, monkeypatch):
+    """App sockets join their groups in `authorize()`, before `auth.ok`. An event published in
+    between waits (a consumer handles one message at a time) and is forwarded right after the
+    auth handler, so the app misses nothing from `auth.ok` on."""
+    token = token_for(order.user)
+    event = {"type": "order.status", "data": {"order_id": order.pk, "x": 1}, "sent_at": "x"}
+    original = consumers.OrderConsumer.authorize
+
+    async def authorize_then_publish(self, identity):
+        code = await original(self, identity)
+        if code is None:
+            await group_send(order_group(order.pk), event)  # joined, auth.ok not sent yet
+        return code
+
+    monkeypatch.setattr(consumers.OrderConsumer, "authorize", authorize_then_publish)
 
     async def scenario():
         socket, _, _ = await open_socket(order_path(order))
-        await socket.send_json_to({"type": "auth", "token": "x" * 200})
-        await expect_close(socket, contract.CLOSE_MESSAGE_TOO_BIG)
+        await socket.send_json_to({"type": "auth", "token": token})
+        assert (await receive(socket))["type"] == "auth.ok"
+        assert (await receive(socket))["data"]["order_id"] == order.pk  # the snapshot
+        assert await receive(socket) == event
+        await socket.disconnect()
+
+    run(scenario)
+
+
+def test_rider_event_published_before_auth_ok_reaches_the_app_after_it(user, monkeypatch):
+    """Same guarantee on the rider socket, which has no snapshot: the rider app re-reads the
+    current offer and task on `auth.ok` (rider_socket_providers.dart), and everything later is
+    forwarded."""
+    monkeypatch.setattr(consumers, "active_rider_id", lambda u: 41 if u.pk == user.pk else None)
+    token = token_for(user, "rider")
+    offer = {"type": "offer.new", "data": contract.OFFER_DATA, "sent_at": "x"}
+    original = consumers.RiderConsumer.authorize
+
+    async def authorize_then_publish(self, identity):
+        code = await original(self, identity)
+        if code is None:
+            await group_send(rider_group(41), offer)
+        return code
+
+    monkeypatch.setattr(consumers.RiderConsumer, "authorize", authorize_then_publish)
+
+    async def scenario():
+        socket, _, _ = await open_socket("/ws/v1/rider/")
+        await socket.send_json_to({"type": "auth", "token": token})
+        assert (await receive(socket))["type"] == "auth.ok"
+        assert await receive(socket) == offer
+        await socket.disconnect()
 
     run(scenario)
