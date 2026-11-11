@@ -644,4 +644,61 @@ void main() {
       expect(state().task!.status, TaskStatus.pickedUp);
     });
   });
+
+  // P8 hardening: a `GET /rider/tasks/current/` (poll, resume, socket)
+  // that left before an action, the accept or "Done" may answer after it.
+  // Its older picture must not replace the newer one.
+  group('a slow fetch never undoes a newer answer', () {
+    test(
+      'a poll answer from before "Arrived" does not put ASSIGNED back',
+      () async {
+        await start(seeded: task(TaskStatus.assigned));
+        final slow = Completer<void>();
+        server().holdFetches = slow;
+        final poll = flow().load(); // reads ASSIGNED, answers late
+
+        expect(await flow().arrivedAtStore(), isTrue);
+        expect(state().task!.status, TaskStatus.atStore);
+
+        slow.complete();
+        await poll;
+        expect(state().task!.status, TaskStatus.atStore);
+        expect(state().refreshing, isFalse);
+        server().holdFetches = null;
+      },
+    );
+
+    test('a fetch from before the accept does not call the new task '
+        '"reassigned"', () async {
+      await start();
+      final slow = Completer<void>();
+      server().holdFetches = slow;
+      final poll = flow().load(); // reads "no task", answers late
+
+      flow().assigned(server().newTask());
+      slow.complete();
+      await poll;
+      expect(state().task?.status, TaskStatus.assigned);
+      expect(state().notice, isNull);
+      expect(c.read(taskBlocksGoingOfflineProvider), isTrue);
+      server().holdFetches = null;
+    });
+
+    test('of two fetches in flight, the older answer is dropped', () async {
+      await start(seeded: task(TaskStatus.atStore));
+      final slow = Completer<void>();
+      server().holdFetches = slow;
+      final older = flow().load(); // reads AT_STORE, answers late
+      await Future<void>.delayed(Duration.zero); // it is now held
+      server().holdFetches = null;
+
+      server().markPacked();
+      await flow().load(force: true); // reads AT_STORE + PACKED
+      expect(state().task!.storeProgress, StoreOrderProgress.ready);
+
+      slow.complete();
+      await older;
+      expect(state().task!.storeProgress, StoreOrderProgress.ready);
+    });
+  });
 }

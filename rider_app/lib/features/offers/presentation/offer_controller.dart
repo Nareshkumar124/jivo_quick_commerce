@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
+import '../../../shared/errors/rider_error_codes.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../../realtime/presentation/rider_socket_providers.dart';
 import '../../shift/presentation/shift_controller.dart';
@@ -102,6 +103,23 @@ class OfferController extends Notifier<OfferState> {
       lifecycle.dispose();
       _stopPolling();
     });
+    // A task that starts (accepted here, or assigned by ops, `task.updated`
+    // ASSIGNED) ends what the offer screen still holds: one order at a
+    // time, and an unread "Order cancelled" must not come back once the
+    // task is done (P8). An accept in flight closes the offer itself.
+    ref.listen(taskFlowControllerProvider.select((s) => s.hasTask), (
+      _,
+      hasTask,
+    ) {
+      if (!hasTask ||
+          state.phase == OfferPhase.none ||
+          state.phase == OfferPhase.accepting) {
+        return;
+      }
+      _forget(state.offer);
+      _stopRinging();
+      state = const OfferState();
+    });
     _startPolling();
     // Polls once when the rider becomes active (app start, including a
     // start from an offer notification).
@@ -141,10 +159,24 @@ class OfferController extends Notifier<OfferState> {
   /// One order at a time (08 §5): no offers while a task is active.
   bool get _busyWithTask => ref.read(taskFlowControllerProvider).hasTask;
 
+  /// Offers that ended on this phone (rejected, expired, taken, withdrawn,
+  /// closed): never shown again, even if a poll still finds one pending on
+  /// the server (a reject that never arrived, a server clock a little
+  /// behind). Before P8 such an offer rang again after the rider said no.
+  final _ended = <int>{};
+
+  void _forget(DeliveryOffer? offer) {
+    if (offer == null) return;
+    _ended.add(offer.id);
+    // A shift sees few offers; keep the set small anyway.
+    if (_ended.length > 50) _ended.remove(_ended.first);
+  }
+
   /// Shows [received] unless another offer or a task is in progress.
   void present(ReceivedOffer received) {
     if (_busyWithTask) return;
     if (state.phase != OfferPhase.none && !state.isEnded) return;
+    if (_ended.contains(received.offer.id)) return;
     final countdown = OfferCountdown(
       expiresAt: received.offer.expiresAt,
       receivedAt: _now(),
@@ -205,6 +237,12 @@ class OfferController extends Notifier<OfferState> {
         _end(OfferPhase.expired);
         return;
       }
+      if (error.riderCode == RiderErrorCode.riderOffline) {
+        // Certain, not a lost answer: the server already set the rider
+        // offline. Retrying the accept can never work (P8).
+        _closeAfterServerOffline();
+        return;
+      }
       switch (error.code) {
         case ApiErrorCode.offerExpired:
           _end(OfferPhase.expired);
@@ -252,6 +290,7 @@ class OfferController extends Notifier<OfferState> {
       offer: offer,
       countdown: state.countdown,
     );
+    _forget(offer);
     _stopRinging();
     try {
       await _repo.reject(offer.id, reason: reason);
@@ -273,12 +312,28 @@ class OfferController extends Notifier<OfferState> {
     // An accept in flight gets its own answer (OFFER_TAKEN or a task).
     if (state.phase == OfferPhase.showing ||
         state.phase == OfferPhase.rejecting) {
-      _end(switch (reason) {
-        OfferEndReason.cancelled => OfferPhase.withdrawn,
-        OfferEndReason.expired => OfferPhase.expired,
-        OfferEndReason.taken => OfferPhase.taken,
-      });
+      switch (reason) {
+        case OfferEndReason.riderOffline:
+          _closeAfterServerOffline();
+        case OfferEndReason.cancelled:
+          _end(OfferPhase.withdrawn);
+        case OfferEndReason.expired:
+          _end(OfferPhase.expired);
+        case OfferEndReason.taken:
+          _end(OfferPhase.taken);
+      }
     }
+  }
+
+  /// The server set the rider offline (`RIDER_OFFLINE`): no offer can be
+  /// taken. The offer closes and the shift controller asks the server
+  /// (`rider_heartbeat`), which stops tracking and shows home's "You were
+  /// set offline" with the server's reason (auto-offline or ops).
+  void _closeAfterServerOffline() {
+    _forget(state.offer);
+    _stopRinging();
+    state = const OfferState();
+    unawaited(ref.read(shiftControllerProvider.notifier).sync());
   }
 
   /// The rider read the expired / taken / withdrawn message.
@@ -287,6 +342,7 @@ class OfferController extends Notifier<OfferState> {
   }
 
   void _end(OfferPhase phase) {
+    _forget(state.offer);
     _stopRinging();
     state = OfferState(phase: phase, offer: state.offer);
   }

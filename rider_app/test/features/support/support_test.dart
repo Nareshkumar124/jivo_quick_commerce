@@ -527,10 +527,25 @@ void main() {
       expect(find.text('My deposit is not in the ledger.'), findsOneWidget);
       expect(find.text('Jivo support'), findsOneWidget);
 
+      // P8: the "Ticket sent" snackbar covers the reply bar for a few
+      // seconds, so this tap used to land on the snackbar and nothing was
+      // sent (the text found was the one still in the field). Let it go
+      // first, and check the reply really went out.
+      ScaffoldMessenger.of(
+        tester.element(byKey('ticket-messages')),
+      ).removeCurrentSnackBar();
+      await tester.pumpAndSettle();
       await tester.enterText(byKey('ticket-reply'), 'Deposited at 10 am');
       await tester.tap(byKey('ticket-reply-send'));
       await tester.pumpAndSettle();
-      expect(find.text('Deposited at 10 am'), findsOneWidget);
+      expect(h.support.calls, contains('reply 2'));
+      expect(
+        find.descendant(
+          of: byKey('ticket-messages'),
+          matching: find.text('Deposited at 10 am'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('a reply carries a photo; the photo opens from the thread', (

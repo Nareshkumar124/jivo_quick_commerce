@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:jivo_api/jivo_api.dart'
-    show AppEnum, DeviceRequest, JivoApi, PlatformEnum;
+    show AppEnum, DeviceRequest, DeviceUnregisterRequest, JivoApi, PlatformEnum;
 import 'package:jivo_core/jivo_core.dart';
 
 import '../domain/device_registry.dart';
@@ -34,16 +34,14 @@ class ApiDeviceRegistry implements DeviceRegistry {
     }
   }
 
-  /// TODO(api): the schema's DELETE has no `requestBody`, so the generated
-  /// `meDeviceUnregister()` cannot send the `fcm_token` the server requires
-  /// (its 400 example). Sent through the same Dio with that body until the
-  /// schema declares it.
+  /// `DELETE /api/v1/me/devices/` (`me_device_unregister`) with the
+  /// `fcm_token` body (the schema declares it now; P8 dropped the
+  /// hand-built request).
   @override
   Future<void> unregister(String fcmToken) async {
     try {
-      await _api.dio.delete<void>(
-        '/api/v1/me/devices/',
-        data: {'fcm_token': fcmToken},
+      await _api.getAccountApi().meDeviceUnregister(
+        deviceUnregisterRequest: DeviceUnregisterRequest(fcmToken: fcmToken),
       );
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);

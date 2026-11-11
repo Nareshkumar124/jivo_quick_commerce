@@ -193,6 +193,10 @@ class RiderSocketController extends Notifier<RiderSocketStatus> {
         ref
           ..invalidate(todaySummaryProvider)
           ..invalidate(cashLedgerProvider);
+      case SocketNotificationNew():
+        ref
+          ..invalidate(inboxUnreadCountProvider)
+          ..invalidate(inboxControllerProvider);
       case SocketAuthOk() || SocketPong() || SocketError():
       case UnknownSocketMessage():
         break;

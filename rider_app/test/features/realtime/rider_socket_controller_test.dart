@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rider_app/features/auth/presentation/rider_account_controller.dart';
 import 'package:rider_app/features/location/domain/backoff.dart';
 import 'package:rider_app/features/location/domain/location_service_client.dart';
+import 'package:rider_app/features/notifications/presentation/inbox_providers.dart';
 import 'package:rider_app/features/offers/presentation/offer_controller.dart';
 import 'package:rider_app/features/permissions/presentation/permissions_gate_controller.dart';
 import 'package:rider_app/features/realtime/data/rider_socket_client.dart';
@@ -216,6 +217,45 @@ void main() {
       c.read(taskFlowControllerProvider).task?.status,
       TaskStatus.assigned,
     );
+  });
+
+  // P8: `notification.new` used to be ignored (UnknownSocketMessage).
+  test('notification.new re-reads the server unread count', () async {
+    await start();
+    await goOnlineAndConnect();
+    c.listen(inboxUnreadCountProvider, (_, _) {});
+    await pumpEventQueue();
+    int reads() => h.inbox.calls.where((call) => call == 'unread-count').length;
+    final before = reads();
+    connector.last.receive({
+      'type': 'notification.new',
+      'data': {'id': 77, 'title': 'Order ready', 'unread_count': 3},
+    });
+    await pumpEventQueue();
+    expect(reads(), before + 1);
+  });
+
+  // P8: RIDER_OFFLINE used to read "Order cancelled", and the phone stayed
+  // online until the next location upload was refused.
+  test('offer.withdrawn RIDER_OFFLINE closes the offer and stops tracking '
+      'with the reason', () async {
+    await start();
+    await goOnlineAndConnect();
+    final expires = h.now.add(const Duration(seconds: 30)).toIso8601String();
+    connector.last.receive(offerNewMessage(id: 9004, expiresAt: expires));
+    await pumpEventQueue();
+    expect(offer().phase, OfferPhase.showing);
+
+    h.shift.autoOffline();
+    connector.last.receive({
+      'type': 'offer.withdrawn',
+      'data': {'offer_id': 9004, 'reason': 'RIDER_OFFLINE'},
+    });
+    await pumpEventQueue();
+    expect(offer().phase, OfferPhase.none);
+    expect(h.location.running, isFalse);
+    expect(c.read(shiftControllerProvider).problem, ShiftProblem.autoOffline);
+    expect(socket(), RiderSocketStatus.disconnected, reason: 'offline');
   });
 
   test('cash.updated refreshes the home cash summary', () async {

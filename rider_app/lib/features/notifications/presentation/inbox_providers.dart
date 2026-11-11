@@ -26,13 +26,16 @@ final inboxRepositoryProvider = Provider<InboxRepository>((ref) {
   return ApiInboxRepository(ref.watch(jivoApiProvider));
 });
 
-/// The home bell's badge: unread entries on the first page. Re-read when
-/// the inbox changes, on `task.updated` and pull-to-refresh on home.
+/// The home bell's badge: the server's unread count (P8, api-requests
+/// #45/#50; it used to count page 1 only). Re-read when the inbox changes,
+/// on `task.updated`, `notification.new` and pull-to-refresh on home.
 final inboxUnreadCountProvider = FutureProvider.autoDispose<InboxBadge>((
   ref,
 ) async {
   if (!ref.watch(riderWorkActiveProvider)) return InboxBadge.none;
-  return InboxBadge.of(await ref.watch(inboxRepositoryProvider).fetchPage());
+  return InboxBadge.count(
+    await ref.watch(inboxRepositoryProvider).fetchUnreadCount(),
+  );
 });
 
 final inboxControllerProvider =
@@ -128,4 +131,7 @@ class _Unavailable implements InboxRepository {
 
   @override
   Future<int> markAllRead() async => throw _error;
+
+  @override
+  Future<int> fetchUnreadCount() async => throw _error;
 }

@@ -60,6 +60,12 @@ class FakeInboxBackend extends FakeApiEndpoint implements InboxRepository {
   }
 
   @override
+  Future<int> fetchUnreadCount() async {
+    await recordCall('unread-count');
+    return entries.where((e) => !e.read).length;
+  }
+
+  @override
   Future<int> markAllRead() async {
     await recordCall('read-all');
     var updated = 0;

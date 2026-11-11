@@ -11,6 +11,7 @@ import '../../../app/providers.dart';
 import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/offline_banner.dart';
 import '../../../shared/widgets/primary_action_bar.dart';
 import '../../../shared/widgets/sensitive_number_field.dart';
 import '../../launch/presentation/blocking_message.dart';
@@ -159,7 +160,11 @@ class TaskStepScaffold extends ConsumerWidget {
         ),
         body: Column(
           children: [
-            if (offline) const _OfflineBanner(),
+            if (offline)
+              OfflineBanner(
+                key: const Key('task-offline-banner'),
+                message: l10n.taskOfflineBanner,
+              ),
             Expanded(child: list),
             if (bottomInBody)
               PrimaryActionRetry(retrying: offline, child: actions),
@@ -177,46 +182,6 @@ class TaskStepScaffold extends ConsumerWidget {
 bool isNetworkError(ApiError? error) =>
     error != null &&
     (error.code == ApiErrorCode.network || error.code == ApiErrorCode.timeout);
-
-/// "No internet. Your progress is saved on Jivo's server; ..." (shell §3).
-class _OfflineBanner extends StatelessWidget {
-  const _OfflineBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = RiderColors.of(context);
-    return Semantics(
-      liveRegion: true,
-      child: Container(
-        key: const Key('task-offline-banner'),
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: colors.codBg,
-          border: Border(
-            bottom: BorderSide(
-              color: colors.codBorder,
-              width: RiderColors.borderWidth,
-            ),
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.wifi_off, color: colors.codText),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                AppLocalizations.of(context).taskOfflineBanner,
-                style: TextStyle(fontSize: 16, color: colors.codText),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// The last action error (server or local) for the bottom bar.
 String? taskStepError(

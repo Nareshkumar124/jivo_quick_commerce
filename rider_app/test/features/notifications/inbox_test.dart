@@ -80,6 +80,36 @@ void main() {
         ),
       );
     });
+
+    // P8: the server's count (api-requests #45/#50), not page 1 only.
+    test('the unread count comes from me_notifications_unread_count', () async {
+      http.answers['/api/v1/me/notifications/unread-count/'] = const Canned(
+        200,
+        {'unread': 23},
+      );
+      expect(await ApiInboxRepository(cannedApi(http)).fetchUnreadCount(), 23);
+    });
+  });
+
+  group('the home badge counts every unread entry (P8)', () {
+    test('unread entries beyond page 1 count; above 9 shows "9+"', () async {
+      final h = RiderTestHarness();
+      // Page 1 (20 entries) all read, 3 older ones unread on page 2.
+      h.inbox.entries
+        ..clear()
+        ..addAll([
+          for (var i = 23; i > 3; i--) _e(i, read: true),
+          for (var i = 3; i > 0; i--) _e(i),
+        ]);
+      await h.signedInBefore('+919811122231'); // ACTIVE
+      final c = await h.container();
+      await c.read(riderAccountControllerProvider.notifier).load();
+      c.listen(inboxUnreadCountProvider, (_, _) {});
+      final badge = await c.read(inboxUnreadCountProvider.future);
+      expect(badge.unread, 3);
+      expect(badge.label, '3');
+      expect(InboxBadge.count(12).label, '9+');
+    });
   });
 
   group('InboxBadge', () {

@@ -225,6 +225,8 @@ void main() {
 
     // 7. Logout: POST /auth/logout/, tokens cleared, back to login.
     await tester.tap(find.byKey(const Key('logout')));
+    await pumpUntil(tester, find.byKey(const Key('logout-confirm')));
+    await tester.tap(find.byKey(const Key('logout-confirm')));
     await pumpUntil(tester, find.text('Log in to Jivo Rider'));
     final logout = app.recorder.to('/api/v1/auth/logout/').single;
     expect(

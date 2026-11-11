@@ -221,7 +221,8 @@ class RiderSocketClient {
       case SocketOfferNew() ||
           SocketOfferEnded() ||
           SocketTaskUpdated() ||
-          SocketCashUpdated():
+          SocketCashUpdated() ||
+          SocketNotificationNew():
         if (!_messages.isClosed) _messages.add(message);
     }
   }

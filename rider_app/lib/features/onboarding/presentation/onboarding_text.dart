@@ -65,6 +65,18 @@ String documentStatusLabel(
   DocumentReviewStatus.rejected => l10n.docStatusRejected,
 };
 
+/// Which part of a document upload the server refused (UX audit RA-04),
+/// from the `VALIDATION_ERROR` field keys of `rider_documents_create`
+/// (`number`, `file`; schema examples). Null for anything else.
+enum UploadFieldError { number, photo }
+
+UploadFieldError? uploadFieldErrorOf(ApiError? error) {
+  if (error == null || error.code != ApiErrorCode.validationError) return null;
+  if (error.details.containsKey('number')) return UploadFieldError.number;
+  if (error.details.containsKey('file')) return UploadFieldError.photo;
+  return null;
+}
+
 /// A server or network error on an onboarding call.
 String onboardingErrorText(BuildContext context, ApiError error) {
   if (error.code == ApiErrorCode.validationError) {

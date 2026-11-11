@@ -28,6 +28,12 @@ void main() {
         RiderPush.parse({'type': 'task.updated', 'task_id': '3'}),
         isA<TaskUpdatedPush>(),
       );
+      expect(
+        RiderPush.parse({'type': 'offer.expired', 'offer_id': '7'}),
+        isA<OfferWithdrawnPush>()
+            .having((p) => p.offerId, 'offerId', 7)
+            .having((p) => p.expired, 'expired', isTrue),
+      );
     });
 
     test('unknown or malformed pushes are ignored', () {
@@ -174,6 +180,20 @@ void main() {
       );
       await pumpEventQueue();
       expect(c.read(offerControllerProvider).phase, OfferPhase.withdrawn);
+      expect(h.offerAlerts.dismissed, greaterThan(0));
+    });
+
+    // P8: 06 §4.3 and api-requests #49 send `offer.expired` over FCM too.
+    test('offer.expired says "Offer expired" (not cancelled) and removes the '
+        'alert', () async {
+      final offer = h.tasks.simulateOffer();
+      await pumpEventQueue();
+
+      push.deliver(
+        PushMessage({'type': 'offer.expired', 'offer_id': '${offer.id}'}),
+      );
+      await pumpEventQueue();
+      expect(c.read(offerControllerProvider).phase, OfferPhase.expired);
       expect(h.offerAlerts.dismissed, greaterThan(0));
     });
   });

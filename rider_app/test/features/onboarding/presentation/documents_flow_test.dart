@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
@@ -261,10 +263,93 @@ void main() {
 
     await tester.tap(byKey('logout'));
     await tester.pumpAndSettle();
+    await tester.tap(byKey('logout-confirm'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Log in to Jivo Rider'), findsOneWidget);
     expect(await h.pendingCapture.read(), isNull);
     expect(h.picker.discarded, ['/cache/lost.jpg']);
     expect(h.picker.lost, isNull);
+  });
+
+  // UX audit RA-04: on slow data the rider saw only a spinner, and a refused
+  // number read "Some details were not accepted".
+  group('upload progress and what was refused (RA-04)', () {
+    testWidgets('the button says how far the upload got; a stall says the '
+        'connection is slow', (tester) async {
+      await openDocuments(tester);
+      await openCapture(tester, KycDocumentType.photo);
+      await takePhoto(tester);
+      final hold = Completer<void>();
+      h.onboarding.holdUpload = hold;
+
+      await tester.tap(byKey('capture-upload'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Uploading… 50%'), findsOneWidget);
+      expect(byKey('capture-upload-progress'), findsOneWidget);
+      expect(find.textContaining('Slow connection'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 16));
+      expect(
+        find.text(
+          'Slow connection. Keep this screen open; the upload continues.',
+        ),
+        findsOneWidget,
+      );
+
+      hold.complete();
+      h.onboarding.holdUpload = null;
+      await tester.pumpAndSettle();
+      expect(statusOf(tester, KycDocumentType.photo), 'In review');
+    });
+
+    testWidgets('a refused number is named under the number field', (
+      tester,
+    ) async {
+      await openDocuments(tester);
+      await openCapture(tester, KycDocumentType.pan);
+      await takePhoto(tester);
+      await tester.enterText(byKey('capture-number'), 'ABCDE1234F');
+      h.onboarding.failNext = const ApiError(
+        code: ApiErrorCode.validationError,
+        statusCode: 400,
+        details: {
+          'number': ['Enter a valid PAN.'],
+        },
+      );
+      await upload(tester);
+      expect(
+        find.text(
+          "Jivo couldn't accept this PAN card number. Check it against the "
+          'card.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Some details'), findsNothing);
+
+      // Fixing the number clears the message.
+      await tester.enterText(byKey('capture-number'), 'ABCDE1234G');
+      await tester.pump();
+      expect(find.textContaining("couldn't accept"), findsNothing);
+    });
+
+    testWidgets('a refused photo says to take a new one', (tester) async {
+      await openDocuments(tester);
+      await openCapture(tester, KycDocumentType.photo);
+      await takePhoto(tester);
+      h.onboarding.failNext = const ApiError(
+        code: ApiErrorCode.validationError,
+        statusCode: 400,
+        details: {
+          'file': ['Upload a JPEG or PNG photo.'],
+        },
+      );
+      await upload(tester);
+      expect(
+        find.text("This photo wasn't accepted. Take a new photo."),
+        findsOneWidget,
+      );
+    });
   });
 }
