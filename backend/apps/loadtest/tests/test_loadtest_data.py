@@ -101,7 +101,7 @@ class TestGuard:
         monkeypatch.setenv("DJANGO_ALLOWED_HOSTS", "api.example.test")
         monkeypatch.setenv("NUM_PROXIES", "1")
         monkeypatch.setenv("LOADTEST_DATA_ALLOWED", "true")
-        for name in ("OTP_TEST_NUMBERS", "SENTRY_DSN"):
+        for name in ("OTP_TEST_NUMBERS", "SEED_DEMO_ALLOWED", "SENTRY_DSN"):
             monkeypatch.delenv(name, raising=False)
         modules = ("config.settings.production", "config.settings.deployed")
         try:

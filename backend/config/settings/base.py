@@ -107,8 +107,9 @@ MIDDLEWARE = [
     "axes.middleware.AxesMiddleware",
 ]
 
-# Staff MFA (H2, DL-59): TOTP for Super Admin, Finance and Support (and Ops when set) on /admin/
-# and /ops/. apps/ops_console/mfa.py. Interim until Jivo SSO (D-04).
+# Staff MFA (H2, DL-59): TOTP for superusers, Super Admin, Finance, Support, Catalog Manager and
+# Store Manager (and Ops when STAFF_MFA_INCLUDE_OPS is set); see DL-70. Store Staff stays out.
+# On /admin/ and /ops/. apps/ops_console/mfa.py. Interim until Jivo SSO (D-04).
 STAFF_MFA_ENFORCED = env_bool("STAFF_MFA_ENFORCED", default=True)
 # Ops / Dispatch is in by default: it has the broadest customer PII and rider KYC access.
 STAFF_MFA_INCLUDE_OPS = env_bool("STAFF_MFA_INCLUDE_OPS", default=True)
@@ -500,7 +501,10 @@ SPECTACULAR_SETTINGS = {
         "Conventions (docs/02-system-architecture.md §5): JSON with snake_case keys; money as "
         "2-decimal strings; times in UTC ISO 8601; pagination with `page`/`page_size` "
         "(default 20, max 100). Apps send `X-App-Name`, `X-App-Version` and `X-Platform` on "
-        "every request. Errors use the envelope "
+        "every request. The access token's `app` claim decides which app a session belongs to: "
+        "`X-App-Name` must agree with it, `/rider/` endpoints need a rider-app token and the "
+        "cart, order and payment endpoints a customer-app token, else 403 `PERMISSION_DENIED` "
+        "(`details.reason` `APP_HEADER_MISMATCH` or `WRONG_APP_TOKEN`). Errors use the envelope "
         '`{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema). '
         "Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`."
     ),
@@ -509,6 +513,8 @@ SPECTACULAR_SETTINGS = {
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",
         "apps.realtime.schema.add_websocket_components",
+        # T-219: the 403 of the token `app` claim check on every JWT operation.
+        "apps.accounts.schema.add_app_token_responses",
     ],
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVE_PERMISSIONS": ["apps.core.permissions.ApiDocsPermission"],

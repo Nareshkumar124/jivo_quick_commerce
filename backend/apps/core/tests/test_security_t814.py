@@ -414,6 +414,7 @@ def deploy_env(monkeypatch):
     monkeypatch.setenv("DJANGO_ALLOWED_HOSTS", "api.example.test")
     monkeypatch.setenv("NUM_PROXIES", "1")
     monkeypatch.delenv("OTP_TEST_NUMBERS", raising=False)
+    monkeypatch.delenv("SEED_DEMO_ALLOWED", raising=False)  # m8: production refuses it
     monkeypatch.delenv("SENTRY_DSN", raising=False)
     yield monkeypatch
     for name in ("config.settings.production", "config.settings.deployed"):
