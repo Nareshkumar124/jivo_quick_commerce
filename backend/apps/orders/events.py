@@ -1,8 +1,16 @@
-"""Order domain events (06 §1.2). Services call `emit()` inside their transaction; the handler
-runs after commit as an idempotent Celery task, so a rolled-back change never notifies anyone.
+"""Order domain events (06 §1.2, 08 §9). Services call `emit()` inside their transaction; the
+handler (`apps.orders.tasks.order_event`) runs after commit as an idempotent Celery task, so a
+rolled-back change never notifies anyone.
 
-Phase 3 only records the event (log line). Phase 4 (store new-order alert, live board) and
-Phase 6 (push, SMS, WebSocket) hang their notifications on these same events (08 §9).
+The handler logs every event (the OPS_ALERTS at ERROR) and then:
+- fans it out to the sockets (`apps.realtime.tasks.publish_order_event`: customer, live board)
+  and to the customer notification (`apps.notifications.tasks.notify_order_event`), each its own
+  retried task, so one failing never holds back the other;
+- PLACED: schedules the store's auto-accept (when the store has it on) and the acceptance SLA
+  check;
+- the DISPATCH_TRIGGER event (ACCEPTED by default, or PLACED): starts rider dispatch;
+- PACKED: tells the assigned rider the order is ready.
+The T9 push and SMS (with the delivery OTP) and "rider arrived" go through `apps.delivery.hooks`.
 """
 
 from django.db import transaction

@@ -187,6 +187,7 @@ class RiderRegisterView(APIView):
         ),
     )
     def post(self, request: Request) -> Response:
+        riders.require_can_register(request.user)  # before the body: 403, never 400 (BUG-0013)
         data = s.RiderRegisterSerializer(data=request.data, context={"user": request.user})
         data.is_valid(raise_exception=True)
         rider = riders.register(request.user, data.validated_data)
@@ -315,6 +316,9 @@ class RiderDocumentsView(APIView):
         ),
     )
     def post(self, request: Request) -> Response:
+        # 06 §3 Access: the profile check runs before the body is read, so a caller without a
+        # rider profile gets 403 `rider_status` NONE even when the body is invalid (BUG-0013).
+        riders.require_rider(request.user)
         data = s.RiderDocumentUploadSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         document = riders.upload_document(
@@ -356,6 +360,7 @@ class RiderBankAccountView(APIView):
         ),
     )
     def put(self, request: Request) -> Response:
+        riders.require_rider(request.user)  # before the body: 403, never 400 (BUG-0013)
         data = s.RiderBankAccountUpdateSerializer(data=request.data)
         data.is_valid(raise_exception=True)
         rider = riders.set_bank_account(request.user, **data.validated_data)
