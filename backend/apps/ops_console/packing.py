@@ -27,6 +27,7 @@ from django.utils import timezone
 from apps.inventory.models import StoreInventory
 from apps.ops_console import sla
 from apps.ops_console.board import CANCELLABLE_STATUSES, units_subquery
+from apps.ops_console.params import text_param_or_404
 from apps.ops_console.scoping import visible_stores
 from apps.orders.choices import OrderStatus, PaymentMethod
 from apps.orders.models import Order, OrderItem
@@ -46,8 +47,9 @@ PRINTABLE_STATUSES = frozenset({OrderStatus.PACKING, OrderStatus.PACKED})
 
 
 def store_for(user, code: str):
-    """The user's store with this code, or 404 (never fetch, then check)."""
-    return get_object_or_404(visible_stores(user), code=code)
+    """The user's store with this code, or 404 (never fetch, then check). A NUL byte in the URL
+    is a 404 too (PostgreSQL refuses it in a query; P8 audit m2)."""
+    return get_object_or_404(visible_stores(user), code=text_param_or_404(code))
 
 
 def store_orders(store):

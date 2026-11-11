@@ -15,7 +15,7 @@ Support and Finance view; DL-45, DL-46).
 
 from django import forms
 from django.contrib import admin
-from django.db import IntegrityError, transaction
+from django.core.exceptions import ValidationError
 from django.db.models import BooleanField, Count, Q, Value
 from django.urls import reverse
 from django.utils import timezone
@@ -26,57 +26,33 @@ from unfold.decorators import display
 from apps.ops_console import status
 from apps.ops_console.admin_support import ReadOnlyHistoryAdmin
 from apps.ops_console.money import RupeeInput, inr
+from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.pii import can_view_full_phone, customer_label
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin
 from apps.promotions.choices import DiscountType
 from apps.promotions.models import COUNTED_STATUSES, Coupon, CouponRedemption
-from apps.promotions.services import normalise_code
+from apps.promotions.services import (
+    MSG_CODE_LOCKED,
+    MSG_CODE_TAKEN,
+    MSG_LIMIT_BELOW_USES,
+    counted_uses,
+    is_used,
+    normalise_code,
+    save_coupon,
+)
 
 # Redemptions that use up the coupon (HELD + APPLIED), as the usage limits count them.
 COUNTED = Q(redemptions__status__in=COUNTED_STATUSES)
 
 MSG_CAP_REQUIRED = "A percent coupon needs a maximum discount (cap) in rupees."
 MSG_NO_CAP_ON_FLAT = "A flat coupon has no cap: its value is the discount. Leave this empty."
-MSG_CODE_TAKEN = "A coupon with this code already exists (codes ignore upper and lower case)."
 MSG_CODE_SPACES = "Use letters and numbers without spaces, e.g. JIVO50."
-MSG_LIMIT_BELOW_USES = (
-    "This coupon has already been used {uses} time(s) (orders awaiting payment included); the "
-    "total limit cannot be lower. Switch the coupon off to stop further use."
-)
-MSG_CODE_LOCKED = (
-    "The code cannot change once the coupon has been used: customers and orders refer to it. "
-    "Create a new coupon instead."
-)
-# The database's case-insensitive uniqueness rule for codes (Coupon.Meta.constraints).
-CODE_UNIQUE_CONSTRAINT = "coupon_code_unique_ci"
 
 
-def counted_uses(coupon) -> int:
-    """Uses that count against the coupon's limits (HELD + APPLIED), as the services count."""
-    return coupon.redemptions.filter(status__in=COUNTED_STATUSES).count()
-
-
-def is_used(coupon) -> bool:
-    """Any redemption or order refers to the coupon (its code is then fixed)."""
-    if coupon is None or coupon.pk is None:
-        return False
-    return coupon.redemptions.exists() or coupon.orders.exists()
-
-
-class CodeTaken(Exception):
-    """Another coupon took this code between the form check and the save (two admins at once).
-    `CouponAdmin.changeform_view` turns it into a form error."""
-
-    def __init__(self, code: str):
-        super().__init__(code)
-        self.code = code
-
-
-def _is_code_conflict(error: IntegrityError) -> bool:
-    cause = error.__cause__
-    diag = getattr(cause, "diag", None)
-    name = getattr(diag, "constraint_name", None) or ""
-    return name == CODE_UNIQUE_CONSTRAINT or CODE_UNIQUE_CONSTRAINT in str(error)
+class _SaveRefused(Exception):
+    def __init__(self, error: ValidationError):
+        super().__init__(str(error))
+        self.error = error
 
 
 class CouponAdminForm(forms.ModelForm):
@@ -110,8 +86,9 @@ class CouponAdminForm(forms.ModelForm):
             "(required). Flat coupons: leave empty.",
         }
 
-    # Set by CouponAdmin when a save lost the race for this code (`CodeTaken`).
-    conflicting_code: str | None = None
+    # Set by CouponAdmin when `save_coupon` refused the save (a raced code, a limit below the
+    # counted uses...): shown as errors of this form, nothing saved.
+    save_refusal: ValidationError | None = None
 
     def code_taken(self, code: str) -> bool:
         taken = Coupon.objects.filter(code__iexact=code)
@@ -126,7 +103,7 @@ class CouponAdminForm(forms.ModelForm):
         if self.instance.pk and code != self.instance.code and is_used(self.instance):
             # The admin shows the code read-only once used; this guards a crafted POST.
             raise forms.ValidationError(MSG_CODE_LOCKED)
-        if code and (code == self.conflicting_code or self.code_taken(code)):
+        if code and self.code_taken(code):
             raise forms.ValidationError(MSG_CODE_TAKEN)
         return code
 
@@ -140,6 +117,8 @@ class CouponAdminForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if self.save_refusal is not None:
+            self.add_error(None, self.save_refusal)
         kind = cleaned.get("discount_type")
         cap = cleaned.get("max_discount")
         if kind == DiscountType.PERCENT and cap is None and "max_discount" not in self.errors:
@@ -251,30 +230,27 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
 
     def get_form(self, request, obj=None, change=False, **kwargs):
         form = super().get_form(request, obj, change, **kwargs)
-        conflict = getattr(request, "_coupon_code_conflict", None)
-        if conflict:
-            form = type(form.__name__, (form,), {"conflicting_code": conflict})
+        refusal = getattr(request, "_coupon_save_refusal", None)
+        if refusal is not None:
+            form = type(form.__name__, (form,), {"save_refusal": refusal})
         return form
 
     def save_model(self, request, obj, form, change):
-        """The form checks the code is free, but another admin may save the same code between
-        that check and this save: the database refuses it (`coupon_code_unique_ci`). A savepoint
-        keeps the request's transaction usable; `changeform_view` shows it as a form error."""
+        """`apps.promotions.services.save_coupon` is the one door (T-406c): it re-checks the
+        edit guards on the locked row and turns a raced code into an error. Its refusal is a
+        `ValidationError` (dict); `changeform_view` shows it as form errors, never a 500."""
         try:
-            with transaction.atomic():
-                super().save_model(request, obj, form, change)
-        except IntegrityError as error:
-            if _is_code_conflict(error):
-                raise CodeTaken(obj.code) from error
-            raise
+            save_coupon(obj)
+        except ValidationError as error:
+            raise _SaveRefused(error) from error
 
     def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
         try:
             return super().changeform_view(request, object_id, form_url, extra_context)
-        except CodeTaken as conflict:
+        except _SaveRefused as refused:
             # Everything of the first attempt was rolled back. Show the form again with the
-            # code marked as taken (nothing is saved: the form is invalid this time).
-            request._coupon_code_conflict = conflict.code
+            # refusal as its errors (nothing is saved: the form is invalid this time).
+            request._coupon_save_refusal = refused.error
             return super().changeform_view(request, object_id, form_url, extra_context)
 
     def has_delete_permission(self, request, obj=None) -> bool:
@@ -382,9 +358,10 @@ class RedemptionCouponFilter(admin.SimpleListFilter):
         value = self.value()
         if not value:
             return queryset
-        if not value.isdigit():
+        coupon_id = parse_ascii_id(value)
+        if coupon_id is None:
             return queryset.none()
-        return queryset.filter(coupon_id=int(value))
+        return queryset.filter(coupon_id=coupon_id)
 
 
 @admin.register(CouponRedemption)

@@ -75,6 +75,26 @@ def test_customer_link_needs_customer_view(client, ticket):
     assert "+919811122233" not in html
 
 
+def test_customer_link_uses_the_customers_admin_rule(client, ticket, monkeypatch):
+    """P7-TC-40 (review minor, P8): the link uses the Customers admin's own view check
+    (`can_view_full_phone` and the view permission), so it can never point at a page that
+    answers 403. A viewer who holds `accounts.view_customer` but fails `can_view_full_phone`
+    sees plain text."""
+    user = login_as(client, roles.SUPPORT)
+    ticket_url = reverse("admin:support_supportticket_change", args=[ticket.pk])
+    customer_url = reverse("admin:accounts_customer_change", args=[ticket.user_id])
+    # Normal case: the link is shown and it opens.
+    assert customer_url in client.get(ticket_url).content.decode()
+    assert client.get(customer_url).status_code == 200
+    # The PII rule gets stricter than the permission (e.g. a future condition).
+    monkeypatch.setattr("apps.accounts.admin.can_view_full_phone", lambda viewer: False)
+    assert user.has_perm("accounts.view_customer")
+    html = client.get(ticket_url).content.decode()
+    assert f"Customer {ticket.user_id}" in html
+    assert customer_url not in html
+    assert client.get(customer_url).status_code == 403
+
+
 @pytest.mark.parametrize("principal", [roles.SUPER_ADMIN, SUPERUSER, roles.SUPPORT])
 def test_read_only_even_for_superusers(client, principal, ticket):
     """P7-TC-40: no add, change or delete in the admin, even for a superuser; replies and

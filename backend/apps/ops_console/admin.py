@@ -29,6 +29,7 @@ from unfold.admin import ModelAdmin
 from unfold.decorators import display
 
 from apps.ops_console import capabilities
+from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.pii import can_view_full_phone
 
 ACTIONS = {
@@ -91,9 +92,10 @@ class StaffActorFilter(admin.SimpleListFilter):
         value = self.value()
         if not value:
             return queryset
-        if not value.isdigit():
+        user_id = parse_ascii_id(value)
+        if user_id is None:
             return queryset.none()
-        return queryset.filter(**{self.field: int(value)})
+        return queryset.filter(**{self.field: user_id})
 
 
 VERBS = {"added": "Added", "changed": "Changed", "deleted": "Deleted"}

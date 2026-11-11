@@ -80,6 +80,8 @@ def test_view_only_customer_access_cannot_change_cod(client, customer):
 
 @pytest.mark.parametrize("role", [roles.OPS, roles.SUPPORT, roles.SUPER_ADMIN])
 def test_block_and_allow_record_the_actor_without_personal_data(client, customer, role):
+    """Lifting a COD block is for Super Admin and Ops only (DL-61 d): Support can block, but the
+    "allow again" action is not offered and a crafted POST changes nothing."""
     staff = staff_in_role(role, name="Ravi Ops")
     client.force_login(staff)
     run(client, "block_cod", customer)
@@ -87,14 +89,38 @@ def test_block_and_allow_record_the_actor_without_personal_data(client, customer
     assert customer.cod_blocked is True
     run(client, "allow_cod", customer)
     customer.refresh_from_db()
-    assert customer.cod_blocked is False
+    if role == roles.SUPPORT:
+        assert customer.cod_blocked is True
+        assert "allow_cod" not in client.get(reverse(LIST)).content.decode()
+        expected = [LOG_COD_BLOCKED]
+    else:
+        assert customer.cod_blocked is False
+        expected = [LOG_COD_BLOCKED, LOG_COD_ALLOWED]
     entries = list(cod_entries(customer).order_by("action_time", "id"))
-    assert [e.change_message for e in entries] == [LOG_COD_BLOCKED, LOG_COD_ALLOWED]
+    assert [e.change_message for e in entries] == expected
     for entry in entries:
         assert entry.user_id == staff.pk
         assert entry.object_repr == f"Customer {customer.pk}"
         assert PHONE not in entry.object_repr
         assert "Asha" not in entry.object_repr
+
+
+def test_service_refusal_to_lift_is_an_error_message(client, customer, monkeypatch):
+    """If the service itself refuses (PermissionDenied), the admin shows one clear error."""
+    from django.core.exceptions import PermissionDenied
+
+    from apps.ops_console import order_actions
+
+    def refuse(*args, **kwargs):
+        raise PermissionDenied("Only Super Admin and Ops can allow cash on delivery again.")
+
+    monkeypatch.setattr(order_actions, "_service", lambda action: refuse)
+    client.force_login(staff_in_role(roles.OPS))
+    response = client.post(
+        reverse(LIST), {"action": "allow_cod", "_selected_action": [customer.pk]}, follow=True
+    )
+    levels = [(m.level_tag, str(m)) for m in response.context["messages"]]
+    assert ("error", "Only Super Admin and Ops can allow cash on delivery again.") in levels
 
 
 def test_unchanged_customers_are_counted_apart_and_not_logged(client, customer):

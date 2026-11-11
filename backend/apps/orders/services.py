@@ -632,11 +632,12 @@ def capture_payment(
             events.emit(events.PLACED, order.pk)
             return CaptureResult(order, "placed")
         if order.status in (OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED):
+            from apps.payments.order_refunds import settle
+
             request_refund(
                 payment, payment.amount, reason=LATE_CAPTURE, key=f"capture:{payment_id}"
             )
-            order.payment_status = PaymentStatus.REFUND_PENDING
-            order.save(update_fields=["payment_status", "updated_at"])
+            settle(order)  # REFUND_PENDING until this and the order's other refunds are done
             events.emit(events.LATE_CAPTURE, order.pk)
             return CaptureResult(order, "late_capture")
         request_refund(
@@ -881,30 +882,41 @@ EXPIRY_LOCK_SECONDS = 5 * 60
 
 class _run_lock:
     """T-403c: one `expire_unpaid_orders` run at a time (beat every minute; a slow gateway can
-    make a run longer than that). A Redis `add` with a timeout, so a crashed run frees the lock.
-    If Redis is down the run goes ahead: every order is re-checked under its row lock anyway."""
+    make a run longer than that). A Redis lock with a timeout, so a crashed run frees the lock,
+    and a **unique token** (redis-py `Lock`: `SET NX PX`, released by an atomic Lua
+    compare-and-delete), so a run that outlived its lock never frees the newer run's lock (code
+    review). The key is the cache's own key (`cache.make_and_validate_key`), in the cache's
+    Redis DB and namespace. If Redis is down the run goes ahead: every order is re-checked under
+    its row lock anyway."""
 
     def __init__(self, key: str) -> None:
-        self.key, self.acquired = key, False
+        self.key, self.lock = key, None
 
     def __enter__(self) -> bool:
         from django.core.cache import cache
 
         try:
-            self.acquired = cache.add(self.key, "1", EXPIRY_LOCK_SECONDS)
+            client = cache._cache.get_client(None, write=True)
+            lock = client.lock(cache.make_and_validate_key(self.key), timeout=EXPIRY_LOCK_SECONDS)
+            if not lock.acquire(blocking=False):
+                return False
         except Exception:
             logger.warning("expire_unpaid_orders: lock unavailable, running without it")
             return True
-        return self.acquired
+        self.lock = lock
+        return True
 
     def __exit__(self, *exc) -> None:
-        if self.acquired:
-            from django.core.cache import cache
+        if self.lock is None:
+            return
+        from redis.exceptions import LockNotOwnedError
 
-            try:
-                cache.delete(self.key)
-            except Exception:
-                logger.warning("expire_unpaid_orders: lock not released (expires by itself)")
+        try:
+            self.lock.release()
+        except LockNotOwnedError:
+            logger.warning("expire_unpaid_orders: run outlived its lock; the newer lock is kept")
+        except Exception:
+            logger.warning("expire_unpaid_orders: lock not released (expires by itself)")
 
 
 def _expire_due(now: datetime, limit: int) -> dict:

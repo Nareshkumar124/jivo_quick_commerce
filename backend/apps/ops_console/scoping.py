@@ -10,6 +10,7 @@ from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import Http404
 
+from apps.ops_console.params import parse_ascii_id
 from apps.stores.models import DarkStore
 from apps.stores.services import stores_for
 
@@ -70,6 +71,7 @@ class ScopedStoreFilter(admin.SimpleListFilter):
         value = self.value()
         if not value:
             return queryset
-        if not value.isdigit():
+        store_id = parse_ascii_id(value)
+        if store_id is None:
             return queryset.none()
-        return queryset.filter(**{f"{self.field}_id": int(value)})
+        return queryset.filter(**{f"{self.field}_id": store_id})

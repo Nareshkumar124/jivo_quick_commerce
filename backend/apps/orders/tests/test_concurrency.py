@@ -534,3 +534,85 @@ def test_concurrent_ratings_of_one_rider_keep_the_average():
     results = race(*jobs)
     assert not [r for r in results if isinstance(r, Exception)], results
     assert Rider.objects.get(pk=rider.pk).rating_avg == Decimal("3.0")
+
+
+def test_slow_gateway_at_retry_payment_holds_no_lock(shop, monkeypatch):
+    """T-403c (R2b review Minor 6): while `retry_payment` waits on a slow gateway, the order row
+    is not locked (another transaction locks it NOWAIT, e.g. a capture or the expiry job), and
+    the new attempt is recorded under the lock when the call returns."""
+    from apps.payments.gateways import FakeRazorpayGateway
+    from apps.payments.models import Payment
+
+    user, order, _ = pending_order(shop)
+    in_call, release = threading.Event(), threading.Event()
+    original = FakeRazorpayGateway.create_order
+
+    def slow_create_order(self, **kwargs):
+        in_call.set()
+        release.wait(10)
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(FakeRazorpayGateway, "create_order", slow_create_order)
+    outcome = {}
+
+    def worker():
+        try:
+            outcome["result"] = services.retry_payment(user, order.pk, str(uuid.uuid4()))
+        except Exception as exc:  # pragma: no cover - reported by the assert below
+            outcome["error"] = exc
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    try:
+        assert in_call.wait(10)
+        with transaction.atomic():
+            Order.objects.select_for_update(nowait=True).get(pk=order.pk)
+            list(Payment.objects.select_for_update(nowait=True).filter(order=order))
+    finally:
+        release.set()
+        thread.join(15)
+    assert "error" not in outcome, outcome
+    _order, payment = outcome["result"]
+    assert payment.status == "CREATED"
+    assert Payment.objects.filter(order=order).count() == 2
+
+
+def test_expiry_skips_an_order_locked_elsewhere(shop):
+    """T-403c (R2b review Minor 8): `expire_order` never waits on an order another worker holds
+    (a capture or cancel in flight, or an overlapping expiry run): it is skipped at once
+    (`skip_locked`) and failed by a later run."""
+    import time
+
+    from django.utils import timezone
+
+    _, order, _ = pending_order(shop)
+    Order.objects.filter(pk=order.pk).update(payment_expires_at=timezone.now())
+    locked, release = threading.Event(), threading.Event()
+
+    def holder():
+        try:
+            with transaction.atomic():
+                Order.objects.select_for_update().get(pk=order.pk)
+                locked.set()
+                release.wait(10)
+        finally:
+            connection.close()
+
+    thread = threading.Thread(target=holder)
+    thread.start()
+    try:
+        assert locked.wait(10)
+        started = time.monotonic()
+        assert services.expire_order(order.pk) == "skipped"
+        assert time.monotonic() - started < 5  # did not wait for the holder's 10 s
+        order.refresh_from_db()
+        assert order.status == "PAYMENT_PENDING"
+    finally:
+        release.set()
+        thread.join(15)
+    assert services.expire_order(order.pk) == "failed"
+    order.refresh_from_db()
+    assert transitions(order) == ["PAYMENT_PENDING", "PAYMENT_FAILED"]
+    assert reserved(shop) == 0

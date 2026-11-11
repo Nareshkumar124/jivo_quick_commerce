@@ -49,6 +49,7 @@ from apps.ops_console import capabilities, once, order_actions, status
 from apps.ops_console.admin_support import ImportExportPermissionsMixin
 from apps.ops_console.forms import ManualRefundForm
 from apps.ops_console.money import inr
+from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.pii import address_lines, can_view_full_phone, customer_label, person_label
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin
 from apps.orders.choices import ActorType
@@ -239,9 +240,10 @@ class CustomerFilter(admin.SimpleListFilter):
         value = self.value()
         if not value:
             return queryset
-        if not value.isdigit():
+        user_id = parse_ascii_id(value)
+        if user_id is None:
             return queryset.none()
-        return queryset.filter(user_id=int(value))
+        return queryset.filter(user_id=user_id)
 
 
 class ReadOnlyInline(TabularInline):
