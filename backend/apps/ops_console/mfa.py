@@ -27,15 +27,18 @@ on the panel (`/admin/` and `/ops/`). Interim until Jivo SSO (D-04) replaces sta
   django-otp, as it stores them.
 """
 
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django import forms
 from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
+from django.contrib.sessions.models import Session
 from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters
@@ -100,13 +103,39 @@ def has_device(user) -> bool:
     return TOTPDevice.objects.filter(user=user, confirmed=True).exists()
 
 
+def allow_hours() -> int:
+    return int(getattr(settings, "STAFF_MFA_SETUP_ALLOW_HOURS", 72))
+
+
+def _allow_expired(user) -> bool:
+    """An allowed device has no timestamp of its own (django-otp, no model change), so the time
+    comes from the audit entry written with it (`staff.mfa_setup_allowed`). No entry: expired
+    (fail closed)."""
+    from apps.core.models import AuditLog
+
+    allowed_at = (
+        AuditLog.objects.filter(
+            action="staff.mfa_setup_allowed",
+            object_type=user._meta.label_lower,
+            object_id=str(user.pk),
+        )
+        .values_list("created_at", flat=True)
+        .first()
+    )  # newest first (Meta.ordering)
+    return allowed_at is None or timezone.now() - allowed_at > timedelta(hours=allow_hours())
+
+
 def allowed_device(user) -> TOTPDevice | None:
-    """The unconfirmed device a Super Admin allowed (DL-70), if any. Never creates one."""
-    return (
+    """The unconfirmed device a Super Admin allowed (DL-70), if any and not expired
+    (`STAFF_MFA_SETUP_ALLOW_HOURS`). Never creates one."""
+    device = (
         TOTPDevice.objects.filter(user=user, confirmed=False, name=ALLOWED_NAME)
         .order_by("-pk")
         .first()
     )
+    if device is None or _allow_expired(user):
+        return None
+    return device
 
 
 def _is_verified(request) -> bool:
@@ -177,6 +206,15 @@ def _page(request, template: str, *, status: int = 200, **context):
     return render(request, template, context, status=status)
 
 
+def _not_allowed(request):
+    return _page(
+        request,
+        "ops/mfa/not_allowed.html",
+        status=403,
+        title="Ask a Super Admin to set up two-step sign-in",
+    )
+
+
 def _key_groups(device: TOTPDevice) -> str:
     """The base32 key in groups of four, for typing by hand."""
     from base64 import b32encode
@@ -205,22 +243,29 @@ def setup(request):
     if device is None:
         if not requires_mfa(user):  # e.g. Store Staff: never asked, nothing to set up here
             return redirect(_next(request, reverse("admin:index")))
-        return _page(
-            request,
-            "ops/mfa/not_allowed.html",
-            status=403,
-            title="Ask a Super Admin to set up two-step sign-in",
-        )
+        return _not_allowed(request)
     form = CodeForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        if device.verify_token(form.cleaned_data["code"].replace(" ", "")):
-            with transaction.atomic():
-                device.confirmed = True
-                device.name = DEVICE_NAME
-                device.save(update_fields=["confirmed", "name"])
+        with transaction.atomic():
+            # Re-fetch under a lock: a concurrent reset or re-allow may have removed this device.
+            locked = (
+                TOTPDevice.objects.select_for_update()
+                .filter(pk=device.pk, user=user, confirmed=False, name=ALLOWED_NAME)
+                .first()
+            )
+            if locked is None or _allow_expired(user):
+                return _not_allowed(request)
+            if locked.verify_token(form.cleaned_data["code"].replace(" ", "")):
+                locked.confirmed = True
+                locked.name = DEVICE_NAME
+                locked.save(update_fields=["confirmed", "name"])
                 TOTPDevice.objects.filter(user=user, confirmed=False).delete()
                 codes = _new_recovery_codes(user)
-            otp_login(request, device)
+                confirmed = locked
+            else:
+                confirmed = None
+        if confirmed is not None:
+            otp_login(request, confirmed)
             request.session[SESSION_CODES] = codes
             return redirect(
                 f"{reverse('ops:mfa-recovery')}?{urlencode({'next': _next(request, '')})}"
@@ -300,16 +345,35 @@ def allow_setup(user, *, by, ip: str | None = None) -> bool:
     return True
 
 
+def end_sessions(user) -> int:
+    """Delete the person's existing sessions (they were verified with the device being reset).
+    Works with the database session engine (`SESSION_ENGINE` default, used here); with another
+    engine it does nothing and returns 0 (accepted risk, docs/09 §3.1). Returns the count."""
+    if settings.SESSION_ENGINE != "django.contrib.sessions.backends.db":
+        return 0
+    ids = [
+        session.pk
+        for session in Session.objects.filter(expire_date__gt=timezone.now()).iterator()
+        if session.get_decoded().get("_auth_user_id") == str(user.pk)
+    ]
+    Session.objects.filter(pk__in=ids).delete()
+    return len(ids)
+
+
 def reset_devices(user, *, by, ip: str | None = None) -> int:
     """Super Admin: remove a staff member's authenticator and recovery codes (lost phone). They
     cannot open the panel until a Super Admin allows a new setup (`allow_setup`, DL-70).
-    Audited (`staff.mfa_reset`, device count only)."""
+    Also ends the person's existing sessions (`end_sessions`). Audited (`staff.mfa_reset`,
+    device and session counts only)."""
     from apps.core import audit
 
     with transaction.atomic():
         totp, _ = TOTPDevice.objects.filter(user=user).delete()
         static, _ = StaticDevice.objects.filter(user=user).delete()
-        audit.record(by, "staff.mfa_reset", user, {"devices": totp + static}, ip=ip)
+        sessions = end_sessions(user)
+        audit.record(
+            by, "staff.mfa_reset", user, {"devices": totp + static, "sessions": sessions}, ip=ip
+        )
     return totp + static
 
 

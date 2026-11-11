@@ -22,14 +22,14 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options) -> None:
         email = normalise_email(options["email"]) or ""
-        user = (
-            get_user_model()
-            .objects.filter(email=email, is_staff=True, is_active=True)
-            .only("pk", "is_staff", "is_active")
-            .first()
-        )
+        user = get_user_model().objects.filter(email=email, is_staff=True, is_active=True).first()
         if user is None:
             raise CommandError("No active staff user has that email.")
+        if not mfa.requires_mfa(user):
+            raise CommandError(
+                f"User {user.pk} does not need two-step sign-in (their role is not asked for it, "
+                "e.g. Store Staff). Nothing was changed."
+            )
         if not mfa.allow_setup(user, by=None):
             raise CommandError(
                 f"User {user.pk} already has two-step sign-in set up. A Super Admin resets it "

@@ -112,6 +112,8 @@ MIDDLEWARE = [
 STAFF_MFA_ENFORCED = env_bool("STAFF_MFA_ENFORCED", default=True)
 # Ops / Dispatch is in by default: it has the broadest customer PII and rider KYC access.
 STAFF_MFA_INCLUDE_OPS = env_bool("STAFF_MFA_INCLUDE_OPS", default=True)
+# A Super Admin's "allow setup" lapses after this many hours if the person has not confirmed.
+STAFF_MFA_SETUP_ALLOW_HOURS = env_int("STAFF_MFA_SETUP_ALLOW_HOURS", default=72)
 OTP_TOTP_ISSUER = "Jivo Ops"
 # django-otp throttling: after each wrong code the device waits 5 s, then 10, 20, ... seconds.
 OTP_TOTP_THROTTLE_FACTOR = 5

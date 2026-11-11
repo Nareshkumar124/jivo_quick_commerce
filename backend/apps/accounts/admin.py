@@ -24,6 +24,7 @@ from apps.accounts.models import Address, Customer, Device, User
 from apps.accounts.services.auth import anonymise_user
 from apps.accounts.services.customers import (
     block_customer,
+    can_lift_cod_block,
     unblock_customer,
 )
 from apps.ops_console import order_actions, status
@@ -675,6 +676,9 @@ class CustomerAdmin(ModelAdmin):
                 self.message_user(request, order_actions.MSG_UNAVAILABLE, messages.ERROR)
                 return
             except order_actions.ActionRefused as refusal:
+                if refusal.code == order_actions.FORBIDDEN:
+                    self.message_user(request, refusal.message, messages.ERROR)
+                    return
                 refused[refusal.message] = refused.get(refusal.message, 0) + 1
         verb = "Blocked cash on delivery for" if blocked else "Allowed cash on delivery for"
         self.message_user(request, f"{verb} {changed} customer(s).", messages.SUCCESS)
@@ -690,7 +694,11 @@ class CustomerAdmin(ModelAdmin):
     def block_cod(self, request, queryset):
         self._set_cod(request, queryset, True)
 
-    @action(description="Allow cash on delivery again", permissions=["change"])
+    def has_lift_cod_permission(self, request) -> bool:
+        """DL-61 (d): only Super Admin and Ops may lift a COD block (`delivery.lift_cod_block`)."""
+        return can_lift_cod_block(request.user) and self.has_change_permission(request)
+
+    @action(description="Allow cash on delivery again", permissions=["lift_cod"])
     def allow_cod(self, request, queryset):
         self._set_cod(request, queryset, False)
 
