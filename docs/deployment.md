@@ -7,7 +7,7 @@ This file records what is **actually set up today**, plus the target for the env
 | Environment | Status |
 |-------------|--------|
 | **local** (developer machine) | ✅ working (described below) |
-| **CI** (GitHub Actions) | ✅ green on `main` (`.github/workflows/backend.yml`, `mobile.yml`). T-404c (2026-11-04) added parallel backend tests and the env-example and Razorpay pin checks. |
+| **CI** (GitHub Actions) | ✅ green on `main` (`.github/workflows/backend.yml`, `mobile.yml`). T-404c (2026-11-04) added parallel backend tests and the env-example and Razorpay pin checks. 2026-11-10: secret scanning (`secret-scan.yml`) and dependency advisories (`dependency-scan.yml`) added (§2.1, §2.2); not yet run on GitHub. |
 | **staging** | ⬜ **not set up.** Needs D-05 (hosting), domains/TLS, Razorpay test keys, and the Firebase staging project |
 | **production** | ⬜ **not set up** (Phase 8, [`release-checklist.md`](release-checklist.md)) |
 | **P8 hardening (prepared, T-813)** | ✅ backup/restore scripts + verifier with a schema-only drill (§7), deploy-time checks and release step in the image (§8), edge limits and log hygiene (§9), monitoring as code (§10), secrets and rotation (§11). Nothing is applied to staging/production until D-05. |
@@ -131,10 +131,123 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
     - Gradle for the APK builds, through `setup-java` `cache: gradle`, keyed on each app's Gradle files
 - **`infra.yml`** (paths `infra/**`): `bash -n` + shellcheck and a PowerShell parse of `infra/backup/`, the restore scripts' refusal of non-test targets and of names with a trailing newline (bash and PowerShell), `infra/scripts/test_entrypoint.sh` (a failing deploy check blocks start; `JQC_SKIP_STARTUP_CHECK` is refused under staging/production settings), a grep that rejects `JQC_SKIP_STARTUP_CHECK` in any env or compose file, ruff on the infra Python, `check_monitoring.py`, `promtool check rules` and `nginx -t` (pinned images by digest).
 - **`deploy-staging.yml`** (manual, protected branches only, environment `staging` with required reviewers, §8.4): builds the production image tagged with the checked-out commit and runs its deploy checks against the real staging env file (§8.1); the deploy step is a placeholder until D-05.
+- **`secret-scan.yml`** (every PR, pushes to `develop`/`main`, weekly, manual): gitleaks looks for committed secrets (§2.1).
+- **`dependency-scan.yml`** (PRs and pushes that change a lockfile, weekly, manual): osv-scanner looks for known vulnerabilities in the locked dependencies of the backend, both apps and the shared packages (§2.2).
 - **Pins and local runs:**
-  - Every action is pinned by commit SHA, with its version in a comment.
-  - Run either script locally with `python3 infra/scripts/<script>.py`. Both use only the standard library and support `--help`.
-  - Validate workflow edits with `uvx --from actionlint-py==1.7.12.25 actionlint`.
+  - Every action is pinned by commit SHA, with its version in a comment. Downloaded tools (gitleaks, osv-scanner) are pinned by version and sha256.
+  - Run the scripts locally with `python3 infra/scripts/<script>.py`. They use only the standard library and support `--help`.
+  - Validate workflow edits with `uvx --from actionlint-py==1.7.12.25 actionlint`. With `shellcheck` on your PATH, actionlint also checks the `run:` scripts. **Known:** `backend.yml` then shows 4 old shellcheck warnings (SC2034, SC2155); the other workflows are clean.
+
+### 2.1 Secret scanning (gitleaks)
+**What it does.** The repo is public, so a committed secret is a published secret, even on a branch that is never merged. `secret-scan.yml` runs gitleaks with the repo-root `.gitleaks.toml`:
+- **Rules:**
+  - gitleaks' built-in rules (cloud keys, private keys, tokens, JWTs, `generic-api-key`, …).
+  - Project rules for what the built-in set misses:
+    - `jqc-razorpay-key-id`: Razorpay key ids.
+    - `jqc-twilio-account-sid`: Twilio account SIDs.
+    - `jqc-dotenv-secret`: a literal value for one of our secret settings (`POSTGRES_PASSWORD=…`, or `RAZORPAY_KEY_SECRET` passed with a value to `docker run -e`).
+    - `jqc-db-url-password`: a password inside a `postgres://` or `redis://` URL.
+    - `jqc-secret-file`: any of the gitignored secret files (`.env*`, Mappls `*.a.olf/conf`, signing keys, `*.local.json`, `qa/private/`, `*/incoming/`), whatever it contains.
+- **What is scanned:**
+
+  | Event | Commits | Plus |
+  |---|---|---|
+  | Pull request | the PR's commits (`base..head`) | the checked-out files |
+  | Push to `develop`/`main` | the pushed commits (`before..after`); a new branch or a force-push falls back to the full history | the checked-out files |
+  | Weekly (Mon 02:23 UTC) and manual | the full history of every branch and tag | the checked-out files |
+
+  The checked-out-files scan exists because `git log -p` shows no diff for merge commits, so a secret typed into a merge-conflict fix would otherwise be missed.
+- **Output:** always `--redact`. The log, the `::error` annotations and the job summary show only rule, file, line and commit, never the value. No report file is uploaded.
+- **Config changes are flagged:** a PR or push that edits `.gitleaks.toml` or `infra/security/osv-scanner.toml` gets a warning, so the reviewer looks at the allowlist.
+- **Schedule and manual runs** only work once the workflow file is on `main` (the default branch). GitHub also pauses schedules after 60 days without repo activity.
+
+**Pins:**
+
+| Tool | Version | Asset | sha256 |
+|---|---|---|---|
+| gitleaks (CI) | 8.30.1 | `gitleaks_8.30.1_linux_x64.tar.gz` | `551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb` |
+| gitleaks (Windows, local) | 8.30.1 | `gitleaks_8.30.1_windows_x64.zip` | `d29144deff3a68aa93ced33dddf84b7fdc26070add4aa0f4513094c8332afc4e` |
+
+Both match the release's `gitleaks_8.30.1_checksums.txt` and GitHub's asset digest. The binary needs no licence; `gitleaks-action` would need one for an organisation, so we don't use it.
+
+**If the scan finds a real secret:**
+1. Treat it as leaked. Don't print or paste the value anywhere, including chat and tickets.
+2. **Rotate it first:** revoke or regenerate it at the provider (§11.2 for our own keys), then update the secrets manager or `backend/.env`.
+3. Replace the value in the code with a setting, an env variable or a `<placeholder>`.
+4. Rewriting history does not un-publish it, and force-pushing `develop`/`main` breaks every clone. Do it only if the user asks.
+5. So the full-history scan passes again, put the finding's **fingerprint** in a root `.gitleaksignore` file: one line `<commit>:<file>:<rule>:<line>` (the `Fingerprint` field of a local JSON report), with a `#` comment naming the rotation date and task. A fingerprint contains no value.
+
+**If the scan flags something that is not a secret** (a test fixture, an example, a placeholder):
+1. Prove it is fake, without printing it (open the file at that line). Good signs: the word EXAMPLE, an `example.com` host, a test-only folder, the documented fake scheme (06 §2.6). **If you are not sure, treat it as real.**
+2. Best fix: make the value obviously fake at the source, so no allowlist is needed. For example `rzp_test_EXAMPLEEXAMPLE`, `AC` + 32 zeros, `NAME=<placeholder>`.
+3. Otherwise add an entry under "allowlists" in `.gitleaks.toml`:
+   - `targetRules` = only the rule id from the finding.
+   - The narrowest match: the exact value in `regexes`, plus `paths` with `condition = "AND"` when the value alone isn't enough.
+   - A comment saying why it is safe.
+   - **Never** allowlist a whole folder for every rule, skip `commits`, or add `stopwords` that real values could contain.
+4. Re-run the local full-history scan (below). The CI warning makes the reviewer check the entry.
+
+**Run it locally** (from the repo root; `.gitleaks.toml` is found automatically). Download the pinned binary once, outside the repo, and check its sha256. On Windows use the zip above, for example in `%USERPROFILE%\.local\share\jivoqc-tools\gitleaks\8.30.1\`.
+```bash
+v=8.30.1; curl -fsSLO "https://github.com/gitleaks/gitleaks/releases/download/v$v/gitleaks_${v}_linux_x64.tar.gz"
+echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks_${v}_linux_x64.tar.gz" | sha256sum -c - \
+  && tar -xzf "gitleaks_${v}_linux_x64.tar.gz" gitleaks
+gitleaks git . --redact                      # full history of every branch (what the weekly run does)
+gitleaks git . --redact --log-opts="--full-history --diff-filter=tuxdb develop..HEAD"   # only your branch
+gitleaks git . --redact --report-format json --report-path /tmp/gitleaks.json   # findings with fingerprints
+```
+- Always pass `--redact`.
+- Don't run `gitleaks dir .` on your working copy. It also reads the gitignored secret files (`backend/.env`, the Mappls config) and reports them. To scan only committed files, run it on an export: `git archive HEAD | tar -x -C /tmp/jqc-tree && (cd /tmp/jqc-tree && gitleaks dir . --redact)`.
+
+### 2.2 Dependency advisories (osv-scanner)
+**What it does.** `dependency-scan.yml` checks the locked versions in these lockfiles against the OSV database (GitHub advisories, PyPA, Pub, …):
+- `backend/uv.lock`
+- `customer_app/pubspec.lock` and `rider_app/pubspec.lock`
+- `packages/*/pubspec.lock`
+
+pip-audit in `backend.yml` stays: it covers only Python, and osv-scanner adds the Flutter side.
+- **Pass or fail:** osv-scanner has no severity threshold, so `infra/scripts/osv_gate.py` rates every advisory:
+  - It uses the CVSS score: ≥ 9.0 CRITICAL, ≥ 7.0 HIGH, ≥ 4.0 MEDIUM, otherwise LOW.
+  - The GitHub label wins when it is higher, or when there is no score.
+  - A `MAL-*` id (a known malicious package) is always CRITICAL.
+  - **HIGH and CRITICAL fail the job.** MEDIUM, LOW and unrated (UNKNOWN) advisories become warnings.
+  - Everything is listed in the job summary with the fixed versions.
+  - The gate runs `--self-test` first, so a broken gate cannot pass silently.
+- **When it runs:** PRs and pushes to `develop`/`main` that change a lockfile, the gate or the config. Weekly (Mon 02:41 UTC) and manually it scans **both `main` and `develop`**, because new advisories appear without any code change.
+- **Exceptions:** only in `infra/security/osv-scanner.toml`, which CI passes with `--config`. So an `osv-scanner.toml` dropped next to a lockfile cannot hide anything.
+
+**Pins:**
+
+| Tool | Version | Asset | sha256 |
+|---|---|---|---|
+| osv-scanner (CI) | 2.7.0 | `osv-scanner_linux_amd64` | `160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b` |
+| osv-scanner (Windows, local) | 2.7.0 | `osv-scanner_windows_amd64.exe` | `9964ed64ec9a387391eb4cc006ad5c531154821aef29b793e02c448de4686438` |
+
+Both match the release's `osv-scanner_SHA256SUMS` and GitHub's asset digest. We pinned 2.7.0, not 2.7.1, because 2.7.1 was one day old on 2026-11-10.
+
+**If an advisory fails the job:**
+1. **Upgrade** the package. The lockfile's owner does it:
+   - Backend: `uv lock --upgrade-package <pkg>` in `backend/`, then the tests.
+   - Flutter: `flutter pub upgrade <pkg>` in every project that uses it. Then run `python3 packages/tool/check_shared_versions.py`, because the four lockfiles must agree.
+2. If there is no fixed version yet, or the vulnerable code is provably never called, add a **reviewed exception** to `infra/security/osv-scanner.toml`. It needs the advisory `id`, `ignoreUntil` at most 90 days ahead, and a `reason` naming the task that removes it. The file has an example. osv-scanner logs every exception it applies.
+
+**Run it locally** (from the repo root; Windows: the `.exe` above):
+```bash
+v=2.7.0; curl -fsSLo osv-scanner "https://github.com/google/osv-scanner/releases/download/v$v/osv-scanner_linux_amd64"
+echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  osv-scanner" | sha256sum -c - && chmod +x osv-scanner
+./osv-scanner scan source --config infra/security/osv-scanner.toml \
+  -L backend/uv.lock -L customer_app/pubspec.lock -L rider_app/pubspec.lock \
+  -L packages/jivo_core/pubspec.lock -L packages/jivo_api/pubspec.lock \
+  --format json --output-file /tmp/osv.json
+python3 infra/scripts/osv_gate.py /tmp/osv.json   # same pass/fail as CI; --fail-on critical|high|medium|low
+```
+For a quick look, use `--format table` instead of the JSON output.
+
+**Upgrading either scanner:**
+1. Pick a release that is at least about two weeks old.
+2. Take the sha256 from the release's own checksum file, and confirm it matches GitHub's asset digest.
+3. Change the version and the sha256 together, in the workflow's `env` and in the tables above.
+4. Re-run both local scans. In the same change, look at what the new version adds or deprecates (for example, osv-scanner 2.7.1 renames `ignoreUntil` to `effectiveUntil`).
 
 ## 3. Branches and releases
 - The flow is `main` ← `develop` ← module branches (`development-phase.md` §9.4).

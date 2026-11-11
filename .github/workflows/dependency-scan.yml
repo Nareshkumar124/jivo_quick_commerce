@@ -1,0 +1,101 @@
+# Dependency advisories (docs/deployment.md §2.2). osv-scanner (pinned release binary,
+# sha256-checked) checks every shipped lockfile against the OSV database (GitHub advisories, PyPA,
+# Pub and more):
+#   backend/uv.lock, customer_app/pubspec.lock, rider_app/pubspec.lock, packages/*/pubspec.lock
+# HIGH and CRITICAL fail the job (infra/scripts/osv_gate.py rates each advisory); MEDIUM, LOW
+# and unrated ones are warnings plus a job-summary table. It complements pip-audit in backend.yml,
+# which covers only the Python side.
+# Reviewed exceptions live only in infra/security/osv-scanner.toml, passed with --config.
+# Weekly it scans both main and develop: new advisories appear without any code change.
+name: dependency-scan
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - "backend/uv.lock"
+      - "customer_app/pubspec.lock"
+      - "rider_app/pubspec.lock"
+      - "packages/*/pubspec.lock"
+      - "infra/security/osv-scanner.toml"
+      - "infra/scripts/osv_gate.py"
+      - ".github/workflows/dependency-scan.yml"
+  pull_request:
+    paths:
+      - "backend/uv.lock"
+      - "customer_app/pubspec.lock"
+      - "rider_app/pubspec.lock"
+      - "packages/*/pubspec.lock"
+      - "infra/security/osv-scanner.toml"
+      - "infra/scripts/osv_gate.py"
+      - ".github/workflows/dependency-scan.yml"
+  schedule:
+    - cron: "41 2 * * 1" # Mondays 02:41 UTC (08:11 IST)
+  workflow_dispatch:
+
+concurrency:
+  group: dependency-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Pinned release binary. Upgrade deliberately: change both values together (deployment.md §2.2).
+  OSV_SCANNER_VERSION: "2.7.0"
+  OSV_SCANNER_SHA256: "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b" # osv-scanner_linux_amd64
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  osv:
+    name: Dependency advisories (${{ matrix.ref || github.ref_name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Weekly: both long-lived branches. Otherwise "", which checks out the triggering commit.
+        ref: ${{ fromJSON(github.event_name == 'schedule' && '["main", "develop"]' || '[""]') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.ref }}
+          persist-credentials: false
+
+      - name: Install osv-scanner (pinned, checksum verified)
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/bin/osv-scanner" \
+            "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"
+          echo "${OSV_SCANNER_SHA256}  $RUNNER_TEMP/bin/osv-scanner" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/bin/osv-scanner"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/osv-scanner" --version
+
+      - name: Severity gate self-test
+        run: python3 infra/scripts/osv_gate.py --self-test
+
+      - name: Scan the lockfiles (fail on HIGH/CRITICAL)
+        run: |
+          args=()
+          for f in backend/uv.lock customer_app/pubspec.lock rider_app/pubspec.lock packages/*/pubspec.lock; do
+            if [[ ! -f "$f" ]]; then
+              echo "::error::Lockfile $f is missing; update this workflow if a project moved."
+              exit 1
+            fi
+            args+=(--lockfile "$f")
+          done
+          set +e
+          osv-scanner scan source --config infra/security/osv-scanner.toml "${args[@]}" \
+            --format json --output-file "$RUNNER_TEMP/osv.json"
+          rc=$?
+          set -e
+          # 0 = no advisories, 1 = advisories found (rated below). Anything else is a scanner error.
+          if [[ "$rc" -ne 0 && "$rc" -ne 1 ]]; then
+            echo "::error::osv-scanner failed (exit $rc)."
+            exit "$rc"
+          fi
+          python3 infra/scripts/osv_gate.py "$RUNNER_TEMP/osv.json" --fail-on high
