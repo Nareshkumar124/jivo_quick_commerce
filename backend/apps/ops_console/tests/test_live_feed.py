@@ -66,7 +66,7 @@ def test_live_board_page_is_live(client, store, principal):
     assert response.status_code == 200
     html = response.content.decode()
     assert "ops/js/live.js" in html
-    assert "ops:live from:body[opsLiveAllowed('board-columns')]" in html
+    assert "ops:live[opsLiveAllowed('board-columns')] from:body" in html
 
 
 def test_live_feed_url_rules():
@@ -94,7 +94,7 @@ def test_partials_refresh_on_live_events_and_keep_polling(client, store, princip
     html = response.content.decode()
     assert "<html" not in html
     assert f"every 5s[opsPollAllowed('{region}')]" in html or "[opsPollAllowed(" in html
-    assert f"ops:live from:body[opsLiveAllowed('{region}')]" in html
+    assert f"ops:live[opsLiveAllowed('{region}')] from:body" in html
     assert "ops:refresh from:body" in html
 
 
@@ -105,7 +105,7 @@ def test_packing_queues_refresh_on_live_events(client, store, principal):
     assert response.status_code == 200
     html = response.content.decode()
     assert "[opsPollAllowed('packing-queues')]" in html
-    assert "ops:live from:body[opsLiveAllowed('packing-queues')]" in html
+    assert "ops:live[opsLiveAllowed('packing-queues')] from:body" in html
 
 
 def test_packing_queues_of_another_store_are_refused(client, store):
@@ -199,3 +199,16 @@ def test_stored_alerts_are_rebuilt_from_whitelisted_keys():
     body = LIVE_JS.split("function loadAlerts")[1].split("function saveAlerts")[0]
     assert "Object.assign" not in body  # no stored key is copied through
     assert "orderUrl: orderUrl(orderId)" in body
+
+
+def test_no_partial_puts_an_event_filter_on_the_from_selector():
+    """htmx 2 reads `from:body[...]` as a CSS selector and throws, which stopped every
+    poll and click on the page (packing Accept did nothing on staging). The filter
+    belongs on the event: `ops:live[filter] from:body`."""
+    from pathlib import Path
+
+    from django.conf import settings
+
+    partials = Path(settings.BASE_DIR) / "templates" / "ops" / "partials"
+    bad = [p.name for p in partials.glob("*.html") if "from:body[" in p.read_text(encoding="utf-8")]
+    assert bad == []
