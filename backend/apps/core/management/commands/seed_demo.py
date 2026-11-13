@@ -33,6 +33,8 @@ SEED_STEPS: list[str] = [
     "apps.cms.seed.seed_pages_and_faqs",
     "apps.support.seed.seed_tickets",
     "apps.support.seed.seed_canned_replies",
+    # 2026-11-13: referral settings row and the test customer's referral code
+    "apps.referrals.seed.seed_referrals",
 ]
 
 

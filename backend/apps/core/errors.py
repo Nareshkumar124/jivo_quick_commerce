@@ -66,6 +66,17 @@ class ErrorCode(models.TextChoices):
     # --- Added 2026-11-13 (per-variant minimum order quantity) ---------------------------------
     MIN_QTY_REQUIRED = "MIN_QTY_REQUIRED", "The minimum quantity for this item is not met."
     MIN_UNITS_NOT_MET = "MIN_UNITS_NOT_MET", "The minimum number of units per order is not met."
+    # --- Added 2026-11-13 (referral program) ---------------------------------------------------
+    REFERRAL_CODE_INVALID = "REFERRAL_CODE_INVALID", "This referral code is not valid."
+    REFERRAL_SELF = "REFERRAL_SELF", "You cannot use your own referral code."
+    REFERRAL_ALREADY_APPLIED = (
+        "REFERRAL_ALREADY_APPLIED",
+        "You have already used a referral code.",
+    )
+    REFERRAL_NOT_ELIGIBLE = (
+        "REFERRAL_NOT_ELIGIBLE",
+        "Referral codes are only for new customers before their first order.",
+    )
 
 
 ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
@@ -111,6 +122,10 @@ ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.PICKUP_CODE_LOCKED: 423,
     ErrorCode.MIN_QTY_REQUIRED: 422,
     ErrorCode.MIN_UNITS_NOT_MET: 422,
+    ErrorCode.REFERRAL_CODE_INVALID: 422,
+    ErrorCode.REFERRAL_SELF: 422,
+    ErrorCode.REFERRAL_ALREADY_APPLIED: 422,
+    ErrorCode.REFERRAL_NOT_ELIGIBLE: 422,
 }
 
 

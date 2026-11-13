@@ -35,6 +35,7 @@ APP_ONLY_PREFIXES: tuple[tuple[str, str], ...] = (
     ("cart/", AppName.CUSTOMER),
     ("orders/", AppName.CUSTOMER),
     ("payments/", AppName.CUSTOMER),  # the gateway webhook is public (no token), never checked
+    ("account/", AppName.CUSTOMER),  # referral (refer a friend), added 2026-11-13
 )
 
 REASON_WRONG_APP_TOKEN = "WRONG_APP_TOKEN"  # noqa: S105 - a reason code, not a secret

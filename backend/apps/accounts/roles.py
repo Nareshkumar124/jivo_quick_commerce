@@ -30,6 +30,7 @@ SUPER_ADMIN_APPS = (
     "catalog",
     "inventory",
     "promotions",
+    "referrals",
     "cart",
     "orders",
     "payments",
@@ -67,10 +68,18 @@ INVENTORY_ADJUST = ["inventory.adjust_stock", "inventory.toggle_availability"]
 # Phase 3 (05 §3 rows Coupons, Refund, Live order board, Packing console; PM default ⚠ until the
 # order and refund screens of Phase 4 refine them). Orders are read-only here: state changes go
 # through orders.services.transition(), never through model permissions.
-COUPON_VIEW = ["promotions.view_coupon", "promotions.view_couponredemption"]
+# Referral program (2026-11-13): managed with coupons (its reward is a coupon).
+REFERRAL_VIEW = [
+    "referrals.view_referralsettings",
+    "referrals.view_referral",
+    "referrals.view_referralcode",
+]
+COUPON_VIEW = ["promotions.view_coupon", "promotions.view_couponredemption", *REFERRAL_VIEW]
 COUPON_MANAGE = [
     *[f"promotions.{action}_coupon" for action in ("add", "change", "delete", "view")],
     "promotions.view_couponredemption",
+    *REFERRAL_VIEW,
+    "referrals.change_referralsettings",
 ]
 ORDER_VIEW = [
     "orders.view_order",

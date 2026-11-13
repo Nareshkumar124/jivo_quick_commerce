@@ -173,6 +173,13 @@ Images (`Category.image`, `ProductImage.image`, `Banner.image`) are public media
 **Coupon**: `code` (unique, case-insensitive), `title`, `description`, `discount_type` (FLAT/PERCENT), `value`, `max_discount`, `min_order_value`, `starts_at`, `ends_at`, `usage_limit_total`, `usage_limit_per_user`, `first_order_only`, `stores` (M2M), `categories` (M2M, applies to item subtotal in those categories), `is_active`, `is_visible` (listed in the app or hidden code).
 Coupon (built in Phase 3 R2a): `code` stored in capitals, unique on `upper(code)`; `usage_limit_per_user` defaults to 1 (empty = unlimited); `starts_at`/`ends_at` nullable (no bound); check constraints: value > 0, PERCENT ≤ 100, `max_discount` > 0 when set, `ends_at` > `starts_at`. History kept (simple-history).
 **CouponRedemption**: `coupon`, `user`, `order` (unique), `discount_amount`, `status` (HELD/APPLIED/RELEASED/REVERSED; Phase 3 adds HELD = the order awaits online payment and RELEASED = that hold ended without a sale). HELD and APPLIED count against the usage limits; using a coupon locks its row and re-checks them.
+**Personal coupons** (added 2026-11-13, migration `promotions.0002`): `Coupon.owner` (FK User, nullable, PROTECT, related name `personal_coupons`). Empty = a public coupon (unchanged behaviour). Set = only that customer sees it in the coupon sheet and can apply or use it; for anyone else it is `COUPON_INVALID`. Referral rewards are personal coupons with a generated code (`REF` + 8 characters), FLAT, `usage_limit_total` = `usage_limit_per_user` = 1, `ends_at` = reward time + validity days.
+
+### 2.5a Referrals (`referrals`, added 2026-11-13)
+
+**ReferralSettings** (one row, id 1, like `AppConfig`; history kept): `is_enabled` (default true), `reward_amount` (Decimal, default 90.00, ₹1 to ₹1,000), `reward_validity_days` (default 30, 1 to 365), `reward_min_order_value` (Decimal, default 0.00, ≥ 0). Check constraints: singleton, amount > 0, minimum ≥ 0, validity ≥ 1.
+**ReferralCode**: `user` (1:1, CASCADE, related name `referral_code`), `code` (char 12, unique; 6 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, created on the customer's first `GET /account/referral/`, never changed).
+**Referral**: `referrer` (FK User, PROTECT, related name `referrals_made`), `referred` (1:1 User, PROTECT, related name `referral`: a customer enters a code at most once), `code` (the code entered), `status` (PENDING/REWARDED/VOID), `reward_order` (FK Order, nullable, PROTECT: the delivered order that triggered the reward or the VOID), `reward_amount` (nullable), `referrer_coupon` / `referred_coupon` (FK Coupon, nullable, PROTECT), `rewarded_at`, `note`, timestamps. Check constraints: referrer ≠ referred; a REWARDED row has both coupons, the order and `rewarded_at`. Index (`referrer`, `status`) for the friend counts.
 
 ### 2.6 Orders (`orders`)
 
@@ -301,6 +308,7 @@ Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, 
 - `Order(user, idempotency_key)` unique.
 - `DeliveryOffer(task)` partial unique where `status='PENDING'`.
 - `Coupon(upper(code))` unique.
+- `ReferralCode.code` unique; `Referral.referred` unique (one code per customer, ever).
 
 ## 4. Data retention
 | Data | Retention |

@@ -1,5 +1,9 @@
 """Coupons and their use by orders (07 §2.5).
 
+A coupon with an `owner` is personal (07 §2.5, added 2026-11-13): only that customer sees it in
+the coupon sheet and can apply or use it (`apps.promotions.services.is_for`). Referral rewards
+are personal coupons.
+
 A coupon's use is a `CouponRedemption` row per order, whose status follows the order (08 T1-T5):
 - HELD: the order awaits online payment; it already counts against the usage limits.
 - APPLIED: the order is placed (COD at once, online when the payment is captured).
@@ -79,6 +83,18 @@ class Coupon(TimeStampedModel):
     is_active = models.BooleanField(default=True)
     is_visible = models.BooleanField(
         default=True, help_text="Listed in the app's coupon sheet. Hidden codes still work."
+    )
+    # Added 2026-11-13 (referral rewards): a personal coupon is seen and usable only by its owner.
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="personal_coupons",
+        help_text=(
+            "Personal coupon: only this customer sees it and can use it (e.g. a referral "
+            "reward). Empty = a public coupon."
+        ),
     )
     history = HistoricalRecords()
 

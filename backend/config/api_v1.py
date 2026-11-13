@@ -13,4 +13,5 @@ urlpatterns = [
     path("", include("apps.delivery.urls")),  # rider app (Phase 5)
     path("", include("apps.support.urls")),  # support tickets (Phase 7)
     path("", include("apps.notifications.urls")),  # inbox (Phase 6)
+    path("", include("apps.referrals.urls")),  # refer a friend (2026-11-13)
 ]

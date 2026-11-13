@@ -11,10 +11,19 @@ Support and Finance view; DL-45, DL-46).
 - Redemptions: read-only, one row per order that used a coupon (`apps.promotions.services` writes
   them). Customers are shown per the PII policy (`ops_console.pii`); the order number is plain
   text because not every coupon role may open orders.
+- Personal coupons (`owner`, added 2026-11-13; referral rewards are personal): the owner is
+  chosen only when a coupon is created (a customer id; the lookup opens the Customers admin for
+  roles that may see customers in full) and is read-only afterwards, so a coupon customers or
+  orders already use never changes hands. The owner is shown per the PII policy, never as
+  `str(user)` (the phone).
 """
+
+from urllib.parse import urlencode
 
 from django import forms
 from django.contrib import admin
+from django.contrib.admin.views.main import TO_FIELD_VAR
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db.models import BooleanField, Count, Q, Value
 from django.urls import reverse
@@ -22,6 +31,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin
 from unfold.decorators import display
+from unfold.widgets import UnfoldForeignKeyRawIdWidget
 
 from apps.ops_console import status
 from apps.ops_console.admin_support import ReadOnlyHistoryAdmin
@@ -47,6 +57,41 @@ COUNTED = Q(redemptions__status__in=COUNTED_STATUSES)
 MSG_CAP_REQUIRED = "A percent coupon needs a maximum discount (cap) in rupees."
 MSG_NO_CAP_ON_FLAT = "A flat coupon has no cap: its value is the discount. Leave this empty."
 MSG_CODE_SPACES = "Use letters and numbers without spaces, e.g. JIVO50."
+MSG_OWNER_NOT_CUSTOMER = "Enter the id of an active customer account (not a staff account)."
+PUBLIC_COUPON = "Public (everyone)"
+
+
+def owner_choices():
+    """Who may own a personal coupon: active customer accounts."""
+    return get_user_model().objects.filter(is_staff=False, is_superuser=False, is_active=True)
+
+
+class CustomerRawIdWidget(UnfoldForeignKeyRawIdWidget):
+    """The owner's id input. Unlike Django's raw-id widget it never shows `str(user)` (the
+    phone): the label is the customer per the PII policy, and the lookup and link go to the
+    Customers admin only for roles that may open it (`accounts.view_customer`)."""
+
+    def __init__(self, rel, admin_site, *, full_pii: bool, attrs=None, using=None):
+        super().__init__(rel, admin_site, attrs, using)
+        self.full_pii = full_pii
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["related_url"] = None
+        if self.full_pii:
+            changelist = reverse("admin:accounts_customer_changelist")
+            context["related_url"] = f"{changelist}?{urlencode({TO_FIELD_VAR: 'id'})}"
+        return context
+
+    def label_and_url_for_value(self, value):
+        try:
+            customer = owner_choices().filter(pk=int(value)).first()
+        except (TypeError, ValueError):
+            customer = None
+        if customer is None:
+            return "", ""
+        url = reverse("admin:accounts_customer_change", args=[customer.pk]) if self.full_pii else ""
+        return customer_label(customer, full=self.full_pii), url
 
 
 class _SaveRefused(Exception):
@@ -75,6 +120,7 @@ class CouponAdminForm(forms.ModelForm):
             "categories",
             "is_active",
             "is_visible",
+            "owner",  # on the add page only (CouponAdmin.get_fieldsets)
         )
         widgets = {
             "max_discount": RupeeInput,
@@ -84,7 +130,10 @@ class CouponAdminForm(forms.ModelForm):
             "value": "FLAT: rupees off. PERCENT: percent off, from 0.01 to 100.",
             "max_discount": "Percent coupons: the most the discount can be, in rupees "
             "(required). Flat coupons: leave empty.",
+            "owner": "Empty: a public coupon. A customer's id: a personal coupon that only this "
+            "customer sees and can use. It cannot be changed after saving.",
         }
+        labels = {"owner": "Personal coupon for (customer id)"}
 
     # Set by CouponAdmin when `save_coupon` refused the save (a raced code, a limit below the
     # counted uses...): shown as errors of this form, nothing saved.
@@ -151,6 +200,24 @@ class CouponStateFilter(admin.SimpleListFilter):
         return queryset
 
 
+class CouponKindFilter(admin.SimpleListFilter):
+    """Personal coupons (one customer, e.g. referral rewards) or public ones."""
+
+    title = "personal or public"
+    parameter_name = "kind"
+
+    def lookups(self, request, model_admin):
+        return [("personal", "Personal (one customer)"), ("public", "Public")]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value == "personal":
+            return queryset.filter(owner__isnull=False)
+        if value == "public":
+            return queryset.filter(owner__isnull=True)
+        return queryset
+
+
 @admin.register(Coupon)
 class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
     form = CouponAdminForm
@@ -163,11 +230,13 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
         "uses",
         "per_user",
         "audience",
+        "owner_label",
         "state_badge",
     )
     list_display_links = ("code", "title")
     list_filter = (
         CouponStateFilter,
+        CouponKindFilter,
         "discount_type",
         "first_order_only",
         "is_visible",
@@ -178,7 +247,8 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
     ordering = ("code",)
     list_per_page = 50
     filter_horizontal = ("stores", "categories")
-    readonly_fields = ("state_badge", "usage_summary", "created_at", "updated_at")
+    raw_id_fields = ("owner",)  # widget: CustomerRawIdWidget (formfield_for_foreignkey)
+    readonly_fields = ("state_badge", "usage_summary", "owner_label", "created_at", "updated_at")
     fieldsets = (
         (
             "Coupon",
@@ -187,6 +257,18 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
                 "description": (
                     "Hidden codes (not listed in the app) still work when typed. Codes are "
                     "stored in capitals; customers may type them in any case."
+                ),
+            },
+        ),
+        (
+            "Who can use it",
+            {
+                # "owner" on the add page, "owner_label" (read-only) afterwards: get_fieldsets.
+                "fields": ("owner",),
+                "description": (
+                    "A personal coupon is listed and works only for its customer (referral "
+                    "rewards are personal coupons). The customer is set when the coupon is "
+                    "created and cannot be changed."
                 ),
             },
         ),
@@ -213,14 +295,45 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .annotate(counted_uses=Count("redemptions", filter=COUNTED))
+            .annotate(
+                counted_uses=Count("redemptions", filter=COUNTED),
+                full_pii=Value(can_view_full_phone(request.user), output_field=BooleanField()),
+            )
+            .select_related("owner")
             .prefetch_related("categories")
         )
 
     def get_fieldsets(self, request, obj=None):
         if obj is None:
             return self.fieldsets[:-1]  # nothing to report on a new coupon
-        return self.fieldsets
+        # An existing coupon never changes hands: its owner is shown, not a field (so a crafted
+        # POST cannot set it either: the form has no `owner` field).
+        return tuple(
+            (
+                title,
+                {
+                    **options,
+                    "fields": tuple(
+                        "owner_label" if name == "owner" else name for name in options["fields"]
+                    ),
+                },
+            )
+            for title, options in self.fieldsets
+        )
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "owner":
+            kwargs["queryset"] = owner_choices()
+            kwargs["widget"] = CustomerRawIdWidget(
+                db_field.remote_field,
+                self.admin_site,
+                full_pii=can_view_full_phone(request.user),
+                using=kwargs.get("using"),
+            )
+            formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
+            formfield.error_messages["invalid_choice"] = MSG_OWNER_NOT_CUSTOMER
+            return formfield
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def get_readonly_fields(self, request, obj=None):
         fields = list(super().get_readonly_fields(request, obj))
@@ -304,12 +417,19 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
 
     @display(description="Audience")
     def audience(self, obj) -> str:
-        parts = []
+        parts = ["Personal"] if obj.owner_id else []
         if obj.first_order_only:
             parts.append("First order")
         if not obj.is_visible:
             parts.append("Hidden code")
         return ", ".join(parts) or "Everyone"
+
+    @display(description="Personal for")
+    def owner_label(self, obj) -> str:
+        if obj is None or obj.owner_id is None:
+            return PUBLIC_COUPON
+        # Masked unless this viewer sees customers in full (history pages: always masked).
+        return customer_label(obj.owner, full=getattr(obj, "full_pii", False))
 
     @display(description="State", label=status.label_tones(status.COUPON))
     def state_badge(self, obj) -> str:
