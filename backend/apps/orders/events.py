@@ -9,7 +9,8 @@ The handler logs every event (the OPS_ALERTS at ERROR) and then:
 - PLACED: schedules the store's auto-accept (when the store has it on) and the acceptance SLA
   check;
 - the DISPATCH_TRIGGER event (ACCEPTED by default, or PLACED): starts rider dispatch;
-- PACKED: tells the assigned rider the order is ready.
+- PACKED: tells the assigned rider the order is ready;
+- DELIVERED: queues the customer's referral reward (`referrals.reward_referral`, 2026-11-13).
 The T9 push and SMS (with the delivery OTP) and "rider arrived" go through `apps.delivery.hooks`.
 """
 

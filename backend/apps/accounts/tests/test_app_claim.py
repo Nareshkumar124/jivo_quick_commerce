@@ -46,6 +46,7 @@ GROUPS = {
     "cart/": CUSTOMER,
     "orders/": CUSTOMER,
     "payments/": CUSTOMER,
+    "account/": CUSTOMER,  # referral (2026-11-13)
     "rider/": RIDER,
 }
 # App-only routes that take no token at all (server to server).

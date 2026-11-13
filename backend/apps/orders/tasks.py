@@ -13,7 +13,8 @@ def order_event(event: str, order_id: int) -> str:
     """Domain event handler (`apps.orders.events`). Phase 4: a PLACED order schedules its
     auto-accept (stores with auto-accept) and its acceptance SLA check; ops alerts are logged
     at ERROR. Phase 5 starts dispatch (DISPATCH_TRIGGER) and tells the rider an order is packed;
-    Phase 6 fans every event out to the sockets and the customer notification (`fan_out`)."""
+    Phase 6 fans every event out to the sockets and the customer notification (`fan_out`).
+    DELIVERED also queues the referral reward (`queue_referral_reward`, added 2026-11-13)."""
     from apps.orders import events
 
     if event in events.OPS_ALERTS:
@@ -23,6 +24,8 @@ def order_event(event: str, order_id: int) -> str:
     # Sockets and the customer notification first: each is its own queued task, so an error in
     # the Phase 4/5 work below never holds them back.
     fan_out(event, order_id)
+    if event == events.DELIVERED:
+        queue_referral_reward(order_id)
     if event == events.PLACED:
         schedule_acceptance(order_id)
     # Phase 5 (08 §2.1): dispatch starts at DISPATCH_TRIGGER (ACCEPTED by default, or PLACED).
@@ -51,6 +54,18 @@ def fan_out(event: str, order_id: int) -> None:
             task.delay(event, order_id)
         except Exception:
             logger.exception("Order event %s: %s not run for order %s", event, task.name, order_id)
+
+
+def queue_referral_reward(order_id: int) -> None:
+    """Added 2026-11-13: a DELIVERED order may give its customer's referral reward
+    (`referrals.reward_referral`, its own retried, idempotent task; never in the delivery
+    request). A failure to queue it never holds back the rest of this handler."""
+    from apps.referrals.tasks import reward_referral
+
+    try:
+        reward_referral.delay(order_id)
+    except Exception:
+        logger.exception("Order %s: referral reward not queued", order_id)
 
 
 def schedule_acceptance(order_id: int) -> None:

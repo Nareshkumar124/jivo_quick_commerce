@@ -7,6 +7,413 @@ info:
 
     Conventions (docs/02-system-architecture.md §5): JSON with snake_case keys; money as 2-decimal strings; times in UTC ISO 8601; pagination with `page`/`page_size` (default 20, max 100). Apps send `X-App-Name`, `X-App-Version` and `X-Platform` on every request. The access token's `app` claim decides which app a session belongs to: `X-App-Name` must agree with it, `/rider/` endpoints need a rider-app token and the cart, order and payment endpoints a customer-app token, else 403 `PERMISSION_DENIED` (`details.reason` `APP_HEADER_MISMATCH` or `WRONG_APP_TOKEN`). Errors use the envelope `{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema). Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`.
 paths:
+  /api/v1/account/referral/:
+    get:
+      operationId: account_referral_retrieve
+      description: |-
+        The caller's own referral code (created on the first call, never changed), a ready-made share message, the reward terms (current admin settings), whether the caller joined with a friend's code, and how many friends joined with theirs.
+
+        When a referred customer's first order is delivered, **both** customers get a personal coupon (FLAT `reward_amount` off, valid `reward_validity_days` days, one use, only for them). It appears in `GET /cart/coupons/` with `is_personal: true`.
+      summary: My referral code and status
+      tags:
+      - account
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Referral'
+              examples:
+                NewCustomer:
+                  value:
+                    code: K7M2PQ
+                    share_message: Use my code K7M2PQ on the Jivo app and we both
+                      get ₹90 off.
+                    is_enabled: true
+                    reward_amount: '90.00'
+                    reward_validity_days: 30
+                    reward_min_order_value: '0.00'
+                    can_apply_code: true
+                    referred_by: null
+                    friends_joined: 0
+                    friends_rewarded: 0
+                  summary: New customer
+                JoinedWithACode,RewardPending:
+                  value:
+                    code: K7M2PQ
+                    share_message: Use my code K7M2PQ on the Jivo app and we both
+                      get ₹90 off.
+                    is_enabled: true
+                    reward_amount: '90.00'
+                    reward_validity_days: 30
+                    reward_min_order_value: '0.00'
+                    can_apply_code: false
+                    referred_by:
+                      code_masked: AB**7P
+                      status: PENDING
+                      applied_at: '2026-11-13T08:15:00Z'
+                    friends_joined: 0
+                    friends_rewarded: 0
+                  summary: Joined with a code, reward pending
+                ReferrerWithFriends:
+                  value:
+                    code: XR4TNW
+                    share_message: Use my code XR4TNW on the Jivo app and we both
+                      get ₹90 off.
+                    is_enabled: true
+                    reward_amount: '90.00'
+                    reward_validity_days: 30
+                    reward_min_order_value: '0.00'
+                    can_apply_code: false
+                    referred_by:
+                      code_masked: AB**7P
+                      status: REWARDED
+                      applied_at: '2026-10-02T11:40:00Z'
+                    friends_joined: 3
+                    friends_rewarded: 1
+                  summary: Referrer with friends
+                ProgramPaused:
+                  value:
+                    code: K7M2PQ
+                    share_message: Use my code K7M2PQ on the Jivo app and we both
+                      get ₹90 off.
+                    is_enabled: false
+                    reward_amount: '90.00'
+                    reward_validity_days: 30
+                    reward_min_order_value: '0.00'
+                    can_apply_code: false
+                    referred_by: null
+                    friends_joined: 0
+                    friends_rewarded: 0
+                  summary: Program paused
+          description: The caller's referral screen.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/account/referral/apply/:
+    post:
+      operationId: account_referral_apply
+      description: 'Once per customer, before their first order (an order that reached
+        PLACED; a failed or abandoned online payment does not count). The code cannot
+        be changed later. Case and spaces are ignored. Returns the referral screen.
+        Checks, first failure wins: program off, code already entered, order already
+        placed, unknown code, own code. Limited to `REFERRAL_APPLY_RATE` per user
+        (default 10 an hour).'
+      summary: Enter a friend's referral code
+      tags:
+      - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferralApplyRequest'
+            examples:
+              Apply:
+                value:
+                  code: ab3k 7p
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Referral'
+              examples:
+                Applied:
+                  value:
+                    code: K7M2PQ
+                    share_message: Use my code K7M2PQ on the Jivo app and we both
+                      get ₹90 off.
+                    is_enabled: true
+                    reward_amount: '90.00'
+                    reward_validity_days: 30
+                    reward_min_order_value: '0.00'
+                    can_apply_code: false
+                    referred_by:
+                      code_masked: AB**7P
+                      status: PENDING
+                      applied_at: '2026-11-13T08:15:00Z'
+                    friends_joined: 0
+                    friends_rewarded: 0
+          description: Code applied.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        code:
+                        - This field may not be blank.
+                  summary: VALIDATION_ERROR
+          description: Missing or blank `code`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                REFERRALCODEINVALID:
+                  value:
+                    error:
+                      code: REFERRAL_CODE_INVALID
+                      message: This referral code is not valid. Check it and try again.
+                      details:
+                        code: ZZZZ99
+                  summary: REFERRAL_CODE_INVALID
+                REFERRALSELF:
+                  value:
+                    error:
+                      code: REFERRAL_SELF
+                      message: You cannot use your own referral code.
+                      details: {}
+                  summary: REFERRAL_SELF
+                REFERRALALREADYAPPLIED:
+                  value:
+                    error:
+                      code: REFERRAL_ALREADY_APPLIED
+                      message: You have already used a referral code. It cannot be
+                        changed.
+                      details: {}
+                  summary: REFERRAL_ALREADY_APPLIED
+                REFERRALNOTELIGIBLEHASORDERS:
+                  value:
+                    error:
+                      code: REFERRAL_NOT_ELIGIBLE
+                      message: Referral codes are only for new customers, before their
+                        first order.
+                      details:
+                        reason: HAS_ORDERS
+                  summary: REFERRAL_NOT_ELIGIBLE_HAS_ORDERS
+                REFERRALNOTELIGIBLEPROGRAMOFF:
+                  value:
+                    error:
+                      code: REFERRAL_NOT_ELIGIBLE
+                      message: The referral program is paused right now.
+                      details:
+                        reason: PROGRAM_OFF
+                  summary: REFERRAL_NOT_ELIGIBLE_PROGRAM_OFF
+          description: 'The code was not applied; nothing changed. `REFERRAL_CODE_INVALID`:
+            unknown code, or its owner''s account is blocked or deleted. `REFERRAL_SELF`:
+            the caller''s own code. `REFERRAL_ALREADY_APPLIED`: a code was entered
+            before. `REFERRAL_NOT_ELIGIBLE`: `details.reason` is `HAS_ORDERS` (an
+            order was already placed) or `PROGRAM_OFF` (the program is paused).'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/addresses/:
     get:
       operationId: addresses_list
@@ -4156,6 +4563,22 @@ paths:
                 Coupons:
                   value:
                     results:
+                    - code: REFK7M2PQ9X
+                      title: '₹90 off: referral reward'
+                      description: Your reward for inviting a friend. One use, only
+                        for you.
+                      discount_type: FLAT
+                      value: '90.00'
+                      max_discount: null
+                      min_order_value: '0.00'
+                      ends_at: '2026-12-13T09:30:00Z'
+                      is_applied: false
+                      is_eligible: true
+                      savings: '90.00'
+                      ineligible_reason: null
+                      message: null
+                      amount_to_unlock: null
+                      is_personal: true
                     - code: OILS15
                       title: 15% off cooking oils
                       description: On edible oils, up to ₹150.
@@ -4170,6 +4593,7 @@ paths:
                       ineligible_reason: null
                       message: null
                       amount_to_unlock: null
+                      is_personal: false
                     - code: JIVO10
                       title: 10% off
                       description: On orders of ₹499 or more, up to ₹100.
@@ -4184,6 +4608,7 @@ paths:
                       ineligible_reason: null
                       message: null
                       amount_to_unlock: null
+                      is_personal: false
                     - code: JIVO50
                       title: Flat ₹50 off
                       description: On orders of ₹299 or more.
@@ -4198,6 +4623,7 @@ paths:
                       ineligible_reason: null
                       message: null
                       amount_to_unlock: null
+                      is_personal: false
                     - code: BIGSAVE200
                       title: Flat ₹200 off
                       description: On orders of ₹1,499 or more.
@@ -4212,6 +4638,7 @@ paths:
                       ineligible_reason: MIN_ORDER_VALUE
                       message: Add items worth ₹716 more to unlock.
                       amount_to_unlock: '716.00'
+                      is_personal: false
                     - code: WELCOME100
                       title: ₹100 off your first order
                       description: On your first order of ₹399 or more.
@@ -4226,6 +4653,7 @@ paths:
                       ineligible_reason: FIRST_ORDER_ONLY
                       message: Only for your first order.
                       amount_to_unlock: null
+                      is_personal: false
                 NoneAvailable:
                   value:
                     results: []
@@ -23660,6 +24088,10 @@ components:
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
           nullable: true
           description: 'MIN_ORDER_VALUE only: item value still needed. Null otherwise.'
+        is_personal:
+          type: boolean
+          description: 'True for the customer''s own personal coupon (e.g. a referral
+            reward): show a ''For you'' label and its expiry (`ends_at`). Added 2026-11-13.'
       required:
       - amount_to_unlock
       - code
@@ -23669,6 +24101,7 @@ components:
       - ineligible_reason
       - is_applied
       - is_eligible
+      - is_personal
       - max_discount
       - message
       - min_order_value
@@ -24130,6 +24563,10 @@ components:
             * `PICKUP_CODE_LOCKED` - Too many wrong order codes. Ask the store or ops.
             * `MIN_QTY_REQUIRED` - The minimum quantity for this item is not met.
             * `MIN_UNITS_NOT_MET` - The minimum number of units per order is not met.
+            * `REFERRAL_CODE_INVALID` - This referral code is not valid.
+            * `REFERRAL_SELF` - You cannot use your own referral code.
+            * `REFERRAL_ALREADY_APPLIED` - You have already used a referral code.
+            * `REFERRAL_NOT_ELIGIBLE` - Referral codes are only for new customers before their first order.
         message:
           type: string
           description: Human-readable message (English).
@@ -24186,6 +24623,10 @@ components:
       - PICKUP_CODE_LOCKED
       - MIN_QTY_REQUIRED
       - MIN_UNITS_NOT_MET
+      - REFERRAL_CODE_INVALID
+      - REFERRAL_SELF
+      - REFERRAL_ALREADY_APPLIED
+      - REFERRAL_NOT_ELIGIBLE
       type: string
       description: |-
         * `VALIDATION_ERROR` - Some fields are invalid.
@@ -24230,6 +24671,10 @@ components:
         * `PICKUP_CODE_LOCKED` - Too many wrong order codes. Ask the store or ops.
         * `MIN_QTY_REQUIRED` - The minimum quantity for this item is not met.
         * `MIN_UNITS_NOT_MET` - The minimum number of units per order is not met.
+        * `REFERRAL_CODE_INVALID` - This referral code is not valid.
+        * `REFERRAL_SELF` - You cannot use your own referral code.
+        * `REFERRAL_ALREADY_APPLIED` - You have already used a referral code.
+        * `REFERRAL_NOT_ELIGIBLE` - Referral codes are only for new customers before their first order.
     ErrorEnvelope:
       type: object
       description: Body of every non-2xx API response.
@@ -26456,6 +26901,107 @@ components:
       - ended_at
       - id
       - order_number
+      - status
+    Referral:
+      type: object
+      description: The caller's referral screen.
+      properties:
+        code:
+          type: string
+          description: The caller's own referral code (upper case, 6 characters).
+            Never changes.
+        share_message:
+          type: string
+          description: Ready-made text for the share sheet, with the code and the
+            reward amount.
+        is_enabled:
+          type: boolean
+          description: 'False: the program is paused (hide sharing; codes cannot be
+            entered).'
+        reward_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Rupees off for each of the two customers, e.g. "90.00".
+        reward_validity_days:
+          type: integer
+          description: Days the reward coupon stays valid after it is given.
+        reward_min_order_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Minimum item total to use the reward coupon ("0.00" = none).
+        can_apply_code:
+          type: boolean
+          description: 'Show the ''Have a referral code?'' box only when true: the
+            program is on, the caller has not entered a code and has no order that
+            was placed yet.'
+        referred_by:
+          allOf:
+          - $ref: '#/components/schemas/ReferredBy'
+          nullable: true
+          description: The code the caller joined with; null when none.
+        friends_joined:
+          type: integer
+          description: Customers who entered the caller's code.
+        friends_rewarded:
+          type: integer
+          description: Of those, how many have had their first order delivered (reward
+            given).
+      required:
+      - can_apply_code
+      - code
+      - friends_joined
+      - friends_rewarded
+      - is_enabled
+      - referred_by
+      - reward_amount
+      - reward_min_order_value
+      - reward_validity_days
+      - share_message
+    ReferralApplyRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          description: A friend's referral code. Case and spaces are ignored.
+          maxLength: 32
+      required:
+      - code
+    ReferralStatusEnum:
+      enum:
+      - PENDING
+      - REWARDED
+      - VOID
+      type: string
+      description: |-
+        * `PENDING` - Waiting for the first delivered order
+        * `REWARDED` - Rewarded (both coupons given)
+        * `VOID` - No reward (program off at the first delivery)
+    ReferredBy:
+      type: object
+      description: The code the caller joined with.
+      properties:
+        code_masked:
+          type: string
+          description: 'The friend''s code, partly hidden: "K7**PQ".'
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ReferralStatusEnum'
+          description: |-
+            PENDING: both get the reward when the caller's first order is delivered. REWARDED: the reward coupon is in the caller's coupon list. VOID: no reward (the program was off at that delivery).
+
+            * `PENDING` - Waiting for the first delivered order
+            * `REWARDED` - Rewarded (both coupons given)
+            * `VOID` - No reward (program off at the first delivery)
+        applied_at:
+          type: string
+          format: date-time
+          description: When the code was entered (UTC).
+      required:
+      - applied_at
+      - code_masked
       - status
     ReorderIssue:
       type: object
