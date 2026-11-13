@@ -320,9 +320,10 @@ void main() {
       _ => contractExample('cart_coupon_remove/200/Removed'),
     };
     final offers = await repository.coupons();
-    expect(offers.first.code, 'OILS15');
-    expect(offers.first.isEligible, isTrue);
-    expect(offers.first.savings, '83.70');
+    // The example lists a personal referral reward first (2026-11-13).
+    final oils = offers.singleWhere((o) => o.code == 'OILS15');
+    expect(oils.isEligible, isTrue);
+    expect(oils.savings, '83.70');
     final locked = offers.where((o) => !o.isEligible);
     expect(locked, isNotEmpty);
     expect(locked.first.ineligibility, isNotNull);

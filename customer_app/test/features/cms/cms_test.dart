@@ -103,6 +103,17 @@ void main() {
 
   testWidgets('real-API build keeps the browser policy links', (tester) async {
     await openAccount(tester, app(available: false));
+    // Below the fold since the Refer & earn row (2026-11-13).
+    await tester.scrollUntilVisible(
+      find.text('Terms of Service'),
+      100,
+      scrollable: find
+          .ancestor(
+            of: find.byKey(const Key('account-help')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(find.byKey(const Key('legal-${CmsSlugs.terms}')), findsNothing);
     expect(find.text('Terms of Service'), findsOneWidget);
   });

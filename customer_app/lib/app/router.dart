@@ -34,6 +34,7 @@ import '../features/orders/presentation/order_detail_screen.dart';
 import '../features/orders/presentation/orders_screen.dart';
 import '../features/profile/presentation/account_screens.dart';
 import '../features/rating/presentation/rate_order_screen.dart';
+import '../features/referral/presentation/referral_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/support/presentation/help_screen.dart';
 import '../features/support/presentation/ticket_screens.dart';
@@ -273,6 +274,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         'delete_account',
         (_) => const DeleteAccountScreen(),
       ),
+      route(Routes.referral, 'referral', (_) => const ReferralScreen()),
     ],
   );
   ref.onDispose(router.dispose);

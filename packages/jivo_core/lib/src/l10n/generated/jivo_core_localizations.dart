@@ -331,6 +331,36 @@ abstract class JivoCoreLocalizations {
   /// **'This store isn\'t available any more. Please choose your location again.'**
   String get errorStoreNotFound;
 
+  /// REFERRAL_CODE_INVALID (customer app): unknown code.
+  ///
+  /// In en, this message translates to:
+  /// **'This referral code isn\'t valid. Check it and try again.'**
+  String get errorReferralCodeInvalid;
+
+  /// REFERRAL_SELF (customer app): the customer entered their own code.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s your own code. Enter a friend\'s code instead.'**
+  String get errorReferralSelf;
+
+  /// REFERRAL_ALREADY_APPLIED (customer app).
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve already used a referral code. It can\'t be changed.'**
+  String get errorReferralAlreadyApplied;
+
+  /// REFERRAL_NOT_ELIGIBLE (customer app), reason HAS_ORDERS or none.
+  ///
+  /// In en, this message translates to:
+  /// **'Referral codes are only for new customers, before their first order.'**
+  String get errorReferralNotEligible;
+
+  /// REFERRAL_NOT_ELIGIBLE with details.reason PROGRAM_OFF (customer app).
+  ///
+  /// In en, this message translates to:
+  /// **'Refer & earn is paused right now. Please try again later.'**
+  String get errorReferralProgramPaused;
+
   /// OTP_INVALID with details.attempts_remaining.
   ///
   /// In en, this message translates to:

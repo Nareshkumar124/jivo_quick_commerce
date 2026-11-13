@@ -14,6 +14,7 @@ import '../../../shared/widgets/state_views.dart';
 import '../../auth/presentation/auth_flow.dart';
 import '../../cms/data/cms_repository.dart';
 import '../../notifications/presentation/inbox_screen.dart';
+import '../../referral/presentation/referral_screen.dart';
 import 'profile_controllers.dart';
 import 'profile_form.dart';
 
@@ -79,6 +80,7 @@ class AccountScreen extends ConsumerWidget {
               title: Text(l10n.addresses),
               onTap: () => context.push(Routes.addresses),
             ),
+            const ReferralAccountTile(),
             ListTile(
               key: const Key('account-notifications'),
               leading: const Icon(Icons.notifications_none),

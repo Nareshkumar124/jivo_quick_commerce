@@ -73,6 +73,29 @@ class LaunchState extends ChangeNotifier {
   }
 }
 
+/// The signed-in user's id, or null when signed out or not loaded yet.
+/// Unlike reading [LaunchState.user], watching this rebuilds when another
+/// user signs in or the user signs out (by any path: logout, deletion,
+/// expired session), so per-user data kept for the session can key on it.
+class SignedInUserId extends Notifier<int?> {
+  @override
+  int? build() {
+    final launch = ref.watch(launchStateProvider);
+    void sync() {
+      final id = launch.user?.id;
+      if (id != state) state = id;
+    }
+
+    launch.addListener(sync);
+    ref.onDispose(() => launch.removeListener(sync));
+    return launch.user?.id;
+  }
+}
+
+final signedInUserIdProvider = NotifierProvider<SignedInUserId, int?>(
+  SignedInUserId.new,
+);
+
 final launchStateProvider = Provider<LaunchState>((ref) {
   final state = LaunchState(
     onboardingSeen: ref.watch(appFlagsProvider).onboardingSeen,

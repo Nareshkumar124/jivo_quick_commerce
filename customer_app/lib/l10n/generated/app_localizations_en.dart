@@ -232,6 +232,144 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileSaved => 'Profile updated.';
 
   @override
+  String referAndEarn(String amount) {
+    return 'Refer & earn $amount';
+  }
+
+  @override
+  String get referAFriend => 'Refer a friend';
+
+  @override
+  String get referralEntryHaveCode => 'Got a friend\'s code? Enter it here';
+
+  @override
+  String get referralTitle => 'Refer & earn';
+
+  @override
+  String referralHeadline(String amount) {
+    return 'Invite a friend, you both get $amount off';
+  }
+
+  @override
+  String get referralYourCode => 'Your referral code';
+
+  @override
+  String referralCodeSemantics(String code) {
+    return 'Your referral code: $code';
+  }
+
+  @override
+  String get referralCopy => 'Copy';
+
+  @override
+  String get referralCopyCodeSemantics => 'Copy your referral code';
+
+  @override
+  String referralCodeCopied(String code) {
+    return 'Code $code copied';
+  }
+
+  @override
+  String get referralShare => 'Share invite';
+
+  @override
+  String get referralShareCopied =>
+      'Invite message copied. Paste it in WhatsApp or SMS to send it.';
+
+  @override
+  String get referralHowItWorks => 'How it works';
+
+  @override
+  String get referralStep1 =>
+      'Share your code with a friend who is new to Jivo.';
+
+  @override
+  String get referralStep2 => 'They enter it before their first order.';
+
+  @override
+  String referralStep3(String amount, int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other:
+          'When their first order is delivered, you both get $amount off. Use it within $days days.',
+      one:
+          'When their first order is delivered, you both get $amount off. Use it within 1 day.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String referralMinOrder(String amount) {
+    return 'Valid on orders of $amount or more.';
+  }
+
+  @override
+  String get referralFriendsJoined => 'Friends joined';
+
+  @override
+  String get referralRewardsEarned => 'Rewards earned';
+
+  @override
+  String get referralNoFriendsYet =>
+      'No friends have joined yet. Share your code to get started.';
+
+  @override
+  String get referralPaused =>
+      'Refer & earn is paused right now. Please check back later.';
+
+  @override
+  String get referralHaveCode => 'Have a referral code?';
+
+  @override
+  String get referralHaveCodeHint =>
+      'Enter a friend\'s code before your first order.';
+
+  @override
+  String get referralCodeLabel => 'Friend\'s code';
+
+  @override
+  String get referralApply => 'Apply';
+
+  @override
+  String get referralCodeRequired => 'Enter your friend\'s code';
+
+  @override
+  String referralApplied(String amount) {
+    return 'Code applied. You and your friend will each get $amount off after your first delivery.';
+  }
+
+  @override
+  String referralJoinedWith(String code) {
+    return 'You joined with code $code';
+  }
+
+  @override
+  String referralStatusPending(String amount) {
+    return 'You and your friend will each get $amount off after your first delivery.';
+  }
+
+  @override
+  String referralStatusRewarded(String amount) {
+    return 'Your $amount reward is in your coupons. Pick it under Apply coupon in your cart.';
+  }
+
+  @override
+  String get referralStatusNoReward =>
+      'No reward for this code: Refer & earn was paused when your first order was delivered.';
+
+  @override
+  String referralPromptBody(String amount) {
+    return 'Enter it before you place this order. You and your friend each get $amount off after it\'s delivered.';
+  }
+
+  @override
+  String get referralPromptAction => 'Enter code';
+
+  @override
+  String get referralPromptDismiss => 'Close';
+
+  @override
   String get addressesEmpty => 'No saved addresses yet.';
 
   @override
