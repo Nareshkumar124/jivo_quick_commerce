@@ -167,7 +167,7 @@ Customers can add to the cart up to `available`. The cart **does not** reserve s
 ### 6.2 Bill calculation (pricing engine, `cart.services.compute_bill`)
 ```
 mrp_total        = Σ mrp × qty
-item_total       = Σ selling_price × qty          (store price_override if set)
+item_total       = Σ unit price × qty             (unit price: the volume tier reached, else the store price_override if set, else selling_price)
 product_discount = mrp_total − item_total
 coupon_discount  = coupon rule on eligible item subtotal, capped by max_discount, ≤ item_total
 delivery_fee     = 0 if item_total ≥ free_delivery_threshold else delivery_fee
@@ -177,6 +177,7 @@ tip              = customer-chosen
 grand_total      = item_total − coupon_discount + delivery_fee + small_cart_fee + handling_fee + tip
 ```
 - Thresholds compare against `item_total` (before the coupon). This must be confirmed with Jivo (D-09).
+- **Volume (slab) prices** (added 2026-11-13, ADR 0001; Jivo Water per-box rates): a variant may have price tiers `{min_order_units, price}`. The tier is chosen once for the whole order by the **tier units** = Σ min(qty, orderable qty) over every line whose variant has tiers (any mix of sizes; units the store cannot supply do not count). Each tiered line then takes its own variant's price at the highest tier reached; below the lowest tier it keeps the normal price. A tier never raises a price (a lower store override stays). The unit price is fixed before `compute_bill`, in one place (`cart.services.load_lines`), so the cart, checkout and order placement agree; `item_total`, fee thresholds, the minimum order value and coupons all use it. Variants without tiers are priced exactly as before. The order line snapshots the unit price; §6.3 recalculation uses that snapshot and never re-tiers.
 - **Minimum units per order** (added 2026-11-13; e.g. 5 water cartons): a store's `min_order_units` (0 = off) counts every line together, any mix of items, as Σ min(qty, orderable qty), so units that cannot be supplied do not count. Below it, the cart shows `units_to_min_order`, checkout is blocked and order placement (T1/T2) is refused with `MIN_UNITS_NOT_MET`, exactly like the minimum order value. It is not money and does not change the bill.
 - Rounding: all amounts are rounded to 2 decimals, half-up. `grand_total` is not rounded to the rupee in v1.
 - The same function is used for the cart display, order creation and partial-unavailability recalculation. The client never computes money.

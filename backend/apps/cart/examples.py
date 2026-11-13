@@ -29,6 +29,7 @@ CHIA_100G = {
     "units_left": None,
     "max_qty_per_order": 5,
     "min_qty_per_order": 1,
+    "price_tiers": [],
     "image": CHIA_IMAGE,
 }
 FLAX_200G = {
@@ -44,6 +45,7 @@ FLAX_200G = {
     "units_left": None,
     "max_qty_per_order": 5,
     "min_qty_per_order": 1,
+    "price_tiers": [],
     "image": FLAX_IMAGE,
 }
 
@@ -78,6 +80,9 @@ LINE_CANOLA_1L_X2 = {
     "product": CANOLA_PRODUCT,
     "variant": cat.CANOLA_1L,
     "quantity": 2,
+    "price_per_unit": cat.CANOLA_1L["selling_price"],
+    "price_tier": None,
+    "next_tier_price": None,
     "line_mrp_total": "698.00",
     "line_total": "558.00",
     "issue": None,
@@ -87,6 +92,9 @@ LINE_WHEATGRASS_X1 = {
     "product": WHEATGRASS_PRODUCT,
     "variant": cat.WHEATGRASS_500ML,
     "quantity": 1,
+    "price_per_unit": cat.WHEATGRASS_500ML["selling_price"],
+    "price_tier": None,
+    "next_tier_price": None,
     "line_mrp_total": "250.00",
     "line_total": "225.00",
     "issue": None,
@@ -96,6 +104,9 @@ LINE_ALOE_X1 = {
     "product": ALOE_PRODUCT,
     "variant": cat.ALOE_1L,
     "quantity": 1,
+    "price_per_unit": cat.ALOE_1L["selling_price"],
+    "price_tier": None,
+    "next_tier_price": None,
     "line_mrp_total": "299.00",
     "line_total": "299.00",
     "issue": None,
@@ -105,6 +116,9 @@ LINE_CHIA_X1 = {
     "product": CHIA_PRODUCT,
     "variant": CHIA_100G,
     "quantity": 1,
+    "price_per_unit": CHIA_100G["selling_price"],
+    "price_tier": None,
+    "next_tier_price": None,
     "line_mrp_total": "150.00",
     "line_total": "119.00",
     "issue": None,
@@ -114,6 +128,9 @@ LINE_FLAX_X1 = {
     "product": FLAX_PRODUCT,
     "variant": FLAX_200G,
     "quantity": 1,
+    "price_per_unit": FLAX_200G["selling_price"],
+    "price_tier": None,
+    "next_tier_price": None,
     "line_mrp_total": "99.00",
     "line_total": "79.00",
     "issue": None,
@@ -123,6 +140,9 @@ LINE_CANOLA_5L_X3_LOW = {
     "product": CANOLA_PRODUCT,
     "variant": cat.CANOLA_5L,  # LOW_STOCK, orderable_quantity 2
     "quantity": 3,
+    "price_per_unit": cat.CANOLA_5L["selling_price"],
+    "price_tier": None,
+    "next_tier_price": None,
     "line_mrp_total": "4950.00",
     "line_total": "3897.00",
     "issue": {"code": "QUANTITY_UNAVAILABLE", "message": "Only 2 left. Reduce the quantity to 2."},
@@ -132,6 +152,9 @@ LINE_MUSTARD_X1_OUT = {
     "product": MUSTARD_PRODUCT,
     "variant": cat.MUSTARD_1L,  # OUT_OF_STOCK
     "quantity": 1,
+    "price_per_unit": cat.MUSTARD_1L["selling_price"],
+    "price_tier": None,
+    "next_tier_price": None,
     "line_mrp_total": "210.00",
     "line_total": "189.00",
     "issue": {"code": "OUT_OF_STOCK", "message": "Out of stock. Remove it to continue."},
@@ -169,6 +192,8 @@ def thresholds(amount_to_min_order=None, amount_to_free_delivery=None) -> dict:
         "min_order_units": 0,
         "units_to_min_order": None,
         "order_unit_label": "items",
+        "tier_units": 0,
+        "next_price_tier": None,
     }
 
 

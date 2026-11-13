@@ -1609,12 +1609,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
                           large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
                           alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
                       quantity: 2
+                      price_per_unit: '279.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                       issue: null
@@ -1640,12 +1644,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
                           large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
                           alt_text: Jivo Wheatgrass Juice 500 ml bottle
                       quantity: 1
+                      price_per_unit: '225.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                       issue: null
@@ -1701,6 +1709,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -1748,6 +1758,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -1792,12 +1804,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
                           large: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-1024.webp
                           alt_text: Jivo Aloe Vera Juice 1 L bottle
                       quantity: 1
+                      price_per_unit: '299.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '299.00'
                       line_total: '299.00'
                       issue: null
@@ -1851,6 +1867,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -1894,12 +1912,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
                           large: https://media.jivo.in/catalog/3a9c5e/chia-100g-1024.webp
                           alt_text: Jivo Chia Seeds 100 g pack
                       quantity: 1
+                      price_per_unit: '119.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '150.00'
                       line_total: '119.00'
                       issue: null
@@ -1947,6 +1969,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -1990,12 +2014,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/71be0d/flax-200g-256.webp
                           medium: https://media.jivo.in/catalog/71be0d/flax-200g-512.webp
                           large: https://media.jivo.in/catalog/71be0d/flax-200g-1024.webp
                           alt_text: Jivo Roasted Flax Seeds 200 g pack
                       quantity: 1
+                      price_per_unit: '79.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '99.00'
                       line_total: '79.00'
                       issue: null
@@ -2043,6 +2071,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2089,12 +2119,16 @@ paths:
                         units_left: 2
                         max_qty_per_order: 3
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
                           large: https://media.jivo.in/catalog/1e7d90/canola-5l-1024.webp
                           alt_text: Jivo Cold Pressed Canola Oil 5 L jar
                       quantity: 3
+                      price_per_unit: '1299.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '4950.00'
                       line_total: '3897.00'
                       issue:
@@ -2122,12 +2156,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
                           large: https://media.jivo.in/catalog/d2905f/mustard-1l-1024.webp
                           alt_text: Jivo Kachi Ghani Mustard Oil 1 L bottle
                       quantity: 1
+                      price_per_unit: '189.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '210.00'
                       line_total: '189.00'
                       issue:
@@ -2177,6 +2215,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2223,12 +2263,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
                           large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
                           alt_text: Jivo Wheatgrass Juice 500 ml bottle
                       quantity: 1
+                      price_per_unit: '225.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                       issue: null
@@ -2282,6 +2326,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2328,12 +2374,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
                           large: https://media.jivo.in/catalog/3a9c5e/chia-100g-1024.webp
                           alt_text: Jivo Chia Seeds 100 g pack
                       quantity: 1
+                      price_per_unit: '119.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '150.00'
                       line_total: '119.00'
                       issue: null
@@ -2363,6 +2413,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2408,12 +2460,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
                           large: https://media.jivo.in/catalog/3a9c5e/chia-100g-1024.webp
                           alt_text: Jivo Chia Seeds 100 g pack
                       quantity: 1
+                      price_per_unit: '119.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '150.00'
                       line_total: '119.00'
                       issue: null
@@ -2461,6 +2517,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2507,12 +2565,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
                           large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
                           alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
                       quantity: 2
+                      price_per_unit: '279.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                       issue: null
@@ -2538,12 +2600,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
                           large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
                           alt_text: Jivo Wheatgrass Juice 500 ml bottle
                       quantity: 1
+                      price_per_unit: '225.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                       issue: null
@@ -2599,6 +2665,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2854,12 +2922,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
                           large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
                           alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
                       quantity: 2
+                      price_per_unit: '279.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                       issue: null
@@ -2885,12 +2957,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
                           large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
                           alt_text: Jivo Wheatgrass Juice 500 ml bottle
                       quantity: 1
+                      price_per_unit: '225.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                       issue: null
@@ -2946,6 +3022,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -3212,6 +3290,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -3443,12 +3523,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
                           large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
                           alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
                       quantity: 2
+                      price_per_unit: '279.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                       issue: null
@@ -3474,12 +3558,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
                           large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
                           alt_text: Jivo Wheatgrass Juice 500 ml bottle
                       quantity: 1
+                      price_per_unit: '225.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                       issue: null
@@ -3535,6 +3623,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -3816,12 +3906,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
                           large: https://media.jivo.in/catalog/3a9c5e/chia-100g-1024.webp
                           alt_text: Jivo Chia Seeds 100 g pack
                       quantity: 1
+                      price_per_unit: '119.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '150.00'
                       line_total: '119.00'
                       issue: null
@@ -3869,6 +3963,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -4358,12 +4454,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
                           large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
                           alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
                       quantity: 2
+                      price_per_unit: '279.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                       issue: null
@@ -4389,12 +4489,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
                           large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
                           alt_text: Jivo Wheatgrass Juice 500 ml bottle
                       quantity: 1
+                      price_per_unit: '225.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                       issue: null
@@ -4450,6 +4554,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -4744,12 +4850,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
                           large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
                           alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
                       quantity: 2
+                      price_per_unit: '279.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '698.00'
                       line_total: '558.00'
                       issue: null
@@ -4775,12 +4885,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
                           large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
                           alt_text: Jivo Wheatgrass Juice 500 ml bottle
                       quantity: 1
+                      price_per_unit: '225.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '250.00'
                       line_total: '225.00'
                       issue: null
@@ -4836,6 +4950,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -5124,12 +5240,16 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
                           large: https://media.jivo.in/catalog/3a9c5e/chia-100g-1024.webp
                           alt_text: Jivo Chia Seeds 100 g pack
                       quantity: 1
+                      price_per_unit: '119.00'
+                      price_tier: null
+                      next_tier_price: null
                       line_mrp_total: '150.00'
                       line_total: '119.00'
                       issue: null
@@ -5177,6 +5297,8 @@ paths:
                       min_order_units: 0
                       units_to_min_order: null
                       order_unit_label: items
+                      tier_units: 0
+                      next_price_tier: null
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -5587,6 +5709,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -5606,6 +5729,7 @@ paths:
                         units_left: 2
                         max_qty_per_order: 3
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -5637,6 +5761,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -5668,6 +5793,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -5699,6 +5825,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
@@ -5730,6 +5857,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -6159,6 +6287,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6178,6 +6307,7 @@ paths:
                           units_left: 2
                           max_qty_per_order: 3
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6209,6 +6339,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6240,6 +6371,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 4
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -6276,6 +6408,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6295,6 +6428,7 @@ paths:
                           units_left: 2
                           max_qty_per_order: 3
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6326,6 +6460,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6357,6 +6492,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                             medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -6451,6 +6587,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6470,6 +6607,7 @@ paths:
                           units_left: 2
                           max_qty_per_order: 3
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6501,6 +6639,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6532,6 +6671,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 4
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -6568,6 +6708,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6587,6 +6728,7 @@ paths:
                           units_left: 2
                           max_qty_per_order: 3
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6618,6 +6760,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6649,6 +6792,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                             medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -6682,6 +6826,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6713,6 +6858,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6732,6 +6878,7 @@ paths:
                         units_left: 2
                         max_qty_per_order: 3
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6763,6 +6910,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
@@ -6856,6 +7004,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6875,6 +7024,7 @@ paths:
                           units_left: 2
                           max_qty_per_order: 3
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6906,6 +7056,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6937,6 +7088,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 4
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -6973,6 +7125,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6992,6 +7145,7 @@ paths:
                           units_left: 2
                           max_qty_per_order: 3
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -7023,6 +7177,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -7054,6 +7209,7 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                             medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -7087,6 +7243,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -7118,6 +7275,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -7137,6 +7295,7 @@ paths:
                         units_left: 2
                         max_qty_per_order: 3
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -7168,6 +7327,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
@@ -11960,12 +12120,16 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
                             large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
                             alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
                         quantity: 2
+                        price_per_unit: '279.00'
+                        price_tier: null
+                        next_tier_price: null
                         line_mrp_total: '698.00'
                         line_total: '558.00'
                         issue: null
@@ -11991,12 +12155,16 @@ paths:
                           units_left: null
                           max_qty_per_order: 4
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
                             large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
                             alt_text: Jivo Wheatgrass Juice 500 ml bottle
                         quantity: 1
+                        price_per_unit: '225.00'
+                        price_tier: null
+                        next_tier_price: null
                         line_mrp_total: '250.00'
                         line_total: '225.00'
                         issue: null
@@ -12052,6 +12220,8 @@ paths:
                         min_order_units: 0
                         units_to_min_order: null
                         order_unit_label: items
+                        tier_units: 0
+                        next_price_tier: null
                       payment_methods:
                       - method: ONLINE
                         is_available: true
@@ -12098,12 +12268,16 @@ paths:
                           units_left: null
                           max_qty_per_order: 5
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
                             large: https://media.jivo.in/catalog/8f3b2c/canola-1l-1024.webp
                             alt_text: Jivo Cold Pressed Canola Oil 1 L bottle
                         quantity: 2
+                        price_per_unit: '279.00'
+                        price_tier: null
+                        next_tier_price: null
                         line_mrp_total: '698.00'
                         line_total: '558.00'
                         issue: null
@@ -12129,12 +12303,16 @@ paths:
                           units_left: null
                           max_qty_per_order: 4
                           min_qty_per_order: 1
+                          price_tiers: []
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
                             large: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-1024.webp
                             alt_text: Jivo Wheatgrass Juice 500 ml bottle
                         quantity: 1
+                        price_per_unit: '225.00'
+                        price_tier: null
+                        next_tier_price: null
                         line_mrp_total: '250.00'
                         line_total: '225.00'
                         issue: null
@@ -12190,6 +12368,8 @@ paths:
                         min_order_units: 0
                         units_to_min_order: null
                         order_unit_label: items
+                        tier_units: 0
+                        next_price_tier: null
                       payment_methods:
                       - method: ONLINE
                         is_available: true
@@ -13569,6 +13749,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -13588,6 +13769,7 @@ paths:
                         units_left: 2
                         max_qty_per_order: 3
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -13619,6 +13801,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -13650,6 +13833,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -13688,6 +13872,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -13719,6 +13904,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 4
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
@@ -13932,6 +14118,7 @@ paths:
                       units_left: null
                       max_qty_per_order: 5
                       min_qty_per_order: 1
+                      price_tiers: []
                       image:
                         thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                         medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -13966,6 +14153,7 @@ paths:
                       units_left: 2
                       max_qty_per_order: 3
                       min_qty_per_order: 1
+                      price_tiers: []
                       image:
                         thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                         medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -14061,6 +14249,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -14092,6 +14281,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -14137,6 +14327,7 @@ paths:
                       units_left: null
                       max_qty_per_order: 5
                       min_qty_per_order: 1
+                      price_tiers: []
                       image:
                         thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                         medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -14206,6 +14397,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -14225,6 +14417,7 @@ paths:
                         units_left: 2
                         max_qty_per_order: 3
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -14256,6 +14449,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -20562,6 +20756,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -20581,6 +20776,7 @@ paths:
                         units_left: 2
                         max_qty_per_order: 3
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -20612,6 +20808,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -20643,6 +20840,7 @@ paths:
                         units_left: null
                         max_qty_per_order: 5
                         min_qty_per_order: 1
+                        price_tiers: []
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -22920,6 +23118,28 @@ components:
         quantity:
           type: integer
           minimum: 1
+        price_per_unit:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: 'The price each unit of this line is billed at (show it, e.g.
+            ''₹85/box''): the volume tier''s price when `price_tier` is set, else
+            `variant.selling_price`.'
+        price_tier:
+          allOf:
+          - $ref: '#/components/schemas/PriceTier'
+          nullable: true
+          description: 'The volume tier applied to this line (ADR 0001): reached by
+            the units of all tiered items in the cart together. Null when the normal
+            price applies.'
+        next_tier_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          description: This line's lower unit price once the cart reaches `thresholds.next_price_tier`;
+            null when that tier does not lower this line's price (or there is no next
+            tier).
         line_mrp_total:
           type: string
           format: decimal
@@ -22929,7 +23149,7 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
-          description: '`variant.selling_price` x `quantity`.'
+          description: '`price_per_unit` x `quantity`.'
         issue:
           allOf:
           - $ref: '#/components/schemas/CartLineIssue'
@@ -22946,6 +23166,9 @@ components:
       - issue
       - line_mrp_total
       - line_total
+      - next_tier_price
+      - price_per_unit
+      - price_tier
       - product
       - quantity
       - variant
@@ -23038,6 +23261,19 @@ components:
           nullable: true
           description: Units still needed ('Add 2 more cartons'); null when the minimum
             is met or there is none. While set, checkout is blocked with `MIN_UNITS_NOT_MET`.
+        tier_units:
+          type: integer
+          minimum: 0
+          description: 'Units that choose the volume price tier (ADR 0001): every
+            line whose variant has `price_tiers`, any mix, each counting min(`quantity`,
+            `orderable_quantity`). 0 when no line has tiers.'
+        next_price_tier:
+          allOf:
+          - $ref: '#/components/schemas/NextPriceTier'
+          nullable: true
+          description: 'The nudge ''Add 3 more boxes to get ₹87/box'': the next tier
+            at which a line''s price drops (each line''s new price is its `next_tier_price`).
+            Null at the top tier or when no line has tiers.'
         order_unit_label:
           type: string
           description: What a unit is called, in the plural, e.g. "cartons" ("items"
@@ -23048,7 +23284,9 @@ components:
       - free_delivery_threshold
       - min_order_units
       - min_order_value
+      - next_price_tier
       - order_unit_label
+      - tier_units
       - units_to_min_order
     CashEntryTypeEnum:
       enum:
@@ -24381,6 +24619,20 @@ components:
       - name
       - phone
       - rider_status
+    NextPriceTier:
+      type: object
+      properties:
+        min_order_units:
+          type: integer
+          minimum: 1
+          description: The tier units the next lower prices start at.
+        units_to_next_tier:
+          type: integer
+          minimum: 1
+          description: Units still to add (any tiered item) to reach it.
+      required:
+      - min_order_units
+      - units_to_next_tier
     NotifyMe:
       type: object
       description: '`POST /serviceability/notify-me/`: interest in delivery to an
@@ -25879,6 +26131,25 @@ components:
       required:
       - lat
       - lng
+    PriceTier:
+      type: object
+      description: |-
+        A volume (slab) price: from `min_order_units` units in one order, each unit costs
+        `price` (ADR 0001).
+      properties:
+        min_order_units:
+          type: integer
+          minimum: 1
+          description: From this many units in the order, counting every item that
+            has price tiers together (any mix).
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Price per unit at this tier (inclusive of all taxes).
+      required:
+      - min_order_units
+      - price
     ProductCard:
       type: object
       description: 'A product tile (03 §2.5): used by home rails, lists, search, collections,
@@ -27971,6 +28242,15 @@ components:
             never above `max_qty_per_order`). The first ADD sets this quantity, and
             the stepper never goes below it: stepping down from here removes the line
             (quantity 0). The cart refuses 1 to `min_qty_per_order` - 1 with 422 `MIN_QTY_REQUIRED`.'
+        price_tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceTier'
+          description: Volume prices, lowest `min_order_units` first; [] when the
+            variant has none (then `selling_price` always applies). The cart applies
+            the highest tier reached by the units of all tiered items together and
+            shows it per line (`price_per_unit`, `price_tier`). For the rate chart
+            on the product page.
         image:
           allOf:
           - $ref: '#/components/schemas/ImageSet'
@@ -28002,6 +28282,7 @@ components:
       - name
       - net_quantity
       - orderable_quantity
+      - price_tiers
       - selling_price
       - sku
       - stock_status
@@ -28069,6 +28350,15 @@ components:
             never above `max_qty_per_order`). The first ADD sets this quantity, and
             the stepper never goes below it: stepping down from here removes the line
             (quantity 0). The cart refuses 1 to `min_qty_per_order` - 1 with 422 `MIN_QTY_REQUIRED`.'
+        price_tiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceTier'
+          description: Volume prices, lowest `min_order_units` first; [] when the
+            variant has none (then `selling_price` always applies). The cart applies
+            the highest tier reached by the units of all tiered items together and
+            shows it per line (`price_per_unit`, `price_tier`). For the rate chart
+            on the product page.
         image:
           allOf:
           - $ref: '#/components/schemas/ImageSet'
@@ -28085,6 +28375,7 @@ components:
       - mrp
       - name
       - orderable_quantity
+      - price_tiers
       - selling_price
       - stock_status
       - unit_price

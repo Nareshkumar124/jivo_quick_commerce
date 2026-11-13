@@ -31,7 +31,12 @@ from apps.accounts.services.addresses import live_addresses
 from apps.cart.choices import CartLineIssueCode, CheckoutBlockerCode, PaymentUnavailableReason
 from apps.cart.models import Cart, CartItem, empty_instructions
 from apps.catalog.models import ProductImage, ProductVariant
-from apps.catalog.services import effective_price_expression, variant_summary
+from apps.catalog.services import (
+    effective_price_expression,
+    tier_prefetch,
+    variant_summary,
+    variant_tiers,
+)
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
 from apps.core.money import ZERO, money_str, round_money, rupees
@@ -246,7 +251,7 @@ def store_variants(
         )
         .select_related("product__category__parent")
     )
-    if with_images:
+    if with_images:  # the full summary (cart lines): images and price tiers too
         ordered_images = ProductImage.objects.order_by("sort_order", "id")
         queryset = queryset.prefetch_related(
             Prefetch("images", queryset=ordered_images, to_attr="own_images"),
@@ -255,6 +260,7 @@ def store_variants(
                 queryset=ordered_images.filter(variant__isnull=True),
                 to_attr="shared_images",
             ),
+            tier_prefetch(),
         )
     variants = {variant.pk: variant for variant in queryset}
     for variant in variants.values():
@@ -281,6 +287,19 @@ class CartLine:
     variant: ProductVariant
     summary: dict
     issue: dict | None
+    # The unit price billed, fixed by `load_lines()` (`apply_price_tiers()`): the volume tier
+    # reached, else the store's price. None (a line built elsewhere): the store's price.
+    price: Decimal | None = None
+    tier: object | None = None  # the `VariantPriceTier` applied, if any
+    next_price: Decimal | None = None  # this line's lower price at the next tier (the nudge)
+
+    @property
+    def unit_price(self) -> Decimal:
+        # `inv_price` is the store's normal price (override or `selling_price`), the price a
+        # line has when no tier applies. A line built outside `load_lines()` (price None) is
+        # billed at it, exactly as before tiers existed; `price_at()` starts from it for the
+        # same reason, so a tier can only ever lower it.
+        return self.price if self.price is not None else self.variant.inv_price
 
     @property
     def has_stock_issue(self) -> bool:
@@ -298,7 +317,7 @@ class CartLine:
             variant_id=self.variant.pk,
             category_id=self.variant.product.category_id,
             mrp=self.variant.mrp,
-            selling_price=self.variant.inv_price,
+            selling_price=self.unit_price,
             quantity=self.item.quantity,
         )
 
@@ -315,6 +334,15 @@ class CartLine:
             },
             "variant": self.summary,
             "quantity": self.item.quantity,
+            "price_per_unit": money_str(self.unit_price),
+            "price_tier": (
+                {"min_order_units": self.tier.min_order_units, "price": money_str(self.tier.price)}
+                if self.tier is not None
+                else None
+            ),
+            "next_tier_price": (
+                money_str(self.next_price) if self.next_price is not None else None
+            ),
             "line_mrp_total": money_str(line.line_mrp_total),
             "line_total": money_str(line.line_total),
             "issue": self.issue,
@@ -358,8 +386,77 @@ def load_lines(cart: Cart, store_id: int) -> list[CartLine]:
     for item in items:
         variant = variants[item.variant_id]
         summary = variant_summary(variant, variant.product)
-        lines.append(CartLine(item, variant, summary, line_issue(item.quantity, summary)))
+        lines.append(
+            CartLine(item, variant, summary, line_issue(item.quantity, summary), variant.inv_price)
+        )
+    apply_price_tiers(lines)
     return lines
+
+
+def tier_units(lines: Sequence[CartLine]) -> int:
+    """Units that choose the volume tier (ADR 0001): every line whose variant has price tiers,
+    any mix, each counting min(quantity, orderable_quantity) as for `order_units` (units the
+    store cannot supply do not count)."""
+    return sum(
+        min(line.item.quantity, line.summary["orderable_quantity"])
+        for line in lines
+        if variant_tiers(line.variant)
+    )
+
+
+def reached_tier(tiers, units: int):
+    """The highest tier with `min_order_units` <= `units` (tiers lowest first), else None."""
+    reached = None
+    for tier in tiers:
+        if tier.min_order_units <= units:
+            reached = tier
+    return reached
+
+
+def apply_price_tiers(lines: Sequence[CartLine]) -> None:
+    """08 §6.2 / ADR 0001: fix each tiered line's unit price before `compute_bill()`. One tier
+    for the whole cart, chosen by `tier_units()`; each variant then takes its own price at that
+    tier. A tier never raises a price: when the store's price is lower (an override), it stays.
+    Lines of variants without tiers keep the store's price."""
+    units = tier_units(lines)
+    for line in lines:
+        tier = reached_tier(variant_tiers(line.variant), units)
+        if tier is not None and tier.price <= line.unit_price:
+            line.price, line.tier = tier.price, tier
+    found = next_tier(lines, units)
+    for line in lines:
+        line.next_price = found[1].get(line.item.pk) if found is not None else None
+
+
+def price_at(line: CartLine, units: int) -> Decimal:
+    """This line's unit price if the cart had `units` tier units (a tier never raises the
+    store's price)."""
+    base = line.variant.inv_price  # the normal price (see `CartLine.unit_price`)
+    tier = reached_tier(variant_tiers(line.variant), units)
+    return tier.price if tier is not None and tier.price <= base else base
+
+
+def next_tier(lines: Sequence[CartLine], units: int) -> tuple[int, dict[int, Decimal]] | None:
+    """The nudge "Add N more to get ₹X": the lowest tier threshold above `units` at which at
+    least one line's price drops, with the lower price per line (by cart item id). None at the
+    top tier or when no line has tiers. The app never computes these prices."""
+    thresholds = sorted(
+        {
+            tier.min_order_units
+            for line in lines
+            for tier in variant_tiers(line.variant)
+            if tier.min_order_units > units
+        }
+    )
+    for threshold in thresholds:
+        lower = {}
+        for line in lines:
+            price = price_at(line, threshold)
+            if price < line.unit_price:
+                lower[line.item.pk] = price
+        if lower:
+            return threshold, lower
+    return None
 
 
 # --------------------------------------------------------------------------- the cart
@@ -485,6 +582,20 @@ def _thresholds(state: CartState) -> dict:
         "min_order_units": rules.min_order_units,
         "units_to_min_order": state.units_to_min_order,
         "order_unit_label": rules.order_unit_label,
+        **_tier_nudge(state.lines),
+    }
+
+
+def _tier_nudge(lines: Sequence[CartLine]) -> dict:
+    units = tier_units(lines)
+    found = next_tier(lines, units)
+    return {
+        "tier_units": units,
+        "next_price_tier": (
+            {"min_order_units": found[0], "units_to_next_tier": found[0] - units}
+            if found is not None
+            else None
+        ),
     }
 
 

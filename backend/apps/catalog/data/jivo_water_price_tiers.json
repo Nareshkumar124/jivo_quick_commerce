@@ -1,0 +1,41 @@
+{
+  "note": "Jivo Water shopkeeper prices per box, GST inclusive (user, 2026-11-13). The slab is chosen by the total boxes of all three sizes together; 250+ keeps the 250 rate. MRP = selling price = the 5-24 rate (no '% off' shown).",
+  "variants": [
+    {
+      "sku": "JVW-WTR-1L-12",
+      "mrp": "90.00",
+      "selling_price": "90.00",
+      "tiers": [
+        {"min_order_units": 5, "price": "90.00"},
+        {"min_order_units": 25, "price": "87.00"},
+        {"min_order_units": 50, "price": "85.00"},
+        {"min_order_units": 100, "price": "82.00"},
+        {"min_order_units": 250, "price": "80.00"}
+      ]
+    },
+    {
+      "sku": "JVW-WTR-500ML-24",
+      "mrp": "125.00",
+      "selling_price": "125.00",
+      "tiers": [
+        {"min_order_units": 5, "price": "125.00"},
+        {"min_order_units": 25, "price": "122.00"},
+        {"min_order_units": 50, "price": "120.00"},
+        {"min_order_units": 100, "price": "117.00"},
+        {"min_order_units": 250, "price": "115.00"}
+      ]
+    },
+    {
+      "sku": "JVW-WTR-250ML-24",
+      "mrp": "90.00",
+      "selling_price": "90.00",
+      "tiers": [
+        {"min_order_units": 5, "price": "90.00"},
+        {"min_order_units": 25, "price": "87.00"},
+        {"min_order_units": 50, "price": "85.00"},
+        {"min_order_units": 100, "price": "82.00"},
+        {"min_order_units": 250, "price": "80.00"}
+      ]
+    }
+  ]
+}

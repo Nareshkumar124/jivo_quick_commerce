@@ -97,6 +97,7 @@ CANOLA_1L = {
     "units_left": None,
     "max_qty_per_order": 5,
     "min_qty_per_order": 1,
+    "price_tiers": [],
     "image": CANOLA_1L_IMAGE,
 }
 CANOLA_5L = {
@@ -112,6 +113,7 @@ CANOLA_5L = {
     "units_left": 2,
     "max_qty_per_order": 3,
     "min_qty_per_order": 1,
+    "price_tiers": [],
     "image": CANOLA_5L_IMAGE,
 }
 OLIVE_1L = {
@@ -127,6 +129,7 @@ OLIVE_1L = {
     "units_left": None,
     "max_qty_per_order": 5,
     "min_qty_per_order": 1,
+    "price_tiers": [],
     "image": OLIVE_1L_IMAGE,
 }
 MUSTARD_1L = {
@@ -142,6 +145,7 @@ MUSTARD_1L = {
     "units_left": None,
     "max_qty_per_order": 5,
     "min_qty_per_order": 1,
+    "price_tiers": [],
     "image": MUSTARD_1L_IMAGE,
 }
 WHEATGRASS_500ML = {
@@ -157,6 +161,7 @@ WHEATGRASS_500ML = {
     "units_left": None,
     "max_qty_per_order": 4,
     "min_qty_per_order": 1,
+    "price_tiers": [],
     "image": WHEATGRASS_IMAGE,
 }
 ALOE_1L = {
@@ -172,6 +177,7 @@ ALOE_1L = {
     "units_left": None,
     "max_qty_per_order": 4,
     "min_qty_per_order": 1,
+    "price_tiers": [],
     "image": ALOE_IMAGE,
 }
 

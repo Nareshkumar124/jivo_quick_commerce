@@ -8,8 +8,10 @@ live in the inventory admin.
 """
 
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.db.models import Case, Count, IntegerField, Max, Min, Q, Value, When
 from django.db.models.functions import Coalesce
+from django.forms.models import BaseInlineFormSet
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from import_export.admin import ImportExportModelAdmin
@@ -37,6 +39,7 @@ from apps.catalog.models import (
     ProductImage,
     ProductVariant,
     TrendingSearch,
+    VariantPriceTier,
 )
 from apps.catalog.validators import LABEL_TEXT_KEYS
 from apps.ops_console.admin_support import (
@@ -331,11 +334,41 @@ for _key in LABEL_TEXT_KEYS:
     setattr(ProductAdmin, _key, _label_display(_key))
 
 
+class VariantPriceTierFormSet(BaseInlineFormSet):
+    """Checks every slab price against the MRP saved on the same page: the variant may be new
+    (the model's own check needs a saved variant) or its MRP may change in this form."""
+
+    def clean(self):
+        super().clean()
+        mrp = getattr(self.instance, "mrp", None)
+        if mrp is None:
+            return
+        for form in self.forms:
+            data = getattr(form, "cleaned_data", None) or {}
+            price = data.get("price")
+            if not data.get("DELETE") and price is not None and price > mrp:
+                raise ValidationError(f"A slab price (₹{price}) can't be above the MRP (₹{mrp}).")
+
+
+class VariantPriceTierInline(TabularInline):
+    """Volume (slab) prices: from `min_order_units` boxes in the whole order, this variant costs
+    `price` each (GST included, at most the MRP). See docs/adr/0001-volume-price-tiers.md."""
+
+    model = VariantPriceTier
+    formset = VariantPriceTierFormSet
+    fk_name = "variant"
+    extra = 0
+    tab = True
+    fields = ("min_order_units", "price")
+    ordering = ("min_order_units",)
+
+
 @admin.register(ProductVariant)
 class ProductVariantAdmin(ReadOnlyHistoryAdmin, CatalogImportExportAdmin):
     """Every SKU. Price changes are kept in the variant's history (History button)."""
 
     resource_classes = [ProductVariantResource]
+    inlines = [VariantPriceTierInline]
     list_display = (
         "sku",
         "product",
