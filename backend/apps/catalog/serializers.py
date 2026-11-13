@@ -43,6 +43,20 @@ class UnitPriceSerializer(serializers.Serializer):
     per = serializers.CharField(help_text='The unit quantity, e.g. "100 ml", "100 g", "1 kg".')
 
 
+class PriceTierSerializer(serializers.Serializer):
+    """A volume (slab) price: from `min_order_units` units in one order, each unit costs
+    `price` (ADR 0001)."""
+
+    min_order_units = serializers.IntegerField(
+        min_value=1,
+        help_text=(
+            "From this many units in the order, counting every item that has price tiers "
+            "together (any mix)."
+        ),
+    )
+    price = money("Price per unit at this tier (inclusive of all taxes).")
+
+
 class VariantSummarySerializer(serializers.Serializer):
     """A sellable variant (SKU) with its price and stock at the store."""
 
@@ -89,6 +103,15 @@ class VariantSummarySerializer(serializers.Serializer):
             "`max_qty_per_order`). The first ADD sets this quantity, and the stepper never goes "
             "below it: stepping down from here removes the line (quantity 0). The cart refuses "
             "1 to `min_qty_per_order` - 1 with 422 `MIN_QTY_REQUIRED`."
+        ),
+    )
+    price_tiers = PriceTierSerializer(
+        many=True,
+        help_text=(
+            "Volume prices, lowest `min_order_units` first; [] when the variant has none (then "
+            "`selling_price` always applies). The cart applies the highest tier reached by the "
+            "units of all tiered items together and shows it per line (`price_per_unit`, "
+            "`price_tier`). For the rate chart on the product page."
         ),
     )
     image = ImageSetSerializer(

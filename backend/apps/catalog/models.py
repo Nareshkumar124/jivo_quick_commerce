@@ -230,6 +230,21 @@ class ProductVariant(TimeStampedModel):
                         )
                     }
                 )
+            tiers_above = list(
+                self.price_tiers.filter(price__gt=self.mrp).values_list(
+                    "min_order_units", flat=True
+                )
+            )
+            if tiers_above:
+                raise ValidationError(
+                    {
+                        "mrp": (
+                            "Price tiers from "
+                            f"{', '.join(str(units) for units in tiers_above)} units are above the "
+                            "new MRP. Lower those tier prices first."
+                        )
+                    }
+                )
         if (self.unit_value is None) != (not self.unit):
             raise ValidationError({"unit": "Set both the unit value and the unit, or neither."})
         if (
@@ -240,6 +255,48 @@ class ProductVariant(TimeStampedModel):
             raise ValidationError(
                 {"min_qty_per_order": "Cannot be above the maximum quantity per order."}
             )
+
+
+class VariantPriceTier(TimeStampedModel):
+    """A volume (slab) price (ADR 0001, 08 §6.2): when one order has at least `min_order_units`
+    qualifying units (every unit of every variant that has tiers, any mix), each unit of this
+    variant costs `price`. The highest tier reached applies; below the lowest tier, the normal
+    price does. A variant without tiers is priced as before."""
+
+    variant = models.ForeignKey(
+        ProductVariant, on_delete=models.CASCADE, related_name="price_tiers"
+    )
+    min_order_units = models.PositiveSmallIntegerField(
+        help_text="From this many qualifying units in the order (all tiered items together)."
+    )
+    price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Price per unit (GST inclusive) at this tier. Above 0 and at most the MRP.",
+    )
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["variant", "min_order_units"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["variant", "min_order_units"], name="variantpricetier_unique_units"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(min_order_units__gte=1), name="variantpricetier_units_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(price__gt=0), name="variantpricetier_price_positive"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.variant_id}: from {self.min_order_units} units at {self.price}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.price is not None and self.variant_id is not None and self.price > self.variant.mrp:
+            raise ValidationError({"price": "Cannot be above the MRP."})
 
 
 class ProductImage(ProcessedImageMixin, TimeStampedModel):

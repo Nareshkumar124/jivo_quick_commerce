@@ -98,6 +98,8 @@ class TestReadingTheCart:
             "min_order_units": 0,
             "units_to_min_order": None,
             "order_unit_label": "items",
+            "tier_units": 0,
+            "next_price_tier": None,
         }
         assert body["address"] is None
         assert body["coupon"] is None

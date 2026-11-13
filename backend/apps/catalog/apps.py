@@ -19,6 +19,7 @@ class CatalogConfig(AppConfig):
             models.Category,
             models.Product,
             models.ProductVariant,
+            models.VariantPriceTier,
             models.ProductImage,
             models.Collection,
             models.CollectionItem,

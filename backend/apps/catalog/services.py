@@ -46,6 +46,7 @@ from apps.catalog.models import (
     ProductImage,
     ProductVariant,
     TrendingSearch,
+    VariantPriceTier,
     VariantUnit,
 )
 from apps.catalog.validators import LABEL_TEXT_KEYS
@@ -142,14 +143,33 @@ def store_products(store: DarkStore, preferred=None) -> QuerySet[Product]:
     )
 
 
+def tier_prefetch() -> Prefetch:
+    """A variant's price tiers, lowest first, as `variant.tier_list` (see `variant_tiers()`)."""
+    return Prefetch(
+        "price_tiers",
+        queryset=VariantPriceTier.objects.order_by("min_order_units"),
+        to_attr="tier_list",
+    )
+
+
+def variant_tiers(variant) -> list[VariantPriceTier]:
+    """The variant's price tiers, lowest first: prefetched (`tier_prefetch()`) or queried."""
+    tiers = getattr(variant, "tier_list", None)
+    if tiers is None:
+        tiers = list(variant.price_tiers.order_by("min_order_units"))
+    return tiers
+
+
 def with_card_data(queryset: QuerySet[Product], store: DarkStore) -> QuerySet[Product]:
-    """Prefetches for `product_card()`: store variants (+ their images) and shared images."""
+    """Prefetches for `product_card()`: store variants (+ their images and price tiers) and
+    shared images."""
     ordered_images = ProductImage.objects.order_by("sort_order", "id")
     return queryset.select_related("category").prefetch_related(
         Prefetch(
             "variants",
             queryset=sold_variants(store).prefetch_related(
-                Prefetch("images", queryset=ordered_images, to_attr="own_images")
+                Prefetch("images", queryset=ordered_images, to_attr="own_images"),
+                tier_prefetch(),
             ),
             to_attr="store_variants",
         ),
@@ -234,6 +254,10 @@ def variant_summary(variant, product) -> dict:
         "units_left": stock.units_left,
         "max_qty_per_order": variant.max_qty_per_order,
         "min_qty_per_order": variant.min_qty_per_order,
+        "price_tiers": [
+            {"min_order_units": tier.min_order_units, "price": money(tier.price)}
+            for tier in variant_tiers(variant)
+        ],
         "image": _variant_image(variant, product),
     }
 

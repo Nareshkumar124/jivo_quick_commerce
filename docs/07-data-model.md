@@ -143,6 +143,8 @@ erDiagram
 
 **ProductVariant (SKU)**: `product`, `sku` (unique), `name` (e.g., "1 L"), `net_quantity` (as on the pack, e.g. "2 x 1 L"; Legal Metrology, added in Phase 2 R1), `unit_value` + `unit` (for "₹/100 ml" display: the API's `unit_price {amount, per}`), `mrp`, `selling_price` (≤ mrp), `max_qty_per_order`, `min_qty_per_order` (default 1, also as a database default so the previous release can still insert rows during a deploy or rollback; ≥ 1 and ≤ `max_qty_per_order`, both DB check constraints; added 2026-11-13 for items sold only in bulk, e.g. at least 5 water cartons; see 08 §6.1), `barcode`, `sap_item_code` (nullable), `weight_grams`, `is_active`, `sort_order`.
 
+**VariantPriceTier** (added 2026-11-13, ADR 0001): `variant` (FK, `price_tiers`), `min_order_units` (≥ 1), `price` (> 0, ≤ the variant's `mrp`: checked in `clean()` and when the MRP changes), with history. Unique (`variant`, `min_order_units`). A volume (slab) price: see 08 §6.2. No tiers = the normal price. Set by `manage.py set_price_tiers` or the admin inline.
+
 **ProductImage**: `product`, `variant` (nullable), `image`, `alt_text`, `sort_order`, `source_sha256` (SHA-256 of the source file, set only by `import_catalog_images`; empty for admin uploads). Unique (`product`, `variant`, `source_sha256`) where `source_sha256` is not empty, with NULL variants counted as equal (`productimage_source_unique`, PostgreSQL 15+ `NULLS NOT DISTINCT`).
 
 **Collection**: `name`, `slug`, `show_on_home`, `sort_order`, `is_active`, `stores` (M2M, empty = all). At most 100 items (the collection page is not paginated).

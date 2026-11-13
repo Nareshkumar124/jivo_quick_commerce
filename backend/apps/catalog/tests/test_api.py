@@ -132,6 +132,7 @@ class TestProductList:
             "units_left": None,
             "max_qty_per_order": 5,
             "min_qty_per_order": 1,
+            "price_tiers": [],
             "image": None,
         }
         assert (five_litre["stock_status"], five_litre["units_left"]) == ("LOW_STOCK", 2)
