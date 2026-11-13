@@ -27,7 +27,7 @@ import '../domain/task_rules.dart';
 /// only, until the PM opens them for staging. Staging and prod keep the
 /// Phase 1 home, even with `FAKE_API`.
 final riderWorkEnabledProvider = Provider<bool>(
-  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
+  (ref) => ref.watch(appEnvProvider).flavor != Flavor.prod,
 );
 
 /// An ACTIVE rider in a build where the delivery screens run.

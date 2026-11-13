@@ -35,7 +35,7 @@ void main() {
     }
   });
 
-  for (final flavor in [Flavor.staging, Flavor.prod]) {
+  for (final flavor in [Flavor.prod]) {
     group('${flavor.name} (even with FAKE_API)', () {
       testWidgets('no records menu; a stray link goes home', (tester) async {
         final h = RiderTestHarness(flavor: flavor);

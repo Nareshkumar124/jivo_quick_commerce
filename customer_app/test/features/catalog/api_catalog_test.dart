@@ -280,14 +280,21 @@ void main() {
           isA<ApiServiceabilityRepository>(),
           reason: env.flavor.name,
         );
-        expect(container.read(cartAvailableProvider), isFalse);
+        // Staging has the real cart and orders (opened for device testing on
+        // jqc.jivo.in); prod keeps them off until launch.
+        final isStaging = env.flavor == Flavor.staging;
+        expect(container.read(cartAvailableProvider), isStaging);
         expect(
           container.read(cartRepositoryProvider),
-          isA<UnavailableCartRepository>(),
+          isStaging
+              ? isA<ApiCartRepository>()
+              : isA<UnavailableCartRepository>(),
         );
         expect(
           container.read(orderRepositoryProvider),
-          isA<UnavailableOrderRepository>(),
+          isStaging
+              ? isA<ApiOrderRepository>()
+              : isA<UnavailableOrderRepository>(),
         );
         // Real Razorpay only: no fake behind it.
         final launcher = container.read(paymentLauncherProvider);
