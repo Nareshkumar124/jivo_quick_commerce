@@ -103,7 +103,8 @@ def _food(ingredients, nutrition=None, shelf="12 months from the date of packing
 
 
 # (slug, name, category, hsn, gst, keywords, highlights, attributes,
-#  [(sku, variant name, net qty, unit value, unit, mrp, price, max qty)])
+#  [(sku, variant name, net qty, unit value, unit, mrp, price, max qty[, min qty])])
+# The min qty per order is optional (default 1 = no minimum).
 PRODUCTS = [
     ("jivo-cold-pressed-canola-oil", "Jivo Cold Pressed Canola Oil", "canola-oil", "1514", "5",
      "canola, cooking oil, omega 3, heart", ["Rich in omega-3", "Lowest saturated fat"],
@@ -282,7 +283,9 @@ def seed_catalog(stdout, options) -> None:
                 "sort_order": order,
             },
         )
-        for vorder, (sku, vname, net, unit_value, unit, mrp, price, max_qty) in enumerate(skus):
+        for vorder, spec in enumerate(skus):
+            sku, vname, net, unit_value, unit, mrp, price, max_qty, *rest = spec
+            min_qty = rest[0] if rest else 1
             variants[sku], _ = ProductVariant.objects.update_or_create(
                 sku=sku,
                 defaults={
@@ -294,6 +297,7 @@ def seed_catalog(stdout, options) -> None:
                     "mrp": D(mrp),
                     "selling_price": D(price),
                     "max_qty_per_order": max_qty,
+                    "min_qty_per_order": min_qty,
                     "sort_order": vorder,
                 },
             )

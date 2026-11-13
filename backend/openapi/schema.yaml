@@ -1608,6 +1608,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -1638,6 +1639,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -1696,6 +1698,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: null
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -1740,6 +1745,9 @@ paths:
                       amount_to_min_order: '99.00'
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: '299.00'
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -1783,6 +1791,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
@@ -1839,6 +1848,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: null
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -1881,6 +1893,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
@@ -1931,6 +1944,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: '180.00'
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -1973,6 +1989,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/71be0d/flax-200g-256.webp
                           medium: https://media.jivo.in/catalog/71be0d/flax-200g-512.webp
@@ -2023,6 +2040,9 @@ paths:
                       amount_to_min_order: '20.00'
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: '220.00'
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2068,6 +2088,7 @@ paths:
                         orderable_quantity: 2
                         units_left: 2
                         max_qty_per_order: 3
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -2100,6 +2121,7 @@ paths:
                         orderable_quantity: 0
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -2152,6 +2174,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: null
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2197,6 +2222,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -2253,6 +2279,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: '74.00'
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2298,6 +2327,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
@@ -2330,6 +2360,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: '180.00'
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2374,6 +2407,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
@@ -2424,6 +2458,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: '180.00'
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2469,6 +2506,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -2499,6 +2537,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -2557,6 +2596,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: null
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -2811,6 +2853,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -2841,6 +2884,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -2899,6 +2943,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: null
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -3162,6 +3209,9 @@ paths:
                       amount_to_min_order: '99.00'
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: '299.00'
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -3392,6 +3442,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -3422,6 +3473,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -3480,6 +3532,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: null
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -3760,6 +3815,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
@@ -3810,6 +3866,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: '180.00'
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -4228,7 +4287,7 @@ paths:
       description: |-
         Sets the line for `variant_id` to `quantity`: creates it, changes it, or removes it with 0. It sets, it does not add, so a retried request never doubles a line.
 
-        An increase is checked against the store's stock and the variant's `max_qty_per_order`; a decrease is always accepted, so a customer can step down a line that has a stock issue. The cart does not reserve stock (08 §6.1).
+        An increase is checked against the store's stock and the variant's `max_qty_per_order`; a decrease is checked only against `min_qty_per_order`, so a customer can step down a line that has a stock issue. A quantity from 1 to `min_qty_per_order` - 1 is always refused (`MIN_QTY_REQUIRED`): the first ADD sends `min_qty_per_order`, and stepping down from it sends 0. The cart does not reserve stock (08 §6.1).
       summary: Set a variant's quantity (the ADD stepper)
       parameters:
       - in: header
@@ -4298,6 +4357,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -4328,6 +4388,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -4386,6 +4447,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: null
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -4474,7 +4538,7 @@ paths:
           description: '`STOCK_UNAVAILABLE`: the store cannot supply the new quantity.
             `details.items` gives the `orderable_quantity` now (0 = out of stock or
             not sold here); exact stock is never published (DL-26). Lowering a quantity
-            is always accepted.'
+            is never refused for stock.'
         '422':
           content:
             application/json:
@@ -4490,7 +4554,19 @@ paths:
                         variant_id: 1002
                         max_qty_per_order: 3
                   summary: MAX_QTY_EXCEEDED
-          description: '`MAX_QTY_EXCEEDED`: above the variant''s `max_qty_per_order`.'
+                MINQTYREQUIRED:
+                  value:
+                    error:
+                      code: MIN_QTY_REQUIRED
+                      message: You need to order at least 2 of this item.
+                      details:
+                        variant_id: 1002
+                        min_qty_per_order: 2
+                  summary: MIN_QTY_REQUIRED
+          description: '`MAX_QTY_EXCEEDED`: above the variant''s `max_qty_per_order`.
+            `MIN_QTY_REQUIRED`: from 1 to `min_qty_per_order` - 1 units, when adding
+            or lowering a line (0 removes the line and is always accepted). Nothing
+            was saved.'
         '400':
           content:
             application/json:
@@ -4595,8 +4671,9 @@ paths:
   /api/v1/cart/items/{id}/:
     patch:
       operationId: cart_items_update
-      description: Same rules as `cart_items_add` (increases are checked, decreases
-        always accepted). Another user's line id is a 404.
+      description: Same rules as `cart_items_add` (increases are checked; decreases
+        are checked only against `min_qty_per_order`). Another user's line id is a
+        404.
       summary: Change a line's quantity
       parameters:
       - in: header
@@ -4666,6 +4743,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -4696,6 +4774,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -4754,6 +4833,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: null
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -4842,7 +4924,7 @@ paths:
           description: '`STOCK_UNAVAILABLE`: the store cannot supply the new quantity.
             `details.items` gives the `orderable_quantity` now (0 = out of stock or
             not sold here); exact stock is never published (DL-26). Lowering a quantity
-            is always accepted.'
+            is never refused for stock.'
         '422':
           content:
             application/json:
@@ -4858,7 +4940,19 @@ paths:
                         variant_id: 1002
                         max_qty_per_order: 3
                   summary: MAX_QTY_EXCEEDED
-          description: '`MAX_QTY_EXCEEDED`: above the variant''s `max_qty_per_order`.'
+                MINQTYREQUIRED:
+                  value:
+                    error:
+                      code: MIN_QTY_REQUIRED
+                      message: You need to order at least 2 of this item.
+                      details:
+                        variant_id: 1002
+                        min_qty_per_order: 2
+                  summary: MIN_QTY_REQUIRED
+          description: '`MAX_QTY_EXCEEDED`: above the variant''s `max_qty_per_order`.
+            `MIN_QTY_REQUIRED`: from 1 to `min_qty_per_order` - 1 units, when adding
+            or lowering a line (0 removes the line and is always accepted). Nothing
+            was saved.'
         '400':
           content:
             application/json:
@@ -5029,6 +5123,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/3a9c5e/chia-100g-256.webp
                           medium: https://media.jivo.in/catalog/3a9c5e/chia-100g-512.webp
@@ -5079,6 +5174,9 @@ paths:
                       amount_to_min_order: null
                       free_delivery_threshold: '299.00'
                       amount_to_free_delivery: '180.00'
+                      min_order_units: 0
+                      units_to_min_order: null
+                      order_unit_label: items
                     payment_methods:
                     - method: ONLINE
                       is_available: true
@@ -5488,6 +5586,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -5506,6 +5605,7 @@ paths:
                         orderable_quantity: 2
                         units_left: 2
                         max_qty_per_order: 3
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -5536,6 +5636,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -5566,6 +5667,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -5596,6 +5698,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
@@ -5626,6 +5729,7 @@ paths:
                         orderable_quantity: 0
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -6054,6 +6158,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6072,6 +6177,7 @@ paths:
                           orderable_quantity: 2
                           units_left: 2
                           max_qty_per_order: 3
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6102,6 +6208,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6132,6 +6239,7 @@ paths:
                           orderable_quantity: 4
                           units_left: null
                           max_qty_per_order: 4
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -6167,6 +6275,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6185,6 +6294,7 @@ paths:
                           orderable_quantity: 2
                           units_left: 2
                           max_qty_per_order: 3
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6215,6 +6325,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6245,6 +6356,7 @@ paths:
                           orderable_quantity: 0
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                             medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -6338,6 +6450,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6356,6 +6469,7 @@ paths:
                           orderable_quantity: 2
                           units_left: 2
                           max_qty_per_order: 3
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6386,6 +6500,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6416,6 +6531,7 @@ paths:
                           orderable_quantity: 4
                           units_left: null
                           max_qty_per_order: 4
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -6451,6 +6567,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6469,6 +6586,7 @@ paths:
                           orderable_quantity: 2
                           units_left: 2
                           max_qty_per_order: 3
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6499,6 +6617,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6529,6 +6648,7 @@ paths:
                           orderable_quantity: 0
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                             medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -6561,6 +6681,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6591,6 +6712,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6609,6 +6731,7 @@ paths:
                         orderable_quantity: 2
                         units_left: 2
                         max_qty_per_order: 3
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6639,6 +6762,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
@@ -6731,6 +6855,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6749,6 +6874,7 @@ paths:
                           orderable_quantity: 2
                           units_left: 2
                           max_qty_per_order: 3
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6779,6 +6905,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6809,6 +6936,7 @@ paths:
                           orderable_quantity: 4
                           units_left: null
                           max_qty_per_order: 4
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -6844,6 +6972,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -6862,6 +6991,7 @@ paths:
                           orderable_quantity: 2
                           units_left: 2
                           max_qty_per_order: 3
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                             medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -6892,6 +7022,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                             medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6922,6 +7053,7 @@ paths:
                           orderable_quantity: 0
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                             medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -6954,6 +7086,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -6984,6 +7117,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -7002,6 +7136,7 @@ paths:
                         orderable_quantity: 2
                         units_left: 2
                         max_qty_per_order: 3
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -7032,6 +7167,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
@@ -8763,7 +8899,7 @@ paths:
     post:
       operationId: orders_create
       description: |-
-        Places the cart as an order at the store in `X-Store-Id` (08 T1/T2). Stock is reserved now, never earlier (08 §6.1). The server re-checks everything: the address is served by the store, the store is open, every line is available (else 409 `STOCK_UNAVAILABLE`), the minimum order, the coupon, and that its bill equals `expected_grand_total` (else 409 `PRICE_CHANGED`: reload the cart).
+        Places the cart as an order at the store in `X-Store-Id` (08 T1/T2). Stock is reserved now, never earlier (08 §6.1). The server re-checks everything: the address is served by the store, the store is open, every line is available (else 409 `STOCK_UNAVAILABLE`), every line has at least its variant's `min_qty_per_order` (else 422 `MIN_QTY_REQUIRED`), the minimum order value and the store's minimum units per order (`MIN_UNITS_NOT_MET`), the coupon, and that its bill equals `expected_grand_total` (else 409 `PRICE_CHANGED`: reload the cart).
 
         **COD:** the order is PLACED at once (`razorpay` is null) and the cart is emptied. COD needs the store to offer it and `grand_total` within its limit.
 
@@ -9478,6 +9614,27 @@ paths:
                         item_total: '79.00'
                         amount_to_min_order: '20.00'
                   summary: MIN_ORDER_NOT_MET
+                MINUNITSNOTMET:
+                  value:
+                    error:
+                      code: MIN_UNITS_NOT_MET
+                      message: Add 2 more cartons to place your order (minimum 5 cartons).
+                      details:
+                        min_order_units: 5
+                        order_units: 3
+                        units_to_min_order: 2
+                        order_unit_label: cartons
+                  summary: MIN_UNITS_NOT_MET
+                MINQTYREQUIRED:
+                  value:
+                    error:
+                      code: MIN_QTY_REQUIRED
+                      message: You need to order at least 2 of Jivo Cold Pressed Canola
+                        Oil 5 L.
+                      details:
+                        variant_id: 1002
+                        min_qty_per_order: 2
+                  summary: MIN_QTY_REQUIRED
                 CODNOTAVAILABLE:
                   value:
                     error:
@@ -11737,10 +11894,12 @@ paths:
       description: 'Puts the order''s items back in the cart, priced at the store
         in `X-Store-Id`, as far as they can be ordered now (03 §2.10). Each line is
         raised to the units of the past order, capped by what can be ordered (`orderable_quantity`);
-        it is never added on top, so repeating the call changes nothing. Lines already
-        in the cart with more units are left as they are. Returns the whole cart and
-        the lines that could not be added in full (`unavailable`): show them, then
-        open the cart.'
+        it is never added on top, so repeating the call changes nothing. A line is
+        never put back below its variant''s `min_qty_per_order` (reason `MIN_QTY_REQUIRED`:
+        the past order had fewer units than today''s minimum). Lines already in the
+        cart with more units are left as they are. Returns the whole cart and the
+        lines that could not be added in full (`unavailable`): show them, then open
+        the cart.'
       summary: Order again
       parameters:
       - in: header
@@ -11800,6 +11959,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -11830,6 +11990,7 @@ paths:
                           orderable_quantity: 4
                           units_left: null
                           max_qty_per_order: 4
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -11888,6 +12049,9 @@ paths:
                         amount_to_min_order: null
                         free_delivery_threshold: '299.00'
                         amount_to_free_delivery: null
+                        min_order_units: 0
+                        units_to_min_order: null
+                        order_unit_label: items
                       payment_methods:
                       - method: ONLINE
                         is_available: true
@@ -11933,6 +12097,7 @@ paths:
                           orderable_quantity: 5
                           units_left: null
                           max_qty_per_order: 5
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                             medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -11963,6 +12128,7 @@ paths:
                           orderable_quantity: 4
                           units_left: null
                           max_qty_per_order: 4
+                          min_qty_per_order: 1
                           image:
                             thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                             medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -12021,6 +12187,9 @@ paths:
                         amount_to_min_order: null
                         free_delivery_threshold: '299.00'
                         amount_to_free_delivery: null
+                        min_order_units: 0
+                        units_to_min_order: null
+                        order_unit_label: items
                       payment_methods:
                       - method: ONLINE
                         is_available: true
@@ -13399,6 +13568,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -13417,6 +13587,7 @@ paths:
                         orderable_quantity: 2
                         units_left: 2
                         max_qty_per_order: 3
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -13447,6 +13618,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -13477,6 +13649,7 @@ paths:
                         orderable_quantity: 0
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -13514,6 +13687,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-256.webp
                           medium: https://media.jivo.in/catalog/6c0e4a/wheatgrass-500ml-512.webp
@@ -13544,6 +13718,7 @@ paths:
                         orderable_quantity: 4
                         units_left: null
                         max_qty_per_order: 4
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-256.webp
                           medium: https://media.jivo.in/catalog/a37f21/aloe-vera-1l-512.webp
@@ -13756,6 +13931,7 @@ paths:
                       orderable_quantity: 5
                       units_left: null
                       max_qty_per_order: 5
+                      min_qty_per_order: 1
                       image:
                         thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                         medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -13789,6 +13965,7 @@ paths:
                       orderable_quantity: 2
                       units_left: 2
                       max_qty_per_order: 3
+                      min_qty_per_order: 1
                       image:
                         thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                         medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -13883,6 +14060,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -13913,6 +14091,7 @@ paths:
                         orderable_quantity: 0
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -13957,6 +14136,7 @@ paths:
                       orderable_quantity: 5
                       units_left: null
                       max_qty_per_order: 5
+                      min_qty_per_order: 1
                       image:
                         thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                         medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -14025,6 +14205,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -14043,6 +14224,7 @@ paths:
                         orderable_quantity: 2
                         units_left: 2
                         max_qty_per_order: 3
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -14073,6 +14255,7 @@ paths:
                         orderable_quantity: 0
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -20378,6 +20561,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/8f3b2c/canola-1l-256.webp
                           medium: https://media.jivo.in/catalog/8f3b2c/canola-1l-512.webp
@@ -20396,6 +20580,7 @@ paths:
                         orderable_quantity: 2
                         units_left: 2
                         max_qty_per_order: 3
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/1e7d90/canola-5l-256.webp
                           medium: https://media.jivo.in/catalog/1e7d90/canola-5l-512.webp
@@ -20426,6 +20611,7 @@ paths:
                         orderable_quantity: 5
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-256.webp
                           medium: https://media.jivo.in/catalog/4b6a13/pomace-olive-1l-512.webp
@@ -20456,6 +20642,7 @@ paths:
                         orderable_quantity: 0
                         units_left: null
                         max_qty_per_order: 5
+                        min_qty_per_order: 1
                         image:
                           thumbnail: https://media.jivo.in/catalog/d2905f/mustard-1l-256.webp
                           medium: https://media.jivo.in/catalog/d2905f/mustard-1l-512.webp
@@ -22747,10 +22934,13 @@ components:
           allOf:
           - $ref: '#/components/schemas/CartLineIssue'
           nullable: true
-          description: 'Set when the line cannot be ordered as it is (quantity above
-            `variant.orderable_quantity`, which is 0 when out of stock or no longer
-            sold). Fix: set the quantity to `variant.orderable_quantity`, or remove
-            the line when it is 0. Null when the line is fine.'
+          description: 'Set when the line cannot be ordered as it is: quantity above
+            `variant.orderable_quantity` (which is 0 when out of stock or no longer
+            sold), or below `variant.min_qty_per_order` (`MIN_QTY_REQUIRED`, e.g.
+            the minimum was raised after the line was added). Fix: set the quantity
+            to `variant.orderable_quantity` (for `MIN_QTY_REQUIRED`, to `variant.min_qty_per_order`),
+            or remove the line when `orderable_quantity` is 0. Null when the line
+            is fine.'
       required:
       - id
       - issue
@@ -22774,10 +22964,12 @@ components:
       enum:
       - OUT_OF_STOCK
       - QUANTITY_UNAVAILABLE
+      - MIN_QTY_REQUIRED
       type: string
       description: |-
         * `OUT_OF_STOCK` - Out of stock: remove it to continue.
         * `QUANTITY_UNAVAILABLE` - Not available in this quantity: reduce it to continue.
+        * `MIN_QTY_REQUIRED` - Below the minimum per order: increase it or remove it to continue.
     CartProduct:
       type: object
       description: The product a cart line belongs to (for the line title and the
@@ -22833,11 +23025,31 @@ components:
           nullable: true
           description: For the nudge 'Add ₹X more for free delivery'; null when delivery
             is already free.
+        min_order_units:
+          type: integer
+          minimum: 0
+          description: 'Fewest units one order must have, any mix of items (e.g. 5
+            cartons); 0 = no minimum. Not compared with `bill.item_total`: units are
+            counted per line as min(`quantity`, `variant.orderable_quantity`), so
+            an out-of-stock line counts 0.'
+        units_to_min_order:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Units still needed ('Add 2 more cartons'); null when the minimum
+            is met or there is none. While set, checkout is blocked with `MIN_UNITS_NOT_MET`.
+        order_unit_label:
+          type: string
+          description: What a unit is called, in the plural, e.g. "cartons" ("items"
+            by default).
       required:
       - amount_to_free_delivery
       - amount_to_min_order
       - free_delivery_threshold
+      - min_order_units
       - min_order_value
+      - order_unit_label
+      - units_to_min_order
     CashEntryTypeEnum:
       enum:
       - COD_COLLECTED
@@ -22958,7 +23170,9 @@ components:
       - NOT_SERVICEABLE
       - STORE_CLOSED
       - STOCK_UNAVAILABLE
+      - MIN_QTY_REQUIRED
       - MIN_ORDER_NOT_MET
+      - MIN_UNITS_NOT_MET
       - COUPON_INVALID
       - COUPON_EXPIRED
       - COUPON_NOT_ELIGIBLE
@@ -22970,7 +23184,9 @@ components:
         * `NOT_SERVICEABLE` - We do not deliver to this address from this store.
         * `STORE_CLOSED` - The store is not accepting orders right now.
         * `STOCK_UNAVAILABLE` - Some items are not available as chosen.
+        * `MIN_QTY_REQUIRED` - Some items are below their minimum per order.
         * `MIN_ORDER_NOT_MET` - The minimum order value is not met.
+        * `MIN_UNITS_NOT_MET` - The minimum number of units per order is not met.
         * `COUPON_INVALID` - The coupon is not valid.
         * `COUPON_EXPIRED` - The coupon has expired.
         * `COUPON_NOT_ELIGIBLE` - This cart is not eligible for the coupon.
@@ -23674,6 +23890,8 @@ components:
             * `RIDER_OFFLINE` - You are offline. Go online again to continue.
             * `PICKUP_CODE_INVALID` - The order code does not match this order.
             * `PICKUP_CODE_LOCKED` - Too many wrong order codes. Ask the store or ops.
+            * `MIN_QTY_REQUIRED` - The minimum quantity for this item is not met.
+            * `MIN_UNITS_NOT_MET` - The minimum number of units per order is not met.
         message:
           type: string
           description: Human-readable message (English).
@@ -23728,6 +23946,8 @@ components:
       - RIDER_OFFLINE
       - PICKUP_CODE_INVALID
       - PICKUP_CODE_LOCKED
+      - MIN_QTY_REQUIRED
+      - MIN_UNITS_NOT_MET
       type: string
       description: |-
         * `VALIDATION_ERROR` - Some fields are invalid.
@@ -23770,6 +23990,8 @@ components:
         * `RIDER_OFFLINE` - You are offline. Go online again to continue.
         * `PICKUP_CODE_INVALID` - The order code does not match this order.
         * `PICKUP_CODE_LOCKED` - Too many wrong order codes. Ask the store or ops.
+        * `MIN_QTY_REQUIRED` - The minimum quantity for this item is not met.
+        * `MIN_UNITS_NOT_MET` - The minimum number of units per order is not met.
     ErrorEnvelope:
       type: object
       description: Body of every non-2xx API response.
@@ -25995,11 +26217,13 @@ components:
       - OUT_OF_STOCK
       - LIMITED_STOCK
       - NOT_AVAILABLE
+      - MIN_QTY_REQUIRED
       type: string
       description: |-
         * `OUT_OF_STOCK` - Out of stock
         * `LIMITED_STOCK` - Only part of the quantity is available
         * `NOT_AVAILABLE` - No longer sold at this store
+        * `MIN_QTY_REQUIRED` - Fewer units than the minimum per order
     ReorderResult:
       type: object
       properties:
@@ -27727,7 +27951,8 @@ components:
           type: integer
           minimum: 0
           description: 'Units a customer can add right now: min(units in stock at
-            this store, `max_qty_per_order`). 0 when out of stock. Cap the ADD stepper
+            this store, `max_qty_per_order`). 0 when out of stock, including when
+            fewer than `min_qty_per_order` units can be sold. Cap the ADD stepper
             here.'
         units_left:
           type: integer
@@ -27739,6 +27964,13 @@ components:
           type: integer
           minimum: 1
           description: Per-order limit for this variant (also enforced by the cart).
+        min_qty_per_order:
+          type: integer
+          minimum: 1
+          description: 'Fewest units of this variant one order can have (1 = no minimum;
+            never above `max_qty_per_order`). The first ADD sets this quantity, and
+            the stepper never goes below it: stepping down from here removes the line
+            (quantity 0). The cart refuses 1 to `min_qty_per_order` - 1 with 422 `MIN_QTY_REQUIRED`.'
         image:
           allOf:
           - $ref: '#/components/schemas/ImageSet'
@@ -27765,6 +27997,7 @@ components:
       - image
       - images
       - max_qty_per_order
+      - min_qty_per_order
       - mrp
       - name
       - net_quantity
@@ -27816,7 +28049,8 @@ components:
           type: integer
           minimum: 0
           description: 'Units a customer can add right now: min(units in stock at
-            this store, `max_qty_per_order`). 0 when out of stock. Cap the ADD stepper
+            this store, `max_qty_per_order`). 0 when out of stock, including when
+            fewer than `min_qty_per_order` units can be sold. Cap the ADD stepper
             here.'
         units_left:
           type: integer
@@ -27828,6 +28062,13 @@ components:
           type: integer
           minimum: 1
           description: Per-order limit for this variant (also enforced by the cart).
+        min_qty_per_order:
+          type: integer
+          minimum: 1
+          description: 'Fewest units of this variant one order can have (1 = no minimum;
+            never above `max_qty_per_order`). The first ADD sets this quantity, and
+            the stepper never goes below it: stepping down from here removes the line
+            (quantity 0). The cart refuses 1 to `min_qty_per_order` - 1 with 422 `MIN_QTY_REQUIRED`.'
         image:
           allOf:
           - $ref: '#/components/schemas/ImageSet'
@@ -27840,6 +28081,7 @@ components:
       - id
       - image
       - max_qty_per_order
+      - min_qty_per_order
       - mrp
       - name
       - orderable_quantity

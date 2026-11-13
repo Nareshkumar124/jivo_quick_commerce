@@ -28,6 +28,7 @@ CHIA_100G = {
     "orderable_quantity": 5,
     "units_left": None,
     "max_qty_per_order": 5,
+    "min_qty_per_order": 1,
     "image": CHIA_IMAGE,
 }
 FLAX_200G = {
@@ -42,6 +43,7 @@ FLAX_200G = {
     "orderable_quantity": 5,
     "units_left": None,
     "max_qty_per_order": 5,
+    "min_qty_per_order": 1,
     "image": FLAX_IMAGE,
 }
 
@@ -164,6 +166,9 @@ def thresholds(amount_to_min_order=None, amount_to_free_delivery=None) -> dict:
         "amount_to_min_order": amount_to_min_order,
         "free_delivery_threshold": "299.00",
         "amount_to_free_delivery": amount_to_free_delivery,
+        "min_order_units": 0,
+        "units_to_min_order": None,
+        "order_unit_label": "items",
     }
 
 
@@ -408,3 +413,4 @@ STOCK_UNAVAILABLE_DETAILS = {
     "items": [{"variant_id": 1002, "requested_quantity": 3, "orderable_quantity": 2}]
 }
 MAX_QTY_DETAILS = {"variant_id": 1002, "max_qty_per_order": 3}
+MIN_QTY_DETAILS = {"variant_id": 1002, "min_qty_per_order": 2}

@@ -254,22 +254,31 @@ class Availability:
     units_left: int | None
 
 
+def orderable_quantity(available: int, max_qty_per_order: int, min_qty_per_order: int) -> int:
+    """08 §6.1: the units one order can take now, min(available, max per order), or 0 when that
+    is below the variant's minimum per order (fewer than `min` units can never be sold)."""
+    orderable = min(max(available, 0), max_qty_per_order)
+    return orderable if orderable >= min_qty_per_order else 0
+
+
 def availability(
     *,
     on_hand: int,
     reserved: int,
     is_available: bool,
     max_qty_per_order: int,
+    min_qty_per_order: int,
     sellable: bool = True,
 ) -> Availability:
-    """`orderable_quantity` = min(available, max per order); LOW_STOCK when 1 <= available <=
-    CATALOG_LOW_STOCK_UNITS (then `units_left` = available). Exact stock is never published."""
+    """`orderable_quantity` = min(available, max per order), 0 (OUT_OF_STOCK) when that is below
+    the minimum per order; LOW_STOCK when 1 <= available <= CATALOG_LOW_STOCK_UNITS (then
+    `units_left` = available). Exact stock is never published."""
     from apps.catalog.choices import StockStatus
 
     available = max(on_hand - reserved, 0) if (is_available and sellable) else 0
-    if available == 0:
+    orderable = orderable_quantity(available, max_qty_per_order, min_qty_per_order)
+    if orderable == 0:
         return Availability(StockStatus.OUT_OF_STOCK, 0, None)
-    orderable = min(available, max_qty_per_order)
     if available <= settings.CATALOG_LOW_STOCK_UNITS:
         return Availability(StockStatus.LOW_STOCK, orderable, available)
     return Availability(StockStatus.IN_STOCK, orderable, None)
@@ -307,6 +316,7 @@ class ReservationLine:
     variant_id: int
     quantity: int
     max_qty_per_order: int
+    min_qty_per_order: int = 1
 
 
 def reserve(order, store_id: int, lines: Iterable[ReservationLine], *, expires_at=None) -> None:
@@ -339,7 +349,9 @@ def reserve(order, store_id: int, lines: Iterable[ReservationLine], *, expires_a
                 {
                     "variant_id": line.variant_id,
                     "requested_quantity": line.quantity,
-                    "orderable_quantity": min(available, line.max_qty_per_order),
+                    "orderable_quantity": orderable_quantity(
+                        available, line.max_qty_per_order, line.min_qty_per_order
+                    ),
                 }
             )
     if short:

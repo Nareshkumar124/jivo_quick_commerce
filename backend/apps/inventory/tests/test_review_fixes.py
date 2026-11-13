@@ -230,6 +230,15 @@ class TestCatalogCacheInvalidation:
         assert version(lambda: services.set_availability(inventory, is_available=False)) is True
         assert version(lambda: services.set_price_override(inventory, Decimal("200.00"))) is True
 
+    def test_minimum_per_order_decides_what_is_published(self, store, version, settings):
+        """Min qty per order: 5 -> 4 free with a minimum of 5 turns the item OUT (published);
+        4 -> 3 stays OUT (0, no units left), so nothing is published."""
+        settings.CATALOG_LOW_STOCK_UNITS = 3
+        carton = VariantFactory(max_qty_per_order=50, min_qty_per_order=5)
+        stock(store, carton, 5)
+        assert version(lambda: _adjust(store, carton, -1, DAMAGE)) is True
+        assert version(lambda: _adjust(store, carton, -1, DAMAGE)) is False
+
     def test_non_catalog_fields_are_not_published(self, store, variant, version):
         inventory = stock(store, variant, 10)
         assert (

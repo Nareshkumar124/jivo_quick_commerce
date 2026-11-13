@@ -159,6 +159,16 @@ class ProductVariant(TimeStampedModel):
     mrp = models.DecimalField(max_digits=12, decimal_places=2)
     selling_price = models.DecimalField(max_digits=12, decimal_places=2)
     max_qty_per_order = models.PositiveSmallIntegerField(default=5)
+    # `db_default` too: the database fills 1 for code that does not know the column yet (the old
+    # release during a deploy, or after a code rollback). `default` keeps 1 on new Python objects.
+    min_qty_per_order = models.PositiveSmallIntegerField(
+        default=1,
+        db_default=1,
+        help_text=(
+            "Fewest units a customer can order in one order (e.g. 5 cartons). At most the "
+            "maximum per order. The item counts as out of stock when fewer can be sold."
+        ),
+    )
     barcode = models.CharField(max_length=32, blank=True)
     sap_item_code = models.CharField(max_length=40, null=True, blank=True, unique=True)
     weight_grams = models.PositiveIntegerField(null=True, blank=True)
@@ -175,6 +185,13 @@ class ProductVariant(TimeStampedModel):
             ),
             models.CheckConstraint(
                 condition=models.Q(max_qty_per_order__gte=1), name="variant_max_qty_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(min_qty_per_order__gte=1), name="variant_min_qty_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(min_qty_per_order__lte=models.F("max_qty_per_order")),
+                name="variant_min_qty_within_max",
             ),
             models.CheckConstraint(
                 condition=(
@@ -215,6 +232,14 @@ class ProductVariant(TimeStampedModel):
                 )
         if (self.unit_value is None) != (not self.unit):
             raise ValidationError({"unit": "Set both the unit value and the unit, or neither."})
+        if (
+            self.min_qty_per_order is not None
+            and self.max_qty_per_order is not None
+            and self.min_qty_per_order > self.max_qty_per_order
+        ):
+            raise ValidationError(
+                {"min_qty_per_order": "Cannot be above the maximum quantity per order."}
+            )
 
 
 class ProductImage(ProcessedImageMixin, TimeStampedModel):

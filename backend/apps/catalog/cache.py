@@ -78,14 +78,15 @@ def inventory_change_is_published(inventory) -> bool:
         return True
     if (before["on_hand"], before["reserved"]) == (inventory.on_hand, inventory.reserved):
         return False
-    max_qty = inventory.variant.max_qty_per_order
+    variant = inventory.variant
 
     def published(on_hand: int, reserved: int):
         return availability(
             on_hand=on_hand,
             reserved=reserved,
             is_available=inventory.is_available,
-            max_qty_per_order=max_qty,
+            max_qty_per_order=variant.max_qty_per_order,
+            min_qty_per_order=variant.min_qty_per_order,
         )
 
     return published(before["on_hand"], before["reserved"]) != published(

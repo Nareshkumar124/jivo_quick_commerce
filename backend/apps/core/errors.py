@@ -63,6 +63,9 @@ class ErrorCode(models.TextChoices):
     RIDER_OFFLINE = "RIDER_OFFLINE", "You are offline. Go online again to continue."
     PICKUP_CODE_INVALID = "PICKUP_CODE_INVALID", "The order code does not match this order."
     PICKUP_CODE_LOCKED = "PICKUP_CODE_LOCKED", "Too many wrong order codes. Ask the store or ops."
+    # --- Added 2026-11-13 (per-variant minimum order quantity) ---------------------------------
+    MIN_QTY_REQUIRED = "MIN_QTY_REQUIRED", "The minimum quantity for this item is not met."
+    MIN_UNITS_NOT_MET = "MIN_UNITS_NOT_MET", "The minimum number of units per order is not met."
 
 
 ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
@@ -106,6 +109,8 @@ ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.RIDER_OFFLINE: 409,
     ErrorCode.PICKUP_CODE_INVALID: 400,
     ErrorCode.PICKUP_CODE_LOCKED: 423,
+    ErrorCode.MIN_QTY_REQUIRED: 422,
+    ErrorCode.MIN_UNITS_NOT_MET: 422,
 }
 
 

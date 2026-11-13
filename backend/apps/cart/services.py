@@ -49,6 +49,10 @@ MSG_STOCK_BLOCKER = (
     "Some items are out of stock or not available in the quantity you chose. Update them to "
     "continue."
 )
+MSG_MIN_QTY_BLOCKER = (
+    "Some items are below their minimum quantity per order. Increase them or remove them to "
+    "continue."
+)
 
 # --------------------------------------------------------------------------- pricing rules
 
@@ -65,6 +69,8 @@ class PricingRules:
     handling_fee: Decimal
     cod_enabled: bool
     cod_max_order_value: Decimal
+    min_order_units: int = 0  # 0 = no minimum
+    order_unit_label: str = "items"
 
     @classmethod
     def from_config(cls, config: PricingConfig) -> "PricingRules":
@@ -77,6 +83,8 @@ class PricingRules:
             handling_fee=config.handling_fee,
             cod_enabled=config.cod_enabled,
             cod_max_order_value=config.cod_max_order_value,
+            min_order_units=config.min_order_units,
+            order_unit_label=config.order_unit_label,
         )
 
 
@@ -275,6 +283,16 @@ class CartLine:
     issue: dict | None
 
     @property
+    def has_stock_issue(self) -> bool:
+        """The store cannot supply the line as it is (out of stock or above what it can)."""
+        return self.issue is not None and not self.below_minimum
+
+    @property
+    def below_minimum(self) -> bool:
+        """The line is under the variant's minimum per order (e.g. the minimum was raised)."""
+        return self.issue is not None and self.issue["code"] == CartLineIssueCode.MIN_QTY_REQUIRED
+
+    @property
     def bill_line(self) -> BillLine:
         return BillLine(
             variant_id=self.variant.pk,
@@ -304,9 +322,20 @@ class CartLine:
 
 
 def line_issue(quantity: int, summary: dict) -> dict | None:
-    """Why a line cannot be ordered as it is; null when it can."""
+    """Why a line cannot be ordered as it is; null when it can. A stock problem comes first; a
+    line the store can supply but below the variant's minimum is MIN_QTY_REQUIRED (`orderable`
+    is 0 or at least the minimum, so raising the line to the minimum is always possible)."""
     orderable, limit = summary["orderable_quantity"], summary["max_qty_per_order"]
+    minimum = summary["min_qty_per_order"]
     if quantity <= orderable:
+        if quantity < minimum:
+            return {
+                "code": CartLineIssueCode.MIN_QTY_REQUIRED,
+                "message": (
+                    f"At least {minimum} per order. Increase the quantity to {minimum} or remove "
+                    "it."
+                ),
+            }
         return None
     if orderable == 0:
         return {
@@ -397,6 +426,28 @@ class CartState:
     def item_total(self) -> Decimal:
         return self.bill.item_total if self.lines else ZERO
 
+    @property
+    def order_units(self) -> int:
+        """Units for the store's minimum units per order: what would be ordered once the lines'
+        stock fixes are made, min(quantity, orderable_quantity) per line (an out-of-stock line
+        counts 0). Any mix of items counts together."""
+        return sum(
+            min(line.item.quantity, line.summary["orderable_quantity"]) for line in self.lines
+        )
+
+    @property
+    def units_to_min_order(self) -> int | None:
+        """Units still needed for `min_order_units`; None when it is met or the rule is off."""
+        missing = self.rules.min_order_units - self.order_units
+        return missing if self.rules.min_order_units and missing > 0 else None
+
+
+def min_units_message(rules: PricingRules, missing: int) -> str:
+    label = rules.order_unit_label
+    return (
+        f"Add {missing} more {label} to place your order (minimum {rules.min_order_units} {label})."
+    )
+
 
 def evaluate(cart: Cart, store: StoreArea, user, *, now: datetime | None = None) -> CartState:
     lines = load_lines(cart, store.pk)
@@ -431,6 +482,9 @@ def _thresholds(state: CartState) -> dict:
             money_str(rules.free_delivery_threshold) if charges_delivery else None
         ),
         "amount_to_free_delivery": money_str(to_free) if charges_delivery and to_free > 0 else None,
+        "min_order_units": rules.min_order_units,
+        "units_to_min_order": state.units_to_min_order,
+        "order_unit_label": rules.order_unit_label,
     }
 
 
@@ -508,8 +562,10 @@ def blockers(state: CartState, *, status, store: StoreArea, address: Address | N
     found = []
     if not status.is_open:
         found.append({"code": CheckoutBlockerCode.STORE_CLOSED, "message": status_message(status)})
-    if any(line.issue for line in state.lines):
+    if any(line.has_stock_issue for line in state.lines):
         found.append({"code": CheckoutBlockerCode.STOCK_UNAVAILABLE, "message": MSG_STOCK_BLOCKER})
+    if any(line.below_minimum for line in state.lines):
+        found.append({"code": CheckoutBlockerCode.MIN_QTY_REQUIRED, "message": MSG_MIN_QTY_BLOCKER})
     to_min = state.rules.min_order_value - state.item_total
     if to_min > 0:
         found.append(
@@ -519,6 +575,13 @@ def blockers(state: CartState, *, status, store: StoreArea, address: Address | N
                     f"Add items worth {rupees(to_min)} more to place your order "
                     f"(minimum {rupees(state.rules.min_order_value)})."
                 ),
+            }
+        )
+    if state.units_to_min_order is not None:
+        found.append(
+            {
+                "code": CheckoutBlockerCode.MIN_UNITS_NOT_MET,
+                "message": min_units_message(state.rules, state.units_to_min_order),
             }
         )
     if state.coupon_check is not None and not state.coupon_check.ok:
@@ -612,9 +675,26 @@ def _stock_error(variant_id: int, requested: int, orderable: int) -> ApiError:
     )
 
 
+def min_qty_error(variant_id: int, minimum: int, item_name: str = "this item") -> ApiError:
+    """422 `MIN_QTY_REQUIRED`: a line of 1 to `minimum` - 1 units (the cart and placement)."""
+    return ApiError(
+        ErrorCode.MIN_QTY_REQUIRED,
+        f"You need to order at least {minimum} of {item_name}.",
+        details={"variant_id": variant_id, "min_qty_per_order": minimum},
+    )
+
+
+def check_minimum(variant_id: int, quantity: int, minimum: int) -> None:
+    """A line quantity from 1 to `minimum` - 1 is refused, up or down (0 removes the line and is
+    always allowed): 422 `MIN_QTY_REQUIRED`."""
+    if 0 < quantity < minimum:
+        raise min_qty_error(variant_id, minimum)
+
+
 def check_increase(store_id: int, variant_id: int, quantity: int) -> None:
-    """An increase must be within the variant's per-order limit (422 `MAX_QTY_EXCEEDED`) and
-    the store's stock (409 `STOCK_UNAVAILABLE`; a variant the store does not sell has 0)."""
+    """An increase must be within the variant's per-order limits (422 `MAX_QTY_EXCEEDED`, 422
+    `MIN_QTY_REQUIRED`) and the store's stock (409 `STOCK_UNAVAILABLE`; a variant the store does
+    not sell has 0, and so does one with fewer free units than its minimum)."""
     variant = store_variants(store_id, [variant_id], with_images=False).get(variant_id)
     if variant is None or not variant.inv_is_available:
         raise _stock_error(variant_id, quantity, 0)
@@ -624,22 +704,26 @@ def check_increase(store_id: int, variant_id: int, quantity: int) -> None:
             f"You can order at most {variant.max_qty_per_order} of this item.",
             details={"variant_id": variant_id, "max_qty_per_order": variant.max_qty_per_order},
         )
+    check_minimum(variant_id, quantity, variant.min_qty_per_order)
     stock = availability(
         on_hand=variant.inv_on_hand,
         reserved=variant.inv_reserved,
         is_available=variant.inv_is_available,
         max_qty_per_order=variant.max_qty_per_order,
+        min_qty_per_order=variant.min_qty_per_order,
     )
     if quantity > stock.orderable_quantity:
         raise _stock_error(variant_id, quantity, stock.orderable_quantity)
 
 
 def set_quantity(cart: Cart, store: StoreArea, variant_id: int, quantity: int) -> None:
-    """`POST /cart/items/`: set the line for `variant_id` to `quantity` (0 removes it). Only an
-    increase is checked, so a customer can always step down a line with an issue."""
+    """`POST /cart/items/`: set the line for `variant_id` to `quantity` (0 removes it). An
+    increase is checked against the limits and stock; a decrease only against the variant's
+    minimum per order, so a customer can always step down a line with a stock issue (or remove
+    it with 0)."""
     with transaction.atomic():
         _locked(cart)
-        item = cart.items.filter(variant_id=variant_id).first()
+        item = cart.items.select_related("variant").filter(variant_id=variant_id).first()
         current = item.quantity if item is not None else 0
         if quantity == 0:
             if item is not None:
@@ -647,6 +731,8 @@ def set_quantity(cart: Cart, store: StoreArea, variant_id: int, quantity: int) -
             return
         if quantity > current:
             check_increase(store.pk, variant_id, quantity)
+        elif quantity < current:
+            check_minimum(variant_id, quantity, item.variant.min_qty_per_order)
         if item is None:
             CartItem.objects.create(cart=cart, variant_id=variant_id, quantity=quantity)
         elif item.quantity != quantity:

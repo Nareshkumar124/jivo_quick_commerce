@@ -90,10 +90,11 @@ def sold_variants(store: DarkStore) -> QuerySet[ProductVariant]:
             inv_reserved=F("store_inv__reserved"),
             inv_is_available=F("store_inv__is_available"),
             inv_price=effective_price_expression("store_inv__price_override"),
+            # Orderable (`availability()`): at least the variant's minimum per order is free.
             in_stock=Case(
                 When(
                     Q(store_inv__is_available=True)
-                    & Q(store_inv__on_hand__gt=F("store_inv__reserved")),
+                    & Q(store_inv__on_hand__gte=F("store_inv__reserved") + F("min_qty_per_order")),
                     then=Value(1),
                 ),
                 default=Value(0),
@@ -218,6 +219,7 @@ def variant_summary(variant, product) -> dict:
         reserved=variant.inv_reserved,
         is_available=variant.inv_is_available,
         max_qty_per_order=variant.max_qty_per_order,
+        min_qty_per_order=variant.min_qty_per_order,
     )
     return {
         "id": variant.pk,
@@ -231,6 +233,7 @@ def variant_summary(variant, product) -> dict:
         "orderable_quantity": stock.orderable_quantity,
         "units_left": stock.units_left,
         "max_qty_per_order": variant.max_qty_per_order,
+        "min_qty_per_order": variant.min_qty_per_order,
         "image": _variant_image(variant, product),
     }
 
