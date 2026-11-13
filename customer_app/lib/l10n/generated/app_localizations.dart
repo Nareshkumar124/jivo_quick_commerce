@@ -862,6 +862,42 @@ abstract class AppLocalizations {
   /// **'{count} in cart'**
   String stepperQuantity(int count);
 
+  /// Screen-reader label of the stepper's number when tapping it opens the type-a-quantity dialog (bulk orders).
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity {count}, tap to type a quantity'**
+  String stepperQuantityTap(int count);
+
+  /// Title of the dialog that lets the customer type a quantity instead of tapping + many times.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter quantity'**
+  String get typeQuantityTitle;
+
+  /// Label of the digits-only quantity field.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get typeQuantityField;
+
+  /// Helper text under the quantity field.
+  ///
+  /// In en, this message translates to:
+  /// **'0 removes it from the cart'**
+  String get typeQuantityHint;
+
+  /// Inline error: the quantity field is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a quantity'**
+  String get typeQuantityEmpty;
+
+  /// Dialog button that sets the typed quantity in the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get typeQuantityUpdate;
+
   /// Shown when plus is tapped at the cap min(stock, max per order).
   ///
   /// In en, this message translates to:

@@ -62,6 +62,23 @@ class SlowCartRepository extends FakeCommerceBackend {
   }
 }
 
+/// The fake server, recording every `(variant, quantity)` sent.
+class _RecordingCart extends FakeCommerceBackend {
+  _RecordingCart() : super(latency: Duration.zero);
+
+  final sent = <(int, int)>[];
+
+  @override
+  Future<CartSnapshot> setQuantity(
+    int variantId,
+    int quantity, {
+    CartLinePreview? preview,
+  }) {
+    sent.add((variantId, quantity));
+    return super.setQuantity(variantId, quantity, preview: preview);
+  }
+}
+
 void main() {
   testWidgets('shows name, variant, server price, struck MRP and discount', (
     tester,
@@ -406,6 +423,111 @@ void main() {
         expect(find.text('Min 5'), findsOneWidget);
       });
     }
+  });
+
+  group('type a quantity (bulk orders)', () {
+    CatalogProduct bulk({int orderable = 1000, int minQty = 1}) => product(
+      name: 'Jivo Water 1 L x 12',
+      only: variant(
+        id: 1501,
+        name: '1 L x 12',
+        orderable: orderable,
+        maxQty: 1000,
+        minQty: minQty,
+      ),
+    );
+
+    Future<_RecordingCart> addOne(
+      WidgetTester tester,
+      CatalogProduct tile,
+    ) async {
+      final cart = _RecordingCart();
+      await pumpTile(tester, tile, repository: cart);
+      await tester.tap(find.text('ADD'));
+      await tester.pumpAndSettle();
+      return cart;
+    }
+
+    Future<void> type(WidgetTester tester, String text) async {
+      await tester.tap(find.byKey(const ValueKey('qty-1501')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('qty-field')), text);
+      await tester.tap(find.byKey(const Key('qty-update')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('tapping the number opens the dialog, prefilled', (
+      tester,
+    ) async {
+      await addOne(tester, bulk());
+      expect(
+        find.bySemanticsLabel('Quantity 1, tap to type a quantity'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('qty-1501')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('qty-dialog')), findsOneWidget);
+      expect(find.text('Enter quantity'), findsOneWidget);
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('qty-field')),
+      );
+      expect(field.controller!.text, '1');
+      expect(field.keyboardType, TextInputType.number);
+
+      await tester.tap(find.byKey(const Key('qty-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('qty-dialog')), findsNothing);
+    });
+
+    testWidgets('typed 100 is one request for 100', (tester) async {
+      final cart = await addOne(tester, bulk());
+      await type(tester, '100');
+      expect(find.byKey(const Key('qty-dialog')), findsNothing);
+      expect(cart.sent, [(1501, 1), (1501, 100)]);
+      expect(qty(tester, 1501), '100');
+    });
+
+    testWidgets('above the cap: refused inline, nothing sent', (tester) async {
+      final cart = await addOne(tester, bulk(orderable: 5));
+      await type(tester, '9');
+      expect(find.byKey(const Key('qty-dialog')), findsOneWidget);
+      expect(find.text('You can add up to 5 of this item'), findsOneWidget);
+      expect(cart.sent, [(1501, 1)]);
+    });
+
+    testWidgets('0 removes the line', (tester) async {
+      final cart = await addOne(tester, bulk());
+      await type(tester, '0');
+      expect(cart.sent.last, (1501, 0));
+      expect(find.text('ADD'), findsOneWidget);
+    });
+
+    testWidgets('only digits can be typed', (tester) async {
+      await addOne(tester, bulk());
+      await tester.tap(find.byKey(const ValueKey('qty-1501')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('qty-field')), '1a2-.3 ');
+      final field = tester.widget<TextField>(
+        find.byKey(const Key('qty-field')),
+      );
+      expect(field.controller!.text, '123');
+    });
+
+    testWidgets('below the per-variant minimum: refused with the minimum', (
+      tester,
+    ) async {
+      final cart = await addOne(tester, bulk(minQty: 5));
+      expect(cart.sent, [(1501, 5)], reason: 'ADD still adds the minimum');
+      await type(tester, '3');
+      expect(find.text('Minimum 5 per order'), findsWidgets);
+      expect(find.byKey(const Key('qty-dialog')), findsOneWidget);
+      expect(cart.sent, [(1501, 5)]);
+
+      await tester.enterText(find.byKey(const Key('qty-field')), '7');
+      await tester.tap(find.byKey(const Key('qty-update')));
+      await tester.pumpAndSettle();
+      expect(cart.sent, [(1501, 5), (1501, 7)]);
+    });
   });
 
   testWidgets('with several variants, ADD opens the variant picker', (

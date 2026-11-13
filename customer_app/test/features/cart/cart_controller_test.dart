@@ -406,6 +406,88 @@ void main() {
     });
   });
 
+  test('a typed quantity is one absolute request, capped like +', () async {
+    final stub = StubCartRepository(cartSnapshot(lines: const []));
+    final c = containerWith(stub);
+    final controller = c.read(cartProvider.notifier);
+    await controller.refresh();
+    final water = variant(id: 1501, orderable: 1000, maxQty: 1000);
+    await controller.setVariantQuantity(water, 100);
+    expect(writes(stub), ['set:1501:100']);
+    await expectLater(
+      controller.setVariantQuantity(variant(id: 7, orderable: 5), 9),
+      throwsA(isA<CartLimitException>().having((e) => e.max, 'max', 5)),
+    );
+    // Unchanged: nothing is sent.
+    await controller.setVariantQuantity(variant(id: 8), 0);
+    expect(writes(stub), ['set:1501:100']);
+  });
+
+  group('a saved address survives cart changes', () {
+    // Only GET /cart/ takes ?address_id=; a change answers with the cart
+    // checked against no address (the staging bug: ADDRESS_REQUIRED after
+    // + or −, although the location is saved address 2).
+    List<CheckoutBlockerCode> blockers() =>
+        state().snapshot.checkout.blockers.map((b) => b.code).toList();
+
+    test('after +, − or ADD the cart is reloaded for the address', () async {
+      await cart().refreshForAddress(2);
+      await cart().increment(variant(), productName: 'Jivo Canola Oil');
+      expect(state().snapshot.addressId, 2);
+      expect(blockers(), isNot(contains(CheckoutBlockerCode.addressRequired)));
+      expect(state().snapshot.checkout.canPlaceOrder, isTrue);
+
+      await cart().increment(variant());
+      await cart().decrement(variant());
+      expect(blockers(), isNot(contains(CheckoutBlockerCode.addressRequired)));
+      expect(state().load, CartLoad.ready, reason: 'no loading state');
+
+      // Without the follow-up load, the change's own answer has the bug.
+      final bare = await repository.setQuantity(101, 2);
+      expect(
+        bare.checkout.blockers.map((b) => b.code),
+        contains(CheckoutBlockerCode.addressRequired),
+      );
+    });
+
+    test('a follow-up load only with a saved address', () async {
+      final stub = StubCartRepository(cartSnapshot());
+      final c = containerWith(stub);
+      final controller = c.read(cartProvider.notifier);
+      await controller.refreshForAddress(null); // a pin: no saved address
+      stub.calls.clear();
+      await controller.setLineQuantity(cartLine(), 3);
+      await controller.setTip('20.00');
+      expect(stub.calls, ['set:101:3', 'update']);
+
+      await controller.refreshForAddress(2);
+      stub.calls.clear();
+      await controller.setLineQuantity(cartLine(), 3);
+      await controller.applyCoupon('JIVO50');
+      await controller.clear(); // the location is changing: none here
+      expect(stub.calls, [
+        'set:101:3',
+        'load:2',
+        'coupon:JIVO50',
+        'load:2',
+        'clear',
+      ]);
+    });
+
+    test('a failed follow-up load keeps the change and never throws', () async {
+      final stub = StubCartRepository(cartSnapshot());
+      final c = containerWith(stub);
+      final controller = c.read(cartProvider.notifier);
+      await controller.refreshForAddress(2);
+      stub
+        ..snapshot = cartSnapshot(lines: [cartLine(quantity: 3)])
+        ..loadError = const ApiError(code: ApiErrorCode.network);
+      await controller.setLineQuantity(cartLine(), 3);
+      expect(c.read(cartProvider).quantityOf(101), 3);
+      expect(c.read(cartProvider).load, CartLoad.ready);
+    });
+  });
+
   test('coupon, tip and instructions go to the server', () async {
     final stub = StubCartRepository(cartSnapshot());
     final c = containerWith(stub);

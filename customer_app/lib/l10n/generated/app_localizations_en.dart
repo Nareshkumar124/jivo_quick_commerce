@@ -429,6 +429,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String stepperQuantityTap(int count) {
+    return 'Quantity $count, tap to type a quantity';
+  }
+
+  @override
+  String get typeQuantityTitle => 'Enter quantity';
+
+  @override
+  String get typeQuantityField => 'Quantity';
+
+  @override
+  String get typeQuantityHint => '0 removes it from the cart';
+
+  @override
+  String get typeQuantityEmpty => 'Enter a quantity';
+
+  @override
+  String get typeQuantityUpdate => 'Update';
+
+  @override
   String maxQtyReached(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
