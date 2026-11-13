@@ -162,6 +162,53 @@ void main() {
     expect(plain.thresholds!.unitsToMinOrder, isNull);
   });
 
+  test(
+    'volume prices: the billed rate, the tier and the nudge, as sent',
+    () async {
+      final cart = Map<String, Object?>.from(
+        contractExample('cart_retrieve/200/ReadyToOrder')! as Map,
+      );
+      final line = Map<String, Object?>.from(
+        (cart['items']! as List).first as Map,
+      );
+      line['price_per_unit'] = '87.00';
+      line['price_tier'] = {'min_order_units': 25, 'price': '87.00'};
+      line['next_tier_price'] = '85.00';
+      line['line_total'] = '2610.00';
+      cart['items'] = [line];
+      cart['thresholds'] = {
+        ...(cart['thresholds']! as Map).cast<String, Object?>(),
+        'tier_units': 30,
+        'next_price_tier': {'min_order_units': 50, 'units_to_next_tier': 20},
+        'order_unit_label': 'boxes',
+      };
+      answer = (_, _) => cart;
+
+      final snapshot = await repository.load();
+      final mapped = snapshot.lines.single;
+      expect(mapped.pricePerUnit, '87.00');
+      expect(mapped.billedPrice, '87.00');
+      expect(mapped.priceTier!.minOrderUnits, 25);
+      expect(mapped.priceTier!.price, '87.00');
+      expect(mapped.nextTierPrice, '85.00');
+      expect(mapped.lineTotal, '2610.00');
+      final thresholds = snapshot.thresholds!;
+      expect(thresholds.tierUnits, 30);
+      expect(thresholds.nextPriceTier!.minOrderUnits, 50);
+      expect(thresholds.nextPriceTier!.unitsToNextTier, 20);
+    },
+  );
+
+  test('the contract default: no tier, no nudge', () async {
+    final cart = await repository.load();
+    for (final line in cart.lines) {
+      expect(line.priceTier, isNull);
+      expect(line.nextTierPrice, isNull);
+      expect(line.pricePerUnit, line.variant.sellingPrice);
+    }
+    expect(cart.thresholds!.nextPriceTier, isNull);
+  });
+
   test('every documented cart decodes', () async {
     for (final name in [
       'ReadyToOrder',

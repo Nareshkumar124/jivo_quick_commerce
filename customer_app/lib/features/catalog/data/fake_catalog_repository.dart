@@ -297,6 +297,7 @@ CatalogVariant _variant(_Variant v, {bool detail = false}) {
     minQtyPerOrder: v.minQty,
     unitPrice: v.unitPrice,
     netQuantity: detail ? v.name : null,
+    priceTiers: v.tiers,
   );
 }
 
@@ -327,6 +328,7 @@ class _Variant {
     this.maxQty = 5,
     this.minQty = 1,
     this.unitPrice,
+    this.tiers = const [],
   });
 
   final int id;
@@ -339,6 +341,7 @@ class _Variant {
   final int maxQty;
   final int minQty;
   final UnitPrice? unitPrice;
+  final List<PriceTier> tiers;
 }
 
 class _Product {
@@ -503,7 +506,51 @@ const _products = [
     _Variant(1401, '250 g', '129.00', '149.00', off: 13, save: '20.00'),
   ]),
   _Product(15, 'jivo-drinking-water', 'Jivo Packaged Drinking Water', 'water', [
-    // Sold by the carton, at least 5 per order (like the live store).
-    _Variant(1501, '1 L', '20.00', '20.00', maxQty: 12, minQty: 5),
+    // Sold by the box, at least 5 per order (like the live store), with
+    // wholesale (volume) prices: the box total of every size together picks
+    // the tier (ADR 0001). Demo numbers only; the server owns the real ones.
+    _Variant(
+      1501,
+      '1 L',
+      '90.00',
+      '90.00',
+      maxQty: 300,
+      minQty: 5,
+      stock: 500,
+      tiers: _waterSmallTiers,
+    ),
+    _Variant(
+      1502,
+      '500 ml',
+      '125.00',
+      '125.00',
+      maxQty: 300,
+      stock: 500,
+      tiers: [
+        PriceTier(minOrderUnits: 5, price: '125.00'),
+        PriceTier(minOrderUnits: 25, price: '122.00'),
+        PriceTier(minOrderUnits: 50, price: '120.00'),
+        PriceTier(minOrderUnits: 100, price: '117.00'),
+        PriceTier(minOrderUnits: 250, price: '115.00'),
+      ],
+    ),
+    _Variant(
+      1503,
+      '250 ml',
+      '90.00',
+      '90.00',
+      maxQty: 300,
+      stock: 500,
+      tiers: _waterSmallTiers,
+    ),
   ]),
+];
+
+/// Box prices of the 1 L and 250 ml water by total boxes in the order.
+const _waterSmallTiers = [
+  PriceTier(minOrderUnits: 5, price: '90.00'),
+  PriceTier(minOrderUnits: 25, price: '87.00'),
+  PriceTier(minOrderUnits: 50, price: '85.00'),
+  PriceTier(minOrderUnits: 100, price: '82.00'),
+  PriceTier(minOrderUnits: 250, price: '80.00'),
 ];

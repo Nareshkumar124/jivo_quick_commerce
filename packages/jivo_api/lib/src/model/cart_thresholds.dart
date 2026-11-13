@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/model/next_price_tier.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -30,6 +31,10 @@ class CartThresholds {
     required this.minOrderUnits,
 
     required this.unitsToMinOrder,
+
+    required this.tierUnits,
+
+    required this.nextPriceTier,
 
     required this.orderUnitLabel,
   });
@@ -68,6 +73,15 @@ class CartThresholds {
   @JsonKey(name: r'units_to_min_order', required: true, includeIfNull: true)
   final int? unitsToMinOrder;
 
+  /// Units that choose the volume price tier (ADR 0001): every line whose variant has `price_tiers`, any mix, each counting min(`quantity`, `orderable_quantity`). 0 when no line has tiers.
+  // minimum: 0
+  @JsonKey(name: r'tier_units', required: true, includeIfNull: false)
+  final int tierUnits;
+
+  /// The nudge 'Add 3 more boxes to get ₹87/box': the next tier at which a line's price drops (each line's new price is its `next_tier_price`). Null at the top tier or when no line has tiers.
+  @JsonKey(name: r'next_price_tier', required: true, includeIfNull: true)
+  final NextPriceTier? nextPriceTier;
+
   /// What a unit is called, in the plural, e.g. \"cartons\" (\"items\" by default).
   @JsonKey(name: r'order_unit_label', required: true, includeIfNull: false)
   final String orderUnitLabel;
@@ -82,6 +96,8 @@ class CartThresholds {
           other.amountToFreeDelivery == amountToFreeDelivery &&
           other.minOrderUnits == minOrderUnits &&
           other.unitsToMinOrder == unitsToMinOrder &&
+          other.tierUnits == tierUnits &&
+          other.nextPriceTier == nextPriceTier &&
           other.orderUnitLabel == orderUnitLabel;
 
   @override
@@ -92,6 +108,8 @@ class CartThresholds {
       (amountToFreeDelivery == null ? 0 : amountToFreeDelivery.hashCode) +
       minOrderUnits.hashCode +
       (unitsToMinOrder == null ? 0 : unitsToMinOrder.hashCode) +
+      tierUnits.hashCode +
+      (nextPriceTier == null ? 0 : nextPriceTier.hashCode) +
       orderUnitLabel.hashCode;
 
   factory CartThresholds.fromJson(Map<String, dynamic> json) =>

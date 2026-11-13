@@ -58,6 +58,7 @@ import 'package:jivo_api/src/model/location_batch_result.dart';
 import 'package:jivo_api/src/model/location_point_request.dart';
 import 'package:jivo_api/src/model/logout_request.dart';
 import 'package:jivo_api/src/model/me.dart';
+import 'package:jivo_api/src/model/next_price_tier.dart';
 import 'package:jivo_api/src/model/notify_me.dart';
 import 'package:jivo_api/src/model/notify_me_request.dart';
 import 'package:jivo_api/src/model/nutrition_row.dart';
@@ -102,6 +103,7 @@ import 'package:jivo_api/src/model/pickup_code_state.dart';
 import 'package:jivo_api/src/model/pickup_request.dart';
 import 'package:jivo_api/src/model/policy_urls.dart';
 import 'package:jivo_api/src/model/position_request.dart';
+import 'package:jivo_api/src/model/price_tier.dart';
 import 'package:jivo_api/src/model/product_card.dart';
 import 'package:jivo_api/src/model/product_detail.dart';
 import 'package:jivo_api/src/model/razorpay_checkout.dart';
@@ -383,6 +385,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'Me':
       return Me.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'NextPriceTier':
+      return NextPriceTier.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'NotifyMe':
       return NotifyMe.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'NotifyMeRequest':
@@ -512,6 +517,8 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'PositionRequest':
       return PositionRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'PriceTier':
+      return PriceTier.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'ProductCard':
       return ProductCard.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'ProductDetail':

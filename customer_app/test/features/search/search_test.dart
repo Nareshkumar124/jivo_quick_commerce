@@ -24,6 +24,27 @@ Future<void> submit(WidgetTester tester, String query) async {
 }
 
 void main() {
+  testWidgets('the search hint is neutral on home and in the field', (
+    tester,
+  ) async {
+    final app = TestApp(tokens: signedInTokens);
+    await app.pump(tester);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('home-search')),
+        matching: find.text('Search products'),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('home-search')));
+    await tester.pumpAndSettle();
+    final field = tester.widget<TextField>(
+      find.byKey(const Key('search-field')),
+    );
+    expect(field.decoration!.hintText, 'Search products');
+  });
+
   testWidgets('suggestions wait for 300 ms of quiet typing', (tester) async {
     final app = await openSearch(tester);
     final field = find.byKey(const Key('search-field'));

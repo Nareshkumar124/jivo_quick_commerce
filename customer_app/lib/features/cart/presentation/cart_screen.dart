@@ -136,6 +136,8 @@ class _CartContent extends StatelessWidget {
     final nudge = snapshot.thresholds?.amountToFreeDelivery;
     // The store's minimum number of units per order (any mix of products).
     final minUnits = minUnitsWarning(l10n, snapshot.thresholds);
+    // The next volume price tier ("Add 3 more boxes to get ₹87/box").
+    final tierNudge = priceTierNudge(l10n, snapshot);
     final loadError = cart.loadError;
     const gap = SizedBox(height: JivoSpacing.lg);
 
@@ -167,6 +169,15 @@ class _CartContent extends StatelessWidget {
             icon: Icons.inventory_2_outlined,
             text: minUnits,
             color: theme.colorScheme.error,
+          ),
+          gap,
+        ],
+        if (tierNudge != null) ...[
+          _Notice(
+            key: const Key('price-tier-nudge'),
+            icon: Icons.savings_outlined,
+            text: tierNudge,
+            color: context.jivoColors.success,
           ),
           gap,
         ],

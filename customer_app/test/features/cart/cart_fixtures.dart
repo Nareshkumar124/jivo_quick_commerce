@@ -20,6 +20,10 @@ CartLine cartLine({
   int orderable = 5,
   int minQty = 1,
   CartIssueCode? issue,
+  List<PriceTier> priceTiers = const [],
+  String? pricePerUnit,
+  PriceTier? priceTier,
+  String? nextTierPrice,
 }) => CartLine(
   id: id,
   productName: name,
@@ -32,11 +36,15 @@ CartLine cartLine({
     orderableQuantity: orderable,
     maxQtyPerOrder: 5,
     minQtyPerOrder: minQty,
+    priceTiers: priceTiers,
   ),
   quantity: quantity,
   lineMrpTotal: lineMrpTotal,
   lineTotal: lineTotal,
   issue: issue == null ? null : CartLineIssue(code: issue, message: 'x'),
+  pricePerUnit: pricePerUnit,
+  priceTier: priceTier,
+  nextTierPrice: nextTierPrice,
 );
 
 /// A bill whose numbers deliberately do **not** add up: any screen that

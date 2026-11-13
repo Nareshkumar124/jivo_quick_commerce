@@ -1,5 +1,6 @@
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/cart/domain/cart.dart';
+import 'package:customer_app/features/catalog/domain/catalog_models.dart';
 import 'package:customer_app/features/checkout/data/fake_payment_launcher.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -409,5 +410,82 @@ void main() {
     expect(failed.status, OrderStatus.paymentFailed);
     expect(failed.canRetryPayment, isFalse);
     expect(await timed.activeOrders(), isEmpty);
+  });
+
+  group('volume (slab) prices, like the server (ADR 0001)', () {
+    const small = [
+      PriceTier(minOrderUnits: 5, price: '90.00'),
+      PriceTier(minOrderUnits: 25, price: '87.00'),
+      PriceTier(minOrderUnits: 50, price: '85.00'),
+    ];
+    const half = [
+      PriceTier(minOrderUnits: 5, price: '125.00'),
+      PriceTier(minOrderUnits: 25, price: '122.00'),
+    ];
+    CatalogVariant box(int id, String price, List<PriceTier> tiers) =>
+        CatalogVariant(
+          id: id,
+          name: '$id',
+          sellingPrice: price,
+          mrp: price,
+          stockStatus: StockStatus.inStock,
+          orderableQuantity: 300,
+          maxQtyPerOrder: 300,
+          priceTiers: tiers,
+        );
+    Future<CartSnapshot> set(int id, int quantity) => backend.setQuantity(
+      id,
+      quantity,
+      preview: CartLinePreview.of(
+        id == 1502 ? box(1502, '125.00', half) : box(1501, '90.00', small),
+        'Jivo Water',
+      ),
+    );
+
+    test(
+      'at 4 boxes the next slab is 25 (5+ costs the normal price)',
+      () async {
+        final cart = await set(1501, 4);
+        final line = cart.lines.single;
+        expect(line.priceTier, isNull);
+        expect(line.billedPrice, '90.00');
+        expect(cart.thresholds!.tierUnits, 4);
+        expect(cart.thresholds!.nextPriceTier!.minOrderUnits, 25);
+        expect(cart.thresholds!.nextPriceTier!.unitsToNextTier, 21);
+        expect(line.nextTierPrice, '87.00');
+      },
+    );
+
+    test('every size counts towards one total', () async {
+      await set(1501, 20);
+      final cart = await set(1502, 5);
+      expect(cart.thresholds!.tierUnits, 25);
+      final litre = cart.lineFor(1501)!;
+      final halfLitre = cart.lineFor(1502)!;
+      expect(litre.priceTier!.minOrderUnits, 25);
+      expect(litre.billedPrice, '87.00');
+      expect(litre.lineTotal, '1740.00');
+      expect(halfLitre.billedPrice, '122.00');
+      expect(cart.bill!.itemTotal, '2350.00');
+      // Only the 1 L gets cheaper at 50.
+      expect(cart.thresholds!.nextPriceTier!.minOrderUnits, 50);
+      expect(litre.nextTierPrice, '85.00');
+      expect(halfLitre.nextTierPrice, isNull);
+    });
+
+    test('at the top slab there is no next tier', () async {
+      final cart = await set(1501, 60);
+      expect(cart.lines.single.billedPrice, '85.00');
+      expect(cart.thresholds!.nextPriceTier, isNull);
+      expect(cart.lines.single.nextTierPrice, isNull);
+    });
+
+    test('items without tiers: normal price, no tier fields', () async {
+      final cart = await add(2);
+      expect(cart.lines.single.billedPrice, '249.00');
+      expect(cart.lines.single.priceTier, isNull);
+      expect(cart.thresholds!.tierUnits, 0);
+      expect(cart.thresholds!.nextPriceTier, isNull);
+    });
   });
 }

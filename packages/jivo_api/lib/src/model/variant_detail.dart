@@ -6,6 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:jivo_api/src/model/stock_status_enum.dart';
 import 'package:jivo_api/src/model/unit_price.dart';
+import 'package:jivo_api/src/model/price_tier.dart';
 import 'package:jivo_api/src/model/image_set.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -45,6 +46,8 @@ class VariantDetail {
     required this.maxQtyPerOrder,
 
     required this.minQtyPerOrder,
+
+    required this.priceTiers,
 
     required this.image,
 
@@ -113,6 +116,10 @@ class VariantDetail {
   @JsonKey(name: r'min_qty_per_order', required: true, includeIfNull: false)
   final int minQtyPerOrder;
 
+  /// Volume prices, lowest `min_order_units` first; [] when the variant has none (then `selling_price` always applies). The cart applies the highest tier reached by the units of all tiered items together and shows it per line (`price_per_unit`, `price_tier`). For the rate chart on the product page.
+  @JsonKey(name: r'price_tiers', required: true, includeIfNull: false)
+  final List<PriceTier> priceTiers;
+
   /// The variant's own first image, else the product's. Null when none.
   @JsonKey(name: r'image', required: true, includeIfNull: true)
   final ImageSet? image;
@@ -145,6 +152,7 @@ class VariantDetail {
           other.unitsLeft == unitsLeft &&
           other.maxQtyPerOrder == maxQtyPerOrder &&
           other.minQtyPerOrder == minQtyPerOrder &&
+          other.priceTiers == priceTiers &&
           other.image == image &&
           other.sku == sku &&
           other.netQuantity == netQuantity &&
@@ -164,6 +172,7 @@ class VariantDetail {
       (unitsLeft == null ? 0 : unitsLeft.hashCode) +
       maxQtyPerOrder.hashCode +
       minQtyPerOrder.hashCode +
+      priceTiers.hashCode +
       (image == null ? 0 : image.hashCode) +
       sku.hashCode +
       netQuantity.hashCode +

@@ -101,6 +101,33 @@ String? minUnitsWarning(AppLocalizations l10n, CartThresholds? thresholds) {
   );
 }
 
+/// The volume-price nudge: "Add 3 more boxes to get ₹87/box on 1 L" when
+/// one line gets cheaper at the server's `next_price_tier`, or "Add 3 more
+/// boxes for lower prices" when several do. Null when there is no next tier,
+/// or while the cart is short of `min_order_units` (that warning comes
+/// first). The count, prices and label are the server's.
+String? priceTierNudge(AppLocalizations l10n, CartSnapshot cart) {
+  final thresholds = cart.thresholds;
+  final next = thresholds?.nextPriceTier;
+  if (thresholds == null || next == null || next.unitsToNextTier <= 0) {
+    return null;
+  }
+  final short = thresholds.unitsToMinOrder;
+  if (short != null && short > 0) return null;
+  final count = next.unitsToNextTier;
+  final label = orderUnitLabel(l10n, thresholds);
+  final cheaper = [
+    for (final line in cart.lines)
+      if (formatRupeesOrNull(line.nextTierPrice) case final price?)
+        (line: line, price: price),
+  ];
+  if (cheaper.length == 1) {
+    final (:line, :price) = cheaper.single;
+    return l10n.priceTierNudgeLine(count, label, price, line.variantName);
+  }
+  return l10n.priceTierNudge(count, label);
+}
+
 /// Why a listed coupon can't be applied.
 String couponIneligibleText(AppLocalizations l10n, CouponOffer offer) =>
     switch (offer.ineligibility) {

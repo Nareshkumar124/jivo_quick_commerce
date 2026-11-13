@@ -15,6 +15,12 @@ abstract class _$CartLineCWProxy {
 
   CartLine quantity(int quantity);
 
+  CartLine pricePerUnit(String pricePerUnit);
+
+  CartLine priceTier(PriceTier? priceTier);
+
+  CartLine nextTierPrice(String? nextTierPrice);
+
   CartLine lineMrpTotal(String lineMrpTotal);
 
   CartLine lineTotal(String lineTotal);
@@ -32,6 +38,9 @@ abstract class _$CartLineCWProxy {
     CartProduct product,
     VariantSummary variant,
     int quantity,
+    String pricePerUnit,
+    PriceTier? priceTier,
+    String? nextTierPrice,
     String lineMrpTotal,
     String lineTotal,
     CartLineIssue? issue,
@@ -57,6 +66,17 @@ class _$CartLineCWProxyImpl implements _$CartLineCWProxy {
   CartLine quantity(int quantity) => this(quantity: quantity);
 
   @override
+  CartLine pricePerUnit(String pricePerUnit) =>
+      this(pricePerUnit: pricePerUnit);
+
+  @override
+  CartLine priceTier(PriceTier? priceTier) => this(priceTier: priceTier);
+
+  @override
+  CartLine nextTierPrice(String? nextTierPrice) =>
+      this(nextTierPrice: nextTierPrice);
+
+  @override
   CartLine lineMrpTotal(String lineMrpTotal) =>
       this(lineMrpTotal: lineMrpTotal);
 
@@ -78,6 +98,9 @@ class _$CartLineCWProxyImpl implements _$CartLineCWProxy {
     Object? product = const $CopyWithPlaceholder(),
     Object? variant = const $CopyWithPlaceholder(),
     Object? quantity = const $CopyWithPlaceholder(),
+    Object? pricePerUnit = const $CopyWithPlaceholder(),
+    Object? priceTier = const $CopyWithPlaceholder(),
+    Object? nextTierPrice = const $CopyWithPlaceholder(),
     Object? lineMrpTotal = const $CopyWithPlaceholder(),
     Object? lineTotal = const $CopyWithPlaceholder(),
     Object? issue = const $CopyWithPlaceholder(),
@@ -99,6 +122,18 @@ class _$CartLineCWProxyImpl implements _$CartLineCWProxy {
           ? _value.quantity
           // ignore: cast_nullable_to_non_nullable
           : quantity as int,
+      pricePerUnit: pricePerUnit == const $CopyWithPlaceholder()
+          ? _value.pricePerUnit
+          // ignore: cast_nullable_to_non_nullable
+          : pricePerUnit as String,
+      priceTier: priceTier == const $CopyWithPlaceholder()
+          ? _value.priceTier
+          // ignore: cast_nullable_to_non_nullable
+          : priceTier as PriceTier?,
+      nextTierPrice: nextTierPrice == const $CopyWithPlaceholder()
+          ? _value.nextTierPrice
+          // ignore: cast_nullable_to_non_nullable
+          : nextTierPrice as String?,
       lineMrpTotal: lineMrpTotal == const $CopyWithPlaceholder()
           ? _value.lineMrpTotal
           // ignore: cast_nullable_to_non_nullable
@@ -136,6 +171,9 @@ CartLine _$CartLineFromJson(Map<String, dynamic> json) => $checkedCreate(
         'product',
         'variant',
         'quantity',
+        'price_per_unit',
+        'price_tier',
+        'next_tier_price',
         'line_mrp_total',
         'line_total',
         'issue',
@@ -152,6 +190,12 @@ CartLine _$CartLineFromJson(Map<String, dynamic> json) => $checkedCreate(
         (v) => VariantSummary.fromJson(v as Map<String, dynamic>),
       ),
       quantity: $checkedConvert('quantity', (v) => (v as num).toInt()),
+      pricePerUnit: $checkedConvert('price_per_unit', (v) => v as String),
+      priceTier: $checkedConvert(
+        'price_tier',
+        (v) => v == null ? null : PriceTier.fromJson(v as Map<String, dynamic>),
+      ),
+      nextTierPrice: $checkedConvert('next_tier_price', (v) => v as String?),
       lineMrpTotal: $checkedConvert('line_mrp_total', (v) => v as String),
       lineTotal: $checkedConvert('line_total', (v) => v as String),
       issue: $checkedConvert(
@@ -164,6 +208,9 @@ CartLine _$CartLineFromJson(Map<String, dynamic> json) => $checkedCreate(
     return val;
   },
   fieldKeyMap: const {
+    'pricePerUnit': 'price_per_unit',
+    'priceTier': 'price_tier',
+    'nextTierPrice': 'next_tier_price',
     'lineMrpTotal': 'line_mrp_total',
     'lineTotal': 'line_total',
   },
@@ -174,6 +221,9 @@ Map<String, dynamic> _$CartLineToJson(CartLine instance) => <String, dynamic>{
   'product': instance.product.toJson(),
   'variant': instance.variant.toJson(),
   'quantity': instance.quantity,
+  'price_per_unit': instance.pricePerUnit,
+  'price_tier': instance.priceTier?.toJson(),
+  'next_tier_price': instance.nextTierPrice,
   'line_mrp_total': instance.lineMrpTotal,
   'line_total': instance.lineTotal,
   'issue': instance.issue?.toJson(),
