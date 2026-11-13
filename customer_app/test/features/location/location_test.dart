@@ -212,6 +212,8 @@ void main() {
     await app.pump(tester);
     await tester.tap(find.byKey(const ValueKey('add-1001')).first);
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('qty-update'))); // prefilled 1
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('cart-bar')), findsOneWidget);
 
     app.serviceability.storeId = 2;

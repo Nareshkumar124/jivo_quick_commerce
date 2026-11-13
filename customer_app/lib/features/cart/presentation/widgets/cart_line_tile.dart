@@ -13,9 +13,9 @@ import '../cart_texts.dart';
 import '../quantity_dialog.dart';
 
 /// One cart line (`03 §2.8`): image, name, pack size, the server's price
-/// and MRP, the minimum per order when above 1, a stepper capped at
-/// `orderable_quantity` (minus at the minimum removes the line), the line
-/// total and a remove button. A stock or minimum problem shows a flag and
+/// and MRP, the minimum per order when above 1, the quantity box (tap to
+/// type a quantity, capped at `orderable_quantity`; 0 removes the line), the
+/// line total and a remove button. A stock or minimum problem shows a flag and
 /// its fix action.
 class CartLineTile extends ConsumerWidget {
   const CartLineTile({required this.line, super.key});
@@ -112,24 +112,11 @@ class CartLineTile extends ConsumerWidget {
                   width: 112,
                   child: DelayedPending(
                     pending: pending,
-                    builder: (context, slow) => QuantityStepper(
+                    builder: (context, slow) => QuantityBox(
                       id: 'line-$id',
                       quantity: line.quantity,
-                      productName: line.productName,
                       busy: slow,
-                      onDecrement: pending
-                          ? null
-                          : () => run(
-                              () =>
-                                  cart.setLineQuantity(line, line.quantity - 1),
-                            ),
-                      onIncrement: pending
-                          ? null
-                          : () => run(
-                              () =>
-                                  cart.setLineQuantity(line, line.quantity + 1),
-                            ),
-                      onQuantityTap: pending
+                      onTap: pending
                           ? null
                           : () async {
                               final typed = await showQuantityDialog(

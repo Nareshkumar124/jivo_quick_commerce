@@ -60,6 +60,8 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('add-1001')).first);
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('qty-update'))); // prefilled 1
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('cart-bar')), findsOneWidget);
     // The item total is the (fake) server's, not a sum in the app.
     final total = (await app.cart.load()).itemTotal!;
@@ -193,6 +195,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('You save ₹101'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('add-102')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('qty-update'))); // prefilled 1
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('qty-102')), findsOneWidget);
     expect(find.textContaining('1 item · ₹'), findsOneWidget);

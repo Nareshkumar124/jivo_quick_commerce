@@ -832,6 +832,12 @@ abstract class AppLocalizations {
   /// **'ADD'**
   String get addToCart;
 
+  /// Screen-reader label of the quantity box that replaced the minus/plus stepper; tapping it opens the Enter quantity dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity {count}, tap to change'**
+  String quantityBoxLabel(int count);
+
   /// Screen reader: a cart change is still running (CA-17 spinner).
   ///
   /// In en, this message translates to:
@@ -843,30 +849,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add {name} to cart'**
   String addToCartSemantics(String name);
-
-  /// Screen-reader label of the stepper's minus button.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove one {name}'**
-  String stepperDecrease(String name);
-
-  /// Screen-reader label of the stepper's plus button.
-  ///
-  /// In en, this message translates to:
-  /// **'Add one more {name}'**
-  String stepperIncrease(String name);
-
-  /// Screen-reader label of the quantity between minus and plus.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} in cart'**
-  String stepperQuantity(int count);
-
-  /// Screen-reader label of the stepper's number when tapping it opens the type-a-quantity dialog (bulk orders).
-  ///
-  /// In en, this message translates to:
-  /// **'Quantity {count}, tap to type a quantity'**
-  String stepperQuantityTap(int count);
 
   /// Title of the dialog that lets the customer type a quantity instead of tapping + many times.
   ///

@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
 
-/// Lets the customer type a quantity instead of tapping + many times (bulk
-/// orders, e.g. 100 cartons of water). Opened by tapping the stepper's
-/// number.
+/// How the customer sets a quantity: ADD and the quantity box open it (there
+/// is no − or +; bulk orders, e.g. 100 cartons of water, are typed).
 ///
-/// Digits only, prefilled with [current]. Allowed: 0 (removes the line) to
-/// [max] (the stepper's cap, `orderable_quantity`), never 1 to [min] - 1.
+/// Digits only, prefilled with [initial] (default [current]; ADD passes the
+/// variant's minimum). Allowed: 0 (removes the line) to
+/// [max] (the item's cap, `orderable_quantity`), never 1 to [min] - 1.
 /// Anything else is refused inline and nothing is sent. Returns the new
 /// quantity, or null when cancelled or unchanged. The caller sends it in
 /// one request; the server still checks it.
@@ -17,20 +17,27 @@ Future<int?> showQuantityDialog(
   required int current,
   required int max,
   required int min,
+  int? initial,
 }) => showDialog<int>(
   context: context,
-  builder: (context) =>
-      _QuantityDialog(current: current, max: max, min: min < 1 ? 1 : min),
+  builder: (context) => _QuantityDialog(
+    current: current,
+    initial: initial ?? current,
+    max: max,
+    min: min < 1 ? 1 : min,
+  ),
 );
 
 class _QuantityDialog extends StatefulWidget {
   const _QuantityDialog({
     required this.current,
+    required this.initial,
     required this.max,
     required this.min,
   });
 
   final int current;
+  final int initial;
   final int max;
   final int min;
 
@@ -39,10 +46,10 @@ class _QuantityDialog extends StatefulWidget {
 }
 
 class _QuantityDialogState extends State<_QuantityDialog> {
-  late final _field = TextEditingController(text: '${widget.current}')
+  late final _field = TextEditingController(text: '${widget.initial}')
     ..selection = TextSelection(
       baseOffset: 0,
-      extentOffset: '${widget.current}'.length,
+      extentOffset: '${widget.initial}'.length,
     );
   String? _error;
 

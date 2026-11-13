@@ -237,6 +237,10 @@ void main() {
             .first,
       );
       await tester.tap(add);
+      // ADD opens "Enter quantity", prefilled with the minimum.
+      final update = find.byKey(const Key('qty-update'));
+      await pumpUntilFound(tester, update);
+      await tester.tap(update);
       await pumpUntilFound(tester, find.byKey(const Key('cart-bar')));
       final cart = container.read(cartProvider).snapshot;
       log(
