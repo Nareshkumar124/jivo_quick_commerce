@@ -35,6 +35,7 @@ import '../features/orders/data/order_repository.dart';
 import '../features/profile/data/profile_repository.dart';
 import '../features/rating/data/api_rating_repository.dart';
 import '../features/rating/data/rating_repository.dart';
+import '../features/referral/data/referral_repository.dart';
 import '../features/support/data/api_support_repository.dart';
 import '../features/support/data/support_repository.dart';
 import '../features/support/data/ticket_photo_picker.dart';
@@ -68,6 +69,14 @@ final profileRepositoryProvider = Provider<ProfileRepository>(
   (ref) => _fake(ref)
       ? FakeProfileRepository()
       : ApiProfileRepository(ref.watch(jivoApiProvider)),
+);
+
+/// Refer a friend (`/account/referral/*`): the API, the fake with
+/// `FAKE_API`.
+final referralRepositoryProvider = Provider<ReferralRepository>(
+  (ref) => _fake(ref)
+      ? FakeReferralRepository()
+      : ApiReferralRepository(ref.watch(jivoApiProvider)),
 );
 
 final addressRepositoryProvider = Provider<AddressRepository>(

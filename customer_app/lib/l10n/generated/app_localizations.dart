@@ -508,6 +508,210 @@ abstract class AppLocalizations {
   /// **'Profile updated.'**
   String get profileSaved;
 
+  /// Account row that opens the referral screen. amount = the server's reward_amount, e.g. ₹90.
+  ///
+  /// In en, this message translates to:
+  /// **'Refer & earn {amount}'**
+  String referAndEarn(String amount);
+
+  /// Account row that opens the referral screen while the reward is not known (loading, error, program paused).
+  ///
+  /// In en, this message translates to:
+  /// **'Refer a friend'**
+  String get referAFriend;
+
+  /// Subtitle of the account referral row for a new customer who can still enter a code.
+  ///
+  /// In en, this message translates to:
+  /// **'Got a friend\'s code? Enter it here'**
+  String get referralEntryHaveCode;
+
+  /// Referral screen title.
+  ///
+  /// In en, this message translates to:
+  /// **'Refer & earn'**
+  String get referralTitle;
+
+  /// Referral screen headline. amount = reward_amount, e.g. ₹90.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite a friend, you both get {amount} off'**
+  String referralHeadline(String amount);
+
+  /// Label above the customer's own code.
+  ///
+  /// In en, this message translates to:
+  /// **'Your referral code'**
+  String get referralYourCode;
+
+  /// Screen-reader label of the customer's code.
+  ///
+  /// In en, this message translates to:
+  /// **'Your referral code: {code}'**
+  String referralCodeSemantics(String code);
+
+  /// Copies the referral code.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get referralCopy;
+
+  /// Screen-reader label of the Copy button.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy your referral code'**
+  String get referralCopyCodeSemantics;
+
+  /// Snackbar after copying the code.
+  ///
+  /// In en, this message translates to:
+  /// **'Code {code} copied'**
+  String referralCodeCopied(String code);
+
+  /// Copies the server's share message to the clipboard (no share sheet in v1).
+  ///
+  /// In en, this message translates to:
+  /// **'Share invite'**
+  String get referralShare;
+
+  /// Snackbar after Share invite copied the share message.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite message copied. Paste it in WhatsApp or SMS to send it.'**
+  String get referralShareCopied;
+
+  /// Heading of the referral rules.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get referralHowItWorks;
+
+  /// Referral rule 1.
+  ///
+  /// In en, this message translates to:
+  /// **'Share your code with a friend who is new to Jivo.'**
+  String get referralStep1;
+
+  /// Referral rule 2.
+  ///
+  /// In en, this message translates to:
+  /// **'They enter it before their first order.'**
+  String get referralStep2;
+
+  /// Referral rule 3. amount = reward_amount, days = reward_validity_days.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{When their first order is delivered, you both get {amount} off. Use it within 1 day.} other{When their first order is delivered, you both get {amount} off. Use it within {days} days.}}'**
+  String referralStep3(String amount, int days);
+
+  /// Added to rule 3 when reward_min_order_value is not zero.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid on orders of {amount} or more.'**
+  String referralMinOrder(String amount);
+
+  /// Referral stat: friends who entered the customer's code.
+  ///
+  /// In en, this message translates to:
+  /// **'Friends joined'**
+  String get referralFriendsJoined;
+
+  /// Referral stat: friends whose first order was delivered (a reward each).
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards earned'**
+  String get referralRewardsEarned;
+
+  /// Under the stats when no friend has joined.
+  ///
+  /// In en, this message translates to:
+  /// **'No friends have joined yet. Share your code to get started.'**
+  String get referralNoFriendsYet;
+
+  /// Shown instead of the code and Share when the program is off (is_enabled false).
+  ///
+  /// In en, this message translates to:
+  /// **'Refer & earn is paused right now. Please check back later.'**
+  String get referralPaused;
+
+  /// Heading of the box where a new customer enters a friend's code; also the checkout card title.
+  ///
+  /// In en, this message translates to:
+  /// **'Have a referral code?'**
+  String get referralHaveCode;
+
+  /// Under 'Have a referral code?' on the referral screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a friend\'s code before your first order.'**
+  String get referralHaveCodeHint;
+
+  /// Label of the friend's code field.
+  ///
+  /// In en, this message translates to:
+  /// **'Friend\'s code'**
+  String get referralCodeLabel;
+
+  /// Sends the friend's referral code.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get referralApply;
+
+  /// Apply was tapped with an empty code field.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your friend\'s code'**
+  String get referralCodeRequired;
+
+  /// Snackbar after the friend's code was accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Code applied. You and your friend will each get {amount} off after your first delivery.'**
+  String referralApplied(String amount);
+
+  /// The friend's code the customer entered (masked by the server, e.g. AB**7P).
+  ///
+  /// In en, this message translates to:
+  /// **'You joined with code {code}'**
+  String referralJoinedWith(String code);
+
+  /// Referral status PENDING.
+  ///
+  /// In en, this message translates to:
+  /// **'You and your friend will each get {amount} off after your first delivery.'**
+  String referralStatusPending(String amount);
+
+  /// Referral status REWARDED.
+  ///
+  /// In en, this message translates to:
+  /// **'Your {amount} reward is in your coupons. Pick it under Apply coupon in your cart.'**
+  String referralStatusRewarded(String amount);
+
+  /// Referral status VOID.
+  ///
+  /// In en, this message translates to:
+  /// **'No reward for this code: Refer & earn was paused when your first order was delivered.'**
+  String get referralStatusNoReward;
+
+  /// Checkout card for a customer who can still enter a friend's code.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter it before you place this order. You and your friend each get {amount} off after it\'s delivered.'**
+  String referralPromptBody(String amount);
+
+  /// Checkout card button that opens the referral screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter code'**
+  String get referralPromptAction;
+
+  /// Tooltip of the button that hides the checkout referral card.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get referralPromptDismiss;
+
   /// Empty state of the address list.
   ///
   /// In en, this message translates to:

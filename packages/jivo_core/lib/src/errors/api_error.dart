@@ -59,6 +59,22 @@ enum ApiErrorCode {
   /// the saved store and check serviceability again.
   storeNotFound('STORE_NOT_FOUND'),
 
+  /// `POST /account/referral/apply/` (422): unknown code, or its owner's
+  /// account is blocked or deleted.
+  referralCodeInvalid('REFERRAL_CODE_INVALID'),
+
+  /// `POST /account/referral/apply/` (422): the caller's own code.
+  referralSelf('REFERRAL_SELF'),
+
+  /// `POST /account/referral/apply/` (422): a code was entered before; it
+  /// cannot be changed.
+  referralAlreadyApplied('REFERRAL_ALREADY_APPLIED'),
+
+  /// `POST /account/referral/apply/` (422): [ApiError.reason] is
+  /// `HAS_ORDERS` (an order was already placed) or `PROGRAM_OFF` (the
+  /// program is paused).
+  referralNotEligible('REFERRAL_NOT_ELIGIBLE'),
+
   /// No connection, DNS failure, refused connection or TLS failure.
   network(null),
 
@@ -233,6 +249,13 @@ class ApiError implements Exception {
   /// `details.units_to_min_order` (sent with `MIN_UNITS_NOT_MET`), if
   /// present.
   int? get unitsToMinOrder => _intDetail('units_to_min_order');
+
+  /// `details.reason` (e.g. `PROGRAM_OFF` with `REFERRAL_NOT_ELIGIBLE`,
+  /// `WRONG_APP_TOKEN` with `PERMISSION_DENIED`), if present.
+  String? get reason {
+    final value = details['reason'];
+    return value is String ? value : null;
+  }
 
   int? _intDetail(String key) {
     final value = details[key];

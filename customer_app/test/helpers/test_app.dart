@@ -23,6 +23,7 @@ import 'package:customer_app/features/location/data/serviceability_repository.da
 import 'package:customer_app/features/location/domain/delivery_location.dart';
 import 'package:customer_app/features/notifications/data/notification_repository.dart';
 import 'package:customer_app/features/profile/data/profile_repository.dart';
+import 'package:customer_app/features/referral/data/referral_repository.dart';
 import 'package:customer_app/features/tracking/data/order_socket.dart';
 import 'package:customer_app/features/tracking/presentation/order_live.dart';
 import 'package:customer_app/shared/connectivity/connectivity.dart';
@@ -77,6 +78,9 @@ class TestApp {
   final config = FakeConfigRepository();
   final auth = FakeAuthRepository();
   final profile = FakeProfileRepository();
+
+  /// Refer a friend: a new customer who can still enter a code.
+  final referral = FakeReferralRepository();
   final addresses = FakeAddressRepository();
   final location = FakeDeviceLocation();
   final catalog = FakeCatalogRepository(latency: Duration.zero);
@@ -141,6 +145,7 @@ class TestApp {
           configRepositoryProvider.overrideWithValue(config),
           authRepositoryProvider.overrideWithValue(auth),
           profileRepositoryProvider.overrideWithValue(profile),
+          referralRepositoryProvider.overrideWithValue(referral),
           addressRepositoryProvider.overrideWithValue(addresses),
           deviceLocationProvider.overrideWithValue(location),
           otpAutofillProvider.overrideWithValue(autofill),

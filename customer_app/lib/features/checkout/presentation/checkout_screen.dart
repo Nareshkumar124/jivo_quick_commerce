@@ -13,6 +13,7 @@ import '../../cart/presentation/widgets/bill_details.dart';
 import '../../cart/presentation/widgets/delivery_address_card.dart';
 import '../../location/presentation/delivery_controller.dart';
 import '../../orders/domain/order.dart';
+import '../../referral/presentation/referral_prompt_card.dart';
 import '../domain/checkout_result.dart';
 import 'checkout_controller.dart';
 import 'payment_failed_screen.dart';
@@ -181,6 +182,7 @@ class CheckoutScreen extends ConsumerWidget {
                 child: BillDetails(bill: bill, coupon: snapshot.coupon),
               ),
             ),
+            if (!checkout.busy) const ReferralPromptCard(),
           ],
         ),
         bottomNavigationBar: Material(

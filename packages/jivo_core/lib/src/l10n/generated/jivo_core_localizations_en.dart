@@ -155,6 +155,26 @@ class JivoCoreLocalizationsEn extends JivoCoreLocalizations {
       'This store isn\'t available any more. Please choose your location again.';
 
   @override
+  String get errorReferralCodeInvalid =>
+      'This referral code isn\'t valid. Check it and try again.';
+
+  @override
+  String get errorReferralSelf =>
+      'That\'s your own code. Enter a friend\'s code instead.';
+
+  @override
+  String get errorReferralAlreadyApplied =>
+      'You\'ve already used a referral code. It can\'t be changed.';
+
+  @override
+  String get errorReferralNotEligible =>
+      'Referral codes are only for new customers, before their first order.';
+
+  @override
+  String get errorReferralProgramPaused =>
+      'Refer & earn is paused right now. Please try again later.';
+
+  @override
   String errorOtpInvalidAttempts(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

@@ -13,6 +13,16 @@ class AppFlags {
   bool get onboardingSeen => _prefs.getBool(onboardingSeenKey) ?? false;
 
   Future<void> markOnboardingSeen() => _prefs.setBool(onboardingSeenKey, true);
+
+  /// The "Have a referral code?" card at checkout was closed by [userId].
+  static String referralPromptDismissedKey(int userId) =>
+      'referral_prompt_dismissed_$userId';
+
+  bool referralPromptDismissed(int userId) =>
+      _prefs.getBool(referralPromptDismissedKey(userId)) ?? false;
+
+  Future<void> dismissReferralPrompt(int userId) =>
+      _prefs.setBool(referralPromptDismissedKey(userId), true);
 }
 
 /// Signs out a session left over from a previous install.

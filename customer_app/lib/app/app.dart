@@ -36,6 +36,10 @@ final signOutCleanupProvider = Provider<void>((ref) {
     ref.invalidate(checkoutProvider);
     ref.invalidate(pendingPaymentProvider);
     ref.invalidate(activeOrdersProvider);
+    // The referral screen and the checkout card's "closed" flag follow
+    // signedInUserIdProvider: clearUser() below drops them without a
+    // request (invalidating here would refetch with no token), and the next
+    // user gets their own.
     // Local data that belongs to the user (`03 §2.2`): the delivery
     // location (a saved address's id and street; the next user's cart would
     // be refused for it), "Previously bought" in the cached home feed, and

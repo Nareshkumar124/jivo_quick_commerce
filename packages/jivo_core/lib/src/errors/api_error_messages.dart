@@ -44,6 +44,10 @@ String apiErrorMessage(JivoCoreLocalizations l10n, ApiError error) =>
       ApiErrorCode.rateLimited => l10n.errorRateLimited,
       ApiErrorCode.serviceUnavailable => l10n.errorServiceUnavailable,
       ApiErrorCode.storeNotFound => l10n.errorStoreNotFound,
+      ApiErrorCode.referralCodeInvalid => l10n.errorReferralCodeInvalid,
+      ApiErrorCode.referralSelf => l10n.errorReferralSelf,
+      ApiErrorCode.referralAlreadyApplied => l10n.errorReferralAlreadyApplied,
+      ApiErrorCode.referralNotEligible => l10n.errorReferralNotEligible,
       // Protocol errors are app bugs the user can't act on.
       ApiErrorCode.methodNotAllowed ||
       ApiErrorCode.notAcceptable ||
@@ -57,13 +61,16 @@ String apiErrorMessage(JivoCoreLocalizations l10n, ApiError error) =>
 
 /// Like [apiErrorMessage], but uses the error `details` where they help:
 /// the attempts left for `OTP_INVALID`, the wait for `OTP_RATE_LIMITED` /
-/// `RATE_LIMITED` and the minimum for `MIN_QTY_REQUIRED`. Falls back to
-/// [apiErrorMessage] otherwise.
+/// `RATE_LIMITED`, the minimum for `MIN_QTY_REQUIRED` and the paused
+/// program for `REFERRAL_NOT_ELIGIBLE` (`reason` `PROGRAM_OFF`). Falls back
+/// to [apiErrorMessage] otherwise.
 String apiErrorMessageWithDetails(JivoCoreLocalizations l10n, ApiError error) {
   final attempts = error.attemptsRemaining;
   final retryAfter = error.retryAfterSeconds;
   final minQty = error.minQtyPerOrder;
   return switch (error.code) {
+    ApiErrorCode.referralNotEligible when error.reason == 'PROGRAM_OFF' =>
+      l10n.errorReferralProgramPaused,
     ApiErrorCode.otpInvalid when attempts != null =>
       l10n.errorOtpInvalidAttempts(attempts),
     ApiErrorCode.otpRateLimited || ApiErrorCode.rateLimited
