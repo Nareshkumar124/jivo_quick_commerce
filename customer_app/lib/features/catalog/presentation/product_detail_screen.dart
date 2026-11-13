@@ -14,6 +14,7 @@ import '../../cart/presentation/cart_bar.dart';
 import '../domain/catalog_models.dart';
 import 'catalog_controllers.dart';
 import 'widgets/price_tags.dart';
+import 'widgets/price_tiers_table.dart';
 import 'widgets/product_tile.dart';
 
 /// Product detail (`03 §2.6`): gallery with zoom, variant chips with price
@@ -237,6 +238,15 @@ class _ProductBodyState extends State<_ProductBody> {
                 variant: variant,
                 productName: product.name,
               ),
+              // Volume (slab) prices of the selected size, as the server
+              // sends them.
+              if (variant.hasPriceTiers) ...[
+                const SizedBox(height: JivoSpacing.lg),
+                PriceTiersTable(
+                  key: ValueKey('price-tiers-${variant.id}'),
+                  tiers: variant.priceTiers,
+                ),
+              ],
               if (product.highlights.isNotEmpty) ...[
                 heading(l10n.highlights),
                 for (final line in product.highlights)

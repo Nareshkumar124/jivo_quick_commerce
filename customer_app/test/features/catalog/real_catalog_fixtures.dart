@@ -43,6 +43,7 @@ Map<String, Object?> realVariant(
   'units_left': unitsLeft,
   'max_qty_per_order': 5,
   'min_qty_per_order': minQty,
+  'price_tiers': <Object>[],
   'image': image,
 };
 

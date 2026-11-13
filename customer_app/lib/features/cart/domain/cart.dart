@@ -187,6 +187,9 @@ class CartLine {
     this.productId,
     this.productSlug,
     this.issue,
+    this.pricePerUnit,
+    this.priceTier,
+    this.nextTierPrice,
   });
 
   /// The server's line id.
@@ -199,9 +202,28 @@ class CartLine {
   final CatalogVariant variant;
   final int quantity;
 
-  /// The server's `mrp × quantity` and `selling_price × quantity`.
+  /// The server's `mrp × quantity` and `price_per_unit × quantity`.
   final String lineMrpTotal;
   final String lineTotal;
+
+  /// The price each unit is billed at (`price_per_unit`): the volume
+  /// tier's price when [priceTier] is set, else the selling price. Read it
+  /// through [billedPrice].
+  final String? pricePerUnit;
+
+  /// The volume tier the cart reached for this line (`price_tier`); null
+  /// when the normal price applies.
+  final PriceTier? priceTier;
+
+  /// This line's lower unit price once the cart reaches
+  /// `thresholds.next_price_tier` (`next_tier_price`); null when that tier
+  /// doesn't lower it.
+  final String? nextTierPrice;
+
+  /// The server's billed unit price. The API always sends
+  /// `price_per_unit`; only a line built without it (older fixtures) falls
+  /// back to the variant's selling price, which the server bills then.
+  String get billedPrice => pricePerUnit ?? variant.sellingPrice;
 
   /// Null when the line is fine.
   final CartLineIssue? issue;
@@ -268,6 +290,8 @@ class CartThresholds {
     this.minOrderUnits = 0,
     this.unitsToMinOrder,
     this.orderUnitLabel = '',
+    this.tierUnits = 0,
+    this.nextPriceTier,
   });
 
   final String minOrderValue;
@@ -291,6 +315,31 @@ class CartThresholds {
   /// What a unit is called (`order_unit_label`, e.g. "cartons"); empty when
   /// the server sends none.
   final String orderUnitLabel;
+
+  /// Units that choose the volume price tier (`tier_units`): every line
+  /// with price tiers, any mix; 0 when no line has tiers.
+  final int tierUnits;
+
+  /// The next tier at which a line's price drops (`next_price_tier`), for
+  /// "Add 3 more boxes to get ₹87/box"; null at the top tier or when no
+  /// line has tiers.
+  final NextPriceTier? nextPriceTier;
+}
+
+/// The next volume tier (`NextPriceTier`): each line's new price there is
+/// its [CartLine.nextTierPrice].
+@immutable
+class NextPriceTier {
+  const NextPriceTier({
+    required this.minOrderUnits,
+    required this.unitsToNextTier,
+  });
+
+  /// The tier units the lower prices start at.
+  final int minOrderUnits;
+
+  /// Units still to add (any tiered item) to reach it.
+  final int unitsToNextTier;
 }
 
 /// `PaymentUnavailableReasonEnum`.

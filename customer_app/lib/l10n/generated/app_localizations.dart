@@ -985,7 +985,7 @@ abstract class AppLocalizations {
   /// Home search bar placeholder.
   ///
   /// In en, this message translates to:
-  /// **'Search for oils, ghee and more'**
+  /// **'Search products'**
   String get searchHint;
 
   /// Home section title: category grid.
@@ -1408,6 +1408,60 @@ abstract class AppLocalizations {
   /// **'{amount}/{per}'**
   String unitPrice(String amount, String per);
 
+  /// Product page and variant picker: heading of the volume (slab) price table from the server's price_tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Wholesale rates (per box)'**
+  String get wholesaleRatesTitle;
+
+  /// Rate table row: a range of boxes in the whole order, e.g. 5–24 boxes. to = the next tier's minimum - 1.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}–{to} boxes'**
+  String priceTierRange(int from, int to);
+
+  /// Rate table row when a tier covers a single count of boxes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 box} other{{count} boxes}}'**
+  String priceTierExactly(int count);
+
+  /// Rate table's last row: this many boxes or more, e.g. 250+ boxes.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}+ boxes'**
+  String priceTierFrom(int from);
+
+  /// Compact rate chip in the variant picker, e.g. 5–24.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}–{to}'**
+  String priceTierRangeShort(int from, int to);
+
+  /// Compact rate chip in the variant picker: the top tier, e.g. 250+.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}+'**
+  String priceTierFromShort(int from);
+
+  /// Compact rate chip in the variant picker, e.g. 5–24: ₹90.
+  ///
+  /// In en, this message translates to:
+  /// **'{range}: {price}'**
+  String priceTierChip(String range, String price);
+
+  /// Screen-reader label of one rate table row, e.g. 5–24 boxes: ₹90 per box.
+  ///
+  /// In en, this message translates to:
+  /// **'{range}: {price} per box'**
+  String priceTierRowSemantics(String range, String price);
+
+  /// Under the rate table: the tier is chosen by all tiered items in the order together.
+  ///
+  /// In en, this message translates to:
+  /// **'Price depends on total boxes in your order (all sizes)'**
+  String get priceTierNote;
+
   /// Home header when the store is closed (no ETA).
   ///
   /// In en, this message translates to:
@@ -1803,6 +1857,35 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'items'**
   String get orderUnitsDefault;
+
+  /// Cart line of an item with volume prices: the server's price_per_unit, e.g. ₹87/box.
+  ///
+  /// In en, this message translates to:
+  /// **'{price}/box'**
+  String pricePerBox(String price);
+
+  /// Small tag on a cart line billed at a volume tier (price_tier is set).
+  ///
+  /// In en, this message translates to:
+  /// **'Wholesale rate'**
+  String get wholesaleRateTag;
+
+  /// Cart nudge when one line gets cheaper at the next volume tier. count = next_price_tier.units_to_next_tier, label = order_unit_label (e.g. boxes), price = that line's next_tier_price, variant = its pack size (e.g. 1 L).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more to get {price}/box on {variant}} other{Add {count} more {label} to get {price}/box on {variant}}}'**
+  String priceTierNudgeLine(
+    int count,
+    String label,
+    String price,
+    String variant,
+  );
+
+  /// Cart nudge when several lines get cheaper at the next volume tier. count = next_price_tier.units_to_next_tier, label = order_unit_label.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more for lower prices} other{Add {count} more {label} for lower prices}}'**
+  String priceTierNudge(int count, String label);
 
   /// Checkout disabled while the store is closed.
   ///

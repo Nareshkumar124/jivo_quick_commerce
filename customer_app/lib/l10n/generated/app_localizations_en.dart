@@ -521,7 +521,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changeLocationSemantics => 'Change delivery location';
 
   @override
-  String get searchHint => 'Search for oils, ghee and more';
+  String get searchHint => 'Search products';
 
   @override
   String get shopByCategory => 'Shop by category';
@@ -756,6 +756,54 @@ class AppLocalizationsEn extends AppLocalizations {
   String unitPrice(String amount, String per) {
     return '$amount/$per';
   }
+
+  @override
+  String get wholesaleRatesTitle => 'Wholesale rates (per box)';
+
+  @override
+  String priceTierRange(int from, int to) {
+    return '$from–$to boxes';
+  }
+
+  @override
+  String priceTierExactly(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count boxes',
+      one: '1 box',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String priceTierFrom(int from) {
+    return '$from+ boxes';
+  }
+
+  @override
+  String priceTierRangeShort(int from, int to) {
+    return '$from–$to';
+  }
+
+  @override
+  String priceTierFromShort(int from) {
+    return '$from+';
+  }
+
+  @override
+  String priceTierChip(String range, String price) {
+    return '$range: $price';
+  }
+
+  @override
+  String priceTierRowSemantics(String range, String price) {
+    return '$range: $price per box';
+  }
+
+  @override
+  String get priceTierNote =>
+      'Price depends on total boxes in your order (all sizes)';
 
   @override
   String get storeClosedHeadline => 'Store closed';
@@ -1010,6 +1058,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get orderUnitsDefault => 'items';
+
+  @override
+  String pricePerBox(String price) {
+    return '$price/box';
+  }
+
+  @override
+  String get wholesaleRateTag => 'Wholesale rate';
+
+  @override
+  String priceTierNudgeLine(
+    int count,
+    String label,
+    String price,
+    String variant,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count more $label to get $price/box on $variant',
+      one: 'Add 1 more to get $price/box on $variant',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String priceTierNudge(int count, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count more $label for lower prices',
+      one: 'Add 1 more for lower prices',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get cartStoreClosed =>

@@ -239,6 +239,7 @@ CatalogVariant variantFromApi(api.VariantSummary v) => CatalogVariant(
   minQtyPerOrder: v.minQtyPerOrder,
   unitPrice: _unitPrice(v.unitPrice),
   imageUrl: v.image?.medium,
+  priceTiers: _tiers(v.priceTiers),
 );
 
 CatalogVariant _variantDetail(api.VariantDetail v) => CatalogVariant(
@@ -257,7 +258,14 @@ CatalogVariant _variantDetail(api.VariantDetail v) => CatalogVariant(
   imageUrl: v.image?.medium,
   images: [for (final i in v.images) i.large],
   netQuantity: v.netQuantity,
+  priceTiers: _tiers(v.priceTiers),
 );
+
+/// `price_tiers` as sent (lowest first); the app never computes a price.
+List<PriceTier> _tiers(List<api.PriceTier> tiers) => [
+  for (final t in tiers)
+    PriceTier(minOrderUnits: t.minOrderUnits, price: t.price),
+];
 
 CatalogProduct _card(api.ProductCard p) => CatalogProduct(
   id: p.id,

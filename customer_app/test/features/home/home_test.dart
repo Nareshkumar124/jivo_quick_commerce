@@ -31,7 +31,9 @@ void main() {
 
     expect(find.text('Delivery in 14 mins'), findsOneWidget);
     expect(find.text('Home · Flat 4B, MG Road, New Delhi'), findsOneWidget);
-    expect(find.text('Search for oils, ghee and more'), findsOneWidget);
+    // A neutral hint: the catalog is not only oils and ghee.
+    expect(find.text('Search products'), findsOneWidget);
+    expect(find.textContaining('oils, ghee'), findsNothing);
     expect(find.byKey(const Key('banner-carousel')), findsOneWidget);
     expect(find.text('Up to 20% off on olive oils'), findsOneWidget);
     expect(find.text('Shop by category'), findsOneWidget);

@@ -19,6 +19,10 @@ abstract class _$CartThresholdsCWProxy {
 
   CartThresholds unitsToMinOrder(int? unitsToMinOrder);
 
+  CartThresholds tierUnits(int tierUnits);
+
+  CartThresholds nextPriceTier(NextPriceTier? nextPriceTier);
+
   CartThresholds orderUnitLabel(String orderUnitLabel);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CartThresholds(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -34,6 +38,8 @@ abstract class _$CartThresholdsCWProxy {
     String? amountToFreeDelivery,
     int minOrderUnits,
     int? unitsToMinOrder,
+    int tierUnits,
+    NextPriceTier? nextPriceTier,
     String orderUnitLabel,
   });
 }
@@ -69,6 +75,13 @@ class _$CartThresholdsCWProxyImpl implements _$CartThresholdsCWProxy {
       this(unitsToMinOrder: unitsToMinOrder);
 
   @override
+  CartThresholds tierUnits(int tierUnits) => this(tierUnits: tierUnits);
+
+  @override
+  CartThresholds nextPriceTier(NextPriceTier? nextPriceTier) =>
+      this(nextPriceTier: nextPriceTier);
+
+  @override
   CartThresholds orderUnitLabel(String orderUnitLabel) =>
       this(orderUnitLabel: orderUnitLabel);
 
@@ -86,6 +99,8 @@ class _$CartThresholdsCWProxyImpl implements _$CartThresholdsCWProxy {
     Object? amountToFreeDelivery = const $CopyWithPlaceholder(),
     Object? minOrderUnits = const $CopyWithPlaceholder(),
     Object? unitsToMinOrder = const $CopyWithPlaceholder(),
+    Object? tierUnits = const $CopyWithPlaceholder(),
+    Object? nextPriceTier = const $CopyWithPlaceholder(),
     Object? orderUnitLabel = const $CopyWithPlaceholder(),
   }) {
     return CartThresholds(
@@ -114,6 +129,14 @@ class _$CartThresholdsCWProxyImpl implements _$CartThresholdsCWProxy {
           ? _value.unitsToMinOrder
           // ignore: cast_nullable_to_non_nullable
           : unitsToMinOrder as int?,
+      tierUnits: tierUnits == const $CopyWithPlaceholder()
+          ? _value.tierUnits
+          // ignore: cast_nullable_to_non_nullable
+          : tierUnits as int,
+      nextPriceTier: nextPriceTier == const $CopyWithPlaceholder()
+          ? _value.nextPriceTier
+          // ignore: cast_nullable_to_non_nullable
+          : nextPriceTier as NextPriceTier?,
       orderUnitLabel: orderUnitLabel == const $CopyWithPlaceholder()
           ? _value.orderUnitLabel
           // ignore: cast_nullable_to_non_nullable
@@ -146,6 +169,8 @@ CartThresholds _$CartThresholdsFromJson(Map<String, dynamic> json) =>
             'amount_to_free_delivery',
             'min_order_units',
             'units_to_min_order',
+            'tier_units',
+            'next_price_tier',
             'order_unit_label',
           ],
         );
@@ -171,6 +196,13 @@ CartThresholds _$CartThresholdsFromJson(Map<String, dynamic> json) =>
             'units_to_min_order',
             (v) => (v as num?)?.toInt(),
           ),
+          tierUnits: $checkedConvert('tier_units', (v) => (v as num).toInt()),
+          nextPriceTier: $checkedConvert(
+            'next_price_tier',
+            (v) => v == null
+                ? null
+                : NextPriceTier.fromJson(v as Map<String, dynamic>),
+          ),
           orderUnitLabel: $checkedConvert(
             'order_unit_label',
             (v) => v as String,
@@ -185,6 +217,8 @@ CartThresholds _$CartThresholdsFromJson(Map<String, dynamic> json) =>
         'amountToFreeDelivery': 'amount_to_free_delivery',
         'minOrderUnits': 'min_order_units',
         'unitsToMinOrder': 'units_to_min_order',
+        'tierUnits': 'tier_units',
+        'nextPriceTier': 'next_price_tier',
         'orderUnitLabel': 'order_unit_label',
       },
     );
@@ -197,5 +231,7 @@ Map<String, dynamic> _$CartThresholdsToJson(CartThresholds instance) =>
       'amount_to_free_delivery': instance.amountToFreeDelivery,
       'min_order_units': instance.minOrderUnits,
       'units_to_min_order': instance.unitsToMinOrder,
+      'tier_units': instance.tierUnits,
+      'next_price_tier': instance.nextPriceTier?.toJson(),
       'order_unit_label': instance.orderUnitLabel,
     };

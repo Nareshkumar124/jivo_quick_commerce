@@ -20,6 +20,20 @@ enum StockStatus { inStock, lowStock, outOfStock }
 /// `UnitPrice`: e.g. ₹27.90 per 100 ml (Legal Metrology).
 typedef UnitPrice = ({String amount, String per});
 
+/// A volume (slab) price (`PriceTier`, ADR 0001): from [minOrderUnits]
+/// units in one order, counting every item that has tiers together (any
+/// mix of sizes), each unit costs [price]. The server applies it in the
+/// cart; the app only shows it.
+@immutable
+class PriceTier {
+  const PriceTier({required this.minOrderUnits, required this.price});
+
+  final int minOrderUnits;
+
+  /// The server's decimal string, inclusive of all taxes.
+  final String price;
+}
+
 /// A sellable variant (SKU) with its price and stock at the store
 /// (`VariantSummary`; the detail-page fields are filled from
 /// `VariantDetail`).
@@ -41,6 +55,7 @@ class CatalogVariant {
     this.imageUrl,
     this.images = const [],
     this.netQuantity,
+    this.priceTiers = const [],
   });
 
   final int id;
@@ -78,6 +93,14 @@ class CatalogVariant {
 
   /// Detail page only: net quantity as on the pack.
   final String? netQuantity;
+
+  /// Volume prices (`price_tiers`), lowest [PriceTier.minOrderUnits]
+  /// first; empty when the variant has none (then [sellingPrice] always
+  /// applies). Shown as the wholesale rate table.
+  final List<PriceTier> priceTiers;
+
+  /// The variant has volume prices: show the wholesale rates.
+  bool get hasPriceTiers => priceTiers.isNotEmpty;
 
   bool get inStock =>
       stockStatus != StockStatus.outOfStock && maxSelectable > 0;

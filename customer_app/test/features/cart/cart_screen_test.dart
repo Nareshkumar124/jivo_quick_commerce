@@ -5,6 +5,7 @@ import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/cart/domain/cart.dart';
 import 'package:customer_app/features/cart/presentation/widgets/bill_details.dart';
 import 'package:customer_app/features/cart/presentation/widgets/cart_line_tile.dart';
+import 'package:customer_app/features/catalog/domain/catalog_models.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_screen.dart';
 import 'package:customer_app/features/home/presentation/home_screen.dart';
 import 'package:flutter/material.dart';
@@ -290,6 +291,205 @@ void main() {
     testWidgets('rule off: no warning', (tester) async {
       await openCart(tester, await appWithOil(quantity: 1));
       expect(find.byKey(const Key('min-units-warning')), findsNothing);
+    });
+  });
+
+  group('wholesale (volume) prices', () {
+    const tiers = [
+      PriceTier(minOrderUnits: 5, price: '90.00'),
+      PriceTier(minOrderUnits: 25, price: '87.00'),
+      PriceTier(minOrderUnits: 50, price: '85.00'),
+    ];
+
+    /// A water line as the server sends it. Its total deliberately does
+    /// not equal rate × quantity: the screen must show the server's.
+    CartLine water({
+      int id = 1,
+      int variantId = 1501,
+      String variantName = '1 L',
+      int quantity = 30,
+      String rate = '87.00',
+      PriceTier? tier = const PriceTier(minOrderUnits: 25, price: '87.00'),
+      String? next,
+    }) => cartLine(
+      id: id,
+      variantId: variantId,
+      name: 'Jivo Water',
+      variantName: variantName,
+      price: '90.00',
+      mrp: '90.00',
+      quantity: quantity,
+      lineTotal: '2611.00',
+      lineMrpTotal: '2700.00',
+      orderable: 300,
+      priceTiers: tiers,
+      pricePerUnit: rate,
+      priceTier: tier,
+      nextTierPrice: next,
+    );
+
+    Future<void> openWith(
+      WidgetTester tester,
+      List<CartLine> lines, {
+      NextPriceTier? next,
+      int? unitsToMinOrder,
+    }) => openCart(
+      tester,
+      TestApp(
+        tokens: signedInTokens,
+        cartRepository: StubCartRepository(
+          cartSnapshot(
+            lines: lines,
+            thresholds: CartThresholds(
+              minOrderValue: '0.00',
+              minOrderUnits: 5,
+              unitsToMinOrder: unitsToMinOrder,
+              orderUnitLabel: 'boxes',
+              tierUnits: 22,
+              nextPriceTier: next,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    String? nudge(WidgetTester tester) {
+      final finder = find.descendant(
+        of: find.byKey(const Key('price-tier-nudge')),
+        matching: find.byType(Text),
+      );
+      return finder.evaluate().isEmpty
+          ? null
+          : tester.widget<Text>(finder).data;
+    }
+
+    testWidgets('a line shows the billed rate per box and the server total', (
+      tester,
+    ) async {
+      await openWith(tester, [water()]);
+
+      expect(textOf(tester, 'cart-line-rate-1501'), '₹87/box');
+      expect(find.byKey(const ValueKey('cart-line-tier-1501')), findsOneWidget);
+      expect(find.text('Wholesale rate'), findsOneWidget);
+      expect(textOf(tester, 'cart-line-total-1501'), '₹2,611');
+      // The struck MRP (₹90) is the server's, not derived.
+      expect(find.text('₹90'), findsOneWidget);
+    });
+
+    testWidgets('below the first slab: the normal rate, no tag', (
+      tester,
+    ) async {
+      await openWith(tester, [water(quantity: 3, rate: '90.00', tier: null)]);
+      expect(textOf(tester, 'cart-line-rate-1501'), '₹90/box');
+      expect(find.byKey(const ValueKey('cart-line-tier-1501')), findsNothing);
+    });
+
+    testWidgets('items without tiers keep the plain price', (tester) async {
+      await openWith(tester, [cartLine()]);
+      expect(find.byKey(const ValueKey('cart-line-rate-101')), findsNothing);
+      expect(find.text('₹249'), findsOneWidget);
+    });
+
+    testWidgets('the nudge names the size and its next price', (tester) async {
+      await openWith(tester, [
+        water(quantity: 22, rate: '90.00', next: '87.00'),
+      ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 3));
+      expect(nudge(tester), 'Add 3 more boxes to get ₹87/box on 1 L');
+      expect(find.byKey(const Key('min-units-warning')), findsNothing);
+    });
+
+    testWidgets('one box away: "Add 1 more"', (tester) async {
+      await openWith(tester, [
+        water(quantity: 24, rate: '90.00', next: '87.00'),
+      ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 1));
+      expect(nudge(tester), 'Add 1 more to get ₹87/box on 1 L');
+    });
+
+    testWidgets('several sizes get cheaper: one generic line', (tester) async {
+      await openWith(tester, [
+        water(quantity: 20, rate: '90.00', next: '87.00'),
+        water(
+          id: 2,
+          variantId: 1502,
+          variantName: '500 ml',
+          quantity: 2,
+          rate: '125.00',
+          next: '122.00',
+        ),
+      ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 3));
+      expect(nudge(tester), 'Add 3 more boxes for lower prices');
+    });
+
+    testWidgets('no next slab (top tier or no tiers): no nudge', (
+      tester,
+    ) async {
+      await openWith(tester, [water(quantity: 260, rate: '80.00')]);
+      expect(find.byKey(const Key('price-tier-nudge')), findsNothing);
+    });
+
+    testWidgets('below the minimum: only the minimum warning', (tester) async {
+      await openWith(
+        tester,
+        [water(quantity: 4, rate: '90.00', tier: null, next: '87.00')],
+        next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 21),
+        unitsToMinOrder: 1,
+      );
+      expect(find.byKey(const Key('price-tier-nudge')), findsNothing);
+      expect(find.byKey(const Key('min-units-warning')), findsOneWidget);
+    });
+
+    testWidgets('on the fake server: rates and nudge follow the box total', (
+      tester,
+    ) async {
+      final app = TestApp(
+        tokens: signedInTokens,
+        commerce: FakeCommerceBackend(
+          latency: Duration.zero,
+          rules: const FakeBillRules(minimumUnits: 5, orderUnitLabel: 'boxes'),
+        ),
+      );
+      CatalogVariant size(int id, String name, String price) => CatalogVariant(
+        id: id,
+        name: name,
+        sellingPrice: price,
+        mrp: price,
+        stockStatus: StockStatus.inStock,
+        orderableQuantity: 300,
+        maxQtyPerOrder: 300,
+        priceTiers: id == 1502
+            ? const [
+                PriceTier(minOrderUnits: 5, price: '125.00'),
+                PriceTier(minOrderUnits: 25, price: '122.00'),
+              ]
+            : tiers,
+      );
+      await app.cart.setQuantity(
+        1501,
+        20,
+        preview: CartLinePreview.of(size(1501, '1 L', '90.00'), 'Jivo Water'),
+      );
+      await app.cart.update(const CartUpdate(addressId: 1));
+      await openCart(tester, app);
+
+      expect(textOf(tester, 'cart-line-rate-1501'), '₹90/box');
+      expect(nudge(tester), 'Add 5 more boxes to get ₹87/box on 1 L');
+
+      // Any size counts towards the total: 21 + 5 = 26 boxes.
+      await app.cart.setQuantity(
+        1502,
+        5,
+        preview: CartLinePreview.of(
+          size(1502, '500 ml', '125.00'),
+          'Jivo Water',
+        ),
+      );
+      await typeLineQty(tester, 1501, '21');
+      expect(textOf(tester, 'cart-line-rate-1501'), '₹87/box');
+      expect(textOf(tester, 'cart-line-rate-1502'), '₹122/box');
+      expect(textOf(tester, 'cart-line-total-1501'), '₹1,827');
+      expect(find.byKey(const ValueKey('cart-line-tier-1502')), findsOneWidget);
+      // 50 is the next slab, and only the 1 L gets cheaper there.
+      expect(nudge(tester), 'Add 24 more boxes to get ₹85/box on 1 L');
     });
   });
 

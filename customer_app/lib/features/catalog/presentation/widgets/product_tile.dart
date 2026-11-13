@@ -11,6 +11,7 @@ import '../../../cart/presentation/add_stepper.dart';
 import '../../../cart/presentation/cart_controller.dart';
 import '../../domain/catalog_models.dart';
 import 'price_tags.dart';
+import 'price_tiers_table.dart';
 
 const _imageHeight = 110.0;
 const _padding = 6.0;
@@ -178,7 +179,8 @@ class _OptionsControl extends ConsumerWidget {
   }
 }
 
-/// The variant picker: each pack size with its price, stock and stepper.
+/// The variant picker: each pack size with its price, stock and stepper,
+/// and its wholesale rates when the server sends `price_tiers`.
 Future<void> showVariantPicker(BuildContext context, CatalogProduct product) =>
     showModalBottomSheet<void>(
       context: context,
@@ -188,6 +190,7 @@ Future<void> showVariantPicker(BuildContext context, CatalogProduct product) =>
       builder: (context) {
         final theme = Theme.of(context);
         final l10n = AppLocalizations.of(context);
+        final tiered = product.variants.any((v) => v.hasPriceTiers);
         return ListView(
           key: const Key('variant-picker'),
           shrinkWrap: true,
@@ -206,51 +209,71 @@ Future<void> showVariantPicker(BuildContext context, CatalogProduct product) =>
             for (final variant in product.variants)
               Padding(
                 padding: const EdgeInsets.only(bottom: JivoSpacing.md),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: MergeSemantics(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              variant.name,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            PriceLine(
-                              price: variant.sellingPrice,
-                              mrp: variant.mrp,
-                            ),
-                            if (variant.discountPercent > 0)
-                              Text(
-                                l10n.discountOff(variant.discountPercent),
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: context.jivoColors.success,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: MergeSemantics(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  variant.name,
+                                  style: theme.textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              ),
-                            if (variant.lowStockUnits != null)
-                              Text(
-                                l10n.onlyLeft(variant.lowStockUnits!),
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.error,
+                                PriceLine(
+                                  price: variant.sellingPrice,
+                                  mrp: variant.mrp,
                                 ),
-                              ),
-                            MinQtyHint(variant: variant),
-                          ],
+                                if (variant.discountPercent > 0)
+                                  Text(
+                                    l10n.discountOff(variant.discountPercent),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: context.jivoColors.success,
+                                    ),
+                                  ),
+                                if (variant.lowStockUnits != null)
+                                  Text(
+                                    l10n.onlyLeft(variant.lowStockUnits!),
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.error,
+                                    ),
+                                  ),
+                                MinQtyHint(variant: variant),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: JivoSpacing.md),
+                        SizedBox(
+                          width: 128,
+                          child: AddStepper(
+                            variant: variant,
+                            productName: product.name,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: JivoSpacing.md),
-                    SizedBox(
-                      width: 128,
-                      child: AddStepper(
-                        variant: variant,
-                        productName: product.name,
+                    if (variant.hasPriceTiers) ...[
+                      const SizedBox(height: JivoSpacing.xs),
+                      PriceTiersCompact(
+                        key: ValueKey('picker-tiers-${variant.id}'),
+                        tiers: variant.priceTiers,
                       ),
-                    ),
+                    ],
                   ],
+                ),
+              ),
+            if (tiered)
+              Text(
+                l10n.priceTierNote,
+                key: const Key('picker-tiers-note'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
           ],
