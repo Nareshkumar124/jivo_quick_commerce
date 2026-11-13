@@ -11,6 +11,7 @@ import '../../catalog/domain/catalog_models.dart';
 import '../domain/cart.dart';
 import 'cart_controller.dart';
 import 'cart_texts.dart';
+import 'quantity_dialog.dart';
 
 /// ADD, which becomes − qty + once the variant is in the cart (`03 §2.5`).
 ///
@@ -37,6 +38,25 @@ class AddStepper extends ConsumerWidget {
         change,
         names: {variant.id: '$productName ${variant.name}'},
       );
+
+  /// Tapping the number: type a quantity, sent in one request.
+  Future<void> _typeQuantity(
+    BuildContext context,
+    CartController cart,
+    int quantity,
+  ) async {
+    final typed = await showQuantityDialog(
+      context,
+      current: quantity,
+      max: variant.maxSelectable,
+      min: variant.minQty,
+    );
+    if (typed == null || !context.mounted) return;
+    await _run(
+      context,
+      () => cart.setVariantQuantity(variant, typed, productName: productName),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -85,6 +105,9 @@ class AddStepper extends ConsumerWidget {
                       context,
                       () => cart.increment(variant, productName: productName),
                     ),
+              onQuantityTap: pending
+                  ? null
+                  : () => _typeQuantity(context, cart, quantity),
             ),
     );
   }
@@ -315,6 +338,7 @@ class QuantityStepper extends StatelessWidget {
     required this.onDecrement,
     required this.onIncrement,
     this.busy = false,
+    this.onQuantityTap,
     super.key,
   });
 
@@ -328,6 +352,10 @@ class QuantityStepper extends StatelessWidget {
   final String productName;
   final VoidCallback? onDecrement;
   final VoidCallback? onIncrement;
+
+  /// Tapping the number: type a quantity (bulk orders). Null: not
+  /// tappable (and while a change is in flight).
+  final VoidCallback? onQuantityTap;
 
   @override
   Widget build(BuildContext context) {
@@ -365,9 +393,13 @@ class QuantityStepper extends StatelessWidget {
             Expanded(
               child: Semantics(
                 liveRegion: true,
+                button: onQuantityTap != null && !busy,
                 label: busy
                     ? l10n.updatingQuantity
-                    : l10n.stepperQuantity(quantity),
+                    : onQuantityTap == null
+                    ? l10n.stepperQuantity(quantity)
+                    : l10n.stepperQuantityTap(quantity),
+                onTap: busy ? null : onQuantityTap,
                 excludeSemantics: true,
                 child: busy
                     ? Center(
@@ -380,14 +412,20 @@ class QuantityStepper extends StatelessWidget {
                           ),
                         ),
                       )
-                    : FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          '$quantity',
-                          key: ValueKey('qty-$id'),
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: onPrimary,
-                            fontWeight: FontWeight.w700,
+                    : InkWell(
+                        key: ValueKey('qty-edit-$id'),
+                        onTap: onQuantityTap,
+                        child: Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '$quantity',
+                              key: ValueKey('qty-$id'),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: onPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ),
                       ),

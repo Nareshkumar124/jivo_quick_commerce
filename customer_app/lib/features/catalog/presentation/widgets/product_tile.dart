@@ -175,6 +175,8 @@ class _OptionsControl extends ConsumerWidget {
       productName: product.name,
       onDecrement: pick,
       onIncrement: pick,
+      // Per-variant quantities are typed in the picker.
+      onQuantityTap: pick,
     );
   }
 }

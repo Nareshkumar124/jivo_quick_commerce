@@ -338,6 +338,59 @@ void main() {
     });
   });
 
+  testWidgets('with a saved address, + and − never ask to save the location '
+      '(staging bug)', (tester) async {
+    // The test location is saved address 1; the cart loads ?address_id=1.
+    await openCart(tester, await appWithOil());
+    FilledButton proceed() => tester.widget<FilledButton>(
+      find.descendant(
+        of: find.byKey(const Key('proceed-to-checkout')),
+        matching: find.byType(FilledButton),
+      ),
+    );
+    expect(find.byKey(const Key('checkout-blocked')), findsNothing);
+    expect(proceed().onPressed, isNotNull);
+
+    for (final key in ['inc-line-101', 'dec-line-101']) {
+      await tester.tap(find.byKey(ValueKey(key)));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('checkout-blocked')),
+        findsNothing,
+        reason: key,
+      );
+      expect(proceed().onPressed, isNotNull, reason: key);
+    }
+  });
+
+  testWidgets('a cart line quantity can be typed; above the cap is refused', (
+    tester,
+  ) async {
+    final app = await appWithOil(); // 2 in the cart, orderable 5
+    await openCart(tester, app);
+    Future<void> type(String text) async {
+      await tester.tap(find.byKey(const ValueKey('qty-line-101')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('qty-field')), text);
+      await tester.tap(find.byKey(const Key('qty-update')));
+      await tester.pumpAndSettle();
+    }
+
+    await type('6');
+    expect(find.text('You can add up to 5 of this item'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('qty-cancel')));
+    await tester.pumpAndSettle();
+    expect((await app.cart.load()).quantityOf(101), 2);
+
+    await type('4');
+    expect((await app.cart.load()).quantityOf(101), 4);
+    expect(textOf(tester, 'qty-line-101'), '4');
+    expect(find.byKey(const Key('checkout-blocked')), findsNothing);
+
+    await type('0');
+    expect(find.byKey(const Key('cart-empty')), findsOneWidget);
+  });
+
   testWidgets('steppers and remove change the server cart', (tester) async {
     final app = await appWithOil();
     await openCart(tester, app);

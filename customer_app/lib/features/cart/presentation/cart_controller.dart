@@ -190,6 +190,25 @@ class CartController extends Notifier<CartState> {
     return refresh();
   }
 
+  /// Only `GET /cart/` takes `?address_id=`. Every other cart call answers
+  /// with the cart checked against no address (the app never saves one on
+  /// the server cart, so a later pin can't silently keep an old address),
+  /// and with a saved address chosen that answer wrongly says
+  /// ADDRESS_REQUIRED. So after such a change, load the cart again for the
+  /// address, quietly: no loading state, the current cart stays on screen,
+  /// a failure keeps it, and the ticket order still lets the newest answer
+  /// win. Nothing to do without a saved address.
+  Future<void> _reloadForAddress() async {
+    final addressId = _addressId;
+    if (addressId == null || !ref.mounted) return;
+    final ticket = ++_issued;
+    try {
+      _apply(ticket, await _repository.load(addressId: addressId));
+    } catch (error) {
+      _checkStore(error);
+    }
+  }
+
   /// ADD (not in the cart yet) adds the variant's minimum per order in one
   /// request; after that, plus adds one. Throws [CartLimitException] at the
   /// cap, or the repository's `ApiError`. [productName] only feeds the dev
@@ -211,6 +230,31 @@ class CartController extends Notifier<CartState> {
     final current = state.quantityOf(variant.id);
     if (current == 0) return;
     await _set(variant.id, _lowered(current - 1, _minFor(variant)));
+  }
+
+  /// Sets [variant] to a typed [quantity] in one request (bulk orders; 0
+  /// removes it). Same rules as [setLineQuantity]: capped at
+  /// `orderable_quantity` going up, and never 1 to min - 1. Throws
+  /// [CartLimitException] above the cap, or the repository's `ApiError`.
+  Future<void> setVariantQuantity(
+    CatalogVariant variant,
+    int quantity, {
+    String? productName,
+  }) async {
+    final current = state.quantityOf(variant.id);
+    final minimum = _minFor(variant);
+    final target = quantity < current
+        ? _lowered(quantity, minimum)
+        : _raised(quantity, minimum);
+    if (target == current) return;
+    if (target > current && target > variant.maxSelectable) {
+      throw CartLimitException(CartLimit.maxReached, variant.maxSelectable);
+    }
+    await _set(
+      variant.id,
+      target,
+      preview: CartLinePreview.of(variant, productName ?? variant.name),
+    );
   }
 
   /// Sets a cart line's quantity from the cart screen, capped at the
@@ -253,7 +297,9 @@ class CartController extends Notifier<CartState> {
     _ => _set(line.variantId, line.orderableQuantity),
   };
 
-  /// Empties the cart (store change).
+  /// Empties the cart (store change). No reload for the address here: the
+  /// location (and its address) is changing, and the cart reloads for the
+  /// new one right after.
   Future<void> clear() async {
     _serverMin.clear();
     final ticket = ++_issued;
@@ -289,6 +335,7 @@ class CartController extends Notifier<CartState> {
     } finally {
       if (ref.mounted) state = state.copyWith(updating: false);
     }
+    await _reloadForAddress();
   }
 
   Future<void> _set(
@@ -313,6 +360,8 @@ class CartController extends Notifier<CartState> {
         state = state.copyWith(pending: {...state.pending}..remove(variantId));
       }
     }
+    // After the stepper is free again: no extra wait per tap.
+    await _reloadForAddress();
   }
 }
 

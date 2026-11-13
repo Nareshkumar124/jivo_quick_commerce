@@ -10,6 +10,7 @@ import '../../domain/cart.dart';
 import '../add_stepper.dart';
 import '../cart_controller.dart';
 import '../cart_texts.dart';
+import '../quantity_dialog.dart';
 
 /// One cart line (`03 §2.8`): image, name, pack size, the server's price
 /// and MRP, the minimum per order when above 1, a stepper capped at
@@ -128,6 +129,20 @@ class CartLineTile extends ConsumerWidget {
                               () =>
                                   cart.setLineQuantity(line, line.quantity + 1),
                             ),
+                      onQuantityTap: pending
+                          ? null
+                          : () async {
+                              final typed = await showQuantityDialog(
+                                context,
+                                current: line.quantity,
+                                max: line.orderableQuantity,
+                                min: line.minQty,
+                              );
+                              if (typed == null || !context.mounted) return;
+                              await run(
+                                () => cart.setLineQuantity(line, typed),
+                              );
+                            },
                     ),
                   ),
                 ),
