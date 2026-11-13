@@ -19,7 +19,7 @@ void main() {
     final backendCodes = ApiErrorCode.values.where((c) => c.wireValue != null);
     expect(
       backendCodes,
-      hasLength(36),
+      hasLength(38),
       reason: '06 §6 + OpenAPI ErrorCodeEnum',
     );
 
@@ -49,6 +49,46 @@ void main() {
     expect(messageFor(ApiErrorCode.timeout), l10n.errorTimeout);
     expect(messageFor(ApiErrorCode.serverError), l10n.errorServer);
     expect(messageFor(ApiErrorCode.cancelled), l10n.errorCancelled);
+  });
+
+  test('MIN_QTY_REQUIRED names the minimum from details when sent', () {
+    final error = ApiError.tryParseEnvelope({
+      'error': {
+        'code': 'MIN_QTY_REQUIRED',
+        'message': 'You need to order at least 5 of Jivo Water.',
+        'details': {'variant_id': 1501, 'min_qty_per_order': 5},
+      },
+    })!;
+
+    expect(error.code, ApiErrorCode.minQtyRequired);
+    expect(error.minQtyPerOrder, 5);
+    expect(
+      apiErrorMessageWithDetails(l10n, error),
+      'You need to order at least 5 of this item.',
+    );
+    // Without details: the generic minimum message, never the server's.
+    expect(
+      apiErrorMessageWithDetails(
+        l10n,
+        const ApiError(code: ApiErrorCode.minQtyRequired),
+      ),
+      l10n.errorMinQtyRequired,
+    );
+  });
+
+  test('MIN_UNITS_NOT_MET carries the units from details', () {
+    final error = ApiError.tryParseEnvelope({
+      'error': {
+        'code': 'MIN_UNITS_NOT_MET',
+        'message': 'Add 2 more cartons.',
+        'details': {'min_order_units': 5, 'units_to_min_order': 2},
+      },
+    })!;
+
+    expect(error.code, ApiErrorCode.minUnitsNotMet);
+    expect(error.minOrderUnits, 5);
+    expect(error.unitsToMinOrder, 2);
+    expect(apiErrorMessage(l10n, error), l10n.errorMinUnitsNotMet);
   });
 
   test('unknown codes fall back to the generic message', () {

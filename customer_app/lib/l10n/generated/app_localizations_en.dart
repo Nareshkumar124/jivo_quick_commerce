@@ -448,6 +448,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String minQtyShort(int count) {
+    return 'Min $count';
+  }
+
+  @override
+  String minQtyPerOrder(int count) {
+    return 'Minimum $count per order';
+  }
+
+  @override
   String discountOff(int percent) {
     return '$percent% OFF';
   }
@@ -801,6 +811,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String minQtyLineIssue(int count) {
+    return 'Order at least $count';
+  }
+
+  @override
   String get removeAction => 'Remove';
 
   @override
@@ -972,6 +987,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String minimumUnitsShortfall(int count, int minimum, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Add $count more $label to place your order (minimum $minimum $label)',
+      one: 'Add 1 more to place your order (minimum $minimum $label)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String minimumUnitsNotMet(int minimum, String label) {
+    return 'Minimum order is $minimum $label.';
+  }
+
+  @override
+  String get orderUnitsDefault => 'items';
+
+  @override
   String get cartStoreClosed =>
       'The store is closed right now. You can check out when it opens.';
 
@@ -1119,6 +1154,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'We don\'t deliver to this address from this store. Choose another address.';
 
   @override
+  String get blockerMinQtyRequired =>
+      'Some items are below their minimum quantity. Fix them to continue.';
+
+  @override
   String get blockerCouponNotEligible =>
       'Your coupon no longer applies. Remove it or add items to continue.';
 
@@ -1165,6 +1204,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String stockOnlyDetail(int count, String name) {
     return 'Only $count of $name can be ordered now.';
+  }
+
+  @override
+  String minQtyRequiredFor(int count, String name) {
+    return 'You need to order at least $count of $name.';
   }
 
   @override
@@ -1444,6 +1488,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String reorderDiscontinued(String name) {
     return '$name is no longer sold';
+  }
+
+  @override
+  String reorderBelowMinimum(String name) {
+    return '$name wasn\'t added: it now has a higher minimum order quantity';
   }
 
   @override

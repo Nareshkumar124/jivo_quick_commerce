@@ -217,6 +217,25 @@ void main() {
     expect(result.addedNothing(5), isTrue);
   });
 
+  test('reorder: MIN_QTY_REQUIRED maps to belowMinimum', () async {
+    final body = Map<String, Object?>.from(
+      contractExample('orders_reorder/200/SomeItemsUnavailable')! as Map,
+    );
+    body['unavailable'] = [
+      {
+        'variant_id': 1501,
+        'product_name': 'Jivo Water',
+        'variant_name': '1 L x 12',
+        'requested_quantity': 2,
+        'added_quantity': 0,
+        'reason': 'MIN_QTY_REQUIRED',
+      },
+    ];
+    answer = (_) => body;
+    final result = await repository.reorder(4870);
+    expect(result.unavailable.single.reason, ReorderSkipReason.belowMinimum);
+  });
+
   test('reorder with everything added', () async {
     answer = (_) => contractExample('orders_reorder/200/EverythingAdded');
     final result = await repository.reorder(4870);

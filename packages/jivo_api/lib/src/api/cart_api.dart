@@ -338,7 +338,7 @@ class CartApi {
   }
 
   /// Set a variant&#39;s quantity (the ADD stepper)
-  /// Sets the line for &#x60;variant_id&#x60; to &#x60;quantity&#x60;: creates it, changes it, or removes it with 0. It sets, it does not add, so a retried request never doubles a line.  An increase is checked against the store&#39;s stock and the variant&#39;s &#x60;max_qty_per_order&#x60;; a decrease is always accepted, so a customer can step down a line that has a stock issue. The cart does not reserve stock (08 §6.1).
+  /// Sets the line for &#x60;variant_id&#x60; to &#x60;quantity&#x60;: creates it, changes it, or removes it with 0. It sets, it does not add, so a retried request never doubles a line.  An increase is checked against the store&#39;s stock and the variant&#39;s &#x60;max_qty_per_order&#x60;; a decrease is checked only against &#x60;min_qty_per_order&#x60;, so a customer can step down a line that has a stock issue. A quantity from 1 to &#x60;min_qty_per_order&#x60; - 1 is always refused (&#x60;MIN_QTY_REQUIRED&#x60;): the first ADD sends &#x60;min_qty_per_order&#x60;, and stepping down from it sends 0. The cart does not reserve stock (08 §6.1).
   ///
   /// Parameters:
   /// * [xStoreId] - The store id from `GET /serviceability/` (`store.id`) for the selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR` with `details: {\"X-Store-Id\": [...]}`. Unknown or deactivated store: 404 `STORE_NOT_FOUND`; drop the saved store and check serviceability again. A closed store is still browsable.
@@ -508,7 +508,7 @@ class CartApi {
   }
 
   /// Change a line&#39;s quantity
-  /// Same rules as &#x60;cart_items_add&#x60; (increases are checked, decreases always accepted). Another user&#39;s line id is a 404.
+  /// Same rules as &#x60;cart_items_add&#x60; (increases are checked; decreases are checked only against &#x60;min_qty_per_order&#x60;). Another user&#39;s line id is a 404.
   ///
   /// Parameters:
   /// * [xStoreId] - The store id from `GET /serviceability/` (`store.id`) for the selected location. Missing or not a positive integer: 400 `VALIDATION_ERROR` with `details: {\"X-Store-Id\": [...]}`. Unknown or deactivated store: 404 `STORE_NOT_FOUND`; drop the saved store and check serviceability again. A closed store is still browsable.

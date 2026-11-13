@@ -21,7 +21,16 @@ enum ApiErrorCode {
   storeClosed('STORE_CLOSED'),
   stockUnavailable('STOCK_UNAVAILABLE'),
   maxQtyExceeded('MAX_QTY_EXCEEDED'),
+
+  /// A cart quantity of 1 to `min_qty_per_order - 1` (422); details
+  /// `{variant_id, min_qty_per_order}`. Quantity 0 (remove) is always
+  /// allowed.
+  minQtyRequired('MIN_QTY_REQUIRED'),
   minOrderNotMet('MIN_ORDER_NOT_MET'),
+
+  /// Fewer units (any mix of products) than the store's `min_order_units`
+  /// (422); details `{min_order_units, units_to_min_order}`.
+  minUnitsNotMet('MIN_UNITS_NOT_MET'),
   couponInvalid('COUPON_INVALID'),
   couponExpired('COUPON_EXPIRED'),
   couponNotEligible('COUPON_NOT_ELIGIBLE'),
@@ -214,6 +223,16 @@ class ApiError implements Exception {
   /// `details.retry_after_seconds` (sent with `OTP_RATE_LIMITED` and
   /// `RATE_LIMITED`), if present.
   int? get retryAfterSeconds => _intDetail('retry_after_seconds');
+
+  /// `details.min_qty_per_order` (sent with `MIN_QTY_REQUIRED`), if present.
+  int? get minQtyPerOrder => _intDetail('min_qty_per_order');
+
+  /// `details.min_order_units` (sent with `MIN_UNITS_NOT_MET`), if present.
+  int? get minOrderUnits => _intDetail('min_order_units');
+
+  /// `details.units_to_min_order` (sent with `MIN_UNITS_NOT_MET`), if
+  /// present.
+  int? get unitsToMinOrder => _intDetail('units_to_min_order');
 
   int? _intDetail(String key) {
     final value = details[key];

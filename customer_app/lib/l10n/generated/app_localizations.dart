@@ -880,6 +880,18 @@ abstract class AppLocalizations {
   /// **'Only {count} left'**
   String onlyLeft(int count);
 
+  /// Product tile hint near ADD when the variant's min_qty_per_order is above 1; ADD adds this many at once.
+  ///
+  /// In en, this message translates to:
+  /// **'Min {count}'**
+  String minQtyShort(int count);
+
+  /// Hint near the stepper on product detail, the variant picker and cart lines when min_qty_per_order is above 1.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum {count} per order'**
+  String minQtyPerOrder(int count);
+
   /// Discount badge, percent from the server.
   ///
   /// In en, this message translates to:
@@ -1474,6 +1486,12 @@ abstract class AppLocalizations {
   /// **'Update to {count}'**
   String updateQuantityTo(int count);
 
+  /// Cart line flag MIN_QTY_REQUIRED: the line is below the variant's minimum per order (e.g. the minimum was raised).
+  ///
+  /// In en, this message translates to:
+  /// **'Order at least {count}'**
+  String minQtyLineIssue(int count);
+
   /// Fix action on an unavailable cart line; removes a coupon.
   ///
   /// In en, this message translates to:
@@ -1750,6 +1768,24 @@ abstract class AppLocalizations {
   /// **'Minimum order is {amount}.'**
   String minimumOrderNotMet(String amount);
 
+  /// Cart warning and checkout blocker MIN_UNITS_NOT_MET: the order has fewer units (any mix of products) than the store's min_order_units. count = units_to_min_order, label = order_unit_label (e.g. cartons). Example: Add 2 more cartons to place your order (minimum 5 cartons).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more to place your order (minimum {minimum} {label})} other{Add {count} more {label} to place your order (minimum {minimum} {label})}}'**
+  String minimumUnitsShortfall(int count, int minimum, String label);
+
+  /// Checkout blocker MIN_UNITS_NOT_MET when the server sends no units_to_min_order.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum order is {minimum} {label}.'**
+  String minimumUnitsNotMet(int minimum, String label);
+
+  /// What an order unit is called when the server sends no order_unit_label (e.g. 'minimum 5 items').
+  ///
+  /// In en, this message translates to:
+  /// **'items'**
+  String get orderUnitsDefault;
+
   /// Checkout disabled while the store is closed.
   ///
   /// In en, this message translates to:
@@ -2002,6 +2038,12 @@ abstract class AppLocalizations {
   /// **'We don\'t deliver to this address from this store. Choose another address.'**
   String get blockerNotServiceable;
 
+  /// Checkout blocker MIN_QTY_REQUIRED.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items are below their minimum quantity. Fix them to continue.'**
+  String get blockerMinQtyRequired;
+
   /// Checkout blocker COUPON_NOT_ELIGIBLE.
   ///
   /// In en, this message translates to:
@@ -2073,6 +2115,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only {count} of {name} can be ordered now.'**
   String stockOnlyDetail(int count, String name);
+
+  /// MIN_QTY_REQUIRED with the server's minimum, for a known cart line or tile.
+  ///
+  /// In en, this message translates to:
+  /// **'You need to order at least {count} of {name}.'**
+  String minQtyRequiredFor(int count, String name);
 
   /// Dialog when placing an order while another awaits payment.
   ///
@@ -2535,6 +2583,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{name} is no longer sold'**
   String reorderDiscontinued(String name);
+
+  /// Reorder: the past order had fewer units than the item's minimum per order today (MIN_QTY_REQUIRED).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} wasn\'t added: it now has a higher minimum order quantity'**
+  String reorderBelowMinimum(String name);
 
   /// Reorder: fewer units than ordered were available.
   ///

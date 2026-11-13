@@ -137,6 +137,10 @@ enum CartIssueCode {
   /// Fewer units can be ordered: reduce to `variant.orderable_quantity`.
   quantityUnavailable,
 
+  /// Below `variant.min_qty_per_order` (e.g. the minimum was raised after
+  /// the line was added): raise it to the minimum, or remove it.
+  minQtyRequired,
+
   /// A code this build doesn't know.
   unknown,
 }
@@ -194,6 +198,10 @@ class CartLine {
   /// The stepper cap and the fix target: the server's
   /// `orderable_quantity` (0 when it can't be ordered).
   int get orderableQuantity => variant.maxSelectable;
+
+  /// The variant's `min_qty_per_order`: minus at this quantity removes the
+  /// line.
+  int get minQty => variant.minQty;
 }
 
 /// The bill from `cart.services.compute_bill` (`08 §6.2`, schema `Bill`),
@@ -240,6 +248,9 @@ class CartThresholds {
     this.amountToMinOrder,
     this.freeDeliveryThreshold,
     this.amountToFreeDelivery,
+    this.minOrderUnits = 0,
+    this.unitsToMinOrder,
+    this.orderUnitLabel = '',
   });
 
   final String minOrderValue;
@@ -250,6 +261,19 @@ class CartThresholds {
 
   /// For "Add ₹X more for FREE delivery"; null when delivery is free.
   final String? amountToFreeDelivery;
+
+  /// The fewest units (any mix of products) an order must have
+  /// (`min_order_units`); 0 = no such rule.
+  final int minOrderUnits;
+
+  /// Units still needed for [minOrderUnits] (`units_to_min_order`); null
+  /// when met or when there is no such rule. While set, checkout is blocked
+  /// (`MIN_UNITS_NOT_MET`) and the cart shows "Add N more".
+  final int? unitsToMinOrder;
+
+  /// What a unit is called (`order_unit_label`, e.g. "cartons"); empty when
+  /// the server sends none.
+  final String orderUnitLabel;
 }
 
 /// `PaymentUnavailableReasonEnum`.
@@ -278,7 +302,13 @@ enum CheckoutBlockerCode {
   notServiceable,
   storeClosed,
   stockUnavailable,
+
+  /// A line is below its variant's `min_qty_per_order`.
+  minQtyRequired,
   minOrderNotMet,
+
+  /// Fewer units in the order than the store's `min_order_units`.
+  minUnitsNotMet,
   couponInvalid,
   couponExpired,
   couponNotEligible,

@@ -27,6 +27,7 @@ Map<String, Object?> realVariant(
   String stock = 'IN_STOCK',
   int orderable = 5,
   int? unitsLeft,
+  int minQty = 1,
   Map<String, Object?>? image,
   Map<String, Object?>? unitPrice,
 }) => {
@@ -41,6 +42,7 @@ Map<String, Object?> realVariant(
   'orderable_quantity': orderable,
   'units_left': unitsLeft,
   'max_qty_per_order': 5,
+  'min_qty_per_order': minQty,
   'image': image,
 };
 

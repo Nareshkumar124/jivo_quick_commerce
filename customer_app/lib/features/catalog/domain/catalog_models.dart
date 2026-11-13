@@ -33,6 +33,7 @@ class CatalogVariant {
     required this.stockStatus,
     required this.orderableQuantity,
     required this.maxQtyPerOrder,
+    this.minQtyPerOrder = 1,
     this.discountAmount = '0.00',
     this.discountPercent = 0,
     this.unitsLeft,
@@ -64,6 +65,11 @@ class CatalogVariant {
   /// Set only for [StockStatus.lowStock]: "Only 2 left".
   final int? unitsLeft;
   final int maxQtyPerOrder;
+
+  /// The fewest units one order may have of this variant
+  /// (`min_qty_per_order`, at least 1). ADD adds this many at once and
+  /// minus at this quantity removes the line. Use [minQty].
+  final int minQtyPerOrder;
   final UnitPrice? unitPrice;
   final String? imageUrl;
 
@@ -74,10 +80,17 @@ class CatalogVariant {
   final String? netQuantity;
 
   bool get inStock =>
-      stockStatus != StockStatus.outOfStock && orderableQuantity > 0;
+      stockStatus != StockStatus.outOfStock && maxSelectable > 0;
 
-  /// The ADD stepper's cap.
-  int get maxSelectable => orderableQuantity < 0 ? 0 : orderableQuantity;
+  /// [minQtyPerOrder], never below 1.
+  int get minQty => minQtyPerOrder < 1 ? 1 : minQtyPerOrder;
+
+  /// The variant has a minimum above one unit: show the "Min N" hint.
+  bool get hasMinQty => minQty > 1;
+
+  /// The ADD stepper's cap. 0 (out of stock) when fewer than [minQty] can
+  /// be ordered; the server sends 0 then too.
+  int get maxSelectable => orderableQuantity < minQty ? 0 : orderableQuantity;
 
   /// Units for "Only N left", or null.
   int? get lowStockUnits =>

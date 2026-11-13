@@ -391,6 +391,7 @@ class ReorderResultDialog extends StatelessWidget {
           name,
         ),
         ReorderSkipReason.discontinued => l10n.reorderDiscontinued(name),
+        ReorderSkipReason.belowMinimum => l10n.reorderBelowMinimum(name),
         _ => l10n.reorderOutOfStock(name),
       };
     }

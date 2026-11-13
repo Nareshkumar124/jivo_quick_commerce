@@ -320,6 +320,51 @@ void main() {
     expect(app.cart.orders, isEmpty);
   });
 
+  testWidgets('MIN_QTY_REQUIRED reloads the cart and goes back to it with '
+      'the flag', (tester) async {
+    final commerce = _CountingLoads();
+    final app = await appWithCart(commerce: commerce);
+    await openCheckout(tester, app);
+
+    commerce.minimums[101] = 5; // raised after the line was added
+    final loadsBefore = commerce.loads;
+    await placeOrder(tester);
+    expect(commerce.loads, greaterThan(loadsBefore), reason: 'cart reloaded');
+    expect(
+      find.text('You need to order at least 5 of Jivo Canola Oil 1 L.'),
+      findsOneWidget,
+    );
+    expect(find.byType(CheckoutScreen), findsNothing, reason: 'popped');
+    expect(find.byType(CartScreen), findsOneWidget);
+    // The flag comes from the reloaded cart (the screen was built before).
+    expect(find.text('Order at least 5'), findsOneWidget);
+    expect(find.text('Update to 5'), findsOneWidget);
+    expect(app.cart.orders, isEmpty);
+  });
+
+  testWidgets('MIN_UNITS_NOT_MET reloads the cart and goes back to it with '
+      'the shortfall', (tester) async {
+    final commerce = _CountingLoads();
+    final app = await appWithCart(commerce: commerce);
+    await openCheckout(tester, app);
+
+    commerce.failNext = const ApiError(
+      code: ApiErrorCode.minUnitsNotMet,
+      statusCode: 422,
+      details: {'min_order_units': 5, 'units_to_min_order': 3},
+    );
+    final loadsBefore = commerce.loads;
+    await placeOrder(tester);
+    expect(commerce.loads, greaterThan(loadsBefore), reason: 'cart reloaded');
+    expect(
+      find.text('Add 3 more items to place your order (minimum 5 items)'),
+      findsOneWidget,
+    );
+    expect(find.byType(CheckoutScreen), findsNothing, reason: 'popped');
+    expect(find.byType(CartScreen), findsOneWidget);
+    expect(app.cart.orders, isEmpty);
+  });
+
   testWidgets('double tap on Place order places one order', (tester) async {
     final app = await appWithCart();
     await openCheckout(tester, app);
@@ -359,6 +404,19 @@ void main() {
     expect(find.byKey(const Key('needs-saved-address')), findsOneWidget);
     expect(placeButton(tester).onPressed, isNull);
   });
+}
+
+/// Counts `GET /cart/` loads.
+class _CountingLoads extends FakeCommerceBackend {
+  _CountingLoads() : super(latency: Duration.zero);
+
+  int loads = 0;
+
+  @override
+  Future<CartSnapshot> load({int? addressId}) {
+    loads++;
+    return super.load(addressId: addressId);
+  }
 }
 
 /// The verify endpoint can't be reached.

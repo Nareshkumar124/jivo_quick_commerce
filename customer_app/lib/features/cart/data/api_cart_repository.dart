@@ -114,6 +114,9 @@ CartSnapshot cartFromApi(api.Cart c) => CartSnapshot.fromLines(
     amountToMinOrder: c.thresholds.amountToMinOrder,
     freeDeliveryThreshold: c.thresholds.freeDeliveryThreshold,
     amountToFreeDelivery: c.thresholds.amountToFreeDelivery,
+    minOrderUnits: c.thresholds.minOrderUnits,
+    unitsToMinOrder: c.thresholds.unitsToMinOrder,
+    orderUnitLabel: c.thresholds.orderUnitLabel,
   ),
   paymentOptions: [
     for (final option in c.paymentMethods)
@@ -177,6 +180,8 @@ CartLine _line(api.CartLine l) => CartLine(
         api.CartLineIssueCodeEnum.OUT_OF_STOCK => CartIssueCode.outOfStock,
         api.CartLineIssueCodeEnum.QUANTITY_UNAVAILABLE =>
           CartIssueCode.quantityUnavailable,
+        api.CartLineIssueCodeEnum.MIN_QTY_REQUIRED =>
+          CartIssueCode.minQtyRequired,
         _ => CartIssueCode.unknown,
       },
       message: issue.message,
@@ -195,8 +200,12 @@ CheckoutBlockerCode _blockerCode(api.CheckoutBlockerCodeEnum code) =>
         CheckoutBlockerCode.storeClosed,
       api.CheckoutBlockerCodeEnum.STOCK_UNAVAILABLE =>
         CheckoutBlockerCode.stockUnavailable,
+      api.CheckoutBlockerCodeEnum.MIN_QTY_REQUIRED =>
+        CheckoutBlockerCode.minQtyRequired,
       api.CheckoutBlockerCodeEnum.MIN_ORDER_NOT_MET =>
         CheckoutBlockerCode.minOrderNotMet,
+      api.CheckoutBlockerCodeEnum.MIN_UNITS_NOT_MET =>
+        CheckoutBlockerCode.minUnitsNotMet,
       api.CheckoutBlockerCodeEnum.COUPON_INVALID =>
         CheckoutBlockerCode.couponInvalid,
       api.CheckoutBlockerCodeEnum.COUPON_EXPIRED =>

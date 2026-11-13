@@ -17,14 +17,20 @@ const _padding = 6.0;
 
 /// The height a [ProductTile] needs at the current text scale, so grids and
 /// rails grow with the system font size instead of overflowing.
-double productTileExtent(BuildContext context) {
+/// [minQtyHint]: some tile shows the "Min 5" line (see [needsMinQtyHint]).
+double productTileExtent(BuildContext context, {bool minQtyHint = false}) {
   final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
   // Fixed: padding, image, gaps, the 48 dp stepper and slack. Text (at
   // 14 sp = 1.0): two name lines (40), variant or options (16), stock label
-  // (16) and the price, which may wrap the MRP onto a second line (20 + 16).
+  // (16) and the price, which may wrap the MRP onto a second line (20 + 16),
+  // plus the "Min 5" line (16) when shown.
   const fixed = 2 * _padding + _imageHeight + 2 * JivoSpacing.sm + 48 + 6;
-  return fixed + 108 * scale;
+  return fixed + (minQtyHint ? 124 : 108) * scale;
 }
+
+/// Some tile in [items] shows the "Min 5" line: its row needs the room.
+bool needsMinQtyHint(List<CatalogProduct> items) =>
+    items.any((p) => p.defaultVariant.hasMinQty);
 
 /// A product tile (`03 §2.5`): image, discount badge, veg mark, name, the
 /// default variant, price with struck-out MRP, stock label and the ADD
@@ -120,6 +126,8 @@ class ProductTile extends StatelessWidget {
                     mrp: variant.mrp,
                   ),
                 ),
+                if (variant.hasMinQty)
+                  MinQtyHint(variant: variant, compact: true),
                 const SizedBox(height: JivoSpacing.sm),
                 if (product.hasOptions)
                   _OptionsControl(product: product)
@@ -230,6 +238,7 @@ Future<void> showVariantPicker(BuildContext context, CatalogProduct product) =>
                                   color: theme.colorScheme.error,
                                 ),
                               ),
+                            MinQtyHint(variant: variant),
                           ],
                         ),
                       ),
@@ -260,7 +269,7 @@ class ProductRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: productTileExtent(context),
+    height: productTileExtent(context, minQtyHint: needsMinQtyHint(items)),
     child: ListView.separated(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: JivoSpacing.gutter),
@@ -284,7 +293,10 @@ class SliverProductGrid extends StatelessWidget {
   Widget build(BuildContext context) => SliverGrid.builder(
     gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
       maxCrossAxisExtent: 200,
-      mainAxisExtent: productTileExtent(context),
+      mainAxisExtent: productTileExtent(
+        context,
+        minQtyHint: needsMinQtyHint(items),
+      ),
       crossAxisSpacing: JivoSpacing.sm,
       mainAxisSpacing: JivoSpacing.sm,
     ),

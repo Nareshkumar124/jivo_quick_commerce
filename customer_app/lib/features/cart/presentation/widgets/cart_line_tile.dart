@@ -12,8 +12,10 @@ import '../cart_controller.dart';
 import '../cart_texts.dart';
 
 /// One cart line (`03 §2.8`): image, name, pack size, the server's price
-/// and MRP, a stepper capped at `orderable_quantity`, the line total and a
-/// remove button. A stock problem shows a flag and its fix action.
+/// and MRP, the minimum per order when above 1, a stepper capped at
+/// `orderable_quantity` (minus at the minimum removes the line), the line
+/// total and a remove button. A stock or minimum problem shows a flag and
+/// its fix action.
 class CartLineTile extends ConsumerWidget {
   const CartLineTile({required this.line, super.key});
 
@@ -35,6 +37,10 @@ class CartLineTile extends ConsumerWidget {
     final issueText = flagged ? lineIssueText(l10n, line) : null;
     final fixLabel = flagged ? lineFixText(l10n, line) : null;
     final outOfStock = flagged && line.orderableQuantity == 0;
+    // The flag already says "Order at least N".
+    final minHint =
+        line.variant.hasMinQty &&
+        line.issue?.code != CartIssueCode.minQtyRequired;
 
     return Padding(
       key: ValueKey('cart-line-$id'),
@@ -70,6 +76,7 @@ class CartLineTile extends ConsumerWidget {
                 ),
                 const SizedBox(height: JivoSpacing.xs),
                 PriceLine(price: line.sellingPrice, mrp: line.mrp),
+                if (minHint) MinQtyHint(variant: line.variant),
                 if (issueText != null)
                   Text(
                     issueText,

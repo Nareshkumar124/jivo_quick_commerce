@@ -68,6 +68,100 @@ void main() {
     expect(cart.quantityOf(1002), 3);
   });
 
+  test(
+    'MIN_QTY_REQUIRED: the line flag, the blocker and the minimum',
+    () async {
+      // The contract's cart with one line below a raised minimum.
+      final cart = Map<String, Object?>.from(
+        contractExample('cart_retrieve/200/ReadyToOrder')! as Map,
+      );
+      final line = Map<String, Object?>.from(
+        (cart['items']! as List).first as Map,
+      );
+      line['variant'] = {
+        ...(line['variant']! as Map).cast<String, Object?>(),
+        'min_qty_per_order': 5,
+      };
+      line['issue'] = {
+        'code': 'MIN_QTY_REQUIRED',
+        'message': 'At least 5 per order.',
+      };
+      cart['items'] = [line];
+      cart['checkout'] = {
+        'can_place_order': false,
+        'blockers': [
+          {
+            'code': 'MIN_QTY_REQUIRED',
+            'message': 'Some items are below their minimum per order.',
+          },
+        ],
+      };
+      answer = (_, _) => cart;
+
+      final snapshot = await repository.load();
+      final mapped = snapshot.lines.single;
+      expect(mapped.minQty, 5);
+      expect(mapped.issue!.code, CartIssueCode.minQtyRequired);
+      expect(
+        snapshot.checkout.blockers.single.code,
+        CheckoutBlockerCode.minQtyRequired,
+      );
+    },
+  );
+
+  test(
+    'a MIN_QTY_REQUIRED answer reaches the caller with its minimum',
+    () async {
+      answer = (_, _) =>
+          (422, contractExample('cart_items_add/422/MINQTYREQUIRED'));
+      await expectLater(
+        repository.setQuantity(1002, 1),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.code, 'code', ApiErrorCode.minQtyRequired)
+              .having((e) => e.minQtyPerOrder, 'min', 2),
+        ),
+      );
+    },
+  );
+
+  test('MIN_UNITS_NOT_MET: the units thresholds and the blocker', () async {
+    final cart = Map<String, Object?>.from(
+      contractExample('cart_retrieve/200/ReadyToOrder')! as Map,
+    );
+    cart['thresholds'] = {
+      ...(cart['thresholds']! as Map).cast<String, Object?>(),
+      'min_order_units': 5,
+      'units_to_min_order': 2,
+      'order_unit_label': 'cartons',
+    };
+    cart['checkout'] = {
+      'can_place_order': false,
+      'blockers': [
+        {
+          'code': 'MIN_UNITS_NOT_MET',
+          'message': 'Add 2 more cartons to place your order.',
+        },
+      ],
+    };
+    answer = (_, _) => cart;
+
+    final snapshot = await repository.load();
+    expect(snapshot.thresholds!.minOrderUnits, 5);
+    expect(snapshot.thresholds!.unitsToMinOrder, 2);
+    expect(snapshot.thresholds!.orderUnitLabel, 'cartons');
+    expect(
+      snapshot.checkout.blockers.single.code,
+      CheckoutBlockerCode.minUnitsNotMet,
+    );
+
+    // The contract's default: the rule is off.
+    answer = (_, _) => contractExample('cart_retrieve/200/ReadyToOrder');
+    final plain = await repository.load();
+    expect(plain.thresholds!.minOrderUnits, 0);
+    expect(plain.thresholds!.unitsToMinOrder, isNull);
+  });
+
   test('every documented cart decodes', () async {
     for (final name in [
       'ReadyToOrder',

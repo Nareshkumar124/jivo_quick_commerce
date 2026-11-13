@@ -179,5 +179,6 @@ const _$ReorderIssueReasonEnumEnumMap = {
   ReorderIssueReasonEnum.OUT_OF_STOCK: 'OUT_OF_STOCK',
   ReorderIssueReasonEnum.LIMITED_STOCK: 'LIMITED_STOCK',
   ReorderIssueReasonEnum.NOT_AVAILABLE: 'NOT_AVAILABLE',
+  ReorderIssueReasonEnum.MIN_QTY_REQUIRED: 'MIN_QTY_REQUIRED',
   ReorderIssueReasonEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

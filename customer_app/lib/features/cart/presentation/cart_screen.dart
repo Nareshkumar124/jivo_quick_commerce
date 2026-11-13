@@ -134,6 +134,8 @@ class _CartContent extends StatelessWidget {
     final snapshot = cart.snapshot;
     final bill = snapshot.bill;
     final nudge = snapshot.thresholds?.amountToFreeDelivery;
+    // The store's minimum number of units per order (any mix of products).
+    final minUnits = minUnitsWarning(l10n, snapshot.thresholds);
     final loadError = cart.loadError;
     const gap = SizedBox(height: JivoSpacing.lg);
 
@@ -155,6 +157,15 @@ class _CartContent extends StatelessWidget {
             key: const Key('cart-problems'),
             icon: Icons.warning_amber_outlined,
             text: l10n.cartProblemsBanner,
+            color: theme.colorScheme.error,
+          ),
+          gap,
+        ],
+        if (minUnits != null) ...[
+          _Notice(
+            key: const Key('min-units-warning'),
+            icon: Icons.inventory_2_outlined,
+            text: minUnits,
             color: theme.colorScheme.error,
           ),
           gap,

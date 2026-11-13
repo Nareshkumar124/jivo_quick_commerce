@@ -60,7 +60,7 @@ class CartLine {
   @JsonKey(name: r'line_total', required: true, includeIfNull: false)
   final String lineTotal;
 
-  /// Set when the line cannot be ordered as it is (quantity above `variant.orderable_quantity`, which is 0 when out of stock or no longer sold). Fix: set the quantity to `variant.orderable_quantity`, or remove the line when it is 0. Null when the line is fine.
+  /// Set when the line cannot be ordered as it is: quantity above `variant.orderable_quantity` (which is 0 when out of stock or no longer sold), or below `variant.min_qty_per_order` (`MIN_QTY_REQUIRED`, e.g. the minimum was raised after the line was added). Fix: set the quantity to `variant.orderable_quantity` (for `MIN_QTY_REQUIRED`, to `variant.min_qty_per_order`), or remove the line when `orderable_quantity` is 0. Null when the line is fine.
   @JsonKey(name: r'issue', required: true, includeIfNull: true)
   final CartLineIssue? issue;
 

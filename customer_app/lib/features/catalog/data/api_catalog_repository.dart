@@ -236,6 +236,7 @@ CatalogVariant variantFromApi(api.VariantSummary v) => CatalogVariant(
   orderableQuantity: v.orderableQuantity,
   unitsLeft: v.unitsLeft,
   maxQtyPerOrder: v.maxQtyPerOrder,
+  minQtyPerOrder: v.minQtyPerOrder,
   unitPrice: _unitPrice(v.unitPrice),
   imageUrl: v.image?.medium,
 );
@@ -251,6 +252,7 @@ CatalogVariant _variantDetail(api.VariantDetail v) => CatalogVariant(
   orderableQuantity: v.orderableQuantity,
   unitsLeft: v.unitsLeft,
   maxQtyPerOrder: v.maxQtyPerOrder,
+  minQtyPerOrder: v.minQtyPerOrder,
   unitPrice: _unitPrice(v.unitPrice),
   imageUrl: v.image?.medium,
   images: [for (final i in v.images) i.large],

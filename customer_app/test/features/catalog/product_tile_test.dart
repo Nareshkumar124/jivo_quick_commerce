@@ -257,6 +257,157 @@ void main() {
     expect(find.byType(SnackBar), findsOneWidget);
   });
 
+  group('minimum per order', () {
+    CatalogProduct water({int orderable = 20}) => product(
+      name: 'Jivo Water 1 L x 12',
+      only: variant(
+        id: 1501,
+        name: '1 L x 12',
+        orderable: orderable,
+        maxQty: 1000,
+        minQty: 5,
+      ),
+    );
+
+    testWidgets('"Min 5" shows near ADD; ADD adds 5; minus at 5 removes', (
+      tester,
+    ) async {
+      final cart = await pumpTile(tester, water());
+      expect(find.text('Min 5'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Minimum 5 per order'),
+        findsOneWidget,
+        reason: 'screen readers hear the full hint',
+      );
+
+      await tester.tap(find.text('ADD'));
+      await tester.pumpAndSettle();
+      expect(qty(tester, 1501), '5');
+      expect((await cart.load()).quantityOf(1501), 5);
+
+      await tester.tap(find.byKey(const ValueKey('inc-1501')));
+      await tester.pumpAndSettle();
+      expect(qty(tester, 1501), '6');
+
+      await tester.tap(find.byKey(const ValueKey('dec-1501')));
+      await tester.pumpAndSettle();
+      expect(qty(tester, 1501), '5');
+
+      await tester.tap(find.byKey(const ValueKey('dec-1501')));
+      await tester.pumpAndSettle();
+      expect(find.text('ADD'), findsOneWidget);
+      expect((await cart.load()).isEmpty, isTrue);
+      expect(find.text('Min 5'), findsOneWidget, reason: 'hint stays');
+    });
+
+    testWidgets('min 1: no hint, ADD adds one', (tester) async {
+      final slow = SlowCartRepository();
+      await pumpTile(tester, product(), repository: slow);
+      expect(find.textContaining('Min'), findsNothing);
+      expect(find.textContaining('Minimum'), findsNothing);
+      await tester.tap(find.text('ADD'));
+      await tester.pump();
+      expect(slow.calls, [(101, 1)]);
+      slow.release();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('fewer orderable than the minimum: out of stock', (
+      tester,
+    ) async {
+      await pumpTile(tester, water(orderable: 4));
+      expect(find.text('Out of stock'), findsOneWidget);
+      expect(find.text('ADD'), findsNothing);
+    });
+
+    testWidgets('MIN_QTY_REQUIRED shows the minimum with the item name', (
+      tester,
+    ) async {
+      // The tile predates a raised minimum: it still says min 1.
+      final cart = FakeCommerceBackend(latency: Duration.zero)
+        ..minimums[101] = 5;
+      await pumpTile(tester, product(), repository: cart);
+
+      await tester.tap(find.text('ADD'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('You need to order at least 5 of Jivo Canola Oil 1 L.'),
+        findsOneWidget,
+      );
+      expect(find.text('ADD'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      // The next tap uses the server's minimum.
+      await tester.tap(find.text('ADD'));
+      await tester.pumpAndSettle();
+      expect(qty(tester, 101), '5');
+    });
+
+    testWidgets('the variant picker shows each variant\'s minimum', (
+      tester,
+    ) async {
+      await pumpTile(
+        tester,
+        product(
+          variants: [
+            variant(),
+            variant(id: 102, name: '1 L x 12', maxQty: 1000, minQty: 5),
+          ],
+        ),
+      );
+      expect(find.text('Min 5'), findsNothing, reason: 'default is min 1');
+      await tester.tap(find.text('ADD'));
+      await tester.pumpAndSettle();
+      expect(find.text('Minimum 5 per order'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('add-102')));
+      await tester.pumpAndSettle();
+      expect(qty(tester, 102), '5');
+    });
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('a grid with a "Min 5" tile does not overflow at ${scale}x', (
+        tester,
+      ) async {
+        tester.view.physicalSize = const Size(360, 740);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(
+          harness(
+            CustomScrollView(
+              slivers: [
+                SliverProductGrid(
+                  items: [
+                    product(
+                      name: 'Jivo Packaged Drinking Water with a long name',
+                      only: variant(
+                        status: StockStatus.lowStock,
+                        unitsLeft: 8,
+                        orderable: 8,
+                        maxQty: 1000,
+                        minQty: 5,
+                      ),
+                    ),
+                    product(id: 2, only: variant(id: 2)),
+                  ],
+                ),
+              ],
+            ),
+            overrides: [
+              cartRepositoryProvider.overrideWithValue(
+                FakeCommerceBackend(latency: Duration.zero),
+              ),
+            ],
+            textScaler: TextScaler.linear(scale),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('Min 5'), findsOneWidget);
+      });
+    }
+  });
+
   testWidgets('with several variants, ADD opens the variant picker', (
     tester,
   ) async {

@@ -74,7 +74,7 @@ const storeJson = {
   'opens_at': null,
 };
 
-Map<String, Object?> variantJson({int id = 101}) => {
+Map<String, Object?> variantJson({int id = 101, int minQty = 1}) => {
   'id': id,
   'name': '1 L',
   'mrp': '299.00',
@@ -86,6 +86,7 @@ Map<String, Object?> variantJson({int id = 101}) => {
   'orderable_quantity': 2,
   'units_left': 2,
   'max_qty_per_order': 5,
+  'min_qty_per_order': minQty,
   'image': null,
 };
 
@@ -469,6 +470,62 @@ void main() {
     final page = await repository.products(category: 'edible-oils');
     expect(page.nextPage, 2);
     expect(http.requests.last.queryParameters['page_size'], 20);
+  });
+
+  test('min_qty_per_order maps onto cards and detail variants', () async {
+    Map<String, Object?> water(Map<String, Object?> v) => {
+      ...v,
+      'orderable_quantity': 20,
+      'stock_status': 'IN_STOCK',
+      'units_left': null,
+      'max_qty_per_order': 1000,
+      'min_qty_per_order': 5,
+    };
+    final http = FakeHttp((request) {
+      if (request.path == '/api/v1/products/jivo-canola-oil/') {
+        final detail = detailJson();
+        final variant = (detail['variants']! as List).single as Map;
+        return (
+          200,
+          {
+            ...detail,
+            'variants': [water(variant.cast<String, Object?>())],
+          },
+        );
+      }
+      return (
+        200,
+        {
+          'count': 1,
+          'next': null,
+          'previous': null,
+          'results': [
+            {
+              ...cardJson(),
+              'variants': [water(variantJson())],
+            },
+          ],
+        },
+      );
+    });
+    final repository = ApiCatalogRepository(http.api(), () => 7);
+
+    final card = (await repository.products()).items.single.defaultVariant;
+    expect(card.minQtyPerOrder, 5);
+    expect(card.hasMinQty, isTrue);
+    expect(card.inStock, isTrue);
+    final detail = (await repository.product('jivo-canola-oil')).defaultVariant;
+    expect(detail.minQty, 5);
+
+    // The default contract value is 1: no minimum.
+    final plain = await ApiCatalogRepository(
+      FakeHttp(backend).api(),
+      () => 7,
+    ).home();
+    expect(
+      plain.collections.single.items.single.defaultVariant.hasMinQty,
+      isFalse,
+    );
   });
 
   test('without a store the catalog asks for the location again', () async {
