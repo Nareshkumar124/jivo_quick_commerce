@@ -127,6 +127,23 @@ class CartSnapshot {
 
   /// Cash on Delivery is shown only when eligible (`03 §2.9`).
   bool get codAvailable => offers(PaymentMethod.cod);
+
+  /// This snapshot with another [checkout] status (everything else kept).
+  CartSnapshot withCheckout(CheckoutStatus checkout) => CartSnapshot(
+    quantities: quantities,
+    itemCount: itemCount,
+    itemTotal: itemTotal,
+    lines: lines,
+    bill: bill,
+    coupon: coupon,
+    tip: tip,
+    instructions: instructions,
+    addressId: addressId,
+    thresholds: thresholds,
+    paymentOptions: paymentOptions,
+    checkout: checkout,
+    storeOpen: storeOpen,
+  );
 }
 
 /// `CartLineIssueCodeEnum`.

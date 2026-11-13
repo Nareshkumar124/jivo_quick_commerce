@@ -47,6 +47,20 @@ Future<TestApp> appWithOil({int quantity = 2, int orderable = 5}) async {
 String textOf(WidgetTester tester, String key) =>
     tester.widget<Text>(find.byKey(ValueKey(key))).data!;
 
+/// Taps a cart line's quantity box, types [text] and taps Update (there is
+/// no - or +).
+Future<void> typeLineQty(
+  WidgetTester tester,
+  int variantId,
+  String text,
+) async {
+  await tester.tap(find.byKey(ValueKey('qty-edit-line-$variantId')));
+  await tester.pumpAndSettle();
+  await tester.enterText(find.byKey(const Key('qty-field')), text);
+  await tester.tap(find.byKey(const Key('qty-update')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(initializeFormatting);
 
@@ -261,15 +275,13 @@ void main() {
       expect(textOf(tester, 'checkout-blocked'), warning, reason: 'blocker');
       expect(proceed(tester).onPressed, isNull);
 
-      await tester.tap(find.byKey(const ValueKey('inc-line-1502')));
-      await tester.pumpAndSettle();
+      await typeLineQty(tester, 1502, '2');
       expect(
         notice('Add 1 more to place your order (minimum 5 cartons)'),
         findsOneWidget,
       );
 
-      await tester.tap(find.byKey(const ValueKey('inc-line-1501')));
-      await tester.pumpAndSettle();
+      await typeLineQty(tester, 1501, '3');
       expect(find.byKey(const Key('min-units-warning')), findsNothing);
       expect(find.byKey(const Key('checkout-blocked')), findsNothing);
       expect(proceed(tester).onPressed, isNotNull);
@@ -282,7 +294,7 @@ void main() {
   });
 
   group('minimum per order', () {
-    testWidgets('the line shows its minimum; minus at the minimum removes', (
+    testWidgets('the line shows its minimum; below it is refused; 0 removes', (
       tester,
     ) async {
       final app = TestApp(tokens: signedInTokens);
@@ -297,7 +309,10 @@ void main() {
       await openCart(tester, app);
       expect(find.text('Minimum 5 per order'), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('dec-line-1501')));
+      await typeLineQty(tester, 1501, '4');
+      expect(find.byKey(const Key('qty-dialog')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('qty-field')), '0');
+      await tester.tap(find.byKey(const Key('qty-update')));
       await tester.pumpAndSettle();
       expect((await app.cart.load()).isEmpty, isTrue);
       expect(find.byKey(const Key('cart-empty')), findsOneWidget);
@@ -338,8 +353,8 @@ void main() {
     });
   });
 
-  testWidgets('with a saved address, + and − never ask to save the location '
-      '(staging bug)', (tester) async {
+  testWidgets('with a saved address, a quantity change never asks to save '
+      'the location (staging bug)', (tester) async {
     // The test location is saved address 1; the cart loads ?address_id=1.
     await openCart(tester, await appWithOil());
     FilledButton proceed() => tester.widget<FilledButton>(
@@ -351,9 +366,8 @@ void main() {
     expect(find.byKey(const Key('checkout-blocked')), findsNothing);
     expect(proceed().onPressed, isNotNull);
 
-    for (final key in ['inc-line-101', 'dec-line-101']) {
-      await tester.tap(find.byKey(ValueKey(key)));
-      await tester.pumpAndSettle();
+    for (final key in ['3', '2']) {
+      await typeLineQty(tester, 101, key);
       expect(
         find.byKey(const Key('checkout-blocked')),
         findsNothing,
@@ -391,12 +405,14 @@ void main() {
     expect(find.byKey(const Key('cart-empty')), findsOneWidget);
   });
 
-  testWidgets('steppers and remove change the server cart', (tester) async {
+  testWidgets('the quantity box and remove change the server cart', (
+    tester,
+  ) async {
     final app = await appWithOil();
     await openCart(tester, app);
+    expect(find.byIcon(Icons.add), findsNothing, reason: 'no - or +');
 
-    await tester.tap(find.byKey(const ValueKey('inc-line-101')));
-    await tester.pumpAndSettle();
+    await typeLineQty(tester, 101, '3');
     expect((await app.cart.load()).quantityOf(101), 3);
     expect(textOf(tester, 'cart-line-total-101'), '₹747');
 

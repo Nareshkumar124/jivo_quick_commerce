@@ -13,13 +13,14 @@ import 'cart_controller.dart';
 import 'cart_texts.dart';
 import 'quantity_dialog.dart';
 
-/// ADD, which becomes − qty + once the variant is in the cart (`03 §2.5`).
-///
-/// Out-of-stock variants show "Out of stock" instead. ADD adds the
-/// variant's `min_qty_per_order` at once; minus at that quantity removes
-/// it. Plus stops at the server's `orderable_quantity` with a message.
-/// Buttons are disabled while a change for this variant is in flight.
-/// Every target is 48 dp.
+/// ADD, which becomes a quantity box once the variant is in the cart
+/// (`03 §2.5`). There is no − or +: both open the "Enter quantity" dialog
+/// (bulk orders are typed), ADD prefilled with the variant's
+/// `min_qty_per_order`, the box with the quantity in the cart. The dialog
+/// checks the cap (`orderable_quantity`) and the minimum; one request sets
+/// the quantity. Out-of-stock variants show "Out of stock" instead. Taps
+/// are ignored while a change for this variant is in flight. Every target
+/// is 48 dp.
 class AddStepper extends ConsumerWidget {
   const AddStepper({
     required this.variant,
@@ -39,7 +40,7 @@ class AddStepper extends ConsumerWidget {
         names: {variant.id: '$productName ${variant.name}'},
       );
 
-  /// Tapping the number: type a quantity, sent in one request.
+  /// ADD or the quantity box: type a quantity, sent in one request.
   Future<void> _typeQuantity(
     BuildContext context,
     CartController cart,
@@ -48,6 +49,7 @@ class AddStepper extends ConsumerWidget {
     final typed = await showQuantityDialog(
       context,
       current: quantity,
+      initial: quantity == 0 ? variant.minQty : quantity,
       max: variant.maxSelectable,
       min: variant.minQty,
     );
@@ -84,28 +86,13 @@ class AddStepper extends ConsumerWidget {
               key: ValueKey('add-${variant.id}'),
               semanticsLabel: l10n.addToCartSemantics(productName),
               busy: slow,
-              onPressed: pending
-                  ? null
-                  : () => _run(
-                      context,
-                      () => cart.increment(variant, productName: productName),
-                    ),
+              onPressed: pending ? null : () => _typeQuantity(context, cart, 0),
             )
-          : QuantityStepper(
+          : QuantityBox(
               id: '${variant.id}',
               quantity: quantity,
-              productName: productName,
               busy: slow,
-              onDecrement: pending
-                  ? null
-                  : () => _run(context, () => cart.decrement(variant)),
-              onIncrement: pending
-                  ? null
-                  : () => _run(
-                      context,
-                      () => cart.increment(variant, productName: productName),
-                    ),
-              onQuantityTap: pending
+              onTap: pending
                   ? null
                   : () => _typeQuantity(context, cart, quantity),
             ),
@@ -329,115 +316,83 @@ class AddButton extends StatelessWidget {
   }
 }
 
-/// − qty +, 48 dp targets. Null callbacks disable both buttons.
-class QuantityStepper extends StatelessWidget {
-  const QuantityStepper({
+/// The quantity in the cart as one tappable box, "100 ✎" (`03 §2.5`):
+/// tapping it opens the "Enter quantity" dialog. Full width of its slot,
+/// 48 dp tall, in the old stepper's colours. A null [onTap] ignores taps
+/// (a change is in flight).
+class QuantityBox extends StatelessWidget {
+  const QuantityBox({
     required this.id,
     required this.quantity,
-    required this.productName,
-    required this.onDecrement,
-    required this.onIncrement,
+    required this.onTap,
     this.busy = false,
-    this.onQuantityTap,
     super.key,
   });
 
-  /// Key suffix: `dec-<id>`, `qty-<id>`, `inc-<id>`.
+  /// Key suffix: `qty-edit-<id>` (the tap target), `qty-<id>` (the number),
+  /// `qty-busy-<id>` (the spinner).
   final String id;
+  final int quantity;
+  final VoidCallback? onTap;
 
   /// A slow change is running: a 16 dp spinner instead of the number,
   /// which changes only when the server answers (CA-17).
   final bool busy;
-  final int quantity;
-  final String productName;
-  final VoidCallback? onDecrement;
-  final VoidCallback? onIncrement;
-
-  /// Tapping the number: type a quantity (bulk orders). Null: not
-  /// tappable (and while a change is in flight).
-  final VoidCallback? onQuantityTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final onPrimary = theme.colorScheme.onPrimary;
-    Widget button(String key, IconData icon, String label, VoidCallback? tap) =>
-        IconButton(
-          key: ValueKey('$key-$id'),
-          tooltip: label,
-          onPressed: tap,
-          constraints: const BoxConstraints.tightFor(
-            width: kJivoMinTouchTarget,
+    final tap = busy ? null : onTap;
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      button: true,
+      enabled: tap != null,
+      label: busy ? l10n.updatingQuantity : l10n.quantityBoxLabel(quantity),
+      onTap: tap,
+      excludeSemantics: true,
+      child: Material(
+        color: theme.colorScheme.primary,
+        borderRadius: BorderRadius.circular(JivoRadii.md),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey('qty-edit-$id'),
+          onTap: tap,
+          child: SizedBox(
+            width: double.infinity,
             height: kJivoMinTouchTarget,
-          ),
-          padding: EdgeInsets.zero,
-          color: onPrimary,
-          disabledColor: onPrimary.withValues(alpha: 0.6),
-          icon: Icon(icon, size: 20),
-        );
-
-    return Material(
-      color: theme.colorScheme.primary,
-      borderRadius: BorderRadius.circular(JivoRadii.md),
-      child: SizedBox(
-        height: kJivoMinTouchTarget,
-        child: Row(
-          children: [
-            button(
-              'dec',
-              Icons.remove,
-              l10n.stepperDecrease(productName),
-              onDecrement,
-            ),
-            Expanded(
-              child: Semantics(
-                liveRegion: true,
-                button: onQuantityTap != null && !busy,
-                label: busy
-                    ? l10n.updatingQuantity
-                    : onQuantityTap == null
-                    ? l10n.stepperQuantity(quantity)
-                    : l10n.stepperQuantityTap(quantity),
-                onTap: busy ? null : onQuantityTap,
-                excludeSemantics: true,
-                child: busy
-                    ? Center(
-                        key: ValueKey('qty-busy-$id'),
-                        child: SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: onPrimary,
-                          ),
-                        ),
-                      )
-                    : InkWell(
-                        key: ValueKey('qty-edit-$id'),
-                        onTap: onQuantityTap,
-                        child: Center(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              '$quantity',
-                              key: ValueKey('qty-$id'),
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: onPrimary,
-                                fontWeight: FontWeight.w700,
-                              ),
+            child: Center(
+              child: busy
+                  ? SizedBox.square(
+                      key: ValueKey('qty-busy-$id'),
+                      dimension: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: onPrimary,
+                      ),
+                    )
+                  : FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '$quantity',
+                            key: ValueKey('qty-$id'),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: onPrimary,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ),
+                          const SizedBox(width: JivoSpacing.xs),
+                          Icon(Icons.edit_outlined, size: 16, color: onPrimary),
+                        ],
                       ),
-              ),
+                    ),
             ),
-            button(
-              'inc',
-              Icons.add,
-              l10n.stepperIncrease(productName),
-              onIncrement,
-            ),
-          ],
+          ),
         ),
       ),
     );

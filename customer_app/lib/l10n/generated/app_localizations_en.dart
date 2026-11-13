@@ -406,31 +406,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToCart => 'ADD';
 
   @override
+  String quantityBoxLabel(int count) {
+    return 'Quantity $count, tap to change';
+  }
+
+  @override
   String get updatingQuantity => 'Updating quantity';
 
   @override
   String addToCartSemantics(String name) {
     return 'Add $name to cart';
-  }
-
-  @override
-  String stepperDecrease(String name) {
-    return 'Remove one $name';
-  }
-
-  @override
-  String stepperIncrease(String name) {
-    return 'Add one more $name';
-  }
-
-  @override
-  String stepperQuantity(int count) {
-    return '$count in cart';
-  }
-
-  @override
-  String stepperQuantityTap(int count) {
-    return 'Quantity $count, tap to type a quantity';
   }
 
   @override

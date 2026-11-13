@@ -73,7 +73,7 @@ class CartState {
   );
 }
 
-/// The server cart behind the ADD stepper, the cart bar and the cart
+/// The server cart behind ADD and the quantity box, the cart bar and the cart
 /// screen (`03 §2.5`, `§2.8`).
 ///
 /// Every change goes to [CartRepository], and the cart it returns (lines,
@@ -190,6 +190,27 @@ class CartController extends Notifier<CartState> {
     return refresh();
   }
 
+  /// A change's answer is checked against no address (only `GET /cart/`
+  /// takes `?address_id=`), so with a saved address chosen it wrongly says
+  /// ADDRESS_REQUIRED until [_reloadForAddress] brings the real answer. Drop
+  /// just that blocker meanwhile, so the red warning doesn't flash after
+  /// every change. Proceed still re-checks the cart for the address first.
+  CartSnapshot _withoutAddressBlocker(CartSnapshot snapshot) {
+    if (_addressId == null) return snapshot;
+    final all = snapshot.checkout.blockers;
+    final kept = [
+      for (final blocker in all)
+        if (blocker.code != CheckoutBlockerCode.addressRequired) blocker,
+    ];
+    if (kept.length == all.length) return snapshot;
+    return snapshot.withCheckout(
+      CheckoutStatus(
+        canPlaceOrder: kept.isEmpty && !snapshot.hasProblems,
+        blockers: kept,
+      ),
+    );
+  }
+
   /// Only `GET /cart/` takes `?address_id=`. Every other cart call answers
   /// with the cart checked against no address (the app never saves one on
   /// the server cart, so a later pin can't silently keep an old address),
@@ -207,29 +228,6 @@ class CartController extends Notifier<CartState> {
     } catch (error) {
       _checkStore(error);
     }
-  }
-
-  /// ADD (not in the cart yet) adds the variant's minimum per order in one
-  /// request; after that, plus adds one. Throws [CartLimitException] at the
-  /// cap, or the repository's `ApiError`. [productName] only feeds the dev
-  /// fake cart.
-  Future<void> increment(CatalogVariant variant, {String? productName}) async {
-    final next = _raised(state.quantityOf(variant.id) + 1, _minFor(variant));
-    if (next > variant.maxSelectable) {
-      throw CartLimitException(CartLimit.maxReached, variant.maxSelectable);
-    }
-    await _set(
-      variant.id,
-      next,
-      preview: CartLinePreview.of(variant, productName ?? variant.name),
-    );
-  }
-
-  /// Removes one of [variant]; at its minimum per order, the whole line.
-  Future<void> decrement(CatalogVariant variant) async {
-    final current = state.quantityOf(variant.id);
-    if (current == 0) return;
-    await _set(variant.id, _lowered(current - 1, _minFor(variant)));
   }
 
   /// Sets [variant] to a typed [quantity] in one request (bulk orders; 0
@@ -328,7 +326,7 @@ class CartController extends Notifier<CartState> {
     final ticket = ++_issued;
     state = state.copyWith(updating: true);
     try {
-      _apply(ticket, await call(_repository));
+      _apply(ticket, _withoutAddressBlocker(await call(_repository)));
     } catch (error) {
       _checkStore(error);
       rethrow;
@@ -349,7 +347,9 @@ class CartController extends Notifier<CartState> {
     try {
       _apply(
         ticket,
-        await _repository.setQuantity(variantId, quantity, preview: preview),
+        _withoutAddressBlocker(
+          await _repository.setQuantity(variantId, quantity, preview: preview),
+        ),
       );
     } catch (error) {
       _checkStore(error);
@@ -360,7 +360,7 @@ class CartController extends Notifier<CartState> {
         state = state.copyWith(pending: {...state.pending}..remove(variantId));
       }
     }
-    // After the stepper is free again: no extra wait per tap.
+    // After the quantity box is free again: no extra wait per change.
     await _reloadForAddress();
   }
 }

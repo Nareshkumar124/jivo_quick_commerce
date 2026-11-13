@@ -169,14 +169,11 @@ class _OptionsControl extends ConsumerWidget {
         onPressed: pick,
       );
     }
-    return QuantityStepper(
+    // Per-variant quantities are typed in the picker.
+    return QuantityBox(
       id: 'product-${product.id}',
       quantity: total,
-      productName: product.name,
-      onDecrement: pick,
-      onIncrement: pick,
-      // Per-variant quantities are typed in the picker.
-      onQuantityTap: pick,
+      onTap: pick,
     );
   }
 }
