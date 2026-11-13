@@ -14,9 +14,11 @@ import 'cart_texts.dart';
 
 /// ADD, which becomes − qty + once the variant is in the cart (`03 §2.5`).
 ///
-/// Out-of-stock variants show "Out of stock" instead. Plus stops at the
-/// server's `orderable_quantity` with a message. Buttons are disabled while
-/// a change for this variant is in flight. Every target is 48 dp.
+/// Out-of-stock variants show "Out of stock" instead. ADD adds the
+/// variant's `min_qty_per_order` at once; minus at that quantity removes
+/// it. Plus stops at the server's `orderable_quantity` with a message.
+/// Buttons are disabled while a change for this variant is in flight.
+/// Every target is 48 dp.
 class AddStepper extends ConsumerWidget {
   const AddStepper({
     required this.variant,
@@ -169,6 +171,42 @@ Future<void> runCartChange(
         cartErrorText(context, error, cart: cart, names: names),
       );
     }
+  }
+}
+
+/// The minimum per order near ADD: "Min 5" ([compact], product tiles) or
+/// "Minimum 5 per order" (product detail, variant picker, cart lines).
+/// Nothing when the variant's `min_qty_per_order` is 1.
+class MinQtyHint extends StatelessWidget {
+  const MinQtyHint({required this.variant, this.compact = false, super.key});
+
+  final CatalogVariant variant;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!variant.hasMinQty) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final count = variant.minQty;
+    final style = compact
+        ? theme.textTheme.labelSmall
+        : theme.textTheme.bodySmall;
+    return Semantics(
+      // "Min 5" alone is unclear to a screen-reader user.
+      label: l10n.minQtyPerOrder(count),
+      excludeSemantics: true,
+      child: Text(
+        compact ? l10n.minQtyShort(count) : l10n.minQtyPerOrder(count),
+        key: ValueKey('min-qty-${variant.id}'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
   }
 }
 

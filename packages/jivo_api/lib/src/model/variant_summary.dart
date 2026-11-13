@@ -44,6 +44,8 @@ class VariantSummary {
 
     required this.maxQtyPerOrder,
 
+    required this.minQtyPerOrder,
+
     required this.image,
   });
 
@@ -85,7 +87,7 @@ class VariantSummary {
   )
   final StockStatusEnum stockStatus;
 
-  /// Units a customer can add right now: min(units in stock at this store, `max_qty_per_order`). 0 when out of stock. Cap the ADD stepper here.
+  /// Units a customer can add right now: min(units in stock at this store, `max_qty_per_order`). 0 when out of stock, including when fewer than `min_qty_per_order` units can be sold. Cap the ADD stepper here.
   // minimum: 0
   @JsonKey(name: r'orderable_quantity', required: true, includeIfNull: false)
   final int orderableQuantity;
@@ -99,6 +101,11 @@ class VariantSummary {
   // minimum: 1
   @JsonKey(name: r'max_qty_per_order', required: true, includeIfNull: false)
   final int maxQtyPerOrder;
+
+  /// Fewest units of this variant one order can have (1 = no minimum; never above `max_qty_per_order`). The first ADD sets this quantity, and the stepper never goes below it: stepping down from here removes the line (quantity 0). The cart refuses 1 to `min_qty_per_order` - 1 with 422 `MIN_QTY_REQUIRED`.
+  // minimum: 1
+  @JsonKey(name: r'min_qty_per_order', required: true, includeIfNull: false)
+  final int minQtyPerOrder;
 
   /// The variant's own first image, else the product's. Null when none.
   @JsonKey(name: r'image', required: true, includeIfNull: true)
@@ -119,6 +126,7 @@ class VariantSummary {
           other.orderableQuantity == orderableQuantity &&
           other.unitsLeft == unitsLeft &&
           other.maxQtyPerOrder == maxQtyPerOrder &&
+          other.minQtyPerOrder == minQtyPerOrder &&
           other.image == image;
 
   @override
@@ -134,6 +142,7 @@ class VariantSummary {
       orderableQuantity.hashCode +
       (unitsLeft == null ? 0 : unitsLeft.hashCode) +
       maxQtyPerOrder.hashCode +
+      minQtyPerOrder.hashCode +
       (image == null ? 0 : image.hashCode);
 
   factory VariantSummary.fromJson(Map<String, dynamic> json) =>

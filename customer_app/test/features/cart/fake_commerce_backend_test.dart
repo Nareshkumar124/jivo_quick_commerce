@@ -132,6 +132,78 @@ void main() {
     expect(cart.lines.single.orderableQuantity, 1);
   });
 
+  group('minimum per order (MIN_QTY_REQUIRED)', () {
+    Future<CartSnapshot> addWater(int quantity, {int orderable = 5}) =>
+        backend.setQuantity(
+          1501,
+          quantity,
+          preview: CartLinePreview.of(
+            oil(id: 1501, orderable: orderable, minQty: 5),
+            'Jivo Water 1 L x 12',
+          ),
+        );
+
+    test('1..min-1 is refused up and down; min and 0 are fine', () async {
+      await expectLater(
+        addWater(1),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.code, 'code', ApiErrorCode.minQtyRequired)
+              .having((e) => e.statusCode, 'status', 422)
+              .having((e) => e.details, 'details', {
+                'variant_id': 1501,
+                'min_qty_per_order': 5,
+              }),
+        ),
+      );
+      final cart = await addWater(5);
+      expect(cart.lines.single.quantity, 5);
+      expect(cart.lines.single.minQty, 5);
+      expect(cart.lines.single.issue, isNull);
+      await expectLater(addWater(4), apiError(ApiErrorCode.minQtyRequired));
+      expect((await addWater(0)).isEmpty, isTrue);
+    });
+
+    test('fewer orderable than the minimum is out of stock', () async {
+      await addWater(5);
+      backend.stock[1501] = 4;
+      final line = (await backend.load()).lines.single;
+      expect(line.orderableQuantity, 0);
+      expect(line.issue!.code, CartIssueCode.outOfStock);
+    });
+
+    test('a raised minimum flags the line, blocks checkout and refuses the '
+        'order', () async {
+      await add(2);
+      backend.minimums[101] = 5;
+      final cart = await backend.load(addressId: 1);
+      expect(cart.lines.single.issue!.code, CartIssueCode.minQtyRequired);
+      expect(
+        cart.checkout.blockers.map((b) => b.code),
+        contains(CheckoutBlockerCode.minQtyRequired),
+      );
+      expect(
+        cart.checkout.blockers.map((b) => b.code),
+        isNot(contains(CheckoutBlockerCode.stockUnavailable)),
+      );
+      await expectLater(
+        backend.placeOrder(
+          PlaceOrderRequest(
+            addressId: 1,
+            paymentMethod: PaymentMethod.cod,
+            expectedGrandTotal: cart.bill!.grandTotal,
+          ),
+          idempotencyKey: 'min',
+        ),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.code, 'code', ApiErrorCode.minQtyRequired)
+              .having((e) => e.minQtyPerOrder, 'min', 5),
+        ),
+      );
+    });
+  });
+
   test('ONLINE: fake gateway key, HMAC verify, idempotent key', () async {
     await add(2);
     final order = await backend.placeOrder(online, idempotencyKey: 'k1');

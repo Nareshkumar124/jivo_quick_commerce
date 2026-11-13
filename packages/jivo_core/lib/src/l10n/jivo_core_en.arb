@@ -38,6 +38,8 @@
   "@errorStockUnavailable": {"description": "STOCK_UNAVAILABLE"},
   "errorMaxQtyExceeded": "You've reached the maximum quantity for this item.",
   "@errorMaxQtyExceeded": {"description": "MAX_QTY_EXCEEDED"},
+  "errorMinQtyRequired": "This item has a minimum order quantity. Please add more.",
+  "@errorMinQtyRequired": {"description": "MIN_QTY_REQUIRED without details.min_qty_per_order."},
   "errorMinOrderNotMet": "Your cart is below the minimum order value.",
   "@errorMinOrderNotMet": {"description": "MIN_ORDER_NOT_MET"},
   "errorCouponInvalid": "This coupon code isn't valid.",
@@ -81,7 +83,12 @@
     "description": "OTP_INVALID with details.attempts_remaining.",
     "placeholders": {"count": {"type": "int"}}
   },
-  "errorTryAgainInMinutes": "{minutes, plural, =1{Too many attempts. Please try again in 1 minute.} other{Too many attempts. Please try again in {minutes} minutes.}}",
+  "errorMinQtyRequiredCount": "You need to order at least {count} of this item.",
+  "@errorMinQtyRequiredCount": {
+    "description": "MIN_QTY_REQUIRED with details.min_qty_per_order.",
+    "placeholders": {"count": {"type": "int"}}
+  },
+  "errorTryAgainInMinutes":"{minutes, plural, =1{Too many attempts. Please try again in 1 minute.} other{Too many attempts. Please try again in {minutes} minutes.}}",
   "@errorTryAgainInMinutes": {
     "description": "OTP_RATE_LIMITED / RATE_LIMITED with details.retry_after_seconds, rounded up to minutes.",
     "placeholders": {"minutes": {"type": "int"}}

@@ -205,6 +205,12 @@ abstract class JivoCoreLocalizations {
   /// **'You\'ve reached the maximum quantity for this item.'**
   String get errorMaxQtyExceeded;
 
+  /// MIN_QTY_REQUIRED without details.min_qty_per_order.
+  ///
+  /// In en, this message translates to:
+  /// **'This item has a minimum order quantity. Please add more.'**
+  String get errorMinQtyRequired;
+
   /// MIN_ORDER_NOT_MET
   ///
   /// In en, this message translates to:
@@ -324,6 +330,12 @@ abstract class JivoCoreLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =0{That OTP is incorrect. No attempts left: please request a new OTP.} =1{That OTP is incorrect. 1 attempt left.} other{That OTP is incorrect. {count} attempts left.}}'**
   String errorOtpInvalidAttempts(int count);
+
+  /// MIN_QTY_REQUIRED with details.min_qty_per_order.
+  ///
+  /// In en, this message translates to:
+  /// **'You need to order at least {count} of this item.'**
+  String errorMinQtyRequiredCount(int count);
 
   /// OTP_RATE_LIMITED / RATE_LIMITED with details.retry_after_seconds, rounded up to minutes.
   ///

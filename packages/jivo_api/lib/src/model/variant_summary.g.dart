@@ -29,6 +29,8 @@ abstract class _$VariantSummaryCWProxy {
 
   VariantSummary maxQtyPerOrder(int maxQtyPerOrder);
 
+  VariantSummary minQtyPerOrder(int minQtyPerOrder);
+
   VariantSummary image(ImageSet? image);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `VariantSummary(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -49,6 +51,7 @@ abstract class _$VariantSummaryCWProxy {
     int orderableQuantity,
     int? unitsLeft,
     int maxQtyPerOrder,
+    int minQtyPerOrder,
     ImageSet? image,
   });
 }
@@ -99,6 +102,10 @@ class _$VariantSummaryCWProxyImpl implements _$VariantSummaryCWProxy {
       this(maxQtyPerOrder: maxQtyPerOrder);
 
   @override
+  VariantSummary minQtyPerOrder(int minQtyPerOrder) =>
+      this(minQtyPerOrder: minQtyPerOrder);
+
+  @override
   VariantSummary image(ImageSet? image) => this(image: image);
 
   @override
@@ -120,6 +127,7 @@ class _$VariantSummaryCWProxyImpl implements _$VariantSummaryCWProxy {
     Object? orderableQuantity = const $CopyWithPlaceholder(),
     Object? unitsLeft = const $CopyWithPlaceholder(),
     Object? maxQtyPerOrder = const $CopyWithPlaceholder(),
+    Object? minQtyPerOrder = const $CopyWithPlaceholder(),
     Object? image = const $CopyWithPlaceholder(),
   }) {
     return VariantSummary(
@@ -167,6 +175,10 @@ class _$VariantSummaryCWProxyImpl implements _$VariantSummaryCWProxy {
           ? _value.maxQtyPerOrder
           // ignore: cast_nullable_to_non_nullable
           : maxQtyPerOrder as int,
+      minQtyPerOrder: minQtyPerOrder == const $CopyWithPlaceholder()
+          ? _value.minQtyPerOrder
+          // ignore: cast_nullable_to_non_nullable
+          : minQtyPerOrder as int,
       image: image == const $CopyWithPlaceholder()
           ? _value.image
           // ignore: cast_nullable_to_non_nullable
@@ -205,6 +217,7 @@ VariantSummary _$VariantSummaryFromJson(
         'orderable_quantity',
         'units_left',
         'max_qty_per_order',
+        'min_qty_per_order',
         'image',
       ],
     );
@@ -239,6 +252,10 @@ VariantSummary _$VariantSummaryFromJson(
         'max_qty_per_order',
         (v) => (v as num).toInt(),
       ),
+      minQtyPerOrder: $checkedConvert(
+        'min_qty_per_order',
+        (v) => (v as num).toInt(),
+      ),
       image: $checkedConvert(
         'image',
         (v) => v == null ? null : ImageSet.fromJson(v as Map<String, dynamic>),
@@ -255,6 +272,7 @@ VariantSummary _$VariantSummaryFromJson(
     'orderableQuantity': 'orderable_quantity',
     'unitsLeft': 'units_left',
     'maxQtyPerOrder': 'max_qty_per_order',
+    'minQtyPerOrder': 'min_qty_per_order',
   },
 );
 
@@ -271,6 +289,7 @@ Map<String, dynamic> _$VariantSummaryToJson(VariantSummary instance) =>
       'orderable_quantity': instance.orderableQuantity,
       'units_left': instance.unitsLeft,
       'max_qty_per_order': instance.maxQtyPerOrder,
+      'min_qty_per_order': instance.minQtyPerOrder,
       'image': instance.image?.toJson(),
     };
 

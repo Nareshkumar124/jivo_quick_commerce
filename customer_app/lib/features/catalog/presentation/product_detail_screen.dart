@@ -227,6 +227,10 @@ class _ProductBodyState extends State<_ProductBody> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+              if (variant.hasMinQty) ...[
+                const SizedBox(height: JivoSpacing.sm),
+                MinQtyHint(variant: variant),
+              ],
               const SizedBox(height: JivoSpacing.md),
               AddStepper(
                 key: ValueKey('pdp-${variant.id}'),

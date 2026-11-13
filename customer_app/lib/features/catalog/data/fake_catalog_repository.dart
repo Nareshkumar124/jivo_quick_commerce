@@ -272,9 +272,11 @@ class FakeCatalogRepository implements CatalogRepository {
   };
 }
 
-/// The server's view of a variant's stock: low at 3 or fewer units.
+/// The server's view of a variant's stock: low at 3 or fewer units, and
+/// out of stock when fewer than its minimum per order can be sold.
 CatalogVariant _variant(_Variant v, {bool detail = false}) {
-  final status = v.stock <= 0
+  final sellable = v.stock >= v.minQty && v.stock > 0;
+  final status = !sellable
       ? StockStatus.outOfStock
       : v.stock <= 3
       ? StockStatus.lowStock
@@ -287,11 +289,12 @@ CatalogVariant _variant(_Variant v, {bool detail = false}) {
     discountAmount: v.save ?? '0.00',
     discountPercent: v.off ?? 0,
     stockStatus: status,
-    orderableQuantity: v.stock <= 0
+    orderableQuantity: !sellable
         ? 0
         : (v.stock < v.maxQty ? v.stock : v.maxQty),
     unitsLeft: status == StockStatus.lowStock ? v.stock : null,
     maxQtyPerOrder: v.maxQty,
+    minQtyPerOrder: v.minQty,
     unitPrice: v.unitPrice,
     netQuantity: detail ? v.name : null,
   );
@@ -322,6 +325,7 @@ class _Variant {
     this.save,
     this.stock = 40,
     this.maxQty = 5,
+    this.minQty = 1,
     this.unitPrice,
   });
 
@@ -333,6 +337,7 @@ class _Variant {
   final String? save;
   final int stock;
   final int maxQty;
+  final int minQty;
   final UnitPrice? unitPrice;
 }
 
@@ -498,6 +503,7 @@ const _products = [
     _Variant(1401, '250 g', '129.00', '149.00', off: 13, save: '20.00'),
   ]),
   _Product(15, 'jivo-drinking-water', 'Jivo Packaged Drinking Water', 'water', [
-    _Variant(1501, '1 L', '20.00', '20.00', maxQty: 12),
+    // Sold by the carton, at least 5 per order (like the live store).
+    _Variant(1501, '1 L', '20.00', '20.00', maxQty: 12, minQty: 5),
   ]),
 ];

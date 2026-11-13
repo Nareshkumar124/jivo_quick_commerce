@@ -213,6 +213,63 @@ void main() {
     expect(button.onPressed, isNull);
   });
 
+  group('minimum per order', () {
+    testWidgets('the line shows its minimum; minus at the minimum removes', (
+      tester,
+    ) async {
+      final app = TestApp(tokens: signedInTokens);
+      await app.cart.setQuantity(
+        1501,
+        5,
+        preview: CartLinePreview.of(
+          oil(id: 1501, minQty: 5),
+          'Jivo Water 1 L x 12',
+        ),
+      );
+      await openCart(tester, app);
+      expect(find.text('Minimum 5 per order'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('dec-line-1501')));
+      await tester.pumpAndSettle();
+      expect((await app.cart.load()).isEmpty, isTrue);
+      expect(find.byKey(const Key('cart-empty')), findsOneWidget);
+    });
+
+    testWidgets('min 1 lines show no hint', (tester) async {
+      await openCart(tester, await appWithOil());
+      expect(find.textContaining('per order'), findsNothing);
+    });
+
+    testWidgets('a line below a raised minimum is flagged, fixed to the '
+        'minimum, and blocks checkout', (tester) async {
+      final app = await appWithOil();
+      app.cart.minimums[101] = 5;
+      await openCart(tester, app);
+
+      expect(find.text('Order at least 5'), findsOneWidget);
+      expect(
+        find.text(
+          'Some items are below their minimum quantity. Fix them to continue.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Minimum 5 per order'), findsNothing, reason: 'flag');
+      final proceed = tester.widget<FilledButton>(
+        find.descendant(
+          of: find.byKey(const Key('proceed-to-checkout')),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      expect(proceed.onPressed, isNull);
+
+      await tester.tap(find.text('Update to 5'));
+      await tester.pumpAndSettle();
+      expect((await app.cart.load()).quantityOf(101), 5);
+      expect(find.text('Order at least 5'), findsNothing);
+      expect(find.text('Minimum 5 per order'), findsOneWidget);
+    });
+  });
+
   testWidgets('steppers and remove change the server cart', (tester) async {
     final app = await appWithOil();
     await openCart(tester, app);

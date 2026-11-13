@@ -69,9 +69,10 @@ class CheckoutScreen extends ConsumerWidget {
         // What changed, from the error's details; the cart was reloaded.
         showMessage(context, cartErrorText(context, error, cart: snapshot));
         // Flagged lines are fixed on the cart screen.
-        if (error.code == ApiErrorCode.stockUnavailable && context.canPop()) {
-          context.pop();
-        }
+        final flagged =
+            error.code == ApiErrorCode.stockUnavailable ||
+            error.code == ApiErrorCode.minQtyRequired;
+        if (flagged && context.canPop()) context.pop();
       })
       ..listen(checkoutProvider.select((s) => s.pendingOrderId), (_, id) {
         if (id == null) return;

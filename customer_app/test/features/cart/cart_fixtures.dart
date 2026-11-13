@@ -18,6 +18,7 @@ CartLine cartLine({
   String lineTotal = '498.00',
   String lineMrpTotal = '598.00',
   int orderable = 5,
+  int minQty = 1,
   CartIssueCode? issue,
 }) => CartLine(
   id: id,
@@ -30,6 +31,7 @@ CartLine cartLine({
     stockStatus: orderable > 0 ? StockStatus.inStock : StockStatus.outOfStock,
     orderableQuantity: orderable,
     maxQtyPerOrder: 5,
+    minQtyPerOrder: minQty,
   ),
   quantity: quantity,
   lineMrpTotal: lineMrpTotal,
@@ -137,6 +139,7 @@ CatalogVariant oil({
   int id = 101,
   int orderable = 5,
   String price = '249.00',
+  int minQty = 1,
 }) => CatalogVariant(
   id: id,
   name: '1 L',
@@ -145,4 +148,5 @@ CatalogVariant oil({
   stockStatus: StockStatus.inStock,
   orderableQuantity: orderable,
   maxQtyPerOrder: 5,
+  minQtyPerOrder: minQty,
 );

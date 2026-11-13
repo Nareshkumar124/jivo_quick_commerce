@@ -137,6 +137,10 @@ enum CartIssueCode {
   /// Fewer units can be ordered: reduce to `variant.orderable_quantity`.
   quantityUnavailable,
 
+  /// Below `variant.min_qty_per_order` (e.g. the minimum was raised after
+  /// the line was added): raise it to the minimum, or remove it.
+  minQtyRequired,
+
   /// A code this build doesn't know.
   unknown,
 }
@@ -194,6 +198,10 @@ class CartLine {
   /// The stepper cap and the fix target: the server's
   /// `orderable_quantity` (0 when it can't be ordered).
   int get orderableQuantity => variant.maxSelectable;
+
+  /// The variant's `min_qty_per_order`: minus at this quantity removes the
+  /// line.
+  int get minQty => variant.minQty;
 }
 
 /// The bill from `cart.services.compute_bill` (`08 §6.2`, schema `Bill`),
@@ -278,6 +286,9 @@ enum CheckoutBlockerCode {
   notServiceable,
   storeClosed,
   stockUnavailable,
+
+  /// A line is below its variant's `min_qty_per_order`.
+  minQtyRequired,
   minOrderNotMet,
   couponInvalid,
   couponExpired,

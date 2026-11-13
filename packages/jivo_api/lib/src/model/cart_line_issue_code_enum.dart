@@ -6,12 +6,14 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// * `OUT_OF_STOCK` - Out of stock: remove it to continue. * `QUANTITY_UNAVAILABLE` - Not available in this quantity: reduce it to continue.
+/// * `OUT_OF_STOCK` - Out of stock: remove it to continue. * `QUANTITY_UNAVAILABLE` - Not available in this quantity: reduce it to continue. * `MIN_QTY_REQUIRED` - Below the minimum per order: increase it or remove it to continue.
 enum CartLineIssueCodeEnum {
   @JsonValue(r'OUT_OF_STOCK')
   OUT_OF_STOCK(r'OUT_OF_STOCK'),
   @JsonValue(r'QUANTITY_UNAVAILABLE')
   QUANTITY_UNAVAILABLE(r'QUANTITY_UNAVAILABLE'),
+  @JsonValue(r'MIN_QTY_REQUIRED')
+  MIN_QTY_REQUIRED(r'MIN_QTY_REQUIRED'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

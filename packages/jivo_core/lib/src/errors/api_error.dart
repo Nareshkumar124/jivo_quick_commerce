@@ -21,6 +21,11 @@ enum ApiErrorCode {
   storeClosed('STORE_CLOSED'),
   stockUnavailable('STOCK_UNAVAILABLE'),
   maxQtyExceeded('MAX_QTY_EXCEEDED'),
+
+  /// A cart quantity of 1 to `min_qty_per_order - 1` (422); details
+  /// `{variant_id, min_qty_per_order}`. Quantity 0 (remove) is always
+  /// allowed.
+  minQtyRequired('MIN_QTY_REQUIRED'),
   minOrderNotMet('MIN_ORDER_NOT_MET'),
   couponInvalid('COUPON_INVALID'),
   couponExpired('COUPON_EXPIRED'),
@@ -214,6 +219,9 @@ class ApiError implements Exception {
   /// `details.retry_after_seconds` (sent with `OTP_RATE_LIMITED` and
   /// `RATE_LIMITED`), if present.
   int? get retryAfterSeconds => _intDetail('retry_after_seconds');
+
+  /// `details.min_qty_per_order` (sent with `MIN_QTY_REQUIRED`), if present.
+  int? get minQtyPerOrder => _intDetail('min_qty_per_order');
 
   int? _intDetail(String key) {
     final value = details[key];

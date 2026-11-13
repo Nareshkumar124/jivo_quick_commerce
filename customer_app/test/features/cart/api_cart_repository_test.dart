@@ -68,6 +68,63 @@ void main() {
     expect(cart.quantityOf(1002), 3);
   });
 
+  test(
+    'MIN_QTY_REQUIRED: the line flag, the blocker and the minimum',
+    () async {
+      // The contract's cart with one line below a raised minimum.
+      final cart = Map<String, Object?>.from(
+        contractExample('cart_retrieve/200/ReadyToOrder')! as Map,
+      );
+      final line = Map<String, Object?>.from(
+        (cart['items']! as List).first as Map,
+      );
+      line['variant'] = {
+        ...(line['variant']! as Map).cast<String, Object?>(),
+        'min_qty_per_order': 5,
+      };
+      line['issue'] = {
+        'code': 'MIN_QTY_REQUIRED',
+        'message': 'At least 5 per order.',
+      };
+      cart['items'] = [line];
+      cart['checkout'] = {
+        'can_place_order': false,
+        'blockers': [
+          {
+            'code': 'MIN_QTY_REQUIRED',
+            'message': 'Some items are below their minimum per order.',
+          },
+        ],
+      };
+      answer = (_, _) => cart;
+
+      final snapshot = await repository.load();
+      final mapped = snapshot.lines.single;
+      expect(mapped.minQty, 5);
+      expect(mapped.issue!.code, CartIssueCode.minQtyRequired);
+      expect(
+        snapshot.checkout.blockers.single.code,
+        CheckoutBlockerCode.minQtyRequired,
+      );
+    },
+  );
+
+  test(
+    'a MIN_QTY_REQUIRED answer reaches the caller with its minimum',
+    () async {
+      answer = (_, _) =>
+          (422, contractExample('cart_items_add/422/MINQTYREQUIRED'));
+      await expectLater(
+        repository.setQuantity(1002, 1),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.code, 'code', ApiErrorCode.minQtyRequired)
+              .having((e) => e.minQtyPerOrder, 'min', 2),
+        ),
+      );
+    },
+  );
+
   test('every documented cart decodes', () async {
     for (final name in [
       'ReadyToOrder',

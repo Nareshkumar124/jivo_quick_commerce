@@ -92,5 +92,6 @@ Map<String, dynamic> _$CartLineIssueToJson(CartLineIssue instance) =>
 const _$CartLineIssueCodeEnumEnumMap = {
   CartLineIssueCodeEnum.OUT_OF_STOCK: 'OUT_OF_STOCK',
   CartLineIssueCodeEnum.QUANTITY_UNAVAILABLE: 'QUANTITY_UNAVAILABLE',
+  CartLineIssueCodeEnum.MIN_QTY_REQUIRED: 'MIN_QTY_REQUIRED',
   CartLineIssueCodeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

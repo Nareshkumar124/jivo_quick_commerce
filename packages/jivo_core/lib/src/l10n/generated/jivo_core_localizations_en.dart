@@ -76,6 +76,10 @@ class JivoCoreLocalizationsEn extends JivoCoreLocalizations {
       'You\'ve reached the maximum quantity for this item.';
 
   @override
+  String get errorMinQtyRequired =>
+      'This item has a minimum order quantity. Please add more.';
+
+  @override
   String get errorMinOrderNotMet =>
       'Your cart is below the minimum order value.';
 
@@ -157,6 +161,11 @@ class JivoCoreLocalizationsEn extends JivoCoreLocalizations {
           'That OTP is incorrect. No attempts left: please request a new OTP.',
     );
     return '$_temp0';
+  }
+
+  @override
+  String errorMinQtyRequiredCount(int count) {
+    return 'You need to order at least $count of this item.';
   }
 
   @override

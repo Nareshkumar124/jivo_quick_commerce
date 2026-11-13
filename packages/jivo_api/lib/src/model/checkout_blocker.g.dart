@@ -95,6 +95,7 @@ const _$CheckoutBlockerCodeEnumEnumMap = {
   CheckoutBlockerCodeEnum.NOT_SERVICEABLE: 'NOT_SERVICEABLE',
   CheckoutBlockerCodeEnum.STORE_CLOSED: 'STORE_CLOSED',
   CheckoutBlockerCodeEnum.STOCK_UNAVAILABLE: 'STOCK_UNAVAILABLE',
+  CheckoutBlockerCodeEnum.MIN_QTY_REQUIRED: 'MIN_QTY_REQUIRED',
   CheckoutBlockerCodeEnum.MIN_ORDER_NOT_MET: 'MIN_ORDER_NOT_MET',
   CheckoutBlockerCodeEnum.COUPON_INVALID: 'COUPON_INVALID',
   CheckoutBlockerCodeEnum.COUPON_EXPIRED: 'COUPON_EXPIRED',

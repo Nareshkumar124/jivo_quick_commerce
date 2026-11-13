@@ -11,23 +11,33 @@ import '../domain/cart.dart';
 /// English `message` is shown only for a code this build doesn't know, and
 /// for an applied coupon's reason, which carries no amount to fill in.
 
-/// The flag on a cart line ("Out of stock", "Only 2 available").
+/// The flag on a cart line ("Out of stock", "Only 2 available",
+/// "Order at least 5").
 String lineIssueText(AppLocalizations l10n, CartLine line) {
   final issue = line.issue!;
   return switch (issue.code) {
     CartIssueCode.outOfStock => l10n.outOfStock,
+    // Fewer than the minimum can be sold: out of stock (`maxSelectable`).
+    CartIssueCode.quantityUnavailable when line.orderableQuantity <= 0 =>
+      l10n.outOfStock,
     CartIssueCode.quantityUnavailable => l10n.onlyAvailable(
       line.orderableQuantity,
     ),
+    CartIssueCode.minQtyRequired when line.orderableQuantity <= 0 =>
+      l10n.outOfStock,
+    CartIssueCode.minQtyRequired => l10n.minQtyLineIssue(line.minQty),
     CartIssueCode.unknown => issue.message,
   };
 }
 
-/// The fix on a flagged line: down to `orderable_quantity`, or remove.
+/// The fix on a flagged line: down to `orderable_quantity`, up to the
+/// minimum per order, or remove.
 String lineFixText(AppLocalizations l10n, CartLine line) =>
-    line.orderableQuantity > 0
-    ? l10n.updateQuantityTo(line.orderableQuantity)
-    : l10n.removeAction;
+    line.orderableQuantity <= 0
+    ? l10n.removeAction
+    : line.issue?.code == CartIssueCode.minQtyRequired
+    ? l10n.updateQuantityTo(line.minQty)
+    : l10n.updateQuantityTo(line.orderableQuantity);
 
 /// Why checkout is disabled: the server's first blocker.
 String? checkoutBlockerText(AppLocalizations l10n, CartSnapshot cart) {
@@ -41,6 +51,7 @@ String? checkoutBlockerText(AppLocalizations l10n, CartSnapshot cart) {
     CheckoutBlockerCode.notServiceable => l10n.blockerNotServiceable,
     CheckoutBlockerCode.storeClosed => l10n.cartStoreClosed,
     CheckoutBlockerCode.stockUnavailable => l10n.cartProblemsBanner,
+    CheckoutBlockerCode.minQtyRequired => l10n.blockerMinQtyRequired,
     CheckoutBlockerCode.minOrderNotMet => switch (thresholds) {
       CartThresholds(:final minOrderValue, :final amountToMinOrder?) =>
         l10n.minimumOrderShortfall(
@@ -101,6 +112,15 @@ String cartErrorText(
     case ApiErrorCode.maxQtyExceeded:
       final max = details['max_qty_per_order'];
       if (max is num) return l10n.maxQtyReached(max.toInt());
+    case ApiErrorCode.minQtyRequired:
+      // Named when the line is known (checkout); otherwise jivo_core's
+      // "at least N of this item" below.
+      final minimum = apiError.minQtyPerOrder;
+      final variantId = details['variant_id'];
+      if (minimum != null && variantId is num) {
+        final name = _lineName(variantId.toInt(), cart, names);
+        if (name != null) return l10n.minQtyRequiredFor(minimum, name);
+      }
     case ApiErrorCode.minOrderNotMet:
       final minimum = details['min_order_value'];
       final short = details['amount_to_min_order'];
@@ -140,10 +160,7 @@ List<String> _stockLines(
     final variantId = item['variant_id'];
     final orderable = item['orderable_quantity'];
     if (variantId is! num || orderable is! num) continue;
-    final line = cart?.lineFor(variantId.toInt());
-    final name =
-        names[variantId.toInt()] ??
-        (line == null ? null : '${line.productName} ${line.variantName}');
+    final name = _lineName(variantId.toInt(), cart, names);
     if (name == null) continue;
     out.add(
       orderable <= 0
@@ -152,4 +169,11 @@ List<String> _stockLines(
     );
   }
   return out;
+}
+
+/// "Product Variant" for [variantId] from [names] or the [cart]'s line.
+String? _lineName(int variantId, CartSnapshot? cart, Map<int, String> names) {
+  final line = cart?.lineFor(variantId);
+  return names[variantId] ??
+      (line == null ? null : '${line.productName} ${line.variantName}');
 }

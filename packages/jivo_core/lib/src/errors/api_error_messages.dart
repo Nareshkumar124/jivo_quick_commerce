@@ -22,6 +22,7 @@ String apiErrorMessage(JivoCoreLocalizations l10n, ApiError error) =>
       ApiErrorCode.storeClosed => l10n.errorStoreClosed,
       ApiErrorCode.stockUnavailable => l10n.errorStockUnavailable,
       ApiErrorCode.maxQtyExceeded => l10n.errorMaxQtyExceeded,
+      ApiErrorCode.minQtyRequired => l10n.errorMinQtyRequired,
       ApiErrorCode.minOrderNotMet => l10n.errorMinOrderNotMet,
       ApiErrorCode.couponInvalid => l10n.errorCouponInvalid,
       ApiErrorCode.couponExpired => l10n.errorCouponExpired,
@@ -54,17 +55,21 @@ String apiErrorMessage(JivoCoreLocalizations l10n, ApiError error) =>
     };
 
 /// Like [apiErrorMessage], but uses the error `details` where they help:
-/// the attempts left for `OTP_INVALID` and the wait for `OTP_RATE_LIMITED` /
-/// `RATE_LIMITED`. Falls back to [apiErrorMessage] otherwise.
+/// the attempts left for `OTP_INVALID`, the wait for `OTP_RATE_LIMITED` /
+/// `RATE_LIMITED` and the minimum for `MIN_QTY_REQUIRED`. Falls back to
+/// [apiErrorMessage] otherwise.
 String apiErrorMessageWithDetails(JivoCoreLocalizations l10n, ApiError error) {
   final attempts = error.attemptsRemaining;
   final retryAfter = error.retryAfterSeconds;
+  final minQty = error.minQtyPerOrder;
   return switch (error.code) {
     ApiErrorCode.otpInvalid when attempts != null =>
       l10n.errorOtpInvalidAttempts(attempts),
     ApiErrorCode.otpRateLimited || ApiErrorCode.rateLimited
         when retryAfter != null && retryAfter > 0 =>
       l10n.errorTryAgainInMinutes((retryAfter / 60).ceil()),
+    ApiErrorCode.minQtyRequired when minQty != null && minQty > 0 =>
+      l10n.errorMinQtyRequiredCount(minQty),
     _ => apiErrorMessage(l10n, error),
   };
 }
