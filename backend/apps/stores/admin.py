@@ -284,8 +284,11 @@ PRICING_FIELDSETS = (
     (
         "Minimum order",
         {
-            "fields": ("min_order_value",),
-            "description": "Every threshold below compares with the item total before the coupon.",
+            "fields": ("min_order_value", "min_order_units", "order_unit_label"),
+            "description": (
+                "Every threshold below compares with the item total before the coupon. "
+                "Minimum units counts the items in the order (0 = off), e.g. 5 cartons."
+            ),
         },
     ),
     ("Delivery fee", {"fields": ("delivery_fee", "free_delivery_threshold")}),

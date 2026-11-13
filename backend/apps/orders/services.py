@@ -338,10 +338,17 @@ def _check_cart(state, *, user, payment_method: str, expected: Decimal) -> None:
             "orderable_quantity": line.summary["orderable_quantity"],
         }
         for line in state.lines
-        if line.issue
+        if line.has_stock_issue
     ]
     if short:
         raise ApiError(ErrorCode.STOCK_UNAVAILABLE, details={"items": short})
+    below = next((line for line in state.lines if line.below_minimum), None)
+    if below is not None:  # e.g. the minimum was raised after the line was added
+        raise cart_services.min_qty_error(
+            below.variant.pk,
+            below.variant.min_qty_per_order,
+            f"{below.variant.product.name} {below.variant.name}",
+        )
     rules, total = state.rules, state.bill.item_total
     if total < rules.min_order_value:
         missing = rules.min_order_value - total
@@ -353,6 +360,18 @@ def _check_cart(state, *, user, payment_method: str, expected: Decimal) -> None:
                 "min_order_value": money_str(rules.min_order_value),
                 "item_total": money_str(total),
                 "amount_to_min_order": money_str(missing),
+            },
+        )
+    units_missing = state.units_to_min_order
+    if units_missing is not None:
+        raise ApiError(
+            ErrorCode.MIN_UNITS_NOT_MET,
+            cart_services.min_units_message(rules, units_missing),
+            details={
+                "min_order_units": rules.min_order_units,
+                "order_units": state.order_units,
+                "units_to_min_order": units_missing,
+                "order_unit_label": rules.order_unit_label,
             },
         )
     if state.coupon_check is not None and not state.coupon_check.ok:
@@ -479,7 +498,10 @@ def _place(
         store.pk,
         [
             inventory.ReservationLine(
-                line.variant.pk, line.item.quantity, line.variant.max_qty_per_order
+                line.variant.pk,
+                line.item.quantity,
+                line.variant.max_qty_per_order,
+                line.variant.min_qty_per_order,
             )
             for line in state.lines
         ],
@@ -966,17 +988,24 @@ def reorder(user, store: StoreArea, order_id: int) -> tuple[list[dict], int]:
                 and variant.inv_id is not None
                 and cart_services.is_sellable(variant)
             )
-            orderable = 0
+            orderable, minimum = 0, 1
             if sellable:
+                minimum = variant.min_qty_per_order
                 orderable = availability(
                     on_hand=variant.inv_on_hand,
                     reserved=variant.inv_reserved,
                     is_available=variant.inv_is_available,
                     max_qty_per_order=variant.max_qty_per_order,
+                    min_qty_per_order=minimum,
                 ).orderable_quantity
             line = lines.get(item.variant_id)
             current = line.quantity if line is not None else 0
             target = max(current, min(wanted, orderable))
+            # Never more than was ordered, and never a line below the minimum per order: a past
+            # order smaller than today's minimum is not put back (MIN_QTY_REQUIRED).
+            below_minimum = 0 < target < minimum
+            if below_minimum:
+                target = current
             added += target > 0
             if target > current:
                 if line is None:
@@ -984,16 +1013,15 @@ def reorder(user, store: StoreArea, order_id: int) -> tuple[list[dict], int]:
                 else:
                     line.quantity = target
                     line.save(update_fields=["quantity", "updated_at"])
-            if orderable < wanted:
-                reason = (
-                    ReorderIssueReason.NOT_AVAILABLE
-                    if not sellable
-                    else (
-                        ReorderIssueReason.OUT_OF_STOCK
-                        if orderable == 0
-                        else ReorderIssueReason.LIMITED_STOCK
-                    )
-                )
+            if below_minimum or orderable < wanted:
+                if not sellable:
+                    reason = ReorderIssueReason.NOT_AVAILABLE
+                elif orderable == 0:
+                    reason = ReorderIssueReason.OUT_OF_STOCK
+                elif below_minimum:
+                    reason = ReorderIssueReason.MIN_QTY_REQUIRED
+                else:
+                    reason = ReorderIssueReason.LIMITED_STOCK
                 issues.append(
                     {
                         "variant_id": item.variant_id,

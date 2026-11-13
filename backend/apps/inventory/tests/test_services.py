@@ -283,21 +283,71 @@ class TestAvailability:
     )
     def test_rules(self, on_hand, reserved, is_available, expected):
         result = services.availability(
-            on_hand=on_hand, reserved=reserved, is_available=is_available, max_qty_per_order=5
+            on_hand=on_hand,
+            reserved=reserved,
+            is_available=is_available,
+            max_qty_per_order=5,
+            min_qty_per_order=1,
         )
         assert (result.stock_status, result.orderable_quantity, result.units_left) == expected
 
     def test_low_stock_capped_by_max_per_order(self):
         result = services.availability(
-            on_hand=2, reserved=0, is_available=True, max_qty_per_order=1
+            on_hand=2, reserved=0, is_available=True, max_qty_per_order=1, min_qty_per_order=1
         )
         assert (result.orderable_quantity, result.units_left) == (1, 2)
 
     def test_not_sellable(self):
         result = services.availability(
-            on_hand=9, reserved=0, is_available=True, max_qty_per_order=5, sellable=False
+            on_hand=9,
+            reserved=0,
+            is_available=True,
+            max_qty_per_order=5,
+            min_qty_per_order=1,
+            sellable=False,
         )
         assert result.stock_status == StockStatus.OUT_OF_STOCK
+
+    @pytest.mark.parametrize(
+        ("on_hand", "reserved", "expected"),
+        [
+            (4, 0, (StockStatus.OUT_OF_STOCK, 0, None)),  # 4 free < minimum 5
+            (9, 5, (StockStatus.OUT_OF_STOCK, 0, None)),  # reservations leave 4 free
+            (5, 0, (StockStatus.IN_STOCK, 5, None)),  # exactly the minimum
+            (60, 0, (StockStatus.IN_STOCK, 50, None)),  # capped by the maximum
+        ],
+    )
+    def test_below_minimum_is_not_orderable(self, on_hand, reserved, expected):
+        """Min qty per order: when fewer than `min_qty_per_order` units can be sold, the variant
+        is OUT_OF_STOCK with orderable_quantity 0 (it must never look buyable)."""
+        result = services.availability(
+            on_hand=on_hand,
+            reserved=reserved,
+            is_available=True,
+            max_qty_per_order=50,
+            min_qty_per_order=5,
+        )
+        assert (result.stock_status, result.orderable_quantity, result.units_left) == expected
+
+    def test_low_stock_above_minimum(self, settings):
+        """LOW_STOCK still shows `units_left` when the free units meet the minimum."""
+        settings.CATALOG_LOW_STOCK_UNITS = 6
+        result = services.availability(
+            on_hand=6, reserved=0, is_available=True, max_qty_per_order=50, min_qty_per_order=5
+        )
+        assert (result.stock_status, result.orderable_quantity, result.units_left) == (
+            StockStatus.LOW_STOCK,
+            6,
+            6,
+        )
+
+    @pytest.mark.parametrize(
+        ("available", "maximum", "minimum", "expected"),
+        [(0, 5, 1, 0), (-2, 5, 1, 0), (3, 5, 1, 3), (9, 5, 1, 5), (4, 9, 5, 0), (7, 9, 5, 7)],
+    )
+    def test_orderable_quantity(self, available, maximum, minimum, expected):
+        """orderable = min(available, max), or 0 below the minimum per order."""
+        assert services.orderable_quantity(available, maximum, minimum) == expected
 
 
 class TestCanAdjust:

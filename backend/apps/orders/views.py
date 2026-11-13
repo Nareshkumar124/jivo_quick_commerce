@@ -167,7 +167,10 @@ class OrderListCreateView(APIView):
             "Places the cart as an order at the store in `X-Store-Id` (08 T1/T2). Stock is "
             "reserved now, never earlier (08 §6.1). The server re-checks everything: the "
             "address is served by the store, the store is open, every line is available (else "
-            "409 `STOCK_UNAVAILABLE`), the minimum order, the coupon, and that its bill equals "
+            "409 `STOCK_UNAVAILABLE`), every line has at least its variant's "
+            "`min_qty_per_order` (else 422 `MIN_QTY_REQUIRED`), the minimum order value and the "
+            "store's minimum units per order (`MIN_UNITS_NOT_MET`), the coupon, "
+            "and that its bill equals "
             "`expected_grand_total` (else 409 `PRICE_CHANGED`: reload the cart).\n\n"
             "**COD:** the order is PLACED at once (`razorpay` is null) and the cart is emptied. "
             "COD needs the store to offer it and `grand_total` within its limit.\n\n"
@@ -240,6 +243,16 @@ class OrderListCreateView(APIView):
                         ErrorCode.MIN_ORDER_NOT_MET,
                         "Add items worth ₹20 more to place your order (minimum ₹99).",
                         ex.MIN_ORDER_DETAILS,
+                    ),
+                    error_example(
+                        ErrorCode.MIN_UNITS_NOT_MET,
+                        "Add 2 more cartons to place your order (minimum 5 cartons).",
+                        ex.MIN_UNITS_DETAILS,
+                    ),
+                    error_example(
+                        ErrorCode.MIN_QTY_REQUIRED,
+                        "You need to order at least 2 of Jivo Cold Pressed Canola Oil 5 L.",
+                        ex.MIN_QTY_DETAILS,
                     ),
                     error_example(
                         ErrorCode.COD_NOT_AVAILABLE,
@@ -503,7 +516,9 @@ class OrderReorderView(APIView):
             "Puts the order's items back in the cart, priced at the store in `X-Store-Id`, as "
             "far as they can be ordered now (03 §2.10). Each line is raised to the units of the "
             "past order, capped by what can be ordered (`orderable_quantity`); it is never "
-            "added on top, so repeating the call changes nothing. Lines already in the cart "
+            "added on top, so repeating the call changes nothing. A line is never put back "
+            "below its variant's `min_qty_per_order` (reason `MIN_QTY_REQUIRED`: the past order "
+            "had fewer units than today's minimum). Lines already in the cart "
             "with more units are left as they are. Returns the whole cart and the lines that "
             "could not be added in full (`unavailable`): show them, then open the cart."
         ),

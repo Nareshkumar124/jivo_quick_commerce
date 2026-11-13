@@ -147,6 +147,7 @@ class ReorderIssueReason(models.TextChoices):
     OUT_OF_STOCK = "OUT_OF_STOCK", "Out of stock"
     LIMITED_STOCK = "LIMITED_STOCK", "Only part of the quantity is available"
     NOT_AVAILABLE = "NOT_AVAILABLE", "No longer sold at this store"
+    MIN_QTY_REQUIRED = "MIN_QTY_REQUIRED", "Fewer units than the minimum per order"
 
 
 # 08 §1 order of the store's work: the customer may cancel up to `CUSTOMER_CANCEL_UNTIL`.

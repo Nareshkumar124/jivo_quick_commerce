@@ -191,7 +191,7 @@ class ProductVariantInline(StackedInline):
             {
                 "fields": (
                     ("sku", "name", "net_quantity"),
-                    ("mrp", "selling_price", "max_qty_per_order"),
+                    ("mrp", "selling_price", "min_qty_per_order", "max_qty_per_order"),
                     ("unit_value", "unit", "weight_grams"),
                     ("barcode", "sap_item_code"),
                     ("is_active", "sort_order"),
@@ -358,7 +358,10 @@ class ProductVariantAdmin(ReadOnlyHistoryAdmin, CatalogImportExportAdmin):
     autocomplete_fields = ("product",)
     fieldsets = (
         (None, {"fields": ("product", ("sku", "name", "net_quantity"))}),
-        ("Price", {"fields": (("mrp", "selling_price"), "max_qty_per_order")}),
+        (
+            "Price",
+            {"fields": (("mrp", "selling_price"), ("min_qty_per_order", "max_qty_per_order"))},
+        ),
         ("Unit price display", {"fields": (("unit_value", "unit"),)}),
         ("Codes", {"fields": (("barcode", "sap_item_code"), "weight_grams")}),
         (None, {"fields": (("is_active", "sort_order"),)}),

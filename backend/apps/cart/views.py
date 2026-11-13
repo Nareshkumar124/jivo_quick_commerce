@@ -62,13 +62,20 @@ NOT_SERVICEABLE = error_response(
 STOCK_UNAVAILABLE = error_response(
     "`STOCK_UNAVAILABLE`: the store cannot supply the new quantity. `details.items` gives the "
     "`orderable_quantity` now (0 = out of stock or not sold here); exact stock is never "
-    "published (DL-26). Lowering a quantity is always accepted.",
+    "published (DL-26). Lowering a quantity is never refused for stock.",
     error_example(ErrorCode.STOCK_UNAVAILABLE, "Only 2 left.", ex.STOCK_UNAVAILABLE_DETAILS),
 )
-MAX_QTY_EXCEEDED = error_response(
-    "`MAX_QTY_EXCEEDED`: above the variant's `max_qty_per_order`.",
+QTY_LIMITS = error_response(
+    "`MAX_QTY_EXCEEDED`: above the variant's `max_qty_per_order`. `MIN_QTY_REQUIRED`: from 1 to "
+    "`min_qty_per_order` - 1 units, when adding or lowering a line (0 removes the line and is "
+    "always accepted). Nothing was saved.",
     error_example(
         ErrorCode.MAX_QTY_EXCEEDED, "You can order at most 3 of this item.", ex.MAX_QTY_DETAILS
+    ),
+    error_example(
+        ErrorCode.MIN_QTY_REQUIRED,
+        "You need to order at least 2 of this item.",
+        ex.MIN_QTY_DETAILS,
     ),
 )
 CART_EXAMPLES = (
@@ -203,8 +210,11 @@ class CartItemListView(APIView):
             "Sets the line for `variant_id` to `quantity`: creates it, changes it, or removes it "
             "with 0. It sets, it does not add, so a retried request never doubles a line.\n\n"
             "An increase is checked against the store's stock and the variant's "
-            "`max_qty_per_order`; a decrease is always accepted, so a customer can step down a "
-            "line that has a stock issue. The cart does not reserve stock (08 §6.1)."
+            "`max_qty_per_order`; a decrease is checked only against `min_qty_per_order`, so a "
+            "customer can step down a line that has a stock issue. A quantity from 1 to "
+            "`min_qty_per_order` - 1 is always refused (`MIN_QTY_REQUIRED`): the first ADD sends "
+            "`min_qty_per_order`, and stepping down from it sends 0. The cart does not reserve "
+            "stock (08 §6.1)."
         ),
         parameters=[STORE_ID_PARAMETER],
         request=CartItemAddSerializer,
@@ -216,7 +226,7 @@ class CartItemListView(APIView):
                 200: ok_response(CartSerializer, "The updated cart.", ("Updated", ex.CART_READY)),
                 401: UNAUTHORIZED,
                 409: STOCK_UNAVAILABLE,
-                422: MAX_QTY_EXCEEDED,
+                422: QTY_LIMITS,
             },
             bad_request=(
                 validation_error(
@@ -244,8 +254,8 @@ class CartItemDetailView(APIView):
         tags=TAGS,
         summary="Change a line's quantity",
         description=(
-            "Same rules as `cart_items_add` (increases are checked, decreases always accepted). "
-            "Another user's line id is a 404."
+            "Same rules as `cart_items_add` (increases are checked; decreases are checked only "
+            "against `min_qty_per_order`). Another user's line id is a 404."
         ),
         parameters=[STORE_ID_PARAMETER, LINE_ID],
         request=CartItemUpdateSerializer,
@@ -255,7 +265,7 @@ class CartItemDetailView(APIView):
                 200: ok_response(CartSerializer, "The updated cart.", ("Updated", ex.CART_READY)),
                 401: UNAUTHORIZED,
                 409: STOCK_UNAVAILABLE,
-                422: MAX_QTY_EXCEEDED,
+                422: QTY_LIMITS,
             },
             bad_request=(
                 validation_error(

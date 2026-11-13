@@ -380,7 +380,11 @@ def test_phase_3_enums(schema):
     assert status["schema"]["enum"] == ["active", "past"]  # query enums are inlined
     assert status.get("required", False) is False
     assert components["CouponDiscountTypeEnum"]["enum"] == ["FLAT", "PERCENT"]
-    assert components["CartLineIssueCodeEnum"]["enum"] == ["OUT_OF_STOCK", "QUANTITY_UNAVAILABLE"]
+    assert components["CartLineIssueCodeEnum"]["enum"] == [
+        "OUT_OF_STOCK",
+        "QUANTITY_UNAVAILABLE",
+        "MIN_QTY_REQUIRED",  # added 2026-11-13 (per-variant minimum per order)
+    ]
     assert components["WebhookResultEnum"]["enum"] == ["processed", "duplicate", "ignored"]
     # Blocker codes that are also error codes keep the same spelling (one app message map).
     error_codes = set(components["ErrorCodeEnum"]["enum"])

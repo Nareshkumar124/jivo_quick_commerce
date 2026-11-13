@@ -48,7 +48,7 @@ Every transition goes through `orders.services.transition()`. Anything not liste
 
 | # | From → To | Trigger / actor | Guards | Side effects |
 |---|-----------|-----------------|--------|--------------|
-| T1 | (new) → `PAYMENT_PENDING` | Customer places an ONLINE order | Cart not empty; address serviceable by the cart's store; store open and accepting; all lines available; qty ≤ max per order; item total ≥ min order; coupon (if any) valid; bill matches the client's displayed total (else `PRICE_CHANGED`) | Create Order + items (price snapshots); **reserve stock** with `expires_at = now + payment window (15 min)`; create Razorpay order + `Payment(CREATED)`; coupon is *held* (counted against limits) |
+| T1 | (new) → `PAYMENT_PENDING` | Customer places an ONLINE order | Cart not empty; address serviceable by the cart's store; store open and accepting; all lines available; min per order ≤ qty ≤ max per order; item total ≥ min order; units ≥ the store's min units per order (if set); coupon (if any) valid; bill matches the client's displayed total (else `PRICE_CHANGED`) | Create Order + items (price snapshots); **reserve stock** with `expires_at = now + payment window (15 min)`; create Razorpay order + `Payment(CREATED)`; coupon is *held* (counted against limits) |
 | T2 | (new) → `PLACED` | Customer places a COD order | Same as T1, plus COD enabled for the store and `grand_total ≤ cod_max_order_value`, and the user is not COD-blocked | Create Order; **reserve stock** (no expiry); redeem coupon; clear cart; payment_status `COD_PENDING`; notify store (sound) + customer; schedule the store-acceptance SLA alert; start dispatch if the trigger is `PLACED` |
 | T3 | `PAYMENT_PENDING` → `PLACED` | Payment captured, confirmed by the verify API **or** webhook (whichever comes first; the second is a no-op) | Razorpay signature valid; captured amount = `grand_total`; order still `PAYMENT_PENDING` | `Payment(CAPTURED)`, payment_status `PAID`; reservation expiry cleared; coupon redeemed; cart cleared; notify store + customer; SLA alert scheduled; dispatch if the trigger is `PLACED` |
 | T3a | `PAYMENT_FAILED`/`CANCELLED` + late capture | Webhook reports a capture after the order already failed | n/a | Do **not** revive the order. Auto-refund the full captured amount and alert ops. |
@@ -159,6 +159,11 @@ v2 ideas (not v1): batching two orders on one trip, predictive ETA, multi-store 
 
 Customers can add to the cart up to `available`. The cart **does not** reserve stock. Only order placement does.
 
+**Minimum per order** (added 2026-11-13): each variant has `min_qty_per_order` (default 1 = no minimum, never above `max_qty_per_order`).
+- A cart line of 1 to `min − 1` units is refused (`MIN_QTY_REQUIRED`), whether adding or lowering. Quantity 0 (remove) is always allowed.
+- A variant is orderable only when `min(available, max_qty_per_order) ≥ min_qty_per_order`. Otherwise its `orderable_quantity` is 0 and it shows as out of stock.
+- Order placement (T1/T2) re-checks it: a line below the minimum (e.g. the minimum was raised after the line was added) is flagged in the cart and refused with `MIN_QTY_REQUIRED`. Reorder never puts a line back below the minimum.
+
 ### 6.2 Bill calculation (pricing engine, `cart.services.compute_bill`)
 ```
 mrp_total        = Σ mrp × qty
@@ -172,6 +177,7 @@ tip              = customer-chosen
 grand_total      = item_total − coupon_discount + delivery_fee + small_cart_fee + handling_fee + tip
 ```
 - Thresholds compare against `item_total` (before the coupon). This must be confirmed with Jivo (D-09).
+- **Minimum units per order** (added 2026-11-13; e.g. 5 water cartons): a store's `min_order_units` (0 = off) counts every line together, any mix of items, as Σ min(qty, orderable qty), so units that cannot be supplied do not count. Below it, the cart shows `units_to_min_order`, checkout is blocked and order placement (T1/T2) is refused with `MIN_UNITS_NOT_MET`, exactly like the minimum order value. It is not money and does not change the bill.
 - Rounding: all amounts are rounded to 2 decimals, half-up. `grand_total` is not rounded to the rupee in v1.
 - The same function is used for the cart display, order creation and partial-unavailability recalculation. The client never computes money.
 

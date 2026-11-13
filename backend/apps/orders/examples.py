@@ -435,6 +435,13 @@ MIN_ORDER_DETAILS = {
     "item_total": "79.00",
     "amount_to_min_order": "20.00",
 }
+MIN_QTY_DETAILS = {"variant_id": 1002, "min_qty_per_order": 2}
+MIN_UNITS_DETAILS = {
+    "min_order_units": 5,
+    "order_units": 3,
+    "units_to_min_order": 2,
+    "order_unit_label": "cartons",
+}
 COD_ABOVE_LIMIT_DETAILS = {"reason": "ABOVE_LIMIT", "cod_max_order_value": "2000.00"}
 STORE_CLOSED_DETAILS = {"store_id": 1, "opens_at": "2026-11-03T01:30:00Z"}
 

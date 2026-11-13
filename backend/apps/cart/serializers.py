@@ -19,7 +19,8 @@ from apps.catalog.serializers import VariantSummarySerializer, money
 from apps.orders.choices import PaymentMethod
 from apps.stores.serializers import StoreStatusSerializer
 
-MAX_LINE_QUANTITY = 1000  # request sanity bound; the real limit is the variant's max_qty_per_order
+# Request sanity bound; the real limits are the variant's min/max per order.
+MAX_LINE_QUANTITY = 1000
 INSTRUCTIONS_NOTE_MAX_LENGTH = 200
 
 
@@ -113,10 +114,12 @@ class CartLineSerializer(serializers.Serializer):
     issue = CartLineIssueSerializer(
         allow_null=True,
         help_text=(
-            "Set when the line cannot be ordered as it is (quantity above "
-            "`variant.orderable_quantity`, which is 0 when out of stock or no longer sold). "
-            "Fix: set the quantity to `variant.orderable_quantity`, or remove the line when it "
-            "is 0. Null when the line is fine."
+            "Set when the line cannot be ordered as it is: quantity above "
+            "`variant.orderable_quantity` (which is 0 when out of stock or no longer sold), or "
+            "below `variant.min_qty_per_order` (`MIN_QTY_REQUIRED`, e.g. the minimum was raised "
+            "after the line was added). Fix: set the quantity to `variant.orderable_quantity` "
+            "(for `MIN_QTY_REQUIRED`, to `variant.min_qty_per_order`), or remove the line when "
+            "`orderable_quantity` is 0. Null when the line is fine."
         ),
     )
 
@@ -156,6 +159,25 @@ class CartThresholdsSerializer(serializers.Serializer):
     )
     amount_to_free_delivery = money_or_null(
         "For the nudge 'Add ₹X more for free delivery'; null when delivery is already free."
+    )
+    min_order_units = serializers.IntegerField(
+        min_value=0,
+        help_text=(
+            "Fewest units one order must have, any mix of items (e.g. 5 cartons); 0 = no "
+            "minimum. Not compared with `bill.item_total`: units are counted per line as "
+            "min(`quantity`, `variant.orderable_quantity`), so an out-of-stock line counts 0."
+        ),
+    )
+    units_to_min_order = serializers.IntegerField(
+        allow_null=True,
+        min_value=1,
+        help_text=(
+            "Units still needed ('Add 2 more cartons'); null when the minimum is met or there is "
+            "none. While set, checkout is blocked with `MIN_UNITS_NOT_MET`."
+        ),
+    )
+    order_unit_label = serializers.CharField(
+        help_text='What a unit is called, in the plural, e.g. "cartons" ("items" by default).'
     )
 
 

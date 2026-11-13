@@ -67,7 +67,8 @@ class VariantSummarySerializer(serializers.Serializer):
         min_value=0,
         help_text=(
             "Units a customer can add right now: min(units in stock at this store, "
-            "`max_qty_per_order`). 0 when out of stock. Cap the ADD stepper here."
+            "`max_qty_per_order`). 0 when out of stock, including when fewer than "
+            "`min_qty_per_order` units can be sold. Cap the ADD stepper here."
         ),
     )
     units_left = serializers.IntegerField(
@@ -80,6 +81,15 @@ class VariantSummarySerializer(serializers.Serializer):
     )
     max_qty_per_order = serializers.IntegerField(
         min_value=1, help_text="Per-order limit for this variant (also enforced by the cart)."
+    )
+    min_qty_per_order = serializers.IntegerField(
+        min_value=1,
+        help_text=(
+            "Fewest units of this variant one order can have (1 = no minimum; never above "
+            "`max_qty_per_order`). The first ADD sets this quantity, and the stepper never goes "
+            "below it: stepping down from here removes the line (quantity 0). The cart refuses "
+            "1 to `min_qty_per_order` - 1 with 422 `MIN_QTY_REQUIRED`."
+        ),
     )
     image = ImageSetSerializer(
         allow_null=True,

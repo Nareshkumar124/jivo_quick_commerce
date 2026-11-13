@@ -13,12 +13,17 @@ class DeliveryInstructionChip(models.TextChoices):
 
 class CartLineIssueCode(models.TextChoices):
     """Why a line cannot be ordered as it is. The fix: set the line to the variant's
-    `orderable_quantity` (remove it when that is 0)."""
+    `orderable_quantity` (remove it when that is 0); for MIN_QTY_REQUIRED, raise it to the
+    variant's `min_qty_per_order` (at most `orderable_quantity`) or remove it."""
 
     OUT_OF_STOCK = "OUT_OF_STOCK", "Out of stock: remove it to continue."
     QUANTITY_UNAVAILABLE = (
         "QUANTITY_UNAVAILABLE",
         "Not available in this quantity: reduce it to continue.",
+    )
+    MIN_QTY_REQUIRED = (
+        "MIN_QTY_REQUIRED",
+        "Below the minimum per order: increase it or remove it to continue.",
     )
 
 
@@ -31,7 +36,9 @@ class CheckoutBlockerCode(models.TextChoices):
     NOT_SERVICEABLE = "NOT_SERVICEABLE", "We do not deliver to this address from this store."
     STORE_CLOSED = "STORE_CLOSED", "The store is not accepting orders right now."
     STOCK_UNAVAILABLE = "STOCK_UNAVAILABLE", "Some items are not available as chosen."
+    MIN_QTY_REQUIRED = "MIN_QTY_REQUIRED", "Some items are below their minimum per order."
     MIN_ORDER_NOT_MET = "MIN_ORDER_NOT_MET", "The minimum order value is not met."
+    MIN_UNITS_NOT_MET = "MIN_UNITS_NOT_MET", "The minimum number of units per order is not met."
     COUPON_INVALID = "COUPON_INVALID", "The coupon is not valid."
     COUPON_EXPIRED = "COUPON_EXPIRED", "The coupon has expired."
     COUPON_NOT_ELIGIBLE = "COUPON_NOT_ELIGIBLE", "This cart is not eligible for the coupon."
