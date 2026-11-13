@@ -19,11 +19,180 @@ import 'package:jivo_api/src/model/device_unregister_request.dart';
 import 'package:jivo_api/src/model/error_envelope.dart';
 import 'package:jivo_api/src/model/me.dart';
 import 'package:jivo_api/src/model/patched_me_request.dart';
+import 'package:jivo_api/src/model/referral.dart';
+import 'package:jivo_api/src/model/referral_apply_request.dart';
 
 class AccountApi {
   final Dio _dio;
 
   const AccountApi(this._dio);
+
+  /// Enter a friend&#39;s referral code
+  /// Once per customer, before their first order (an order that reached PLACED; a failed or abandoned online payment does not count). The code cannot be changed later. Case and spaces are ignored. Returns the referral screen. Checks, first failure wins: program off, code already entered, order already placed, unknown code, own code. Limited to &#x60;REFERRAL_APPLY_RATE&#x60; per user (default 10 an hour).
+  ///
+  /// Parameters:
+  /// * [referralApplyRequest]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Referral] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Referral>> accountReferralApply({
+    required ReferralApplyRequest referralApplyRequest,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/account/referral/apply/';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(referralApplyRequest);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Referral? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<Referral, Referral>(
+              rawData,
+              'Referral',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Referral>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// My referral code and status
+  /// The caller&#39;s own referral code (created on the first call, never changed), a ready-made share message, the reward terms (current admin settings), whether the caller joined with a friend&#39;s code, and how many friends joined with theirs.  When a referred customer&#39;s first order is delivered, **both** customers get a personal coupon (FLAT &#x60;reward_amount&#x60; off, valid &#x60;reward_validity_days&#x60; days, one use, only for them). It appears in &#x60;GET /cart/coupons/&#x60; with &#x60;is_personal: true&#x60;.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Referral] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Referral>> accountReferralRetrieve({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/account/referral/';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Referral? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<Referral, Referral>(
+              rawData,
+              'Referral',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Referral>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
 
   /// Delete my account (OTP confirmed)
   /// Two steps: (1) &#x60;POST /auth/otp/request/&#x60; with the user&#39;s own phone and &#x60;purpose: delete_account&#x60;; (2) this call with that OTP. Only a &#x60;delete_account&#x60; OTP issued to the caller&#39;s phone is accepted.  On success every refresh token of the user is revoked and their devices are deactivated: clear local data and go to the login screen. Personal data is anonymised after the grace period (&#x60;anonymise_after&#x60;, 30 days, 07 §4); order and invoice records are kept without personal data.

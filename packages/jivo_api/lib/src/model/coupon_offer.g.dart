@@ -35,6 +35,8 @@ abstract class _$CouponOfferCWProxy {
 
   CouponOffer amountToUnlock(String? amountToUnlock);
 
+  CouponOffer isPersonal(bool isPersonal);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CouponOffer(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -56,6 +58,7 @@ abstract class _$CouponOfferCWProxy {
     CouponIneligibleReasonEnum? ineligibleReason,
     String? message,
     String? amountToUnlock,
+    bool isPersonal,
   });
 }
 
@@ -113,6 +116,9 @@ class _$CouponOfferCWProxyImpl implements _$CouponOfferCWProxy {
       this(amountToUnlock: amountToUnlock);
 
   @override
+  CouponOffer isPersonal(bool isPersonal) => this(isPersonal: isPersonal);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CouponOffer(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -134,6 +140,7 @@ class _$CouponOfferCWProxyImpl implements _$CouponOfferCWProxy {
     Object? ineligibleReason = const $CopyWithPlaceholder(),
     Object? message = const $CopyWithPlaceholder(),
     Object? amountToUnlock = const $CopyWithPlaceholder(),
+    Object? isPersonal = const $CopyWithPlaceholder(),
   }) {
     return CouponOffer(
       code: code == const $CopyWithPlaceholder()
@@ -192,6 +199,10 @@ class _$CouponOfferCWProxyImpl implements _$CouponOfferCWProxy {
           ? _value.amountToUnlock
           // ignore: cast_nullable_to_non_nullable
           : amountToUnlock as String?,
+      isPersonal: isPersonal == const $CopyWithPlaceholder()
+          ? _value.isPersonal
+          // ignore: cast_nullable_to_non_nullable
+          : isPersonal as bool,
     );
   }
 }
@@ -227,6 +238,7 @@ CouponOffer _$CouponOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
         'ineligible_reason',
         'message',
         'amount_to_unlock',
+        'is_personal',
       ],
     );
     final val = CouponOffer(
@@ -261,6 +273,7 @@ CouponOffer _$CouponOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
       ),
       message: $checkedConvert('message', (v) => v as String?),
       amountToUnlock: $checkedConvert('amount_to_unlock', (v) => v as String?),
+      isPersonal: $checkedConvert('is_personal', (v) => v as bool),
     );
     return val;
   },
@@ -273,6 +286,7 @@ CouponOffer _$CouponOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
     'isEligible': 'is_eligible',
     'ineligibleReason': 'ineligible_reason',
     'amountToUnlock': 'amount_to_unlock',
+    'isPersonal': 'is_personal',
   },
 );
 
@@ -293,6 +307,7 @@ Map<String, dynamic> _$CouponOfferToJson(CouponOffer instance) =>
           _$CouponIneligibleReasonEnumEnumMap[instance.ineligibleReason],
       'message': instance.message,
       'amount_to_unlock': instance.amountToUnlock,
+      'is_personal': instance.isPersonal,
     };
 
 const _$CouponDiscountTypeEnumEnumMap = {

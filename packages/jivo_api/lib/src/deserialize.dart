@@ -111,6 +111,9 @@ import 'package:jivo_api/src/model/razorpay_prefill.dart';
 import 'package:jivo_api/src/model/razorpay_webhook_event_request.dart';
 import 'package:jivo_api/src/model/read_all_result.dart';
 import 'package:jivo_api/src/model/recent_task.dart';
+import 'package:jivo_api/src/model/referral.dart';
+import 'package:jivo_api/src/model/referral_apply_request.dart';
+import 'package:jivo_api/src/model/referred_by.dart';
 import 'package:jivo_api/src/model/reorder_issue.dart';
 import 'package:jivo_api/src/model/reorder_result.dart';
 import 'package:jivo_api/src/model/rider_bank_account.dart';
@@ -539,6 +542,14 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'RecentTask':
       return RecentTask.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'Referral':
+      return Referral.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ReferralApplyRequest':
+      return ReferralApplyRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ReferralStatusEnum':
+    case 'ReferredBy':
+      return ReferredBy.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'ReorderIssue':
       return ReorderIssue.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'ReorderIssueReasonEnum':

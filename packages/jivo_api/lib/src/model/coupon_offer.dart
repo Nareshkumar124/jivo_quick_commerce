@@ -48,6 +48,8 @@ class CouponOffer {
     required this.message,
 
     required this.amountToUnlock,
+
+    required this.isPersonal,
   });
 
   /// Upper case. Apply with `POST /cart/coupon/`.
@@ -114,6 +116,10 @@ class CouponOffer {
   @JsonKey(name: r'amount_to_unlock', required: true, includeIfNull: true)
   final String? amountToUnlock;
 
+  /// True for the customer's own personal coupon (e.g. a referral reward): show a 'For you' label and its expiry (`ends_at`). Added 2026-11-13.
+  @JsonKey(name: r'is_personal', required: true, includeIfNull: false)
+  final bool isPersonal;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -131,7 +137,8 @@ class CouponOffer {
           other.savings == savings &&
           other.ineligibleReason == ineligibleReason &&
           other.message == message &&
-          other.amountToUnlock == amountToUnlock;
+          other.amountToUnlock == amountToUnlock &&
+          other.isPersonal == isPersonal;
 
   @override
   int get hashCode =>
@@ -148,7 +155,8 @@ class CouponOffer {
       (savings == null ? 0 : savings.hashCode) +
       (ineligibleReason == null ? 0 : ineligibleReason.hashCode) +
       (message == null ? 0 : message.hashCode) +
-      (amountToUnlock == null ? 0 : amountToUnlock.hashCode);
+      (amountToUnlock == null ? 0 : amountToUnlock.hashCode) +
+      isPersonal.hashCode;
 
   factory CouponOffer.fromJson(Map<String, dynamic> json) =>
       _$CouponOfferFromJson(json);
