@@ -114,6 +114,9 @@ CartSnapshot cartFromApi(api.Cart c) => CartSnapshot.fromLines(
     amountToMinOrder: c.thresholds.amountToMinOrder,
     freeDeliveryThreshold: c.thresholds.freeDeliveryThreshold,
     amountToFreeDelivery: c.thresholds.amountToFreeDelivery,
+    minOrderUnits: c.thresholds.minOrderUnits,
+    unitsToMinOrder: c.thresholds.unitsToMinOrder,
+    orderUnitLabel: c.thresholds.orderUnitLabel,
   ),
   paymentOptions: [
     for (final option in c.paymentMethods)
@@ -201,6 +204,8 @@ CheckoutBlockerCode _blockerCode(api.CheckoutBlockerCodeEnum code) =>
         CheckoutBlockerCode.minQtyRequired,
       api.CheckoutBlockerCodeEnum.MIN_ORDER_NOT_MET =>
         CheckoutBlockerCode.minOrderNotMet,
+      api.CheckoutBlockerCodeEnum.MIN_UNITS_NOT_MET =>
+        CheckoutBlockerCode.minUnitsNotMet,
       api.CheckoutBlockerCodeEnum.COUPON_INVALID =>
         CheckoutBlockerCode.couponInvalid,
       api.CheckoutBlockerCodeEnum.COUPON_EXPIRED =>

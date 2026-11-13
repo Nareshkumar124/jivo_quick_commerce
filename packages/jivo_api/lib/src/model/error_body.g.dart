@@ -153,5 +153,6 @@ const _$ErrorCodeEnumEnumMap = {
   ErrorCodeEnum.PICKUP_CODE_INVALID: 'PICKUP_CODE_INVALID',
   ErrorCodeEnum.PICKUP_CODE_LOCKED: 'PICKUP_CODE_LOCKED',
   ErrorCodeEnum.MIN_QTY_REQUIRED: 'MIN_QTY_REQUIRED',
+  ErrorCodeEnum.MIN_UNITS_NOT_MET: 'MIN_UNITS_NOT_MET',
   ErrorCodeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

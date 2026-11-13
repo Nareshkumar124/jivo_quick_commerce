@@ -987,6 +987,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String minimumUnitsShortfall(int count, int minimum, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Add $count more $label to place your order (minimum $minimum $label)',
+      one: 'Add 1 more to place your order (minimum $minimum $label)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String minimumUnitsNotMet(int minimum, String label) {
+    return 'Minimum order is $minimum $label.';
+  }
+
+  @override
+  String get orderUnitsDefault => 'items';
+
+  @override
   String get cartStoreClosed =>
       'The store is closed right now. You can check out when it opens.';
 

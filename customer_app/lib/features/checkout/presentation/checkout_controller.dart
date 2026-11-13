@@ -51,8 +51,8 @@ class CheckoutState {
 /// - ONLINE: Razorpay opens; success is reported only after the server's
 ///   verify call confirms the order (`08 §4`).
 /// - `PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `MIN_QTY_REQUIRED`,
-///   `MIN_ORDER_NOT_MET`, `COD_NOT_AVAILABLE` and the coupon errors reload
-///   the cart, so the
+///   `MIN_ORDER_NOT_MET`, `MIN_UNITS_NOT_MET`, `COD_NOT_AVAILABLE` and the
+///   coupon errors reload the cart, so the
 ///   screens show the server's new bill and flags; the message says what
 ///   changed, from the error's `details` (`cartErrorText`).
 /// - Another order awaiting payment: [CheckoutState.pendingOrderId].
@@ -165,6 +165,7 @@ class CheckoutController extends Notifier<CheckoutState> {
     ApiErrorCode.stockUnavailable ||
     ApiErrorCode.minQtyRequired ||
     ApiErrorCode.minOrderNotMet ||
+    ApiErrorCode.minUnitsNotMet ||
     ApiErrorCode.codNotAvailable ||
     ApiErrorCode.couponExpired ||
     ApiErrorCode.couponNotEligible ||

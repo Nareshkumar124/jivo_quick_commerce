@@ -24,6 +24,7 @@ String apiErrorMessage(JivoCoreLocalizations l10n, ApiError error) =>
       ApiErrorCode.maxQtyExceeded => l10n.errorMaxQtyExceeded,
       ApiErrorCode.minQtyRequired => l10n.errorMinQtyRequired,
       ApiErrorCode.minOrderNotMet => l10n.errorMinOrderNotMet,
+      ApiErrorCode.minUnitsNotMet => l10n.errorMinUnitsNotMet,
       ApiErrorCode.couponInvalid => l10n.errorCouponInvalid,
       ApiErrorCode.couponExpired => l10n.errorCouponExpired,
       ApiErrorCode.couponNotEligible => l10n.errorCouponNotEligible,

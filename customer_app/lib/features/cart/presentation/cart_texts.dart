@@ -63,12 +63,42 @@ String? checkoutBlockerText(AppLocalizations l10n, CartSnapshot cart) {
       ),
       null => blocker.message,
     },
+    CheckoutBlockerCode.minUnitsNotMet =>
+      minUnitsWarning(l10n, thresholds) ??
+          switch (thresholds) {
+            CartThresholds(:final minOrderUnits) when minOrderUnits > 0 =>
+              l10n.minimumUnitsNotMet(
+                minOrderUnits,
+                orderUnitLabel(l10n, thresholds),
+              ),
+            _ => blocker.message,
+          },
     CheckoutBlockerCode.couponInvalid => l10n.blockerCouponInvalid,
     CheckoutBlockerCode.couponExpired => l10n.blockerCouponExpired,
     CheckoutBlockerCode.couponNotEligible => l10n.blockerCouponNotEligible,
     CheckoutBlockerCode.couponUsageExceeded => l10n.blockerCouponUsed,
     CheckoutBlockerCode.unknown => blocker.message,
   };
+}
+
+/// What an order unit is called: the server's `order_unit_label`
+/// ("cartons"), or "items" when it sends none.
+String orderUnitLabel(AppLocalizations l10n, CartThresholds? thresholds) {
+  final label = thresholds?.orderUnitLabel.trim() ?? '';
+  return label.isEmpty ? l10n.orderUnitsDefault : label;
+}
+
+/// "Add 2 more cartons to place your order (minimum 5 cartons)" while the
+/// cart is short of the store's `min_order_units` (any mix of products);
+/// null when the rule is met or off. All numbers are the server's.
+String? minUnitsWarning(AppLocalizations l10n, CartThresholds? thresholds) {
+  final short = thresholds?.unitsToMinOrder;
+  if (thresholds == null || short == null || short <= 0) return null;
+  return l10n.minimumUnitsShortfall(
+    short,
+    thresholds.minOrderUnits,
+    orderUnitLabel(l10n, thresholds),
+  );
 }
 
 /// Why a listed coupon can't be applied.
@@ -128,6 +158,16 @@ String cartErrorText(
         return l10n.minimumOrderShortfall(
           formatRupees(minimum),
           formatRupees(short),
+        );
+      }
+    case ApiErrorCode.minUnitsNotMet:
+      final minimum = apiError.minOrderUnits;
+      final short = apiError.unitsToMinOrder;
+      if (minimum != null && short != null && short > 0) {
+        return l10n.minimumUnitsShortfall(
+          short,
+          minimum,
+          orderUnitLabel(l10n, cart?.thresholds),
         );
       }
     case ApiErrorCode.couponNotEligible:

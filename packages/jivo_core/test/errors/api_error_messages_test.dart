@@ -19,7 +19,7 @@ void main() {
     final backendCodes = ApiErrorCode.values.where((c) => c.wireValue != null);
     expect(
       backendCodes,
-      hasLength(37),
+      hasLength(38),
       reason: '06 §6 + OpenAPI ErrorCodeEnum',
     );
 
@@ -74,6 +74,21 @@ void main() {
       ),
       l10n.errorMinQtyRequired,
     );
+  });
+
+  test('MIN_UNITS_NOT_MET carries the units from details', () {
+    final error = ApiError.tryParseEnvelope({
+      'error': {
+        'code': 'MIN_UNITS_NOT_MET',
+        'message': 'Add 2 more cartons.',
+        'details': {'min_order_units': 5, 'units_to_min_order': 2},
+      },
+    })!;
+
+    expect(error.code, ApiErrorCode.minUnitsNotMet);
+    expect(error.minOrderUnits, 5);
+    expect(error.unitsToMinOrder, 2);
+    expect(apiErrorMessage(l10n, error), l10n.errorMinUnitsNotMet);
   });
 
   test('unknown codes fall back to the generic message', () {

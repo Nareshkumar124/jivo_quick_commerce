@@ -15,6 +15,12 @@ abstract class _$CartThresholdsCWProxy {
 
   CartThresholds amountToFreeDelivery(String? amountToFreeDelivery);
 
+  CartThresholds minOrderUnits(int minOrderUnits);
+
+  CartThresholds unitsToMinOrder(int? unitsToMinOrder);
+
+  CartThresholds orderUnitLabel(String orderUnitLabel);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CartThresholds(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -26,6 +32,9 @@ abstract class _$CartThresholdsCWProxy {
     String? amountToMinOrder,
     String? freeDeliveryThreshold,
     String? amountToFreeDelivery,
+    int minOrderUnits,
+    int? unitsToMinOrder,
+    String orderUnitLabel,
   });
 }
 
@@ -52,6 +61,18 @@ class _$CartThresholdsCWProxyImpl implements _$CartThresholdsCWProxy {
       this(amountToFreeDelivery: amountToFreeDelivery);
 
   @override
+  CartThresholds minOrderUnits(int minOrderUnits) =>
+      this(minOrderUnits: minOrderUnits);
+
+  @override
+  CartThresholds unitsToMinOrder(int? unitsToMinOrder) =>
+      this(unitsToMinOrder: unitsToMinOrder);
+
+  @override
+  CartThresholds orderUnitLabel(String orderUnitLabel) =>
+      this(orderUnitLabel: orderUnitLabel);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CartThresholds(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -63,6 +84,9 @@ class _$CartThresholdsCWProxyImpl implements _$CartThresholdsCWProxy {
     Object? amountToMinOrder = const $CopyWithPlaceholder(),
     Object? freeDeliveryThreshold = const $CopyWithPlaceholder(),
     Object? amountToFreeDelivery = const $CopyWithPlaceholder(),
+    Object? minOrderUnits = const $CopyWithPlaceholder(),
+    Object? unitsToMinOrder = const $CopyWithPlaceholder(),
+    Object? orderUnitLabel = const $CopyWithPlaceholder(),
   }) {
     return CartThresholds(
       minOrderValue: minOrderValue == const $CopyWithPlaceholder()
@@ -82,6 +106,18 @@ class _$CartThresholdsCWProxyImpl implements _$CartThresholdsCWProxy {
           ? _value.amountToFreeDelivery
           // ignore: cast_nullable_to_non_nullable
           : amountToFreeDelivery as String?,
+      minOrderUnits: minOrderUnits == const $CopyWithPlaceholder()
+          ? _value.minOrderUnits
+          // ignore: cast_nullable_to_non_nullable
+          : minOrderUnits as int,
+      unitsToMinOrder: unitsToMinOrder == const $CopyWithPlaceholder()
+          ? _value.unitsToMinOrder
+          // ignore: cast_nullable_to_non_nullable
+          : unitsToMinOrder as int?,
+      orderUnitLabel: orderUnitLabel == const $CopyWithPlaceholder()
+          ? _value.orderUnitLabel
+          // ignore: cast_nullable_to_non_nullable
+          : orderUnitLabel as String,
     );
   }
 }
@@ -108,6 +144,9 @@ CartThresholds _$CartThresholdsFromJson(Map<String, dynamic> json) =>
             'amount_to_min_order',
             'free_delivery_threshold',
             'amount_to_free_delivery',
+            'min_order_units',
+            'units_to_min_order',
+            'order_unit_label',
           ],
         );
         final val = CartThresholds(
@@ -124,6 +163,18 @@ CartThresholds _$CartThresholdsFromJson(Map<String, dynamic> json) =>
             'amount_to_free_delivery',
             (v) => v as String?,
           ),
+          minOrderUnits: $checkedConvert(
+            'min_order_units',
+            (v) => (v as num).toInt(),
+          ),
+          unitsToMinOrder: $checkedConvert(
+            'units_to_min_order',
+            (v) => (v as num?)?.toInt(),
+          ),
+          orderUnitLabel: $checkedConvert(
+            'order_unit_label',
+            (v) => v as String,
+          ),
         );
         return val;
       },
@@ -132,6 +183,9 @@ CartThresholds _$CartThresholdsFromJson(Map<String, dynamic> json) =>
         'amountToMinOrder': 'amount_to_min_order',
         'freeDeliveryThreshold': 'free_delivery_threshold',
         'amountToFreeDelivery': 'amount_to_free_delivery',
+        'minOrderUnits': 'min_order_units',
+        'unitsToMinOrder': 'units_to_min_order',
+        'orderUnitLabel': 'order_unit_label',
       },
     );
 
@@ -141,4 +195,7 @@ Map<String, dynamic> _$CartThresholdsToJson(CartThresholds instance) =>
       'amount_to_min_order': instance.amountToMinOrder,
       'free_delivery_threshold': instance.freeDeliveryThreshold,
       'amount_to_free_delivery': instance.amountToFreeDelivery,
+      'min_order_units': instance.minOrderUnits,
+      'units_to_min_order': instance.unitsToMinOrder,
+      'order_unit_label': instance.orderUnitLabel,
     };

@@ -22,6 +22,8 @@ class FakeBillRules {
     this.smallCartFee = 1500,
     this.handlingFee = 500,
     this.minimumOrder = 4900,
+    this.minimumUnits = 0,
+    this.orderUnitLabel = 'items',
     this.codMaxOrderValue = 150000,
     this.maxTip = 50000,
     this.paymentWindow = const Duration(minutes: 15),
@@ -37,6 +39,13 @@ class FakeBillRules {
   final int smallCartFee;
   final int handlingFee;
   final int minimumOrder;
+
+  /// `min_order_units`: the fewest units (any mix of products) an order
+  /// must have; 0 = no such rule (the default).
+  final int minimumUnits;
+
+  /// `order_unit_label`, e.g. "cartons".
+  final String orderUnitLabel;
   final int codMaxOrderValue;
 
   /// `CART_MAX_TIP`.
@@ -463,6 +472,17 @@ class FakeCommerceBackend
           'min_order_value': cart.thresholds!.minOrderValue,
           'item_total': bill.itemTotal,
           'amount_to_min_order': toMinimum,
+        },
+      );
+    }
+    final toUnits = cart.thresholds?.unitsToMinOrder;
+    if (toUnits != null) {
+      _fail(
+        ApiErrorCode.minUnitsNotMet,
+        status: 422,
+        details: {
+          'min_order_units': rules.minimumUnits,
+          'units_to_min_order': toUnits,
         },
       );
     }
@@ -1197,6 +1217,8 @@ class FakeCommerceBackend
     final productDiscount = mrpTotal - itemTotal;
     final toFreeDelivery = rules.freeDeliveryThreshold - itemTotal;
     final toMinimum = rules.minimumOrder - itemTotal;
+    // Units over every line (any mix of products); 0 when the rule is off.
+    final toMinUnits = rules.minimumUnits > 0 ? rules.minimumUnits - units : 0;
     final address = addressId ?? _savedAddressId;
     final codAvailable = grandTotal <= rules.codMaxOrderValue;
     final hasProblems = lines.any(
@@ -1236,6 +1258,13 @@ class FakeCommerceBackend
             code: CheckoutBlockerCode.minOrderNotMet,
             message: 'Add items worth ${_rupees(toMinimum)} more to order.',
           ),
+        if (toMinUnits > 0)
+          CheckoutBlocker(
+            code: CheckoutBlockerCode.minUnitsNotMet,
+            message:
+                'Add $toMinUnits more ${rules.orderUnitLabel} to place your '
+                'order (minimum ${rules.minimumUnits}).',
+          ),
         if (coupon != null && !coupon.isApplicable)
           const CheckoutBlocker(
             code: CheckoutBlockerCode.couponNotEligible,
@@ -1266,6 +1295,9 @@ class FakeCommerceBackend
       thresholds: CartThresholds(
         minOrderValue: _amount(rules.minimumOrder),
         amountToMinOrder: toMinimum > 0 ? _amount(toMinimum) : null,
+        minOrderUnits: rules.minimumUnits,
+        unitsToMinOrder: toMinUnits > 0 ? toMinUnits : null,
+        orderUnitLabel: rules.orderUnitLabel,
         freeDeliveryThreshold: _amount(rules.freeDeliveryThreshold),
         amountToFreeDelivery: toFreeDelivery > 0
             ? _amount(toFreeDelivery)

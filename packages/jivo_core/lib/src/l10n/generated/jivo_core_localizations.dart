@@ -217,6 +217,12 @@ abstract class JivoCoreLocalizations {
   /// **'Your cart is below the minimum order value.'**
   String get errorMinOrderNotMet;
 
+  /// MIN_UNITS_NOT_MET: fewer units in the order than the store's minimum (any mix of products). The cart screen says how many more.
+  ///
+  /// In en, this message translates to:
+  /// **'Your order is below the minimum quantity. Please add more items.'**
+  String get errorMinUnitsNotMet;
+
   /// COUPON_INVALID
   ///
   /// In en, this message translates to:

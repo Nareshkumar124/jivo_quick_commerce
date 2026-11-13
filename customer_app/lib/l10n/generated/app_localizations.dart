@@ -1768,6 +1768,24 @@ abstract class AppLocalizations {
   /// **'Minimum order is {amount}.'**
   String minimumOrderNotMet(String amount);
 
+  /// Cart warning and checkout blocker MIN_UNITS_NOT_MET: the order has fewer units (any mix of products) than the store's min_order_units. count = units_to_min_order, label = order_unit_label (e.g. cartons). Example: Add 2 more cartons to place your order (minimum 5 cartons).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more to place your order (minimum {minimum} {label})} other{Add {count} more {label} to place your order (minimum {minimum} {label})}}'**
+  String minimumUnitsShortfall(int count, int minimum, String label);
+
+  /// Checkout blocker MIN_UNITS_NOT_MET when the server sends no units_to_min_order.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum order is {minimum} {label}.'**
+  String minimumUnitsNotMet(int minimum, String label);
+
+  /// What an order unit is called when the server sends no order_unit_label (e.g. 'minimum 5 items').
+  ///
+  /// In en, this message translates to:
+  /// **'items'**
+  String get orderUnitsDefault;
+
   /// Checkout disabled while the store is closed.
   ///
   /// In en, this message translates to:

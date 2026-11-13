@@ -68,10 +68,11 @@ class CheckoutScreen extends ConsumerWidget {
         }
         // What changed, from the error's details; the cart was reloaded.
         showMessage(context, cartErrorText(context, error, cart: snapshot));
-        // Flagged lines are fixed on the cart screen.
+        // Flagged lines, and too few units, are fixed on the cart screen.
         final flagged =
             error.code == ApiErrorCode.stockUnavailable ||
-            error.code == ApiErrorCode.minQtyRequired;
+            error.code == ApiErrorCode.minQtyRequired ||
+            error.code == ApiErrorCode.minUnitsNotMet;
         if (flagged && context.canPop()) context.pop();
       })
       ..listen(checkoutProvider.select((s) => s.pendingOrderId), (_, id) {

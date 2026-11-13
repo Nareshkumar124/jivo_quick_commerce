@@ -342,6 +342,29 @@ void main() {
     expect(app.cart.orders, isEmpty);
   });
 
+  testWidgets('MIN_UNITS_NOT_MET reloads the cart and goes back to it with '
+      'the shortfall', (tester) async {
+    final commerce = _CountingLoads();
+    final app = await appWithCart(commerce: commerce);
+    await openCheckout(tester, app);
+
+    commerce.failNext = const ApiError(
+      code: ApiErrorCode.minUnitsNotMet,
+      statusCode: 422,
+      details: {'min_order_units': 5, 'units_to_min_order': 3},
+    );
+    final loadsBefore = commerce.loads;
+    await placeOrder(tester);
+    expect(commerce.loads, greaterThan(loadsBefore), reason: 'cart reloaded');
+    expect(
+      find.text('Add 3 more items to place your order (minimum 5 items)'),
+      findsOneWidget,
+    );
+    expect(find.byType(CheckoutScreen), findsNothing, reason: 'popped');
+    expect(find.byType(CartScreen), findsOneWidget);
+    expect(app.cart.orders, isEmpty);
+  });
+
   testWidgets('double tap on Place order places one order', (tester) async {
     final app = await appWithCart();
     await openCheckout(tester, app);

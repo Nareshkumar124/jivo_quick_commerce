@@ -125,6 +125,43 @@ void main() {
     },
   );
 
+  test('MIN_UNITS_NOT_MET: the units thresholds and the blocker', () async {
+    final cart = Map<String, Object?>.from(
+      contractExample('cart_retrieve/200/ReadyToOrder')! as Map,
+    );
+    cart['thresholds'] = {
+      ...(cart['thresholds']! as Map).cast<String, Object?>(),
+      'min_order_units': 5,
+      'units_to_min_order': 2,
+      'order_unit_label': 'cartons',
+    };
+    cart['checkout'] = {
+      'can_place_order': false,
+      'blockers': [
+        {
+          'code': 'MIN_UNITS_NOT_MET',
+          'message': 'Add 2 more cartons to place your order.',
+        },
+      ],
+    };
+    answer = (_, _) => cart;
+
+    final snapshot = await repository.load();
+    expect(snapshot.thresholds!.minOrderUnits, 5);
+    expect(snapshot.thresholds!.unitsToMinOrder, 2);
+    expect(snapshot.thresholds!.orderUnitLabel, 'cartons');
+    expect(
+      snapshot.checkout.blockers.single.code,
+      CheckoutBlockerCode.minUnitsNotMet,
+    );
+
+    // The contract's default: the rule is off.
+    answer = (_, _) => contractExample('cart_retrieve/200/ReadyToOrder');
+    final plain = await repository.load();
+    expect(plain.thresholds!.minOrderUnits, 0);
+    expect(plain.thresholds!.unitsToMinOrder, isNull);
+  });
+
   test('every documented cart decodes', () async {
     for (final name in [
       'ReadyToOrder',

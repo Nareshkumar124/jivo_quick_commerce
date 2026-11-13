@@ -132,6 +132,85 @@ void main() {
     expect(cart.lines.single.orderableQuantity, 1);
   });
 
+  group('minimum units per order (MIN_UNITS_NOT_MET)', () {
+    Future<CartSnapshot> addTo(
+      FakeCommerceBackend to,
+      int variantId,
+      int quantity,
+    ) => to.setQuantity(
+      variantId,
+      quantity,
+      preview: CartLinePreview.of(
+        oil(id: variantId, price: '20.00'),
+        'Jivo Water $variantId',
+      ),
+    );
+
+    test('off by default: nothing changes', () async {
+      final cart = await add(1);
+      expect(cart.thresholds!.minOrderUnits, 0);
+      expect(cart.thresholds!.unitsToMinOrder, isNull);
+      expect(
+        cart.checkout.blockers.map((b) => b.code),
+        isNot(contains(CheckoutBlockerCode.minUnitsNotMet)),
+      );
+    });
+
+    test('counts units over a mix of products until the minimum', () async {
+      final store = FakeCommerceBackend(
+        latency: Duration.zero,
+        rules: const FakeBillRules(minimumUnits: 5, orderUnitLabel: 'cartons'),
+      );
+      await addTo(store, 1501, 2);
+      var cart = await addTo(store, 1502, 2);
+      expect(cart.thresholds!.minOrderUnits, 5);
+      expect(cart.thresholds!.unitsToMinOrder, 1);
+      expect(cart.thresholds!.orderUnitLabel, 'cartons');
+      expect(
+        cart.checkout.blockers.map((b) => b.code),
+        contains(CheckoutBlockerCode.minUnitsNotMet),
+      );
+
+      cart = await addTo(store, 1503, 1); // 2 + 2 + 1 = 5
+      expect(cart.thresholds!.unitsToMinOrder, isNull);
+      expect(
+        cart.checkout.blockers.map((b) => b.code),
+        isNot(contains(CheckoutBlockerCode.minUnitsNotMet)),
+      );
+    });
+
+    test('placing a short order is refused with the shortfall', () async {
+      final store = FakeCommerceBackend(
+        latency: Duration.zero,
+        rules: const FakeBillRules(
+          minimumUnits: 5,
+          orderUnitLabel: 'cartons',
+          minimumOrder: 0,
+        ),
+      );
+      await addTo(store, 1501, 3);
+      final cart = await store.load(addressId: 1);
+      await expectLater(
+        store.placeOrder(
+          PlaceOrderRequest(
+            addressId: 1,
+            paymentMethod: PaymentMethod.cod,
+            expectedGrandTotal: cart.bill!.grandTotal,
+          ),
+          idempotencyKey: 'units',
+        ),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.code, 'code', ApiErrorCode.minUnitsNotMet)
+              .having((e) => e.statusCode, 'status', 422)
+              .having((e) => e.minOrderUnits, 'min', 5)
+              .having((e) => e.unitsToMinOrder, 'short', 2),
+        ),
+      );
+      expect(store.orders, isEmpty);
+    });
+  });
+
   group('minimum per order (MIN_QTY_REQUIRED)', () {
     Future<CartSnapshot> addWater(int quantity, {int orderable = 5}) =>
         backend.setQuantity(

@@ -84,6 +84,10 @@ class JivoCoreLocalizationsEn extends JivoCoreLocalizations {
       'Your cart is below the minimum order value.';
 
   @override
+  String get errorMinUnitsNotMet =>
+      'Your order is below the minimum quantity. Please add more items.';
+
+  @override
   String get errorCouponInvalid => 'This coupon code isn\'t valid.';
 
   @override

@@ -26,6 +26,12 @@ class CartThresholds {
     required this.freeDeliveryThreshold,
 
     required this.amountToFreeDelivery,
+
+    required this.minOrderUnits,
+
+    required this.unitsToMinOrder,
+
+    required this.orderUnitLabel,
   });
 
   /// Minimum item total to place an order.
@@ -52,6 +58,20 @@ class CartThresholds {
   )
   final String? amountToFreeDelivery;
 
+  /// Fewest units one order must have, any mix of items (e.g. 5 cartons); 0 = no minimum. Not compared with `bill.item_total`: units are counted per line as min(`quantity`, `variant.orderable_quantity`), so an out-of-stock line counts 0.
+  // minimum: 0
+  @JsonKey(name: r'min_order_units', required: true, includeIfNull: false)
+  final int minOrderUnits;
+
+  /// Units still needed ('Add 2 more cartons'); null when the minimum is met or there is none. While set, checkout is blocked with `MIN_UNITS_NOT_MET`.
+  // minimum: 1
+  @JsonKey(name: r'units_to_min_order', required: true, includeIfNull: true)
+  final int? unitsToMinOrder;
+
+  /// What a unit is called, in the plural, e.g. \"cartons\" (\"items\" by default).
+  @JsonKey(name: r'order_unit_label', required: true, includeIfNull: false)
+  final String orderUnitLabel;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -59,14 +79,20 @@ class CartThresholds {
           other.minOrderValue == minOrderValue &&
           other.amountToMinOrder == amountToMinOrder &&
           other.freeDeliveryThreshold == freeDeliveryThreshold &&
-          other.amountToFreeDelivery == amountToFreeDelivery;
+          other.amountToFreeDelivery == amountToFreeDelivery &&
+          other.minOrderUnits == minOrderUnits &&
+          other.unitsToMinOrder == unitsToMinOrder &&
+          other.orderUnitLabel == orderUnitLabel;
 
   @override
   int get hashCode =>
       minOrderValue.hashCode +
       (amountToMinOrder == null ? 0 : amountToMinOrder.hashCode) +
       (freeDeliveryThreshold == null ? 0 : freeDeliveryThreshold.hashCode) +
-      (amountToFreeDelivery == null ? 0 : amountToFreeDelivery.hashCode);
+      (amountToFreeDelivery == null ? 0 : amountToFreeDelivery.hashCode) +
+      minOrderUnits.hashCode +
+      (unitsToMinOrder == null ? 0 : unitsToMinOrder.hashCode) +
+      orderUnitLabel.hashCode;
 
   factory CartThresholds.fromJson(Map<String, dynamic> json) =>
       _$CartThresholdsFromJson(json);

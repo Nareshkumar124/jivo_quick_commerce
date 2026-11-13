@@ -248,6 +248,9 @@ class CartThresholds {
     this.amountToMinOrder,
     this.freeDeliveryThreshold,
     this.amountToFreeDelivery,
+    this.minOrderUnits = 0,
+    this.unitsToMinOrder,
+    this.orderUnitLabel = '',
   });
 
   final String minOrderValue;
@@ -258,6 +261,19 @@ class CartThresholds {
 
   /// For "Add ₹X more for FREE delivery"; null when delivery is free.
   final String? amountToFreeDelivery;
+
+  /// The fewest units (any mix of products) an order must have
+  /// (`min_order_units`); 0 = no such rule.
+  final int minOrderUnits;
+
+  /// Units still needed for [minOrderUnits] (`units_to_min_order`); null
+  /// when met or when there is no such rule. While set, checkout is blocked
+  /// (`MIN_UNITS_NOT_MET`) and the cart shows "Add N more".
+  final int? unitsToMinOrder;
+
+  /// What a unit is called (`order_unit_label`, e.g. "cartons"); empty when
+  /// the server sends none.
+  final String orderUnitLabel;
 }
 
 /// `PaymentUnavailableReasonEnum`.
@@ -290,6 +306,9 @@ enum CheckoutBlockerCode {
   /// A line is below its variant's `min_qty_per_order`.
   minQtyRequired,
   minOrderNotMet,
+
+  /// Fewer units in the order than the store's `min_order_units`.
+  minUnitsNotMet,
   couponInvalid,
   couponExpired,
   couponNotEligible,
