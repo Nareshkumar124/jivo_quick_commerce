@@ -39,16 +39,13 @@ void main() {
       }
     });
 
-    test('staging with FAKE_API=true (and prod): never', () {
-      for (final flavor in [Flavor.staging, Flavor.prod]) {
-        final c = containerFor(flavor, fakeApi: true);
-        expect(c.read(riderWorkEnabledProvider), isFalse, reason: '$flavor');
-        expect(
-          c.read(riderOnboardingEnabledProvider),
-          isFalse,
-          reason: '$flavor',
-        );
-      }
+    test('staging: on (real API, opened for device testing); prod: never', () {
+      final staging = containerFor(Flavor.staging, fakeApi: true);
+      expect(staging.read(riderWorkEnabledProvider), isTrue);
+      expect(staging.read(riderOnboardingEnabledProvider), isTrue);
+      final prod = containerFor(Flavor.prod, fakeApi: true);
+      expect(prod.read(riderWorkEnabledProvider), isFalse);
+      expect(prod.read(riderOnboardingEnabledProvider), isFalse);
     });
   });
 

@@ -41,10 +41,10 @@ void main() {
     });
   });
 
-  group('static status screen (staging)', () {
+  group('static status screen (prod)', () {
     late RiderTestHarness h;
 
-    setUp(() => h = RiderTestHarness(flavor: Flavor.staging));
+    setUp(() => h = RiderTestHarness(flavor: Flavor.prod));
 
     testWidgets('"Check status" follows an approval to home', (tester) async {
       await h.signedInBefore(pendingPhone);

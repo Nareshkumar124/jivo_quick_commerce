@@ -23,7 +23,7 @@ import '../domain/rider_profile.dart';
 /// form). Staging and prod keep the Phase 1 placeholders, even with
 /// `FAKE_API`: these fakes never run there.
 final riderOnboardingEnabledProvider = Provider<bool>(
-  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
+  (ref) => ref.watch(appEnvProvider).flavor != Flavor.prod,
 );
 
 /// The fake rider backend (TODO(api)). Overridden in tests (no delay).

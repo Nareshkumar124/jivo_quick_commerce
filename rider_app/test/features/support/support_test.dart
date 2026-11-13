@@ -700,10 +700,10 @@ void main() {
       expect(h.urls.opened.last, Uri(scheme: 'tel', path: '+911800123456'));
     });
 
-    testWidgets('staging: help and My rating are on the home and open', (
+    testWidgets('prod: help and My rating are on the home and open', (
       tester,
     ) async {
-      final h = RiderTestHarness(flavor: Flavor.staging);
+      final h = RiderTestHarness(flavor: Flavor.prod);
       // The screens are under test here, not the network.
       h.extraOverrides = [
         supportRepositoryProvider.overrideWithValue(h.support),
