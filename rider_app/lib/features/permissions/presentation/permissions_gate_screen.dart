@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../domain/permission_gate.dart';
 import 'permissions_gate_controller.dart';
@@ -42,6 +43,10 @@ class _PermissionsGateScreenState extends ConsumerState<PermissionsGateScreen> {
       if (context.canPop()) context.pop();
       return;
     }
+    await _fixItem(next);
+  }
+
+  Future<void> _fixItem(GateItem next) async {
     if (next.step == GateStep.disclosure) {
       final accepted = await context.push<bool>(Routes.disclosure);
       if (accepted ?? false) {
@@ -67,6 +72,7 @@ class _PermissionsGateScreenState extends ConsumerState<PermissionsGateScreen> {
           evaluation: value,
           notices: notices,
           onPrimary: () => _onPrimary(value),
+          onFixItem: _fixItem,
           onOpenAppSettings: _controller.openAppSettings,
           onOpenLocationAlwaysSettings: _controller.openLocationAlwaysSettings,
           onOpenFullScreenIntentSettings:
@@ -99,6 +105,7 @@ class _GateBody extends StatelessWidget {
     required this.evaluation,
     required this.notices,
     required this.onPrimary,
+    required this.onFixItem,
     required this.onOpenAppSettings,
     required this.onOpenLocationAlwaysSettings,
     required this.onOpenFullScreenIntentSettings,
@@ -107,6 +114,7 @@ class _GateBody extends StatelessWidget {
   final GateEvaluation evaluation;
   final GateNotices notices;
   final VoidCallback onPrimary;
+  final void Function(GateItem item) onFixItem;
   final VoidCallback onOpenAppSettings;
   final VoidCallback onOpenLocationAlwaysSettings;
   final VoidCallback onOpenFullScreenIntentSettings;
@@ -150,7 +158,8 @@ class _GateBody extends StatelessWidget {
                     actionKey: const Key('gate-open-app-settings'),
                     onAction: onOpenLocationAlwaysSettings,
                   ),
-                for (final item in evaluation.items) _GateRow(item: item),
+                for (final item in evaluation.items)
+                  _GateRow(item: item, onTap: () => onFixItem(item)),
                 if (evaluation.fullScreenIntentMissing)
                   _AdvisoryCard(
                     icon: Icons.fullscreen,
@@ -207,14 +216,14 @@ class _GateBody extends StatelessWidget {
 }
 
 class _GateRow extends StatelessWidget {
-  const _GateRow({required this.item});
+  const _GateRow({required this.item, this.onTap});
 
   final GateItem item;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
     final (title, hint) = switch (item.step) {
       GateStep.disclosure => (
         l10n.gateStepDisclosure,
@@ -240,18 +249,47 @@ class _GateRow extends StatelessWidget {
       ),
       GateStep.gps => (l10n.gateStepGps, l10n.gateStepGpsHint),
     };
+    final rc = RiderColors.of(context);
     final (icon, color, status) = item.done
-        ? (Icons.check_circle, Colors.green.shade700, l10n.gateStatusDone)
+        ? (Icons.check_circle, rc.onlineBg, l10n.gateStatusDone)
         : item.blocked
-        ? (Icons.block, scheme.error, l10n.gateStatusBlocked)
-        : (Icons.radio_button_unchecked, scheme.outline, l10n.gateStatusNeeded);
+        ? (Icons.block, rc.danger, l10n.gateStatusBlocked)
+        : (
+            Icons.radio_button_unchecked,
+            rc.textSecondary,
+            l10n.gateStatusNeeded,
+          );
 
     return ListTile(
+      key: Key('gate-row-${item.step.name}'),
       contentPadding: EdgeInsets.zero,
+      minTileHeight: kRiderListRowMin,
+      onTap: item.done ? null : onTap,
       leading: Icon(icon, color: color, size: 32),
       title: Text(title),
-      subtitle: item.done ? null : Text(hint),
-      trailing: Text(status, style: TextStyle(color: color)),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: rc.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (!item.done) Text(hint),
+        ],
+      ),
     );
   }
 }

@@ -63,10 +63,7 @@ void main() {
 
     h.location.emitStats(_upload(UploadStatus.retryLater, error: 'network'));
     await tester.pumpAndSettle();
-    expect(
-      find.text("You're online, but there's no internet"),
-      findsOneWidget,
-    );
+    expect(find.text("You're online, but there's no internet"), findsOneWidget);
     expect(find.byKey(const Key('home-offline-banner')), findsOneWidget);
 
     h.location.emitStats(_upload(UploadStatus.accepted));
@@ -91,7 +88,9 @@ void main() {
       ..listen(riderConnectionLostProvider, (_, _) {});
     await pumpEventQueue();
     await c.read(shiftControllerProvider.notifier).goOnline(_text);
-    h.location.emitStats(_upload(UploadStatus.retryLater, error: 'serverError'));
+    h.location.emitStats(
+      _upload(UploadStatus.retryLater, error: 'serverError'),
+    );
     await pumpEventQueue();
     expect(c.read(riderConnectionLostProvider), isFalse);
   });

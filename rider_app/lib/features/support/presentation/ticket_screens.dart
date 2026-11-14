@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -330,14 +332,44 @@ class TicketThreadScreen extends ConsumerStatefulWidget {
   ConsumerState<TicketThreadScreen> createState() => _TicketThreadScreenState();
 }
 
-class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
+/// How often an open ticket thread re-reads new replies (RA-22).
+const Duration kTicketPollInterval = Duration(seconds: 15);
+
+class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen>
+    with WidgetsBindingObserver {
+  Timer? _poll;
   final _reply = TextEditingController();
   final List<UploadedAttachment> _photos = [];
   bool _sending = false;
   bool _uploading = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _poll?.cancel();
+    _poll = Timer.periodic(kTicketPollInterval, (_) => _controller.poll());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _controller.poll();
+      _startPolling();
+    } else {
+      _poll?.cancel();
+      _poll = null;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _poll?.cancel();
     _reply.dispose();
     super.dispose();
   }
@@ -440,6 +472,7 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
           sending: _sending,
           uploading: _uploading,
           onSend: _send,
+          onRefresh: _controller.poll,
           onAddPhoto: _addPhoto,
           onRemovePhoto: (photo) => setState(() => _photos.remove(photo)),
         ),
@@ -478,10 +511,12 @@ class _ThreadBody extends StatelessWidget {
     required this.sending,
     required this.uploading,
     required this.onSend,
+    required this.onRefresh,
     required this.onAddPhoto,
     required this.onRemovePhoto,
   });
 
+  final Future<void> Function() onRefresh;
   final TicketThread thread;
   final TextEditingController reply;
   final List<UploadedAttachment> photos;
@@ -500,29 +535,34 @@ class _ThreadBody extends StatelessWidget {
     return Column(
       children: [
         Expanded(
-          child: ListView(
-            key: const Key('ticket-messages'),
-            padding: const EdgeInsets.all(16),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      ticketSubject(
-                        l10n,
-                        ticket.topic,
-                        orderNumber: ticket.orderNumber,
+          child: RefreshIndicator(
+            onRefresh: onRefresh,
+            child: ListView(
+              key: const Key('ticket-messages'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        ticketSubject(
+                          l10n,
+                          ticket.topic,
+                          orderNumber: ticket.orderNumber,
+                        ),
+                        key: const Key('ticket-topic'),
+                        style: theme.textTheme.titleMedium,
                       ),
-                      key: const Key('ticket-topic'),
-                      style: theme.textTheme.titleMedium,
                     ),
-                  ),
-                  _StatusChip(status: ticket.status),
-                ],
-              ),
-              const SizedBox(height: 12),
-              for (final message in thread.messages) _Bubble(message: message),
-            ],
+                    _StatusChip(status: ticket.status),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                for (final message in thread.messages)
+                  _Bubble(message: message),
+              ],
+            ),
           ),
         ),
         SafeArea(

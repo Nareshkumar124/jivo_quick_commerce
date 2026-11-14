@@ -72,13 +72,17 @@ class _HistoryTile extends StatelessWidget {
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
-                  Text(
-                    historyStatusText(l10n, entry.status),
-                    key: Key('history-${entry.taskId}-status'),
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: delivered
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.error,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      historyStatusText(l10n, entry.status),
+                      key: Key('history-${entry.taskId}-status'),
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: delivered
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.error,
+                      ),
                     ),
                   ),
                 ],

@@ -870,7 +870,7 @@
     }
   },
   "profileNoRating": "No ratings yet",
-  "documentsProfileIntro": "Your KYC documents and their review status. Approved documents can't be changed. Upload again any document marked Rejected.",
+  "documentsProfileIntro": "Your KYC documents and their review status. Approved documents can't be changed. Upload again any document marked Not accepted.",
   "documentsNeedAttention": "{count, plural, =1{1 document needs a new upload.} other{{count} documents need a new upload.}}",
   "@documentsNeedAttention": {
     "placeholders": {

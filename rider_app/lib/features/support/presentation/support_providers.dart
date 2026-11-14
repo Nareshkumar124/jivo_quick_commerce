@@ -92,6 +92,17 @@ class TicketThreadController extends AsyncNotifier<TicketThread> {
     );
   }
 
+  /// Silent refresh for polling and pull-to-refresh: a failed fetch keeps the
+  /// thread already on screen instead of replacing it with an error.
+  Future<void> poll() async {
+    try {
+      final thread = await ref.read(supportRepositoryProvider).ticket(ticketId);
+      if (ref.mounted) state = AsyncData(thread);
+    } on Object {
+      // Keep what is shown; the next tick tries again.
+    }
+  }
+
   /// Sends [message] with the photos [attachmentKeys]. Returns null when
   /// sent (the thread is the server's answer), else the error to show; the
   /// typed text and photos are kept by the screen.
