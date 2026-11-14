@@ -170,7 +170,18 @@ class CategoryTile extends StatelessWidget {
             SizedBox(
               height: 64,
               width: 64,
-              child: ProductImage(url: imageUrl, icon: Icons.category_outlined),
+              // Multiply with the page colour, so a photo's white
+              // background disappears into the screen (no white box).
+              child: ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  Theme.of(context).scaffoldBackgroundColor,
+                  BlendMode.multiply,
+                ),
+                child: ProductImage(
+                  url: imageUrl,
+                  icon: Icons.category_outlined,
+                ),
+              ),
             ),
             const SizedBox(height: JivoSpacing.xs),
             Text(
