@@ -36,6 +36,7 @@ import '../features/orders/presentation/orders_screen.dart';
 import '../features/profile/presentation/account_screens.dart';
 import '../features/rating/presentation/rate_order_screen.dart';
 import '../features/referral/presentation/referral_screen.dart';
+import '../features/catalog/presentation/all_products_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/support/presentation/help_screen.dart';
 import '../features/support/presentation/ticket_screens.dart';
@@ -233,6 +234,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       route(Routes.search, 'search', (_) => const SearchScreen()),
+      route(
+        Routes.allProducts,
+        'all_products',
+        (_) => const AllProductsScreen(),
+      ),
       route(Routes.location, 'location', (_) => const LocationScreen()),
       route(
         Routes.mapPicker,
