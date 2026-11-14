@@ -163,6 +163,7 @@
   "referAndEarn": "Refer & earn {amount}",
   "@referAndEarn": {"description": "Account row that opens the referral screen. amount = the server's reward_amount, e.g. ₹90.", "placeholders": {"amount": {"type": "String"}}},
   "referAFriend": "Refer a friend",
+  "referralStripGeneric": "Invite friends and earn rewards",
   "@referAFriend": {"description": "Account row that opens the referral screen while the reward is not known (loading, error, program paused)."},
   "referralEntryHaveCode": "Got a friend's code? Enter it here",
   "@referralEntryHaveCode": {"description": "Subtitle of the account referral row for a new customer who can still enter a code."},

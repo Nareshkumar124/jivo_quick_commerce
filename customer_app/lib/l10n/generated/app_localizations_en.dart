@@ -240,6 +240,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get referAFriend => 'Refer a friend';
 
   @override
+  String get referralStripGeneric => 'Invite friends and earn rewards';
+
+  @override
   String get referralEntryHaveCode => 'Got a friend\'s code? Enter it here';
 
   @override

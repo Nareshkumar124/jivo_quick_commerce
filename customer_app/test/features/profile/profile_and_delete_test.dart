@@ -193,4 +193,23 @@ void main() {
     expect(await app.store.read(), isNull);
     expect(find.text('Log in or sign up'), findsOneWidget);
   });
+
+  testWidgets('account screen has no overflow at 2x text on 360 dp', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    final app = TestApp(tokens: signedInTokens);
+    await app.pump(tester);
+    await tester.tap(find.byTooltip('Account'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('account-edit')), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('account-referral')), 100);
+    await tester.scrollUntilVisible(find.text('Log out'), 100);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
 }
