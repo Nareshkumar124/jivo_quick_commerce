@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/redirect.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/product_image.dart';
@@ -410,9 +411,12 @@ class _GalleryState extends State<_Gallery> {
               child: GestureDetector(
                 key: ValueKey('gallery-$i'),
                 onTap: () => _openZoom(i),
-                child: Padding(
-                  padding: const EdgeInsets.all(JivoSpacing.gutter),
-                  child: ProductImage(url: urls[i]),
+                child: ColoredBox(
+                  color: context.customerColors.imageWell,
+                  child: Padding(
+                    padding: const EdgeInsets.all(JivoSpacing.gutter),
+                    child: ProductImage(url: urls[i], onWell: true),
+                  ),
                 ),
               ),
             ),

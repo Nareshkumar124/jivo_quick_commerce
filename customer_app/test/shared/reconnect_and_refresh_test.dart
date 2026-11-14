@@ -62,13 +62,13 @@ void main() {
       tallView(tester);
       final app = TestApp(tokens: signedInTokens);
       await app.pump(tester);
-      expect(find.text('Shop by category'), findsOneWidget);
+      expect(find.text('All products'), findsOneWidget);
 
       app.catalog.failNext = network;
       await pullToRefresh(tester);
       expect(app.catalog.failNext, isNull, reason: 'the refresh ran');
 
-      expect(find.text('Shop by category'), findsOneWidget);
+      expect(find.text('All products'), findsOneWidget);
       expect(find.text('Bestsellers'), findsOneWidget);
       expect(refreshFailed, findsOneWidget);
       expect(find.text('Retry'), findsOneWidget, reason: 'snackbar action');
@@ -102,7 +102,7 @@ void main() {
       app.catalog.failNext = network;
       await app.pump(tester);
       expect(find.text('Retry'), findsOneWidget);
-      expect(find.text('Shop by category'), findsNothing);
+      expect(find.text('All products'), findsNothing);
 
       app.connectivity.add(false);
       await tester.pumpAndSettle();
@@ -115,7 +115,7 @@ void main() {
       app.connectivity.add(true);
       await tester.pumpAndSettle();
       expect(find.text('No internet connection'), findsNothing);
-      expect(find.text('Shop by category'), findsOneWidget);
+      expect(find.text('All products'), findsOneWidget);
     });
 
     test('two network failures in a row mean "no internet"; any answer '

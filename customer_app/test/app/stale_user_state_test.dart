@@ -192,7 +192,7 @@ void main() {
     final check = await delivery.check(location);
     await delivery.select(location, check.serviceability);
     await tester.pumpAndSettle();
-    expect(find.text('Shop by category'), findsOneWidget);
+    expect(find.text('All products'), findsOneWidget);
     expect(find.text('Previously bought'), findsNothing);
   });
 }

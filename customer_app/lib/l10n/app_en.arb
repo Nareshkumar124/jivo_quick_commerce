@@ -397,8 +397,6 @@
   "@changeLocationSemantics": {"description": "Screen-reader hint of the home header address."},
   "searchHint": "Search products",
   "@searchHint": {"description": "Home search bar placeholder."},
-  "shopByCategory": "Shop by category",
-  "@shopByCategory": {"description": "Home section title: category grid."},
   "allProducts": "All products",
   "@allProducts": {"description": "Home section title: every product of the store."},
   "shopNow": "Shop now",

@@ -1192,12 +1192,6 @@ abstract class AppLocalizations {
   /// **'Search products'**
   String get searchHint;
 
-  /// Home section title: category grid.
-  ///
-  /// In en, this message translates to:
-  /// **'Shop by category'**
-  String get shopByCategory;
-
   /// Home section title: every product of the store.
   ///
   /// In en, this message translates to:

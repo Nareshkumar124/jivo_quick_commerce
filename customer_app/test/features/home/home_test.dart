@@ -36,10 +36,8 @@ void main() {
     expect(find.textContaining('oils, ghee'), findsNothing);
     expect(find.byKey(const Key('banner-carousel')), findsOneWidget);
     expect(find.text('Up to 20% off on olive oils'), findsOneWidget);
-    expect(find.text('Shop by category'), findsOneWidget);
-    for (final category in ['Edible Oils', 'Ghee', 'Health Foods']) {
-      expect(find.text(category), findsOneWidget);
-    }
+    expect(find.text('All products'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-category-edible-oils')), findsNothing);
     expect(find.text('Bestsellers'), findsOneWidget);
     expect(find.text('Offers'), findsOneWidget);
     expect(find.text('New launches'), findsOneWidget);
@@ -153,7 +151,9 @@ void main() {
     final app = TestApp(tokens: signedInTokens);
     await app.pump(tester);
 
-    await tester.tap(find.byKey(const ValueKey('home-category-edible-oils')));
+    await tester.tap(find.text('Categories').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All').first);
     await tester.pumpAndSettle();
     // 8 oils, 6 per page: the second page loads at the end of the grid.
     expect(app.catalog.calls, contains('products:edible-oils:relevance:2'));

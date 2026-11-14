@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../app/theme.dart';
+
 /// Every product, category and banner image goes through this widget, so
 /// switching to `cached_network_image` touches one file. Without a URL (placeholder data) or on a load error it shows a
 /// neutral placeholder. Decorative: callers provide the semantics.
@@ -9,6 +11,7 @@ class ProductImage extends StatelessWidget {
     required this.url,
     this.fit = BoxFit.contain,
     this.icon = Icons.shopping_basket_outlined,
+    this.onWell = false,
     super.key,
   });
 
@@ -18,6 +21,10 @@ class ProductImage extends StatelessWidget {
   /// Shown in the placeholder.
   final IconData icon;
 
+  /// The image sits on the tinted image well: multiply the well colour in so
+  /// the white photo background takes the well colour (bottle looks cut out).
+  final bool onWell;
+
   @override
   Widget build(BuildContext context) {
     final placeholder = _Placeholder(icon: icon);
@@ -25,13 +32,21 @@ class ProductImage extends StatelessWidget {
     if (source == null || source.isEmpty) return placeholder;
     // Planned performance work: cached_network_image (disk cache across launches); the
     // catalog API serves image URLs since Phase 2.
-    return Image.network(
+    final image = Image.network(
       source,
       fit: fit,
       excludeFromSemantics: true,
       errorBuilder: (_, _, _) => placeholder,
       loadingBuilder: (context, child, progress) =>
           progress == null ? child : placeholder,
+    );
+    if (!onWell) return image;
+    return ColorFiltered(
+      colorFilter: ColorFilter.mode(
+        context.customerColors.imageWell,
+        BlendMode.multiply,
+      ),
+      child: image,
     );
   }
 }
