@@ -531,9 +531,8 @@ void main() {
       // seconds, so this tap used to land on the snackbar and nothing was
       // sent (the text found was the one still in the field). Let it go
       // first, and check the reply really went out.
-      ScaffoldMessenger.of(
-        tester.element(byKey('ticket-messages')),
-      ).removeCurrentSnackBar();
+      ScaffoldMessenger.of(tester.element(byKey('ticket-messages')))
+          .removeCurrentSnackBar();
       await tester.pumpAndSettle();
       await tester.enterText(byKey('ticket-reply'), 'Deposited at 10 am');
       await tester.tap(byKey('ticket-reply-send'));
@@ -654,10 +653,7 @@ void main() {
       await tester.tap(byKey('ticket-send'));
       await tester.pumpAndSettle();
       expect(h.support.calls, contains('create TASK task=$taskId'));
-      expect(
-        textOf(tester, 'ticket-topic'),
-        startsWith('An order · Order J'),
-      );
+      expect(textOf(tester, 'ticket-topic'), startsWith('An order · Order J'));
     });
 
     testWidgets('a payout opens the form linked to that payout', (

@@ -77,28 +77,28 @@ class ApiRiderOnboardingRepository implements RiderOnboardingRepository {
     DocumentUpload upload, {
     UploadProgress? onProgress,
   }) => _call(() async {
-        if (upload.image.length > kKycImageMaxBytes) {
-          throw const ApiError(
-            code: ApiErrorCode.validationError,
-            details: {
-              'file': ['The photo is larger than 1 MB.'],
-            },
-          );
-        }
-        final document = (await _api.getRiderApi().riderDocumentsCreate(
-          docType: api.RiderDocumentTypeEnum.values.firstWhere(
-            (t) => t.value == upload.type.wireValue,
-          ),
-          file: MultipartFile.fromBytes(
-            upload.image,
-            filename: '${upload.type.wireValue.toLowerCase()}.jpg',
-            contentType: DioMediaType('image', 'jpeg'),
-          ),
-          number: upload.number,
-          onSendProgress: onProgress,
-        )).data!;
-        return documentFromApi(document)!;
-      });
+    if (upload.image.length > kKycImageMaxBytes) {
+      throw const ApiError(
+        code: ApiErrorCode.validationError,
+        details: {
+          'file': ['The photo is larger than 1 MB.'],
+        },
+      );
+    }
+    final document = (await _api.getRiderApi().riderDocumentsCreate(
+      docType: api.RiderDocumentTypeEnum.values.firstWhere(
+        (t) => t.value == upload.type.wireValue,
+      ),
+      file: MultipartFile.fromBytes(
+        upload.image,
+        filename: '${upload.type.wireValue.toLowerCase()}.jpg',
+        contentType: DioMediaType('image', 'jpeg'),
+      ),
+      number: upload.number,
+      onSendProgress: onProgress,
+    )).data!;
+    return documentFromApi(document)!;
+  });
 
   @override
   Future<BankAccountSummary> saveBankAccount(BankAccountInput input) =>

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../shared/widgets/label_value_row.dart';
 import '../../../app/providers.dart';
 import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
@@ -271,20 +272,20 @@ class _AmountRow extends StatelessWidget {
         horizontal: dense ? 8 : 16,
         vertical: dense ? 2 : 10,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: dense ? theme.textTheme.bodyMedium : null),
-                if (sublabel != null)
-                  Text(sublabel!, style: theme.textTheme.bodySmall),
-              ],
-            ),
-          ),
-          Text(formatRupees(amount), style: style),
-        ],
+      child: LabelValueRow(
+        label: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: dense ? theme.textTheme.bodyMedium : null),
+            if (sublabel != null)
+              Text(sublabel!, style: theme.textTheme.bodySmall),
+          ],
+        ),
+        value: Text(
+          formatRupees(amount),
+          style: style,
+          textAlign: TextAlign.end,
+        ),
       ),
     );
   }
