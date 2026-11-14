@@ -11,6 +11,7 @@ import 'package:customer_app/features/home/presentation/home_screen.dart';
 import 'package:customer_app/features/location/domain/delivery_location.dart';
 import 'package:customer_app/features/location/data/serviceability_repository.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
+import 'package:customer_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -67,6 +68,8 @@ FilledButton placeButton(WidgetTester tester) => tester.widget<FilledButton>(
     matching: find.byType(FilledButton),
   ),
 );
+
+void _noop(PaymentMethod? _) {}
 
 void main() {
   setUpAll(initializeFormatting);
@@ -389,6 +392,59 @@ void main() {
     await openCheckout(tester, app);
     expect(find.byKey(const Key('pay-online')), findsOneWidget);
     expect(find.byKey(const Key('pay-cod')), findsNothing);
+    // Shown greyed out with the server's reason; Online stays selected.
+    expect(find.byKey(const Key('pay-cod-unavailable')), findsOneWidget);
+    expect(
+      find.textContaining('Cash on delivery is available up to'),
+      findsOneWidget,
+    );
+    final tile = tester.widget<RadioListTile<PaymentMethod>>(
+      find.byKey(const Key('pay-cod-unavailable')),
+    );
+    expect(tile.enabled, isFalse);
+    await tester.tap(find.byKey(const Key('pay-cod-unavailable')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<RadioGroup<PaymentMethod>>(
+            find.byType(RadioGroup<PaymentMethod>),
+          )
+          .groupValue,
+      PaymentMethod.online,
+    );
+  });
+
+  testWidgets('COD unavailable: empty message falls back, fits 2x text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            child: RadioGroup<PaymentMethod>(
+              groupValue: PaymentMethod.online,
+              onChanged: _noop,
+              child: CodUnavailableTile(message: ' '),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(
+      find.text("Cash on delivery isn't available for this order"),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a pin without a saved address cannot place an order', (

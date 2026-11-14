@@ -1315,6 +1315,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get payCodSubtitle => 'Pay by cash or UPI when your order arrives';
 
   @override
+  String get codUnavailableFallback =>
+      'Cash on delivery isn\'t available for this order';
+
+  @override
   String get placeOrder => 'Place order';
 
   @override

@@ -737,6 +737,8 @@
   "@payCod": {"description": "Payment method."},
   "payCodSubtitle": "Pay by cash or UPI when your order arrives",
   "@payCodSubtitle": {"description": "Payment method subtitle."},
+  "codUnavailableFallback": "Cash on delivery isn't available for this order",
+  "@codUnavailableFallback": {"description": "Shown under the disabled COD option when the server sends no reason."},
   "placeOrder": "Place order",
   "@placeOrder": {"description": "Places a COD order."},
   "payAmount": "Pay {amount}",

@@ -55,7 +55,8 @@ class CheckoutScreen extends ConsumerWidget {
       })
       ..listen(checkoutProvider.select((s) => s.error), (_, error) {
         if (error == null) return;
-        final online = ref.read(checkoutProvider).method == PaymentMethod.online;
+        final online =
+            ref.read(checkoutProvider).method == PaymentMethod.online;
         controller.acknowledge();
         // M6: the payment gateway is down at placement. The server created
         // the order and ended it PAYMENT_FAILED (it shows in My orders);
@@ -170,6 +171,15 @@ class CheckoutScreen extends ConsumerWidget {
                         title: Text(l10n.payCod),
                         subtitle: Text(l10n.payCodSubtitle),
                       ),
+                    if (!snapshot.offers(PaymentMethod.cod) &&
+                        snapshot.paymentOptions.any(
+                          (o) => o.method == PaymentMethod.cod,
+                        ))
+                      CodUnavailableTile(
+                        message: snapshot.paymentOptions
+                            .firstWhere((o) => o.method == PaymentMethod.cod)
+                            .message,
+                      ),
                   ],
                 ),
               ),
@@ -270,5 +280,30 @@ Future<void> _showPendingOrder(BuildContext context, int orderId) async {
   );
   if ((open ?? false) && context.mounted) {
     await context.push(Routes.paymentFailed(orderId));
+  }
+}
+
+/// Cash on Delivery the server marked unavailable: greyed out, not
+/// selectable, with the server's reason shown as is (CA-21).
+class CodUnavailableTile extends StatelessWidget {
+  const CodUnavailableTile({super.key, this.message});
+
+  final String? message;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final text = (message == null || message!.trim().isEmpty)
+        ? l10n.codUnavailableFallback
+        : message!;
+    return RadioListTile<PaymentMethod>(
+      key: const Key('pay-cod-unavailable'),
+      value: PaymentMethod.cod,
+      enabled: false,
+      secondary: const Icon(Icons.payments_outlined),
+      title: Text(l10n.payCod),
+      subtitle: Text(text),
+      isThreeLine: false,
+    );
   }
 }
