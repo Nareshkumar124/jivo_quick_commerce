@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/repositories.dart';
@@ -15,6 +16,22 @@ final trackPollIntervalProvider = Provider<Duration>(
   (ref) => const Duration(seconds: 10),
 );
 
+/// How current the tracking data is (`tracking-layout` §3): app state only.
+enum TrackFreshMode { live, polling, stale }
+
+@immutable
+class TrackFreshness {
+  const TrackFreshness(this.mode, this.lastUpdatedAt);
+
+  final TrackFreshMode mode;
+
+  /// The phone's time when track data was last received.
+  final DateTime? lastUpdatedAt;
+}
+
+/// How long the socket must be down before "Live" turns into "Updated".
+const trackLiveDebounce = Duration(seconds: 5);
+
 /// One order's live tracking: `GET /orders/{id}/track/`, then the order
 /// socket's `order.status`, `rider.location` and `order.eta` messages.
 /// While the socket is down it polls every [trackPollIntervalProvider]
@@ -26,13 +43,36 @@ class TrackController extends AsyncNotifier<OrderTrack> {
   final int orderId;
   Timer? _timer;
   OrderSocket? _socket;
+  Timer? _debounce;
+  bool _showLive = false;
+  bool _stale = false;
+  DateTime? _lastUpdatedAt;
+
+  /// The freshness line's state.
+  final ValueNotifier<TrackFreshness> freshness = ValueNotifier(
+    const TrackFreshness(TrackFreshMode.polling, null),
+  );
+
+  void _publish({bool received = false}) {
+    if (received) {
+      _lastUpdatedAt = DateTime.now();
+      _stale = false;
+    }
+    final mode = _stale
+        ? TrackFreshMode.stale
+        : (_showLive ? TrackFreshMode.live : TrackFreshMode.polling);
+    freshness.value = TrackFreshness(mode, _lastUpdatedAt);
+  }
 
   /// Whether updates arrive over the socket right now (no polling).
   bool get live => _socket?.live.value ?? false;
 
   @override
   Future<OrderTrack> build() async {
-    ref.onDispose(() => _timer?.cancel());
+    ref.onDispose(() {
+      _timer?.cancel();
+      _debounce?.cancel();
+    });
     final socket = ref.watch(orderSocketProvider(orderId));
     _socket = socket;
     if (socket != null) {
@@ -45,12 +85,24 @@ class TrackController extends AsyncNotifier<OrderTrack> {
       });
     }
     final track = await ref.read(trackRepositoryProvider).fetch(orderId);
+    _showLive = live;
     _schedule(track);
+    _publish(received: true);
     return track;
   }
 
   void _onLiveChanged(bool isLive) {
     if (!ref.mounted) return;
+    _debounce?.cancel();
+    if (isLive) {
+      _showLive = true;
+      _publish();
+    } else if (_showLive) {
+      _debounce = Timer(trackLiveDebounce, () {
+        _showLive = false;
+        _publish();
+      });
+    }
     if (isLive) {
       _timer?.cancel();
       // Messages may have been missed while down: re-read once (`06 §4.1`).
@@ -65,6 +117,7 @@ class TrackController extends AsyncNotifier<OrderTrack> {
     if (!ref.mounted) return;
     final current = state.value;
     if (current == null) return; // The first fetch is still running.
+    _publish(received: true);
     final next = applyOrderSocketEvent(current, event);
     if (next == null) {
       unawaited(poll());
@@ -87,6 +140,7 @@ class TrackController extends AsyncNotifier<OrderTrack> {
       final track = await ref.read(trackRepositoryProvider).fetch(orderId);
       if (!ref.mounted) return;
       state = AsyncData(track);
+      _publish(received: true);
       _schedule(track);
     } catch (error) {
       if (!ref.mounted) return;
@@ -94,6 +148,8 @@ class TrackController extends AsyncNotifier<OrderTrack> {
       if (last == null) {
         state = AsyncError(error, StackTrace.current);
       } else {
+        _stale = true;
+        _publish();
         _schedule(last);
       }
     }

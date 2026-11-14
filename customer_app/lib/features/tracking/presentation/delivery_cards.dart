@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
@@ -13,9 +14,12 @@ import '../domain/order_track.dart';
 /// delivery (`03 §2.10`; the server sends it only then, `06 §2.6`).
 /// Used on live tracking and on the order detail.
 class DeliveryOtpCard extends StatelessWidget {
-  const DeliveryOtpCard({required this.otp, super.key});
+  const DeliveryOtpCard({required this.otp, this.atDoor = false, super.key});
 
   final String otp;
+
+  /// The rider is at the door: a border and a stronger title.
+  final bool atDoor;
 
   @override
   Widget build(BuildContext context) {
@@ -25,21 +29,36 @@ class DeliveryOtpCard extends StatelessWidget {
       key: const Key('delivery-otp'),
       margin: EdgeInsets.zero,
       color: theme.colorScheme.primaryContainer,
+      shape: atDoor
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(JivoRadii.md),
+              side: BorderSide(color: theme.colorScheme.primary, width: 2),
+            )
+          : null,
       child: Padding(
         padding: const EdgeInsets.all(JivoSpacing.lg),
         child: Column(
           children: [
-            Text(l10n.trackingOtpTitle, style: theme.textTheme.titleSmall),
+            Text(
+              atDoor ? l10n.trackingOtpAtDoorTitle : l10n.trackingOtpTitle,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleSmall,
+            ),
             const SizedBox(height: JivoSpacing.xs),
             Semantics(
               label: l10n.trackingOtpSemantics(otp.split('').join(' ')),
               child: ExcludeSemantics(
-                child: Text(
-                  otp,
-                  key: const Key('delivery-otp-code'),
-                  style: theme.textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 8,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    otp,
+                    key: const Key('delivery-otp-code'),
+                    maxLines: 1,
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 8,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                 ),
               ),
@@ -75,10 +94,9 @@ class RiderCard extends ConsumerWidget {
       leading: RiderAvatar(photoUrl: rider.photoUrl),
       title: Text(rider.name),
       subtitle: Text(
-        [
-          l10n.trackingRiderLabel,
-          if (updatedAt != null) formatTime(updatedAt),
-        ].join(' · '),
+        updatedAt == null
+            ? l10n.trackingRiderLabel
+            : l10n.trackingRiderUpdated(_whenText(l10n, updatedAt)),
       ),
       trailing: phone == null || phone.isEmpty
           ? null
@@ -93,6 +111,14 @@ class RiderCard extends ConsumerWidget {
             ),
     );
   }
+}
+
+/// "just now", "5 min ago" or "at 3:45 pm" (IST), from the phone's clock.
+String _whenText(AppLocalizations l10n, DateTime at) {
+  final minutes = DateTime.now().toUtc().difference(at.toUtc()).inMinutes;
+  if (minutes < 1) return l10n.trackingJustNow;
+  if (minutes < 60) return l10n.trackingMinutesAgo(minutes);
+  return l10n.trackingAtTime(formatTime(at));
 }
 
 /// The rider's photo in a circle; a person icon without one or when it

@@ -1875,6 +1875,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trackingArrivingNow => 'Arriving any moment';
 
   @override
+  String get trackingLive => 'Live';
+
+  @override
+  String trackingUpdatedAt(String time) {
+    return 'Updated $time';
+  }
+
+  @override
+  String trackingStale(String time) {
+    return 'Can’t update right now. Last update $time. Pull down to try again.';
+  }
+
+  @override
+  String get trackingLateOnTheWay =>
+      'Running a little late. Your rider is on the way.';
+
+  @override
+  String get trackingLatePreparing =>
+      'Taking a little longer than planned. Your order is being prepared.';
+
+  @override
+  String get trackingGetHelp => 'Get help';
+
+  @override
+  String get trackingOtpAtDoorTitle =>
+      'Your rider is at the door. Delivery OTP';
+
+  @override
+  String trackingRiderUpdated(String when) {
+    return 'Location updated $when';
+  }
+
+  @override
+  String get trackingJustNow => 'just now';
+
+  @override
+  String trackingMinutesAgo(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n min ago',
+      one: '1 min ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trackingAtTime(String time) {
+    return 'at $time';
+  }
+
+  @override
+  String trackingDeliveredAt(String time) {
+    return 'Delivered at $time';
+  }
+
+  @override
+  String get trackingCancelledBody =>
+      'This order was cancelled. See the order details for any refund.';
+
+  @override
+  String get trackingRateOrder => 'Rate your order';
+
+  @override
   String get trackingRiderAssigning => 'Assigning a delivery partner…';
 
   @override

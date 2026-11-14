@@ -3123,6 +3123,90 @@ abstract class AppLocalizations {
   /// **'Arriving any moment'**
   String get trackingArrivingNow;
 
+  /// Tracking: data is arriving live.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get trackingLive;
+
+  /// Tracking: when the data was last received.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {time}'**
+  String trackingUpdatedAt(String time);
+
+  /// Tracking: the last refresh failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t update right now. Last update {time}. Pull down to try again.'**
+  String trackingStale(String time);
+
+  /// Tracking: well past the ETA, out for delivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Running a little late. Your rider is on the way.'**
+  String get trackingLateOnTheWay;
+
+  /// Tracking: well past the ETA, before pickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Taking a little longer than planned. Your order is being prepared.'**
+  String get trackingLatePreparing;
+
+  /// Tracking: opens support.
+  ///
+  /// In en, this message translates to:
+  /// **'Get help'**
+  String get trackingGetHelp;
+
+  /// Tracking: OTP title when the rider is at the door.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider is at the door. Delivery OTP'**
+  String get trackingOtpAtDoorTitle;
+
+  /// Tracking: rider row subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Location updated {when}'**
+  String trackingRiderUpdated(String when);
+
+  /// Tracking: under a minute ago.
+  ///
+  /// In en, this message translates to:
+  /// **'just now'**
+  String get trackingJustNow;
+
+  /// Tracking: minutes ago.
+  ///
+  /// In en, this message translates to:
+  /// **'{n, plural, =1{1 min ago} other{{n} min ago}}'**
+  String trackingMinutesAgo(int n);
+
+  /// Tracking: an IST time.
+  ///
+  /// In en, this message translates to:
+  /// **'at {time}'**
+  String trackingAtTime(String time);
+
+  /// Tracking: delivered time.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered at {time}'**
+  String trackingDeliveredAt(String time);
+
+  /// Tracking: cancelled order.
+  ///
+  /// In en, this message translates to:
+  /// **'This order was cancelled. See the order details for any refund.'**
+  String get trackingCancelledBody;
+
+  /// Tracking: rate button.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate your order'**
+  String get trackingRateOrder;
+
   /// Tracking before a rider is assigned.
   ///
   /// In en, this message translates to:
