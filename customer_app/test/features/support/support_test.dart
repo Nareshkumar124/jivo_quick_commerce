@@ -176,6 +176,9 @@ void main() {
     testWidgets('get help from an order detail links the order', (
       tester,
     ) async {
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final a = app();
       await a.pump(tester);
       final id = backend.orders
@@ -195,9 +198,16 @@ void main() {
           matching: find.byType(Scrollable),
         ),
       );
+      await tester.ensureVisible(find.byKey(const Key('order-help')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('order-help')));
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('category-MISSING_ITEMS')),
+        100,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.byKey(const Key('category-MISSING_ITEMS')), findsOneWidget);
       await tester.tap(find.byKey(const Key('category-MISSING_ITEMS')));
       await tester.enterText(

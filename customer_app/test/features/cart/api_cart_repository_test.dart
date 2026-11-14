@@ -180,7 +180,7 @@ void main() {
         ...(cart['thresholds']! as Map).cast<String, Object?>(),
         'tier_units': 30,
         'next_price_tier': {'min_order_units': 50, 'units_to_next_tier': 20},
-        'order_unit_label': 'boxes',
+        'order_unit_label': 'cartons',
       };
       answer = (_, _) => cart;
 

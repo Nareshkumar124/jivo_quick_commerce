@@ -21,7 +21,7 @@ Future<void> pumpTile(WidgetTester tester, CatalogProduct tile) async {
       Center(
         child: SizedBox(
           width: 160,
-          height: 320,
+          height: 380,
           child: ProductTile(product: tile),
         ),
       ),
@@ -59,7 +59,7 @@ CatalogVariant tiered({
   priceTiers: tiers,
 );
 
-/// The text of the rate row starting at [from] boxes.
+/// The text of the rate row starting at [from] cartons.
 List<String> rowTexts(WidgetTester tester, int from) => [
   for (final text in tester.widgetList<Text>(
     find.descendant(
@@ -113,17 +113,17 @@ void main() {
     ) async {
       await pumpTable(tester, waterTiers);
 
-      expect(find.text('Wholesale rates (per box)'), findsOneWidget);
-      expect(rowTexts(tester, 5), ['5–24 boxes', '₹90']);
-      expect(rowTexts(tester, 25), ['25–49 boxes', '₹87']);
-      expect(rowTexts(tester, 50), ['50–99 boxes', '₹85']);
-      expect(rowTexts(tester, 100), ['100–249 boxes', '₹82']);
-      expect(rowTexts(tester, 250), ['250+ boxes', '₹80']);
+      expect(find.text('Wholesale rates (per carton)'), findsOneWidget);
+      expect(rowTexts(tester, 5), ['5–24 cartons', '₹90']);
+      expect(rowTexts(tester, 25), ['25–49 cartons', '₹87']);
+      expect(rowTexts(tester, 50), ['50–99 cartons', '₹85']);
+      expect(rowTexts(tester, 100), ['100–249 cartons', '₹82']);
+      expect(rowTexts(tester, 250), ['250+ cartons', '₹80']);
       expect(
-        find.text('Price depends on total boxes in your order (all sizes)'),
+        find.text('Price depends on total cartons in your order (all sizes)'),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('5–24 boxes: ₹90 per box'), findsOneWidget);
+      expect(find.bySemanticsLabel('5–24 cartons: ₹90 per carton'), findsOneWidget);
     });
 
     testWidgets('one-count slab and paise are shown as sent', (tester) async {
@@ -131,14 +131,14 @@ void main() {
         PriceTier(minOrderUnits: 1, price: '90.50'),
         PriceTier(minOrderUnits: 2, price: '89.00'),
       ]);
-      expect(rowTexts(tester, 1), ['1 box', '₹90.50']);
-      expect(rowTexts(tester, 2), ['2+ boxes', '₹89']);
+      expect(rowTexts(tester, 1), ['1 carton', '₹90.50']);
+      expect(rowTexts(tester, 2), ['2+ cartons', '₹89']);
     });
 
     testWidgets('nothing without tiers', (tester) async {
       await pumpTable(tester, const []);
       expect(find.byKey(const Key('price-tiers')), findsNothing);
-      expect(find.text('Wholesale rates (per box)'), findsNothing);
+      expect(find.text('Wholesale rates (per carton)'), findsNothing);
     });
 
     testWidgets('fits at 2x text on a phone', (tester) async {
@@ -152,7 +152,7 @@ void main() {
         ),
       );
       expect(tester.takeException(), isNull);
-      expect(rowTexts(tester, 250), ['250+ boxes', '₹80']);
+      expect(rowTexts(tester, 250), ['250+ cartons', '₹80']);
     });
   });
 
@@ -161,7 +161,7 @@ void main() {
         GoRouter.of(tester.element(find.byType(HomeScreen)));
 
     Future<void> openProduct(WidgetTester tester, String slug) async {
-      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.physicalSize = const Size(800, 7000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await TestApp(tokens: signedInTokens).pump(tester);
@@ -175,10 +175,10 @@ void main() {
       await openProduct(tester, 'jivo-drinking-water');
 
       expect(find.byKey(const ValueKey('price-tiers-1501')), findsOneWidget);
-      expect(rowTexts(tester, 5), ['5–24 boxes', '₹90']);
-      expect(rowTexts(tester, 250), ['250+ boxes', '₹80']);
+      expect(rowTexts(tester, 5), ['5–24 cartons', '₹90']);
+      expect(rowTexts(tester, 250), ['250+ cartons', '₹80']);
       expect(
-        find.text('Price depends on total boxes in your order (all sizes)'),
+        find.text('Price depends on total cartons in your order (all sizes)'),
         findsOneWidget,
       );
 
@@ -186,15 +186,15 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('variant-1502')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('price-tiers-1502')), findsOneWidget);
-      expect(rowTexts(tester, 25), ['25–49 boxes', '₹122']);
-      expect(rowTexts(tester, 250), ['250+ boxes', '₹115']);
+      expect(rowTexts(tester, 25), ['25–49 cartons', '₹122']);
+      expect(rowTexts(tester, 250), ['250+ cartons', '₹115']);
     });
 
     testWidgets('a product without tiers shows no rate table', (tester) async {
       await openProduct(tester, 'jivo-canola-oil');
       expect(find.text('Jivo Canola Oil'), findsOneWidget);
       expect(find.byKey(const Key('price-tiers')), findsNothing);
-      expect(find.text('Wholesale rates (per box)'), findsNothing);
+      expect(find.text('Wholesale rates (per carton)'), findsNothing);
     });
   });
 
@@ -244,7 +244,7 @@ void main() {
       await tester.tap(find.text('ADD'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('variant-picker')), findsOneWidget);
-      expect(find.text('Wholesale rates (per box)'), findsNothing);
+      expect(find.text('Wholesale rates (per carton)'), findsNothing);
       expect(find.byKey(const Key('picker-tiers-note')), findsNothing);
     });
   });

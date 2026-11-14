@@ -1198,6 +1198,42 @@ abstract class AppLocalizations {
   /// **'Shop by category'**
   String get shopByCategory;
 
+  /// Home section title: every product of the store.
+  ///
+  /// In en, this message translates to:
+  /// **'All products'**
+  String get allProducts;
+
+  /// Full-screen banner button for a category, collection, product or web link.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop now'**
+  String get shopNow;
+
+  /// Full-screen banner button for the referral banner.
+  ///
+  /// In en, this message translates to:
+  /// **'Refer now'**
+  String get referNow;
+
+  /// Tooltip of the full-screen banner close button.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeBanner;
+
+  /// Unit after the price on a product card.
+  ///
+  /// In en, this message translates to:
+  /// **'/carton'**
+  String get perCarton;
+
+  /// Product card gold label: the last volume price from the server's price_tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} at {count}+ cartons'**
+  String bulkPriceFrom(String price, int count);
+
   /// Home section title: buy-again rail.
   ///
   /// In en, this message translates to:
@@ -1615,25 +1651,25 @@ abstract class AppLocalizations {
   /// Product page and variant picker: heading of the volume (slab) price table from the server's price_tiers.
   ///
   /// In en, this message translates to:
-  /// **'Wholesale rates (per box)'**
+  /// **'Wholesale rates (per carton)'**
   String get wholesaleRatesTitle;
 
   /// Rate table row: a range of boxes in the whole order, e.g. 5–24 boxes. to = the next tier's minimum - 1.
   ///
   /// In en, this message translates to:
-  /// **'{from}–{to} boxes'**
+  /// **'{from}–{to} cartons'**
   String priceTierRange(int from, int to);
 
   /// Rate table row when a tier covers a single count of boxes.
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 box} other{{count} boxes}}'**
+  /// **'{count, plural, =1{1 carton} other{{count} cartons}}'**
   String priceTierExactly(int count);
 
   /// Rate table's last row: this many boxes or more, e.g. 250+ boxes.
   ///
   /// In en, this message translates to:
-  /// **'{from}+ boxes'**
+  /// **'{from}+ cartons'**
   String priceTierFrom(int from);
 
   /// Compact rate chip in the variant picker, e.g. 5–24.
@@ -1657,13 +1693,13 @@ abstract class AppLocalizations {
   /// Screen-reader label of one rate table row, e.g. 5–24 boxes: ₹90 per box.
   ///
   /// In en, this message translates to:
-  /// **'{range}: {price} per box'**
+  /// **'{range}: {price} per carton'**
   String priceTierRowSemantics(String range, String price);
 
   /// Under the rate table: the tier is chosen by all tiered items in the order together.
   ///
   /// In en, this message translates to:
-  /// **'Price depends on total boxes in your order (all sizes)'**
+  /// **'Price depends on total cartons in your order (all sizes)'**
   String get priceTierNote;
 
   /// Home header when the store is closed (no ETA).
@@ -2065,7 +2101,7 @@ abstract class AppLocalizations {
   /// Cart line of an item with volume prices: the server's price_per_unit, e.g. ₹87/box.
   ///
   /// In en, this message translates to:
-  /// **'{price}/box'**
+  /// **'{price}/carton'**
   String pricePerBox(String price);
 
   /// Small tag on a cart line billed at a volume tier (price_tier is set).
@@ -2083,13 +2119,13 @@ abstract class AppLocalizations {
   /// Cart piggy card detail when one line gets cheaper.
   ///
   /// In en, this message translates to:
-  /// **'and pay {price}/box on {variant}'**
+  /// **'and pay {price}/carton on {variant}'**
   String priceTierDetailLine(String price, String variant);
 
   /// Cart piggy card detail when several lines get cheaper.
   ///
   /// In en, this message translates to:
-  /// **'and pay less per box'**
+  /// **'and pay less per carton'**
   String get priceTierDetailMany;
 
   /// Cart piggy card button: opens search to add items.
@@ -2149,7 +2185,7 @@ abstract class AppLocalizations {
   /// Cart nudge when one line gets cheaper at the next volume tier. count = next_price_tier.units_to_next_tier, label = order_unit_label (e.g. boxes), price = that line's next_tier_price, variant = its pack size (e.g. 1 L).
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Add 1 more to get {price}/box on {variant}} other{Add {count} more {label} to get {price}/box on {variant}}}'**
+  /// **'{count, plural, =1{Add 1 more to get {price}/carton on {variant}} other{Add {count} more {label} to get {price}/carton on {variant}}}'**
   String priceTierNudgeLine(
     int count,
     String label,

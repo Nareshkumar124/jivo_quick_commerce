@@ -346,7 +346,7 @@ void main() {
               minOrderValue: '0.00',
               minOrderUnits: 5,
               unitsToMinOrder: unitsToMinOrder,
-              orderUnitLabel: 'boxes',
+              orderUnitLabel: 'cartons',
               tierUnits: 22,
               nextPriceTier: next,
             ),
@@ -367,12 +367,12 @@ void main() {
       return texts.where((t) => t != 'Add more').join(' ');
     }
 
-    testWidgets('a line shows the billed rate per box and the server total', (
+    testWidgets('a line shows the billed rate per carton and the server total', (
       tester,
     ) async {
       await openWith(tester, [water()]);
 
-      expect(textOf(tester, 'cart-line-rate-1501'), '₹87/box');
+      expect(textOf(tester, 'cart-line-rate-1501'), '₹87/carton');
       expect(find.byKey(const ValueKey('cart-line-tier-1501')), findsOneWidget);
       expect(find.text('Wholesale rate'), findsOneWidget);
       expect(textOf(tester, 'cart-line-total-1501'), '₹2,611');
@@ -384,7 +384,7 @@ void main() {
       tester,
     ) async {
       await openWith(tester, [water(quantity: 3, rate: '90.00', tier: null)]);
-      expect(textOf(tester, 'cart-line-rate-1501'), '₹90/box');
+      expect(textOf(tester, 'cart-line-rate-1501'), '₹90/carton');
       expect(find.byKey(const ValueKey('cart-line-tier-1501')), findsNothing);
     });
 
@@ -398,15 +398,15 @@ void main() {
       await openWith(tester, [
         water(quantity: 22, rate: '90.00', next: '87.00'),
       ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 3));
-      expect(nudge(tester), 'Add 3 more boxes and pay ₹87/box on 1 L');
+      expect(nudge(tester), 'Add 3 more cartons and pay ₹87/carton on 1 L');
       expect(find.byKey(const Key('min-units-warning')), findsNothing);
     });
 
-    testWidgets('one box away: "Add 1 more"', (tester) async {
+    testWidgets('one carton away: "Add 1 more"', (tester) async {
       await openWith(tester, [
         water(quantity: 24, rate: '90.00', next: '87.00'),
       ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 1));
-      expect(nudge(tester), 'Add 1 more and pay ₹87/box on 1 L');
+      expect(nudge(tester), 'Add 1 more and pay ₹87/carton on 1 L');
     });
 
     testWidgets('several sizes get cheaper: one generic line', (tester) async {
@@ -421,7 +421,7 @@ void main() {
           next: '122.00',
         ),
       ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 3));
-      expect(nudge(tester), 'Add 3 more boxes and pay less per box');
+      expect(nudge(tester), 'Add 3 more cartons and pay less per carton');
     });
 
     testWidgets('the piggy card is first, above the items, with Add more', (
@@ -439,7 +439,7 @@ void main() {
       expect(
         tester.getSemantics(find.byKey(const Key('price-tier-nudge'))),
         matchesSemantics(
-          label: 'Add 3 more boxes to get ₹87/box on 1 L',
+          label: 'Add 3 more cartons to get ₹87/carton on 1 L',
           isLiveRegion: true,
         ),
       );
@@ -464,7 +464,7 @@ void main() {
               child: PriceTierNudgeCard(
                 key: const Key('price-tier-nudge'),
                 headline: 'Add 300 more cartons',
-                detail: 'and pay ₹87/box on 1 L',
+                detail: 'and pay ₹87/carton on 1 L',
                 semanticsLabel: 'x',
                 onAddMore: () {},
               ),
@@ -485,9 +485,9 @@ void main() {
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: PriceTierNudgeCard(
-              headline: 'Add 3 more boxes',
-              detail: 'and pay less per box',
-              semanticsLabel: 'Add 3 more boxes and pay less per box',
+              headline: 'Add 3 more cartons',
+              detail: 'and pay less per carton',
+              semanticsLabel: 'Add 3 more cartons and pay less per carton',
               onAddMore: () {},
             ),
           ),
@@ -516,14 +516,14 @@ void main() {
       expect(find.byKey(const Key('min-units-warning')), findsOneWidget);
     });
 
-    testWidgets('on the fake server: rates and nudge follow the box total', (
+    testWidgets('on the fake server: rates and nudge follow the carton total', (
       tester,
     ) async {
       final app = TestApp(
         tokens: signedInTokens,
         commerce: FakeCommerceBackend(
           latency: Duration.zero,
-          rules: const FakeBillRules(minimumUnits: 5, orderUnitLabel: 'boxes'),
+          rules: const FakeBillRules(minimumUnits: 5, orderUnitLabel: 'cartons'),
         ),
       );
       CatalogVariant size(int id, String name, String price) => CatalogVariant(
@@ -549,10 +549,10 @@ void main() {
       await app.cart.update(const CartUpdate(addressId: 1));
       await openCart(tester, app);
 
-      expect(textOf(tester, 'cart-line-rate-1501'), '₹90/box');
-      expect(nudge(tester), 'Add 5 more boxes and pay ₹87/box on 1 L');
+      expect(textOf(tester, 'cart-line-rate-1501'), '₹90/carton');
+      expect(nudge(tester), 'Add 5 more cartons and pay ₹87/carton on 1 L');
 
-      // Any size counts towards the total: 21 + 5 = 26 boxes.
+      // Any size counts towards the total: 21 + 5 = 26 cartons.
       await app.cart.setQuantity(
         1502,
         5,
@@ -562,12 +562,12 @@ void main() {
         ),
       );
       await typeLineQty(tester, 1501, '21');
-      expect(textOf(tester, 'cart-line-rate-1501'), '₹87/box');
-      expect(textOf(tester, 'cart-line-rate-1502'), '₹122/box');
+      expect(textOf(tester, 'cart-line-rate-1501'), '₹87/carton');
+      expect(textOf(tester, 'cart-line-rate-1502'), '₹122/carton');
       expect(textOf(tester, 'cart-line-total-1501'), '₹1,827');
       expect(find.byKey(const ValueKey('cart-line-tier-1502')), findsOneWidget);
       // 50 is the next slab, and only the 1 L gets cheaper there.
-      expect(nudge(tester), 'Add 24 more boxes and pay ₹85/box on 1 L');
+      expect(nudge(tester), 'Add 24 more cartons and pay ₹85/carton on 1 L');
     });
   });
 

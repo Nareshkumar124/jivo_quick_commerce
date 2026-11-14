@@ -16,6 +16,7 @@ import '../features/orders/presentation/pending_payment.dart';
 import '../features/profile/presentation/profile_controllers.dart';
 import '../features/search/presentation/search_controller.dart';
 import '../l10n/generated/app_localizations.dart';
+import 'theme.dart';
 import '../shared/connectivity/connectivity.dart';
 import '../shared/widgets/offline_banner.dart';
 import 'launch_state.dart';
@@ -93,7 +94,7 @@ class JivoCustomerApp extends ConsumerWidget {
       ..watch(notificationTapRouterProvider);
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-      theme: JivoTheme.light(),
+      theme: buildCustomerTheme(),
       locale: locale,
       supportedLocales: const [locale],
       localizationsDelegates: const [

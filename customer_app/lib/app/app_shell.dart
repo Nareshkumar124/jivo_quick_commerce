@@ -31,22 +31,33 @@ class AppShell extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (shell.currentIndex != accountTab) const CartBar(),
-          NavigationBar(
+          MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.3,
+            child: NavigationBar(
             selectedIndex: shell.currentIndex,
             onDestinationSelected: (index) => shell.goBranch(
               index,
               initialLocation: index == shell.currentIndex,
             ),
             destinations: [
-              tab(Icons.home_outlined, Icons.home, l10n.tabHome),
+              tab(Icons.home_outlined, Icons.home_rounded, l10n.tabHome),
               tab(
                 Icons.grid_view_outlined,
-                Icons.grid_view,
+                Icons.grid_view_rounded,
                 l10n.tabCategories,
               ),
-              tab(Icons.replay_outlined, Icons.replay, l10n.tabOrderAgain),
-              tab(Icons.person_outline, Icons.person, l10n.tabAccount),
+              tab(
+                Icons.replay_rounded,
+                Icons.replay_circle_filled_rounded,
+                l10n.tabOrderAgain,
+              ),
+              tab(
+                Icons.person_outline_rounded,
+                Icons.person_rounded,
+                l10n.tabAccount,
+              ),
             ],
+          ),
           ),
         ],
       ),

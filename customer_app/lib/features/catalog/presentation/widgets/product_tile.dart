@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../../app/redirect.dart';
+import '../../../../app/theme.dart';
 import '../../../../app/repositories.dart';
 import '../../../../l10n/generated/app_localizations.dart';
+import '../../../../shared/formatting/formatters.dart';
 import '../../../../shared/widgets/product_image.dart';
 import '../../../cart/presentation/add_stepper.dart';
 import '../../../cart/presentation/cart_controller.dart';
@@ -13,30 +15,46 @@ import '../../domain/catalog_models.dart';
 import 'price_tags.dart';
 import 'price_tiers_table.dart';
 
-const _imageHeight = 110.0;
-const _padding = 6.0;
+const _imageHeight = 128.0;
+const _padding = 12.0;
 
 /// The height a [ProductTile] needs at the current text scale, so grids and
 /// rails grow with the system font size instead of overflowing.
-/// [minQtyHint]: some tile shows the "Min 5" line (see [needsMinQtyHint]).
+/// [minQtyHint]: some tile shows the "Min 5" hint (see [needsMinQtyHint]).
 double productTileExtent(BuildContext context, {bool minQtyHint = false}) {
   final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-  // Fixed: padding, image, gaps, the 48 dp stepper and slack. Text (at
-  // 14 sp = 1.0): two name lines (40), variant or options (16), stock label
-  // (16) and the price, which may wrap the MRP onto a second line (20 + 16),
-  // plus the "Min 5" line (16) when shown.
-  const fixed = 2 * _padding + _imageHeight + 2 * JivoSpacing.sm + 48 + 6;
-  return fixed + (minQtyHint ? 124 : 108) * scale;
+  // Fixed: padding, image well, gaps and the 48 dp control. Text (at 14 sp =
+  // 1.0): name (40), pack-size pill (16), price (28), bulk pill (16), "Only
+  // N left" (16), plus the "Min 5" line (16) when it wraps.
+  const fixed = 2 * _padding + _imageHeight + 8 + 4 + 6 + 4 + 8 + 48 + 8;
+  return fixed + (minQtyHint ? 132 : 116) * scale;
+}
+
+/// Two columns on phones; one column from 1.5x text (CA-14).
+double productGridMaxExtent(BuildContext context) {
+  final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+  return 200 * (scale >= 1.5 ? scale : 1);
 }
 
 /// Some tile in [items] shows the "Min 5" line: its row needs the room.
 bool needsMinQtyHint(List<CatalogProduct> items) =>
     items.any((p) => p.defaultVariant.hasMinQty);
 
-/// A product tile (`03 §2.5`): image, discount badge, veg mark, name, the
-/// default variant, price with struck-out MRP, stock label and the ADD
-/// stepper. Out-of-stock tiles are greyed out. With several variants, ADD
-/// opens a variant picker.
+/// The last (cheapest) volume price, when it differs from the selling
+/// price: all strings and counts are the server's.
+({String price, int from})? bulkPriceOf(CatalogVariant variant) {
+  if (variant.priceTiers.length < 2) return null;
+  final last = priceTierRows(variant.priceTiers).last;
+  if (formatRupees(last.price) == formatRupees(variant.sellingPrice)) {
+    return null;
+  }
+  return (price: last.price, from: last.from);
+}
+
+/// A product card (`03 §2.5`): image well, discount badge, veg mark, name,
+/// pack size, bold price per carton, the gold bulk-price label, stock label
+/// and the gold ADD button. Out-of-stock cards are greyed out. With several
+/// variants, ADD opens a variant picker.
 class ProductTile extends StatelessWidget {
   const ProductTile({required this.product, super.key});
 
@@ -46,61 +64,162 @@ class ProductTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final cc = context.customerColors;
     final variant = product.defaultVariant;
     final discount = variant.discountPercent;
     final unitsLeft = variant.lowStockUnits;
-    final info = Column(
+    final bulk = bulkPriceOf(variant);
+    final selling = formatRupees(variant.sellingPrice);
+    final listed = formatRupees(variant.mrp);
+    final pill = BoxDecoration(
+      color: theme.colorScheme.primaryContainer,
+      borderRadius: BorderRadius.circular(JivoRadii.pill),
+    );
+    final top = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
+        Container(
           height: _imageHeight,
           width: double.infinity,
+          decoration: BoxDecoration(
+            color: cc.imageWell,
+            borderRadius: BorderRadius.circular(JivoRadii.md),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: Stack(
             children: [
               Positioned.fill(
-                child: ProductImage(url: variant.imageUrl ?? product.imageUrl),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: ProductImage(
+                    url: variant.imageUrl ?? product.imageUrl,
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
               if (discount > 0)
                 Positioned(
-                  left: 0,
-                  top: 0,
+                  left: 6,
+                  top: 6,
                   child: DiscountBadge(percent: discount),
                 ),
               Positioned(
-                right: 4,
-                top: 4,
+                right: 6,
+                top: 6,
                 child: VegMark(isVeg: product.isVeg),
               ),
             ],
           ),
         ),
-        const SizedBox(height: JivoSpacing.sm),
+        const SizedBox(height: 8),
         Text(
           product.name,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: theme.textTheme.titleSmall,
         ),
-        Text(
-          product.hasOptions
-              ? l10n.variantOptions(variant.name, product.variants.length)
-              : variant.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+      ],
+    );
+    final pills = Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            MergeSemantics(child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: pill,
+              child: Text(
+                product.hasOptions
+                    ? l10n.variantOptions(variant.name, product.variants.length)
+                    : variant.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+              ),
+            )),
+            if (variant.hasMinQty) MinQtyHint(variant: variant, compact: true),
+          ],
+        );
+    final bottom = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.end,
+          spacing: JivoSpacing.xs,
+          children: [
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    selling,
+                    semanticsLabel: l10n.priceSemantics(selling),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  Text(
+                    l10n.perCarton,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (listed != selling)
+              Text(
+                listed,
+                semanticsLabel: l10n.mrpSemantics(listed),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  decoration: TextDecoration.lineThrough,
+                ),
+              ),
+          ],
         ),
+        if (bulk != null) ...[
+          const SizedBox(height: 4),
+          Container(
+            key: ValueKey('bulk-${product.id}'),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: cc.goldLight,
+              borderRadius: BorderRadius.circular(JivoRadii.pill),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.trending_down_rounded, size: 16, color: cc.onGold),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    l10n.bulkPriceFrom(formatRupees(bulk.price), bulk.from),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: cc.onGold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (unitsLeft != null)
           Text(
             l10n.onlyLeft(unitsLeft),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelSmall?.copyWith(
+            style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.error,
-              fontWeight: FontWeight.w600,
             ),
           ),
       ],
@@ -119,17 +238,12 @@ class ProductTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                MergeSemantics(child: info),
+                MergeSemantics(child: top),
+                const SizedBox(height: 4),
+                pills,
+                MergeSemantics(child: bottom),
                 const Spacer(),
-                MergeSemantics(
-                  child: PriceLine(
-                    price: variant.sellingPrice,
-                    mrp: variant.mrp,
-                  ),
-                ),
-                if (variant.hasMinQty)
-                  MinQtyHint(variant: variant, compact: true),
-                const SizedBox(height: JivoSpacing.sm),
+                const SizedBox(height: 8),
                 if (product.hasOptions)
                   _OptionsControl(product: product)
                 else
@@ -287,7 +401,7 @@ class ProductRail extends StatelessWidget {
 
   final List<CatalogProduct> items;
 
-  static const tileWidth = 150.0;
+  static const tileWidth = 160.0;
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -314,13 +428,13 @@ class SliverProductGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SliverGrid.builder(
     gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-      maxCrossAxisExtent: 200,
+      maxCrossAxisExtent: productGridMaxExtent(context),
       mainAxisExtent: productTileExtent(
         context,
         minQtyHint: needsMinQtyHint(items),
       ),
-      crossAxisSpacing: JivoSpacing.sm,
-      mainAxisSpacing: JivoSpacing.sm,
+      crossAxisSpacing: JivoSpacing.md,
+      mainAxisSpacing: JivoSpacing.md,
     ),
     itemCount: items.length,
     itemBuilder: (_, i) => ProductTile(product: items[i]),

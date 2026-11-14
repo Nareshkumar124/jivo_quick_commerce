@@ -7,6 +7,7 @@ import '../../../app/redirect.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
+import '../../../app/theme.dart';
 import 'cart_controller.dart';
 
 /// The floating cart bar: "2 items · ₹348 · View cart" (`03 §1`). Hidden
@@ -21,7 +22,7 @@ class CartBar extends ConsumerWidget {
     final snapshot = ref.watch(cartProvider.select((c) => c.snapshot));
     if (snapshot.isEmpty) return const SizedBox.shrink();
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
+    final cc = context.customerColors;
     final total = snapshot.itemTotal;
     final summary = [
       l10n.cartItems(snapshot.itemCount),
@@ -39,7 +40,9 @@ class CartBar extends ConsumerWidget {
         ),
         child: Material(
           key: const Key('cart-bar'),
-          color: scheme.primary,
+          color: cc.primaryDeep,
+          elevation: 3,
+          shadowColor: cc.shadow,
           borderRadius: BorderRadius.circular(JivoRadii.md),
           child: InkWell(
             borderRadius: BorderRadius.circular(JivoRadii.md),
@@ -53,25 +56,43 @@ class CartBar extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.shopping_bag_outlined, color: scheme.onPrimary),
+                    const Icon(Icons.shopping_bag_rounded, color: Colors.white),
                     const SizedBox(width: JivoSpacing.md),
                     Expanded(
                       child: Text(
                         summary,
-                        style: TextStyle(
-                          color: scheme.onPrimary,
-                          fontWeight: FontWeight.w600,
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: JivoSpacing.sm),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: cc.gold,
+                        borderRadius: BorderRadius.circular(JivoRadii.pill),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 9, 8, 9),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              l10n.viewCart,
+                              style: TextStyle(
+                                color: cc.onGold,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 20,
+                              color: cc.onGold,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    Text(
-                      l10n.viewCart,
-                      style: TextStyle(
-                        color: scheme.onPrimary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Icon(Icons.chevron_right, color: scheme.onPrimary),
                   ],
                 ),
               ),

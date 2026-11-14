@@ -34,7 +34,6 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [bannerAutoScrollProvider.overrideWithValue(null)],
         child: MaterialApp.router(
           routerConfig: router,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -45,6 +44,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('banner-carousel')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('banner-viewer-action')));
     await tester.pumpAndSettle();
 
     expect(find.text('REFERRAL SCREEN'), findsOneWidget);
