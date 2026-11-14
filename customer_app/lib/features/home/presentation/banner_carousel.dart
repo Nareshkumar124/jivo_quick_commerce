@@ -27,6 +27,8 @@ void openBannerLink(BuildContext context, WidgetRef ref, BannerLink link) {
       context.push(Routes.product(slug));
     case UrlBannerLink(:final url):
       ref.read(urlOpenerProvider).open(url);
+    case ReferralBannerLink():
+      context.push(Routes.referral);
     case NoBannerLink():
       break;
   }

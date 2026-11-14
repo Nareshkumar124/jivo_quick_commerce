@@ -25,6 +25,9 @@ abstract final class Routes {
   /// Refer & earn: the customer's code, and entering a friend's.
   static const referral = '/account/referral';
 
+  /// My coupons: the coupons available to this customer.
+  static const myCoupons = '/account/coupons';
+
   /// Under Home, on the root navigator: `go` keeps Home behind them.
   static const cart = '/home/cart';
   static const checkout = '/home/cart/checkout';

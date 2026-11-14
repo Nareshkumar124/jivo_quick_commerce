@@ -459,6 +459,8 @@ class CouponOffer {
     this.message,
     this.amountToUnlock,
     this.endsAt,
+    this.isPersonal = false,
+    this.minOrderValue,
   });
 
   final String code;
@@ -483,6 +485,12 @@ class CouponOffer {
 
   /// UTC expiry, or null.
   final DateTime? endsAt;
+
+  /// Made only for this customer (e.g. a referral reward).
+  final bool isPersonal;
+
+  /// The coupon's minimum order value (server amount), if any.
+  final String? minOrderValue;
 }
 
 /// The delivery-instruction chips (`DeliveryInstructionChipEnum`).

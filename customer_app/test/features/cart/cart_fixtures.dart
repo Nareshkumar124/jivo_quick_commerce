@@ -126,8 +126,15 @@ class StubCartRepository implements CartRepository {
   @override
   Future<CartSnapshot> clear() => _answer('clear');
 
+  List<CouponOffer> couponList = const [];
+  Object? couponError;
+
   @override
-  Future<List<CouponOffer>> coupons() async => const [];
+  Future<List<CouponOffer>> coupons() async {
+    final error = couponError;
+    if (error != null) throw error;
+    return couponList;
+  }
 
   @override
   Future<CartSnapshot> applyCoupon(String code) => _answer('coupon:$code');

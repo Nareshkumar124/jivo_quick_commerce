@@ -232,6 +232,11 @@ class UrlBannerLink extends BannerLink {
   final Uri url;
 }
 
+/// Opens the Refer & earn screen (`link_type` referral).
+class ReferralBannerLink extends BannerLink {
+  const ReferralBannerLink();
+}
+
 class NoBannerLink extends BannerLink {
   const NoBannerLink();
 }

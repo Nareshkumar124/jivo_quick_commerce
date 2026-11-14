@@ -82,6 +82,13 @@ class AccountScreen extends ConsumerWidget {
             ),
             const ReferralAccountTile(),
             ListTile(
+              key: const Key('account-my-coupons'),
+              leading: const Icon(Icons.local_offer_outlined),
+              title: Text(l10n.myCoupons),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(Routes.myCoupons),
+            ),
+            ListTile(
               key: const Key('account-notifications'),
               leading: const Icon(Icons.notifications_none),
               title: Text(l10n.notificationsTitle),

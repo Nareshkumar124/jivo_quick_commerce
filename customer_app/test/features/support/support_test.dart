@@ -50,10 +50,7 @@ void main() {
     test('categories offered without an order exclude order issues', () {
       final offered = TicketCategory.offered(withOrder: false);
       expect(offered.any((c) => c.needsOrder), isFalse);
-      expect(
-        TicketCategory.offered(withOrder: true),
-        TicketCategory.values,
-      );
+      expect(TicketCategory.offered(withOrder: true), TicketCategory.values);
       expect(TicketStatus.fromWire('IN_PROGRESS'), TicketStatus.inProgress);
       expect(TicketStatus.fromWire('NEW'), TicketStatus.unknown);
     });
@@ -96,6 +93,10 @@ void main() {
     }
 
     Future<void> openHelp(WidgetTester tester, TestApp a) async {
+      // Tall enough for the whole Account list (it grew a row).
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await a.pump(tester);
       await tester.tap(find.byTooltip('Account'));
       await tester.pumpAndSettle();
@@ -144,7 +145,11 @@ void main() {
       // Order issues need an order.
       expect(find.byKey(const Key('category-MISSING_ITEMS')), findsNothing);
 
-      await showIn(tester, 'new-ticket', find.byKey(const Key('ticket-submit')));
+      await showIn(
+        tester,
+        'new-ticket',
+        find.byKey(const Key('ticket-submit')),
+      );
       await tester.tap(find.byKey(const Key('ticket-submit')));
       await tester.pumpAndSettle();
       expect(find.text('Choose an issue type.'), findsOneWidget);
@@ -155,7 +160,11 @@ void main() {
         find.byKey(const Key('ticket-message')),
         'I cannot change my email address',
       );
-      await showIn(tester, 'new-ticket', find.byKey(const Key('ticket-submit')));
+      await showIn(
+        tester,
+        'new-ticket',
+        find.byKey(const Key('ticket-submit')),
+      );
       await tester.tap(find.byKey(const Key('ticket-submit')));
       await tester.pumpAndSettle();
 
@@ -195,7 +204,11 @@ void main() {
         find.byKey(const Key('ticket-message')),
         'One bottle was missing',
       );
-      await showIn(tester, 'new-ticket', find.byKey(const Key('ticket-submit')));
+      await showIn(
+        tester,
+        'new-ticket',
+        find.byKey(const Key('ticket-submit')),
+      );
       await tester.tap(find.byKey(const Key('ticket-submit')));
       await tester.pumpAndSettle();
 
@@ -245,7 +258,11 @@ void main() {
         statusCode: 429,
         details: {'retry_after_seconds': 120},
       );
-      await showIn(tester, 'new-ticket', find.byKey(const Key('ticket-submit')));
+      await showIn(
+        tester,
+        'new-ticket',
+        find.byKey(const Key('ticket-submit')),
+      );
       await tester.tap(find.byKey(const Key('ticket-submit')));
       await tester.pumpAndSettle();
       expect(
