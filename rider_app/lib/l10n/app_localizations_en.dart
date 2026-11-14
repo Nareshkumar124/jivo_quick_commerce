@@ -1521,7 +1521,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get documentsProfileIntro =>
-      'Your KYC documents and their review status. Approved documents can\'t be changed. Upload again any document marked Rejected.';
+      'Your KYC documents and their review status. Approved documents can\'t be changed. Upload again any document marked Not accepted.';
 
   @override
   String documentsNeedAttention(int count) {

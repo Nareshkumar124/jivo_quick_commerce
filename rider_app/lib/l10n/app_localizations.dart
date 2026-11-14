@@ -2663,7 +2663,7 @@ abstract class AppLocalizations {
   /// No description provided for @documentsProfileIntro.
   ///
   /// In en, this message translates to:
-  /// **'Your KYC documents and their review status. Approved documents can\'t be changed. Upload again any document marked Rejected.'**
+  /// **'Your KYC documents and their review status. Approved documents can\'t be changed. Upload again any document marked Not accepted.'**
   String get documentsProfileIntro;
 
   /// No description provided for @documentsNeedAttention.
