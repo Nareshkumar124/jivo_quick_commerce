@@ -6,7 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// * `category` - Product list of the category whose slug is link_value * `collection` - Collection page whose slug is link_value * `product` - Product detail whose slug is link_value * `url` - External https URL in link_value (open in the browser) * `none` - Not tappable
+/// * `category` - Product list of the category whose slug is link_value * `collection` - Collection page whose slug is link_value * `product` - Product detail whose slug is link_value * `url` - External https URL in link_value (open in the browser) * `referral` - Opens the app's Refer & earn screen; link_value empty * `none` - Not tappable
 enum BannerLinkTypeEnum {
   @JsonValue(r'category')
   category(r'category'),
@@ -16,6 +16,8 @@ enum BannerLinkTypeEnum {
   product(r'product'),
   @JsonValue(r'url')
   url(r'url'),
+  @JsonValue(r'referral')
+  referral(r'referral'),
   @JsonValue(r'none')
   none(r'none'),
   @JsonValue(r'unknown_default_open_api')

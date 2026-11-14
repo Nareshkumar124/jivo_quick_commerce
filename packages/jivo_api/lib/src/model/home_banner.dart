@@ -51,7 +51,7 @@ class HomeBanner {
   )
   final BannerLinkTypeEnum linkType;
 
-  /// category/collection/product: the target's slug. url: an absolute https URL. none: \"\". Ignore a banner whose target no longer opens (404).
+  /// category/collection/product: the target's slug. url: an absolute https URL. referral: \"\" (open the Refer & earn screen). none: \"\". Ignore a banner whose target no longer opens (404).
   @JsonKey(name: r'link_value', required: true, includeIfNull: false)
   final String linkValue;
 
