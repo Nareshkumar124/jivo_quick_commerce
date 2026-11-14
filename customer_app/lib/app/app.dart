@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
@@ -105,8 +106,12 @@ class JivoCustomerApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       routerConfig: ref.watch(routerProvider),
-      builder: (context, child) =>
-          OfflineBanner(child: child ?? const SizedBox()),
+      // Screens without an AppBar (Home's custom header, full-screen views)
+      // still get a visible status bar.
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: customerSystemUiStyle,
+        child: OfflineBanner(child: child ?? const SizedBox()),
+      ),
     );
   }
 }

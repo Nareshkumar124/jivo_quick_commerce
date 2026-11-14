@@ -33,6 +33,18 @@ extension CustomerColorsContext on BuildContext {
 
 /// The customer app theme: Jivo green, gold calls to action on an ivory
 /// background. Built on `JivoTheme.light()`, which the rider app keeps.
+/// The phone's own bars: a deep-green status bar with white icons (time,
+/// battery) and a white navigation bar with dark icons, so both stay visible
+/// on the ivory/white theme.
+const customerSystemUiStyle = SystemUiOverlayStyle(
+  statusBarColor: Color(0xFF075C36),
+  statusBarIconBrightness: Brightness.light,
+  statusBarBrightness: Brightness.dark,
+  systemNavigationBarColor: Color(0xFFFFFFFF),
+  systemNavigationBarIconBrightness: Brightness.dark,
+  systemNavigationBarDividerColor: Color(0xFFE0E0E0),
+);
+
 ThemeData buildCustomerTheme() {
   const c = CustomerColors();
   const green = Color(0xFF0B7A47);
@@ -129,6 +141,7 @@ ThemeData buildCustomerTheme() {
     appBarTheme: AppBarTheme(
       backgroundColor: c.primaryDeep,
       foregroundColor: white,
+      systemOverlayStyle: customerSystemUiStyle,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
@@ -141,9 +154,6 @@ ThemeData buildCustomerTheme() {
       ),
       iconTheme: const IconThemeData(color: white, size: 24),
       actionsIconTheme: const IconThemeData(color: white, size: 24),
-      systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
-      ),
     ),
     cardTheme: CardThemeData(
       color: white,
