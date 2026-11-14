@@ -34,7 +34,7 @@ from django.db.models import (
 from django.utils import timezone
 from rest_framework.exceptions import NotFound
 
-from apps.catalog.choices import ProductSort, SuggestionType
+from apps.catalog.choices import BannerAudience, ProductSort, SuggestionType
 from apps.catalog.images import image_set
 from apps.catalog.models import (
     MAX_COLLECTION_ITEMS,
@@ -641,12 +641,30 @@ def home_body(store: DarkStore) -> dict:
                 "image": image_set(b.image, b.title),
                 "link_type": b.link_type,
                 "link_value": b.link_value,
+                "audience": b.audience,  # used by `banners_for_audience`, not published
             }
             for b in banners
         ],
         "categories": [{k: v for k, v in node.items() if k != "children"} for node in tree],
         "collections": collection_rails,
     }
+
+
+def banners_for_audience(body: dict, user) -> dict:
+    """Per-user view of the cached home body: drop banners meant for the other audience.
+
+    The cached `body` is shared by every user, so it is never mutated: a copy is returned."""
+    from apps.promotions.services import has_placed_order
+
+    returning = user is not None and has_placed_order(user)
+    hidden = BannerAudience.NEW_CUSTOMERS if returning else BannerAudience.RETURNING_CUSTOMERS
+    banners = [
+        {k: v for k, v in b.items() if k != "audience"}
+        for b in body["banners"]
+        # .get: home bodies cached before migration 0006 have no "audience" key (= ALL).
+        if b.get("audience", BannerAudience.ALL) != hidden
+    ]
+    return {**body, "banners": banners}
 
 
 def buy_again(store: DarkStore, user) -> list[dict]:

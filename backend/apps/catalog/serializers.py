@@ -177,7 +177,8 @@ class HomeBannerSerializer(serializers.Serializer):
         allow_blank=True,
         help_text=(
             "category/collection/product: the target's slug. url: an absolute https URL. "
-            'none: "". Ignore a banner whose target no longer opens (404).'
+            'referral: "" (open the Refer & earn screen). none: "". '
+            "Ignore a banner whose target no longer opens (404)."
         ),
     )
 

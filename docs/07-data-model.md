@@ -150,7 +150,7 @@ erDiagram
 **Collection**: `name`, `slug`, `show_on_home`, `sort_order`, `is_active`, `stores` (M2M, empty = all). At most 100 items (the collection page is not paginated).
 **CollectionItem**: `collection`, `variant`, `sort_order`.
 
-**Banner**: `title`, `image`, `link_type` (category/collection/product/url/none), `link_value`, `stores` (M2M, empty = all), `starts_at`, `ends_at`, `sort_order`, `is_active`.
+**Banner**: `title`, `image`, `link_type` (category/collection/product/url/referral/none), `link_value`, `audience` (ALL default / NEW_CUSTOMERS / RETURNING_CUSTOMERS), `stores` (M2M, empty = all), `starts_at`, `ends_at`, `sort_order`, `is_active`.
 
 **TrendingSearch** (added in Phase 2): `term` (unique), `sort_order`, `is_active`. Admin-defined trending searches (03 §2.7), returned by `search/suggest` for a blank query.
 

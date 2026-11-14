@@ -474,6 +474,7 @@ class BannerAdmin(ModelAdmin):
         "title",
         "image_preview",
         "link",
+        "audience",
         "stores_shown",
         "starts_at",
         "ends_at",
@@ -483,7 +484,7 @@ class BannerAdmin(ModelAdmin):
     )
     list_display_links = ("title",)
     list_editable = ("sort_order", "is_active")
-    list_filter = ("is_active", "link_type")
+    list_filter = ("is_active", "link_type", "audience")
     search_fields = ("title", "link_value")
     filter_horizontal = ("stores",)
     readonly_fields = ("image_preview",)
@@ -495,11 +496,12 @@ class BannerAdmin(ModelAdmin):
                 "fields": ("link_type", "link_value"),
                 "description": (
                     "Category, collection or product: the target's slug. URL: an https:// "
-                    "address. None: not tappable."
+                    "address. Refer a friend: opens Refer & earn (leave the value empty). "
+                    "None: not tappable."
                 ),
             },
         ),
-        ("Where and when", {"fields": ("stores", ("starts_at", "ends_at"))}),
+        ("Where and when", {"fields": ("audience", "stores", ("starts_at", "ends_at"))}),
         (None, {"fields": (("sort_order", "is_active"),)}),
     )
 

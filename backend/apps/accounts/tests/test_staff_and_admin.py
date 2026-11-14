@@ -70,6 +70,10 @@ class TestRoles:
             "view_reports",
             "view_catalog_reports",
             "view_finance_reports",
+            # Referral program (b3434bd): Finance views referrals, codes and settings
+            "view_referral",
+            "view_referralcode",
+            "view_referralsettings",
         }
 
     @pytest.mark.parametrize(
