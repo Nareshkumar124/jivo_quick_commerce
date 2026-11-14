@@ -94,6 +94,7 @@ class ProductTile extends StatelessWidget {
                   child: ProductImage(
                     url: variant.imageUrl ?? product.imageUrl,
                     fit: BoxFit.contain,
+                    onWell: true,
                   ),
                 ),
               ),

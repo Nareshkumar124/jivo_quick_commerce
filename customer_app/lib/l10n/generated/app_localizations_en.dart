@@ -662,9 +662,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchHint => 'Search products';
 
   @override
-  String get shopByCategory => 'Shop by category';
-
-  @override
   String get allProducts => 'All products';
 
   @override

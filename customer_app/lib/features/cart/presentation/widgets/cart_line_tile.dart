@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../../app/theme.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../shared/formatting/formatters.dart';
 import '../../../../shared/widgets/product_image.dart';
@@ -55,7 +56,10 @@ class CartLineTile extends ConsumerWidget {
             borderRadius: BorderRadius.circular(JivoRadii.sm),
             child: SizedBox.square(
               dimension: 56,
-              child: ProductImage(url: line.imageUrl),
+              child: ColoredBox(
+                color: context.customerColors.imageWell,
+                child: ProductImage(url: line.imageUrl, onWell: true),
+              ),
             ),
           ),
           const SizedBox(width: JivoSpacing.md),

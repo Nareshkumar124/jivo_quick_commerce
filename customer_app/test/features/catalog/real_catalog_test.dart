@@ -180,7 +180,7 @@ void main() {
         phone(tester, scale);
         await startReal(tester);
         expect(find.byType(HomeScreen), findsOneWidget);
-        expect(find.text('Shop by category'), findsOneWidget);
+        expect(find.text('All products'), findsOneWidget);
         await tester.scrollUntilVisible(
           find.text('Bestsellers'),
           200,

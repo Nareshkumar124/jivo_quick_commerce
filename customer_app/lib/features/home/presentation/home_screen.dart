@@ -16,7 +16,6 @@ import '../../../shared/widgets/state_views.dart';
 import '../../auth/presentation/auth_flow.dart';
 import '../../catalog/domain/catalog_models.dart';
 import '../../catalog/presentation/catalog_controllers.dart';
-import '../../catalog/presentation/categories_screen.dart';
 import '../../catalog/presentation/widgets/paged_product_grid.dart';
 import '../../catalog/presentation/widgets/product_tile.dart';
 import '../../location/domain/delivery_location.dart';
@@ -190,30 +189,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return [
       if (feed.banners.isNotEmpty)
         SliverToBoxAdapter(child: BannerCarousel(banners: feed.banners)),
-      if (feed.categories.isNotEmpty) ...[
-        SliverToBoxAdapter(child: _SectionHeader(title: l10n.shopByCategory)),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: JivoSpacing.gutter),
-          sliver: SliverGrid.builder(
-            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 96,
-              mainAxisExtent: categoryTileExtent(context),
-              crossAxisSpacing: JivoSpacing.sm,
-              mainAxisSpacing: JivoSpacing.sm,
-            ),
-            itemCount: feed.categories.length,
-            itemBuilder: (context, i) {
-              final category = feed.categories[i];
-              return CategoryTile(
-                key: ValueKey('home-category-${category.slug}'),
-                label: category.name,
-                imageUrl: category.imageUrl,
-                onTap: () => context.push(Routes.category(category.slug)),
-              );
-            },
-          ),
-        ),
-      ],
       SliverToBoxAdapter(child: _SectionHeader(title: l10n.allProducts)),
       const _AllProducts(),
       for (final collection in feed.collections)
