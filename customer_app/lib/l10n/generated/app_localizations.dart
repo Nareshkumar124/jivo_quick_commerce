@@ -2074,6 +2074,78 @@ abstract class AppLocalizations {
   /// **'Wholesale rate'**
   String get wholesaleRateTag;
 
+  /// Cart piggy card headline. count = units_to_next_tier, label = order unit label.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more} other{Add {count} more {label}}}'**
+  String priceTierHeadline(int count, String label);
+
+  /// Cart piggy card detail when one line gets cheaper.
+  ///
+  /// In en, this message translates to:
+  /// **'and pay {price}/box on {variant}'**
+  String priceTierDetailLine(String price, String variant);
+
+  /// Cart piggy card detail when several lines get cheaper.
+  ///
+  /// In en, this message translates to:
+  /// **'and pay less per box'**
+  String get priceTierDetailMany;
+
+  /// Cart piggy card button: opens search to add items.
+  ///
+  /// In en, this message translates to:
+  /// **'Add more'**
+  String get priceTierAddMore;
+
+  /// Account row and screen title for the coupon list.
+  ///
+  /// In en, this message translates to:
+  /// **'My coupons'**
+  String get myCoupons;
+
+  /// Label on a coupon made only for this customer.
+  ///
+  /// In en, this message translates to:
+  /// **'For you'**
+  String get couponForYou;
+
+  /// Coupon minimum order value (server amount).
+  ///
+  /// In en, this message translates to:
+  /// **'Min order {amount}'**
+  String couponMinOrder(String amount);
+
+  /// Snackbar after copying a coupon code.
+  ///
+  /// In en, this message translates to:
+  /// **'Code {code} copied'**
+  String couponCodeCopied(String code);
+
+  /// Screen reader label of the copy-code chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code {code}'**
+  String couponCopySemantics(String code);
+
+  /// My coupons: no store selected yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your delivery location to see coupons'**
+  String get couponsNeedLocation;
+
+  /// My coupons: button to the location flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose location'**
+  String get couponsChooseLocation;
+
+  /// My coupons empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'No coupons right now'**
+  String get myCouponsEmpty;
+
   /// Cart nudge when one line gets cheaper at the next volume tier. count = next_price_tier.units_to_next_tier, label = order_unit_label (e.g. boxes), price = that line's next_tier_price, variant = its pack size (e.g. 1 L).
   ///
   /// In en, this message translates to:

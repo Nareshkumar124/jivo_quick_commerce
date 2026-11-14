@@ -5,6 +5,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/providers.dart';
 import '../../../app/repositories.dart';
 import '../../cart/presentation/cart_controller.dart';
+import '../../catalog/presentation/catalog_controllers.dart';
 import '../../orders/domain/order.dart';
 import '../../orders/presentation/pending_payment.dart';
 import '../domain/checkout_result.dart';
@@ -188,6 +189,8 @@ Future<void> onOrderConfirmed(Ref ref, PlacedOrder order) async {
         },
       );
   await ref.read(cartProvider.notifier).refresh();
+  // The server hides the welcome banner after a first order.
+  ref.invalidate(homeFeedProvider);
   refreshPendingPayment(ref);
 }
 

@@ -9,6 +9,7 @@ import '../../../../shared/widgets/state_views.dart';
 import '../../domain/cart.dart';
 import '../cart_controller.dart';
 import '../cart_texts.dart';
+import '../my_coupons_screen.dart' show CouponForYouLabel;
 
 /// Coupons for the current cart, with eligibility and savings
 /// (`GET /cart/coupons/`).
@@ -231,6 +232,10 @@ class _CouponCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (offer.isPersonal) ...[
+                      CouponForYouLabel(code: offer.code),
+                      const SizedBox(height: JivoSpacing.xs),
+                    ],
                     Text(
                       offer.code,
                       style: theme.textTheme.titleSmall?.copyWith(

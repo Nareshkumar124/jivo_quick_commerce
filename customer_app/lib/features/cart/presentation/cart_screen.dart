@@ -17,6 +17,7 @@ import 'widgets/cart_line_tile.dart';
 import 'widgets/coupon_sheet.dart';
 import 'widgets/delivery_address_card.dart';
 import 'widgets/instructions_selector.dart';
+import 'widgets/price_tier_nudge_card.dart';
 import 'widgets/tip_selector.dart';
 
 /// The cart (`03 §2.8`, screen #20). It reloads on open (stock
@@ -138,6 +139,7 @@ class _CartContent extends StatelessWidget {
     final minUnits = minUnitsWarning(l10n, snapshot.thresholds);
     // The next volume price tier ("Add 3 more boxes to get ₹87/box").
     final tierNudge = priceTierNudge(l10n, snapshot);
+    final tierParts = priceTierNudgeParts(l10n, snapshot);
     final loadError = cart.loadError;
     const gap = SizedBox(height: JivoSpacing.lg);
 
@@ -145,6 +147,16 @@ class _CartContent extends StatelessWidget {
       key: const Key('cart-content'),
       padding: const EdgeInsets.all(JivoSpacing.gutter),
       children: [
+        if (tierNudge != null && tierParts != null) ...[
+          PriceTierNudgeCard(
+            key: const Key('price-tier-nudge'),
+            headline: tierParts.headline,
+            detail: tierParts.detail,
+            semanticsLabel: tierNudge,
+            onAddMore: () => context.push(Routes.search),
+          ),
+          gap,
+        ],
         if (cart.load == CartLoad.failed && loadError != null) ...[
           _Notice(
             key: const Key('cart-refresh-failed'),
@@ -169,15 +181,6 @@ class _CartContent extends StatelessWidget {
             icon: Icons.inventory_2_outlined,
             text: minUnits,
             color: theme.colorScheme.error,
-          ),
-          gap,
-        ],
-        if (tierNudge != null) ...[
-          _Notice(
-            key: const Key('price-tier-nudge'),
-            icon: Icons.savings_outlined,
-            text: tierNudge,
-            color: context.jivoColors.success,
           ),
           gap,
         ],

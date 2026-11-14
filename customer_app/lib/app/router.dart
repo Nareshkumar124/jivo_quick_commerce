@@ -14,6 +14,7 @@ import '../features/catalog/presentation/collection_screen.dart';
 import '../features/catalog/presentation/product_detail_screen.dart';
 import '../features/catalog/presentation/product_list_screen.dart';
 import '../features/cart/presentation/cart_screen.dart';
+import '../features/cart/presentation/my_coupons_screen.dart';
 import '../features/checkout/presentation/checkout_screen.dart';
 import '../features/checkout/presentation/order_success_screen.dart';
 import '../features/checkout/presentation/payment_failed_screen.dart';
@@ -275,6 +276,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         (_) => const DeleteAccountScreen(),
       ),
       route(Routes.referral, 'referral', (_) => const ReferralScreen()),
+      route(Routes.myCoupons, 'my_coupons', (_) => const MyCouponsScreen()),
     ],
   );
   ref.onDispose(router.dispose);

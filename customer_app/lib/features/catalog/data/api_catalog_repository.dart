@@ -200,6 +200,7 @@ HomeBanner _banner(api.HomeBanner b) {
     api.BannerLinkTypeEnum.product when value.isNotEmpty => ProductBannerLink(
       value,
     ),
+    api.BannerLinkTypeEnum.referral => const ReferralBannerLink(),
     api.BannerLinkTypeEnum.url => switch (Uri.tryParse(value)) {
       final Uri uri when uri.scheme == 'https' => UrlBannerLink(uri),
       _ => const NoBannerLink(),

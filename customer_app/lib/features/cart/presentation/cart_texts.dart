@@ -128,6 +128,32 @@ String? priceTierNudge(AppLocalizations l10n, CartSnapshot cart) {
   return l10n.priceTierNudge(count, label);
 }
 
+/// The piggy card's two lines (big headline, smaller detail), from the same
+/// server numbers as [priceTierNudge]. Null when there is no nudge.
+({String headline, String detail})? priceTierNudgeParts(
+  AppLocalizations l10n,
+  CartSnapshot cart,
+) {
+  if (priceTierNudge(l10n, cart) == null) return null;
+  final thresholds = cart.thresholds!;
+  final count = thresholds.nextPriceTier!.unitsToNextTier;
+  final label = orderUnitLabel(l10n, thresholds);
+  final cheaper = [
+    for (final line in cart.lines)
+      if (formatRupeesOrNull(line.nextTierPrice) case final price?)
+        (line: line, price: price),
+  ];
+  return (
+    headline: l10n.priceTierHeadline(count, label),
+    detail: cheaper.length == 1
+        ? l10n.priceTierDetailLine(
+            cheaper.single.price,
+            cheaper.single.line.variantName,
+          )
+        : l10n.priceTierDetailMany,
+  );
+}
+
 /// Why a listed coupon can't be applied.
 String couponIneligibleText(AppLocalizations l10n, CouponOffer offer) =>
     switch (offer.ineligibility) {

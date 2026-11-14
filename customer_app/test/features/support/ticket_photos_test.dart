@@ -80,6 +80,10 @@ void main() {
     }
 
     Future<void> openHelp(WidgetTester tester) async {
+      // Tall enough for the whole Account list (it grew a row).
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await app().pump(tester);
       await tester.tap(find.byTooltip('Account'));
       await tester.pumpAndSettle();

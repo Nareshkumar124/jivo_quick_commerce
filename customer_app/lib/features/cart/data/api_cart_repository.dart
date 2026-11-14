@@ -256,6 +256,8 @@ CouponOffer _offer(api.CouponOffer o) => CouponOffer(
   message: o.message,
   amountToUnlock: o.amountToUnlock,
   endsAt: o.endsAt,
+  isPersonal: o.isPersonal,
+  minOrderValue: o.minOrderValue,
 );
 
 InstructionTag? _chipFromApi(

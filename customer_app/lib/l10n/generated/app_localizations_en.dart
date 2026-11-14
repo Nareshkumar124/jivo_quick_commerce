@@ -1206,6 +1206,59 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wholesaleRateTag => 'Wholesale rate';
 
   @override
+  String priceTierHeadline(int count, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count more $label',
+      one: 'Add 1 more',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String priceTierDetailLine(String price, String variant) {
+    return 'and pay $price/box on $variant';
+  }
+
+  @override
+  String get priceTierDetailMany => 'and pay less per box';
+
+  @override
+  String get priceTierAddMore => 'Add more';
+
+  @override
+  String get myCoupons => 'My coupons';
+
+  @override
+  String get couponForYou => 'For you';
+
+  @override
+  String couponMinOrder(String amount) {
+    return 'Min order $amount';
+  }
+
+  @override
+  String couponCodeCopied(String code) {
+    return 'Code $code copied';
+  }
+
+  @override
+  String couponCopySemantics(String code) {
+    return 'Copy code $code';
+  }
+
+  @override
+  String get couponsNeedLocation =>
+      'Choose your delivery location to see coupons';
+
+  @override
+  String get couponsChooseLocation => 'Choose location';
+
+  @override
+  String get myCouponsEmpty => 'No coupons right now';
+
+  @override
   String priceTierNudgeLine(
     int count,
     String label,

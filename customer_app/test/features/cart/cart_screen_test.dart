@@ -5,6 +5,8 @@ import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/cart/domain/cart.dart';
 import 'package:customer_app/features/cart/presentation/widgets/bill_details.dart';
 import 'package:customer_app/features/cart/presentation/widgets/cart_line_tile.dart';
+import 'package:customer_app/features/cart/presentation/widgets/price_tier_nudge_card.dart';
+import 'package:customer_app/l10n/generated/app_localizations.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_screen.dart';
 import 'package:customer_app/features/home/presentation/home_screen.dart';
@@ -358,9 +360,11 @@ void main() {
         of: find.byKey(const Key('price-tier-nudge')),
         matching: find.byType(Text),
       );
-      return finder.evaluate().isEmpty
-          ? null
-          : tester.widget<Text>(finder).data;
+      if (finder.evaluate().isEmpty) return null;
+      final texts = [
+        for (final e in finder.evaluate()) (e.widget as Text).data,
+      ];
+      return texts.where((t) => t != 'Add more').join(' ');
     }
 
     testWidgets('a line shows the billed rate per box and the server total', (
@@ -394,7 +398,7 @@ void main() {
       await openWith(tester, [
         water(quantity: 22, rate: '90.00', next: '87.00'),
       ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 3));
-      expect(nudge(tester), 'Add 3 more boxes to get ₹87/box on 1 L');
+      expect(nudge(tester), 'Add 3 more boxes and pay ₹87/box on 1 L');
       expect(find.byKey(const Key('min-units-warning')), findsNothing);
     });
 
@@ -402,7 +406,7 @@ void main() {
       await openWith(tester, [
         water(quantity: 24, rate: '90.00', next: '87.00'),
       ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 1));
-      expect(nudge(tester), 'Add 1 more to get ₹87/box on 1 L');
+      expect(nudge(tester), 'Add 1 more and pay ₹87/box on 1 L');
     });
 
     testWidgets('several sizes get cheaper: one generic line', (tester) async {
@@ -417,7 +421,81 @@ void main() {
           next: '122.00',
         ),
       ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 3));
-      expect(nudge(tester), 'Add 3 more boxes for lower prices');
+      expect(nudge(tester), 'Add 3 more boxes and pay less per box');
+    });
+
+    testWidgets('the piggy card is first, above the items, with Add more', (
+      tester,
+    ) async {
+      await openWith(tester, [
+        water(quantity: 22, rate: '90.00', next: '87.00'),
+      ], next: const NextPriceTier(minOrderUnits: 25, unitsToNextTier: 3));
+      final card = tester.getTopLeft(find.byKey(const Key('price-tier-nudge')));
+      final line = tester.getTopLeft(
+        find.byKey(const ValueKey('cart-line-rate-1501')),
+      );
+      expect(card.dy, lessThan(line.dy));
+      expect(find.byKey(const Key('price-tier-add-more')), findsOneWidget);
+      expect(
+        tester.getSemantics(find.byKey(const Key('price-tier-nudge'))),
+        matchesSemantics(
+          label: 'Add 3 more boxes to get ₹87/box on 1 L',
+          isLiveRegion: true,
+        ),
+      );
+    });
+
+    testWidgets('the piggy card fits 360 dp at 2x text', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(16),
+              child: PriceTierNudgeCard(
+                key: const Key('price-tier-nudge'),
+                headline: 'Add 300 more cartons',
+                detail: 'and pay ₹87/box on 1 L',
+                semanticsLabel: 'x',
+                onAddMore: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('price-tier-nudge')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Add more stays reachable for TalkBack', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: PriceTierNudgeCard(
+              headline: 'Add 3 more boxes',
+              detail: 'and pay less per box',
+              semanticsLabel: 'Add 3 more boxes and pay less per box',
+              onAddMore: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Add more'), findsOneWidget);
+      handle.dispose();
     });
 
     testWidgets('no next slab (top tier or no tiers): no nudge', (
@@ -472,7 +550,7 @@ void main() {
       await openCart(tester, app);
 
       expect(textOf(tester, 'cart-line-rate-1501'), '₹90/box');
-      expect(nudge(tester), 'Add 5 more boxes to get ₹87/box on 1 L');
+      expect(nudge(tester), 'Add 5 more boxes and pay ₹87/box on 1 L');
 
       // Any size counts towards the total: 21 + 5 = 26 boxes.
       await app.cart.setQuantity(
@@ -489,7 +567,7 @@ void main() {
       expect(textOf(tester, 'cart-line-total-1501'), '₹1,827');
       expect(find.byKey(const ValueKey('cart-line-tier-1502')), findsOneWidget);
       // 50 is the next slab, and only the 1 L gets cheaper there.
-      expect(nudge(tester), 'Add 24 more boxes to get ₹85/box on 1 L');
+      expect(nudge(tester), 'Add 24 more boxes and pay ₹85/box on 1 L');
     });
   });
 
