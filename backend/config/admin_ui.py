@@ -22,7 +22,9 @@ UNFOLD = {
         {"icon": "database", "title": "Admin", "link": reverse_lazy("admin:index")},
     ],
     "SIDEBAR": {
-        "show_search": True,
+        # No "Search apps and models" box: the user turned the command search off (2026-11-14).
+        # Its popup (and Ctrl+K) is removed by templates/unfold/helpers/command.html.
+        "show_search": False,
         # Django's own app list, already filtered by the user's permissions: reaches models that
         # have no module entry (token blacklist, beat schedules, axes logs).
         "show_all_applications": True,

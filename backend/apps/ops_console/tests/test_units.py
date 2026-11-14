@@ -201,3 +201,34 @@ class TestNavigation:
         client.force_login(staff_in_role(roles.OPS))
         html = client.get("/ops/").content.decode()
         assert 'aria-current="page"' in html
+
+    @pytest.mark.parametrize(
+        ("url_name", "query", "current"),
+        [
+            ("admin:inventory_storeinventory_changelist", "", "Stock per store"),
+            ("admin:inventory_storeinventory_changelist", "?stock=low&on_sale=1", "Low stock"),
+            ("admin:inventory_storeinventory_changelist", "?stock=low&on_sale=1&o=2", "Low stock"),
+            ("admin:inventory_storeinventory_inward", "", "Stock inward (CSV)"),
+            ("admin:inventory_stockmovement_changelist", "", "Stock ledger"),
+        ],
+    )
+    def test_unfold_sidebar_marks_only_the_current_link(self, client, url_name, query, current):
+        """The three links under /admin/inventory/storeinventory/ used to light up together
+        (unfold matched any link whose path is part of the page path, ignoring the query)."""
+        client.force_login(make_principal(SUPERUSER))
+        response = client.get(reverse(url_name) + query)
+        assert response.status_code == 200
+        lit = [
+            item["title"]
+            for group in response.context["sidebar_navigation"]
+            for item in group["items"]
+            if item["active"]
+        ]
+        assert lit == [current]
+
+    def test_admin_has_no_command_search(self, client):
+        """The user turned off the "Type to search" popup (Ctrl+K) and its sidebar box."""
+        client.force_login(make_principal(SUPERUSER))
+        html = client.get(reverse("admin:index")).content.decode()
+        assert "search-input-command" not in html
+        assert "Search apps and models" not in html
