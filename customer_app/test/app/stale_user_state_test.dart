@@ -67,7 +67,7 @@ const homeAddress = AddressInput(
 );
 
 void tallView(WidgetTester tester) {
-  tester.view.physicalSize = const Size(800, 3200);
+  tester.view.physicalSize = const Size(800, 7000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }

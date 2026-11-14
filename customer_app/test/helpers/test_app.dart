@@ -14,7 +14,6 @@ import 'package:customer_app/features/catalog/data/catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
 import 'package:customer_app/features/checkout/data/fake_payment_launcher.dart';
 import 'package:customer_app/features/checkout/data/payment_launcher.dart';
-import 'package:customer_app/features/home/presentation/banner_carousel.dart';
 import 'package:customer_app/features/launch/data/config_repository.dart';
 import 'package:customer_app/features/location/data/delivery_location_store.dart';
 import 'package:customer_app/features/location/data/maps_availability.dart';
@@ -163,7 +162,6 @@ class TestApp {
             FakeMapsAvailability(available: mapsAvailable),
           ),
           reverseGeocoderProvider.overrideWithValue(geocoder),
-          bannerAutoScrollProvider.overrideWithValue(null),
           orderRealtimeProvider.overrideWithValue(realtime),
           notificationRepositoryProvider.overrideWithValue(notifications),
           ...extraOverrides,

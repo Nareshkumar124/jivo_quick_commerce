@@ -665,6 +665,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get shopByCategory => 'Shop by category';
 
   @override
+  String get allProducts => 'All products';
+
+  @override
+  String get shopNow => 'Shop now';
+
+  @override
+  String get referNow => 'Refer now';
+
+  @override
+  String get closeBanner => 'Close';
+
+  @override
+  String get perCarton => '/carton';
+
+  @override
+  String bulkPriceFrom(String price, int count) {
+    return '$price at $count+ cartons';
+  }
+
+  @override
   String get previouslyBought => 'Previously bought';
 
   @override
@@ -896,11 +916,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get wholesaleRatesTitle => 'Wholesale rates (per box)';
+  String get wholesaleRatesTitle => 'Wholesale rates (per carton)';
 
   @override
   String priceTierRange(int from, int to) {
-    return '$from–$to boxes';
+    return '$from–$to cartons';
   }
 
   @override
@@ -908,15 +928,15 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count boxes',
-      one: '1 box',
+      other: '$count cartons',
+      one: '1 carton',
     );
     return '$_temp0';
   }
 
   @override
   String priceTierFrom(int from) {
-    return '$from+ boxes';
+    return '$from+ cartons';
   }
 
   @override
@@ -936,12 +956,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String priceTierRowSemantics(String range, String price) {
-    return '$range: $price per box';
+    return '$range: $price per carton';
   }
 
   @override
   String get priceTierNote =>
-      'Price depends on total boxes in your order (all sizes)';
+      'Price depends on total cartons in your order (all sizes)';
 
   @override
   String get storeClosedHeadline => 'Store closed';
@@ -1199,7 +1219,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String pricePerBox(String price) {
-    return '$price/box';
+    return '$price/carton';
   }
 
   @override
@@ -1218,11 +1238,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String priceTierDetailLine(String price, String variant) {
-    return 'and pay $price/box on $variant';
+    return 'and pay $price/carton on $variant';
   }
 
   @override
-  String get priceTierDetailMany => 'and pay less per box';
+  String get priceTierDetailMany => 'and pay less per carton';
 
   @override
   String get priceTierAddMore => 'Add more';
@@ -1268,8 +1288,8 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Add $count more $label to get $price/box on $variant',
-      one: 'Add 1 more to get $price/box on $variant',
+      other: 'Add $count more $label to get $price/carton on $variant',
+      one: 'Add 1 more to get $price/carton on $variant',
     );
     return '$_temp0';
   }

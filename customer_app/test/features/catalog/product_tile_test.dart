@@ -24,7 +24,7 @@ Future<FakeCommerceBackend> pumpTile(
       Center(
         child: SizedBox(
           width: 160,
-          height: 320,
+          height: 380,
           child: ProductTile(product: tile),
         ),
       ),
@@ -170,7 +170,7 @@ void main() {
     // One quantity box: no - or +.
     expect(find.byIcon(Icons.remove), findsNothing);
     expect(find.byIcon(Icons.add), findsNothing);
-    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.edit_rounded), findsOneWidget);
     expect(find.bySemanticsLabel('Quantity 1, tap to change'), findsOneWidget);
 
     await setQty(tester, box(101), text: '3');
@@ -234,10 +234,10 @@ void main() {
     await pumpTile(tester, product(), repository: slow);
 
     await setQty(tester, find.text('ADD'), settle: false);
-    final add = tester.widget<OutlinedButton>(
+    final add = tester.widget<FilledButton>(
       find.descendant(
         of: find.byKey(const ValueKey('add-101')),
-        matching: find.byType(OutlinedButton),
+        matching: find.byType(FilledButton),
       ),
     );
     expect(add.onPressed, isNull);
@@ -588,7 +588,7 @@ void main() {
         Center(
           child: SizedBox(
             width: 160,
-            height: 320,
+            height: 380,
             child: ProductTile(product: product()),
           ),
         ),

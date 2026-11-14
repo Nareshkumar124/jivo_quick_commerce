@@ -57,7 +57,7 @@ class PagedProductGrid extends ConsumerWidget {
               sliver: SliverProductGrid(items: shown.items),
             ),
             SliverToBoxAdapter(
-              child: _LoadMoreFooter(
+              child: LoadMoreFooter(
                 state: shown,
                 onLoadMore: () => ref.read(provider.notifier).loadMore(),
               ),
@@ -76,8 +76,12 @@ class PagedProductGrid extends ConsumerWidget {
 
 /// Built only when scrolled near the end (slivers are lazy), so building it
 /// is the "load more" trigger. A failed page shows a retry button.
-class _LoadMoreFooter extends StatelessWidget {
-  const _LoadMoreFooter({required this.state, required this.onLoadMore});
+class LoadMoreFooter extends StatelessWidget {
+  const LoadMoreFooter({
+    required this.state,
+    required this.onLoadMore,
+    super.key,
+  });
 
   final PagedProducts state;
   final VoidCallback onLoadMore;

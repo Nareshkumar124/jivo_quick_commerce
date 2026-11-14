@@ -91,6 +91,17 @@ class CategoryQuery extends ProductQuery {
   int get hashCode => Object.hash(slug, sort);
 }
 
+/// Every active product of the store (Home's "All products").
+class AllProductsQuery extends ProductQuery {
+  const AllProductsQuery();
+
+  @override
+  bool operator ==(Object other) => other is AllProductsQuery;
+
+  @override
+  int get hashCode => 7;
+}
+
 class CollectionQuery extends ProductQuery {
   const CollectionQuery(this.slug);
 
@@ -172,6 +183,7 @@ class PagedProductsController extends AsyncNotifier<PagedProducts> {
           sort: sort,
           page: page,
         ),
+        AllProductsQuery() => repository.products(page: page),
         CollectionQuery(:final slug) => repository.collection(slug, page: page),
         SearchQuery(:final text) => repository.search(text, page: page),
       },

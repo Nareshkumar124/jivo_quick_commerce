@@ -443,7 +443,7 @@ void main() {
     );
 
     test(
-      'at 4 boxes the next slab is 25 (5+ costs the normal price)',
+      'at 4 cartons the next slab is 25 (5+ costs the normal price)',
       () async {
         final cart = await set(1501, 4);
         final line = cart.lines.single;

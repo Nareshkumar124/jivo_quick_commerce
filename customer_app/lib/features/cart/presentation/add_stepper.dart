@@ -283,11 +283,10 @@ class AddButton extends StatelessWidget {
     final theme = Theme.of(context);
     return SizedBox(
       width: double.infinity,
-      child: OutlinedButton(
+      child: FilledButton(
         onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: theme.colorScheme.primary,
-          side: BorderSide(color: theme.colorScheme.primary),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(64, kJivoMinTouchTarget),
           padding: EdgeInsets.zero,
         ),
         child: busy
@@ -299,16 +298,27 @@ class AddButton extends StatelessWidget {
                   dimension: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: theme.colorScheme.primary,
+                    color: theme.colorScheme.onSecondary,
                   ),
                 ),
               )
             : Semantics(
                 label: semanticsLabel,
                 excludeSemantics: true,
-                child: Text(
-                  AppLocalizations.of(context).addToCart,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add_rounded, size: 20),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        AppLocalizations.of(context).addToCart,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
                 ),
               ),
       ),
@@ -381,13 +391,13 @@ class QuantityBox extends StatelessWidget {
                           Text(
                             '$quantity',
                             key: ValueKey('qty-$id'),
-                            style: theme.textTheme.titleSmall?.copyWith(
+                            style: theme.textTheme.titleMedium?.copyWith(
                               color: onPrimary,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(width: JivoSpacing.xs),
-                          Icon(Icons.edit_outlined, size: 16, color: onPrimary),
+                          Icon(Icons.edit_rounded, size: 18, color: onPrimary),
                         ],
                       ),
                     ),

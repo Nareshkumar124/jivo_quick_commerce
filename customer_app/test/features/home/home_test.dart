@@ -11,7 +11,7 @@ import '../../helpers/test_app.dart';
 
 /// Tall enough to build every home section without scrolling.
 void tallView(WidgetTester tester) {
-  tester.view.physicalSize = const Size(800, 3000);
+  tester.view.physicalSize = const Size(800, 7000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }

@@ -23,7 +23,6 @@ import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/app/router.dart';
 import 'package:customer_app/features/auth/presentation/login_screen.dart';
 import 'package:customer_app/features/auth/presentation/otp_screen.dart';
-import 'package:customer_app/features/home/presentation/banner_carousel.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
 import 'package:customer_app/features/profile/presentation/profile_form.dart';
 import 'package:customer_app/features/tracking/presentation/tracking_providers.dart';
@@ -98,7 +97,6 @@ void main() {
           prefs: prefs,
           overrides: [
             otpAutofillProvider.overrideWithValue(FakeOtpAutofill()),
-            bannerAutoScrollProvider.overrideWithValue(null),
             if (fake)
               trackPollIntervalProvider.overrideWithValue(
                 const Duration(milliseconds: 400),
