@@ -19,7 +19,7 @@ Status: ⬜ not started · 🔄 in progress · ⛔ blocked · ✅ built (automat
 | **P8** Hardening & launch | Security review, load test, backup restore, store releases, pilot, UAT, go-live | 🔄 | ⬜ | Merged: OWASP fixes T-814 (`1015790`), Locust harness T-812 (`842e632`), backup/restore and monitoring T-813 (`4b30378`). Staging `jqc.jivo.in` live with HTTPS. Open: load test run, store releases (D-11), pilot, UAT, production (D-05). Uses [`../release-checklist.md`](../release-checklist.md). |
 
 ## Per-phase files
-The detailed per-phase files (`phase-N-*.md`: task checklist, test cases, exit criteria, demo script, sign-off) are **not written yet**. Until they exist:
+The per-phase files `phase-0-*.md` … `phase-8-*.md` were drafted on 2026-11-14 (task checklist, test cases, exit criteria, demo script, empty sign-off, open questions); they are drafts until each gate. Background sources:
 - **Scope:** [`../development-phase.md`](../development-phase.md) §3.
 - **Test cases:** the QA agent's [`../../qa/docs/02-test-case-repository.md`](../../qa/docs/02-test-case-repository.md) (`P<n>-TC-<nn>` IDs, with 🔥 smoke cases).
 - **Sign-off:** the template in `10 §8`. Record it below.
