@@ -13,6 +13,7 @@ import '../../location/domain/delivery_location.dart';
 import '../../location/presentation/delivery_controller.dart';
 import '../../location/presentation/location_flow.dart';
 import '../../location/presentation/map_picker_screen.dart';
+import '../../location/presentation/store_closed_banner.dart';
 import '../data/device_location.dart';
 import '../domain/saved_address.dart';
 import 'address_controllers.dart';
@@ -197,6 +198,16 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   };
   AddressLabel _label = AddressLabel.home;
   bool _initialised = false;
+  bool _pinError = false;
+  final _pinKey = GlobalKey();
+  late String _snapshot;
+
+  /// What the geocoder put in each field; a field still holding it counts
+  /// as "prefilled and untouched" (CA-07 section 5).
+  final _prefilled = <String, String>{};
+
+  String _formText() =>
+      '$_label|${_fields.values.map((c) => c.text).join('|')}';
 
   SavedAddress? _existing() {
     final id = widget.addressId;
@@ -228,6 +239,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
         input.receiverPhone ?? '',
       );
     }
+    _snapshot = _formText();
   }
 
   @override
@@ -258,7 +270,13 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   void _prefill(AddressParts parts) {
     void fill(String key, String? value) {
       final field = _fields[key]!;
-      if (value != null && field.text.trim().isEmpty) field.text = value;
+      if (value == null) return;
+      final untouched =
+          field.text.trim().isEmpty || _prefilled[key] == field.text;
+      if (untouched) {
+        field.text = value;
+        _prefilled[key] = value;
+      }
     }
 
     fill('area', parts.area);
@@ -268,6 +286,95 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     if (pincode != null && Validators.isPincode(pincode)) {
       fill('pincode', pincode);
     }
+    // Prefilled text is not a change the customer made.
+    _snapshot = _formText();
+  }
+
+  bool get _dirty {
+    final point = ref.read(addressFormProvider).point;
+    final newPin =
+        widget.addressId == null && widget.initial == null && point != null;
+    return _formText() != _snapshot || newPin;
+  }
+
+  Future<void> _confirmLeave() async {
+    if (!_dirty) {
+      context.pop();
+      return;
+    }
+    final l10n = AppLocalizations.of(context);
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.addressDiscardTitle),
+        content: Text(l10n.addressDiscardBody),
+        actions: [
+          TextButton(
+            autofocus: true,
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.addressKeepEditing),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.addressDiscard),
+          ),
+        ],
+      ),
+    );
+    if (discard == true && mounted) context.pop();
+  }
+
+  Widget _serviceLine(AppLocalizations l10n, AddressFormState state) {
+    final theme = Theme.of(context);
+    final result = state.serviceability;
+    final IconData icon;
+    final String text;
+    Color? color;
+    if (state.checking) {
+      return Semantics(
+        liveRegion: true,
+        child: Row(
+          children: [
+            const SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: JivoSpacing.sm),
+            Expanded(child: Text(l10n.addressServiceableChecking)),
+          ],
+        ),
+      );
+    }
+    if (result == null) return const SizedBox.shrink();
+    final store = result.store;
+    if (!result.serviceable) {
+      icon = Icons.wrong_location_outlined;
+      text = l10n.addressServiceableNo;
+      color = theme.colorScheme.error;
+    } else if (store != null && !store.isOpen) {
+      icon = Icons.schedule;
+      text = l10n.addressServiceableClosed(
+        storeClosedText(l10n, store.opensAt, now: DateTime.now()),
+      );
+    } else {
+      icon = Icons.check_circle_outline;
+      text = l10n.addressServiceableYes;
+    }
+    return Semantics(
+      liveRegion: true,
+      child: Row(
+        key: const Key('address-serviceability'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: color),
+          const SizedBox(width: JivoSpacing.sm),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickOnMap(GeoPoint? at) async {
@@ -285,6 +392,14 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   }
 
   Future<void> _save() async {
+    if (ref.read(addressFormProvider).point == null) {
+      setState(() => _pinError = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final target = _pinKey.currentContext;
+        if (target != null) Scrollable.ensureVisible(target);
+      });
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     String text(String key) => _fields[key]!.text.trim();
     final phoneDigits = text('rphone');
@@ -327,6 +442,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       );
       if (!mounted) return;
     }
+    _snapshot = _formText();
     showMessage(context, l10n.addressSaved);
     context.pop();
   }
@@ -386,195 +502,264 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       ),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.addressId == null ? l10n.newAddress : l10n.editAddress,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmLeave();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.addressId == null ? l10n.newAddress : l10n.editAddress,
+          ),
         ),
-      ),
-      // A Column (not a lazy ListView) so every field is built and validated.
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(JivoSpacing.gutter),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Semantics(
-                header: true,
-                child: Text(
-                  l10n.locationTitle,
-                  style: theme.textTheme.titleMedium,
+        // A Column (not a lazy ListView) so every field is built and validated.
+        body: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(JivoSpacing.gutter),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    l10n.locationTitle,
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
-              ),
-              const SizedBox(height: JivoSpacing.sm),
-              if (point != null)
-                Card(
-                  key: const Key('address-pin'),
-                  margin: EdgeInsets.zero,
-                  child: ListTile(
-                    leading: Icon(
-                      Icons.location_on,
-                      color: theme.colorScheme.primary,
+                const SizedBox(height: JivoSpacing.sm),
+                if (point != null)
+                  Card(
+                    key: const Key('address-pin'),
+                    margin: EdgeInsets.zero,
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.location_on,
+                        color: theme.colorScheme.primary,
+                      ),
+                      title: Text(
+                        state.pinLine ?? l10n.locationCaptured,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        l10n.pinCoordinates(
+                          formatCoordinate(point.lat),
+                          formatCoordinate(point.lng),
+                        ),
+                      ),
                     ),
-                    title: Text(
-                      state.pinLine ?? l10n.locationCaptured,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
+                  )
+                else if (!hasMap)
+                  Text(l10n.locationNeeded),
+                if (_pinError && point == null)
+                  Card(
+                    key: _pinKey,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: theme.colorScheme.error,
+                        width: 2,
+                      ),
                     ),
-                    subtitle: Text(
-                      l10n.pinCoordinates(
-                        formatCoordinate(point.lat),
-                        formatCoordinate(point.lng),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.error,
+                          color: theme.colorScheme.error,
+                        ),
+                        title: Text(
+                          hasMap ? l10n.pinNeededMap : l10n.pinNeededNoMap,
+                        ),
                       ),
                     ),
                   ),
-                )
-              else if (!hasMap)
-                Text(l10n.locationNeeded),
-              if (state.locationFailure != null) ...[
+                if (point != null) ...[
+                  const SizedBox(height: JivoSpacing.sm),
+                  _serviceLine(l10n, state),
+                ],
+                if (state.locationFailure != null) ...[
+                  const SizedBox(height: JivoSpacing.sm),
+                  Text(
+                    _locationMessage(l10n, state.locationFailure!),
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+                  if (state.locationFailure != LocationFailure.unavailable)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () => ref
+                            .read(addressFormProvider.notifier)
+                            .openSettings(),
+                        child: Text(l10n.openSettings),
+                      ),
+                    ),
+                ],
                 const SizedBox(height: JivoSpacing.sm),
-                Text(
-                  _locationMessage(l10n, state.locationFailure!),
-                  style: TextStyle(color: theme.colorScheme.error),
-                ),
-                if (state.locationFailure != LocationFailure.unavailable)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: () =>
-                          ref.read(addressFormProvider.notifier).openSettings(),
-                      child: Text(l10n.openSettings),
+                if (hasMap && point == null)
+                  FilledButton.icon(
+                    key: const Key('address-set-on-map'),
+                    onPressed: () => _pickOnMap(null),
+                    icon: const Icon(Icons.map_outlined),
+                    label: Text(l10n.setLocationOnMap),
+                  )
+                else if (hasMap)
+                  OutlinedButton.icon(
+                    key: const Key('address-adjust-pin'),
+                    onPressed: () => _pickOnMap(point),
+                    icon: const Icon(Icons.edit_location_alt_outlined),
+                    label: Text(l10n.adjustPin),
+                  ),
+                if (hasMap)
+                  TextButton.icon(
+                    onPressed: state.locating
+                        ? null
+                        : () => ref.read(addressFormProvider.notifier).locate(),
+                    icon: locateIcon,
+                    label: Text(l10n.useCurrentLocation),
+                  )
+                else ...[
+                  OutlinedButton.icon(
+                    onPressed: state.locating
+                        ? null
+                        : () => ref.read(addressFormProvider.notifier).locate(),
+                    icon: locateIcon,
+                    label: Text(l10n.useCurrentLocation),
+                  ),
+                  const SizedBox(height: JivoSpacing.xs),
+                  Text(
+                    l10n.gpsOnlyAtAddress,
+                    key: const Key('address-gps-warning'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-              ],
-              const SizedBox(height: JivoSpacing.sm),
-              if (hasMap && point == null)
-                FilledButton.icon(
-                  key: const Key('address-set-on-map'),
-                  onPressed: () => _pickOnMap(null),
-                  icon: const Icon(Icons.map_outlined),
-                  label: Text(l10n.setLocationOnMap),
-                )
-              else if (hasMap)
-                OutlinedButton.icon(
-                  key: const Key('address-adjust-pin'),
-                  onPressed: () => _pickOnMap(point),
-                  icon: const Icon(Icons.edit_location_alt_outlined),
-                  label: Text(l10n.adjustPin),
-                ),
-              if (hasMap)
-                TextButton.icon(
-                  onPressed: state.locating
-                      ? null
-                      : () => ref.read(addressFormProvider.notifier).locate(),
-                  icon: locateIcon,
-                  label: Text(l10n.useCurrentLocation),
-                )
-              else ...[
-                OutlinedButton.icon(
-                  onPressed: state.locating
-                      ? null
-                      : () => ref.read(addressFormProvider.notifier).locate(),
-                  icon: locateIcon,
-                  label: Text(l10n.useCurrentLocation),
-                ),
-                const SizedBox(height: JivoSpacing.xs),
-                Text(
-                  l10n.gpsOnlyAtAddress,
-                  key: const Key('address-gps-warning'),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              const SizedBox(height: JivoSpacing.xl),
-              Wrap(
-                spacing: JivoSpacing.sm,
-                children: [
-                  for (final (label, text) in [
-                    (AddressLabel.home, l10n.labelHome),
-                    (AddressLabel.work, l10n.labelWork),
-                    (AddressLabel.other, l10n.labelOther),
-                  ])
-                    ChoiceChip(
-                      label: Text(text),
-                      selected: _label == label,
-                      onSelected: (_) => setState(() => _label = label),
-                    ),
                 ],
-              ),
-              const SizedBox(height: JivoSpacing.md),
-              field('custom', l10n.customLabel, maxLength: 40),
-              field(
-                'house',
-                l10n.houseLabel,
-                validator: required,
-                maxLength: 120,
-              ),
-              field(
-                'street',
-                l10n.buildingStreetLabel,
-                validator: required,
-                maxLength: 200,
-              ),
-              field('landmark', l10n.landmarkLabel, maxLength: 120),
-              field('area', l10n.areaLabel, maxLength: 120),
-              field('city', l10n.cityLabel, validator: required, maxLength: 80),
-              field(
-                'state',
-                l10n.stateLabel,
-                validator: required,
-                maxLength: 80,
-              ),
-              field(
-                'pincode',
-                l10n.pincodeLabel,
-                keyboard: TextInputType.number,
-                formatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(6),
-                ],
-                validator: (v) =>
-                    Validators.isPincode(v ?? '') ? null : l10n.pincodeInvalid,
-              ),
-              field('rname', l10n.receiverNameLabel, maxLength: 120),
-              field(
-                'rphone',
-                l10n.receiverPhoneLabel,
-                keyboard: TextInputType.phone,
-                prefix: '+91 ',
-                formatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(10),
-                ],
-                validator: (v) => (v ?? '').isEmpty || Validators.isMobile(v!)
-                    ? null
-                    : l10n.phoneInvalid,
-              ),
-              if (state.error != null) ...[
-                Text(
-                  describeErrorWithDetails(context, state.error!),
-                  style: TextStyle(color: theme.colorScheme.error),
+                const SizedBox(height: JivoSpacing.xl),
+                Wrap(
+                  spacing: JivoSpacing.sm,
+                  children: [
+                    for (final (label, text) in [
+                      (AddressLabel.home, l10n.labelHome),
+                      (AddressLabel.work, l10n.labelWork),
+                      (AddressLabel.other, l10n.labelOther),
+                    ])
+                      ChoiceChip(
+                        label: Text(text),
+                        selected: _label == label,
+                        onSelected: (_) => setState(() => _label = label),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: JivoSpacing.md),
-              ],
-              if (point == null) ...[
-                Text(
-                  hasMap ? l10n.pinNeededMap : l10n.pinNeededNoMap,
-                  key: const Key('address-pin-needed'),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                field('custom', l10n.customLabel, maxLength: 40),
+                field(
+                  'house',
+                  l10n.houseLabel,
+                  validator: required,
+                  maxLength: 120,
                 ),
-                const SizedBox(height: JivoSpacing.sm),
+                field(
+                  'street',
+                  l10n.buildingStreetLabel,
+                  validator: required,
+                  maxLength: 200,
+                ),
+                field('landmark', l10n.landmarkLabel, maxLength: 120),
+                ListenableBuilder(
+                  listenable: Listenable.merge([
+                    for (final k in ['area', 'city', 'state', 'pincode'])
+                      _fields[k]!,
+                  ]),
+                  builder: (context, _) {
+                    final show = _prefilled.entries.any(
+                      (e) =>
+                          e.value.isNotEmpty && _fields[e.key]!.text == e.value,
+                    );
+                    if (!show) return const SizedBox.shrink();
+                    return Padding(
+                      key: const Key('address-prefill-note'),
+                      padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.auto_fix_high, size: 16),
+                          const SizedBox(width: JivoSpacing.xs),
+                          Expanded(
+                            child: Text(
+                              l10n.addressPrefillNote,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                field('area', l10n.areaLabel, maxLength: 120),
+                field(
+                  'city',
+                  l10n.cityLabel,
+                  validator: required,
+                  maxLength: 80,
+                ),
+                field(
+                  'state',
+                  l10n.stateLabel,
+                  validator: required,
+                  maxLength: 80,
+                ),
+                field(
+                  'pincode',
+                  l10n.pincodeLabel,
+                  keyboard: TextInputType.number,
+                  formatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  validator: (v) => Validators.isPincode(v ?? '')
+                      ? null
+                      : l10n.pincodeInvalid,
+                ),
+                field('rname', l10n.receiverNameLabel, maxLength: 120),
+                field(
+                  'rphone',
+                  l10n.receiverPhoneLabel,
+                  keyboard: TextInputType.phone,
+                  prefix: '+91 ',
+                  formatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: (v) => (v ?? '').isEmpty || Validators.isMobile(v!)
+                      ? null
+                      : l10n.phoneInvalid,
+                ),
+                if (state.error != null) ...[
+                  Text(
+                    describeErrorWithDetails(context, state.error!),
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+                  const SizedBox(height: JivoSpacing.md),
+                ],
+                if (point == null) ...[
+                  Text(
+                    hasMap ? l10n.pinNeededMap : l10n.pinNeededNoMap,
+                    key: const Key('address-pin-needed'),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: JivoSpacing.sm),
+                ],
+                BusyButton(
+                  label: l10n.save,
+                  busy: state.saving,
+                  onPressed: _save,
+                ),
               ],
-              BusyButton(
-                label: l10n.save,
-                busy: state.saving,
-                onPressed: point == null ? null : _save,
-              ),
-            ],
+            ),
           ),
         ),
       ),

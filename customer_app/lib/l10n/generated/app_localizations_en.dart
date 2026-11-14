@@ -458,6 +458,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setLocationOnMap => 'Set location on map';
 
   @override
+  String get mapBackToForm => 'Back to the form';
+
+  @override
+  String get addressServiceableYes => 'We deliver here.';
+
+  @override
+  String get addressServiceableNo =>
+      'We don\'t deliver to this pin yet. You can still save the address.';
+
+  @override
+  String get addressServiceableChecking => 'Checking delivery for this pin…';
+
+  @override
+  String addressServiceableClosed(String when) {
+    return 'We deliver here. $when';
+  }
+
+  @override
+  String get addressPrefillNote =>
+      'Filled from the map. Check them before saving.';
+
+  @override
+  String get addressDiscardTitle => 'Discard this address?';
+
+  @override
+  String get addressDiscardBody => 'What you typed will be lost.';
+
+  @override
+  String get addressKeepEditing => 'Keep editing';
+
+  @override
+  String get addressDiscard => 'Discard';
+
+  @override
   String get adjustPin => 'Adjust pin';
 
   @override

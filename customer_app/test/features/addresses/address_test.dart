@@ -57,11 +57,13 @@ void main() {
     await tester.tap(find.text('Add address'));
     await tester.pumpAndSettle();
     final save = find.widgetWithText(FilledButton, 'Save');
+    await tapVisible(tester, save);
     expect(
-      tester.widget<FilledButton>(save).onPressed,
-      isNull,
-      reason: 'needs a location first',
+      find.text('Set the delivery location first.'),
+      findsWidgets,
+      reason: 'a tap without a pin explains what is missing',
     );
+    expect(app.addresses.saved, isEmpty);
 
     await tester.tap(find.text('Use my current location'));
     await tester.pumpAndSettle();

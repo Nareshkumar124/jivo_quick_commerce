@@ -886,6 +886,66 @@ abstract class AppLocalizations {
   /// **'Set location on map'**
   String get setLocationOnMap;
 
+  /// Map picker fallback opened from the address form: returns to that form.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the form'**
+  String get mapBackToForm;
+
+  /// Address form: server says the pin is serviceable.
+  ///
+  /// In en, this message translates to:
+  /// **'We deliver here.'**
+  String get addressServiceableYes;
+
+  /// Address form: pin not serviceable; saving is still allowed.
+  ///
+  /// In en, this message translates to:
+  /// **'We don\'t deliver to this pin yet. You can still save the address.'**
+  String get addressServiceableNo;
+
+  /// Address form: serviceability check running.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking delivery for this pin…'**
+  String get addressServiceableChecking;
+
+  /// Serviceable but the store is closed; {when} is the store-closed text.
+  ///
+  /// In en, this message translates to:
+  /// **'We deliver here. {when}'**
+  String addressServiceableClosed(String when);
+
+  /// Address form: area, city, state or PIN code came from the map.
+  ///
+  /// In en, this message translates to:
+  /// **'Filled from the map. Check them before saving.'**
+  String get addressPrefillNote;
+
+  /// Dialog when leaving the address form with changes.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this address?'**
+  String get addressDiscardTitle;
+
+  /// Discard dialog body.
+  ///
+  /// In en, this message translates to:
+  /// **'What you typed will be lost.'**
+  String get addressDiscardBody;
+
+  /// Discard dialog: stay.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get addressKeepEditing;
+
+  /// Discard dialog: leave.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get addressDiscard;
+
   /// Address form (CA-07): opens the map picker at the address's pin.
   ///
   /// In en, this message translates to:
