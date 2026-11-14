@@ -109,7 +109,7 @@ class JivoCustomerApp extends ConsumerWidget {
       // Screens without an AppBar (Home's custom header, full-screen views)
       // still get a visible status bar.
       builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: customerSystemUiStyle,
+        value: customerLightScreenStyle,
         child: OfflineBanner(child: child ?? const SizedBox()),
       ),
     );

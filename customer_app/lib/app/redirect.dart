@@ -13,6 +13,9 @@ abstract final class Routes {
   static const categories = '/categories';
   static const orderAgain = '/order-again';
   static const search = '/search';
+
+  /// Every product as a grid (the cart's "Add more").
+  static const allProducts = '/products';
   static const location = '/location';
   static const mapPicker = '/location/map';
   static const notServiceable = '/location/not-serviceable';

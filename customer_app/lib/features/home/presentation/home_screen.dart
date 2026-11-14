@@ -84,7 +84,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : ref.watch(homeFeedProvider).value?.store ?? delivery.store;
     return Scaffold(
       key: const Key('home-screen'),
+      // No top SafeArea: the green header paints behind the status bar and
+      // adds the top inset itself.
       body: SafeArea(
+        top: false,
         child: RefreshIndicator(
           onRefresh: _refresh,
           child: CustomScrollView(
@@ -318,6 +321,7 @@ class _HomeHeader extends StatelessWidget {
         statusBarColor: Colors.transparent,
       ),
       child: DecoratedBox(
+        key: const Key('home-header'),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,

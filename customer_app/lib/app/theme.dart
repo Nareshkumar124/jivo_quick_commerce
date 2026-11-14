@@ -45,6 +45,20 @@ const customerSystemUiStyle = SystemUiOverlayStyle(
   systemNavigationBarDividerColor: Color(0xFFE0E0E0),
 );
 
+/// Default for screens without an AppBar (login, OTP, onboarding, splash,
+/// location, empty states): they have a light top, so the status icons are
+/// dark. Home and AppBar screens set their own light-icon style over the
+/// deep-green top. (Android 15 ignores statusBarColor: the app draws behind
+/// the bar.)
+const customerLightScreenStyle = SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.dark,
+  statusBarBrightness: Brightness.light,
+  systemNavigationBarColor: Color(0xFFFFFFFF),
+  systemNavigationBarIconBrightness: Brightness.dark,
+  systemNavigationBarDividerColor: Color(0xFFE0E0E0),
+);
+
 ThemeData buildCustomerTheme() {
   const c = CustomerColors();
   const green = Color(0xFF0B7A47);

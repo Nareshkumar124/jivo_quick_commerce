@@ -153,7 +153,7 @@ class _CartContent extends StatelessWidget {
             headline: tierParts.headline,
             detail: tierParts.detail,
             semanticsLabel: tierNudge,
-            onAddMore: () => context.push(Routes.search),
+            onAddMore: () => context.push(Routes.allProducts),
           ),
           gap,
         ],
