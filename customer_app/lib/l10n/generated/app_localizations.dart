@@ -2217,6 +2217,12 @@ abstract class AppLocalizations {
   /// **'Pay by cash or UPI when your order arrives'**
   String get payCodSubtitle;
 
+  /// Shown under the disabled COD option when the server sends no reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery isn\'t available for this order'**
+  String get codUnavailableFallback;
+
   /// Places a COD order.
   ///
   /// In en, this message translates to:
