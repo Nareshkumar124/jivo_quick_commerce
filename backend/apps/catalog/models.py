@@ -13,7 +13,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, RegexVa
 from django.db import models
 from simple_history.models import HistoricalRecords
 
-from apps.catalog.choices import BannerLinkType
+from apps.catalog.choices import BannerAudience, BannerLinkType
 from apps.catalog.images import RandomImagePath, is_new_upload, prepare_image, validate_image_upload
 from apps.catalog.validators import (
     validate_highlights,
@@ -414,6 +414,12 @@ class Banner(ProcessedImageMixin, TimeStampedModel):
         blank=True,
         help_text="Slug for category/collection/product, https URL for url, empty for none.",
     )
+    audience = models.CharField(
+        max_length=20,
+        choices=BannerAudience.choices,
+        default=BannerAudience.ALL,
+        help_text="Who sees it. New = no order placed yet (signed-out visitors count as new).",
+    )
     stores = models.ManyToManyField(
         "stores.DarkStore", blank=True, related_name="banners", help_text="Empty = all stores."
     )
@@ -441,9 +447,9 @@ class Banner(ProcessedImageMixin, TimeStampedModel):
     def clean(self) -> None:
         super().clean()
         value = self.link_value.strip()
-        if self.link_type == BannerLinkType.NONE:
+        if self.link_type in (BannerLinkType.NONE, BannerLinkType.REFERRAL):
             if value:
-                raise ValidationError({"link_value": "Leave empty when the banner has no link."})
+                raise ValidationError({"link_value": "Leave empty when the banner has no target."})
         elif self.link_type == BannerLinkType.URL:
             if not value.startswith("https://"):
                 raise ValidationError({"link_value": "Enter an https:// URL."})

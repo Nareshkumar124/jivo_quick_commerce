@@ -23324,6 +23324,7 @@ components:
       - collection
       - product
       - url
+      - referral
       - none
       type: string
       description: |-
@@ -23331,6 +23332,7 @@ components:
         * `collection` - Collection page whose slug is link_value
         * `product` - Product detail whose slug is link_value
         * `url` - External https URL in link_value (open in the browser)
+        * `referral` - Opens the app's Refer & earn screen; link_value empty
         * `none` - Not tappable
     Bill:
       type: object
@@ -24794,7 +24796,8 @@ components:
         link_value:
           type: string
           description: 'category/collection/product: the target''s slug. url: an absolute
-            https URL. none: "". Ignore a banner whose target no longer opens (404).'
+            https URL. referral: "" (open the Refer & earn screen). none: "". Ignore
+            a banner whose target no longer opens (404).'
       required:
       - id
       - image

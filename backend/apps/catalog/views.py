@@ -132,7 +132,7 @@ class HomeView(APIView):
         user = request.user if request.user.is_authenticated else None
         data = {
             "store": store_status(store).as_dict(),
-            **body,
+            **services.banners_for_audience(body, user),
             "buy_again": services.buy_again(store, user),
         }
         return Response(data)
