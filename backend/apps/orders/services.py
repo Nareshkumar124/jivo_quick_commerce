@@ -31,7 +31,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from apps.accounts.serializers import AddressSerializer
 from apps.cart import services as cart_services
 from apps.cart.choices import PaymentUnavailableReason
-from apps.cart.models import Cart, CartItem
+from apps.cart.models import Cart, CartItem, empty_instructions
 from apps.cms.models import AppConfig
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
@@ -539,12 +539,14 @@ def _order_items(order: Order, lines) -> list[OrderItem]:
 
 def _clear_ordered_lines(cart: Cart, order: Order) -> None:
     """T2/T3 "cart cleared" (PM decision): remove the lines that were ordered, keep anything the
-    customer added since, and drop the coupon (it now belongs to the order)."""
+    customer added since, and drop the coupon (it now belongs to the order). The tip and the
+    delivery instructions/note also reset, so the next order starts fresh (user, 2026-11-14)."""
     ordered = order.items.values_list("variant_id", flat=True)
     CartItem.objects.filter(cart=cart, variant_id__in=ordered).delete()
-    if cart.coupon_id is not None:
-        cart.coupon = None
-        cart.save(update_fields=["coupon", "updated_at"])
+    cart.coupon = None
+    cart.tip = Decimal("0.00")
+    cart.instructions = empty_instructions()
+    cart.save(update_fields=["coupon", "tip", "instructions", "updated_at"])
 
 
 # --------------------------------------------------------------------------- payment capture
