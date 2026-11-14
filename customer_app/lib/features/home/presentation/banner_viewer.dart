@@ -30,6 +30,8 @@ class BannerViewer extends ConsumerStatefulWidget {
 class _BannerViewerState extends ConsumerState<BannerViewer> {
   final _transform = TransformationController();
   double _drag = 0;
+  bool _closing = false;
+  Offset _tapAt = Offset.zero;
 
   @override
   void dispose() {
@@ -38,6 +40,28 @@ class _BannerViewerState extends ConsumerState<BannerViewer> {
   }
 
   bool get _zoomed => _transform.value.getMaxScaleOnAxis() > 1.01;
+
+  void _resetDrag() {
+    if (_drag != 0) setState(() => _drag = 0);
+    _closing = false;
+  }
+
+  /// Double tap: zoom to 2.5x around the tapped point, or back to 1x.
+  void _toggleZoom() {
+    if (_zoomed) {
+      _transform.value = Matrix4.identity();
+      return;
+    }
+    const scale = 2.5;
+    _transform.value = Matrix4.identity()
+      ..translateByDouble(
+        -_tapAt.dx * (scale - 1),
+        -_tapAt.dy * (scale - 1),
+        0,
+        1,
+      )
+      ..scaleByDouble(scale, scale, 1, 1);
+  }
 
   void _open() {
     final link = widget.banner.link;
@@ -60,22 +84,36 @@ class _BannerViewerState extends ConsumerState<BannerViewer> {
         fit: StackFit.expand,
         children: [
           GestureDetector(
-            onVerticalDragUpdate: (d) {
-              if (!_zoomed) setState(() => _drag += d.delta.dy);
-            },
-            onVerticalDragEnd: (d) {
-              if (_drag > 120 || (d.primaryVelocity ?? 0) > 800) {
-                Navigator.of(context).maybePop();
-              } else {
-                setState(() => _drag = 0);
-              }
-            },
+            // Taps only. Swipe-down is read from the InteractiveViewer's own
+            // scale gestures, so no second recognizer fights pinch zoom.
+            behavior: HitTestBehavior.opaque,
+            onDoubleTapDown: (d) => _tapAt = d.localPosition,
+            onDoubleTap: _toggleZoom,
             child: Transform.translate(
               offset: Offset(0, _drag.clamp(0, 400).toDouble()),
               child: InteractiveViewer(
                 key: const Key('banner-viewer-zoom'),
                 transformationController: _transform,
+                minScale: 1,
                 maxScale: 5,
+                onInteractionStart: (d) {
+                  _closing = d.pointerCount == 1 && !_zoomed;
+                },
+                onInteractionUpdate: (d) {
+                  if (d.pointerCount > 1 || _zoomed) {
+                    _closing = false;
+                    _resetDrag();
+                  } else if (_closing) {
+                    setState(() => _drag += d.focalPointDelta.dy);
+                  }
+                },
+                onInteractionEnd: (d) {
+                  if (_closing &&
+                      (_drag > 120 || d.velocity.pixelsPerSecond.dy > 800)) {
+                    Navigator.of(context).maybePop();
+                  }
+                  _resetDrag();
+                },
                 child: Center(
                   child: Semantics(
                     image: true,

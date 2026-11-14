@@ -416,7 +416,7 @@ void main() {
       final app = TestApp(tokens: signedInTokens);
       await openAccount(app, tester);
 
-      expect(find.text('Refer & earn ₹90'), findsOneWidget);
+      expect(find.text('Invite a friend, you both get ₹90 off'), findsOneWidget);
       expect(find.text("Got a friend's code? Enter it here"), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('account-referral')));
@@ -429,7 +429,7 @@ void main() {
       final app = TestApp(tokens: signedInTokens);
       app.referral.hasOrders = true;
       await openAccount(app, tester);
-      expect(find.text('Refer & earn ₹90'), findsOneWidget);
+      expect(find.text('Invite a friend, you both get ₹90 off'), findsOneWidget);
       expect(find.byKey(const Key('referral-have-code')), findsNothing);
     });
 

@@ -520,6 +520,12 @@ abstract class AppLocalizations {
   /// **'Refer a friend'**
   String get referAFriend;
 
+  /// No description provided for @referralStripGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite friends and earn rewards'**
+  String get referralStripGeneric;
+
   /// Subtitle of the account referral row for a new customer who can still enter a code.
   ///
   /// In en, this message translates to:
