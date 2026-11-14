@@ -352,7 +352,11 @@ class _MapUnavailableState extends ConsumerState<_MapUnavailable> {
                 onPressed: () => widget.fromAddressForm
                     ? context.pop()
                     : context.pushReplacement(Routes.newAddress),
-                child: Text(l10n.enterAddressManually),
+                child: Text(
+                  widget.fromAddressForm
+                      ? l10n.mapBackToForm
+                      : l10n.enterAddressManually,
+                ),
               ),
             ),
           ],

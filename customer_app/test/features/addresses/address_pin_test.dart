@@ -230,4 +230,100 @@ void main() {
       isNotNull,
     );
   });
+
+  testWidgets('the fallback "Back to the form" returns to the same form, no '
+      'second one', (tester) async {
+    final app = TestApp(
+      tokens: signedInTokens,
+      mapsAvailable: true,
+      extraOverrides: [
+        pinMapBuilderProvider.overrideWithValue(
+          ({
+            required initial,
+            required onCreated,
+            required onCameraIdle,
+            required onError,
+          }) => Builder(
+            builder: (context) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => onError(1, 'auth'),
+              );
+              return const SizedBox();
+            },
+          ),
+        ),
+      ],
+    );
+    await openNewAddress(tester, app);
+    await tester.enterText(find.byKey(const Key('address-house')), '12');
+    await tester.tap(find.byKey(const Key('address-set-on-map')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('map-unavailable')), findsOneWidget);
+    await tester.tap(find.text('Back to the form'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('map-unavailable')), findsNothing);
+    expect(find.byKey(const Key('address-house')), findsOneWidget);
+    expect(
+      fieldText(tester, 'house'),
+      '12',
+      reason: 'same form, not a new one',
+    );
+  });
+
+  testWidgets('serviceability line, prefill note, adjust keeps typed values, '
+      'and discard asks', (tester) async {
+    final app = TestApp(
+      tokens: signedInTokens,
+      mapsAvailable: true,
+      extraOverrides: [pinMapBuilderProvider.overrideWithValue(fakeMap())],
+    );
+    app.geocoder.parts = const AddressParts(
+      line: 'Connaught Place, New Delhi',
+      area: 'Connaught Place',
+      city: 'New Delhi',
+      state: 'Delhi',
+      pincode: '110001',
+    );
+    await openNewAddress(tester, app);
+    await tester.tap(find.byKey(const Key('address-set-on-map')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm location'));
+    await tester.pumpAndSettle();
+    expect(find.text('We deliver here.'), findsOneWidget);
+    expect(find.byKey(const Key('address-prefill-note')), findsOneWidget);
+
+    // Typing over a prefilled field removes it from the note's concern.
+    await tester.enterText(find.byKey(const Key('address-city')), 'Gurgaon');
+    app.geocoder.parts = const AddressParts(
+      line: 'Elsewhere',
+      area: 'Khan Market',
+      city: 'Delhi City',
+      state: 'Delhi',
+      pincode: '110003',
+    );
+    await tester.tap(find.byKey(const Key('address-adjust-pin')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm location'));
+    await tester.pumpAndSettle();
+    expect(fieldText(tester, 'city'), 'Gurgaon');
+    expect(fieldText(tester, 'area'), 'Khan Market');
+    expect(fieldText(tester, 'pincode'), '110003');
+
+    // Not serviceable: the line says so, Save is still possible.
+    app.serviceability.radiusMeters = 1;
+    app.geocoder.address = 'Far away';
+    await tester.tap(find.byKey(const Key('address-adjust-pin')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm location'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('address-house')), '9');
+    final nav = tester.state<NavigatorState>(find.byType(Navigator).first);
+    await nav.maybePop();
+    await tester.pumpAndSettle();
+    expect(find.text('Discard this address?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('address-house')), findsOneWidget);
+  });
 }

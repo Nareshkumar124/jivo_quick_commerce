@@ -61,6 +61,8 @@ class AddressFormState {
     this.locationFailure,
     this.saving = false,
     this.error,
+    this.checking = false,
+    this.serviceability,
   });
 
   /// The address's pin (`03 §2.4`: required). Editing keeps the saved one
@@ -79,6 +81,11 @@ class AddressFormState {
   final bool saving;
   final Object? error;
 
+  /// The server's serviceability answer for [point] (CA-07 §6); null while
+  /// unknown or when the check failed.
+  final Serviceability? serviceability;
+  final bool checking;
+
   AddressFormState copyWith({
     GeoPoint? point,
     String? pinLine,
@@ -90,6 +97,9 @@ class AddressFormState {
     bool? saving,
     Object? error,
     bool clearError = false,
+    bool? checking,
+    Serviceability? serviceability,
+    bool clearServiceability = false,
   }) => AddressFormState(
     point: point ?? this.point,
     pinLine: clearPinLine ? null : (pinLine ?? this.pinLine),
@@ -100,6 +110,10 @@ class AddressFormState {
         : (locationFailure ?? this.locationFailure),
     saving: saving ?? this.saving,
     error: clearError ? null : (error ?? this.error),
+    checking: checking ?? this.checking,
+    serviceability: clearServiceability
+        ? null
+        : (serviceability ?? this.serviceability),
   );
 }
 
@@ -118,8 +132,10 @@ class AddressFormController extends Notifier<AddressFormState> {
         point: (lat: existing.input.lat, lng: existing.input.lng),
         pinLine: existing.summary,
       );
+      unawaited(_check(state.point!));
     } else if (initial != null) {
       state = AddressFormState(point: initial.point, pinLine: initial.subtitle);
+      unawaited(_check(initial.point));
       unawaited(_lookUp(initial.point));
     }
   }
@@ -132,7 +148,26 @@ class AddressFormController extends Notifier<AddressFormState> {
       clearPinLine: line == null,
       clearFailure: true,
     );
+    unawaited(_check(point));
     await _lookUp(point);
+  }
+
+  /// Asks the server whether it delivers to [point]; information only, it
+  /// never blocks Save. A failed check shows nothing.
+  Future<void> _check(GeoPoint point) async {
+    state = state.copyWith(checking: true, clearServiceability: true);
+    Serviceability? result;
+    try {
+      result = await ref.read(serviceabilityRepositoryProvider).check(point);
+    } catch (_) {
+      result = null;
+    }
+    if (!ref.mounted || state.point != point) return;
+    state = state.copyWith(
+      checking: false,
+      serviceability: result,
+      clearServiceability: result == null,
+    );
   }
 
   /// Address parts for prefilling, only where a map (and so the geocoder's
@@ -157,6 +192,7 @@ class AddressFormController extends Notifier<AddressFormState> {
       final point = await ref.read(deviceLocationProvider).current();
       if (!ref.mounted) return;
       state = state.copyWith(point: point, locating: false, clearPinLine: true);
+      unawaited(_check(point));
       await _lookUp(point);
     } on LocationException catch (e) {
       if (ref.mounted) {
