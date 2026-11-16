@@ -408,8 +408,17 @@ def test_p6_tc19_rider_socket_access():
         assert c1 is None and m1 and m1[0]["type"] == "auth.ok", (c1, m1)
     else:
         assert c1 == 4403, (c1, me.status_code)
-    assert (c2, m2) == (4403, []), (c2, m2)
+    # DL-74 (main 069a8d8): a customer-app token on the rider socket first gets an `error` with code
+    # WRONG_APP_TOKEN (the REST `details.reason`), then the close 4403
+    assert c2 == 4403 and len(m2) == 1, (c2, m2)
+    assert m2[0]["type"] == "error" and m2[0]["data"]["code"] == "WRONG_APP_TOKEN", m2
+    assert m2[0]["data"].get("message"), m2
     assert (c3, m3) == (4403, []), (c3, m3)
+    # DL-74 REST: the same customer-app token on the rider API -> 403 PERMISSION_DENIED, WRONG_APP_TOKEN
+    rest = httpx.get(f"{ORIGIN}/api/v1/rider/me/", headers={**APP_HEADERS, **bearer(r1_customer.access)})
+    assert rest.status_code == 403, rest.text
+    err = rest.json()["error"]
+    assert err["code"] == "PERMISSION_DENIED" and err["details"]["reason"] == "WRONG_APP_TOKEN", err
 
 
 @pytest.mark.skip(reason="P6-TC-20 needs a spare QA rider and the `wsrecheck` profile (stage 2)")

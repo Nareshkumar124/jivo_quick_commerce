@@ -258,7 +258,7 @@ def shop_factory(api, make_address):
 # 60/min, anonymous API 300/min). The functional suites send far more than that from one IP, so the
 # history of those scopes is cleared before each test (QA Redis DB only). The limits themselves are
 # checked by dedicated cases (P2-TC-19, P2-TC-52 in tests/test_p2_main.py, marked `keep_throttles`).
-_PER_TEST_SCOPES = ("serviceability", "search", "anon", "user", "address_write")
+_PER_TEST_SCOPES = ("serviceability", "search", "anon", "user", "address_write", "coupon_apply")  # run 3: + coupon_apply (20/hour)
 
 
 @pytest.fixture(autouse=True)

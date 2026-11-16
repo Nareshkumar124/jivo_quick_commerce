@@ -1,6 +1,6 @@
 # 10: Release Readiness Report
 
-**Latest verdicts:** "Run 2 on main (2026-11-16, after the DL-76 migrations)" at the end of this file. Earlier sections are kept as history.
+**Latest verdicts:** "Run 3 on main (2026-11-16, `b6736cf`)" at the end of this file. Earlier sections are kept as history.
 
 **Date:** 2026-11-02 (QA run 1) · **Build:** backend commit `4960527` (released P0+P1). The apps were statically reviewed at the same commit · **Gate rules:** `docs/10-testing-strategy.md` §5.2.
 
@@ -394,3 +394,37 @@ Backend code for delivery, realtime and orders is unchanged on develop `3f6fc42`
 | **7** | **Not ready on main** | Device TC-37–39; full suite on main not completed |
 
 **Still owed on main (needs a relaunch when memory allows, PM's call):** the P3–P7 suites and the 🔥 smoke set. Suggestion: one phase per run, with `QA_WORKER_CONCURRENCY=4`, and output written straight to the file (no pipe) so a stop keeps the partial result.
+
+
+## Run 3 on main (2026-11-16, main `b6736cf`, QA worktree `m-qa`)
+**Environment:** QA instance `127.0.0.1:8004` run in place from the worktree (`qa/tools/instance.sh start local`), Redis `127.0.0.1:6380` DBs 5/6/7, MinIO :9000, shared remote DB (read-only SQL from QA; `support 0004` applied per DL-77). One pytest process at a time, `QA_WORKER_CONCURRENCY=4`, output written straight to `qa/private/runs/m3-*.txt`. Port 8001 and jqc.jivo.in were never touched. :8004 and the QA worker were stopped at the end. Run cut short at the coordinator's request (finish fast): P6/P7 full suites and the smoke set were **not run this round**.
+
+| Run | Command (from `qa/`) | Result |
+|---|---|---|
+| New cases + BUG-0025 | `QA_EXTRA_ENV="DISPATCH_RETRY_SECONDS=300 DISPATCH_TIMEOUT_SECONDS=900 COD_QR_EXPIRY_SECONDS=20 RIDER_CUSTOMER_PII_SECONDS=30" uv run pytest tests/test_m3_followups.py tests/test_p5_main.py -k "tc133 or tc41 or tc92c"` | P7-TC-41 ✅, P5-TC-92c ✅ (BUG-0025 Verified); P5-TC-133 failed on a test assumption (fixture address has no receiver name), fixed, rerun **1 passed** |
+| BUG-0023 / 0024, DL-74 | `uv run pytest tests/test_p5_stage4.py tests/test_p5_stage4b.py tests/test_p6_ws.py -k "tc42 or tc117 or tc19_rider"` | **5 passed**: TC-42 (1 accepted, 9 × 409 OFFER_EXPIRED), TC-42b (409 OFFER_EXPIRED), TC-117 (all 8 roles per DL-61 a), P6-TC-19 (socket `error` WRONG_APP_TOKEN then 4403; REST 403 `details.reason` WRONG_APP_TOKEN) |
+| P3 | `uv run pytest tests/test_p3_*.py` (8 files) | 65 passed, 2 failed, 7 skipped → both failures test-side (TC-31 P3-era oracle superseded by 08 T11; TC-45 `coupon_apply` 20/h throttle not reset between tests), fixed; rerun with the 4 refund-ordering cases (worker stopped): **6 passed, 1 skipped**. Net **P3: 0 failed**; skipped: refundwindow profile, QA_SLOW TC-47, one data-state case |
+| P4 | `uv run pytest tests/test_p4_*.py` (6 files) | 69 passed, 1 failed, 10 skipped → TC-36 relied on a worker started by a later test (test order), fixed; rerun **1 passed**. Net **P4: 0 failed**; skipped: gwdown/cancelplaced profiles, 4 console stubs, 2 moved cases, 1 data-state |
+| P5 batch 1 | `uv run pytest tests/test_p5_{cash,db,dispatch,final,kyc,ops,security,shift,task_flow}.py` | 200 passed, 6 failed, 19 skipped, 1 xfailed (63 min). TC-106/107/108: stale oracles after DL-74/T-219 and R2's own ids in the sweep → tests updated; TC-24/59/67: no offer in 25 s because a stale QA order (1001) re-searching since 10:47 took the riders (OBS-M-07) → cancelled; rerun **11 passed + 8 passed**. Net **0 failed**. Skips: KYC cases (riders already ACTIVE), riderclock profile |
+| P5 batch 2 | `uv run pytest tests/test_p5_stage4.py tests/test_p5_stage4b.py tests/test_p5_stage4_profiles.py` | 14 passed, **3 failed**, 5 skipped. Not product defects as far as QA can tell, but **not re-run** (coordinator stop): TC-110 and TC-103 need a PENDING_KYC spare rider (now ACTIVE, OBS-M-09); TC-58 p95 9.91 s from a polluted day of history (OBS-M-06) |
+| P6, P7 full suites, 🔥 smoke | — | **Not run this round** |
+| Logs | instance logs | No product 500 seen in the targeted runs (not exhaustively scanned this round) |
+
+**QA suite changes (no product code):** guards removed for BUG-0023/0024/0025; P6-TC-19 extended for DL-74; P2-TC-57 oracle = Super Admin + Ops; P3-TC-31 oracle per 08 T11; `coupon_apply` scope reset per test; P4-TC-36 starts its worker; P5-TC-106/107/108 oracles per DL-74; **QA worker detection fixed** (`p4_support._qa_worker_pids` missed the `m-qa` worktree, so each session leaked a worker); new `tests/test_m3_followups.py` (P5-TC-133, P7-TC-41).
+
+**Bugs:** BUG-0023, 0024, 0025 **Verified**. **Open: none** (P0 0 · P1 0 · P2 0 · P3 0). No new bug.
+
+| Phase | Verdict (run 3) | Why |
+|---|---|---|
+| **0** | **Not ready (gate incomplete)** | Unchanged: TC-21/22 (Flutter build, generated client), TC-23 (CI evidence). Not re-run this round |
+| **1** | **Not ready (gate incomplete)** | Unchanged: 13 device cases, TC-61/62, TC-67, TC-46. Not re-run this round |
+| **2** | **Not ready (gate incomplete)** | TC-57 now ✅ against the PM default (run-2 evidence). Remaining: device TC-58–62, TC-56 not automated, TC-38 image fetch on staging, TC-55 tier data. Not re-run this round |
+| **3** | **Not ready (gate incomplete)** | Suites re-pass on main (0 failed after test fixes); no open bug. Remaining for §5.2: the 🔥 smoke set on the gated build (not run this round), CI evidence, staging/sign-off steps |
+| **4** | **Not ready** | Suites re-pass on main (0 failed). Device cases TC-51–54, 56, 58 (four P0) ⬜; TC-16/17/57 still need a DELIVERED order with an invoice host; smoke not run this round |
+| **5** | **Not ready** | All three P5 bugs Verified; batch 1 fully passes after test-data/oracle fixes; new TC-133 ✅. Not passed: TC-58, TC-103, TC-110 (inconclusive, test data, not re-run); device TC-19, 33, 124, 131; TC-77 (GTK); smoke not run |
+| **6** | **Not ready (gate incomplete)** | P6-TC-19 ✅ with DL-74. Full P6 suite not run this round; device TC-17, 57; TC-44, 45, 54 |
+| **7** | **Not ready (gate incomplete)** | P7-TC-41 ✅ (photos on create). Full P7 suite not run this round; device TC-37–39 |
+
+**Device cases still owed (PM, phone):** P1-TC-80…92 (13); P2-TC-58–62 (5); P4-TC-51–54, 56, 58 (6); P5-TC-19, 33, 124, 131 (4); P6-TC-17, 57 (2); P7-TC-37–39 (3). Also P0-TC-21/22 (Flutter build and generated client). New app-side checks worth adding to the phone run: rider app sign-out on WRONG_APP_TOKEN (DL-74) and customer ticket photos on create.
+
+**Still owed on main:** P6 and P7 full suites, the 🔥 smoke set, P5-TC-58/103/110 with clean data, profile-only cases.

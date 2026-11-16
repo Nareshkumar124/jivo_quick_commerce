@@ -243,8 +243,8 @@ def test_p3_tc30_list_and_filters(shop_a):
 
 
 def test_p3_tc31_cancel_rules(shop_a):
-    """P3-TC-31 Cancel needs a known reason (400 otherwise); a COD PLACED order cannot be
-    cancelled by the customer in P3 (409 {status: PLACED})."""
+    """P3-TC-31 Cancel needs a known reason (400 otherwise); a COD PLACED order is
+    cancellable by the customer since P4 (08 T11, §7; the P3-era 409 is superseded)."""
     shop_a.fill({V_SUN_1L: 1}, address_id=shop_a.address["id"])
     oid = shop_a.place("ONLINE", address_id=shop_a.address["id"]).json()["order"]["id"]
     r = shop_a.api.post(f"{ORDERS}{oid}/cancel/", json={"reason": "BOGUS"}, headers=shop_a.h)
@@ -255,6 +255,6 @@ def test_p3_tc31_cancel_rules(shop_a):
         "select id from orders_order where user_id=%s and status='PLACED' and payment_method='COD' limit 1",
         (shop_a.session.user["id"],),
     )
-    if cod:
-        err = assert_error(shop_a.cancel(cod[0][0]), 409, "INVALID_STATE_TRANSITION")
-        assert err["details"] == {"status": "PLACED"}
+    if cod:  # run 3 (main): the P3-only 409 is superseded by 08 T11 / §7 (P4): PLACED COD is cancellable
+        r = shop_a.cancel(cod[0][0])
+        assert r.status_code == 200 and r.json()["status"] == "CANCELLED", describe(r)

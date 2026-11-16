@@ -211,13 +211,14 @@ def test_p2_tc55_min_qty_and_price_tiers_on_tiles(api):
 
 
 LEADS = "/admin/stores/serviceabilityrequest/"
-# PM default (2026-11-16) until Jivo decides; 05 §3 has no row for the notify-me leads screen.
-LEADS_ROLES = {"Super Admin", "Ops / Dispatch", "Store Manager"}
+# PM default (2026-11-16, revised in run 3): Super Admin and Ops only (the current code), until
+# Jivo decides; 05 §3 has no row for the notify-me leads screen (OBS-M-04).
+LEADS_ROLES = {"Super Admin", "Ops / Dispatch"}
 
 
 def test_p2_tc57_leads_screen_roles(staff):
     """P2-TC-57 Notify-me leads (05 §2 "Serviceability requests"): the list opens (200) for the PM
-    default roles Super Admin, Ops and Store Manager, and is refused (403) for the others; nobody
+    default roles Super Admin and Ops, and is refused (403) for the others; nobody
     can add a lead through the admin (leads come from the app)."""
     wrong = []
     for role, c in staff.items():

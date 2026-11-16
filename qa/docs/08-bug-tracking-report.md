@@ -1,6 +1,6 @@
 # 08: Bug Tracking Report
 
-**Updated:** 2026-11-16 (QA on main `f6ed556`, worktree `qa/main`). The table below is the **current status of every bug**, synced with the files in `qa/bugs/` (the file is the authority). The sections after it are the history of each QA run, kept as they were written; their "Open" statuses are historical.
+**Updated:** 2026-11-16 run 3 (QA on main `b6736cf`, worktree `m-qa`; earlier today `f6ed556`). The table below is the **current status of every bug**, synced with the files in `qa/bugs/` (the file is the authority). The sections after it are the history of each QA run, kept as they were written; their "Open" statuses are historical.
 
 Severity uses `docs/10-testing-strategy.md` §5.3, with the brief's equivalent in brackets: P0 Blocker = Critical · P1 Critical = High · P2 Major = Medium · P3/P4 = Low. Security bugs keep their exploit detail in `qa/private/` (gitignored) until fixed.
 
@@ -23,13 +23,23 @@ Severity uses `docs/10-testing-strategy.md` §5.3, with the brief's equivalent i
 | [BUG-0020](../bugs/BUG-0020.md) | Oversized socket message → 1011 instead of 1009 on daphne | backend: realtime consumers | P3 Minor (Low) | P2 | django-backend-dev | **Verified (2026-11-16, main `f6ed556`)** | P6-TC-50 |
 | [BUG-0021](../bugs/BUG-0021.md) | T9 pickup sends no `order.status` OUT_FOR_DELIVERY on the sockets | backend: delivery / order events | P2 Major (Medium) | P1 | django-backend-dev | Verified (stage 4, `f8db671`) | P6-TC-59, 14 |
 | [BUG-0022](../bugs/BUG-0022.md) | `rider.location` heading always null | backend: rider location | P3 Minor (Low) | P3 | django-backend-dev | Verified (stage 4, `f8db671`) | P6-TC-14, 34 |
-| [BUG-0023](../bugs/BUG-0023.md) | Late accept after a processed expiry answers `OFFER_TAKEN` instead of `OFFER_EXPIRED` | backend: dispatch | P3 Minor (Low) | P3 | django-backend-dev | Open (fix in progress, PM 2026-11-16; not re-tested) | P5-TC-42, 42b |
-| [BUG-0024](../bugs/BUG-0024.md) | Store Manager gets 403 on "Change cash limit" for own store's riders | admin panel: Riders | P2 Major (Medium) | P2 | admin-panel-dev | Open (fix in progress, PM 2026-11-16; not re-tested) | P5-TC-117 |
-| [BUG-0025](../bugs/BUG-0025.md) | A payment on an expired, unreplaced COD UPI QR marks it PAID instead of being refunded | backend: COD UPI QR (`record_credit`) | P3 Minor (Low) | P3 | django-backend-dev | **Open (new, 2026-11-16 run 2)** | P5-TC-92c |
+| [BUG-0023](../bugs/BUG-0023.md) | Late accept after a processed expiry answers `OFFER_TAKEN` instead of `OFFER_EXPIRED` | backend: dispatch | P3 Minor (Low) | P3 | django-backend-dev | **Verified (2026-11-16 run 3, main `b6736cf`; fix `d1534af`)** | P5-TC-42, 42b |
+| [BUG-0024](../bugs/BUG-0024.md) | Store Manager gets 403 on "Change cash limit" for own store's riders | admin panel: Riders | P2 Major (Medium) | P2 | admin-panel-dev | **Verified (2026-11-16 run 3, main `b6736cf`; fix `6f79549`)** | P5-TC-117 |
+| [BUG-0025](../bugs/BUG-0025.md) | A payment on an expired, unreplaced COD UPI QR marks it PAID instead of being refunded | backend: COD UPI QR (`record_credit`) | P3 Minor (Low) | P3 | django-backend-dev | **Verified (2026-11-16 run 3, main `b6736cf`; fix `7adbb2d`)** | P5-TC-92c |
 
 BUG-0014 to BUG-0019 were never assigned.
 
-**Open by severity (2026-11-16, after run 2):** P0 0 · P1 0 · P2 1 (BUG-0024) · P3 2 (BUG-0023, **BUG-0025**). **Verified today:** BUG-0013, BUG-0020. **New today:** BUG-0025 (run 2, after the DL-76 migrations).
+**Open by severity (2026-11-16, after run 3):** P0 0 · P1 0 · P2 0 · P3 0. **No bug is open.** **Verified today:** BUG-0013, BUG-0020 (run 1); BUG-0023, BUG-0024, BUG-0025 (run 3). **New today:** BUG-0025 (run 2). Run 3 found no new product bug.
+
+## Run 3 on main (2026-11-16, `b6736cf`)
+BUG-0023, BUG-0024 and BUG-0025 **Verified** (evidence in each bug file). No new product bug. Observations:
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| OBS-M-06 | P5-TC-58 (dispatch latency from today's history) gave p95 9.91 s (n=143), above 3 s. | Today's history mixes the 300 s retry profile, QA workers leaked by a QA helper defect (fixed: the worker detection pattern missed the `m-qa` worktree path, so each session started another worker, some with short-timer env) and a stale QA order (1001) re-searching since 10:47. Not attributable to the product; re-measure on a clean day. |
+| OBS-M-07 | A QA order left ACCEPTED at QA-02 (1001, from an interrupted earlier run) kept its task SEARCHING all day and took R2's offer in P5-TC-24. | Test-data hygiene; cancelled through the customer API, TC-24 then passed. Order 1076 (store 1, PACKING, QA user A) is still open and needs ops cleanup (PM). |
+| OBS-M-08 | 06 §3 repeats the "Customer PII window" bullet twice (lines 361–362, near-identical). | Doc nit for django-backend-dev; behaviour matches (P5-TC-133 ✅). |
+| OBS-M-09 | P5-TC-103 and TC-110 need a PENDING_KYC spare rider; the spares are now ACTIVE. | Test data; needs a fresh QA number approved by the PM. |
 
 ## QA on main (2026-11-16, `f6ed556`)
 Run 1 found no new bug, one environment blocker and two observations. Run 2 (after the DL-76 migrations) turned OBS-M-03 into BUG-0025:
