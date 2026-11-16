@@ -26,6 +26,14 @@ from apps.ops_console.dates import DISPLAY_TZ
 
 # Marks refusals made by the Ops Console, so ops.js can tell them from other 403s (CSRF).
 REFUSAL_HEADER = "X-Ops-Refused"
+# BUG-0006: ops.js sends this on automatic htmx refreshes (timed polls, live-feed and
+# post-action refreshes), which are not user activity for the 2-hour staff idle timeout.
+BACKGROUND_HEADER = "X-Ops-Background"
+
+
+def is_background(request) -> bool:
+    """An automatic refresh, not a user action (it must not extend an idle session)."""
+    return is_htmx(request) and request.headers.get(BACKGROUND_HEADER) == "1"
 
 
 def is_htmx(request) -> bool:

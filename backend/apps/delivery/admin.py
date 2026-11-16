@@ -268,19 +268,26 @@ class RiderAdmin(ScopedObjectMixin, ReadOnlyMixin, ModelAdmin):
         return kyc.can_review(request.user)
 
     def has_cash_limit_permission(self, request, object_id=None) -> bool:
-        """DL-61 (a): Super Admin, Ops, Store Manager (own store riders; the queryset scopes).
-        SLICE 5.4: `kyc.set_cash_limit` moves from `review_rider` to `dispatch_order`
-        (`kyc.OPS_DELIVERY`); until that merge the button follows the review permission."""
-        ops_perm = getattr(kyc, "OPS_DELIVERY", None)
-        if ops_perm is None:
-            return kyc.can_review(request.user)
+        """DL-61 (a): Super Admin, Ops, Store Manager (own store riders; `_ops_rider` scopes),
+        the same rule as `kyc.set_cash_limit` (`kyc.OPS_DELIVERY`)."""
         user = request.user
-        return bool(user.is_active and user.is_staff and user.has_perm(ops_perm))
+        return bool(user.is_active and user.is_staff and user.has_perm(kyc.OPS_DELIVERY))
 
     def _rider(self, request, object_id) -> Rider:
+        """A rider for the KYC review actions (`delivery.review_rider`), home or preferred
+        store in the user's stores."""
         if not kyc.can_review(request.user):
             raise PermissionDenied
         return get_object_or_404(self.get_queryset(request), pk=unquote(object_id))
+
+    def _ops_rider(self, request, object_id) -> Rider:
+        """A rider for the ops delivery actions (DL-61 (a), BUG-0024): `kyc.OPS_DELIVERY`, and
+        only riders whose HOME store is one of the user's stores (the service's own scope);
+        any other id is a 404."""
+        if not self.has_cash_limit_permission(request):
+            raise PermissionDenied
+        riders = self.get_queryset(request).filter(home_store__in=stores_for(request.user))
+        return get_object_or_404(riders, pk=unquote(object_id))
 
     def _run(self, request, rider, call, success: str):
         try:
@@ -412,7 +419,7 @@ class RiderAdmin(ScopedObjectMixin, ReadOnlyMixin, ModelAdmin):
 
     @action(description="Change cash limit", url_path="cash-limit", permissions=["cash_limit"])
     def change_cash_limit(self, request, object_id):
-        rider = self._rider(request, object_id)
+        rider = self._ops_rider(request, object_id)
         form = CashLimitForm(request.POST or None)
         if request.method == "POST" and form.is_valid():
             return self._run(

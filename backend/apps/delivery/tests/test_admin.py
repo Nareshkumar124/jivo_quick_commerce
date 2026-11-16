@@ -193,3 +193,67 @@ def test_shifts_and_locations_are_read_only_and_scoped(client, world):
     client.force_login(staff_in_role(roles.OPS))  # no location permission
     url = reverse("admin:delivery_riderlocation_change", args=[location.pk])
     assert client.get(url).status_code == 403
+
+
+# --------------------------------------------------------------------------- BUG-0024 cash limit
+
+# DL-61 (a): Super Admin and Ops for every rider, Store Manager for their own store's riders.
+CASH_LIMIT_ROLES = frozenset({*_SA, roles.OPS, roles.STORE_MANAGER})
+
+
+@pytest.fixture
+def home_riders():
+    own = DarkStoreFactory(code="GGN-02")
+    other = DarkStoreFactory(code="NOI-19")
+    return {
+        "own": own,
+        "other": other,
+        "rider": RiderFactory(home_store=own, preferred_store=own),
+        "foreign": RiderFactory(home_store=other, preferred_store=other),
+        # Preferred store is the manager's, home store is not: the ops actions follow the home
+        # store (DL-61), so this one is out of scope for the cash limit.
+        "preferred_only": RiderFactory(home_store=other, preferred_store=own),
+    }
+
+
+@pytest.mark.parametrize("principal", PRINCIPALS)
+def test_cash_limit_matrix(client, home_riders, principal):
+    """BUG-0024 / P5-TC-117: the cash-limit form opens for every DL-61 (a) role."""
+    login_with_stores(client, principal, home_riders["own"])
+    url = reverse("admin:delivery_rider_change_cash_limit", args=[home_riders["rider"].pk])
+    assert client.get(url).status_code == expected(principal, CASH_LIMIT_ROLES), principal
+
+
+def test_store_manager_changes_own_store_rider_cash_limit(client, home_riders):
+    staff = login_with_stores(client, roles.STORE_MANAGER, home_riders["own"])
+    rider = home_riders["rider"]
+    url = reverse("admin:delivery_rider_change_cash_limit", args=[rider.pk])
+    response = client.post(url, {"amount": "4500.00"})
+    assert response.status_code == 302
+    rider.refresh_from_db()
+    assert str(rider.cash_limit) == "4500.00"
+    entry = AuditLog.objects.filter(
+        actor=staff, action="rider.cash_limit", object_id=str(rider.pk)
+    ).latest("id")
+    assert entry.ip == "127.0.0.1"
+
+
+@pytest.mark.parametrize("key", ["foreign", "preferred_only"])
+def test_store_manager_cannot_change_another_store_rider_cash_limit(client, home_riders, key):
+    """IDOR: a rider whose home store is not the manager's is a 404, GET and POST alike."""
+    login_with_stores(client, roles.STORE_MANAGER, home_riders["own"])
+    rider = home_riders[key]
+    before = rider.cash_limit
+    url = reverse("admin:delivery_rider_change_cash_limit", args=[rider.pk])
+    assert client.get(url).status_code == 404
+    assert client.post(url, {"amount": "1.00"}).status_code == 404
+    rider.refresh_from_db()
+    assert rider.cash_limit == before
+
+
+def test_store_manager_still_cannot_use_review_actions(client, home_riders):
+    login_with_stores(client, roles.STORE_MANAGER, home_riders["own"])
+    rider = home_riders["rider"]
+    for name in ("approve", "suspend", "change_home_store"):
+        url = reverse(f"admin:delivery_rider_{name}", args=[rider.pk])
+        assert client.get(url).status_code == 403, name

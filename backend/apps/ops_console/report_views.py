@@ -8,8 +8,10 @@ All data comes from the backend's `apps.reports.services` (the 12 reports of bac
 error state on the page, a 400 with the message for a CSV download). Its rows are display
 strings already (money "249.00"); the panel never recomputes them.
 
-Access: staff only (`ops_view`), then the report's own permission. An unknown key is a 404, a
-report the role may not open a 403. The store filter offers only `stores_for(user)`.
+Access: staff with any report permission (`ops_view(capability=PRODUCT_REPORT)`, the "any
+report" capability, so the view layer refuses every other role before the service runs), then
+the report's own permission in the service. An unknown key is a 404, a report the role may not
+open a 403. The store filter offers only `stores_for(user)`.
 """
 
 import re
@@ -23,6 +25,7 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
+from apps.ops_console import capabilities
 from apps.ops_console.access import forbidden, is_htmx, ops_view
 from apps.ops_console.report_filters import Params, ReportFilterForm
 from apps.ops_console.views import ops_context
@@ -161,7 +164,7 @@ def _render(request, title, context, status=200):
 # --------------------------------------------------------------------------- index
 
 
-@ops_view()
+@ops_view(capability=capabilities.PRODUCT_REPORT)
 def index(request):
     visible = [
         {"slug": spec.key, "title": spec.title, "description": spec.description}
@@ -188,7 +191,7 @@ def _spec(user, slug):
     return None
 
 
-@ops_view()
+@ops_view(capability=capabilities.PRODUCT_REPORT)
 def report(request, slug: str):
     user = request.user
     spec = _spec(user, slug)
@@ -240,7 +243,7 @@ def _recent_exports(user, key):
 
 
 @require_POST
-@ops_view()
+@ops_view(capability=capabilities.PRODUCT_REPORT)
 def report_export(request, slug: str):
     """Queue the backend's async CSV export (Celery, private bucket)."""
     user = request.user
@@ -269,7 +272,7 @@ def report_export(request, slug: str):
     return redirect(target)
 
 
-@ops_view()
+@ops_view(capability=capabilities.PRODUCT_REPORT)
 def export_download(request, export_id: int):
     """The requester's own finished export, through a short-lived signed URL."""
     try:

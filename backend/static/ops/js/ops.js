@@ -94,6 +94,17 @@
 		htmx.config.historyCacheSize = 0;
 	}
 
+	// BUG-0006 (05 §5, 2 h idle for admin roles): automatic refreshes (timed polls, live-feed and
+	// post-action refreshes) are not user activity. They carry X-Ops-Background so the staff
+	// session policy can leave the idle clock alone (apps.ops_console.access.BACKGROUND_HEADER).
+	const BACKGROUND_EVENTS = { "ops:live": true, "ops:refresh": true };
+	document.addEventListener("htmx:configRequest", function (event) {
+		const trigger = event.detail.triggeringEvent;
+		if (!trigger || BACKGROUND_EVENTS[trigger.type]) {
+			event.detail.headers["X-Ops-Background"] = "1";
+		}
+	});
+
 	document.addEventListener("htmx:confirm", function (event) {
 		const question = event.detail.question;
 		if (!question || !window.Alpine) return; // no hx-confirm: proceed as normal
