@@ -37,7 +37,10 @@ CLOSE_CODES = {
         "Not signed in: the token is missing, invalid or expired (refresh it, then reconnect), "
         "or the staff session ended."
     ),
-    CLOSE_FORBIDDEN: "Signed in, but this socket is not for you (role, rider status).",
+    CLOSE_FORBIDDEN: (
+        "Signed in, but this socket is not for you (role, rider status, or a customer-app token "
+        "on the rider socket: an `error` message with code WRONG_APP_TOKEN comes first, DL-74)."
+    ),
     CLOSE_NOT_FOUND: "The order does not exist or is not yours.",
     CLOSE_AUTH_TIMEOUT: "No auth message in time.",
     CLOSE_TOO_MANY_SOCKETS: "Too many open sockets for this user: close one, then reconnect.",
@@ -441,7 +444,10 @@ DATA_COMPONENTS: dict[str, dict] = {
         expires_at=DT_NULL,
     ),
     "WsErrorData": _object(
-        "A non-fatal error about a client message (the socket stays open).",
+        (
+            "A non-fatal error about a client message (the socket stays open). Exception: "
+            "`WRONG_APP_TOKEN` on `/ws/v1/rider/` (DL-74) is sent just before the 4403 close."
+        ),
         code=STR,
         message=STR,
     ),

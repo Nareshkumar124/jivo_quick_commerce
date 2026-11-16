@@ -123,6 +123,16 @@ def test_minimum_order_blocker_is_fixed_by_adding_items():
     assert api.journey_failures == []
 
 
+def test_minimum_units_blocker_is_fixed_by_adding_units():
+    """MIN_UNITS_NOT_MET (store min_order_units), alone and together with MIN_ORDER_NOT_MET."""
+    from decimal import Decimal
+
+    for api in (FakeApi(min_units=6), FakeApi(min_units=6, min_order=Decimal("500.00"))):
+        s = session(api, online_share=0.0, cancel_share=0.0, seed=3)
+        assert s.buyer_journey() == "placed"
+        assert api.journey_failures == []
+
+
 def test_a_pending_order_is_cancelled_then_placement_retried():
     api = FakeApi(pending_order_once=True)
     s = session(api, online_share=0.0, cancel_share=0.0)

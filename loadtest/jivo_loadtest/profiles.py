@@ -90,6 +90,18 @@ PROFILES: dict[str, Profile] = {
         orders_per_min=6,
         measure_from_s=10,
     ),
+    "light": Profile(
+        name="light",
+        description=(
+            "DL-75 shared-staging run: 20 sessions for 5 minutes (4 buyers, 16 browsers, no "
+            "riders, 4 orders/min). Watch the other sites on the host and abort if they slow."
+        ),
+        stages=(Stage(300, 20, 1),),
+        buyers=4,
+        riders=0,
+        orders_per_min=4,
+        measure_from_s=30,
+    ),
     "ramp": Profile(
         name="ramp",
         description=(

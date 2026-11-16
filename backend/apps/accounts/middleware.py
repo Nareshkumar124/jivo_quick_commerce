@@ -12,7 +12,10 @@ Staff sign in to the admin and the Ops Console with a Django session (Jivo Auth 
   `STAFF_SESSION_IDLE_SECONDS` (2 h) without a request. Interpretation recorded in 05 §5.
 
 The session cookie's expiry follows the same limits, so the browser drops it too. Activity is
-written to the session at most once a minute. Expired sessions are flushed (`logout`) before the
+written to the session at most once a minute. Automatic Ops Console refreshes (htmx requests
+with `X-Ops-Background: 1`, sent by `ops.js` on timed polls and live refreshes) are not
+activity: they never move the idle clock, so an open Ops tab still goes idle after 2 h (the
+absolute 8 h applies as always). Expired sessions are flushed (`logout`) before the
 view runs, so the admin and the Ops Console send the user to the login page.
 """
 
@@ -27,6 +30,17 @@ from apps.accounts import roles
 LOGIN_AT_KEY = "_staff_login_at"
 LAST_SEEN_KEY = "_staff_last_seen"
 TOUCH_INTERVAL_SECONDS = 60
+# The same rule as `apps.ops_console.access.is_background` (kept here so accounts does not
+# depend on the Ops Console app).
+BACKGROUND_HEADER = "X-Ops-Background"
+
+
+def is_background(request) -> bool:
+    """An automatic Ops Console refresh, not a user action (BUG-0006)."""
+    return (
+        request.headers.get("HX-Request") == "true"
+        and request.headers.get(BACKGROUND_HEADER) == "1"
+    )
 
 
 def stamp_staff_login(sender, request, user, **kwargs) -> None:
@@ -79,6 +93,6 @@ def _enforce(request, user) -> None:
     if now >= _deadline(login_at, last_seen, idle=idle):
         logout(request)
         return
-    if idle and now - last_seen >= TOUCH_INTERVAL_SECONDS:
+    if idle and now - last_seen >= TOUCH_INTERVAL_SECONDS and not is_background(request):
         session[LAST_SEEN_KEY] = now
         _set_cookie_expiry(request, _deadline(login_at, now, idle=idle))

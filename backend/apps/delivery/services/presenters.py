@@ -173,9 +173,51 @@ def current_offer_body(offer, now) -> dict:
     return {"offer": offer_body(offer, task.order, task), "server_time": now}
 
 
+# 09 §3.2: blanked once the PII window is over. Area, city, state and pincode are the locality
+# the offer already showed; lat/lng are rounded to 2 decimals (about 1 km).
+_PII_ADDRESS_FIELDS = (
+    "custom_label",
+    "receiver_name",
+    "receiver_phone",
+    "house",
+    "building_street",
+    "landmark",
+)
+_TASK_ENDED = ("DELIVERED", "RETURNED", "CANCELLED")
+
+
+def customer_pii_visible(task, now=None) -> bool:
+    """09 §3.2: the rider sees the customer's name, phone and full address from accept (a task
+    body is only built for the assigned rider; offers carry the locality only) until
+    RIDER_CUSTOMER_PII_SECONDS after the task ended."""
+    if task.status not in _TASK_ENDED:
+        return True
+    if task.ended_at is None:
+        return False  # fail closed
+    now = now or timezone.now()
+    return now - task.ended_at < timedelta(seconds=settings.RIDER_CUSTOMER_PII_SECONDS)
+
+
+def rider_customer_address(task, now=None) -> dict:
+    """The drop address for the rider: in full inside the PII window, else the same shape (the
+    contract is unchanged) with the name, phone and street fields blank and the point coarse."""
+    snapshot = dict(task.order.address_snapshot or {})
+    if customer_pii_visible(task, now):
+        return snapshot
+    for field in _PII_ADDRESS_FIELDS:
+        if field in snapshot:
+            snapshot[field] = ""
+    for field in ("lat", "lng"):
+        value = snapshot.get(field)
+        if isinstance(value, int | float):
+            snapshot[field] = round(float(value), 2)
+    return snapshot
+
+
 def task_body(task) -> dict:
     """`RiderTask` (06 §3, api-requests #13). The full address and phone are revealed only
-    here, i.e. after accepting."""
+    here, i.e. after accepting, and only until RIDER_CUSTOMER_PII_SECONDS after the task ended
+    (09 §3.2, `rider_customer_address`)."""
     from apps.delivery.services.tasks import (
         not_reachable_after,
         otp_attempts_remaining,
@@ -218,10 +260,11 @@ def task_body(task) -> dict:
             "lat": store.location.y,
             "lng": store.location.x,
         },
-        "customer_address": order.address_snapshot,
+        "customer_address": rider_customer_address(task),
         "instructions": {
             "chips": list(instructions.get("chips", [])),
-            "note": instructions.get("note", ""),
+            # Free text the customer wrote (may hold a phone or flat number): same window.
+            "note": instructions.get("note", "") if customer_pii_visible(task) else "",
         },
         "items": items,
         "item_count": sum(item["quantity"] for item in items),

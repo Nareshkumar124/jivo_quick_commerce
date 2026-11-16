@@ -387,10 +387,12 @@ def accept_offer(user, offer_id: int, now=None) -> DeliveryTask:
         rider = Rider.objects.select_for_update().get(pk=rider.pk)
         if offer.status == OfferStatus.ACCEPTED and task.rider_id == rider.pk:
             return task
-        if offer.status == OfferStatus.WITHDRAWN or task.status != TS.OFFERED:
-            raise ApiError(ErrorCode.OFFER_TAKEN)
-        if offer.status != OfferStatus.PENDING:
+        # The offer's own status first (BUG-0023): an expiry already processed (task back to
+        # SEARCHING or UNASSIGNED, nobody else offered yet) is still OFFER_EXPIRED.
+        if offer.status == OfferStatus.EXPIRED:
             raise ApiError(ErrorCode.OFFER_EXPIRED)
+        if offer.status != OfferStatus.PENDING or task.status != TS.OFFERED:
+            raise ApiError(ErrorCode.OFFER_TAKEN)
         if not rider.is_online:
             raise ApiError(ErrorCode.RIDER_OFFLINE)
         busy = (

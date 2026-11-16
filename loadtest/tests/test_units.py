@@ -164,6 +164,29 @@ def test_smoke_profile():
     assert smoke.min_orders_per_min is None
 
 
+def test_light_profile_dl75():
+    """DL-75: 20 sessions for 5 minutes on shared staging: 4 buyers, 16 browsers, no riders."""
+    light = profiles.get("light")
+    assert (light.peak_users, light.duration_s) == (20, 300)
+    assert (light.buyers, light.riders) == (4, 0)
+    assert light.peak_users - light.buyers - light.riders == 16  # browsers
+    assert light.min_orders_per_min is None
+
+
+def test_default_location_is_the_staging_store(monkeypatch):
+    from decimal import Decimal
+
+    from jivo_loadtest.config import RunConfig
+
+    monkeypatch.delenv("LOADTEST_LAT", raising=False)
+    monkeypatch.delenv("LOADTEST_LNG", raising=False)
+    cfg = RunConfig.from_env()
+    assert (cfg.lat, cfg.lng) == (Decimal("28.631878"), Decimal("77.128798"))
+    monkeypatch.setenv("LOADTEST_LAT", "28.471")
+    monkeypatch.setenv("LOADTEST_LNG", "77.044")
+    assert RunConfig.from_env().lat == Decimal("28.471")
+
+
 def test_ramp_steps():
     ramp = profiles.get("ramp")
     assert [ramp.tick(t)[0] for t in (0, 130, 250, 370, 490)] == [100, 200, 300, 400, 500]

@@ -82,9 +82,9 @@ Contract details (published in `backend/openapi/schema.yaml`, Phase 1 R1; the sc
 #### App tokens (T-219, P2 follow-up)
 The access token's `app` claim (`customer`/`rider`) decides which app a session belongs to. It is set at OTP verify from the body `app`, copied into every access token and kept on every refresh (every token issued since Phase 1 carries it). `X-App-Name` only names the calling app and must agree with the claim. One check runs for every token-authenticated request (`apps.accounts.app_access`, called by the JWT authentication class), so no view can skip it:
 - **Header mismatch:** `X-App-Name` names the other app → 403 `PERMISSION_DENIED`, `details: {reason: "APP_HEADER_MISMATCH", header_app, token_app}`. An absent, empty or unknown header names no app and is ignored (unknown client-info values are never an error, P0-TC-13).
-- **Wrong app's token:** an app-only endpoint called with the other app's token → 403 `PERMISSION_DENIED`, `details: {reason: "WRONG_APP_TOKEN", required_app, token_app}`. This runs before the endpoint's own checks, so a customer-app token on `/rider/me/` gets this error, not `rider_status`.
+- **Wrong app's token:** an app-only endpoint called with the other app's token → 403 `PERMISSION_DENIED`, `details: {reason: "WRONG_APP_TOKEN", required_app, token_app}`. This runs before the endpoint's own checks, so a customer-app token on `/rider/me/` gets this error, not `rider_status`. DL-74 (2026-11-16) confirms this for every `/api/v1/rider/*` endpoint (including stores, register and `/rider/ratings/`) and the rider socket (§4.1).
 - **No claim:** a token without a valid `app` claim fits no app-only endpoint and no `X-App-Name` value. None is issued.
-- **Not affected:** public endpoints (they never read a token), staff sessions (admin, Ops Console) and the sockets (the rider socket keeps its own rule, §4.1).
+- **Not affected:** public endpoints (they never read a token), staff sessions (admin, Ops Console) and the sockets (the rider socket keeps its own rule, §4.1: a customer-app token gets an `error` message with code `WRONG_APP_TOKEN`, then close 4403, DL-74).
 
 | Endpoint group | Paths under `/api/v1/` | Token class |
 |---|---|---|
@@ -356,6 +356,8 @@ Contract details (Phase 5, T-511; published in `backend/openapi/schema.yaml`, ta
 - **Offers and task (#11 to #18):**
   - Offer: `{id, task_id, store_name, drop_locality, distance_km, payment_type, cod_amount, estimated_payout, item_count, offered_at, expires_at}`, wrapped with `server_time`. Reject returns 204.
   - `tasks/current/` returns `{task, recent_task, server_time}`. `recent_task` = a task that ended in the last 10 minutes.
+  - **Customer PII window (09 §3.2, P8 security review):** the task body's `customer_address` (the order's address snapshot) and `instructions.note` are in full from accept until `RIDER_CUSTOMER_PII_SECONDS` (3600) after the task ended (DELIVERED / RETURNED / CANCELLED). After that, any response that still carries a task body (e.g. an idempotent replay of `deliver/`) keeps the same shape with `custom_label`, `receiver_name`, `receiver_phone`, `house`, `building_street`, `landmark` and `instructions.note` blank and lat/lng rounded to 2 decimals (`presenters.rider_customer_address`). Offers carry the locality only; `recent_task` and the history (list and detail) never carry customer personal data. The contract (field set) is unchanged.
+  - **Customer PII window (09 §3.2, P8 security review):** the task body's `customer_address` (the order's address snapshot) and `instructions.note` are in full from accept until `RIDER_CUSTOMER_PII_SECONDS` (3600) after the task ended (DELIVERED, RETURNED, CANCELLED). After that, any response that still carries a task body (e.g. an idempotent replay of `deliver/`) keeps the same shape with `custom_label`, `receiver_name`, `receiver_phone`, `house`, `building_street`, `landmark` and `instructions.note` blank and lat/lng rounded to 2 decimals (`presenters.rider_customer_address`). Offers carry the locality only; `recent_task` and the history (list and detail) never carry customer personal data.
   - Task fields: `cod_amount_due` and `cod_amount_previous` (the amount before a T8a change; the rider gets a push), `geofence` radii, and `delivery_otp {length, attempts_remaining, locked}`.
   - Pickup takes the 4-character code or the bag QR payload `JQC1:<order_number>:<code>`. A wrong code is 400 `PICKUP_CODE_INVALID`.
   - `deliver` checks, in order: state, then the COD collection (exact amount; UPI QR PAID; a mismatch is 400 and uses no OTP attempt), then the OTP. `DELIVERY_OTP_INVALID` and `DELIVERY_OTP_LOCKED` carry `attempts_remaining`.
@@ -451,7 +453,7 @@ Auth: the JWT is sent in the first message after connecting (`{"type": "auth", "
 - **Close codes:**
   - 4400: the first message is not `auth`
   - 4401: missing, invalid or expired token, or no staff session
-  - 4403: signed in but not allowed (no role or store, not an active rider, wrong app)
+  - 4403: signed in but not allowed (no role or store, not an active rider, wrong app). For a customer-app token on `/ws/v1/rider/` (DL-74) the server first sends `{"type": "error", "data": {"code": "WRONG_APP_TOKEN", "message": ...}}`, then closes 4403
   - 4404: the order does not exist **or is another user's** (the same code, so ids leak nothing)
   - 4408: auth timeout
   - 4429: the user already has `WS_MAX_SOCKETS_PER_USER` (5) sockets open
@@ -563,7 +565,7 @@ All tasks are **idempotent** (safe to retry) and log with the order/rider ID for
 | `VALIDATION_ERROR` | 400 | Field errors in `details` |
 | `OTP_INVALID` / `OTP_EXPIRED` / `OTP_RATE_LIMITED` | 400/400/429 | OTP problems |
 | `AUTH_REQUIRED` / `TOKEN_INVALID` | 401 | |
-| `PERMISSION_DENIED` | 403 | |
+| `PERMISSION_DENIED` | 403 | `details.reason` says why when there is a specific cause, e.g. `WRONG_APP_TOKEN` (an app-only endpoint called with the other app's token: every `/api/v1/rider/*` endpoint takes rider-app tokens only, DL-74; `details.required_app`, `details.token_app`; the same code is sent as a socket `error` before the 4403 close on `/ws/v1/rider/`), `APP_HEADER_MISMATCH` (§2.1 "App tokens"), `RIDER_NOT_ACTIVE`. |
 | `NOT_FOUND` | 404 | |
 | `APP_UPDATE_REQUIRED` | 426 | Client version below minimum |
 | `NOT_SERVICEABLE` | 422 | Location outside every active service area |
