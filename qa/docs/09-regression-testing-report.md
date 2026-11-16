@@ -106,3 +106,8 @@ Smoke P0–P7 not run as a set this session (stopped for a PC shutdown). Regress
 **Affected areas re-run on main:** P0 + P1 full (196 passed after 18 test-side oracle/environment fixes, no product regression); P2 serviceability / DB / security (82 passed, 7 blocked); P2 clock TC-11 ✅; redis-down P0/P1 cases ✅.
 
 **Regression found:** none in what could run. **Not regression-tested on main:** P3–P7 order flows and the P2 catalog (OBS-M-01). Re-run the full smoke set after the migrations.
+
+## Run 2 on main (2026-11-16, after DL-76)
+- **Smoke set: not run** (the machine was critically low on memory; the P3–P7 run before it was stopped by Claude Code's memory guard with no per-test output).
+- **Re-run and passing on main:** all P2 suites (136 passed; the 2 failures are an environment fetch and a PM-default decision), the P2 clock and redis-down cases, P5-TC-50 (b), P5-TC-92 a/b/d.
+- **Regression found:** none. BUG-0025 is a first execution (P5-TC-92c), not a regression.

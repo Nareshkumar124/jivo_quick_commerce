@@ -169,3 +169,63 @@ def test_p2_tc54_stock_adjustment_through_admin(staff):
     assert all(codes[r] in (403, 404) for r in codes), codes
     assert db_query("select count(*) from inventory_stockmovement where reason=%s",
                     ("QA P2-TC-54 must be refused",))[0][0] == 0
+
+
+# =========================================================================== P2-TC-55
+
+
+def test_p2_tc55_min_qty_and_price_tiers_on_tiles(api):
+    """P2-TC-55 06 §2.4 VariantSummary (2026-11-13, ADR 0001): every tile variant carries
+    `min_qty_per_order` (= the DB value, >= 1, <= max_qty_per_order) and `price_tiers` (= the DB
+    tiers ordered by units, price as a 2-dp string, [] when none); a variant whose available stock
+    is below its minimum shows orderable_quantity 0 / OUT_OF_STOCK. Tier pricing in the bill needs
+    tier data (none in the shared DB on 2026-11-16): reported as not covered."""
+    from qa_support import STORE_HEADERS
+
+    db_min = dict(db_query("select id, min_qty_per_order from catalog_productvariant"))
+    tiers: dict[int, list] = {}
+    for vid, units, price in db_query("select variant_id, min_order_units, price from catalog_variantpricetier "
+                                      "order by variant_id, min_order_units"):
+        tiers.setdefault(vid, []).append({"min_order_units": units, "price": f"{price:.2f}"})
+    seen, page = 0, 1
+    while True:
+        r = api.get("/api/v1/products/", params={"page": page, "page_size": 50}, headers=STORE_HEADERS)
+        assert r.status_code == 200, describe(r)
+        for card in r.json()["results"]:
+            for v in card["variants"]:
+                seen += 1
+                assert v["min_qty_per_order"] == db_min[v["id"]] >= 1, v
+                assert v["min_qty_per_order"] <= v["max_qty_per_order"], v
+                assert v["price_tiers"] == tiers.get(v["id"], []), (v["id"], v["price_tiers"])
+                if v["orderable_quantity"]:
+                    assert v["orderable_quantity"] >= v["min_qty_per_order"], v
+        if not r.json().get("next"):
+            break
+        page += 1
+    assert seen > 0
+    print(f"TC-55: {seen} variants checked; tiers in DB: {sum(map(len, tiers.values()))}; "
+          f"variants with min > 1: {sum(1 for m in db_min.values() if m > 1)}")
+
+
+# =========================================================================== P2-TC-57
+
+
+LEADS = "/admin/stores/serviceabilityrequest/"
+# PM default (2026-11-16) until Jivo decides; 05 §3 has no row for the notify-me leads screen.
+LEADS_ROLES = {"Super Admin", "Ops / Dispatch", "Store Manager"}
+
+
+def test_p2_tc57_leads_screen_roles(staff):
+    """P2-TC-57 Notify-me leads (05 §2 "Serviceability requests"): the list opens (200) for the PM
+    default roles Super Admin, Ops and Store Manager, and is refused (403) for the others; nobody
+    can add a lead through the admin (leads come from the app)."""
+    wrong = []
+    for role, c in staff.items():
+        code = c.get(LEADS).status_code
+        expected = 200 if role in LEADS_ROLES else 403
+        if code != expected:
+            wrong.append((role, code, expected))
+        add = c.get(f"{LEADS}add/").status_code
+        if add != 403:
+            wrong.append((role, "add", add, 403))
+    assert wrong == [], wrong

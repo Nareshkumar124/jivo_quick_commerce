@@ -85,3 +85,8 @@
 
 ## QA on main (2026-11-16, `f6ed556`)
 Not run: the integration flows (order → dispatch → delivery → refunds, sockets on order events) need the cart and order endpoints, which answer 500 on main against the unmigrated shared DB (OBS-M-01). The new integration cases P5-TC-50 (b) (T8 packing triggers dispatch before the retry) and P5-TC-92 (COD UPI QR after T8a, expired QR, failed task) are automated in `tests/test_p5_main.py` and wait for the migrations. The redis-down resilience cases P0-TC-03b and P1-TC-63/63b/63c pass on main; P2-TC-12b is blocked.
+
+## Run 2 on main (2026-11-16, after DL-76)
+- P5-TC-50 (b): T8 packing triggers dispatch at once (offer 3.3 s after packing while the retry was still 3 min away). ✅
+- P5-TC-92: COD UPI QR with T8a (new due 165.00 vs the offer's 330.00) ✅; a replaced expired QR paid late is refunded once ✅; failed task: QR CANCELLED and the payment refunded ✅; **an expired, unreplaced QR paid late is accepted as PAID: BUG-0025** ❌.
+- The P3–P7 integration suites were stopped by the memory guard before any result was written; not reported as passed.

@@ -171,6 +171,7 @@ def test_p5_tc92b_replaced_expired_qr_late_payment_refunded(r1, p5_shop_a, api):
     assert r.status_code == 200, describe(r)
 
 
+@pytest.mark.xfail(strict=True, reason="BUG-0025: a credit on an expired, unreplaced QR is accepted as PAID")
 def test_p5_tc92c_expired_qr_paid_late_is_refunded(r1, p5_shop_a, api):
     """P5-TC-92 (2') A payment on an expired QR that was not replaced (still PENDING in the DB, shown
     EXPIRED to the rider): 06 slice 5.4 and 08 T10 say a credit on an expired QR is refunded in full

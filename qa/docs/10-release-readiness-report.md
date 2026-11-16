@@ -1,6 +1,6 @@
 # 10: Release Readiness Report
 
-**Latest verdicts:** "Fresh verdicts P0–P7 on main (2026-11-16)" at the end of this file. Earlier sections are kept as history.
+**Latest verdicts:** "Run 2 on main (2026-11-16, after the DL-76 migrations)" at the end of this file. Earlier sections are kept as history.
 
 **Date:** 2026-11-02 (QA run 1) · **Build:** backend commit `4960527` (released P0+P1). The apps were statically reviewed at the same commit · **Gate rules:** `docs/10-testing-strategy.md` §5.2.
 
@@ -363,3 +363,34 @@ Backend code for delivery, realtime and orders is unchanged on develop `3f6fc42`
 4. OBS-M-03 (expired COD QR credit accepted in code, not reproduced): P5-TC-92c will decide once unblocked.
 
 **Device cases still owed (PM, phone):** P1-TC-80…92 (13); P2-TC-58–62 (5, new); P4-TC-51–54, 56, 58 (6); P5-TC-19, 33, 124, 131 (4); P6-TC-17, 57 (2); P7-TC-37–39 (3). Also P0-TC-21/22 (app builds and the generated client, any Flutter-capable run).
+
+## Run 2 on main (2026-11-16, after the DL-76 migrations; QA worktree `e50426c` = main `f6ed556` code)
+**Environment:** as in run 1. The six migrations were applied to the shared DB by the PM with the user's approval (DL-76); `showmigrations` shows none pending.
+
+| Run | Command (from `qa/`) | Result |
+|---|---|---|
+| P5-TC-50 (b), TC-92 | `QA_EXTRA_ENV="DISPATCH_RETRY_SECONDS=300 DISPATCH_TIMEOUT_SECONDS=900 COD_QR_EXPIRY_SECONDS=20" uv run pytest tests/test_p5_main.py` | **4 passed, 1 failed.** TC-50 (b) ✅ (offer 3.3 s after packing, retry still 3 min away). TC-92 a, b, d ✅. **TC-92c ❌ → BUG-0025** (new; OBS-M-03 confirmed) |
+| All P2 suites (local) | `uv run pytest tests/test_p2_serviceability.py tests/test_p2_db.py tests/test_p2_security.py tests/test_p2_catalog.py tests/test_p2_main.py` | **136 passed, 2 failed, 1 skipped.** TC-38: the image fetch 404s because this PC's MinIO lacks the files (OBS-M-05, environment). TC-57: Store Manager 403 against the PM default (OBS-M-04, decision) |
+| P2 `clock` TC-09/10 | `QA_FAKE_NOW=2026-11-16T23:30:00+05:30` | **1 passed** |
+| `redis-down` (TC-12b + P0/P1) | `uv run pytest tests/test_profile_redis_down.py` | **5 passed** |
+| P3–P7 suites | `uv run pytest tests/test_p3_*.py … tests/test_p7*.py` | **Not completed: stopped by Claude Code because the PC ran critically low on memory** (about 50 min in, around 14:30). The pipe buffered the output, so **no per-test results exist**, and none are claimed. From the instance log of the run (13:40–14:30, 14,700 lines): one 500 (`POST /orders/`, `psycopg.OperationalError: server closed the connection unexpectedly`, a shared-DB connection drop, OBS-01 class); every other traceback is a 403 the role tests expect. Not restarted, following the memory guard |
+| 🔥 smoke P0–P7 | — | **Not run in run 2** (memory, as above). Run 1's smoke was blocked by OBS-M-01 for P3–P7 |
+
+**New bug:** [BUG-0025](../bugs/BUG-0025.md) (P3 Minor / Low, django-backend-dev): a payment on an expired, unreplaced COD UPI QR is accepted as PAID instead of being refunded (08 T10, 06 §2 slice 5.4). No money is lost; the risk is a customer who pays cash after seeing "expired" and then also by UPI. **Open:** P0 0 · P1 0 · P2 1 (BUG-0024) · P3 2 (BUG-0023, BUG-0025).
+
+**Case status changes:**
+- P2 run 2: **46/57 (80.7 %)**, Pri P0/P1 45/54; ❌ 1 (TC-57, PM default); ◐ 2 (TC-38, 55); ⬜ 6 (TC-56 not automated; TC-58–62 device); ⏭ 2.
+- P5: TC-50 ✅; TC-92 ❌ (BUG-0025); now 123/133 = 92.5 %.
+
+| Phase | Verdict (run 2) | Why |
+|---|---|---|
+| **0** | **Not ready (gate incomplete)** | Unchanged: TC-21/22 (Flutter build and generated client) and TC-23 (CI) |
+| **1** | **Not ready (gate incomplete)** | Unchanged: 13 device cases; TC-61/62 (QA-owned AppConfig); TC-67 stub; TC-46 |
+| **2** | **Not ready (gate incomplete)** | No product defect: catalog, home, search, stock never exact, money as 2-dp strings, the admin role matrix and stock adjustment all pass on main. Remaining: device TC-58–62 (three P0), TC-56 (CSV) not automated, TC-57 needs the leads-role decision (OBS-M-04), TC-38's image fetch on staging, TC-55 tier pricing without tier data. 80.7 % < 95 % |
+| **3** | **Not ready on main** | The P3 suites were in the killed run: no result on main. Last good result: `9ed7ffc`, 97.1 % |
+| **4** | **Not ready** | Device cases; not regression-tested on main (killed run) |
+| **5** | **Not ready** | BUG-0023, BUG-0024 (in progress) and new BUG-0025 (TC-92); device cases; full suite on main not completed |
+| **6** | **Not ready (gate incomplete)** | Device TC-17, 57; TC-44, 45, 54; full suite on main not completed |
+| **7** | **Not ready on main** | Device TC-37–39; full suite on main not completed |
+
+**Still owed on main (needs a relaunch when memory allows, PM's call):** the P3–P7 suites and the 🔥 smoke set. Suggestion: one phase per run, with `QA_WORKER_CONCURRENCY=4`, and output written straight to the file (no pipe) so a stop keeps the partial result.
