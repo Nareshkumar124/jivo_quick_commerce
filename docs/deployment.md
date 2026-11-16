@@ -8,7 +8,7 @@ This file records what is **actually set up today**, plus the target for the env
 |-------------|--------|
 | **local** (developer machine) | ✅ working (described below) |
 | **CI** (GitHub Actions) | ⚠️ `mobile` green on `main`; `backend` and `infra` red on `main` `8e42ec0` (2026-11-10), fixed on `devops/p8-ci` (2026-11-16): runner lacked GDAL after the PostGIS engine switch, four new settings missing from the env example, and the PowerShell restore test's exit code (§2). T-404c (2026-11-04) added parallel backend tests and the env-example and Razorpay pin checks. |
-| **CI** (GitHub Actions) | ✅ green on `main` (`.github/workflows/backend.yml`, `mobile.yml`). T-404c (2026-11-04) added parallel backend tests and the env-example and Razorpay pin checks. 2026-11-10: secret scanning (`secret-scan.yml`) and dependency advisories (`dependency-scan.yml`) added (§2.1, §2.2); not yet run on GitHub. |
+| **CI workflows** | (`.github/workflows/backend.yml`, `mobile.yml`). T-404c (2026-11-04) added parallel backend tests and the env-example and Razorpay pin checks. 2026-11-10: secret scanning (`secret-scan.yml`) and dependency advisories (`dependency-scan.yml`) added (§2.1, §2.2); not yet run on GitHub. |
 | **staging** | ⬜ **not set up.** Needs D-05 (hosting), domains/TLS, Razorpay test keys, and the Firebase staging project |
 | **production** | ⬜ **not set up** (Phase 8, [`release-checklist.md`](release-checklist.md)) |
 | **P8 hardening (prepared, T-813)** | ✅ backup/restore scripts + verifier with a schema-only drill (§7), deploy-time checks and release step in the image (§8), edge limits and log hygiene (§9), monitoring as code (§10), secrets and rotation (§11). Nothing is applied to staging/production until D-05. |
