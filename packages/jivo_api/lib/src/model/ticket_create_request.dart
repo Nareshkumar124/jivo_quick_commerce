@@ -29,6 +29,8 @@ class TicketCreateRequest {
     this.taskId,
 
     this.payoutId,
+
+    this.attachmentKeys,
   });
 
   /// MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY need `order_id`. TASK, PAYOUT and CASH are for the rider app only (a rider session).  * `MISSING_ITEMS` - Missing items * `DAMAGED_ITEMS` - Damaged items * `WRONG_ITEMS` - Wrong items * `LATE_DELIVERY` - Late delivery * `PAYMENT_REFUND` - Payment or refund * `ACCOUNT` - Account * `OTHER` - Other * `TASK` - A delivery task * `PAYOUT` - Payout * `CASH` - Cash deposit
@@ -59,6 +61,10 @@ class TicketCreateRequest {
   @JsonKey(name: r'payout_id', required: false, includeIfNull: false)
   final int? payoutId;
 
+  /// Optional, at most 3: keys returned by `POST /support/attachments/` to the caller in the last hour, not yet used. The photos attach to the ticket's first message.
+  @JsonKey(name: r'attachment_keys', required: false, includeIfNull: false)
+  final List<String>? attachmentKeys;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -67,7 +73,8 @@ class TicketCreateRequest {
           other.message == message &&
           other.orderId == orderId &&
           other.taskId == taskId &&
-          other.payoutId == payoutId;
+          other.payoutId == payoutId &&
+          other.attachmentKeys == attachmentKeys;
 
   @override
   int get hashCode =>
@@ -75,7 +82,8 @@ class TicketCreateRequest {
       message.hashCode +
       (orderId == null ? 0 : orderId.hashCode) +
       (taskId == null ? 0 : taskId.hashCode) +
-      (payoutId == null ? 0 : payoutId.hashCode);
+      (payoutId == null ? 0 : payoutId.hashCode) +
+      attachmentKeys.hashCode;
 
   factory TicketCreateRequest.fromJson(Map<String, dynamic> json) =>
       _$TicketCreateRequestFromJson(json);

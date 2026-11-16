@@ -17,6 +17,8 @@ abstract class _$TicketCreateRequestCWProxy {
 
   TicketCreateRequest payoutId(int? payoutId);
 
+  TicketCreateRequest attachmentKeys(List<String>? attachmentKeys);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TicketCreateRequest(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -29,6 +31,7 @@ abstract class _$TicketCreateRequestCWProxy {
     int? orderId,
     int? taskId,
     int? payoutId,
+    List<String>? attachmentKeys,
   });
 }
 
@@ -55,6 +58,10 @@ class _$TicketCreateRequestCWProxyImpl implements _$TicketCreateRequestCWProxy {
   TicketCreateRequest payoutId(int? payoutId) => this(payoutId: payoutId);
 
   @override
+  TicketCreateRequest attachmentKeys(List<String>? attachmentKeys) =>
+      this(attachmentKeys: attachmentKeys);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TicketCreateRequest(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -67,6 +74,7 @@ class _$TicketCreateRequestCWProxyImpl implements _$TicketCreateRequestCWProxy {
     Object? orderId = const $CopyWithPlaceholder(),
     Object? taskId = const $CopyWithPlaceholder(),
     Object? payoutId = const $CopyWithPlaceholder(),
+    Object? attachmentKeys = const $CopyWithPlaceholder(),
   }) {
     return TicketCreateRequest(
       category: category == const $CopyWithPlaceholder()
@@ -89,6 +97,10 @@ class _$TicketCreateRequestCWProxyImpl implements _$TicketCreateRequestCWProxy {
           ? _value.payoutId
           // ignore: cast_nullable_to_non_nullable
           : payoutId as int?,
+      attachmentKeys: attachmentKeys == const $CopyWithPlaceholder()
+          ? _value.attachmentKeys
+          // ignore: cast_nullable_to_non_nullable
+          : attachmentKeys as List<String>?,
     );
   }
 }
@@ -123,6 +135,10 @@ TicketCreateRequest _$TicketCreateRequestFromJson(Map<String, dynamic> json) =>
           orderId: $checkedConvert('order_id', (v) => (v as num?)?.toInt()),
           taskId: $checkedConvert('task_id', (v) => (v as num?)?.toInt()),
           payoutId: $checkedConvert('payout_id', (v) => (v as num?)?.toInt()),
+          attachmentKeys: $checkedConvert(
+            'attachment_keys',
+            (v) => (v as List<dynamic>?)?.map((e) => e as String).toList(),
+          ),
         );
         return val;
       },
@@ -130,6 +146,7 @@ TicketCreateRequest _$TicketCreateRequestFromJson(Map<String, dynamic> json) =>
         'orderId': 'order_id',
         'taskId': 'task_id',
         'payoutId': 'payout_id',
+        'attachmentKeys': 'attachment_keys',
       },
     );
 
@@ -141,6 +158,7 @@ Map<String, dynamic> _$TicketCreateRequestToJson(
   'order_id': ?instance.orderId,
   'task_id': ?instance.taskId,
   'payout_id': ?instance.payoutId,
+  'attachment_keys': ?instance.attachmentKeys,
 };
 
 const _$TicketCategoryEnumEnumMap = {

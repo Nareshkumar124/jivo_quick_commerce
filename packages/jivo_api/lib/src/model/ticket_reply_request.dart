@@ -24,7 +24,7 @@ class TicketReplyRequest {
   @JsonKey(name: r'message', required: true, includeIfNull: false)
   final String message;
 
-  /// Optional, at most 3: keys returned by `POST /support/tickets/{id}/attachments/` for this ticket by the caller in the last hour, not yet used by another message (Phase 7).
+  /// Optional, at most 3: keys returned by `POST /support/tickets/{id}/attachments/` for this ticket (or by `POST /support/attachments/`) to the caller in the last hour, not yet used by another message (Phase 7).
   @JsonKey(name: r'attachment_keys', required: false, includeIfNull: false)
   final List<String>? attachmentKeys;
 

@@ -23,6 +23,98 @@ class SupportApi {
 
   const SupportApi(this._dio);
 
+  /// Upload a photo for a new ticket
+  /// Upload a photo before opening the ticket, then send its &#x60;key&#x60; in &#x60;attachment_keys&#x60; of &#x60;support_tickets_create&#x60; (or of a reply) within an hour, or it is deleted. Multipart &#x60;file&#x60;: a JPEG, PNG or WebP image of at most 5 MB, stored re-encoded (WebP, EXIF removed) in private storage; returned with its &#x60;key&#x60; and a short-lived signed &#x60;url&#x60;. Shares the per-user limit of &#x60;support_tickets_attachments_create&#x60; (&#x60;SUPPORT_ATTACHMENTS_RATE&#x60;, default 30 per hour).
+  ///
+  /// Parameters:
+  /// * [file] - JPEG, PNG or WebP, at most 5 MB. Stored re-encoded, without EXIF data.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [TicketAttachment] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<TicketAttachment>> supportAttachmentsCreate({
+    required MultipartFile file,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/support/attachments/';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      contentType: 'multipart/form-data',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    TicketAttachment? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<TicketAttachment, TicketAttachment>(
+              rawData,
+              'TicketAttachment',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<TicketAttachment>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Upload a photo to my ticket
   /// Phase 7 (06 §2.7). Multipart &#x60;file&#x60;: a JPEG, PNG or WebP image of at most 5 MB. It is stored re-encoded (WebP, EXIF removed) in private storage and returned with its &#x60;key&#x60; and a short-lived signed &#x60;url&#x60;. Send the key in &#x60;attachment_keys&#x60; of the next reply within an hour, or it is not attached. A CLOSED ticket refuses uploads. Rate limited per user (&#x60;SUPPORT_ATTACHMENTS_RATE&#x60;, default 30 per hour).
   ///
@@ -123,7 +215,7 @@ class SupportApi {
   }
 
   /// Open a support ticket
-  /// Creates an OPEN ticket whose first message is &#x60;message&#x60;. MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY are about an order and need &#x60;order_id&#x60;; the other categories may name one. The order must be the caller&#39;s own. To add photos, upload them to the new ticket (&#x60;support_tickets_attachments_create&#x60;) and send them with a reply (&#x60;attachment_keys&#x60;). Rate limited per user (&#x60;SUPPORT_TICKETS_CREATE_RATE&#x60;, default 10 per hour).
+  /// Creates an OPEN ticket whose first message is &#x60;message&#x60;. MISSING_ITEMS, DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY are about an order and need &#x60;order_id&#x60;; the other categories may name one. The order must be the caller&#39;s own. Photos: upload each first with &#x60;support_attachments_create&#x60; and send up to 3 &#x60;attachment_keys&#x60;; they attach to the first message (one message, not two). The older flow (create, upload to the ticket, reply with the keys) still works. A failed create attaches nothing and the keys stay usable. Rate limited per user (&#x60;SUPPORT_TICKETS_CREATE_RATE&#x60;, default 10 per hour).
   ///
   /// Parameters:
   /// * [ticketCreateRequest]
@@ -296,7 +388,7 @@ class SupportApi {
   }
 
   /// Reply on my ticket
-  /// Adds the caller&#39;s message and returns the whole ticket. A RESOLVED ticket is reopened (OPEN). A CLOSED ticket refuses replies with 400 &#x60;VALIDATION_ERROR&#x60; (&#x60;details.ticket&#x60;): offer a new ticket instead. Photos: upload each with &#x60;support_tickets_attachments_create&#x60;, then send up to 3 &#x60;attachment_keys&#x60; (keys the caller uploaded to this ticket in the last hour, not used yet). Rate limited per user (&#x60;SUPPORT_MESSAGES_RATE&#x60;, default 60 per hour).
+  /// Adds the caller&#39;s message and returns the whole ticket. A RESOLVED ticket is reopened (OPEN). A CLOSED ticket refuses replies with 400 &#x60;VALIDATION_ERROR&#x60; (&#x60;details.ticket&#x60;): offer a new ticket instead. Photos: upload each with &#x60;support_tickets_attachments_create&#x60; (or &#x60;support_attachments_create&#x60;), then send up to 3 &#x60;attachment_keys&#x60; (keys the caller uploaded in the last hour, not used yet). Rate limited per user (&#x60;SUPPORT_MESSAGES_RATE&#x60;, default 60 per hour).
   ///
   /// Parameters:
   /// * [id] - `SupportTicket.id` (not the TK- number).
