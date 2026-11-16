@@ -25,7 +25,8 @@ assignment and priority write the audit log (ids and codes only).
 **Phase 7 additions:** SLA due times per priority (`first_response_due_at`,
 `resolution_due_at`; `sla_state`, `with_sla`, `breached_tickets`), the customer's push/inbox
 notification on a staff reply (`support.replied`, after commit), image attachments
-(`upload_attachment`, `attachment_keys` on replies, signed URLs) and canned replies
+(`upload_attachment`, `upload_new_ticket_attachment`, `attachment_keys` on replies and on
+ticket create, signed URLs) and canned replies
 (`canned_replies`, `render_canned_reply`).
 
 **PII (09):** message bodies are personal data. Logs and audit entries carry ids, codes and
@@ -183,8 +184,11 @@ def create_ticket(
     app: str | None = None,
     task_id: int | None = None,
     payout_id: int | None = None,
+    attachment_keys: list[str] | tuple[str, ...] = (),
 ) -> SupportTicket:
-    """A new OPEN ticket with the customer's first message. `order_id` must be one of the
+    """A new OPEN ticket with the customer's first message. `attachment_keys` (optional, at
+    most 3) are photos the caller uploaded with `upload_new_ticket_attachment` in the last hour
+    and not used yet; they attach to that first message. `order_id` must be one of the
     customer's own orders (another user's order is "not found"); the order categories need
     one. The serializer has already checked the message length.
 
@@ -217,13 +221,17 @@ def create_ticket(
             last_activity_at=now,
             **due_times(now, TicketPriority.NORMAL),
         )
-        TicketMessage.objects.create(ticket=ticket, sender=user, is_staff=False, body=message)
+        first = TicketMessage.objects.create(
+            ticket=ticket, sender=user, is_staff=False, body=message
+        )
+        _claim_attachments(user, ticket, first, attachment_keys, now)
         _emit(
             "support.ticket_created",
             ticket,
             category=category,
             has_order=order is not None,
             length=len(message),
+            attachments=len(attachment_keys),
         )
     return ticket
 
@@ -548,6 +556,18 @@ def upload_attachment(user, ticket_id: int, upload, *, app: str | None = None) -
         raise ApiError(
             ErrorCode.VALIDATION_ERROR, MSG_TICKET_CLOSED, details={"ticket": [MSG_TICKET_CLOSED]}
         )
+    return _store_attachment(user, ticket, upload)
+
+
+def upload_new_ticket_attachment(user, upload) -> TicketAttachment:
+    """Store a photo before its ticket exists (`POST /support/attachments/`), so it can go on
+    the new ticket's first message (`create_ticket(attachment_keys=...)`) or on a reply. Same
+    checks and storage as `upload_attachment`, under `support/new/<key>.webp`; unclaimed after
+    `ATTACHMENT_CLAIM_WINDOW` it is purged."""
+    return _store_attachment(user, None, upload)
+
+
+def _store_attachment(user, ticket, upload) -> TicketAttachment:
     content = _reencode(upload)
     attachment = TicketAttachment(
         key=uuid.uuid4().hex, ticket=ticket, uploaded_by=user, size=content.size
@@ -556,7 +576,7 @@ def upload_attachment(user, ticket_id: int, upload, *, app: str | None = None) -
     attachment.save()
     logger.info(
         "support attachment uploaded ticket=%s key=%s size=%s",
-        ticket.pk,
+        ticket.pk if ticket is not None else None,
         attachment.key,
         attachment.size,
     )
@@ -564,6 +584,8 @@ def upload_attachment(user, ticket_id: int, upload, *, app: str | None = None) -
 
 
 def _claim_attachments(user, ticket, message, keys, now) -> None:
+    """Attach the caller's unused photos to `message`: ones uploaded to this ticket or before
+    any ticket (`upload_new_ticket_attachment`), within `ATTACHMENT_CLAIM_WINDOW`."""
     keys = list(dict.fromkeys(keys or ()))
     if not keys:
         return
@@ -575,7 +597,7 @@ def _claim_attachments(user, ticket, message, keys, now) -> None:
         )
     found = list(
         TicketAttachment.objects.select_for_update().filter(
-            ticket=ticket,
+            Q(ticket=ticket) | Q(ticket__isnull=True),
             uploaded_by=user,
             message__isnull=True,
             key__in=keys,
@@ -586,7 +608,9 @@ def _claim_attachments(user, ticket, message, keys, now) -> None:
         raise ApiError(
             ErrorCode.VALIDATION_ERROR, details={"attachment_keys": [MSG_ATTACHMENT_NOT_FOUND]}
         )
-    TicketAttachment.objects.filter(pk__in=[a.pk for a in found]).update(message=message)
+    TicketAttachment.objects.filter(pk__in=[a.pk for a in found]).update(
+        ticket=ticket, message=message
+    )
     message.attachments = keys
     message.save(update_fields=["attachments"])
 

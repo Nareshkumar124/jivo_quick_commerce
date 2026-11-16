@@ -112,8 +112,10 @@ class TicketListCreateView(APIView):
             "Creates an OPEN ticket whose first message is `message`. MISSING_ITEMS, "
             "DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY are about an order and need "
             "`order_id`; the other categories may name one. The order must be the caller's own. "
-            "To add photos, upload them to the new ticket (`support_tickets_attachments_create`) "
-            "and send them with a reply (`attachment_keys`). Rate limited per "
+            "Photos: upload each first with `support_attachments_create` and send up to 3 "
+            "`attachment_keys`; they attach to the first message (one message, not two). The "
+            "older flow (create, upload to the ticket, reply with the keys) still works. A "
+            "failed create attaches nothing and the keys stay usable. Rate limited per "
             "user (`SUPPORT_TICKETS_CREATE_RATE`, default 10 per hour)."
         ),
         request=TicketCreateSerializer,
@@ -121,6 +123,7 @@ class TicketListCreateView(APIView):
             ("About an order", ex.CREATE_WITH_ORDER),
             ("General question", ex.CREATE_WITHOUT_ORDER),
             ("Rider: about a task", ex.CREATE_RIDER_TASK),
+            ("With photos", ex.CREATE_WITH_PHOTOS),
         ),
         responses=app_responses(
             {
@@ -144,6 +147,10 @@ class TicketListCreateView(APIView):
                         {"message": ["Ensure this field has at least 10 characters."]},
                         name="Message too short",
                     ),
+                    validation_error(
+                        {"attachment_keys": [services.MSG_ATTACHMENT_NOT_FOUND]},
+                        name="Unknown or expired photo",
+                    ),
                 ),
                 401: UNAUTHORIZED,
                 429: RATE_LIMITED,
@@ -161,6 +168,7 @@ class TicketListCreateView(APIView):
             app=_session_app(request),
             task_id=data.validated_data.get("task_id"),
             payout_id=data.validated_data.get("payout_id"),
+            attachment_keys=data.validated_data.get("attachment_keys", []),
         )
         return Response(_ticket_body(request, ticket.pk), status=201)
 
@@ -203,9 +211,9 @@ class TicketMessageCreateView(APIView):
             "Adds the caller's message and returns the whole ticket. A RESOLVED ticket is "
             "reopened (OPEN). A CLOSED ticket refuses replies with 400 `VALIDATION_ERROR` "
             "(`details.ticket`): offer a new ticket instead. Photos: upload each with "
-            "`support_tickets_attachments_create`, then send up to 3 `attachment_keys` (keys the "
-            "caller uploaded to this ticket in the last hour, not used yet). Rate limited per "
-            "user (`SUPPORT_MESSAGES_RATE`, default 60 per hour)."
+            "`support_tickets_attachments_create` (or `support_attachments_create`), then "
+            "send up to 3 `attachment_keys` (keys the caller uploaded in the last hour, not "
+            "used yet). Rate limited per user (`SUPPORT_MESSAGES_RATE`, default 60 per hour)."
         ),
         parameters=[TICKET_ID],
         request=TicketReplySerializer,
@@ -296,5 +304,49 @@ class TicketAttachmentCreateView(APIView):
         data.is_valid(raise_exception=True)
         attachment = services.upload_attachment(
             request.user, id, data.validated_data["file"], app=_session_app(request)
+        )
+        return Response(services.attachment_body(attachment), status=201)
+
+
+UPLOAD_400 = error_response(
+    "Missing file, or not a JPEG/PNG/WebP image of at most 5 MB.",
+    validation_error({"file": [services.MSG_IMAGE_TYPE]}, name="Not an image"),
+)
+
+
+class NewTicketAttachmentCreateView(APIView):
+    parser_classes = [MultiPartParser]
+    throttle_classes = [TicketAttachmentThrottle]
+
+    @extend_schema(
+        operation_id="support_attachments_create",
+        tags=TAGS,
+        summary="Upload a photo for a new ticket",
+        description=(
+            "Upload a photo before opening the ticket, then send its `key` in "
+            "`attachment_keys` of `support_tickets_create` (or of a reply) within an hour, or "
+            "it is deleted. Multipart `file`: a JPEG, PNG or WebP image of at most 5 MB, "
+            "stored re-encoded (WebP, EXIF removed) in private storage; returned with its "
+            "`key` and a short-lived signed `url`. Shares the per-user limit of "
+            "`support_tickets_attachments_create` (`SUPPORT_ATTACHMENTS_RATE`, default 30 per "
+            "hour)."
+        ),
+        request={"multipart/form-data": TicketAttachmentUploadSerializer},
+        responses=app_responses(
+            {
+                201: ok_response(
+                    TicketAttachmentSerializer, "Stored.", ("Uploaded", ex.ATTACHMENT)
+                ),
+                400: UPLOAD_400,
+                401: UNAUTHORIZED,
+                429: RATE_LIMITED,
+            }
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        data = TicketAttachmentUploadSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        attachment = services.upload_new_ticket_attachment(
+            request.user, data.validated_data["file"]
         )
         return Response(services.attachment_body(attachment), status=201)

@@ -3,6 +3,11 @@ from django.urls import path
 from apps.support import views
 
 urlpatterns = [
+    path(
+        "support/attachments/",
+        views.NewTicketAttachmentCreateView.as_view(),
+        name="support-attachments",
+    ),
     path("support/tickets/", views.TicketListCreateView.as_view(), name="support-ticket-list"),
     path(
         "support/tickets/<int:id>/",

@@ -123,7 +123,7 @@ class TicketMessage(models.Model):
     attachments = models.JSONField(
         default=list,
         blank=True,
-        help_text="Storage keys of attached images. Not used yet (upload contract: docs/06 §2.7).",
+        help_text="Storage keys of the attached images (06 §2.7).",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -139,18 +139,29 @@ class TicketMessage(models.Model):
 
 
 def attachment_upload_to(instance, filename: str) -> str:
-    """Private bucket, random key (06 §2.7): `support/<ticket id>/<uuid>.webp`."""
-    return f"support/{instance.ticket_id}/{instance.key}.webp"
+    """Private bucket, random key (06 §2.7): `support/<ticket id>/<uuid>.webp`, or
+    `support/new/<uuid>.webp` for a photo uploaded before its ticket exists."""
+    folder = instance.ticket_id if instance.ticket_id is not None else "new"
+    return f"support/{folder}/{instance.key}.webp"
 
 
 class TicketAttachment(models.Model):
-    """An image the customer attached to a ticket (06 §2.7). Uploaded first
-    (`POST /support/tickets/{id}/attachments/`), then claimed by the next message that names
-    its `key` in `attachment_keys`. Stored re-encoded (WebP, EXIF stripped) in the private
+    """An image the customer attached to a ticket (06 §2.7). Uploaded first, either to an
+    existing ticket (`POST /support/tickets/{id}/attachments/`) or before the ticket exists
+    (`POST /support/attachments/`, `ticket` empty until claimed), then claimed by the next
+    message that names its `key` in `attachment_keys` (a reply, or the new ticket's first
+    message). Stored re-encoded (WebP, EXIF stripped) in the private
     bucket; served only through short-lived signed URLs."""
 
     key = models.CharField(max_length=32, unique=True, help_text="Random hex id (uuid4).")
-    ticket = models.ForeignKey(SupportTicket, on_delete=models.CASCADE, related_name="uploads")
+    ticket = models.ForeignKey(
+        SupportTicket,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="uploads",
+        help_text="Empty for a photo uploaded before its ticket was opened, until claimed.",
+    )
     message = models.ForeignKey(
         TicketMessage,
         on_delete=models.CASCADE,
@@ -172,7 +183,8 @@ class TicketAttachment(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.ticket.number} attachment {self.key}"
+        owner = self.ticket.number if self.ticket_id is not None else "unclaimed"
+        return f"{owner} attachment {self.key}"
 
 
 class CannedReply(TimeStampedModel):

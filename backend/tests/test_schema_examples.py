@@ -190,6 +190,7 @@ def test_phase_2_enums(schema):
         "collection",
         "product",
         "url",
+        "referral",
         "none",
     ]
     assert components["SearchSuggestionTypeEnum"]["enum"] == ["product", "category", "keyword"]
