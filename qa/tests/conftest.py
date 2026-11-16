@@ -252,3 +252,22 @@ def shop_factory(api, make_address):
         shop.cancel_pending()
         shop.remove_coupon()
         shop.clear()
+
+
+# Main (2026-11-16): T-814 added per-IP baseline throttles (06 §2: `serviceability` 60/min, `search`
+# 60/min, anonymous API 300/min). The functional suites send far more than that from one IP, so the
+# history of those scopes is cleared before each test (QA Redis DB only). The limits themselves are
+# checked by dedicated cases (P2-TC-19, P2-TC-52 in tests/test_p2_main.py, marked `keep_throttles`).
+_PER_TEST_SCOPES = ("serviceability", "search", "anon", "user", "address_write")
+
+
+@pytest.fixture(autouse=True)
+def _fresh_scope_throttles(request):
+    if profile() == "redis-down" or request.node.get_closest_marker("keep_throttles"):
+        yield
+        return
+    from qa_support import clear_throttle
+
+    for scope in _PER_TEST_SCOPES:
+        clear_throttle(scope)
+    yield

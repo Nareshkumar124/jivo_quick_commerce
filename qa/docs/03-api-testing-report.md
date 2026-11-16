@@ -259,3 +259,16 @@ Contract checks in these runs (strict schema validation of every 2xx body the su
 | `test_p7_console.py` (console HTTP, 8 sub-cases) | 8 passed |
 
 API contract finding: **BUG-0023**. The error code of a late accept after a processed expiry contradicts 06 §3 / 08 §5 (`OFFER_TAKEN` instead of `OFFER_EXPIRED`).
+
+## QA on main (2026-11-16, `f6ed556`)
+**Environment blocker OBS-M-01:** the shared DB lacks six main migrations, so `home`, `products`, `products/{id}`, `search`, `search/suggest`, `collections/{slug}` and every `cart` / `orders` call answer 500 on main (`column catalog_productvariant.min_qty_per_order does not exist`). Not a contract defect. Those operations were not contract-tested on main.
+
+| Area | Command | Result |
+|---|---|---|
+| P0/P1 contract (auth, tokens, profile, addresses, config) | `uv run pytest tests/test_p0_foundation.py tests/test_p1_*.py` | 196 passed, 0 failed, 9 skipped (profile cases), after 18 test-side fixes (see 10) |
+| Served schema = committed (P0-TC-11) | `-k tc11` | ✅ (the earlier failure was QA reading the YAML as cp1252) |
+| Serviceability, notify-me, categories, P2 contract inventory | `tests/test_p2_serviceability.py tests/test_p2_security.py tests/test_p2_db.py` | ✅ except the 7 cases that need the 500 endpoints |
+| T-814 throttle on serviceability (P2-TC-52) | `tests/test_p2_main.py -k tc52` | ✅ 61st request in a minute → 429 RATE_LIMITED, `retry_after_seconds`, Retry-After |
+| T-219 header mismatch (P1-TC-60) | `tests/test_p1_config_guard.py -k tc60` | ✅ customer token + `X-App-Name: rider` → 403 `PERMISSION_DENIED` `{reason: APP_HEADER_MISMATCH, header_app: rider, token_app: customer}` |
+| T-814 M2 refresh reuse (P1-TC-24c) | `tests/test_p1_tokens.py -k tc24c` | ✅ 5 trials × 10 concurrent: one 200, nine 401 `TOKEN_INVALID`; the winner's new refresh token is then 401 too (family revoked, 06 §2) |
+| Rider API without a profile (P5-TC-16, BUG-0013) | `tests/test_p5_kyc.py -k tc16` | ✅ 403 `rider_status NONE` even with an invalid body |

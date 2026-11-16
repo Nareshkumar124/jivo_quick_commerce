@@ -103,37 +103,44 @@ def test_p2_tc02_outside_service_area(api, point):
 
 @pytest.mark.db
 def test_p2_tc03_matches_postgis_point_in_polygon(api):
-    """P2-TC-03 A 13x13 grid over (and around) the store polygon: the API's `serviceable` equals
+    """P2-TC-03 A 13x13 grid over (and around) each active store polygon: the API's `serviceable` equals
     PostGIS ST_Contains on the active stores' service_area for every point (oracle: read-only
     SQL). The API runs GEOS in-process on a cached snapshot, so this checks the snapshot too."""
     clear_catalog_cache()
-    ((xmin, ymin, xmax, ymax),) = db_query(
-        "select ST_XMin(e), ST_YMin(e), ST_XMax(e), ST_YMax(e) from "
-        "(select ST_Extent(service_area)::geometry e from stores_darkstore where is_active) s"
+    # main (2026-11-16): two active stores (GGN-01 Gurugram, QA-02 Jaipur), so one grid over their
+    # joint extent would miss both polygons. One 13x13 grid per active store's own extent.
+    extents = db_query(
+        "select id, ST_XMin(service_area), ST_YMin(service_area), ST_XMax(service_area), "
+        "ST_YMax(service_area) from stores_darkstore where is_active order by id"
     )
     pad = 0.01
     steps = 13
-    lngs = [xmin - pad + (xmax - xmin + 2 * pad) * i / (steps - 1) + 0.000137 for i in range(steps)]
-    lats = [ymin - pad + (ymax - ymin + 2 * pad) * i / (steps - 1) + 0.000113 for i in range(steps)]
-    points = [(round(lat, 6), round(lng, 6)) for lat in lats for lng in lngs]
-    values = ",".join(f"({lng}, {lat})" for lat, lng in points)
-    expected = {
-        (round(float(y), 6), round(float(x), 6)): inside
-        for x, y, inside in db_query(
-            f"select x, y, exists(select 1 from stores_darkstore where is_active and "
-            f"ST_Contains(service_area, ST_SetSRID(ST_MakePoint(x, y), 4326))) "
-            f"from (values {values}) as p(x, y)"
-        )
-    }
-    mismatches, inside = [], 0
-    for lat, lng in points:
-        r = _check(api, lat, lng)
-        assert r.status_code == 200, describe(r)
-        inside += expected[(lat, lng)]
-        if r.json()["serviceable"] != expected[(lat, lng)]:
-            mismatches.append((lat, lng, expected[(lat, lng)]))
-    assert 0 < inside < steps * steps, "grid must cover both inside and outside points"
-    assert mismatches == []
+    sent = 0
+    for store_id, xmin, ymin, xmax, ymax in extents:
+        lngs = [xmin - pad + (xmax - xmin + 2 * pad) * i / (steps - 1) + 0.000137 for i in range(steps)]
+        lats = [ymin - pad + (ymax - ymin + 2 * pad) * i / (steps - 1) + 0.000113 for i in range(steps)]
+        points = [(round(lat, 6), round(lng, 6)) for lat in lats for lng in lngs]
+        values = ",".join(f"({lng}, {lat})" for lat, lng in points)
+        expected = {
+            (round(float(y), 6), round(float(x), 6)): inside
+            for x, y, inside in db_query(
+                f"select x, y, exists(select 1 from stores_darkstore where is_active and "
+                f"ST_Contains(service_area, ST_SetSRID(ST_MakePoint(x, y), 4326))) "
+                f"from (values {values}) as p(x, y)"
+            )
+        }
+        mismatches, inside = [], 0
+        for lat, lng in points:
+            if sent % 50 == 0:  # main (T-814): serviceability is 60/min per IP
+                clear_throttle("serviceability")
+            sent += 1
+            r = _check(api, lat, lng)
+            assert r.status_code == 200, describe(r)
+            inside += expected[(lat, lng)]
+            if r.json()["serviceable"] != expected[(lat, lng)]:
+                mismatches.append((lat, lng, expected[(lat, lng)]))
+        assert 0 < inside < steps * steps, f"store {store_id}: grid must cover inside and outside points"
+        assert mismatches == [], f"store {store_id}: {mismatches[:5]}"
 
 
 @pytest.mark.db

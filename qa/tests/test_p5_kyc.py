@@ -592,7 +592,7 @@ def test_p5_tc112_reveal_number_by_role(r1, role):
         assert out[0]["result"]["len"] == 10
 
 
-@pytest.mark.xfail(strict=True, reason="BUG-0013: body validation runs before the rider-profile check")
+# BUG-0013 fixed on main (verified 2026-11-16, f6ed556): profile check runs before body validation.
 @pytest.mark.parametrize("path", ["bank-account/", "documents/"])
 def test_p5_tc16_no_profile_invalid_body_still_403(api, path):
     """P5-TC-16 06 §3 Access: without a rider profile the answer is 403 rider_status NONE, whatever the body."""

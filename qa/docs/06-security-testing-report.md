@@ -104,3 +104,13 @@ Exploit-level details of open security findings are in `qa/private/` (gitignored
 - **Socket session checks:** a suspended rider's open socket is closed 4403 at the re-check (P6-TC-20 ✅); logging out of the panel closes the open ops feed 4401 (P6-TC-32 ✅); an access token expiring on an open order socket closes it 4401 at `exp` (P6-TC-09 ✅). The staff session idle/absolute policy holds (BUG-0006 verified).
 - **Fuzzing:** schemathesis on 19 rider operations (8 examples each, QA G's token): no 5xx, every response schema-valid (P5-TC-129 ✅).
 - No new security bug; nothing new in `qa/private/` (BUG-0023 and BUG-0024 are functional).
+
+## QA on main (2026-11-16, `f6ed556`)
+- **BUG-0013 Verified:** no rider profile + invalid body → 403 `PERMISSION_DENIED` `rider_status NONE` (the profile check now runs before body validation).
+- **BUG-0020 Verified:** an oversized socket message closes with 1009 on daphne; WARNING, no ERROR traceback.
+- **Refresh-token reuse (T-814 M2):** a reused, validly signed refresh token revokes every refresh token of the user (P1-TC-24c, 5/5 trials).
+- **App claim (T-219):** a customer token sent as the rider app → 403 `APP_HEADER_MISMATCH` (OBS-06 resolved). DL-74 (the rider API refuses customer-app tokens) is in progress; QA re-tests after the follow-up.
+- **Admin P2 role matrix (P2-TC-53):** every role that 05 §3 excludes gets 403 on the stores, catalog, collection, banner, inventory and stock-movement admin pages, and nobody can add inventory rows. Allowed roles could not be checked on banners, inventory and movements (500, OBS-M-01). Anonymous and customer-JWT access to P2 admin and ops pages is refused (P2-TC-44).
+- **Public bodies (P2-TC-40):** no PII in serviceability or the category tree; the other catalog bodies are blocked (OBS-M-01).
+- **Throttles (T-814):** serviceability 60/min per IP enforced with the JSON envelope (P2-TC-52).
+- No new security bug. `qa/private/` holds no new exploit detail.

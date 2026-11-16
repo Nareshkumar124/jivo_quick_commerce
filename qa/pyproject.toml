@@ -25,6 +25,7 @@ addopts = "-ra --strict-markers"
 markers = [
     "smoke: regression smoke (🔥) cases",
     "limits: rate-limit / lockout tests (stateful; clear own Redis DB counters first)",
+    "keep_throttles: do not clear the per-test scope throttles (the test checks a limit)",
     "profile_staging: needs the instance started with --profile staging (DEBUG off)",
     "profile_redis_down: needs the instance started with --profile redis-down",
     "profile_daylimit: needs the instance started with --profile daylimit",
