@@ -7,8 +7,9 @@
   The gateway call runs outside any row lock.
 - **The server confirms payment** (`record_credit`): the signed webhook `qr_code.credited`, or a
   gateway lookup (`refresh`) when the rider delivers with UPI or asks for the QR again (a missed
-  webhook). The QR becomes PAID only when it is open, the amount is the QR's amount and the
-  order's `grand_total`, and the order is still out for delivery with the rider at the customer.
+  webhook). The QR becomes PAID only when it is open and not past `expires_at` (BUG-0025), the
+  amount is the QR's amount and the order's `grand_total`, and the order is still out for
+  delivery with the rider at the customer.
 - **Any other credit is refunded in full** automatically to the UPI payment (reason
   `cod_qr_unused`, key `codqr:<payment id>`) and ops are alerted (`COD_QR_REFUNDED`): a payment on
   a QR closed because cash was taken, on an expired QR, of a wrong amount, or after the delivery
@@ -258,8 +259,12 @@ def record_credit(
             raw=raw or {},
             captured_at=now,
         )
+        # BUG-0025: a PENDING QR past `expires_at` is EXPIRED (as `display_status` shows the
+        # rider), even when nobody asked for a new one: a late credit on it is refunded.
+        expired = qr.status == CodQrStatus.PENDING and qr.expires_at <= now
         accepted = (
             qr.status == CodQrStatus.PENDING
+            and not expired
             and amount == qr.amount
             and amount == order.grand_total
             and order.payment_method == PaymentMethod.COD
@@ -274,7 +279,7 @@ def record_credit(
             logger.info("COD QR %s paid for order %s", gateway_qr_id, order.order_number)
             return "paid"
         request_refund(payment, amount, reason=COD_QR_UNUSED, key=f"codqr:{payment_id}")
-        close(qr, now)
+        close(qr, now, CodQrStatus.EXPIRED if expired else CodQrStatus.CANCELLED)
         data = {
             "order_id": order.pk,
             "order_number": order.order_number,
