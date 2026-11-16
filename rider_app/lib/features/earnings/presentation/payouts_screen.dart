@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../shared/widgets/label_value_row.dart';
 import '../../../app/routes.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -57,38 +58,35 @@ class _PayoutTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(period, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 4),
-                      Text(
-                        paid ? l10n.payoutPaid : l10n.payoutPending,
-                        key: Key('payout-${payout.id}-status'),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: paid
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.tertiary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (payout.reference case final reference?)
-                        Text(l10n.payoutReference(reference)),
-                      if (payout.paidAt case final paidAt?)
-                        Text(l10n.payoutPaidOn(istDayOf(context, paidAt))),
-                    ],
+            LabelValueRow(
+              label: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(period, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    paid ? l10n.payoutPaid : l10n.payoutPending,
+                    key: Key('payout-${payout.id}-status'),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: paid
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.tertiary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
+                  if (payout.reference case final reference?)
+                    Text(l10n.payoutReference(reference)),
+                  if (payout.paidAt case final paidAt?)
+                    Text(l10n.payoutPaidOn(istDayOf(context, paidAt))),
+                ],
+              ),
+              value: Text(
+                formatRupees(payout.amount),
+                textAlign: TextAlign.end,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-                Text(
-                  formatRupees(payout.amount),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
+              ),
             ),
             Align(
               alignment: Alignment.centerRight,

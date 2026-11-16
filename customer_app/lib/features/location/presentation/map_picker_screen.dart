@@ -19,6 +19,15 @@ const kDefaultMapCenter = (lat: 28.613939, lng: 77.209023);
 /// its address.
 typedef PickedLocation = ({GeoPoint point, String? address});
 
+/// The picker's route `extra` when it is opened from the address form
+/// (CA-07): there, "Enter address manually" just goes back to the form.
+class MapPickerArgs {
+  const MapPickerArgs({this.initial, this.fromAddressForm = false});
+
+  final GeoPoint? initial;
+  final bool fromAddressForm;
+}
+
 /// Builds the map under the pin. A provider, so widget tests can swap the
 /// Mappls platform view for a plain widget.
 typedef PinMapBuilder = Widget Function({
@@ -55,9 +64,16 @@ Widget _mapplsMap({
 /// app (see README). Without it, or when the map reports an error (e.g.
 /// authentication), a fallback offers the current location or manual entry.
 class MapPickerScreen extends ConsumerStatefulWidget {
-  const MapPickerScreen({this.initial, super.key});
+  const MapPickerScreen({
+    this.initial,
+    this.fromAddressForm = false,
+    super.key,
+  });
 
   final GeoPoint? initial;
+
+  /// Opened from the address form: manual entry returns to it.
+  final bool fromAddressForm;
 
   @override
   ConsumerState<MapPickerScreen> createState() => _MapPickerScreenState();
@@ -77,7 +93,9 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
           initial: widget.initial ?? kDefaultMapCenter,
           onMapError: () => setState(() => _mapFailed = true),
         ),
-        AsyncData() || AsyncError() => const _MapUnavailable(),
+        AsyncData() || AsyncError() => _MapUnavailable(
+          fromAddressForm: widget.fromAddressForm,
+        ),
         _ => const Center(child: CircularProgressIndicator()),
       },
     );
@@ -247,7 +265,9 @@ class _PinMapState extends ConsumerState<_PinMap> {
 /// No map in this build (or it failed to load): current location or manual
 /// address entry.
 class _MapUnavailable extends ConsumerStatefulWidget {
-  const _MapUnavailable();
+  const _MapUnavailable({required this.fromAddressForm});
+
+  final bool fromAddressForm;
 
   @override
   ConsumerState<_MapUnavailable> createState() => _MapUnavailableState();
@@ -329,8 +349,14 @@ class _MapUnavailableState extends ConsumerState<_MapUnavailable> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () => context.pushReplacement(Routes.newAddress),
-                child: Text(l10n.enterAddressManually),
+                onPressed: () => widget.fromAddressForm
+                    ? context.pop()
+                    : context.pushReplacement(Routes.newAddress),
+                child: Text(
+                  widget.fromAddressForm
+                      ? l10n.mapBackToForm
+                      : l10n.enterAddressManually,
+                ),
               ),
             ),
           ],

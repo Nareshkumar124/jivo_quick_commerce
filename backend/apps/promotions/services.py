@@ -1,6 +1,8 @@
 """Coupon rules (07 §2.5, 08 §6.2) and the use of coupons by orders (08 T1-T5).
 
 Checks, in this order (the first failure is the answer):
+0. a personal coupon (`owner` set) of another customer -> `COUPON_INVALID`, exactly as an
+   unknown code (added 2026-11-13; re-checked on the locked row when an order uses it);
 1. inactive or not started -> `COUPON_INVALID`; 2. expired -> `COUPON_EXPIRED`;
 3. not offered at this store -> `COUPON_NOT_ELIGIBLE` (STORE);
 4. used up overall or by this customer -> `COUPON_USAGE_EXCEEDED` (scope total / per_user);
@@ -16,15 +18,21 @@ or only the coupon's categories), so never above the item total.
 
 Usage limits count HELD and APPLIED redemptions. `hold_coupon()` / `apply_coupon_now()` lock the
 coupon row, so two orders racing for a coupon's last use cannot both get it.
+
+Panel edits (T-406c) go through `save_coupon()`: the code is fixed once the coupon is used, the
+total limit never goes below the uses already counted (both checked on the locked row), and a
+code taken by a concurrent save is a `ValidationError`, not a 500.
 """
 
+import secrets
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Protocol
 
-from django.db import connection
+from django.core.exceptions import NON_FIELD_ERRORS, ValidationError
+from django.db import IntegrityError, connection, transaction
 from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 
@@ -167,6 +175,11 @@ def _money(value: Decimal) -> str:
     return str(Decimal(value).quantize(CENT, rounding=ROUND_HALF_UP))
 
 
+def is_for(coupon: Coupon, user) -> bool:
+    """A public coupon is for everyone; a personal one only for its owner."""
+    return coupon.owner_id is None or coupon.owner_id == getattr(user, "pk", None)
+
+
 def is_live(coupon: Coupon, now: datetime) -> bool:
     return coupon.is_active and (coupon.starts_at is None or coupon.starts_at <= now)
 
@@ -194,7 +207,7 @@ def check_coupon(
     """Apply the rules (module docstring) to the cart's lines. `usage`/`placed_before` may be
     passed in when checking many coupons at once."""
     now = now or timezone.now()
-    if not is_live(coupon, now):
+    if not is_for(coupon, user) or not is_live(coupon, now):
         return CouponCheck(coupon, ErrorCode.COUPON_INVALID, MSG_INVALID)
     if is_expired(coupon, now):
         return CouponCheck(coupon, ErrorCode.COUPON_EXPIRED, MSG_EXPIRED)
@@ -239,10 +252,15 @@ def check_coupon(
     return CouponCheck(coupon, discount=coupon_discount(coupon, lines))
 
 
-def listed_coupons(store_id: int, now: datetime) -> QuerySet[Coupon]:
-    """Visible coupons valid at `store_id` now (usage limits are checked per customer)."""
+def listed_coupons(store_id: int, now: datetime, user=None) -> QuerySet[Coupon]:
+    """Visible coupons valid at `store_id` now (usage limits are checked per customer): the
+    public ones plus `user`'s own personal coupons (never another customer's)."""
+    owner = Q(owner__isnull=True)
+    if getattr(user, "pk", None) is not None:
+        owner |= Q(owner=user)
     return (
         Coupon.objects.filter(is_active=True, is_visible=True)
+        .filter(owner)
         .filter(Q(starts_at__isnull=True) | Q(starts_at__lte=now))
         .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now))
         .filter(Q(stores__isnull=True) | Q(stores=store_id))
@@ -264,7 +282,7 @@ def coupon_offers(
     """The 'Apply coupon' sheet (`CouponOffer` dicts): eligible first by savings, then the
     rest by code. Coupons this customer (or everyone) has used up are left out."""
     now = now or timezone.now()
-    coupons = list(listed_coupons(store_id, now))
+    coupons = list(listed_coupons(store_id, now, user))
     usages = usage_for(coupons, user)
     placed_before = has_placed_order(user) if any(c.first_order_only for c in coupons) else False
     offers = []
@@ -315,6 +333,7 @@ def offer_body(check: CouponCheck, *, applied: bool) -> dict:
         "amount_to_unlock": (
             _money(check.amount_to_unlock) if check.amount_to_unlock is not None else None
         ),
+        "is_personal": coupon.owner_id is not None,
     }
 
 
@@ -331,7 +350,7 @@ def _use(order, coupon: Coupon, discount: Decimal, status: RedemptionStatus) -> 
         raise RuntimeError("Coupon use must run inside the order-placement transaction.")
     locked = Coupon.objects.select_for_update().get(pk=coupon.pk)
     now = timezone.now()
-    if not is_live(locked, now):
+    if not is_for(locked, order.user) or not is_live(locked, now):
         raise CouponCheck(locked, ErrorCode.COUPON_INVALID, MSG_INVALID).as_error()
     if is_expired(locked, now):
         raise CouponCheck(locked, ErrorCode.COUPON_EXPIRED, MSG_EXPIRED).as_error()
@@ -382,3 +401,158 @@ def release_coupon(order) -> bool:
 def reverse_coupon(order) -> bool:
     """08 T11/T12 (Phase 4): a cancelled order gives the coupon back."""
     return _move(order, RedemptionStatus.APPLIED, RedemptionStatus.REVERSED)
+
+
+# --------------------------------------------------------------------------- personal coupons
+
+# Generated codes: easy to read aloud (no I, O, 0 or 1).
+PERSONAL_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+PERSONAL_CODE_LENGTH = 8
+PERSONAL_CODE_ATTEMPTS = 5
+
+
+def personal_code(prefix: str) -> str:
+    random_part = "".join(
+        secrets.choice(PERSONAL_CODE_ALPHABET) for _ in range(PERSONAL_CODE_LENGTH)
+    )
+    return f"{prefix}{random_part}"
+
+
+def create_personal_coupon(
+    owner,
+    *,
+    amount: Decimal,
+    valid_days: int,
+    min_order_value: Decimal,
+    title: str,
+    description: str = "",
+    prefix: str = "REF",
+    now: datetime | None = None,
+) -> Coupon:
+    """A FLAT `amount` coupon only `owner` can see and use, once, until `now + valid_days`
+    (added 2026-11-13 for referral rewards). Its code is generated (`prefix` + 8 characters); a
+    clash with an existing code (any case) is retried with a new code. Runs in the caller's
+    transaction (a savepoint per attempt)."""
+    now = now or timezone.now()
+    for _attempt in range(PERSONAL_CODE_ATTEMPTS):
+        coupon = Coupon(
+            code=personal_code(prefix),
+            title=title[:80],
+            description=description[:200],
+            discount_type=DiscountType.FLAT,
+            value=amount,
+            min_order_value=min_order_value,
+            starts_at=None,
+            ends_at=now + timedelta(days=valid_days),
+            usage_limit_total=1,
+            usage_limit_per_user=1,
+            first_order_only=False,
+            is_active=True,
+            is_visible=True,
+            owner=owner,
+        )
+        try:
+            with transaction.atomic():
+                coupon.save()
+        except IntegrityError as error:
+            if is_code_conflict(error):
+                continue
+            raise
+        return coupon
+    raise RuntimeError("Could not generate a unique personal coupon code.")
+
+
+# --------------------------------------------------------------------------- panel edits (T-406c)
+
+MSG_CODE_TAKEN = "A coupon with this code already exists (codes ignore upper and lower case)."
+MSG_CODE_LOCKED = (
+    "The code cannot change once the coupon has been used: customers and orders refer to it. "
+    "Create a new coupon instead."
+)
+MSG_LIMIT_BELOW_USES = (
+    "This coupon has already been used {uses} time(s) (orders awaiting payment included); the "
+    "total limit cannot be lower. Switch the coupon off to stop further use."
+)
+MSG_COUPON_GONE = "This coupon was deleted meanwhile: nothing was saved. Reload the list."
+# The database's case-insensitive uniqueness rule for codes (`Coupon.Meta.constraints`).
+CODE_UNIQUE_CONSTRAINT = "coupon_code_unique_ci"
+
+
+def counted_uses(coupon: Coupon) -> int:
+    """Uses that count against the coupon's limits (HELD + APPLIED), as `_use` counts them."""
+    if coupon.pk is None:
+        return 0
+    return CouponRedemption.objects.filter(coupon_id=coupon.pk, status__in=COUNTED_STATUSES).count()
+
+
+def is_used(coupon: Coupon | None) -> bool:
+    """Any redemption (any status) or order refers to the coupon: its code is then fixed."""
+    if coupon is None or coupon.pk is None:
+        return False
+    return coupon.redemptions.exists() or coupon.orders.exists()
+
+
+def coupon_edit_errors(coupon: Coupon, stored: Coupon | None = None) -> dict[str, str]:
+    """T-406c (T-304 review Minors 3-4): why `coupon` (edited, not yet saved) may not replace
+    its stored row, as {field: message}; empty when the edit is allowed. A new coupon has none.
+    - `code`: cannot change once the coupon is used (customers and orders refer to it);
+    - `usage_limit_total`: cannot go below the uses already counted (HELD + APPLIED).
+    `stored` is the current row (the caller's locked copy); read from the database if omitted.
+    Code uniqueness is the database's rule (`save_coupon` turns its refusal into an error)."""
+    if coupon.pk is None:
+        return {}
+    if stored is None:
+        stored = Coupon.objects.filter(pk=coupon.pk).first()
+        if stored is None:
+            return {}
+    errors: dict[str, str] = {}
+    if normalise_code(coupon.code) != stored.code and is_used(stored):
+        errors["code"] = MSG_CODE_LOCKED
+    if coupon.usage_limit_total is not None:
+        uses = counted_uses(stored)
+        if coupon.usage_limit_total < uses:
+            errors["usage_limit_total"] = MSG_LIMIT_BELOW_USES.format(uses=uses)
+    return errors
+
+
+def is_code_conflict(error: IntegrityError) -> bool:
+    """The database refused a coupon save because another coupon has the code (any case)."""
+    diag = getattr(error.__cause__, "diag", None)
+    name = getattr(diag, "constraint_name", None) or ""
+    return name == CODE_UNIQUE_CONSTRAINT or CODE_UNIQUE_CONSTRAINT in str(error)
+
+
+def save_coupon(coupon: Coupon) -> Coupon:
+    """The one door for creating or editing a coupon from the panel (T-406c). Raises
+    `django.core.exceptions.ValidationError` with a message per field (`code`,
+    `usage_limit_total`) and saves nothing when the change is refused:
+    - the edit guards of `coupon_edit_errors`, checked on the **locked** coupon row: the lock
+      `hold_coupon` / `apply_coupon_now` take before counting a use, so no use can slip in
+      between this check and the save (the form's own check can be raced);
+    - two staff saving the same code at once: the database refuses the second
+      (`coupon_code_unique_ci`) and that becomes an error on `code`, never a 500;
+    - a coupon deleted meanwhile (its pk has no row any more) is refused with a form-level
+      error (`NON_FIELD_ERRORS`, `MSG_COUPON_GONE`), never inserted again (code review).
+    Every refusal is a dict error, so a form takes it whole: `form.add_error(None, error)`.
+    Runs in its own transaction (a savepoint inside the caller's, e.g. the admin's request), so
+    the caller's transaction stays usable after a refusal. Saves only the row: many-to-many
+    fields (`stores`, `categories`) are the caller's to save after it (the admin's
+    `save_related`). History is recorded by the model (django-simple-history)."""
+    with transaction.atomic():
+        if coupon.pk is not None:
+            stored = Coupon.objects.select_for_update().filter(pk=coupon.pk).first()
+            if stored is None:
+                gone = ValidationError(MSG_COUPON_GONE, code="not_found")
+                raise ValidationError({NON_FIELD_ERRORS: [gone]})
+            errors = coupon_edit_errors(coupon, stored)
+            if errors:
+                raise ValidationError(errors)
+        try:
+            with transaction.atomic():
+                coupon.save()
+        except IntegrityError as error:
+            if is_code_conflict(error):
+                taken = ValidationError(MSG_CODE_TAKEN, code="code_taken")
+                raise ValidationError({"code": [taken]}) from error
+            raise
+    return coupon

@@ -16,9 +16,13 @@ class FakeShiftBackend implements ShiftRepository {
   /// Who ended the last shift, for [status] (e.g. `system` = auto-offline).
   ShiftEndedBy? endedBy;
 
-  /// Thrown (once) by the next [start] / [end].
+  /// The task the server has the rider on, for [status] (`active_task_id`).
+  int? activeTaskId;
+
+  /// Thrown (once) by the next [start] / [end] / [status].
   ApiError? nextStartError;
   ApiError? nextEndError;
+  ApiError? nextStatusError;
 
   /// Calls, for tests: `start(lat,lng)`, `end` and `status`.
   final calls = <String>[];
@@ -62,7 +66,16 @@ class FakeShiftBackend implements ShiftRepository {
   @override
   Future<ShiftStatus> status() async {
     calls.add('status');
-    return ShiftStatus(isOnline: online, endedBy: online ? null : endedBy);
+    final error = nextStatusError;
+    if (error != null) {
+      nextStatusError = null;
+      throw error;
+    }
+    return ShiftStatus(
+      isOnline: online,
+      endedBy: online ? null : endedBy,
+      activeTaskId: activeTaskId,
+    );
   }
 }
 

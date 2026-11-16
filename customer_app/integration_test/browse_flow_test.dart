@@ -24,7 +24,6 @@ import 'package:customer_app/features/auth/presentation/login_screen.dart';
 import 'package:customer_app/features/auth/presentation/otp_screen.dart';
 import 'package:customer_app/features/cart/presentation/cart_controller.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_controllers.dart';
-import 'package:customer_app/features/home/presentation/banner_carousel.dart';
 import 'package:customer_app/features/location/data/maps_availability.dart';
 import 'package:customer_app/features/location/data/serviceability_repository.dart';
 import 'package:customer_app/features/location/presentation/delivery_controller.dart';
@@ -111,7 +110,6 @@ void main() {
               const FakeMapsAvailability(),
             ),
             // A still home lets the frames settle.
-            bannerAutoScrollProvider.overrideWithValue(null),
           ],
         ),
       );
@@ -237,6 +235,10 @@ void main() {
             .first,
       );
       await tester.tap(add);
+      // ADD opens "Enter quantity", prefilled with the minimum.
+      final update = find.byKey(const Key('qty-update'));
+      await pumpUntilFound(tester, update);
+      await tester.tap(update);
       await pumpUntilFound(tester, find.byKey(const Key('cart-bar')));
       final cart = container.read(cartProvider).snapshot;
       log(

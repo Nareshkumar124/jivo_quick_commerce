@@ -17,11 +17,14 @@ sealed class RiderPush {
     switch (data[typeKey]) {
       case 'offer.new':
         return OfferPush(id('offer_id'));
-      case 'offer.withdrawn':
+      case 'offer.withdrawn' || 'offer.expired':
         final offerId = id('offer_id');
         return offerId == null
             ? const UnknownPush()
-            : OfferWithdrawnPush(offerId);
+            : OfferWithdrawnPush(
+                offerId,
+                expired: data[typeKey] == 'offer.expired',
+              );
       case 'task.updated':
         return TaskUpdatedPush(id('task_id'));
       case 'cash.updated':
@@ -44,11 +47,14 @@ class OfferPush extends RiderPush {
   final int? offerId;
 }
 
-/// `offer.withdrawn`: the order was cancelled before the rider accepted.
+/// `offer.withdrawn`: the order was cancelled before the rider accepted (the
+/// FCM payload carries no reason). `offer.expired` (06 §4.3, api-requests
+/// #49): the 30 s ran out on the server ([expired]).
 class OfferWithdrawnPush extends RiderPush {
-  const OfferWithdrawnPush(this.offerId);
+  const OfferWithdrawnPush(this.offerId, {this.expired = false});
 
   final int offerId;
+  final bool expired;
 }
 
 /// `task.updated`: the store packed the order, the order was cancelled, ...

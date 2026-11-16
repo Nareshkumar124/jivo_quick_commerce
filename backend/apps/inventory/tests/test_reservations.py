@@ -79,6 +79,20 @@ def test_short_lines_are_all_listed_and_nothing_is_reserved(setup):
     assert not StockReservation.objects.exists()
 
 
+def test_short_line_below_minimum_reports_zero(setup):
+    """Min qty per order: a short line whose free units are below the variant's minimum is
+    reported with orderable_quantity 0 (not the few units that cannot be sold)."""
+    store, _, _, order = setup
+    carton = VariantFactory(max_qty_per_order=50, min_qty_per_order=5)
+    stock(store, carton, 7, reserved=3)  # 4 free < 5
+    with transaction.atomic(), pytest.raises(ApiError) as caught:
+        services.reserve(order, store.pk, [ReservationLine(carton.pk, 5, 50, 5)])
+    assert caught.value.details == {
+        "items": [{"variant_id": carton.pk, "requested_quantity": 5, "orderable_quantity": 0}]
+    }
+    assert row(store, carton).reserved == 3
+
+
 def test_switched_off_item_is_not_reservable(setup):
     store, a, _, order = setup
     StoreInventory.objects.filter(store=store, variant=a).update(is_available=False)

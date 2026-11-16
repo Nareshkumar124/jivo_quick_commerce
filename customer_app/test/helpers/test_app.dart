@@ -10,10 +10,10 @@ import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/data/fake_token_refresher.dart';
 import 'package:customer_app/features/cart/data/cart_repository.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
+import 'package:customer_app/features/catalog/data/catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
 import 'package:customer_app/features/checkout/data/fake_payment_launcher.dart';
 import 'package:customer_app/features/checkout/data/payment_launcher.dart';
-import 'package:customer_app/features/home/presentation/banner_carousel.dart';
 import 'package:customer_app/features/launch/data/config_repository.dart';
 import 'package:customer_app/features/location/data/delivery_location_store.dart';
 import 'package:customer_app/features/location/data/maps_availability.dart';
@@ -22,6 +22,7 @@ import 'package:customer_app/features/location/data/serviceability_repository.da
 import 'package:customer_app/features/location/domain/delivery_location.dart';
 import 'package:customer_app/features/notifications/data/notification_repository.dart';
 import 'package:customer_app/features/profile/data/profile_repository.dart';
+import 'package:customer_app/features/referral/data/referral_repository.dart';
 import 'package:customer_app/features/tracking/data/order_socket.dart';
 import 'package:customer_app/features/tracking/presentation/order_live.dart';
 import 'package:customer_app/shared/connectivity/connectivity.dart';
@@ -56,6 +57,7 @@ class TestApp {
     String? autofillCode,
     FakeCommerceBackend? commerce,
     this.cartRepository,
+    this.catalogRepository,
     this.realtime = const DisabledOrderRealtime(),
     this.notifications = const UnavailableNotificationRepository(),
   }) : autofill = FakeOtpAutofill(autofillCode),
@@ -75,6 +77,9 @@ class TestApp {
   final config = FakeConfigRepository();
   final auth = FakeAuthRepository();
   final profile = FakeProfileRepository();
+
+  /// Refer a friend: a new customer who can still enter a code.
+  final referral = FakeReferralRepository();
   final addresses = FakeAddressRepository();
   final location = FakeDeviceLocation();
   final catalog = FakeCatalogRepository(latency: Duration.zero);
@@ -91,6 +96,10 @@ class TestApp {
 
   /// Replaces [cart] as the cart repository only (orders stay on [cart]).
   final CartRepository? cartRepository;
+
+  /// Replaces [catalog] (e.g. the API repository over fake HTTP with
+  /// server-shaped payloads).
+  final CatalogRepository? catalogRepository;
 
   /// How the fake payment sheet answers (no sheet in widget tests).
   FakePaymentChoice Function(PaymentRequest request) onPay = (_) =>
@@ -135,12 +144,15 @@ class TestApp {
           configRepositoryProvider.overrideWithValue(config),
           authRepositoryProvider.overrideWithValue(auth),
           profileRepositoryProvider.overrideWithValue(profile),
+          referralRepositoryProvider.overrideWithValue(referral),
           addressRepositoryProvider.overrideWithValue(addresses),
           deviceLocationProvider.overrideWithValue(location),
           otpAutofillProvider.overrideWithValue(autofill),
           urlOpenerProvider.overrideWithValue(urls),
           connectivityStreamProvider.overrideWithValue(connectivity.stream),
-          catalogRepositoryProvider.overrideWithValue(catalog),
+          catalogRepositoryProvider.overrideWithValue(
+            catalogRepository ?? catalog,
+          ),
           serviceabilityRepositoryProvider.overrideWithValue(serviceability),
           cartRepositoryProvider.overrideWithValue(cartRepository ?? cart),
           orderRepositoryProvider.overrideWithValue(cart),
@@ -150,7 +162,6 @@ class TestApp {
             FakeMapsAvailability(available: mapsAvailable),
           ),
           reverseGeocoderProvider.overrideWithValue(geocoder),
-          bannerAutoScrollProvider.overrideWithValue(null),
           orderRealtimeProvider.overrideWithValue(realtime),
           notificationRepositoryProvider.overrideWithValue(notifications),
           ...extraOverrides,

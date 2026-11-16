@@ -1,0 +1,16 @@
+# osv-scanner config: the ONLY place for reviewed advisory exceptions (docs/deployment.md §2.2).
+# CI (.github/workflows/dependency-scan.yml) always passes it with --config, so an
+# osv-scanner.toml placed next to a lockfile is ignored and cannot hide an advisory.
+#
+# Prefer upgrading the package. Add an exception only when there is no fixed version yet, or the
+# vulnerable code path is provably not used, and only through a reviewed change:
+# - id: the advisory id that osv-scanner prints (GHSA-..., PYSEC-...); its aliases go with it.
+# - ignoreUntil: an expiry date at most 90 days ahead, so the exception is looked at again.
+#   (osv-scanner 2.7.1 renames it to effectiveUntil; switch when the pin is upgraded.)
+# - reason: why it is safe, and the tracker task that removes it.
+#
+# Example (do not uncomment as is):
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = 2027-01-31
+# reason = "No fix released yet; we never call the affected API (T-nnn tracks the upgrade)."

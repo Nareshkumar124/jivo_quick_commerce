@@ -20,6 +20,19 @@ class OrderAgainScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final storeId = ref.watch(currentStoreIdProvider);
+    ref.listen(homeFeedProvider, (previous, next) {
+      if (isFailedRefresh(previous, next) &&
+          next.value?.store?.id == ref.read(currentStoreIdProvider)) {
+        showRefreshFailed(context, () => ref.invalidate(homeFeedProvider));
+      }
+    });
+    final feed = ref.watch(homeFeedProvider);
+    // This store's feed, also when a refresh failed (CA-03).
+    final shown = switch (feed) {
+      AsyncData(:final value) => value,
+      AsyncError(:final value?) when value.store?.id == storeId => value,
+      _ => null,
+    };
     return Scaffold(
       appBar: AppBar(title: Text(l10n.tabOrderAgain)),
       body: storeId == null
@@ -31,18 +44,19 @@ class OrderAgainScreen extends ConsumerWidget {
                 child: Text(l10n.selectLocation),
               ),
             )
-          : switch (ref.watch(homeFeedProvider)) {
-              AsyncData(:final value) when value.buyAgain.isEmpty => EmptyView(
+          : switch (feed) {
+              _ when shown != null && shown.buyAgain.isEmpty => EmptyView(
                 message: l10n.orderAgainEmpty,
                 icon: Icons.replay,
               ),
-              AsyncData(:final value) => RefreshIndicator(
-                onRefresh: () => ref.refresh(homeFeedProvider.future),
+              _ when shown != null => RefreshIndicator(
+                onRefresh: () =>
+                    refreshQuietly(ref.refresh(homeFeedProvider.future)),
                 child: CustomScrollView(
                   slivers: [
                     SliverPadding(
                       padding: const EdgeInsets.all(JivoSpacing.sm),
-                      sliver: SliverProductGrid(items: value.buyAgain),
+                      sliver: SliverProductGrid(items: shown.buyAgain),
                     ),
                   ],
                 ),

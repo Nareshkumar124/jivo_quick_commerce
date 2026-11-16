@@ -216,23 +216,42 @@ class TaskFlowController extends Notifier<TaskFlowState> {
 
   bool get _active => ref.mounted && ref.read(riderWorkActiveProvider);
 
+  /// The newest [load]: only its answer is applied.
+  int _fetches = 0;
+
+  /// Bumped whenever the task on screen is replaced by a newer answer than
+  /// a fetch can have: an action's response, its reconcile, the accept or
+  /// "Done". A fetch that left before such a change answers with an older
+  /// picture (P8: a slow poll put ASSIGNED back over AT_STORE, or reported
+  /// a just-accepted task as reassigned), so it is dropped.
+  int _changes = 0;
+
   /// `GET /rider/tasks/current/` and show that step. [force] runs it even
   /// while another refresh is in flight (after an uncertain accept, the
   /// caller must see this fetch's answer).
   Future<void> load({bool force = false}) async {
     if (!_active || (state.refreshing && !force)) return;
+    final fetch = ++_fetches;
+    final changesAtStart = _changes;
     state = state.copyWith(refreshing: true);
     try {
       final current = await _repo.fetchCurrentTask();
-      if (!ref.mounted) return;
+      if (!ref.mounted || fetch != _fetches) return;
+      if (changesAtStart != _changes || state.busy != null) {
+        // Overtaken: what is on screen (or the action in flight) is newer.
+        // The next poll reads again.
+        state = state.copyWith(refreshing: false, loaded: true);
+        return;
+      }
       _applyFetched(current);
     } on Object catch (e) {
       final error = ApiError.from(e);
       if (!ref.mounted) return;
       reportAppControlError(ref, error);
+      debugPrint('TaskFlowController.load: ${error.code}');
+      if (fetch != _fetches) return;
       // Keep what is on screen; the next resume or Retry tries again.
       state = state.copyWith(refreshing: false, loaded: true);
-      debugPrint('TaskFlowController.load: ${error.code}');
     } finally {
       _armPoll();
     }
@@ -310,6 +329,7 @@ class TaskFlowController extends Notifier<TaskFlowState> {
 
   /// The offer was accepted: the task starts (ASSIGNED).
   void assigned(RiderTask task) {
+    _changes++;
     _setTask(task);
     state = TaskFlowState(loaded: true, task: task);
     _syncPickup(task);
@@ -430,6 +450,7 @@ class TaskFlowController extends Notifier<TaskFlowState> {
   void finish() {
     final task = state.task;
     if (task != null && !task.status.isTerminal) return;
+    _changes++;
     _setTask(null);
     state = const TaskFlowState(loaded: true);
     _armPoll();
@@ -488,6 +509,7 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     try {
       final updated = await call(task);
       if (!ref.mounted) return false;
+      _changes++;
       _setTask(updated);
       state = state.copyWith(task: updated, clearBusy: true);
       _syncPickup(updated);
@@ -516,6 +538,9 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       if (error.isWaitNotElapsed && notReachableAfter != null) {
         latest = latest.copyWith(notReachableAfter: notReachableAfter);
       }
+      // The server's answer (attempts left, a lock, the wait) is newer than
+      // any fetch still in flight.
+      _changes++;
       switch (error.code) {
         case ApiErrorCode.deliveryOtpInvalid:
           final left = error.attemptsRemaining;
@@ -556,6 +581,7 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     try {
       final fetched = await _repo.fetchCurrentTask();
       if (!ref.mounted) return;
+      _changes++;
       _applyFetched(fetched, afterUncertain: action);
       if (keepError && state.task?.status == before && error != null) {
         state = state.copyWith(error: error);

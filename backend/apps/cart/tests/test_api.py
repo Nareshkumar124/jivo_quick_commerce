@@ -95,6 +95,11 @@ class TestReadingTheCart:
             "amount_to_min_order": "99.00",
             "free_delivery_threshold": "299.00",
             "amount_to_free_delivery": "299.00",
+            "min_order_units": 0,
+            "units_to_min_order": None,
+            "order_unit_label": "items",
+            "tier_units": 0,
+            "next_price_tier": None,
         }
         assert body["address"] is None
         assert body["coupon"] is None

@@ -132,11 +132,17 @@ def _after_change(rider: Rider, now) -> list[str]:
 # --------------------------------------------------------------------------- register & edit
 
 
+def require_can_register(user) -> None:
+    """403 `PERMISSION_DENIED` for staff accounts: they cannot register as riders. The view
+    calls it before reading the body, so the refusal never depends on the body (BUG-0013)."""
+    if user.is_staff:
+        raise ApiError(ErrorCode.PERMISSION_DENIED, MSG_STAFF)
+
+
 def register(user, data: dict) -> Rider:
     """`POST /rider/register/`: create the profile in PENDING_KYC (04 §2.2). Once only (409
     `INVALID_STATE_TRANSITION` after that; edit with PATCH /rider/me/)."""
-    if user.is_staff:
-        raise ApiError(ErrorCode.PERMISSION_DENIED, MSG_STAFF)
+    require_can_register(user)
     store = _store(data["preferred_store_id"])
     existing = rider_for(user)
     if existing is not None:

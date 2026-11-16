@@ -110,6 +110,34 @@ class RiderAccountController extends Notifier<RiderAccountState> {
     }
   }
 
+  /// Re-reads `rider_status` (`GET /me/`) while staying on the current
+  /// screen, unlike [load], which goes back to the splash first. For the
+  /// status screens: "Check status" and every return to the app (UX audit
+  /// RA-06). A changed status re-routes; an error is rethrown for the
+  /// screen (the session ends only on a rejected token, as in [load]).
+  Future<void> refreshStatus() async {
+    final current = state;
+    if (current is! AccountLoaded) return load();
+    try {
+      final me = await ref.read(accountRepositoryProvider).fetchMe();
+      if (!_session.isSignedIn) return;
+      final now = state;
+      if (now is AccountLoaded && now.riderStatus != me.riderStatus) {
+        state = AccountLoaded(user: me, riderStatus: me.riderStatus);
+      }
+    } on Object catch (e) {
+      final error = ApiError.from(e);
+      if (!_session.isSignedIn) return;
+      if (error.code == ApiErrorCode.authRequired ||
+          error.code == ApiErrorCode.tokenInvalid) {
+        await _session.signOut(reason: SignOutReason.sessionExpired);
+        return;
+      }
+      reportAppControlError(ref, error);
+      throw error;
+    }
+  }
+
   /// After a successful OTP verify. The account is set before the session
   /// announces `signedIn`, so the router goes straight to the right screen.
   Future<void> signedIn(AuthSession session) async {
@@ -146,16 +174,25 @@ class RiderAccountController extends Notifier<RiderAccountState> {
     state = AccountLoaded(user: current.user, riderStatus: status);
   }
 
-  /// Logout (04 §2.9): refused while online. Otherwise revokes the refresh
-  /// token on the server (best effort) and ends the local session, which
-  /// deletes the location buffer through the sign-out hook.
-  Future<LogoutResult> logout() async {
+  /// Why logout is refused right now (during a task, or online), or null.
+  /// The UI asks this before its confirmation dialog (UX audit RA-11), so a
+  /// refused logout explains itself instead of asking "Log out?" first.
+  Future<LogoutResult?> logoutBlocker() async {
     if (ref.read(taskBlocksGoingOfflineProvider)) {
       return LogoutResult.blockedDuringTask;
     }
     if (await ref.read(locationServiceClientProvider).isRunning()) {
       return LogoutResult.blockedWhileOnline;
     }
+    return null;
+  }
+
+  /// Logout (04 §2.9): refused while online. Otherwise revokes the refresh
+  /// token on the server (best effort) and ends the local session, which
+  /// deletes the location buffer through the sign-out hook.
+  Future<LogoutResult> logout() async {
+    final blocked = await logoutBlocker();
+    if (blocked != null) return blocked;
     final refresh = _session.refreshToken;
     // Stop push to this phone first, while the session can still call the
     // API (best effort).
@@ -204,6 +241,32 @@ bool reportAppControlError(Ref ref, ApiError error) {
       }
       return true;
     default:
+      _followRiderStatus(ref, error);
       return false;
+  }
+}
+
+/// A rider endpoint refused because the rider is no longer ACTIVE (403
+/// `PERMISSION_DENIED`, `details.reason` = `RIDER_NOT_ACTIVE`): ops
+/// suspended them, or a review moved them back, while they were signed in.
+/// The schema says "route on `rider_status`", so the router shows that
+/// status screen instead of a home that can never go online (P8). The
+/// error itself is still shown where it happened.
+void _followRiderStatus(Ref ref, ApiError error) {
+  if (error.code != ApiErrorCode.permissionDenied ||
+      error.details['reason'] != 'RIDER_NOT_ACTIVE') {
+    return;
+  }
+  final raw = error.details['rider_status'];
+  for (final status in RiderStatusEnum.values) {
+    if (status.value != raw ||
+        status == RiderStatusEnum.ACTIVE ||
+        status == RiderStatusEnum.unknownDefaultOpenApi) {
+      continue;
+    }
+    ref
+        .read(riderAccountControllerProvider.notifier)
+        .riderStatusChanged(status);
+    return;
   }
 }

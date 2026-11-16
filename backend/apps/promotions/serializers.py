@@ -38,6 +38,12 @@ class CouponOfferSerializer(serializers.Serializer):
     amount_to_unlock = money_or_null(
         "MIN_ORDER_VALUE only: item value still needed. Null otherwise."
     )
+    is_personal = serializers.BooleanField(
+        help_text=(
+            "True for the customer's own personal coupon (e.g. a referral reward): show a "
+            "'For you' label and its expiry (`ends_at`). Added 2026-11-13."
+        )
+    )
 
 
 class CouponListSerializer(serializers.Serializer):

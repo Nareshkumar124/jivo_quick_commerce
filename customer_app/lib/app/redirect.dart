@@ -13,6 +13,9 @@ abstract final class Routes {
   static const categories = '/categories';
   static const orderAgain = '/order-again';
   static const search = '/search';
+
+  /// Every product as a grid (the cart's "Add more").
+  static const allProducts = '/products';
   static const location = '/location';
   static const mapPicker = '/location/map';
   static const notServiceable = '/location/not-serviceable';
@@ -21,6 +24,12 @@ abstract final class Routes {
   static const addresses = '/account/addresses';
   static const newAddress = '/account/addresses/new';
   static const deleteAccount = '/account/delete';
+
+  /// Refer & earn: the customer's code, and entering a friend's.
+  static const referral = '/account/referral';
+
+  /// My coupons: the coupons available to this customer.
+  static const myCoupons = '/account/coupons';
 
   /// Under Home, on the root navigator: `go` keeps Home behind them.
   static const cart = '/home/cart';

@@ -138,6 +138,19 @@ def prepare_image(field_file, *, square: bool) -> None:
         storage.save(rendition_name(field_file.name, width), _webp(copy))
 
 
+def delete_stored_image(storage, name: str) -> list[str]:
+    """Delete a stored image and its renditions; a missing file is fine. Used to clean up after
+    a save that failed once `prepare_image()` had stored the files. Returns the names that could
+    not be deleted."""
+    failed = []
+    for target in (name, *(rendition_name(name, width) for width in RENDITIONS.values())):
+        try:
+            storage.delete(target)
+        except Exception:
+            failed.append(target)
+    return failed
+
+
 def is_new_upload(field_file) -> bool:
     return bool(field_file) and not getattr(field_file, "_committed", True)
 

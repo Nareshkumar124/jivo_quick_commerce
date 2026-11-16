@@ -41,6 +41,23 @@ class LocationTaskSettings {
   /// not running at that moment. Read and cleared with [takeServerStop].
   static const _serverStopKey = 'rider.location.server_stop';
 
+  /// Every key kept in SharedPreferences (through flutter_foreground_task)
+  /// for the online service. Rider-session state, so sign-out removes them
+  /// ([clearStored]): the next rider on this phone must not see the last
+  /// one's "You were set offline" (P8 security audit).
+  static const storedKeys = [_storageKey, _serverStopKey];
+
+  /// Removes [storedKeys]. Only while the service is stopped. [remove] is
+  /// replaced in tests.
+  static Future<void> clearStored({
+    Future<bool> Function({required String key}) remove =
+        FlutterForegroundTask.removeData,
+  }) async {
+    for (final key in storedKeys) {
+      await remove(key: key);
+    }
+  }
+
   final TrackingConfig config;
   final TrackingMode mode;
 

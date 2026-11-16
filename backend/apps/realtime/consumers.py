@@ -7,9 +7,17 @@
 App sockets are accepted first (so the close code reaches the app), then must authenticate
 within WS_AUTH_TIMEOUT_SECONDS. Nothing is sent to a socket before it is authorised.
 
+No event is lost while a socket starts. A consumer handles one message at a time, so a group
+message that arrives while it is still authorising waits and is forwarded once it is done.
+- App sockets join their groups in `authorize()`, before `auth.ok` is sent: every event published
+  after `auth.ok` reaches the app (the order socket also sends a snapshot right after it).
+- The ops socket checks access and joins its store groups before it accepts, so every event
+  published after the page's `open` event reaches it.
+
 Abuse limits (P8 OWASP review L5, `apps.realtime.limits`): at most WS_MAX_SOCKETS_PER_USER
 sockets per user (4429), at most WS_MAX_BAD_MESSAGES malformed or unknown messages (4400), and
-inbound messages up to WS_MAX_MESSAGE_BYTES (1009); the ASGI server caps frames before that.
+inbound messages up to WS_MAX_MESSAGE_BYTES (1009; daphne needs `apps.realtime.daphne_compat` to
+send it); the ASGI server caps frames before that.
 """
 
 import asyncio
@@ -45,14 +53,16 @@ class BaseSocketConsumer(AsyncJsonWebsocketConsumer):
 
     # ------------------------------------------------------------------ socket slots (L5)
 
-    async def take_slot(self, user_id: int) -> bool:
-        """Count this socket against the user's limit; False (and closed 4429) when full."""
+    async def take_slot(self, user_id: int, *, close: bool = True) -> bool:
+        """Count this socket against the user's limit. False when the user is at the limit;
+        the socket is then closed with 4429, unless `close` is False (not accepted yet)."""
         if self.slot_user_id is not None:
             return True
         if not await sync_to_async(limits.acquire, thread_sensitive=False)(
             user_id, self.channel_name
         ):
-            await self.close_with(contract.CLOSE_TOO_MANY_SOCKETS)
+            if close:
+                await self.close_with(contract.CLOSE_TOO_MANY_SOCKETS)
             return False
         self.slot_user_id = user_id
         return True
@@ -143,6 +153,15 @@ class BaseSocketConsumer(AsyncJsonWebsocketConsumer):
         raw = text_data if text_data is not None else bytes_data
         size = len(raw.encode()) if isinstance(raw, str) else len(raw or b"")
         if size > settings.WS_MAX_MESSAGE_BYTES:
+            # 06 §4.1: never processed, closed with 1009. The client's fault, so a WARNING line,
+            # not an ERROR traceback (BUG-0020).
+            logger.warning(
+                "Socket %s: a %s-byte message is over WS_MAX_MESSAGE_BYTES (%s); closing with %s",
+                self.channel_name,
+                size,
+                settings.WS_MAX_MESSAGE_BYTES,
+                contract.CLOSE_MESSAGE_TOO_BIG,
+            )
             await self.close_with(contract.CLOSE_MESSAGE_TOO_BIG)
             return
         try:
@@ -421,30 +440,44 @@ class OpsLiveConsumer(BaseSocketConsumer):
     session_deadline: float | None = None
 
     async def connect(self) -> None:
+        # Check access and join the store groups BEFORE accepting (review of ca8e69c): it used to
+        # accept first, so an event published between the page's `open` event and `group_add`
+        # was lost. A refusal is still accepted first, so its close code reaches the page.
+        code = await self.refresh_access()
+        if code is None and not await self.take_slot(self.scope["user"].pk, close=False):
+            code = contract.CLOSE_TOO_MANY_SOCKETS
         await self.accept()
-        if await self.check_access():
-            user_id = self.scope["user"].pk
-            if not await self.take_slot(user_id):
-                return
-            self.authorised = True
-            self.schedule_recheck()
+        if code is not None:
+            await self.close_with(code)
+            return
+        self.authorised = True
+        self.schedule_recheck()
 
     def _session_key(self) -> str | None:
         session = self.scope.get("session")
         return getattr(session, "session_key", None)
 
-    async def check_access(self) -> bool:
+    async def refresh_access(self) -> int | None:
+        """Re-read the staff user's access (05 §3, §5) and (re)join the permitted store groups.
+        Returns the close code that refuses access, or None."""
         user = self.scope.get("user")
         user_id = user.pk if user is not None and user.is_authenticated else None
         result = await database_sync_to_async(ops_store_ids)(user_id, self._session_key())
         if isinstance(result, int):
-            await self.close_with(result)
-            return False
+            return result
         self.session_deadline = result.session_deadline
         wanted = {store_group(pk) for pk in result.store_ids}
         await self.leave(self.joined - wanted)
         await self.join(sorted(wanted))
         await self.renew_slot()
+        return None
+
+    async def check_access(self) -> bool:
+        """The periodic re-check: close the socket when access is gone."""
+        code = await self.refresh_access()
+        if code is not None:
+            await self.close_with(code)
+            return False
         return True
 
     def schedule_recheck(self) -> None:

@@ -7,6 +7,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/launch_state.dart';
 import '../../../app/providers.dart';
 import '../../../app/redirect.dart';
+import '../../../app/theme.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
@@ -14,6 +15,7 @@ import '../../../shared/widgets/state_views.dart';
 import '../../auth/presentation/auth_flow.dart';
 import '../../cms/data/cms_repository.dart';
 import '../../notifications/presentation/inbox_screen.dart';
+import '../../referral/presentation/referral_controller.dart';
 import 'profile_controllers.dart';
 import 'profile_form.dart';
 
@@ -55,101 +57,139 @@ class AccountScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(l10n.accountTitle)),
       body: switch (user) {
         AsyncData(:final value) => ListView(
+          padding: const EdgeInsets.fromLTRB(
+            JivoSpacing.gutter,
+            JivoSpacing.md,
+            JivoSpacing.gutter,
+            JivoSpacing.xl,
+          ),
           children: [
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: Text(value.name),
-              subtitle: Text([value.phone, ?value.email].join('\n')),
-              isThreeLine: value.email != null,
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: Text(l10n.editProfile),
-              onTap: () => context.push(Routes.editProfile),
-            ),
-            ListTile(
-              key: const Key('account-orders'),
-              leading: const Icon(Icons.receipt_long_outlined),
-              title: Text(l10n.myOrders),
-              onTap: () => context.push(Routes.orders),
-            ),
-            ListTile(
-              leading: const Icon(Icons.location_on_outlined),
-              title: Text(l10n.addresses),
-              onTap: () => context.push(Routes.addresses),
-            ),
-            ListTile(
-              key: const Key('account-notifications'),
-              leading: const Icon(Icons.notifications_none),
-              title: Text(l10n.notificationsTitle),
-              trailing: const InboxUnreadBadge(),
-              onTap: () => context.push(Routes.notifications),
-            ),
-            ListTile(
-              key: const Key('account-help'),
-              leading: const Icon(Icons.help_outline),
-              title: Text(l10n.helpTitle),
-              onTap: () => context.push(Routes.help),
-            ),
-            if (inAppPages) ...[
-              const Divider(),
-              ListTile(
-                title: Text(
-                  l10n.legal,
-                  style: Theme.of(context).textTheme.titleSmall,
+            _ProfileHeader(name: value.name, phone: value.phone),
+            const SizedBox(height: JivoSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickTile(
+                    key: const Key('account-orders'),
+                    icon: Icons.receipt_long_outlined,
+                    label: l10n.myOrders,
+                    onTap: () => context.push(Routes.orders),
+                  ),
                 ),
-              ),
-              for (final (label, slug) in [
-                (l10n.aboutJivo, CmsSlugs.about),
-                (l10n.termsOfService, CmsSlugs.terms),
-                (l10n.privacyPolicy, CmsSlugs.privacy),
-                (l10n.refundPolicy, CmsSlugs.refund),
-              ])
-                ListTile(
-                  key: Key('legal-$slug'),
-                  title: Text(label),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push(Routes.page(slug)),
+                const SizedBox(width: JivoSpacing.md),
+                Expanded(
+                  child: _QuickTile(
+                    key: const Key('account-my-coupons'),
+                    icon: Icons.local_offer_outlined,
+                    label: l10n.myCoupons,
+                    onTap: () => context.push(Routes.myCoupons),
+                  ),
                 ),
-            ] else if (policies != null) ...[
-              const Divider(),
-              ListTile(
-                title: Text(
-                  l10n.legal,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-              ),
-              for (final (label, url) in [
-                (l10n.termsOfService, policies.terms),
-                (l10n.privacyPolicy, policies.privacy),
-                (l10n.refundPolicy, policies.refund),
-              ])
-                ListTile(
-                  title: Text(label),
-                  trailing: const Icon(Icons.open_in_new, size: 18),
-                  onTap: () => opener.open(url),
-                ),
-            ],
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: Text(l10n.logout),
-              onTap: () => _logout(context, ref),
+              ],
             ),
-            ListTile(
-              leading: Icon(
-                Icons.delete_outline,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              title: Text(
-                l10n.deleteAccount,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-              onTap: () => context.push(Routes.deleteAccount),
+            const SizedBox(height: JivoSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _QuickTile(
+                    key: const Key('account-referral-tile'),
+                    icon: Icons.card_giftcard_outlined,
+                    label: l10n.referAFriend,
+                    onTap: () => context.push(Routes.referral),
+                  ),
+                ),
+                const SizedBox(width: JivoSpacing.md),
+                Expanded(
+                  child: _QuickTile(
+                    key: const Key('account-addresses'),
+                    icon: Icons.location_on_outlined,
+                    label: l10n.addresses,
+                    onTap: () => context.push(Routes.addresses),
+                  ),
+                ),
+              ],
             ),
-            ListTile(
-              title: Text(
+            const SizedBox(height: JivoSpacing.md),
+            const _ReferralStrip(),
+            const SizedBox(height: JivoSpacing.md),
+            _Group(
+              children: [
+                _Row(
+                  key: const Key('account-notifications'),
+                  icon: Icons.notifications_none,
+                  label: l10n.notificationsTitle,
+                  trailing: const InboxUnreadBadge(),
+                  onTap: () => context.push(Routes.notifications),
+                ),
+                _Row(
+                  key: const Key('account-help'),
+                  icon: Icons.help_outline,
+                  label: l10n.helpTitle,
+                  onTap: () => context.push(Routes.help),
+                ),
+                if (inAppPages)
+                  for (final (label, slug, icon) in [
+                    (l10n.aboutJivo, CmsSlugs.about, Icons.info_outline),
+                    (
+                      l10n.termsOfService,
+                      CmsSlugs.terms,
+                      Icons.description_outlined,
+                    ),
+                    (
+                      l10n.privacyPolicy,
+                      CmsSlugs.privacy,
+                      Icons.privacy_tip_outlined,
+                    ),
+                    (l10n.refundPolicy, CmsSlugs.refund, Icons.currency_rupee),
+                  ])
+                    _Row(
+                      key: Key('legal-$slug'),
+                      icon: icon,
+                      label: label,
+                      onTap: () => context.push(Routes.page(slug)),
+                    )
+                else if (policies != null)
+                  for (final (label, url, icon) in [
+                    (
+                      l10n.termsOfService,
+                      policies.terms,
+                      Icons.description_outlined,
+                    ),
+                    (
+                      l10n.privacyPolicy,
+                      policies.privacy,
+                      Icons.privacy_tip_outlined,
+                    ),
+                    (l10n.refundPolicy, policies.refund, Icons.currency_rupee),
+                  ])
+                    _Row(
+                      icon: icon,
+                      label: label,
+                      trailing: const Icon(Icons.open_in_new, size: 18),
+                      onTap: () => opener.open(url),
+                    ),
+              ],
+            ),
+            const SizedBox(height: JivoSpacing.md),
+            _Group(
+              children: [
+                _Row(
+                  key: const Key('account-logout'),
+                  icon: Icons.logout,
+                  label: l10n.logout,
+                  onTap: () => _logout(context, ref),
+                ),
+                _Row(
+                  icon: Icons.delete_outline,
+                  label: l10n.deleteAccount,
+                  danger: true,
+                  onTap: () => context.push(Routes.deleteAccount),
+                ),
+              ],
+            ),
+            const SizedBox(height: JivoSpacing.lg),
+            Center(
+              child: Text(
                 l10n.appVersion(version),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -162,6 +202,263 @@ class AccountScreen extends ConsumerWidget {
         ),
         _ => const SkeletonList(rows: 4),
       },
+    );
+  }
+}
+
+String _initials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
+  if (parts.isEmpty) return '?';
+  final first = parts.first.characters.first;
+  final last = parts.length > 1 ? parts.last.characters.first : '';
+  return (first + last).toUpperCase();
+}
+
+/// Keeps the country code and the last three digits.
+String _maskPhone(String phone) {
+  if (phone.length < 8) return phone;
+  final tail = phone.substring(phone.length - 3);
+  return '${phone.substring(0, 3)} ${'•' * (phone.length - 6)}$tail';
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.name, required this.phone});
+
+  final String name;
+  final String phone;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = context.customerColors;
+    final text = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(JivoSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors.headerGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          ExcludeSemantics(
+            child: CircleAvatar(
+              radius: 30,
+              backgroundColor: colors.gold,
+              child: Text(
+                _initials(name),
+                style: text.titleLarge?.copyWith(
+                  color: colors.onGold,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: JivoSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  _maskPhone(phone),
+                  style: text.bodyMedium?.copyWith(color: Colors.white70),
+                ),
+                const SizedBox(height: JivoSpacing.sm),
+                ActionChip(
+                  key: const Key('account-edit'),
+                  avatar: Icon(
+                    Icons.edit_outlined,
+                    size: 16,
+                    color: colors.onGold,
+                  ),
+                  label: Text(l10n.edit),
+                  labelStyle: TextStyle(color: colors.onGold),
+                  backgroundColor: colors.goldLight,
+                  side: BorderSide.none,
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
+                  onPressed: () => context.push(Routes.editProfile),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickTile extends StatelessWidget {
+  const _QuickTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.customerColors;
+    return Material(
+      color: colors.goldLight.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 72),
+          child: Padding(
+            padding: const EdgeInsets.all(JivoSpacing.md),
+            child: Row(
+              children: [
+                Icon(icon, color: colors.primaryDeep),
+                const SizedBox(width: JivoSpacing.sm),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Gold strip that opens Refer & earn. The amount comes from the referral
+/// data; without it the text is generic.
+class _ReferralStrip extends ConsumerWidget {
+  const _ReferralStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final colors = context.customerColors;
+    final info = ref.watch(currentReferralProvider).value;
+    final reward = info == null ? null : formatRupeesOrNull(info.rewardAmount);
+    final active = info != null && info.isEnabled && reward != null;
+    return Material(
+      key: const Key('account-referral'),
+      color: colors.gold,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => context.push(Routes.referral),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 64),
+          child: Padding(
+            padding: const EdgeInsets.all(JivoSpacing.md),
+            child: Row(
+              children: [
+                Icon(Icons.card_giftcard, color: colors.onGold),
+                const SizedBox(width: JivoSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        active
+                            ? l10n.referralHeadline(reward)
+                            : l10n.referralStripGeneric,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: colors.onGold,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (active && info.canApplyCode)
+                        Text(
+                          l10n.referralEntryHaveCode,
+                          key: const Key('referral-have-code'),
+                          style: TextStyle(color: colors.onGold),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: colors.onGold),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Group extends StatelessWidget {
+  const _Group({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) const Divider(height: 1, indent: 64),
+          children[i],
+        ],
+      ],
+    ),
+  );
+}
+
+class _Row extends StatelessWidget {
+  const _Row({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.trailing,
+    this.danger = false,
+    super.key,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Widget? trailing;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = danger
+        ? Theme.of(context).colorScheme.error
+        : context.customerColors.primaryDeep;
+    return ListTile(
+      minTileHeight: 56,
+      leading: CircleAvatar(
+        radius: 18,
+        backgroundColor: tint.withValues(alpha: 0.12),
+        child: Icon(icon, size: 20, color: tint),
+      ),
+      title: Text(label, style: danger ? TextStyle(color: tint) : null),
+      trailing: trailing ?? const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }

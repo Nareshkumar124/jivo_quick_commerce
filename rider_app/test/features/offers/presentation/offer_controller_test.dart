@@ -4,6 +4,8 @@ import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/features/auth/presentation/rider_account_controller.dart';
 import 'package:rider_app/features/offers/domain/delivery_offer.dart';
 import 'package:rider_app/features/offers/presentation/offer_controller.dart';
+import 'package:rider_app/features/shift/presentation/shift_controller.dart';
+import 'package:rider_app/features/task/domain/task_repositories.dart';
 import 'package:rider_app/features/task/domain/task_status.dart';
 import 'package:rider_app/features/task/presentation/task_flow_controller.dart';
 
@@ -127,6 +129,33 @@ void main() {
     },
   );
 
+  // P8: the server still lists the offer (the reject never arrived), so the
+  // next poll used to show it again, ringing, after the rider said no.
+  test('an offer the rider rejected is not shown again by the poll', () async {
+    final o = await offer();
+    h.tasks.failNext = const ApiError(code: ApiErrorCode.network);
+    await offers().reject();
+    expect(h.tasks.offer?.id, o.id, reason: 'still pending on the server');
+
+    await offers().refresh();
+    expect(state().phase, OfferPhase.none);
+
+    // A new offer still shows.
+    final next = await offer();
+    expect(state().offer?.id, next.id);
+  });
+
+  test('an expired offer acknowledged is not shown again', () async {
+    await offer();
+    h.now = h.now.add(const Duration(seconds: 30));
+    offers().tick();
+    offers().acknowledge();
+    // The server's clock is a little behind: it still lists the offer.
+    h.now = h.now.subtract(const Duration(seconds: 2));
+    await offers().refresh();
+    expect(state().phase, OfferPhase.none);
+  });
+
   test('accept with the response lost: the task assigned on the server is '
       'picked up', () async {
     await offer();
@@ -171,4 +200,90 @@ void main() {
       expect(h.tasks.calls, contains('fetchCurrentOffer'));
     },
   );
+
+  // P8 hardening: the server set the rider offline (auto-offline, ops)
+  // while the phone still showed them online.
+  group('RIDER_OFFLINE', () {
+    /// Online on the phone and on the server, then the server ends it.
+    Future<void> onlineThenSetOfflineByServer() async {
+      h.location.running = true;
+      h.shift.online = true;
+      c.listen(shiftControllerProvider, (_, _) {});
+      await pumpEventQueue();
+      expect(c.read(shiftControllerProvider).isOnline, isTrue);
+      h.shift.autoOffline();
+    }
+
+    test('accept answered 409 RIDER_OFFLINE: the offer closes, tracking '
+        'stops and home says why (not kept open with an error)', () async {
+      await onlineThenSetOfflineByServer();
+      final o = await offer();
+      h.tasks.failNext = const ApiError(
+        code: ApiErrorCode.unknown,
+        rawCode: 'RIDER_OFFLINE',
+        statusCode: 409,
+      );
+      await offers().accept();
+      await pumpEventQueue();
+
+      expect(state().phase, OfferPhase.none);
+      expect(h.tasks.calls, contains('accept ${o.id}'));
+      expect(h.location.running, isFalse);
+      final shift = c.read(shiftControllerProvider);
+      expect(shift.phase, ShiftPhase.offline);
+      expect(shift.problem, ShiftProblem.autoOffline);
+    });
+
+    test('offer.withdrawn RIDER_OFFLINE is not "Order cancelled": the offer '
+        'closes and the shift check runs', () async {
+      await onlineThenSetOfflineByServer();
+      final o = await offer();
+      offers().withdrawn(o.id, reason: OfferEndReason.riderOffline);
+      await pumpEventQueue();
+
+      expect(state().phase, OfferPhase.none);
+      expect(h.location.running, isFalse);
+      expect(c.read(shiftControllerProvider).problem, ShiftProblem.autoOffline);
+    });
+
+    test('the socket reason maps to riderOffline', () {
+      expect(
+        OfferEndReason.fromWire('RIDER_OFFLINE'),
+        OfferEndReason.riderOffline,
+      );
+      expect(
+        OfferEndReason.fromWire('ORDER_CANCELLED'),
+        OfferEndReason.cancelled,
+      );
+    });
+  });
+
+  // P8 hardening: ops assign the rider an order directly (task.updated
+  // ASSIGNED) while an offer is open or its end message is unread.
+  group('a task that starts closes the offer screen', () {
+    test(
+      'an unread "Order cancelled" does not come back after the task',
+      () async {
+        await offer();
+        h.tasks.withdrawOffer();
+        await Future<void>.delayed(Duration.zero);
+        expect(state().phase, OfferPhase.withdrawn);
+
+        h.tasks.seedTask(h.tasks.newTask());
+        await c.read(taskFlowControllerProvider.notifier).load();
+        expect(c.read(taskFlowControllerProvider).hasTask, isTrue);
+        expect(state().isOpen, isFalse, reason: 'nothing left to show later');
+      },
+    );
+
+    test('an offer still showing stops ringing and closes', () async {
+      await offer();
+      final stopsBefore = h.alerter.stops;
+      h.tasks.seedTask(h.tasks.newTask());
+      await c.read(taskFlowControllerProvider.notifier).load();
+
+      expect(state().phase, OfferPhase.none);
+      expect(h.alerter.stops, greaterThan(stopsBefore));
+    });
+  });
 }

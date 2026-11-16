@@ -29,6 +29,10 @@ abstract class _$VariantDetailCWProxy {
 
   VariantDetail maxQtyPerOrder(int maxQtyPerOrder);
 
+  VariantDetail minQtyPerOrder(int minQtyPerOrder);
+
+  VariantDetail priceTiers(List<PriceTier> priceTiers);
+
   VariantDetail image(ImageSet? image);
 
   VariantDetail sku(String sku);
@@ -55,6 +59,8 @@ abstract class _$VariantDetailCWProxy {
     int orderableQuantity,
     int? unitsLeft,
     int maxQtyPerOrder,
+    int minQtyPerOrder,
+    List<PriceTier> priceTiers,
     ImageSet? image,
     String sku,
     String netQuantity,
@@ -108,6 +114,14 @@ class _$VariantDetailCWProxyImpl implements _$VariantDetailCWProxy {
       this(maxQtyPerOrder: maxQtyPerOrder);
 
   @override
+  VariantDetail minQtyPerOrder(int minQtyPerOrder) =>
+      this(minQtyPerOrder: minQtyPerOrder);
+
+  @override
+  VariantDetail priceTiers(List<PriceTier> priceTiers) =>
+      this(priceTiers: priceTiers);
+
+  @override
   VariantDetail image(ImageSet? image) => this(image: image);
 
   @override
@@ -139,6 +153,8 @@ class _$VariantDetailCWProxyImpl implements _$VariantDetailCWProxy {
     Object? orderableQuantity = const $CopyWithPlaceholder(),
     Object? unitsLeft = const $CopyWithPlaceholder(),
     Object? maxQtyPerOrder = const $CopyWithPlaceholder(),
+    Object? minQtyPerOrder = const $CopyWithPlaceholder(),
+    Object? priceTiers = const $CopyWithPlaceholder(),
     Object? image = const $CopyWithPlaceholder(),
     Object? sku = const $CopyWithPlaceholder(),
     Object? netQuantity = const $CopyWithPlaceholder(),
@@ -189,6 +205,14 @@ class _$VariantDetailCWProxyImpl implements _$VariantDetailCWProxy {
           ? _value.maxQtyPerOrder
           // ignore: cast_nullable_to_non_nullable
           : maxQtyPerOrder as int,
+      minQtyPerOrder: minQtyPerOrder == const $CopyWithPlaceholder()
+          ? _value.minQtyPerOrder
+          // ignore: cast_nullable_to_non_nullable
+          : minQtyPerOrder as int,
+      priceTiers: priceTiers == const $CopyWithPlaceholder()
+          ? _value.priceTiers
+          // ignore: cast_nullable_to_non_nullable
+          : priceTiers as List<PriceTier>,
       image: image == const $CopyWithPlaceholder()
           ? _value.image
           // ignore: cast_nullable_to_non_nullable
@@ -239,6 +263,8 @@ VariantDetail _$VariantDetailFromJson(
         'orderable_quantity',
         'units_left',
         'max_qty_per_order',
+        'min_qty_per_order',
+        'price_tiers',
         'image',
         'sku',
         'net_quantity',
@@ -276,6 +302,16 @@ VariantDetail _$VariantDetailFromJson(
         'max_qty_per_order',
         (v) => (v as num).toInt(),
       ),
+      minQtyPerOrder: $checkedConvert(
+        'min_qty_per_order',
+        (v) => (v as num).toInt(),
+      ),
+      priceTiers: $checkedConvert(
+        'price_tiers',
+        (v) => (v as List<dynamic>)
+            .map((e) => PriceTier.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      ),
       image: $checkedConvert(
         'image',
         (v) => v == null ? null : ImageSet.fromJson(v as Map<String, dynamic>),
@@ -300,6 +336,8 @@ VariantDetail _$VariantDetailFromJson(
     'orderableQuantity': 'orderable_quantity',
     'unitsLeft': 'units_left',
     'maxQtyPerOrder': 'max_qty_per_order',
+    'minQtyPerOrder': 'min_qty_per_order',
+    'priceTiers': 'price_tiers',
     'netQuantity': 'net_quantity',
   },
 );
@@ -317,6 +355,8 @@ Map<String, dynamic> _$VariantDetailToJson(VariantDetail instance) =>
       'orderable_quantity': instance.orderableQuantity,
       'units_left': instance.unitsLeft,
       'max_qty_per_order': instance.maxQtyPerOrder,
+      'min_qty_per_order': instance.minQtyPerOrder,
+      'price_tiers': instance.priceTiers.map((e) => e.toJson()).toList(),
       'image': instance.image?.toJson(),
       'sku': instance.sku,
       'net_quantity': instance.netQuantity,

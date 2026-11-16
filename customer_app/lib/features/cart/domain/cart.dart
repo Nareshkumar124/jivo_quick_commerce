@@ -127,6 +127,23 @@ class CartSnapshot {
 
   /// Cash on Delivery is shown only when eligible (`03 §2.9`).
   bool get codAvailable => offers(PaymentMethod.cod);
+
+  /// This snapshot with another [checkout] status (everything else kept).
+  CartSnapshot withCheckout(CheckoutStatus checkout) => CartSnapshot(
+    quantities: quantities,
+    itemCount: itemCount,
+    itemTotal: itemTotal,
+    lines: lines,
+    bill: bill,
+    coupon: coupon,
+    tip: tip,
+    instructions: instructions,
+    addressId: addressId,
+    thresholds: thresholds,
+    paymentOptions: paymentOptions,
+    checkout: checkout,
+    storeOpen: storeOpen,
+  );
 }
 
 /// `CartLineIssueCodeEnum`.
@@ -136,6 +153,10 @@ enum CartIssueCode {
 
   /// Fewer units can be ordered: reduce to `variant.orderable_quantity`.
   quantityUnavailable,
+
+  /// Below `variant.min_qty_per_order` (e.g. the minimum was raised after
+  /// the line was added): raise it to the minimum, or remove it.
+  minQtyRequired,
 
   /// A code this build doesn't know.
   unknown,
@@ -166,6 +187,9 @@ class CartLine {
     this.productId,
     this.productSlug,
     this.issue,
+    this.pricePerUnit,
+    this.priceTier,
+    this.nextTierPrice,
   });
 
   /// The server's line id.
@@ -178,9 +202,28 @@ class CartLine {
   final CatalogVariant variant;
   final int quantity;
 
-  /// The server's `mrp × quantity` and `selling_price × quantity`.
+  /// The server's `mrp × quantity` and `price_per_unit × quantity`.
   final String lineMrpTotal;
   final String lineTotal;
+
+  /// The price each unit is billed at (`price_per_unit`): the volume
+  /// tier's price when [priceTier] is set, else the selling price. Read it
+  /// through [billedPrice].
+  final String? pricePerUnit;
+
+  /// The volume tier the cart reached for this line (`price_tier`); null
+  /// when the normal price applies.
+  final PriceTier? priceTier;
+
+  /// This line's lower unit price once the cart reaches
+  /// `thresholds.next_price_tier` (`next_tier_price`); null when that tier
+  /// doesn't lower it.
+  final String? nextTierPrice;
+
+  /// The server's billed unit price. The API always sends
+  /// `price_per_unit`; only a line built without it (older fixtures) falls
+  /// back to the variant's selling price, which the server bills then.
+  String get billedPrice => pricePerUnit ?? variant.sellingPrice;
 
   /// Null when the line is fine.
   final CartLineIssue? issue;
@@ -194,6 +237,10 @@ class CartLine {
   /// The stepper cap and the fix target: the server's
   /// `orderable_quantity` (0 when it can't be ordered).
   int get orderableQuantity => variant.maxSelectable;
+
+  /// The variant's `min_qty_per_order`: minus at this quantity removes the
+  /// line.
+  int get minQty => variant.minQty;
 }
 
 /// The bill from `cart.services.compute_bill` (`08 §6.2`, schema `Bill`),
@@ -240,6 +287,11 @@ class CartThresholds {
     this.amountToMinOrder,
     this.freeDeliveryThreshold,
     this.amountToFreeDelivery,
+    this.minOrderUnits = 0,
+    this.unitsToMinOrder,
+    this.orderUnitLabel = '',
+    this.tierUnits = 0,
+    this.nextPriceTier,
   });
 
   final String minOrderValue;
@@ -250,6 +302,44 @@ class CartThresholds {
 
   /// For "Add ₹X more for FREE delivery"; null when delivery is free.
   final String? amountToFreeDelivery;
+
+  /// The fewest units (any mix of products) an order must have
+  /// (`min_order_units`); 0 = no such rule.
+  final int minOrderUnits;
+
+  /// Units still needed for [minOrderUnits] (`units_to_min_order`); null
+  /// when met or when there is no such rule. While set, checkout is blocked
+  /// (`MIN_UNITS_NOT_MET`) and the cart shows "Add N more".
+  final int? unitsToMinOrder;
+
+  /// What a unit is called (`order_unit_label`, e.g. "cartons"); empty when
+  /// the server sends none.
+  final String orderUnitLabel;
+
+  /// Units that choose the volume price tier (`tier_units`): every line
+  /// with price tiers, any mix; 0 when no line has tiers.
+  final int tierUnits;
+
+  /// The next tier at which a line's price drops (`next_price_tier`), for
+  /// "Add 3 more boxes to get ₹87/box"; null at the top tier or when no
+  /// line has tiers.
+  final NextPriceTier? nextPriceTier;
+}
+
+/// The next volume tier (`NextPriceTier`): each line's new price there is
+/// its [CartLine.nextTierPrice].
+@immutable
+class NextPriceTier {
+  const NextPriceTier({
+    required this.minOrderUnits,
+    required this.unitsToNextTier,
+  });
+
+  /// The tier units the lower prices start at.
+  final int minOrderUnits;
+
+  /// Units still to add (any tiered item) to reach it.
+  final int unitsToNextTier;
 }
 
 /// `PaymentUnavailableReasonEnum`.
@@ -278,7 +368,13 @@ enum CheckoutBlockerCode {
   notServiceable,
   storeClosed,
   stockUnavailable,
+
+  /// A line is below its variant's `min_qty_per_order`.
+  minQtyRequired,
   minOrderNotMet,
+
+  /// Fewer units in the order than the store's `min_order_units`.
+  minUnitsNotMet,
   couponInvalid,
   couponExpired,
   couponNotEligible,
@@ -363,6 +459,8 @@ class CouponOffer {
     this.message,
     this.amountToUnlock,
     this.endsAt,
+    this.isPersonal = false,
+    this.minOrderValue,
   });
 
   final String code;
@@ -387,6 +485,12 @@ class CouponOffer {
 
   /// UTC expiry, or null.
   final DateTime? endsAt;
+
+  /// Made only for this customer (e.g. a referral reward).
+  final bool isPersonal;
+
+  /// The coupon's minimum order value (server amount), if any.
+  final String? minOrderValue;
 }
 
 /// The delivery-instruction chips (`DeliveryInstructionChipEnum`).

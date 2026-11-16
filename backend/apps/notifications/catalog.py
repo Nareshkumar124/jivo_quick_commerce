@@ -222,6 +222,17 @@ SPECS["support.ticket_replied_rider"] = EventSpec(
     data_type="ticket",
 )
 
+# Referral reward (added 2026-11-13; apps.referrals sends it to both customers once the referred
+# customer's first order is delivered). Push + inbox, no SMS.
+SPECS["referral.reward_earned"] = EventSpec(
+    "referral.reward_earned",
+    "You earned {{amount}} off",
+    "{{reason}} Your {{amount}} coupon is in Apply coupon at checkout. Use it by {{expires_on}}.",
+    category=NotificationCategory.PROMO,
+    link="jivo://account/referral",
+    data_type="referral",
+)
+
 
 def get_spec(event: str) -> EventSpec | None:
     return SPECS.get(event)

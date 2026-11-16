@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,7 @@ import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/dev_tools_button.dart';
 import '../../../shared/widgets/primary_action_bar.dart';
+import '../../../shared/widgets/resume_listener.dart';
 import '../../auth/domain/rider_account.dart';
 import '../../auth/domain/rider_destination.dart';
 import '../../auth/presentation/logout_button.dart';
@@ -40,7 +43,24 @@ class OnboardingStatusScreen extends ConsumerWidget {
         ? account.riderStatus
         : RiderStatusEnum.unknownDefaultOpenApi;
     if (!canEditApplication(status)) return const RiderStatusScreen();
+    // RA-06: a review may finish while the rider is away. Only while this
+    // is the top screen, so a resume never races an upload on a sub-screen.
+    return ResumeListener(
+      onResume: () {
+        if (ModalRoute.isCurrentOf(context) ?? true) {
+          unawaited(ref.read(riderProfileControllerProvider.notifier).reload());
+        }
+      },
+      child: const _ApplicationStatus(),
+    );
+  }
+}
 
+class _ApplicationStatus extends ConsumerWidget {
+  const _ApplicationStatus();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final profile = ref.watch(riderProfileControllerProvider);
     final value = profile.value;
@@ -171,6 +191,8 @@ class _ProfileStatus extends ConsumerWidget {
                 onPressed: () => open(Routes.documents),
                 child: Text(l10n.statusActionViewDocuments),
               ),
+              // RA-06: a way to ask while waiting, not only after a rejection.
+              if (canCallSupport) callSupport,
               if (devReview) _DevReviewButton(onDone: controller.reload),
               const DevToolsButton(),
             ],

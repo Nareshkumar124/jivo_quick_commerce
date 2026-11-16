@@ -77,6 +77,12 @@ class CouponApplyThrottle(FailOpenUserThrottle):
     scope = "coupon_apply"
 
 
+class ReferralApplyThrottle(FailOpenUserThrottle):
+    """Entering a friend's referral code: stops guessing codes (added 2026-11-13)."""
+
+    scope = "referral_apply"
+
+
 class AddressWriteThrottle(FailOpenUserThrottle):
     """Creating, editing, deleting and defaulting saved addresses."""
 

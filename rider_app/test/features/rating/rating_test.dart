@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/app/routes.dart';
@@ -191,6 +192,41 @@ void main() {
       expect(byKey('rating-500'), findsOneWidget);
       // No customer data on a rating: stars, tags, order number and date.
       expect(find.text('JV-261102-001240'), findsOneWidget);
+    });
+
+    // UX audit RA-21: faint amber stars (2.13:1), the stars the only value
+    // of a row, and "4.6 ★" read aloud as "black star".
+    testWidgets('stars in the 6.33:1 token, "N/5" in words, spoken labels', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      final h = RiderTestHarness();
+      await openFromHome(tester, h, 'home-profile');
+      expect(
+        find.textContaining(RegExp(r'^\d\.\d out of 5$')),
+        findsOneWidget,
+        reason: 'profile row: no "★" read as "black star"',
+      );
+      await tester.tap(byKey('profile-rating'));
+      await tester.pumpAndSettle();
+
+      for (final icon in tester.widgetList<Icon>(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Icon &&
+              (w.icon == Icons.star ||
+                  w.icon == Icons.star_half ||
+                  w.icon == Icons.star_border),
+        ),
+      )) {
+        expect(icon.color, const Color(0xFF8A5300));
+      }
+      expect(find.textContaining(RegExp(r'^[0-5]/5$')), findsWidgets);
+      expect(
+        find.bySemanticsLabel('Average rating 4.6 out of 5'),
+        findsOneWidget,
+      );
+      semantics.dispose();
     });
 
     testWidgets('a failed load can be retried', (tester) async {

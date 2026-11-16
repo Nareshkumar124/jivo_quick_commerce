@@ -17,6 +17,7 @@ import 'widgets/cart_line_tile.dart';
 import 'widgets/coupon_sheet.dart';
 import 'widgets/delivery_address_card.dart';
 import 'widgets/instructions_selector.dart';
+import 'widgets/price_tier_nudge_card.dart';
 import 'widgets/tip_selector.dart';
 
 /// The cart (`03 §2.8`, screen #20). It reloads on open (stock
@@ -40,8 +41,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     Future.microtask(_refresh);
   }
 
+  /// Priced for the delivery location's saved address, or for none: a pin
+  /// or a deleted address must not leave the last id behind.
   Future<void> _refresh() =>
-      ref.read(cartProvider.notifier).refresh(addressId: _addressId);
+      ref.read(cartProvider.notifier).refreshForAddress(_addressId);
 
   /// Re-validates stock and the bill, then opens checkout (`03 §2.8`).
   Future<void> _proceed() async {
@@ -76,7 +79,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       next,
     ) {
       if (previous != next) {
-        ref.read(cartProvider.notifier).refresh(addressId: next);
+        ref.read(cartProvider.notifier).refreshForAddress(next);
       }
     });
 
@@ -132,6 +135,11 @@ class _CartContent extends StatelessWidget {
     final snapshot = cart.snapshot;
     final bill = snapshot.bill;
     final nudge = snapshot.thresholds?.amountToFreeDelivery;
+    // The store's minimum number of units per order (any mix of products).
+    final minUnits = minUnitsWarning(l10n, snapshot.thresholds);
+    // The next volume price tier ("Add 3 more boxes to get ₹87/box").
+    final tierNudge = priceTierNudge(l10n, snapshot);
+    final tierParts = priceTierNudgeParts(l10n, snapshot);
     final loadError = cart.loadError;
     const gap = SizedBox(height: JivoSpacing.lg);
 
@@ -139,6 +147,16 @@ class _CartContent extends StatelessWidget {
       key: const Key('cart-content'),
       padding: const EdgeInsets.all(JivoSpacing.gutter),
       children: [
+        if (tierNudge != null && tierParts != null) ...[
+          PriceTierNudgeCard(
+            key: const Key('price-tier-nudge'),
+            headline: tierParts.headline,
+            detail: tierParts.detail,
+            semanticsLabel: tierNudge,
+            onAddMore: () => context.push(Routes.allProducts),
+          ),
+          gap,
+        ],
         if (cart.load == CartLoad.failed && loadError != null) ...[
           _Notice(
             key: const Key('cart-refresh-failed'),
@@ -153,6 +171,15 @@ class _CartContent extends StatelessWidget {
             key: const Key('cart-problems'),
             icon: Icons.warning_amber_outlined,
             text: l10n.cartProblemsBanner,
+            color: theme.colorScheme.error,
+          ),
+          gap,
+        ],
+        if (minUnits != null) ...[
+          _Notice(
+            key: const Key('min-units-warning'),
+            icon: Icons.inventory_2_outlined,
+            text: minUnits,
             color: theme.colorScheme.error,
           ),
           gap,

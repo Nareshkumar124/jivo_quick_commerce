@@ -11,13 +11,25 @@ row has an error: one bad row means nothing is saved.
   file is validated exactly like an admin import: upsert by `slug` / `sku`, never delete.
 - Images go through `ProductImage.save()` (`apps.catalog.images.prepare_image`), the same path as
   an admin upload: magic bytes, size limit, EXIF strip, random keys, renditions, public storage.
-  A row is matched by (product, variant, SHA-256 of the source file), so a re-run adds nothing.
+  A row is matched by (product, variant, SHA-256 of the source file), so a re-run adds nothing;
+  the unique constraint `productimage_source_unique` keeps it that way when two runs overlap.
+  Stored files cannot be rolled back, so images are the exception to "all or nothing": each one
+  is saved in its own transaction, a row that fails while saving is reported (and its stored
+  files deleted) without stopping the others, and the same command run again finishes the job.
 - Deactivation saves each model (price history and catalog cache signals run).
+- A file that is not UTF-8 text (or not readable as CSV) is a file error in the report, never a
+  traceback.
+
+Dry runs have no effect outside the database transaction: the only side effects of these saves
+are the catalog cache bumps, which run on commit (`apps.catalog.cache`), and the variant price
+history rows, which are rolled back with everything else. No Celery task, search index or file
+storage is touched before `--commit`.
 """
 
 import csv
 import hashlib
 import io
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,8 +39,30 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 from django.db import transaction
 
-from apps.catalog.images import validate_image_upload
+from apps.catalog.images import delete_stored_image, validate_image_upload
 from apps.catalog.models import Product, ProductImage, ProductVariant
+
+logger = logging.getLogger(__name__)
+
+NOT_UTF8 = 'not UTF-8 text. Save it as "CSV UTF-8" and try again.'
+
+
+def _read_csv_rows(path: Path, label: str, errors: list[str]) -> tuple[list[str], list[dict]]:
+    """(header, rows) of a UTF-8 CSV file. A file that is not UTF-8 text or not readable as CSV
+    adds a `<label>: ...` error and gives ([], [])."""
+    try:
+        text = path.read_bytes().decode("utf-8-sig")
+    except UnicodeDecodeError:
+        errors.append(f"{label}: {NOT_UTF8}")
+        return [], []
+    reader = csv.DictReader(io.StringIO(text, newline=""))
+    try:
+        rows = list(reader)
+    except csv.Error as error:
+        errors.append(f"{label}: not a readable CSV file ({error}).")
+        return [], []
+    return list(reader.fieldnames or []), rows
+
 
 # --------------------------------------------------------------------------- catalog CSVs
 
@@ -157,14 +191,17 @@ class ImageRow:
     manifest_order: tuple = ()
     sort_order: int = 0
     existing: ProductImage | None = None
-    action: str = ""  # create | update | unchanged | duplicate
+    # Planned: create | update | unchanged | duplicate. After saving, a create or update that
+    # failed is `failed`, and a create another run saved first is `existing`.
+    action: str = ""
 
 
 @dataclass
 class ImageImportResult:
     committed: bool
     rows: list[ImageRow] = field(default_factory=list)
-    errors: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)  # manifest/row validation: nothing saved
+    save_errors: list[str] = field(default_factory=list)  # rows that failed while saving
 
     def count(self, action: str) -> int:
         return sum(1 for row in self.rows if row.action == action)
@@ -242,16 +279,27 @@ def import_images(manifest: Path, root: Path, *, commit: bool) -> ImageImportRes
     variant) the images keep the manifest order and are numbered from 0, so the first one is the
     primary image. A row whose (product, variant, file SHA-256) already exists is not added
     again; only its sort order and alt text are brought in line with the manifest.
+
+    Any validation error: nothing is saved. With `commit`, see `save_images()` for what happens
+    when a row fails while saving.
     """
+    result = plan_images(manifest, root)
+    if commit and not result.errors:
+        save_images(result)
+    return result
+
+
+def plan_images(manifest: Path, root: Path) -> ImageImportResult:
+    """Read and validate the manifest and decide each row's action. Saves nothing."""
     root = root.resolve()
     result = ImageImportResult(committed=False)
-    with manifest.open(encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        missing = [name for name in MANIFEST_REQUIRED if name not in (reader.fieldnames or [])]
-        if missing:
-            result.errors.append(f"manifest: missing column(s) {', '.join(missing)}.")
-            return result
-        raw_rows = list(reader)
+    header, raw_rows = _read_csv_rows(manifest, "manifest", result.errors)
+    if result.errors:
+        return result
+    missing = [name for name in MANIFEST_REQUIRED if name not in header]
+    if missing:
+        result.errors.append(f"manifest: missing column(s) {', '.join(missing)}.")
+        return result
     for line, raw in enumerate(raw_rows, start=2):
         row = _parse_image_row(raw, line, root, result.errors)
         if row is not None:
@@ -285,32 +333,88 @@ def import_images(manifest: Path, root: Path, *, commit: bool) -> ImageImportRes
                 row.action = "update"
             else:
                 row.action = "unchanged"
-
-    if commit:
-        for row in result.rows:
-            _save_image(row)
-        result.committed = True
     return result
 
 
+def save_images(result: ImageImportResult) -> None:
+    """Save the planned creates and updates, one row per transaction: stored files cannot be
+    rolled back, and a re-run picks up where a failed run stopped.
+
+    A row that fails does not stop the others: it becomes `failed`, its error goes to
+    `result.save_errors` and the files it had stored are deleted. A create that another run
+    (started at the same time) saved first becomes `existing`: the unique constraint
+    `productimage_source_unique` refused the duplicate. Its sort order and alt text are those
+    of the other run; the next run aligns them with the manifest."""
+    for row in result.rows:
+        if row.action not in ("create", "update"):
+            continue
+        try:
+            _save_image(row)
+        except Exception as error:
+            if row.action == "create" and _saved_by_another_run(row):
+                row.action = "existing"
+                continue
+            row.action = "failed"
+            texts = (
+                _messages(error)
+                if isinstance(error, ValidationError)
+                else [f"{type(error).__name__}: {error}"]
+            )
+            # No traceback: the console shows the logs, and the report already has the error.
+            logger.warning("import_catalog_images: line %s failed: %s", row.line, "; ".join(texts))
+            result.save_errors.extend(f"line {row.line}: {text}" for text in texts)
+    result.committed = True
+
+
 def _save_image(row: ImageRow) -> None:
-    """One row per transaction: the stored files cannot be rolled back, and a re-run picks up
-    where a failed run stopped."""
     if row.action == "update":
         row.existing.sort_order, row.existing.alt_text = row.sort_order, row.alt_text
         row.existing.save(update_fields=["sort_order", "alt_text", "updated_at"])
-    elif row.action == "create":
-        with transaction.atomic(), row.path.open("rb") as handle:
-            image = ProductImage(
-                product=row.product,
-                variant=row.variant,
-                image=File(handle, name=row.path.name),
-                alt_text=row.alt_text,
-                sort_order=row.sort_order,
-                source_sha256=row.sha256,
-            )
-            image.full_clean()
-            image.save()
+        return
+    with row.path.open("rb") as handle:
+        image = ProductImage(
+            product=row.product,
+            variant=row.variant,
+            image=File(handle, name=row.path.name),
+            alt_text=row.alt_text,
+            sort_order=row.sort_order,
+            source_sha256=row.sha256,
+        )
+        try:
+            with transaction.atomic():
+                image.full_clean()
+                image.save()
+        except BaseException:
+            _discard_stored_files(image)
+            raise
+
+
+def _saved_by_another_run(row: ImageRow) -> bool:
+    try:
+        return ProductImage.objects.filter(
+            product=row.product, variant=row.variant, source_sha256=row.sha256
+        ).exists()
+    except Exception:  # e.g. the connection is gone: report the original error
+        return False
+
+
+def _discard_stored_files(image: ProductImage) -> None:
+    """After a failed create: delete the files `prepare_image()` had already stored (the
+    original and its renditions), so a failed row leaves nothing behind. They are kept when a
+    row refers to them after all (a commit whose reply was lost), or when that cannot be
+    checked: an unused file is harmless, an image row without its file is not."""
+    field_file = image.image
+    if not field_file or not getattr(field_file, "_committed", False):
+        return  # failed before anything was stored
+    name = field_file.name
+    try:
+        if ProductImage.objects.filter(image=name).exists():
+            return
+    except Exception:
+        logger.warning("import_catalog_images: kept %s (could not check the database)", name)
+        return
+    for left in delete_stored_image(field_file.storage, name):
+        logger.warning("import_catalog_images: could not delete %s", left)
 
 
 # --------------------------------------------------------------------------- deactivation
@@ -329,13 +433,14 @@ class DeactivationResult:
 def read_sku_list(path: Path) -> tuple[list[str], list[str]]:
     """SKUs from a CSV with a `sku` column (other columns are ignored, except `is_active`, which
     must be 0 when present: this file only deactivates). Returns (skus, errors)."""
-    text = path.read_text(encoding="utf-8-sig")
-    reader = csv.DictReader(io.StringIO(text, newline=""))
-    if "sku" not in (reader.fieldnames or []):
+    errors: list[str] = []
+    header, rows = _read_csv_rows(path, "file", errors)
+    if errors:
+        return [], errors
+    if "sku" not in header:
         return [], ["file: missing column sku."]
     skus: list[str] = []
-    errors: list[str] = []
-    for line, raw in enumerate(reader, start=2):
+    for line, raw in enumerate(rows, start=2):
         sku = (raw.get("sku") or "").strip()
         if not sku:
             errors.append(f"line {line}: sku is empty.")

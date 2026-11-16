@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/routes.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/primary_action_bar.dart';
 import '../../launch/presentation/blocking_message.dart';
@@ -183,18 +184,16 @@ class _DocumentTile extends StatelessWidget {
     final scheme = theme.colorScheme;
     final doc = document;
     final status = doc?.status;
-    final statusColor = switch (status) {
-      null => scheme.onSurfaceVariant,
-      DocumentReviewStatus.pending => scheme.primary,
-      DocumentReviewStatus.approved => scheme.primary,
-      DocumentReviewStatus.rejected => scheme.error,
+    final rc = RiderColors.of(context);
+    final (statusIcon, statusColor) = switch (status) {
+      null => (Icons.radio_button_unchecked, rc.textSecondary),
+      DocumentReviewStatus.pending => (Icons.hourglass_top, rc.textPrimary),
+      DocumentReviewStatus.approved => (Icons.verified, rc.onlineBg),
+      DocumentReviewStatus.rejected => (Icons.error, rc.danger),
     };
     final canOpen = doc?.canReplace ?? true;
-    final action = doc == null
-        ? l10n.docActionUpload
-        : status == DocumentReviewStatus.rejected
-        ? l10n.docActionReupload
-        : l10n.docActionReplace;
+    final statusLabel = documentStatusLabel(l10n, status);
+    final name = documentName(l10n, type);
 
     return Card(
       key: Key('doc-${type.wireValue}'),
@@ -204,58 +203,63 @@ class _DocumentTile extends StatelessWidget {
               side: BorderSide(color: scheme.error, width: 2),
             )
           : null,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: canOpen ? onOpen : null,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 80),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Icon(_icon(type), size: 36, color: scheme.primary),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        documentName(l10n, type),
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        documentStatusLabel(l10n, status),
-                        key: Key('doc-${type.wireValue}-status'),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: statusColor,
-                          fontWeight: FontWeight.w600,
+      child: Semantics(
+        button: canOpen,
+        label: '$name, $statusLabel',
+        excludeSemantics: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: canOpen ? onOpen : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 80),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(_icon(type), size: 36, color: scheme.primary),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(statusIcon, size: 20, color: statusColor),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                statusLabel,
+                                key: Key('doc-${type.wireValue}-status'),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      if (doc?.numberMasked case final masked?)
-                        Text(masked, style: theme.textTheme.bodyMedium),
-                      if (status == DocumentReviewStatus.rejected &&
-                          doc?.reviewNote != null)
-                        Text(
-                          doc!.reviewNote!,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: scheme.error,
+                        if (doc?.numberMasked case final masked?)
+                          Text(masked, style: theme.textTheme.bodyMedium),
+                        if (status == DocumentReviewStatus.rejected &&
+                            doc?.reviewNote != null)
+                          Text(
+                            doc!.reviewNote!,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: rc.danger,
+                            ),
                           ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (canOpen)
-                  Text(
-                    action,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: scheme.primary,
+                      ],
                     ),
-                  )
-                else if (status == DocumentReviewStatus.approved)
-                  Icon(Icons.verified, color: scheme.primary),
-              ],
+                  ),
+                  if (canOpen) ...[
+                    const SizedBox(width: 8),
+                    Icon(Icons.chevron_right, color: scheme.primary),
+                  ],
+                ],
+              ),
             ),
           ),
         ),

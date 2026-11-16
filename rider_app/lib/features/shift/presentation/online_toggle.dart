@@ -18,6 +18,7 @@ import '../../task/domain/task_status.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
 import '../domain/today_summary.dart';
+import 'connection_providers.dart';
 import 'home_providers.dart';
 import 'shift_controller.dart';
 import '../../../shared/errors/rider_error_text.dart';
@@ -85,6 +86,9 @@ class ShiftStatusCard extends ConsumerWidget {
         !online && (state.problem == ShiftProblem.autoOffline || byOps);
     final prepaidOnly =
         online && (state.prepaidOnly || (summary?.limitReached ?? false));
+    // RA-10: online, but offers can't reach the phone.
+    final noConnection =
+        state.isOnline && ref.watch(riderConnectionLostProvider);
     final store = summary?.homeStoreName;
 
     final BoxDecoration decoration;
@@ -96,6 +100,11 @@ class ShiftStatusCard extends ConsumerWidget {
       leading = Icon(Icons.location_off, color: colors.codBorder, size: 24);
       title = l10n.shiftAutoOfflineTitle;
       body = byOps ? l10n.shiftEndedByOpsBody : l10n.shiftAutoOfflineBody;
+    } else if (noConnection) {
+      decoration = colors.codDecoration();
+      leading = Icon(Icons.wifi_off, color: colors.codBorder, size: 24);
+      title = l10n.shiftOnlineNoInternetTitle;
+      body = l10n.shiftOnlineNoInternetBody;
     } else if (prepaidOnly) {
       decoration = colors.codDecoration();
       leading = _Dot(color: colors.codBorder, filled: true);
@@ -154,8 +163,10 @@ class ShiftStatusCard extends ConsumerWidget {
                   Text(
                     body,
                     key: const Key('shift-status-body'),
-                    maxLines: autoOffline ? null : 2,
-                    overflow: autoOffline ? null : TextOverflow.ellipsis,
+                    maxLines: autoOffline || noConnection ? null : 2,
+                    overflow: autoOffline || noConnection
+                        ? null
+                        : TextOverflow.ellipsis,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: colors.textPrimary,
                     ),
@@ -351,7 +362,16 @@ class GuardCard extends ConsumerWidget {
             ? controller.retryEnd
             : () => goOnlineFromHome(ref, l10n),
       ),
-      HomeGuard.other => (l10n.retry, controller.dismissProblem),
+      // RA-12: "Try again" really tries again (it used to only hide the
+      // card); the close button dismisses.
+      HomeGuard.other => (
+        l10n.retry,
+        state.busy
+            ? null
+            : state.isOnline
+            ? () => goOfflineFromHome(ref)
+            : () => goOnlineFromHome(ref, l10n),
+      ),
     };
 
     return Semantics(
@@ -405,6 +425,17 @@ class GuardCard extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    if (guard == HomeGuard.other)
+                      IconButton(
+                        key: const Key('shift-problem-close'),
+                        tooltip: l10n.dismiss,
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        onPressed: controller.dismissProblem,
+                        icon: const Icon(Icons.close),
+                      ),
                   ],
                 ),
                 if (label != null) ...[

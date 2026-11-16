@@ -39,6 +39,7 @@ from apps.ops_console.delivery_ops_forms import (
     MarkPaidForm,
 )
 from apps.ops_console.order_views import _form_message, _refused, _run, poll_seconds
+from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.views import ops_context
 from apps.orders.choices import OrderStatus
 from apps.stores.services import stores_for
@@ -153,10 +154,10 @@ def rider_force_offline(request, rider_id: int):
 
 
 def _store_id(request) -> int | None:
-    value = request.GET.get("store") or request.POST.get("store") or ""
-    if not value.isdigit():
+    store_id = parse_ascii_id(request.GET.get("store") or request.POST.get("store") or "")
+    if store_id is None:
         return None
-    return int(value) if stores_for(request.user).filter(pk=int(value)).exists() else None
+    return store_id if stores_for(request.user).filter(pk=store_id).exists() else None
 
 
 def _can_record(user) -> bool:

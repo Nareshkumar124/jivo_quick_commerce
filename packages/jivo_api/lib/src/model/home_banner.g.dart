@@ -142,6 +142,7 @@ const _$BannerLinkTypeEnumEnumMap = {
   BannerLinkTypeEnum.collection: 'collection',
   BannerLinkTypeEnum.product: 'product',
   BannerLinkTypeEnum.url: 'url',
+  BannerLinkTypeEnum.referral: 'referral',
   BannerLinkTypeEnum.none: 'none',
   BannerLinkTypeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

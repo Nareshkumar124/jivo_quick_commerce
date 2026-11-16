@@ -5,7 +5,13 @@ from django.core.exceptions import ImproperlyConfigured
 from .deployed import *
 
 APP_ENVIRONMENT = "production"
-SEED_DEMO_ALLOWED = env_bool("SEED_DEMO_ALLOWED", default=False)
+
+# Security audit m8: demo data never reaches production. seed_demo creates demo staff and
+# fixed-OTP customers, and simulate_rider fakes rider pings; both obey this flag. Refuse to start
+# if it is set (staging keeps it).
+if env_bool("SEED_DEMO_ALLOWED", default=False):
+    raise ImproperlyConfigured("SEED_DEMO_ALLOWED must not be set in production (m8).")
+SEED_DEMO_ALLOWED = False
 
 # D-15: fixed-OTP test numbers never exist in production. Refuse to start if configured.
 if env_str("OTP_TEST_NUMBERS", default="").strip():

@@ -154,6 +154,18 @@ abstract class AppLocalizations {
   /// **'No internet connection'**
   String get offlineBanner;
 
+  /// Second line of the offline banner (CA-02).
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll update as soon as you\'re back online.'**
+  String get offlineBannerHint;
+
+  /// Snackbar when a refresh failed but the earlier content stays on screen (CA-03).
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t refresh. Check your connection.'**
+  String get refreshFailed;
+
   /// Onboarding slide 1 title.
   ///
   /// In en, this message translates to:
@@ -496,6 +508,216 @@ abstract class AppLocalizations {
   /// **'Profile updated.'**
   String get profileSaved;
 
+  /// Account row that opens the referral screen. amount = the server's reward_amount, e.g. ₹90.
+  ///
+  /// In en, this message translates to:
+  /// **'Refer & earn {amount}'**
+  String referAndEarn(String amount);
+
+  /// Account row that opens the referral screen while the reward is not known (loading, error, program paused).
+  ///
+  /// In en, this message translates to:
+  /// **'Refer a friend'**
+  String get referAFriend;
+
+  /// No description provided for @referralStripGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite friends and earn rewards'**
+  String get referralStripGeneric;
+
+  /// Subtitle of the account referral row for a new customer who can still enter a code.
+  ///
+  /// In en, this message translates to:
+  /// **'Got a friend\'s code? Enter it here'**
+  String get referralEntryHaveCode;
+
+  /// Referral screen title.
+  ///
+  /// In en, this message translates to:
+  /// **'Refer & earn'**
+  String get referralTitle;
+
+  /// Referral screen headline. amount = reward_amount, e.g. ₹90.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite a friend, you both get {amount} off'**
+  String referralHeadline(String amount);
+
+  /// Label above the customer's own code.
+  ///
+  /// In en, this message translates to:
+  /// **'Your referral code'**
+  String get referralYourCode;
+
+  /// Screen-reader label of the customer's code.
+  ///
+  /// In en, this message translates to:
+  /// **'Your referral code: {code}'**
+  String referralCodeSemantics(String code);
+
+  /// Copies the referral code.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get referralCopy;
+
+  /// Screen-reader label of the Copy button.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy your referral code'**
+  String get referralCopyCodeSemantics;
+
+  /// Snackbar after copying the code.
+  ///
+  /// In en, this message translates to:
+  /// **'Code {code} copied'**
+  String referralCodeCopied(String code);
+
+  /// Copies the server's share message to the clipboard (no share sheet in v1).
+  ///
+  /// In en, this message translates to:
+  /// **'Share invite'**
+  String get referralShare;
+
+  /// Snackbar after Share invite copied the share message.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite message copied. Paste it in WhatsApp or SMS to send it.'**
+  String get referralShareCopied;
+
+  /// Heading of the referral rules.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get referralHowItWorks;
+
+  /// Referral rule 1.
+  ///
+  /// In en, this message translates to:
+  /// **'Share your code with a friend who is new to Jivo.'**
+  String get referralStep1;
+
+  /// Referral rule 2.
+  ///
+  /// In en, this message translates to:
+  /// **'They enter it before their first order.'**
+  String get referralStep2;
+
+  /// Referral rule 3. amount = reward_amount, days = reward_validity_days.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{When their first order is delivered, you both get {amount} off. Use it within 1 day.} other{When their first order is delivered, you both get {amount} off. Use it within {days} days.}}'**
+  String referralStep3(String amount, int days);
+
+  /// Added to rule 3 when reward_min_order_value is not zero.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid on orders of {amount} or more.'**
+  String referralMinOrder(String amount);
+
+  /// Referral stat: friends who entered the customer's code.
+  ///
+  /// In en, this message translates to:
+  /// **'Friends joined'**
+  String get referralFriendsJoined;
+
+  /// Referral stat: friends whose first order was delivered (a reward each).
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards earned'**
+  String get referralRewardsEarned;
+
+  /// Under the stats when no friend has joined.
+  ///
+  /// In en, this message translates to:
+  /// **'No friends have joined yet. Share your code to get started.'**
+  String get referralNoFriendsYet;
+
+  /// Shown instead of the code and Share when the program is off (is_enabled false).
+  ///
+  /// In en, this message translates to:
+  /// **'Refer & earn is paused right now. Please check back later.'**
+  String get referralPaused;
+
+  /// Heading of the box where a new customer enters a friend's code; also the checkout card title.
+  ///
+  /// In en, this message translates to:
+  /// **'Have a referral code?'**
+  String get referralHaveCode;
+
+  /// Under 'Have a referral code?' on the referral screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a friend\'s code before your first order.'**
+  String get referralHaveCodeHint;
+
+  /// Label of the friend's code field.
+  ///
+  /// In en, this message translates to:
+  /// **'Friend\'s code'**
+  String get referralCodeLabel;
+
+  /// Sends the friend's referral code.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get referralApply;
+
+  /// Apply was tapped with an empty code field.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your friend\'s code'**
+  String get referralCodeRequired;
+
+  /// Snackbar after the friend's code was accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Code applied. You and your friend will each get {amount} off after your first delivery.'**
+  String referralApplied(String amount);
+
+  /// The friend's code the customer entered (masked by the server, e.g. AB**7P).
+  ///
+  /// In en, this message translates to:
+  /// **'You joined with code {code}'**
+  String referralJoinedWith(String code);
+
+  /// Referral status PENDING.
+  ///
+  /// In en, this message translates to:
+  /// **'You and your friend will each get {amount} off after your first delivery.'**
+  String referralStatusPending(String amount);
+
+  /// Referral status REWARDED.
+  ///
+  /// In en, this message translates to:
+  /// **'Your {amount} reward is in your coupons. Pick it under Apply coupon in your cart.'**
+  String referralStatusRewarded(String amount);
+
+  /// Referral status VOID.
+  ///
+  /// In en, this message translates to:
+  /// **'No reward for this code: Refer & earn was paused when your first order was delivered.'**
+  String get referralStatusNoReward;
+
+  /// Checkout card for a customer who can still enter a friend's code.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter it before you place this order. You and your friend each get {amount} off after it\'s delivered.'**
+  String referralPromptBody(String amount);
+
+  /// Checkout card button that opens the referral screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter code'**
+  String get referralPromptAction;
+
+  /// Tooltip of the button that hides the checkout referral card.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get referralPromptDismiss;
+
   /// Empty state of the address list.
   ///
   /// In en, this message translates to:
@@ -664,6 +886,102 @@ abstract class AppLocalizations {
   /// **'We need your location to deliver to this address. Stand at the address and tap \"Use my current location\".'**
   String get locationNeeded;
 
+  /// Address form (CA-07): opens the map picker when the address has no pin yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Set location on map'**
+  String get setLocationOnMap;
+
+  /// Map picker fallback opened from the address form: returns to that form.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to the form'**
+  String get mapBackToForm;
+
+  /// Address form: server says the pin is serviceable.
+  ///
+  /// In en, this message translates to:
+  /// **'We deliver here.'**
+  String get addressServiceableYes;
+
+  /// Address form: pin not serviceable; saving is still allowed.
+  ///
+  /// In en, this message translates to:
+  /// **'We don\'t deliver to this pin yet. You can still save the address.'**
+  String get addressServiceableNo;
+
+  /// Address form: serviceability check running.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking delivery for this pin…'**
+  String get addressServiceableChecking;
+
+  /// Serviceable but the store is closed; {when} is the store-closed text.
+  ///
+  /// In en, this message translates to:
+  /// **'We deliver here. {when}'**
+  String addressServiceableClosed(String when);
+
+  /// Address form: area, city, state or PIN code came from the map.
+  ///
+  /// In en, this message translates to:
+  /// **'Filled from the map. Check them before saving.'**
+  String get addressPrefillNote;
+
+  /// Dialog when leaving the address form with changes.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this address?'**
+  String get addressDiscardTitle;
+
+  /// Discard dialog body.
+  ///
+  /// In en, this message translates to:
+  /// **'What you typed will be lost.'**
+  String get addressDiscardBody;
+
+  /// Discard dialog: stay.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep editing'**
+  String get addressKeepEditing;
+
+  /// Discard dialog: leave.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get addressDiscard;
+
+  /// Address form (CA-07): opens the map picker at the address's pin.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust pin'**
+  String get adjustPin;
+
+  /// Address form without a map (CA-07): warning under "Use my current location".
+  ///
+  /// In en, this message translates to:
+  /// **'Use this only when you are at this address now.'**
+  String get gpsOnlyAtAddress;
+
+  /// Address form (CA-07): why Save is disabled, with a map.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the delivery location on the map first.'**
+  String get pinNeededMap;
+
+  /// Address form (CA-07): why Save is disabled, without a map.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the delivery location first.'**
+  String get pinNeededNoMap;
+
+  /// Address switcher (CA-07): opens the address form with the selected pin.
+  ///
+  /// In en, this message translates to:
+  /// **'Save this location as an address'**
+  String get saveThisLocation;
+
   /// Location permission denied.
   ///
   /// In en, this message translates to:
@@ -784,29 +1102,53 @@ abstract class AppLocalizations {
   /// **'ADD'**
   String get addToCart;
 
+  /// Screen-reader label of the quantity box that replaced the minus/plus stepper; tapping it opens the Enter quantity dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity {count}, tap to change'**
+  String quantityBoxLabel(int count);
+
+  /// Screen reader: a cart change is still running (CA-17 spinner).
+  ///
+  /// In en, this message translates to:
+  /// **'Updating quantity'**
+  String get updatingQuantity;
+
   /// Screen-reader label of the ADD button.
   ///
   /// In en, this message translates to:
   /// **'Add {name} to cart'**
   String addToCartSemantics(String name);
 
-  /// Screen-reader label of the stepper's minus button.
+  /// Title of the dialog that lets the customer type a quantity instead of tapping + many times.
   ///
   /// In en, this message translates to:
-  /// **'Remove one {name}'**
-  String stepperDecrease(String name);
+  /// **'Enter quantity'**
+  String get typeQuantityTitle;
 
-  /// Screen-reader label of the stepper's plus button.
+  /// Label of the digits-only quantity field.
   ///
   /// In en, this message translates to:
-  /// **'Add one more {name}'**
-  String stepperIncrease(String name);
+  /// **'Quantity'**
+  String get typeQuantityField;
 
-  /// Screen-reader label of the quantity between minus and plus.
+  /// Helper text under the quantity field.
   ///
   /// In en, this message translates to:
-  /// **'{count} in cart'**
-  String stepperQuantity(int count);
+  /// **'0 removes it from the cart'**
+  String get typeQuantityHint;
+
+  /// Inline error: the quantity field is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a quantity'**
+  String get typeQuantityEmpty;
+
+  /// Dialog button that sets the typed quantity in the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get typeQuantityUpdate;
 
   /// Shown when plus is tapped at the cap min(stock, max per order).
   ///
@@ -825,6 +1167,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only {count} left'**
   String onlyLeft(int count);
+
+  /// Product tile hint near ADD when the variant's min_qty_per_order is above 1; ADD adds this many at once.
+  ///
+  /// In en, this message translates to:
+  /// **'Min {count}'**
+  String minQtyShort(int count);
+
+  /// Hint near the stepper on product detail, the variant picker and cart lines when min_qty_per_order is above 1.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum {count} per order'**
+  String minQtyPerOrder(int count);
 
   /// Discount badge, percent from the server.
   ///
@@ -901,14 +1255,44 @@ abstract class AppLocalizations {
   /// Home search bar placeholder.
   ///
   /// In en, this message translates to:
-  /// **'Search for oils, ghee and more'**
+  /// **'Search products'**
   String get searchHint;
 
-  /// Home section title: category grid.
+  /// Home section title: every product of the store.
   ///
   /// In en, this message translates to:
-  /// **'Shop by category'**
-  String get shopByCategory;
+  /// **'All products'**
+  String get allProducts;
+
+  /// Full-screen banner button for a category, collection, product or web link.
+  ///
+  /// In en, this message translates to:
+  /// **'Shop now'**
+  String get shopNow;
+
+  /// Full-screen banner button for the referral banner.
+  ///
+  /// In en, this message translates to:
+  /// **'Refer now'**
+  String get referNow;
+
+  /// Tooltip of the full-screen banner close button.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeBanner;
+
+  /// Unit after the price on a product card.
+  ///
+  /// In en, this message translates to:
+  /// **'/carton'**
+  String get perCarton;
+
+  /// Product card gold label: the last volume price from the server's price_tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'{price} at {count}+ cartons'**
+  String bulkPriceFrom(String price, int count);
 
   /// Home section title: buy-again rail.
   ///
@@ -1324,6 +1708,60 @@ abstract class AppLocalizations {
   /// **'{amount}/{per}'**
   String unitPrice(String amount, String per);
 
+  /// Product page and variant picker: heading of the volume (slab) price table from the server's price_tiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Wholesale rates (per carton)'**
+  String get wholesaleRatesTitle;
+
+  /// Rate table row: a range of boxes in the whole order, e.g. 5–24 boxes. to = the next tier's minimum - 1.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}–{to} cartons'**
+  String priceTierRange(int from, int to);
+
+  /// Rate table row when a tier covers a single count of boxes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 carton} other{{count} cartons}}'**
+  String priceTierExactly(int count);
+
+  /// Rate table's last row: this many boxes or more, e.g. 250+ boxes.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}+ cartons'**
+  String priceTierFrom(int from);
+
+  /// Compact rate chip in the variant picker, e.g. 5–24.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}–{to}'**
+  String priceTierRangeShort(int from, int to);
+
+  /// Compact rate chip in the variant picker: the top tier, e.g. 250+.
+  ///
+  /// In en, this message translates to:
+  /// **'{from}+'**
+  String priceTierFromShort(int from);
+
+  /// Compact rate chip in the variant picker, e.g. 5–24: ₹90.
+  ///
+  /// In en, this message translates to:
+  /// **'{range}: {price}'**
+  String priceTierChip(String range, String price);
+
+  /// Screen-reader label of one rate table row, e.g. 5–24 boxes: ₹90 per box.
+  ///
+  /// In en, this message translates to:
+  /// **'{range}: {price} per carton'**
+  String priceTierRowSemantics(String range, String price);
+
+  /// Under the rate table: the tier is chosen by all tiered items in the order together.
+  ///
+  /// In en, this message translates to:
+  /// **'Price depends on total cartons in your order (all sizes)'**
+  String get priceTierNote;
+
   /// Home header when the store is closed (no ETA).
   ///
   /// In en, this message translates to:
@@ -1419,6 +1857,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Update to {count}'**
   String updateQuantityTo(int count);
+
+  /// Cart line flag MIN_QTY_REQUIRED: the line is below the variant's minimum per order (e.g. the minimum was raised).
+  ///
+  /// In en, this message translates to:
+  /// **'Order at least {count}'**
+  String minQtyLineIssue(int count);
 
   /// Fix action on an unavailable cart line; removes a coupon.
   ///
@@ -1696,6 +2140,125 @@ abstract class AppLocalizations {
   /// **'Minimum order is {amount}.'**
   String minimumOrderNotMet(String amount);
 
+  /// Cart warning and checkout blocker MIN_UNITS_NOT_MET: the order has fewer units (any mix of products) than the store's min_order_units. count = units_to_min_order, label = order_unit_label (e.g. cartons). Example: Add 2 more cartons to place your order (minimum 5 cartons).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more to place your order (minimum {minimum} {label})} other{Add {count} more {label} to place your order (minimum {minimum} {label})}}'**
+  String minimumUnitsShortfall(int count, int minimum, String label);
+
+  /// Checkout blocker MIN_UNITS_NOT_MET when the server sends no units_to_min_order.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum order is {minimum} {label}.'**
+  String minimumUnitsNotMet(int minimum, String label);
+
+  /// What an order unit is called when the server sends no order_unit_label (e.g. 'minimum 5 items').
+  ///
+  /// In en, this message translates to:
+  /// **'items'**
+  String get orderUnitsDefault;
+
+  /// Cart line of an item with volume prices: the server's price_per_unit, e.g. ₹87/box.
+  ///
+  /// In en, this message translates to:
+  /// **'{price}/carton'**
+  String pricePerBox(String price);
+
+  /// Small tag on a cart line billed at a volume tier (price_tier is set).
+  ///
+  /// In en, this message translates to:
+  /// **'Wholesale rate'**
+  String get wholesaleRateTag;
+
+  /// Cart piggy card headline. count = units_to_next_tier, label = order unit label.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more} other{Add {count} more {label}}}'**
+  String priceTierHeadline(int count, String label);
+
+  /// Cart piggy card detail when one line gets cheaper.
+  ///
+  /// In en, this message translates to:
+  /// **'and pay {price}/carton on {variant}'**
+  String priceTierDetailLine(String price, String variant);
+
+  /// Cart piggy card detail when several lines get cheaper.
+  ///
+  /// In en, this message translates to:
+  /// **'and pay less per carton'**
+  String get priceTierDetailMany;
+
+  /// Cart piggy card button: opens search to add items.
+  ///
+  /// In en, this message translates to:
+  /// **'Add more'**
+  String get priceTierAddMore;
+
+  /// Account row and screen title for the coupon list.
+  ///
+  /// In en, this message translates to:
+  /// **'My coupons'**
+  String get myCoupons;
+
+  /// Label on a coupon made only for this customer.
+  ///
+  /// In en, this message translates to:
+  /// **'For you'**
+  String get couponForYou;
+
+  /// Coupon minimum order value (server amount).
+  ///
+  /// In en, this message translates to:
+  /// **'Min order {amount}'**
+  String couponMinOrder(String amount);
+
+  /// Snackbar after copying a coupon code.
+  ///
+  /// In en, this message translates to:
+  /// **'Code {code} copied'**
+  String couponCodeCopied(String code);
+
+  /// Screen reader label of the copy-code chip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code {code}'**
+  String couponCopySemantics(String code);
+
+  /// My coupons: no store selected yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your delivery location to see coupons'**
+  String get couponsNeedLocation;
+
+  /// My coupons: button to the location flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose location'**
+  String get couponsChooseLocation;
+
+  /// My coupons empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'No coupons right now'**
+  String get myCouponsEmpty;
+
+  /// Cart nudge when one line gets cheaper at the next volume tier. count = next_price_tier.units_to_next_tier, label = order_unit_label (e.g. boxes), price = that line's next_tier_price, variant = its pack size (e.g. 1 L).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more to get {price}/carton on {variant}} other{Add {count} more {label} to get {price}/carton on {variant}}}'**
+  String priceTierNudgeLine(
+    int count,
+    String label,
+    String price,
+    String variant,
+  );
+
+  /// Cart nudge when several lines get cheaper at the next volume tier. count = next_price_tier.units_to_next_tier, label = order_unit_label.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more for lower prices} other{Add {count} more {label} for lower prices}}'**
+  String priceTierNudge(int count, String label);
+
   /// Checkout disabled while the store is closed.
   ///
   /// In en, this message translates to:
@@ -1749,6 +2312,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pay by cash or UPI when your order arrives'**
   String get payCodSubtitle;
+
+  /// Shown under the disabled COD option when the server sends no reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash on delivery isn\'t available for this order'**
+  String get codUnavailableFallback;
 
   /// Places a COD order.
   ///
@@ -1948,6 +2517,12 @@ abstract class AppLocalizations {
   /// **'We don\'t deliver to this address from this store. Choose another address.'**
   String get blockerNotServiceable;
 
+  /// Checkout blocker MIN_QTY_REQUIRED.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items are below their minimum quantity. Fix them to continue.'**
+  String get blockerMinQtyRequired;
+
   /// Checkout blocker COUPON_NOT_ELIGIBLE.
   ///
   /// In en, this message translates to:
@@ -2019,6 +2594,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only {count} of {name} can be ordered now.'**
   String stockOnlyDetail(int count, String name);
+
+  /// MIN_QTY_REQUIRED with the server's minimum, for a known cart line or tile.
+  ///
+  /// In en, this message translates to:
+  /// **'You need to order at least {count} of {name}.'**
+  String minQtyRequiredFor(int count, String name);
 
   /// Dialog when placing an order while another awaits payment.
   ///
@@ -2368,6 +2949,60 @@ abstract class AppLocalizations {
   /// **'Arriving by {time}'**
   String orderArrivingBy(String time);
 
+  /// Home active-order card (CA-10): the trailing label when it opens tracking.
+  ///
+  /// In en, this message translates to:
+  /// **'Track'**
+  String get activeOrderTrack;
+
+  /// Home active-order card (CA-10): the trailing label when it opens the order detail.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get activeOrderDetails;
+
+  /// Home active-order card (CA-10) while out for delivery. Never shows the OTP itself.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery OTP ready'**
+  String get activeOrderOtpReady;
+
+  /// Home active-order card (CA-10) for DELIVERY_FAILED.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t deliver it. See what happens next.'**
+  String get activeOrderDeliveryFailedBody;
+
+  /// Home (CA-10): under the card when there are more active orders.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{+1 more order in progress} other{+{count} more orders in progress}}'**
+  String activeOrderMore(int count);
+
+  /// Home (CA-10): opens My orders.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get activeOrderSeeAll;
+
+  /// Home active-order card (CA-10): its screen-reader label.
+  ///
+  /// In en, this message translates to:
+  /// **'{summary}. Opens {destination}.'**
+  String activeOrderSemantics(String summary, String destination);
+
+  /// Destination in activeOrderSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'tracking'**
+  String get activeOrderOpensTracking;
+
+  /// Destination in activeOrderSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'the order details'**
+  String get activeOrderOpensDetails;
+
   /// Order detail of a PAYMENT_PENDING order.
   ///
   /// In en, this message translates to:
@@ -2427,6 +3062,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{name} is no longer sold'**
   String reorderDiscontinued(String name);
+
+  /// Reorder: the past order had fewer units than the item's minimum per order today (MIN_QTY_REQUIRED).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} wasn\'t added: it now has a higher minimum order quantity'**
+  String reorderBelowMinimum(String name);
 
   /// Reorder: fewer units than ordered were available.
   ///
@@ -2547,6 +3188,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Arriving any moment'**
   String get trackingArrivingNow;
+
+  /// Tracking: data is arriving live.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get trackingLive;
+
+  /// Tracking: when the data was last received.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {time}'**
+  String trackingUpdatedAt(String time);
+
+  /// Tracking: the last refresh failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t update right now. Last update {time}. Pull down to try again.'**
+  String trackingStale(String time);
+
+  /// Tracking: well past the ETA, out for delivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Running a little late. Your rider is on the way.'**
+  String get trackingLateOnTheWay;
+
+  /// Tracking: well past the ETA, before pickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Taking a little longer than planned. Your order is being prepared.'**
+  String get trackingLatePreparing;
+
+  /// Tracking: opens support.
+  ///
+  /// In en, this message translates to:
+  /// **'Get help'**
+  String get trackingGetHelp;
+
+  /// Tracking: OTP title when the rider is at the door.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rider is at the door. Delivery OTP'**
+  String get trackingOtpAtDoorTitle;
+
+  /// Tracking: rider row subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Location updated {when}'**
+  String trackingRiderUpdated(String when);
+
+  /// Tracking: under a minute ago.
+  ///
+  /// In en, this message translates to:
+  /// **'just now'**
+  String get trackingJustNow;
+
+  /// Tracking: minutes ago.
+  ///
+  /// In en, this message translates to:
+  /// **'{n, plural, =1{1 min ago} other{{n} min ago}}'**
+  String trackingMinutesAgo(int n);
+
+  /// Tracking: an IST time.
+  ///
+  /// In en, this message translates to:
+  /// **'at {time}'**
+  String trackingAtTime(String time);
+
+  /// Tracking: delivered time.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered at {time}'**
+  String trackingDeliveredAt(String time);
+
+  /// Tracking: cancelled order.
+  ///
+  /// In en, this message translates to:
+  /// **'This order was cancelled. See the order details for any refund.'**
+  String get trackingCancelledBody;
+
+  /// Tracking: rate button.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate your order'**
+  String get trackingRateOrder;
 
   /// Tracking before a rider is assigned.
   ///

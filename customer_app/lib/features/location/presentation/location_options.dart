@@ -160,6 +160,23 @@ class _LocationOptionsState extends ConsumerState<LocationOptions> {
           title: Text(l10n.pickOnMap),
           onTap: () => _pickOnMap(initial: current?.point),
         ),
+        // A pin or detected location without a saved address: save it as
+        // one, keeping the pin the customer chose (CA-07).
+        if (current != null && current.addressId == null)
+          ListTile(
+            key: const Key('save-this-location'),
+            enabled: !_busy,
+            leading: const Icon(Icons.bookmark_add_outlined),
+            title: Text(l10n.saveThisLocation),
+            subtitle: current.subtitle == null
+                ? null
+                : Text(
+                    current.subtitle!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+            onTap: () => context.push(Routes.newAddress, extra: current),
+          ),
         ListTile(
           enabled: !_busy,
           leading: const Icon(Icons.add),

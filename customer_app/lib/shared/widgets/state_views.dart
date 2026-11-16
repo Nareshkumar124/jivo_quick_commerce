@@ -1,18 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../l10n/generated/app_localizations.dart';
+import '../connectivity/connectivity.dart';
 
 /// Error with a retry button (`03 §4`). [error] is mapped through jivo_core;
-/// raw exception text is never shown.
-class ErrorRetryView extends StatelessWidget {
-  const ErrorRetryView({required this.error, required this.onRetry, super.key});
+/// raw exception text is never shown. With [retryOnReconnect] (the
+/// default) it also retries once by itself each time the connection comes
+/// back (`03 §2.1`, CA-02).
+class ErrorRetryView extends ConsumerWidget {
+  const ErrorRetryView({
+    required this.error,
+    required this.onRetry,
+    this.retryOnReconnect = true,
+    super.key,
+  });
 
   final Object error;
   final VoidCallback onRetry;
+  final bool retryOnReconnect;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (retryOnReconnect) {
+      ref.listen(reconnectProvider, (previous, next) {
+        if (previous != next) onRetry();
+      });
+    }
     final theme = Theme.of(context);
     return Center(
       child: SingleChildScrollView(
@@ -145,6 +160,40 @@ class BusyButton extends StatelessWidget {
           : Text(label),
     ),
   );
+}
+
+/// A reload failed while the earlier content stays on screen (CA-03):
+/// [next] is an error that still holds the last data, right after a load.
+bool isFailedRefresh(AsyncValue<Object?>? previous, AsyncValue<Object?> next) =>
+    next is AsyncError &&
+    next.hasValue &&
+    !next.isLoading &&
+    (previous?.isLoading ?? false);
+
+/// For `RefreshIndicator.onRefresh`: waits for [reload] and swallows its
+/// error, which the screen already shows (snackbar or error state). Without
+/// this, a failed pull-to-refresh is an uncaught async error.
+Future<void> refreshQuietly(Future<Object?> reload) async {
+  try {
+    await reload;
+  } catch (_) {
+    // Shown by the screen.
+  }
+}
+
+/// "Couldn't refresh. Check your connection." with Retry (CA-03): the
+/// content on screen stays, instead of a full-screen error.
+void showRefreshFailed(BuildContext context, VoidCallback onRetry) {
+  final l10n = AppLocalizations.of(context);
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        key: const Key('refresh-failed'),
+        content: Text(l10n.refreshFailed),
+        action: SnackBarAction(label: l10n.retry, onPressed: onRetry),
+      ),
+    );
 }
 
 /// Shows [message] in a snackbar.

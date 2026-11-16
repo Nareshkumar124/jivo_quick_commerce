@@ -12,7 +12,7 @@ from django.urls import reverse
 
 from apps.accounts import roles
 from apps.ops_console.tests.helpers import staff_in_role
-from apps.promotions import admin as promotions_admin
+from apps.promotions import services
 from apps.promotions.admin import MSG_CODE_LOCKED, MSG_CODE_TAKEN, CouponAdminForm
 from apps.promotions.models import Coupon, RedemptionStatus
 from apps.promotions.tests.test_admin import (  # noqa: F401 - fixtures
@@ -121,5 +121,5 @@ def test_code_race_becomes_a_form_error(client, manager, monkeypatch):
 def test_other_integrity_errors_are_not_hidden(monkeypatch):
     from django.db import IntegrityError
 
-    assert promotions_admin._is_code_conflict(IntegrityError("coupon_code_unique_ci")) is True
-    assert promotions_admin._is_code_conflict(IntegrityError("coupon_value_positive")) is False
+    assert services.is_code_conflict(IntegrityError("coupon_code_unique_ci")) is True
+    assert services.is_code_conflict(IntegrityError("coupon_value_positive")) is False

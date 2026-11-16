@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/redirect.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/product_image.dart';
@@ -14,6 +15,7 @@ import '../../cart/presentation/cart_bar.dart';
 import '../domain/catalog_models.dart';
 import 'catalog_controllers.dart';
 import 'widgets/price_tags.dart';
+import 'widgets/price_tiers_table.dart';
 import 'widgets/product_tile.dart';
 
 /// Product detail (`03 §2.6`): gallery with zoom, variant chips with price
@@ -227,12 +229,25 @@ class _ProductBodyState extends State<_ProductBody> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+              if (variant.hasMinQty) ...[
+                const SizedBox(height: JivoSpacing.sm),
+                MinQtyHint(variant: variant),
+              ],
               const SizedBox(height: JivoSpacing.md),
               AddStepper(
                 key: ValueKey('pdp-${variant.id}'),
                 variant: variant,
                 productName: product.name,
               ),
+              // Volume (slab) prices of the selected size, as the server
+              // sends them.
+              if (variant.hasPriceTiers) ...[
+                const SizedBox(height: JivoSpacing.lg),
+                PriceTiersTable(
+                  key: ValueKey('price-tiers-${variant.id}'),
+                  tiers: variant.priceTiers,
+                ),
+              ],
               if (product.highlights.isNotEmpty) ...[
                 heading(l10n.highlights),
                 for (final line in product.highlights)
@@ -396,9 +411,12 @@ class _GalleryState extends State<_Gallery> {
               child: GestureDetector(
                 key: ValueKey('gallery-$i'),
                 onTap: () => _openZoom(i),
-                child: Padding(
-                  padding: const EdgeInsets.all(JivoSpacing.gutter),
-                  child: ProductImage(url: urls[i]),
+                child: ColoredBox(
+                  color: context.customerColors.imageWell,
+                  child: Padding(
+                    padding: const EdgeInsets.all(JivoSpacing.gutter),
+                    child: ProductImage(url: urls[i], onWell: true),
+                  ),
                 ),
               ),
             ),

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ (API 31+): nothing of the rider app leaves the phone through
+     cloud backup or a device-to-device transfer. android:allowBackup="false"
+     in the manifest covers Android 11 and below, but on 12+ it does not stop
+     device-to-device transfers; these rules do. Kept out: the session tokens
+     (flutter_secure_storage; their Keystore key is never transferred, so a
+     restored copy could not be read anyway), the location buffer and the
+     online-service settings (shared_prefs, files), KYC photos waiting for
+     upload (files). P8 security audit. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

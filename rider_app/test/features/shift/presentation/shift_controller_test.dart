@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
 import 'package:jivo_core/jivo_core.dart';
+import 'package:rider_app/features/auth/domain/rider_account.dart';
 import 'package:rider_app/features/auth/presentation/rider_account_controller.dart';
 import 'package:rider_app/features/location/domain/tracking_config.dart';
 import 'package:rider_app/features/location/domain/location_service_client.dart';
@@ -9,7 +11,9 @@ import 'package:rider_app/features/permissions/domain/permission_snapshot.dart';
 import 'package:rider_app/features/permissions/presentation/permissions_gate_controller.dart';
 import 'package:rider_app/features/shift/domain/shift_repository.dart';
 import 'package:rider_app/features/shift/presentation/shift_controller.dart';
+import 'package:rider_app/features/task/domain/task_status.dart';
 import 'package:rider_app/features/task/presentation/task_block.dart';
+import 'package:rider_app/features/task/presentation/task_flow_controller.dart';
 
 import '../../../helpers/fake_permissions_service.dart';
 import '../../../helpers/permission_fixtures.dart';
@@ -257,6 +261,133 @@ void main() {
     await shift().sync();
     expect(h.location.running, isFalse);
     expect(state().problem, ShiftProblem.endedByOps);
+  });
+
+  // P8 hardening: Android stopped the app and its location service in the
+  // middle of a delivery (OEM battery manager, force stop) and the rider
+  // opens the app again. The task screen comes back, but home's toggle is
+  // out of reach during a task, so nothing restarted tracking.
+  group('cold start mid-task with the service gone', () {
+    Future<void> coldStart({
+      required bool serverOnline,
+      bool task = true,
+      void Function(RiderTestHarness h)? before,
+    }) async {
+      h = RiderTestHarness();
+      perms = StubbedPermissions(allGranted);
+      h.location.running = false;
+      h.shift
+        ..online = serverOnline
+        ..activeTaskId = task ? 501 : null;
+      if (task) h.tasks.seedTask(h.tasks.newTask(status: TaskStatus.pickedUp));
+      before?.call(h);
+      await h.signedInBefore('+919811122231');
+      c = await h.container(
+        extra: [permissionsServiceProvider.overrideWithValue(perms.service)],
+      );
+      c
+        ..listen(shiftControllerProvider, (_, _) {})
+        ..listen(taskFlowControllerProvider, (_, _) {});
+      await c.read(riderAccountControllerProvider.notifier).load();
+      await pumpEventQueue();
+    }
+
+    test('the server still has the rider online on the task: tracking '
+        'resumes with the on-task intervals', () async {
+      await coldStart(serverOnline: true);
+      expect(
+        c.read(taskFlowControllerProvider).task?.status,
+        TaskStatus.pickedUp,
+      );
+      expect(h.location.running, isTrue);
+      expect(h.location.calls, ['start(onTask)']);
+      expect(state().phase, ShiftPhase.online);
+      expect(state().synced, isTrue);
+    });
+
+    test('the server has the rider offline: nothing is tracked', () async {
+      await coldStart(serverOnline: false);
+      expect(h.location.calls, isEmpty);
+      expect(state().phase, ShiftPhase.offline);
+      expect(state().synced, isTrue);
+    });
+
+    test(
+      'no network for the check: the next return to the app tries again',
+      () async {
+        await coldStart(
+          serverOnline: true,
+          before: (h) => h.shift.nextStatusError = const ApiError(
+            code: ApiErrorCode.network,
+          ),
+        );
+        expect(h.location.calls, isEmpty);
+        expect(state().phase, ShiftPhase.offline);
+
+        await shift().sync(); // the app came back to the foreground
+        expect(h.location.calls, ['start(onTask)']);
+        expect(state().phase, ShiftPhase.online);
+      },
+    );
+
+    test(
+      'no task: the phone stays offline until the rider goes online',
+      () async {
+        await coldStart(serverOnline: true, task: false);
+        expect(h.location.calls, isEmpty);
+        expect(h.shift.calls, isNot(contains('status')));
+        expect(state().phase, ShiftPhase.offline);
+      },
+    );
+  });
+
+  // P8 hardening: ops suspended the rider while signed in. The schema's 403
+  // example says "Not ACTIVE: route on rider_status".
+  group('403 RIDER_NOT_ACTIVE routes on details.rider_status', () {
+    const suspended = ApiError(
+      code: ApiErrorCode.permissionDenied,
+      statusCode: 403,
+      details: {'reason': 'RIDER_NOT_ACTIVE', 'rider_status': 'SUSPENDED'},
+    );
+
+    RiderStatusEnum? riderStatus() =>
+        switch (c.read(riderAccountControllerProvider)) {
+          AccountLoaded(:final riderStatus) => riderStatus,
+          _ => null,
+        };
+
+    test('going online refused: the account follows the server', () async {
+      await setUpRider();
+      expect(riderStatus(), RiderStatusEnum.ACTIVE);
+      h.shift.nextStartError = suspended;
+
+      expect(await shift().goOnline(_text), isFalse);
+      expect(riderStatus(), RiderStatusEnum.SUSPENDED);
+      expect(h.location.running, isFalse);
+    });
+
+    test('tracking stopped with PERMISSION_DENIED: the heartbeat says why, '
+        'and the account follows', () async {
+      await setUpRider();
+      await shift().goOnline(_text);
+      h.shift.nextStatusError = suspended;
+
+      h.location.serverStop('PERMISSION_DENIED');
+      await pumpEventQueue();
+      expect(h.shift.calls, contains('status'));
+      expect(riderStatus(), RiderStatusEnum.SUSPENDED);
+    });
+
+    test('other refusals change nothing', () async {
+      await setUpRider();
+      h.shift.nextStartError = const ApiError(
+        code: ApiErrorCode.permissionDenied,
+        statusCode: 403,
+        details: {'rider_status': 'ACTIVE'},
+      );
+      await shift().goOnline(_text);
+      expect(riderStatus(), RiderStatusEnum.ACTIVE);
+    });
   });
 
   test('prepaid_only from shift/start is kept while online', () async {

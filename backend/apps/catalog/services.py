@@ -34,7 +34,7 @@ from django.db.models import (
 from django.utils import timezone
 from rest_framework.exceptions import NotFound
 
-from apps.catalog.choices import ProductSort, SuggestionType
+from apps.catalog.choices import BannerAudience, ProductSort, SuggestionType
 from apps.catalog.images import image_set
 from apps.catalog.models import (
     MAX_COLLECTION_ITEMS,
@@ -46,6 +46,7 @@ from apps.catalog.models import (
     ProductImage,
     ProductVariant,
     TrendingSearch,
+    VariantPriceTier,
     VariantUnit,
 )
 from apps.catalog.validators import LABEL_TEXT_KEYS
@@ -90,10 +91,11 @@ def sold_variants(store: DarkStore) -> QuerySet[ProductVariant]:
             inv_reserved=F("store_inv__reserved"),
             inv_is_available=F("store_inv__is_available"),
             inv_price=effective_price_expression("store_inv__price_override"),
+            # Orderable (`availability()`): at least the variant's minimum per order is free.
             in_stock=Case(
                 When(
                     Q(store_inv__is_available=True)
-                    & Q(store_inv__on_hand__gt=F("store_inv__reserved")),
+                    & Q(store_inv__on_hand__gte=F("store_inv__reserved") + F("min_qty_per_order")),
                     then=Value(1),
                 ),
                 default=Value(0),
@@ -141,14 +143,33 @@ def store_products(store: DarkStore, preferred=None) -> QuerySet[Product]:
     )
 
 
+def tier_prefetch() -> Prefetch:
+    """A variant's price tiers, lowest first, as `variant.tier_list` (see `variant_tiers()`)."""
+    return Prefetch(
+        "price_tiers",
+        queryset=VariantPriceTier.objects.order_by("min_order_units"),
+        to_attr="tier_list",
+    )
+
+
+def variant_tiers(variant) -> list[VariantPriceTier]:
+    """The variant's price tiers, lowest first: prefetched (`tier_prefetch()`) or queried."""
+    tiers = getattr(variant, "tier_list", None)
+    if tiers is None:
+        tiers = list(variant.price_tiers.order_by("min_order_units"))
+    return tiers
+
+
 def with_card_data(queryset: QuerySet[Product], store: DarkStore) -> QuerySet[Product]:
-    """Prefetches for `product_card()`: store variants (+ their images) and shared images."""
+    """Prefetches for `product_card()`: store variants (+ their images and price tiers) and
+    shared images."""
     ordered_images = ProductImage.objects.order_by("sort_order", "id")
     return queryset.select_related("category").prefetch_related(
         Prefetch(
             "variants",
             queryset=sold_variants(store).prefetch_related(
-                Prefetch("images", queryset=ordered_images, to_attr="own_images")
+                Prefetch("images", queryset=ordered_images, to_attr="own_images"),
+                tier_prefetch(),
             ),
             to_attr="store_variants",
         ),
@@ -218,6 +239,7 @@ def variant_summary(variant, product) -> dict:
         reserved=variant.inv_reserved,
         is_available=variant.inv_is_available,
         max_qty_per_order=variant.max_qty_per_order,
+        min_qty_per_order=variant.min_qty_per_order,
     )
     return {
         "id": variant.pk,
@@ -231,6 +253,11 @@ def variant_summary(variant, product) -> dict:
         "orderable_quantity": stock.orderable_quantity,
         "units_left": stock.units_left,
         "max_qty_per_order": variant.max_qty_per_order,
+        "min_qty_per_order": variant.min_qty_per_order,
+        "price_tiers": [
+            {"min_order_units": tier.min_order_units, "price": money(tier.price)}
+            for tier in variant_tiers(variant)
+        ],
         "image": _variant_image(variant, product),
     }
 
@@ -614,12 +641,30 @@ def home_body(store: DarkStore) -> dict:
                 "image": image_set(b.image, b.title),
                 "link_type": b.link_type,
                 "link_value": b.link_value,
+                "audience": b.audience,  # used by `banners_for_audience`, not published
             }
             for b in banners
         ],
         "categories": [{k: v for k, v in node.items() if k != "children"} for node in tree],
         "collections": collection_rails,
     }
+
+
+def banners_for_audience(body: dict, user) -> dict:
+    """Per-user view of the cached home body: drop banners meant for the other audience.
+
+    The cached `body` is shared by every user, so it is never mutated: a copy is returned."""
+    from apps.promotions.services import has_placed_order
+
+    returning = user is not None and has_placed_order(user)
+    hidden = BannerAudience.NEW_CUSTOMERS if returning else BannerAudience.RETURNING_CUSTOMERS
+    banners = [
+        {k: v for k, v in b.items() if k != "audience"}
+        for b in body["banners"]
+        # .get: home bodies cached before migration 0006 have no "audience" key (= ALL).
+        if b.get("audience", BannerAudience.ALL) != hidden
+    ]
+    return {**body, "banners": banners}
 
 
 def buy_again(store: DarkStore, user) -> list[dict]:

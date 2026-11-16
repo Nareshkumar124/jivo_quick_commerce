@@ -1,0 +1,184 @@
+# gitleaks config for Jivo Quick Commerce. The repo is PUBLIC: anything committed is published.
+# CI: .github/workflows/secret-scan.yml. How to run it locally and how to add an allowlist entry
+# safely: docs/deployment.md §2.1. gitleaks finds this file by itself at the repo root.
+#
+# Rules = gitleaks' built-in set (useDefault) + the project rules below, for secrets the built-in
+# set doesn't know (Razorpay key ids, Twilio SIDs, our secret env variables, DB URLs, secret files).
+#
+# Allowlist rules (keep them):
+# - Each entry names the rule(s) it applies to (targetRules), matches ONE known fake value or
+#   placeholder shape (plus a path when the value alone is not enough), and says why it is safe.
+# - Never allowlist a real secret. A real one is rotated first, then dealt with (deployment.md §2.1).
+# - Changes to this file are flagged in the CI run, so a reviewer always sees them.
+
+title = "Jivo Quick Commerce gitleaks config"
+
+[extend]
+useDefault = true
+
+# ------------------------------------------------------------------------------ project rules
+
+[[rules]]
+id = "jqc-razorpay-key-id"
+description = "Razorpay API key id. Its key secret is usually close by."
+regex = '''\b(rzp_(?:live|test)_[A-Za-z0-9]{14})\b'''
+secretGroup = 1
+keywords = ["rzp_live_", "rzp_test_"]
+tags = ["razorpay"]
+
+[[rules]]
+id = "jqc-twilio-account-sid"
+description = "Twilio account SID. With TWILIO_AUTH_TOKEN it sends SMS on our account."
+regex = '''\b(AC[0-9a-f]{32})\b'''
+secretGroup = 1
+tags = ["twilio"]
+
+[[rules]]
+id = "jqc-dotenv-secret"
+description = "A literal value for one of our secret settings in env-file, shell, compose or Dockerfile syntax (NAME=value), also mid-line (docker run -e NAME=value, NAME=value cmd)."
+regex = '''(?m)(?:^|[\s;&|(\x60])["']?(?:DJANGO_SECRET_KEY|JWT_SIGNING_KEY|OTP_HASH_KEY|FIELD_ENCRYPTION_KEYS|POSTGRES_PASSWORD|PGPASSWORD|SEED_DEMO_STAFF_PASSWORD|MINIO_ROOT_PASSWORD|EMAIL_HOST_PASSWORD|RAZORPAY_KEY_SECRET|RAZORPAY_WEBHOOK_SECRET|TWILIO_AUTH_TOKEN|S3_SECRET_ACCESS_KEY|AWS_SECRET_ACCESS_KEY)=["']?([^\s"'#]{4,})'''
+secretGroup = 1
+keywords = [
+  "django_secret_key", "jwt_signing_key", "otp_hash_key", "field_encryption_keys",
+  "postgres_password", "pgpassword", "seed_demo_staff_password", "minio_root_password",
+  "email_host_password", "razorpay_key_secret", "razorpay_webhook_secret", "twilio_auth_token",
+  "s3_secret_access_key", "aws_secret_access_key",
+]
+tags = ["env"]
+
+    # Not values: `$VAR`, `${VAR:?}` and `$(command)` read the secret from somewhere else at
+    # run time (compose files, shell scripts, CI steps).
+    [[rules.allowlists]]
+    description = "shell or compose variable reference"
+    regexes = ['''^\$(?:\{|\(|[A-Za-z_])''']
+
+    # `NAME=<placeholder>`: the angle-bracket placeholder style of the env examples and docs.
+    [[rules.allowlists]]
+    description = "angle-bracket placeholder"
+    regexes = ['''^<''']
+
+    # Patterns, not values: a shell `case` glob (`NAME=*)`, infra/backup/lib.sh) or a grep regex
+    # (`NAME=.+`, the PM merge skill's own secret grep).
+    [[rules.allowlists]]
+    description = "shell glob or grep regex"
+    regexes = ['''^(?:\*|\.[*+])''']
+
+    # Exact placeholder words: backend/Dockerfile gives collectstatic importable settings at build
+    # time (`collectstatic-build-only`, `unused`; no database, never a runtime value), and the env
+    # example says `change-me-to-a-long-random-string`.
+    [[rules.allowlists]]
+    description = "named build-time and example placeholders"
+    regexes = ['''^(?:collectstatic-build-only|unused|change-me-to-a-long-random-string)$''']
+
+    # The rule is for env/shell/compose/Docker syntax. In Python, `NAME="x"` at the start of a
+    # line is a keyword argument (override_settings, monkeypatch) in a test, with a short fake
+    # value; the built-in rules still scan Python files.
+    [[rules.allowlists]]
+    description = "Python keyword arguments in tests, not env syntax"
+    paths = [
+      '''^backend/(apps/[^/]+/)?tests/.*\.py$''',
+      '''(^|/)conftest\.py$''',
+      '''^qa/tests/.*\.py$''',
+    ]
+
+[[rules]]
+id = "jqc-db-url-password"
+description = "Database, Redis or broker URL with a password in it."
+regex = '''(?i)\b(?:postgres(?:ql)?|postgis|redis|rediss|amqp|mysql)://[^\s:/@'"]*:([^\s@/'"]{3,})@'''
+secretGroup = 1
+keywords = ["://"]
+tags = ["database"]
+
+    [[rules.allowlists]]
+    description = "placeholder (<password>) or variable reference ($VAR, ${VAR})"
+    regexes = ['''^(?:<|\$)''']
+
+# A file that must never be committed, whatever it contains: the secret files in .gitignore.
+# Env files (.env, .env.<anything>), Android signing (key.properties, *.jks, *.keystore), Mappls
+# SDK config (*.a.olf, *.a.conf, *.i.olf, *.i.conf, mappls-conf.txt), local dart-define values
+# and Claude permissions (*.local.json), QA exploit details (qa/private/), raw Jivo inputs
+# (data/incoming/, design/incoming/).
+[[rules]]
+id = "jqc-secret-file"
+description = "A gitignored secret file was committed."
+path = '''(?:^|/)(?:\.env(?:\.[^/]+)?|key\.properties|[^/]+\.(?:jks|keystore)|[^/]+\.[ai]\.(?:olf|conf)|mappls-conf\.txt|[^/]+\.local\.json)$|^(?:qa/private|data/incoming|design/incoming)/'''
+tags = ["file"]
+
+    # .env.example files hold placeholders only (.gitignore re-includes them on purpose).
+    [[rules.allowlists]]
+    description = "env example files"
+    paths = ['''(?:^|/)\.env\.example$''']
+
+# ------------------------------------------------------------------------------ allowlists
+# Known fake values and placeholders. Keep each one narrow.
+
+# 1. The fake Razorpay test key ids made of the word EXAMPLE/Example (rzp_test_EXAMPLEEXAMPLE,
+#    rzp_test_Example<digits>): the contract examples and the payment tests (06 §2.6). Real keys
+#    are random and never spell a word.
+[[allowlists]]
+targetRules = ["jqc-razorpay-key-id"]
+description = "Razorpay EXAMPLE test key ids"
+regexes = ['''^rzp_test_(?:EXAMPLE|Example)[A-Za-z0-9]*$''']
+
+# 2. AC followed by 32 zeros: the placeholder account SID of the Twilio tests. It is no account.
+[[allowlists]]
+targetRules = ["jqc-twilio-account-sid"]
+description = "all-zero Twilio account SID"
+regexes = ['''^AC0{32}$''']
+
+# 3. `NAME=<placeholder>` in *.env.example: generic-api-key reads the `>` that closes a placeholder
+#    as an assignment and takes the next line as the key. The match then starts with the end of
+#    the placeholder (`...-secret>` + newline). A real value has no `>` before it.
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "angle-bracket placeholders in env example files"
+condition = "AND"
+paths = ['''(?:^|/)[^/]*\.env\.example$''']
+regexTarget = "match"
+regexes = ['''^[\w.-]*>\s''']
+
+# 4. The example JWTs of the API contract (backend/apps/accounts/examples.py ->
+#    backend/openapi/schema.yaml -> app fixtures). Their signature part is the base64url of the
+#    text "signature-for-examples-only", so they verify against no key. Only that exact signature
+#    is allowed; any other JWT is still reported. generic-api-key is included because it also
+#    reports a short example token written as `access: <token>`.
+[[allowlists]]
+targetRules = ["jwt", "generic-api-key"]
+description = "contract example JWTs with the fake signature"
+regexes = ['''\.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5$''']
+
+# 5. Test fixture: the example support-attachment object key (backend/apps/support/examples.py ->
+#    schema.yaml -> customer app tests and fixtures). It is a storage object name on
+#    storage.example.com, not a credential.
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "example support attachment object key"
+regexes = ['''^9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19$''']
+
+# 6. Test fixtures: UUIDs (idempotency keys, request ids) and Razorpay order/payment ids in test
+#    code. generic-api-key flags them because the variable is named *Key. Test folders only.
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "UUIDs and Razorpay object ids in tests"
+condition = "AND"
+paths = ['''^(?:backend/(?:apps/[^/]+/)?tests|customer_app/test|rider_app/test|packages/[^/]+/test|qa/tests|loadtest/tests)/''']
+regexes = [
+  '''^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''',
+  '''^(?:order|pay)_[A-Za-z0-9]{14}$''',
+]
+
+# 7. Prose, not a key: an agent brief lists 401/403 cases in one sentence and
+#    generic-api-key reads the word before the comma as an assignment.
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "prose in agent briefs"
+condition = "AND"
+paths = ['''^\.claude/agents/[^/]+\.md$''']
+regexes = ['''^permission/IDOR$''']
+
+# 8. Vendored third-party code: minified OpenLayers. generic-api-key misreads minified property
+#    names as keys. Only generic-api-key is skipped here; every other rule still scans the file.
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "vendored minified OpenLayers"
+paths = ['''^backend/static/ops/vendor/ol-[0-9.]+\.min\.js$''']

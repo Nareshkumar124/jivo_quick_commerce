@@ -1,0 +1,179 @@
+"""Customer referrals (07 §2.5a, added 2026-11-13).
+
+- `ReferralSettings`: one row (id 1) the admin edits: on/off, reward amount, validity, minimum.
+- `ReferralCode`: each customer's own code, created on their first `GET /account/referral/`.
+- `Referral`: a customer (`referred`) entered another customer's (`referrer`) code. At most one
+  per referred customer, ever. When the referred customer's first order is delivered, both get
+  a personal coupon (`apps.referrals.services.reward_for_order`).
+Rows change only through `apps.referrals.services`.
+"""
+
+from decimal import Decimal
+
+from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
+from django.db.models import F, Q
+from simple_history.models import HistoricalRecords
+
+from apps.core.models import TimeStampedModel
+from apps.referrals.choices import ReferralStatus
+
+SINGLETON_ID = 1
+CODE_MAX_LENGTH = 12
+MONEY = {"max_digits": 12, "decimal_places": 2}
+
+DEFAULT_REWARD_AMOUNT = Decimal("90.00")
+DEFAULT_VALIDITY_DAYS = 30
+DEFAULT_MIN_ORDER_VALUE = Decimal("0.00")
+MAX_REWARD_AMOUNT = Decimal("1000.00")
+
+
+class ReferralSettings(TimeStampedModel):
+    """The referral program's settings (user decisions, 2026-11-13): a single row edited in the
+    admin. Read when a code is entered (on/off) and when a reward is given (all fields)."""
+
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text=(
+            "Off: customers cannot enter codes, and a referred customer whose first order is "
+            "delivered while it is off gets no reward (the referral becomes VOID)."
+        ),
+    )
+    reward_amount = models.DecimalField(
+        **MONEY,
+        default=DEFAULT_REWARD_AMOUNT,
+        validators=[MinValueValidator(Decimal("1.00")), MaxValueValidator(MAX_REWARD_AMOUNT)],
+        help_text="Rupees off for each of the two customers (a FLAT personal coupon).",
+    )
+    reward_validity_days = models.PositiveSmallIntegerField(
+        default=DEFAULT_VALIDITY_DAYS,
+        validators=[MinValueValidator(1), MaxValueValidator(365)],
+        help_text="Days the reward coupons stay valid after they are given.",
+    )
+    reward_min_order_value = models.DecimalField(
+        **MONEY,
+        default=DEFAULT_MIN_ORDER_VALUE,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Minimum item total (before the coupon) to use a reward coupon. 0 = none.",
+    )
+    history = HistoricalRecords()
+
+    class Meta:
+        verbose_name = "referral settings"
+        verbose_name_plural = "referral settings"
+        constraints = [
+            models.CheckConstraint(condition=Q(id=SINGLETON_ID), name="referralsettings_singleton"),
+            models.CheckConstraint(
+                condition=Q(reward_amount__gt=0), name="referralsettings_amount_positive"
+            ),
+            models.CheckConstraint(
+                condition=Q(reward_min_order_value__gte=0),
+                name="referralsettings_min_order_not_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(reward_validity_days__gte=1),
+                name="referralsettings_validity_at_least_1",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return "Referral settings"
+
+    def save(self, *args, **kwargs) -> None:
+        self.pk = SINGLETON_ID
+        if self._state.adding:
+            # Saving a new instance while the row exists updates that row (keep created_at).
+            created_at = (
+                ReferralSettings.objects.filter(pk=SINGLETON_ID)
+                .values_list("created_at", flat=True)
+                .first()
+            )
+            if created_at is not None:
+                self.created_at = created_at
+                self._state.adding = False
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls) -> "ReferralSettings":
+        config, _ = cls.objects.get_or_create(pk=SINGLETON_ID)
+        return config
+
+
+class ReferralCode(TimeStampedModel):
+    """A customer's own referral code: created once, never changed."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="referral_code"
+    )
+    code = models.CharField(
+        max_length=CODE_MAX_LENGTH,
+        unique=True,
+        help_text="Upper case, e.g. K7M2PQ. Friends type it in the app.",
+    )
+
+    class Meta:
+        ordering = ["code"]
+
+    def __str__(self) -> str:
+        return self.code
+
+    def save(self, *args, **kwargs) -> None:
+        self.code = (self.code or "").strip().upper()
+        super().save(*args, **kwargs)
+
+
+class Referral(TimeStampedModel):
+    """`referred` joined with `referrer`'s code. Rewarded once, when `referred`'s first order is
+    delivered (both get a personal coupon)."""
+
+    referrer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="referrals_made"
+    )
+    referred = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="referral",
+        help_text="A customer can enter a referral code only once.",
+    )
+    code = models.CharField(max_length=CODE_MAX_LENGTH, help_text="The code that was entered.")
+    status = models.CharField(
+        max_length=10, choices=ReferralStatus.choices, default=ReferralStatus.PENDING
+    )
+    reward_order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="The referred customer's delivered order that gave the reward (or the VOID).",
+    )
+    reward_amount = models.DecimalField(**MONEY, null=True, blank=True)
+    referrer_coupon = models.ForeignKey(
+        "promotions.Coupon", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    referred_coupon = models.ForeignKey(
+        "promotions.Coupon", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    rewarded_at = models.DateTimeField(null=True, blank=True)
+    note = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(condition=~Q(referrer=F("referred")), name="referral_not_self"),
+            models.CheckConstraint(
+                condition=~Q(status=ReferralStatus.REWARDED)
+                | Q(
+                    reward_order__isnull=False,
+                    referrer_coupon__isnull=False,
+                    referred_coupon__isnull=False,
+                    rewarded_at__isnull=False,
+                ),
+                name="referral_rewarded_complete",
+            ),
+        ]
+        indexes = [models.Index(fields=["referrer", "status"], name="referral_referrer_status_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.referred_id} by {self.referrer_id} ({self.code}): {self.status}"

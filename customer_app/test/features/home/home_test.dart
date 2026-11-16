@@ -11,7 +11,7 @@ import '../../helpers/test_app.dart';
 
 /// Tall enough to build every home section without scrolling.
 void tallView(WidgetTester tester) {
-  tester.view.physicalSize = const Size(800, 3000);
+  tester.view.physicalSize = const Size(800, 7000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
 }
@@ -31,13 +31,13 @@ void main() {
 
     expect(find.text('Delivery in 14 mins'), findsOneWidget);
     expect(find.text('Home · Flat 4B, MG Road, New Delhi'), findsOneWidget);
-    expect(find.text('Search for oils, ghee and more'), findsOneWidget);
+    // A neutral hint: the catalog is not only oils and ghee.
+    expect(find.text('Search products'), findsOneWidget);
+    expect(find.textContaining('oils, ghee'), findsNothing);
     expect(find.byKey(const Key('banner-carousel')), findsOneWidget);
     expect(find.text('Up to 20% off on olive oils'), findsOneWidget);
-    expect(find.text('Shop by category'), findsOneWidget);
-    for (final category in ['Edible Oils', 'Ghee', 'Health Foods']) {
-      expect(find.text(category), findsOneWidget);
-    }
+    expect(find.text('All products'), findsOneWidget);
+    expect(find.byKey(const ValueKey('home-category-edible-oils')), findsNothing);
     expect(find.text('Bestsellers'), findsOneWidget);
     expect(find.text('Offers'), findsOneWidget);
     expect(find.text('New launches'), findsOneWidget);
@@ -59,6 +59,8 @@ void main() {
     await app.pump(tester);
 
     await tester.tap(find.byKey(const ValueKey('add-1001')).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('qty-update'))); // prefilled 1
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('cart-bar')), findsOneWidget);
     // The item total is the (fake) server's, not a sum in the app.
@@ -149,7 +151,9 @@ void main() {
     final app = TestApp(tokens: signedInTokens);
     await app.pump(tester);
 
-    await tester.tap(find.byKey(const ValueKey('home-category-edible-oils')));
+    await tester.tap(find.text('Categories').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All').first);
     await tester.pumpAndSettle();
     // 8 oils, 6 per page: the second page loads at the end of the grid.
     expect(app.catalog.calls, contains('products:edible-oils:relevance:2'));
@@ -193,6 +197,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('You save ₹101'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('add-102')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('qty-update'))); // prefilled 1
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('qty-102')), findsOneWidget);
     expect(find.textContaining('1 item · ₹'), findsOneWidget);

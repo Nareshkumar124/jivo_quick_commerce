@@ -2651,7 +2651,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileRatingValue.
   ///
   /// In en, this message translates to:
-  /// **'{rating} ★'**
+  /// **'{rating} out of 5'**
   String profileRatingValue(String rating);
 
   /// No description provided for @profileNoRating.
@@ -2663,7 +2663,7 @@ abstract class AppLocalizations {
   /// No description provided for @documentsProfileIntro.
   ///
   /// In en, this message translates to:
-  /// **'Your KYC documents and their review status. Approved documents can\'t be changed. Upload again any document marked Rejected.'**
+  /// **'Your KYC documents and their review status. Approved documents can\'t be changed. Upload again any document marked Not accepted.'**
   String get documentsProfileIntro;
 
   /// No description provided for @documentsNeedAttention.
@@ -3853,6 +3853,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other'**
   String get ratingTagOther;
+
+  /// No description provided for @shiftOnlineNoInternetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re online, but there\'s no internet'**
+  String get shiftOnlineNoInternetTitle;
+
+  /// No description provided for @shiftOnlineNoInternetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'New orders can\'t reach you until the connection is back. Your location is saved and sent when you\'re back online.'**
+  String get shiftOnlineNoInternetBody;
+
+  /// No description provided for @homeOfflineBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'No internet. You stay online; orders arrive when you\'re back.'**
+  String get homeOfflineBanner;
+
+  /// No description provided for @logoutConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out of Jivo Rider?'**
+  String get logoutConfirmTitle;
+
+  /// No description provided for @logoutConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ll need a new OTP to log in again.'**
+  String get logoutConfirmBody;
+
+  /// No description provided for @logoutConfirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get logoutConfirmCancel;
+
+  /// No description provided for @captureUploadingPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading… {percent}%'**
+  String captureUploadingPercent(int percent);
+
+  /// No description provided for @captureUploadSlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow connection. Keep this screen open; the upload continues.'**
+  String get captureUploadSlow;
+
+  /// No description provided for @captureNumberNotAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo couldn\'t accept this {document} number. Check it against the card.'**
+  String captureNumberNotAccepted(String document);
+
+  /// No description provided for @capturePhotoNotAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo wasn\'t accepted. Take a new photo.'**
+  String get capturePhotoNotAccepted;
+
+  /// No description provided for @ratingOutOfFive.
+  ///
+  /// In en, this message translates to:
+  /// **'{stars}/5'**
+  String ratingOutOfFive(int stars);
+
+  /// No description provided for @ratingAverageSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Average rating {average} out of 5'**
+  String ratingAverageSemantics(String average);
 }
 
 class _AppLocalizationsDelegate

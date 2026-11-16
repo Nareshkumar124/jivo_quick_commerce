@@ -13,6 +13,38 @@ import 'package:jivo_core/jivo_core.dart';
 import '../catalog/catalog_fixtures.dart';
 import 'cart_fixtures.dart';
 
+/// The fake server, recording every quantity sent to `POST /cart/items/`.
+class _RecordingCommerce extends FakeCommerceBackend {
+  _RecordingCommerce() : super(latency: Duration.zero);
+
+  final sent = <int>[];
+
+  @override
+  Future<CartSnapshot> setQuantity(
+    int variantId,
+    int quantity, {
+    CartLinePreview? preview,
+  }) {
+    sent.add(quantity);
+    return super.setQuantity(variantId, quantity, preview: preview);
+  }
+}
+
+/// One more / one less, as typed absolute quantities: the controller's
+/// rules for a typed value (cap, minimum per order) are what used to back
+/// the − and + buttons.
+extension on CartController {
+  Future<void> addOne(CatalogVariant variant, {String? productName}) =>
+      setVariantQuantity(
+        variant,
+        state.quantityOf(variant.id) + 1,
+        productName: productName,
+      );
+
+  Future<void> removeOne(CatalogVariant variant) =>
+      setVariantQuantity(variant, state.quantityOf(variant.id) - 1);
+}
+
 void main() {
   late FakeCommerceBackend repository;
   late ProviderContainer container;
@@ -39,15 +71,15 @@ void main() {
 
   test('increment and decrement go through the repository', () async {
     final oil = variant();
-    await cart().increment(oil, productName: 'Jivo Canola Oil');
-    await cart().increment(oil);
+    await cart().addOne(oil, productName: 'Jivo Canola Oil');
+    await cart().addOne(oil);
     expect(state().quantityOf(101), 2);
     expect(state().snapshot.itemCount, 2);
     expect(state().snapshot.lines.single.productName, 'Jivo Canola Oil');
 
-    await cart().decrement(oil);
-    await cart().decrement(oil);
-    await cart().decrement(oil); // already 0: no call
+    await cart().removeOne(oil);
+    await cart().removeOne(oil);
+    await cart().removeOne(oil); // already 0: no call
     expect(state().snapshot.isEmpty, isTrue);
     expect((await repository.load()).isEmpty, isTrue);
   });
@@ -60,13 +92,13 @@ void main() {
     );
 
     final scarce = variant(orderable: 1);
-    await cart().increment(scarce);
+    await cart().addOne(scarce);
     await expectLater(
-      cart().increment(scarce),
+      cart().addOne(scarce),
       throwsA(isA<CartLimitException>().having((e) => e.max, 'max', 1)),
     );
     await expectLater(
-      cart().increment(
+      cart().addOne(
         variant(id: 9, status: StockStatus.outOfStock, orderable: 0),
       ),
       throwsA(isA<CartLimitException>()),
@@ -85,15 +117,15 @@ void main() {
   });
 
   test('clear empties the cart', () async {
-    await cart().increment(variant());
-    await cart().increment(variant(id: 7));
+    await cart().addOne(variant());
+    await cart().addOne(variant(id: 7));
     await cart().clear();
     expect(state().snapshot.isEmpty, isTrue);
   });
 
   test('a failed change keeps the old quantity and clears pending', () async {
     repository.failNext = Exception('boom');
-    await expectLater(cart().increment(variant()), throwsException);
+    await expectLater(cart().addOne(variant()), throwsException);
     expect(state().quantityOf(101), 0);
     expect(state().isPending(101), isFalse);
   });
@@ -173,6 +205,380 @@ void main() {
     expect(writes(stub), ['set:101:3']);
   });
 
+  group('minimum per order', () {
+    CatalogVariant water({int orderable = 20}) =>
+        variant(id: 1501, orderable: orderable, maxQty: 1000, minQty: 5);
+
+    test('ADD sets the minimum in one request; plus adds one', () async {
+      final stub = StubCartRepository(cartSnapshot());
+      final c = containerWith(stub);
+      final controller = c.read(cartProvider.notifier);
+      await controller.addOne(water());
+      expect(writes(stub), ['set:1501:5']);
+
+      stub.snapshot = cartSnapshot(
+        lines: [cartLine(variantId: 1501, quantity: 5, minQty: 5)],
+      );
+      await controller.refresh();
+      await controller.addOne(water());
+      expect(writes(stub).last, 'set:1501:6');
+    });
+
+    test('minus at the minimum removes the line; above it, one', () async {
+      final stub = StubCartRepository(
+        cartSnapshot(
+          lines: [cartLine(variantId: 1501, quantity: 6, minQty: 5)],
+        ),
+      );
+      final c = containerWith(stub);
+      final controller = c.read(cartProvider.notifier);
+      await controller.refresh();
+      await controller.removeOne(water());
+      expect(writes(stub), ['set:1501:5']);
+
+      stub.snapshot = cartSnapshot(
+        lines: [cartLine(variantId: 1501, quantity: 5, minQty: 5)],
+      );
+      await controller.refresh();
+      await controller.removeOne(water());
+      expect(writes(stub).last, 'set:1501:0');
+    });
+
+    test('min 1 behaves as before: ADD 1, minus at 1 removes', () async {
+      await cart().addOne(variant(), productName: 'Jivo Canola Oil');
+      expect(state().quantityOf(101), 1);
+      await cart().removeOne(variant());
+      expect(state().snapshot.isEmpty, isTrue);
+    });
+
+    test('fewer orderable than the minimum is out of stock', () async {
+      final scarce = water(orderable: 4);
+      expect(scarce.inStock, isFalse);
+      expect(scarce.maxSelectable, 0);
+      expect(water(orderable: 5).inStock, isTrue);
+      await expectLater(
+        cart().addOne(scarce),
+        throwsA(isA<CartLimitException>()),
+      );
+      expect(state().quantityOf(1501), 0);
+    });
+
+    test('a cart line never steps into 1..min-1', () async {
+      final stub = StubCartRepository(cartSnapshot());
+      final c = containerWith(stub);
+      final controller = c.read(cartProvider.notifier);
+      final atMin = cartLine(
+        variantId: 1501,
+        quantity: 5,
+        orderable: 20,
+        minQty: 5,
+      );
+      await controller.setLineQuantity(atMin, 4); // minus: removes
+      await controller.setLineQuantity(atMin, 6); // plus: one more
+      // A line below the minimum (raised after adding): plus goes to min.
+      await controller.setLineQuantity(
+        cartLine(variantId: 1502, quantity: 2, orderable: 20, minQty: 5),
+        3,
+      );
+      expect(writes(stub), ['set:1501:0', 'set:1501:6', 'set:1502:5']);
+    });
+
+    test('the MIN_QTY_REQUIRED fix raises the line to the minimum', () async {
+      final stub = StubCartRepository(cartSnapshot());
+      final c = containerWith(stub);
+      await c
+          .read(cartProvider.notifier)
+          .fixLine(
+            cartLine(
+              variantId: 1501,
+              quantity: 2,
+              orderable: 20,
+              minQty: 5,
+              issue: CartIssueCode.minQtyRequired,
+            ),
+          );
+      expect(writes(stub), ['set:1501:5']);
+    });
+
+    test(
+      'a line already below the minimum: up goes to it, down removes',
+      () async {
+        final below = cartLine(
+          variantId: 1501,
+          quantity: 3,
+          orderable: 20,
+          minQty: 5,
+        );
+        final stub = StubCartRepository(cartSnapshot(lines: [below]));
+        final c = containerWith(stub);
+        final controller = c.read(cartProvider.notifier);
+        await controller.refresh();
+        await controller.addOne(water()); // tile +
+        await controller.removeOne(water()); // tile −
+        await controller.setLineQuantity(below, 4); // cart line +
+        await controller.setLineQuantity(below, 2); // cart line −
+        expect(writes(stub), [
+          'set:1501:5',
+          'set:1501:0',
+          'set:1501:5',
+          'set:1501:0',
+        ]);
+      },
+    );
+
+    test('a failed ADD sends the minimum once; nothing in 1..min-1 is ever '
+        'sent', () async {
+      final backend = _RecordingCommerce();
+      final c = containerWith(backend);
+      final controller = c.read(cartProvider.notifier);
+      backend.failNext = const ApiError(code: ApiErrorCode.network);
+      await expectLater(controller.addOne(water()), throwsA(isA<ApiError>()));
+      expect(backend.sent, [5]);
+      expect(c.read(cartProvider).quantityOf(1501), 0);
+
+      await controller.addOne(water()); // ADD
+      await controller.addOne(water()); // +
+      await controller.removeOne(water()); // −
+      await controller.removeOne(water()); // − at the minimum
+      expect(backend.sent, [5, 5, 6, 5, 0]);
+      expect(backend.sent.where((q) => q > 0 && q < 5), isEmpty);
+    });
+
+    test('a minimum the server reports is used on the next tap', () async {
+      // The tile still says min 1; the server raised it to 5.
+      final stale = variant(id: 1501, orderable: 20, maxQty: 1000);
+      repository.minimums[1501] = 5;
+      await expectLater(
+        cart().addOne(stale),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.code, 'code', ApiErrorCode.minQtyRequired)
+              .having((e) => e.minQtyPerOrder, 'min', 5),
+        ),
+      );
+      expect(state().quantityOf(1501), 0);
+
+      await cart().addOne(stale);
+      expect(state().quantityOf(1501), 5);
+      await cart().removeOne(stale);
+      expect(state().quantityOf(1501), 0);
+    });
+
+    group('a learned minimum gives way to the server', () {
+      late _RecordingCommerce backend;
+      late CartController controller;
+      // The tile's catalog predates the raise: it still shows min 1.
+      final stale = variant(id: 1501, orderable: 20, maxQty: 1000);
+
+      Matcher minError() => throwsA(
+        isA<ApiError>().having(
+          (e) => e.code,
+          'code',
+          ApiErrorCode.minQtyRequired,
+        ),
+      );
+
+      setUp(() async {
+        backend = _RecordingCommerce()..minimums[1501] = 5;
+        final c = containerWith(backend);
+        controller = c.read(cartProvider.notifier);
+        await controller.refresh(); // the first load, done
+        await expectLater(controller.addOne(stale), minError()); // learns 5
+        backend.minimums.remove(1501); // then the server lowers it to 1
+      });
+
+      test(
+        'refresh forgets it: learned 5, the server says 1, ADD sends 1',
+        () async {
+          await controller.refresh();
+          await controller.addOne(stale);
+          expect(backend.sent, [1, 1]);
+        },
+      );
+
+      test("a cart answer's minimum replaces it", () async {
+        await controller.addOne(stale); // still the learned 5
+        await controller.removeOne(stale); // the cart now says min 1
+        final line = controller.state.snapshot.lineFor(1501)!;
+        await controller.removeLine(line);
+        await controller.addOne(stale); // nothing learned is left
+        expect(backend.sent, [1, 5, 4, 0, 1]);
+      });
+
+      test('a catalog variant that shows the minimum replaces it', () async {
+        backend.failNext = const ApiError(code: ApiErrorCode.network);
+        await expectLater(
+          controller.addOne(variant(id: 1501, orderable: 20, minQty: 5)),
+          throwsA(isA<ApiError>()),
+        );
+        // The catalog reloads with the server's new minimum, 1.
+        await controller.addOne(stale);
+        expect(backend.sent, [1, 5, 1]);
+      });
+    });
+  });
+
+  test('a typed quantity is one absolute request, capped like +', () async {
+    final stub = StubCartRepository(cartSnapshot(lines: const []));
+    final c = containerWith(stub);
+    final controller = c.read(cartProvider.notifier);
+    await controller.refresh();
+    final water = variant(id: 1501, orderable: 1000, maxQty: 1000);
+    await controller.setVariantQuantity(water, 100);
+    expect(writes(stub), ['set:1501:100']);
+    await expectLater(
+      controller.setVariantQuantity(variant(id: 7, orderable: 5), 9),
+      throwsA(isA<CartLimitException>().having((e) => e.max, 'max', 5)),
+    );
+    // Unchanged: nothing is sent.
+    await controller.setVariantQuantity(variant(id: 8), 0);
+    expect(writes(stub), ['set:1501:100']);
+  });
+
+  group('a change answered without the address', () {
+    // The answer to a change says ADDRESS_REQUIRED (only GET /cart/ takes
+    // ?address_id=). Hold the follow-up load (it fails here) to see the
+    // state right after the change.
+    CartSnapshot answer() => cartSnapshot(
+      checkout: const CheckoutStatus(
+        canPlaceOrder: false,
+        blockers: [
+          CheckoutBlocker(
+            code: CheckoutBlockerCode.addressRequired,
+            message: 'x',
+          ),
+        ],
+      ),
+    );
+
+    test(
+      'with a saved address: its ADDRESS_REQUIRED is dropped at once',
+      () async {
+        final stub = StubCartRepository(cartSnapshot());
+        final c = containerWith(stub);
+        final controller = c.read(cartProvider.notifier);
+        await controller.refreshForAddress(2);
+        stub
+          ..snapshot = answer()
+          ..loadError = const ApiError(code: ApiErrorCode.network);
+        await controller.setLineQuantity(cartLine(), 3);
+        final checkout = c.read(cartProvider).snapshot.checkout;
+        expect(checkout.blockers, isEmpty);
+        expect(checkout.canPlaceOrder, isTrue);
+      },
+    );
+
+    test('other blockers stay and still block', () async {
+      final stub = StubCartRepository(cartSnapshot());
+      final c = containerWith(stub);
+      final controller = c.read(cartProvider.notifier);
+      await controller.refreshForAddress(2);
+      stub
+        ..snapshot = cartSnapshot(
+          checkout: const CheckoutStatus(
+            canPlaceOrder: false,
+            blockers: [
+              CheckoutBlocker(
+                code: CheckoutBlockerCode.addressRequired,
+                message: 'x',
+              ),
+              CheckoutBlocker(
+                code: CheckoutBlockerCode.minOrderNotMet,
+                message: 'y',
+              ),
+            ],
+          ),
+        )
+        ..loadError = const ApiError(code: ApiErrorCode.network);
+      await controller.setTip('20.00');
+      final checkout = c.read(cartProvider).snapshot.checkout;
+      expect(checkout.blockers.map((b) => b.code), [
+        CheckoutBlockerCode.minOrderNotMet,
+      ]);
+      expect(checkout.canPlaceOrder, isFalse);
+    });
+
+    test('without a saved address it is kept', () async {
+      final stub = StubCartRepository(cartSnapshot());
+      final c = containerWith(stub);
+      final controller = c.read(cartProvider.notifier);
+      await controller.refreshForAddress(null);
+      stub.snapshot = answer();
+      await controller.setLineQuantity(cartLine(), 3);
+      final checkout = c.read(cartProvider).snapshot.checkout;
+      expect(
+        checkout.blockers.single.code,
+        CheckoutBlockerCode.addressRequired,
+      );
+      expect(checkout.canPlaceOrder, isFalse);
+    });
+  });
+
+  group('a saved address survives cart changes', () {
+    // Only GET /cart/ takes ?address_id=; a change answers with the cart
+    // checked against no address (the staging bug: ADDRESS_REQUIRED after
+    // + or −, although the location is saved address 2).
+    List<CheckoutBlockerCode> blockers() =>
+        state().snapshot.checkout.blockers.map((b) => b.code).toList();
+
+    test('after +, − or ADD the cart is reloaded for the address', () async {
+      await cart().refreshForAddress(2);
+      await cart().addOne(variant(), productName: 'Jivo Canola Oil');
+      expect(state().snapshot.addressId, 2);
+      expect(blockers(), isNot(contains(CheckoutBlockerCode.addressRequired)));
+      expect(state().snapshot.checkout.canPlaceOrder, isTrue);
+
+      await cart().addOne(variant());
+      await cart().removeOne(variant());
+      expect(blockers(), isNot(contains(CheckoutBlockerCode.addressRequired)));
+      expect(state().load, CartLoad.ready, reason: 'no loading state');
+
+      // Without the follow-up load, the change's own answer has the bug.
+      final bare = await repository.setQuantity(101, 2);
+      expect(
+        bare.checkout.blockers.map((b) => b.code),
+        contains(CheckoutBlockerCode.addressRequired),
+      );
+    });
+
+    test('a follow-up load only with a saved address', () async {
+      final stub = StubCartRepository(cartSnapshot());
+      final c = containerWith(stub);
+      final controller = c.read(cartProvider.notifier);
+      await controller.refreshForAddress(null); // a pin: no saved address
+      stub.calls.clear();
+      await controller.setLineQuantity(cartLine(), 3);
+      await controller.setTip('20.00');
+      expect(stub.calls, ['set:101:3', 'update']);
+
+      await controller.refreshForAddress(2);
+      stub.calls.clear();
+      await controller.setLineQuantity(cartLine(), 3);
+      await controller.applyCoupon('JIVO50');
+      await controller.clear(); // the location is changing: none here
+      expect(stub.calls, [
+        'set:101:3',
+        'load:2',
+        'coupon:JIVO50',
+        'load:2',
+        'clear',
+      ]);
+    });
+
+    test('a failed follow-up load keeps the change and never throws', () async {
+      final stub = StubCartRepository(cartSnapshot());
+      final c = containerWith(stub);
+      final controller = c.read(cartProvider.notifier);
+      await controller.refreshForAddress(2);
+      stub
+        ..snapshot = cartSnapshot(lines: [cartLine(quantity: 3)])
+        ..loadError = const ApiError(code: ApiErrorCode.network);
+      await controller.setLineQuantity(cartLine(), 3);
+      expect(c.read(cartProvider).quantityOf(101), 3);
+      expect(c.read(cartProvider).load, CartLoad.ready);
+    });
+  });
+
   test('coupon, tip and instructions go to the server', () async {
     final stub = StubCartRepository(cartSnapshot());
     final c = containerWith(stub);
@@ -195,7 +601,7 @@ void main() {
   });
 
   test('a coupon error reaches the caller and clears updating', () async {
-    await cart().increment(variant());
+    await cart().addOne(variant());
     await expectLater(
       cart().applyCoupon('NOPE'),
       throwsA(

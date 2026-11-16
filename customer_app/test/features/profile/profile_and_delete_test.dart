@@ -1,8 +1,11 @@
 import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/domain/auth_models.dart';
+import 'package:customer_app/features/location/data/delivery_location_store.dart';
+import 'package:customer_app/features/search/data/recent_searches_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/test_app.dart';
 
@@ -92,6 +95,9 @@ void main() {
     ) async {
       final app = TestApp(tokens: signedInTokens);
       await openDelete(app, tester);
+      final prefs = await SharedPreferences.getInstance();
+      await RecentSearchesStore(prefs).add('ghee');
+      expect(prefs.getString(DeliveryLocationStore.key), isNotNull);
       expect(
         find.textContaining('30 days to change your mind'),
         findsOneWidget,
@@ -122,6 +128,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(app.session.isSignedIn, isFalse);
       expect(find.text('Log in or sign up'), findsOneWidget);
+      // Local data goes with the account (`03 §2.2`): the saved delivery
+      // address (id, street, lat/lng) and the recent searches.
+      expect(prefs.getString(DeliveryLocationStore.key), isNull);
+      expect(prefs.getStringList(RecentSearchesStore.key), isNull);
     });
 
     testWidgets('a wrong OTP keeps the user on the screen', (tester) async {
@@ -182,5 +192,24 @@ void main() {
     expect(app.session.isSignedIn, isFalse);
     expect(await app.store.read(), isNull);
     expect(find.text('Log in or sign up'), findsOneWidget);
+  });
+
+  testWidgets('account screen has no overflow at 2x text on 360 dp', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearAllTestValues);
+    final app = TestApp(tokens: signedInTokens);
+    await app.pump(tester);
+    await tester.tap(find.byTooltip('Account'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('account-edit')), findsOneWidget);
+    await tester.scrollUntilVisible(find.byKey(const Key('account-referral')), 100);
+    await tester.scrollUntilVisible(find.text('Log out'), 100);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
   });
 }

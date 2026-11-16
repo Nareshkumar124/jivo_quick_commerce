@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../shared/widgets/label_value_row.dart';
 import '../../../app/routes.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -108,11 +109,9 @@ class _Detail extends StatelessWidget {
           if (at != null)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Row(
-                children: [
-                  Expanded(child: Text(label)),
-                  Text(istDateTime(context, at)),
-                ],
+              child: LabelValueRow(
+                label: Text(label),
+                value: Text(istDateTime(context, at), textAlign: TextAlign.end),
               ),
             ),
         const Divider(height: 32),

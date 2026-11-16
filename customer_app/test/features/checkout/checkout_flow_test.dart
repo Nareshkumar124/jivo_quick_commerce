@@ -11,6 +11,7 @@ import 'package:customer_app/features/home/presentation/home_screen.dart';
 import 'package:customer_app/features/location/domain/delivery_location.dart';
 import 'package:customer_app/features/location/data/serviceability_repository.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
+import 'package:customer_app/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -67,6 +68,8 @@ FilledButton placeButton(WidgetTester tester) => tester.widget<FilledButton>(
     matching: find.byType(FilledButton),
   ),
 );
+
+void _noop(PaymentMethod? _) {}
 
 void main() {
   setUpAll(initializeFormatting);
@@ -320,6 +323,51 @@ void main() {
     expect(app.cart.orders, isEmpty);
   });
 
+  testWidgets('MIN_QTY_REQUIRED reloads the cart and goes back to it with '
+      'the flag', (tester) async {
+    final commerce = _CountingLoads();
+    final app = await appWithCart(commerce: commerce);
+    await openCheckout(tester, app);
+
+    commerce.minimums[101] = 5; // raised after the line was added
+    final loadsBefore = commerce.loads;
+    await placeOrder(tester);
+    expect(commerce.loads, greaterThan(loadsBefore), reason: 'cart reloaded');
+    expect(
+      find.text('You need to order at least 5 of Jivo Canola Oil 1 L.'),
+      findsOneWidget,
+    );
+    expect(find.byType(CheckoutScreen), findsNothing, reason: 'popped');
+    expect(find.byType(CartScreen), findsOneWidget);
+    // The flag comes from the reloaded cart (the screen was built before).
+    expect(find.text('Order at least 5'), findsOneWidget);
+    expect(find.text('Update to 5'), findsOneWidget);
+    expect(app.cart.orders, isEmpty);
+  });
+
+  testWidgets('MIN_UNITS_NOT_MET reloads the cart and goes back to it with '
+      'the shortfall', (tester) async {
+    final commerce = _CountingLoads();
+    final app = await appWithCart(commerce: commerce);
+    await openCheckout(tester, app);
+
+    commerce.failNext = const ApiError(
+      code: ApiErrorCode.minUnitsNotMet,
+      statusCode: 422,
+      details: {'min_order_units': 5, 'units_to_min_order': 3},
+    );
+    final loadsBefore = commerce.loads;
+    await placeOrder(tester);
+    expect(commerce.loads, greaterThan(loadsBefore), reason: 'cart reloaded');
+    expect(
+      find.text('Add 3 more items to place your order (minimum 5 items)'),
+      findsOneWidget,
+    );
+    expect(find.byType(CheckoutScreen), findsNothing, reason: 'popped');
+    expect(find.byType(CartScreen), findsOneWidget);
+    expect(app.cart.orders, isEmpty);
+  });
+
   testWidgets('double tap on Place order places one order', (tester) async {
     final app = await appWithCart();
     await openCheckout(tester, app);
@@ -344,6 +392,59 @@ void main() {
     await openCheckout(tester, app);
     expect(find.byKey(const Key('pay-online')), findsOneWidget);
     expect(find.byKey(const Key('pay-cod')), findsNothing);
+    // Shown greyed out with the server's reason; Online stays selected.
+    expect(find.byKey(const Key('pay-cod-unavailable')), findsOneWidget);
+    expect(
+      find.textContaining('Cash on delivery is available up to'),
+      findsOneWidget,
+    );
+    final tile = tester.widget<RadioListTile<PaymentMethod>>(
+      find.byKey(const Key('pay-cod-unavailable')),
+    );
+    expect(tile.enabled, isFalse);
+    await tester.tap(find.byKey(const Key('pay-cod-unavailable')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<RadioGroup<PaymentMethod>>(
+            find.byType(RadioGroup<PaymentMethod>),
+          )
+          .groupValue,
+      PaymentMethod.online,
+    );
+  });
+
+  testWidgets('COD unavailable: empty message falls back, fits 2x text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: const Scaffold(
+          body: SingleChildScrollView(
+            child: RadioGroup<PaymentMethod>(
+              groupValue: PaymentMethod.online,
+              onChanged: _noop,
+              child: CodUnavailableTile(message: ' '),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(
+      find.text("Cash on delivery isn't available for this order"),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a pin without a saved address cannot place an order', (
@@ -359,6 +460,19 @@ void main() {
     expect(find.byKey(const Key('needs-saved-address')), findsOneWidget);
     expect(placeButton(tester).onPressed, isNull);
   });
+}
+
+/// Counts `GET /cart/` loads.
+class _CountingLoads extends FakeCommerceBackend {
+  _CountingLoads() : super(latency: Duration.zero);
+
+  int loads = 0;
+
+  @override
+  Future<CartSnapshot> load({int? addressId}) {
+    loads++;
+    return super.load(addressId: addressId);
+  }
 }
 
 /// The verify endpoint can't be reached.

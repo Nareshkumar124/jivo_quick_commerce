@@ -40,6 +40,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get offlineBanner => 'No internet connection';
 
   @override
+  String get offlineBannerHint =>
+      'We\'ll update as soon as you\'re back online.';
+
+  @override
+  String get refreshFailed => 'Couldn\'t refresh. Check your connection.';
+
+  @override
   String get onboardingTitle1 => 'Wellness, delivered fast';
 
   @override
@@ -225,6 +232,147 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profileSaved => 'Profile updated.';
 
   @override
+  String referAndEarn(String amount) {
+    return 'Refer & earn $amount';
+  }
+
+  @override
+  String get referAFriend => 'Refer a friend';
+
+  @override
+  String get referralStripGeneric => 'Invite friends and earn rewards';
+
+  @override
+  String get referralEntryHaveCode => 'Got a friend\'s code? Enter it here';
+
+  @override
+  String get referralTitle => 'Refer & earn';
+
+  @override
+  String referralHeadline(String amount) {
+    return 'Invite a friend, you both get $amount off';
+  }
+
+  @override
+  String get referralYourCode => 'Your referral code';
+
+  @override
+  String referralCodeSemantics(String code) {
+    return 'Your referral code: $code';
+  }
+
+  @override
+  String get referralCopy => 'Copy';
+
+  @override
+  String get referralCopyCodeSemantics => 'Copy your referral code';
+
+  @override
+  String referralCodeCopied(String code) {
+    return 'Code $code copied';
+  }
+
+  @override
+  String get referralShare => 'Share invite';
+
+  @override
+  String get referralShareCopied =>
+      'Invite message copied. Paste it in WhatsApp or SMS to send it.';
+
+  @override
+  String get referralHowItWorks => 'How it works';
+
+  @override
+  String get referralStep1 =>
+      'Share your code with a friend who is new to Jivo.';
+
+  @override
+  String get referralStep2 => 'They enter it before their first order.';
+
+  @override
+  String referralStep3(String amount, int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other:
+          'When their first order is delivered, you both get $amount off. Use it within $days days.',
+      one:
+          'When their first order is delivered, you both get $amount off. Use it within 1 day.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String referralMinOrder(String amount) {
+    return 'Valid on orders of $amount or more.';
+  }
+
+  @override
+  String get referralFriendsJoined => 'Friends joined';
+
+  @override
+  String get referralRewardsEarned => 'Rewards earned';
+
+  @override
+  String get referralNoFriendsYet =>
+      'No friends have joined yet. Share your code to get started.';
+
+  @override
+  String get referralPaused =>
+      'Refer & earn is paused right now. Please check back later.';
+
+  @override
+  String get referralHaveCode => 'Have a referral code?';
+
+  @override
+  String get referralHaveCodeHint =>
+      'Enter a friend\'s code before your first order.';
+
+  @override
+  String get referralCodeLabel => 'Friend\'s code';
+
+  @override
+  String get referralApply => 'Apply';
+
+  @override
+  String get referralCodeRequired => 'Enter your friend\'s code';
+
+  @override
+  String referralApplied(String amount) {
+    return 'Code applied. You and your friend will each get $amount off after your first delivery.';
+  }
+
+  @override
+  String referralJoinedWith(String code) {
+    return 'You joined with code $code';
+  }
+
+  @override
+  String referralStatusPending(String amount) {
+    return 'You and your friend will each get $amount off after your first delivery.';
+  }
+
+  @override
+  String referralStatusRewarded(String amount) {
+    return 'Your $amount reward is in your coupons. Pick it under Apply coupon in your cart.';
+  }
+
+  @override
+  String get referralStatusNoReward =>
+      'No reward for this code: Refer & earn was paused when your first order was delivered.';
+
+  @override
+  String referralPromptBody(String amount) {
+    return 'Enter it before you place this order. You and your friend each get $amount off after it\'s delivered.';
+  }
+
+  @override
+  String get referralPromptAction => 'Enter code';
+
+  @override
+  String get referralPromptDismiss => 'Close';
+
+  @override
   String get addressesEmpty => 'No saved addresses yet.';
 
   @override
@@ -310,6 +458,59 @@ class AppLocalizationsEn extends AppLocalizations {
       'We need your location to deliver to this address. Stand at the address and tap \"Use my current location\".';
 
   @override
+  String get setLocationOnMap => 'Set location on map';
+
+  @override
+  String get mapBackToForm => 'Back to the form';
+
+  @override
+  String get addressServiceableYes => 'We deliver here.';
+
+  @override
+  String get addressServiceableNo =>
+      'We don\'t deliver to this pin yet. You can still save the address.';
+
+  @override
+  String get addressServiceableChecking => 'Checking delivery for this pin…';
+
+  @override
+  String addressServiceableClosed(String when) {
+    return 'We deliver here. $when';
+  }
+
+  @override
+  String get addressPrefillNote =>
+      'Filled from the map. Check them before saving.';
+
+  @override
+  String get addressDiscardTitle => 'Discard this address?';
+
+  @override
+  String get addressDiscardBody => 'What you typed will be lost.';
+
+  @override
+  String get addressKeepEditing => 'Keep editing';
+
+  @override
+  String get addressDiscard => 'Discard';
+
+  @override
+  String get adjustPin => 'Adjust pin';
+
+  @override
+  String get gpsOnlyAtAddress =>
+      'Use this only when you are at this address now.';
+
+  @override
+  String get pinNeededMap => 'Set the delivery location on the map first.';
+
+  @override
+  String get pinNeededNoMap => 'Set the delivery location first.';
+
+  @override
+  String get saveThisLocation => 'Save this location as an address';
+
+  @override
   String get locationDenied =>
       'Location permission is off. Allow location access so we can find your address.';
 
@@ -380,24 +581,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addToCart => 'ADD';
 
   @override
+  String quantityBoxLabel(int count) {
+    return 'Quantity $count, tap to change';
+  }
+
+  @override
+  String get updatingQuantity => 'Updating quantity';
+
+  @override
   String addToCartSemantics(String name) {
     return 'Add $name to cart';
   }
 
   @override
-  String stepperDecrease(String name) {
-    return 'Remove one $name';
-  }
+  String get typeQuantityTitle => 'Enter quantity';
 
   @override
-  String stepperIncrease(String name) {
-    return 'Add one more $name';
-  }
+  String get typeQuantityField => 'Quantity';
 
   @override
-  String stepperQuantity(int count) {
-    return '$count in cart';
-  }
+  String get typeQuantityHint => '0 removes it from the cart';
+
+  @override
+  String get typeQuantityEmpty => 'Enter a quantity';
+
+  @override
+  String get typeQuantityUpdate => 'Update';
 
   @override
   String maxQtyReached(int count) {
@@ -416,6 +625,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String onlyLeft(int count) {
     return 'Only $count left';
+  }
+
+  @override
+  String minQtyShort(int count) {
+    return 'Min $count';
+  }
+
+  @override
+  String minQtyPerOrder(int count) {
+    return 'Minimum $count per order';
   }
 
   @override
@@ -477,10 +696,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changeLocationSemantics => 'Change delivery location';
 
   @override
-  String get searchHint => 'Search for oils, ghee and more';
+  String get searchHint => 'Search products';
 
   @override
-  String get shopByCategory => 'Shop by category';
+  String get allProducts => 'All products';
+
+  @override
+  String get shopNow => 'Shop now';
+
+  @override
+  String get referNow => 'Refer now';
+
+  @override
+  String get closeBanner => 'Close';
+
+  @override
+  String get perCarton => '/carton';
+
+  @override
+  String bulkPriceFrom(String price, int count) {
+    return '$price at $count+ cartons';
+  }
 
   @override
   String get previouslyBought => 'Previously bought';
@@ -714,6 +950,54 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get wholesaleRatesTitle => 'Wholesale rates (per carton)';
+
+  @override
+  String priceTierRange(int from, int to) {
+    return '$from–$to cartons';
+  }
+
+  @override
+  String priceTierExactly(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cartons',
+      one: '1 carton',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String priceTierFrom(int from) {
+    return '$from+ cartons';
+  }
+
+  @override
+  String priceTierRangeShort(int from, int to) {
+    return '$from–$to';
+  }
+
+  @override
+  String priceTierFromShort(int from) {
+    return '$from+';
+  }
+
+  @override
+  String priceTierChip(String range, String price) {
+    return '$range: $price';
+  }
+
+  @override
+  String priceTierRowSemantics(String range, String price) {
+    return '$range: $price per carton';
+  }
+
+  @override
+  String get priceTierNote =>
+      'Price depends on total cartons in your order (all sizes)';
+
+  @override
   String get storeClosedHeadline => 'Store closed';
 
   @override
@@ -769,6 +1053,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String updateQuantityTo(int count) {
     return 'Update to $count';
+  }
+
+  @override
+  String minQtyLineIssue(int count) {
+    return 'Order at least $count';
   }
 
   @override
@@ -943,6 +1232,114 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String minimumUnitsShortfall(int count, int minimum, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Add $count more $label to place your order (minimum $minimum $label)',
+      one: 'Add 1 more to place your order (minimum $minimum $label)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String minimumUnitsNotMet(int minimum, String label) {
+    return 'Minimum order is $minimum $label.';
+  }
+
+  @override
+  String get orderUnitsDefault => 'items';
+
+  @override
+  String pricePerBox(String price) {
+    return '$price/carton';
+  }
+
+  @override
+  String get wholesaleRateTag => 'Wholesale rate';
+
+  @override
+  String priceTierHeadline(int count, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count more $label',
+      one: 'Add 1 more',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String priceTierDetailLine(String price, String variant) {
+    return 'and pay $price/carton on $variant';
+  }
+
+  @override
+  String get priceTierDetailMany => 'and pay less per carton';
+
+  @override
+  String get priceTierAddMore => 'Add more';
+
+  @override
+  String get myCoupons => 'My coupons';
+
+  @override
+  String get couponForYou => 'For you';
+
+  @override
+  String couponMinOrder(String amount) {
+    return 'Min order $amount';
+  }
+
+  @override
+  String couponCodeCopied(String code) {
+    return 'Code $code copied';
+  }
+
+  @override
+  String couponCopySemantics(String code) {
+    return 'Copy code $code';
+  }
+
+  @override
+  String get couponsNeedLocation =>
+      'Choose your delivery location to see coupons';
+
+  @override
+  String get couponsChooseLocation => 'Choose location';
+
+  @override
+  String get myCouponsEmpty => 'No coupons right now';
+
+  @override
+  String priceTierNudgeLine(
+    int count,
+    String label,
+    String price,
+    String variant,
+  ) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count more $label to get $price/carton on $variant',
+      one: 'Add 1 more to get $price/carton on $variant',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String priceTierNudge(int count, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count more $label for lower prices',
+      one: 'Add 1 more for lower prices',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get cartStoreClosed =>
       'The store is closed right now. You can check out when it opens.';
 
@@ -970,6 +1367,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get payCodSubtitle => 'Pay by cash or UPI when your order arrives';
+
+  @override
+  String get codUnavailableFallback =>
+      'Cash on delivery isn\'t available for this order';
 
   @override
   String get placeOrder => 'Place order';
@@ -1090,6 +1491,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'We don\'t deliver to this address from this store. Choose another address.';
 
   @override
+  String get blockerMinQtyRequired =>
+      'Some items are below their minimum quantity. Fix them to continue.';
+
+  @override
   String get blockerCouponNotEligible =>
       'Your coupon no longer applies. Remove it or add items to continue.';
 
@@ -1136,6 +1541,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String stockOnlyDetail(int count, String name) {
     return 'Only $count of $name can be ordered now.';
+  }
+
+  @override
+  String minQtyRequiredFor(int count, String name) {
+    return 'You need to order at least $count of $name.';
   }
 
   @override
@@ -1344,6 +1754,44 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get activeOrderTrack => 'Track';
+
+  @override
+  String get activeOrderDetails => 'Details';
+
+  @override
+  String get activeOrderOtpReady => 'Delivery OTP ready';
+
+  @override
+  String get activeOrderDeliveryFailedBody =>
+      'We couldn\'t deliver it. See what happens next.';
+
+  @override
+  String activeOrderMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '+$count more orders in progress',
+      one: '+1 more order in progress',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get activeOrderSeeAll => 'See all';
+
+  @override
+  String activeOrderSemantics(String summary, String destination) {
+    return '$summary. Opens $destination.';
+  }
+
+  @override
+  String get activeOrderOpensTracking => 'tracking';
+
+  @override
+  String get activeOrderOpensDetails => 'the order details';
+
+  @override
   String get orderAwaitingPayment => 'This order is waiting for payment.';
 
   @override
@@ -1377,6 +1825,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String reorderDiscontinued(String name) {
     return '$name is no longer sold';
+  }
+
+  @override
+  String reorderBelowMinimum(String name) {
+    return '$name wasn\'t added: it now has a higher minimum order quantity';
   }
 
   @override
@@ -1457,6 +1910,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get trackingArrivingNow => 'Arriving any moment';
+
+  @override
+  String get trackingLive => 'Live';
+
+  @override
+  String trackingUpdatedAt(String time) {
+    return 'Updated $time';
+  }
+
+  @override
+  String trackingStale(String time) {
+    return 'Can’t update right now. Last update $time. Pull down to try again.';
+  }
+
+  @override
+  String get trackingLateOnTheWay =>
+      'Running a little late. Your rider is on the way.';
+
+  @override
+  String get trackingLatePreparing =>
+      'Taking a little longer than planned. Your order is being prepared.';
+
+  @override
+  String get trackingGetHelp => 'Get help';
+
+  @override
+  String get trackingOtpAtDoorTitle =>
+      'Your rider is at the door. Delivery OTP';
+
+  @override
+  String trackingRiderUpdated(String when) {
+    return 'Location updated $when';
+  }
+
+  @override
+  String get trackingJustNow => 'just now';
+
+  @override
+  String trackingMinutesAgo(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n min ago',
+      one: '1 min ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trackingAtTime(String time) {
+    return 'at $time';
+  }
+
+  @override
+  String trackingDeliveredAt(String time) {
+    return 'Delivered at $time';
+  }
+
+  @override
+  String get trackingCancelledBody =>
+      'This order was cancelled. See the order details for any refund.';
+
+  @override
+  String get trackingRateOrder => 'Rate your order';
 
   @override
   String get trackingRiderAssigning => 'Assigning a delivery partner…';

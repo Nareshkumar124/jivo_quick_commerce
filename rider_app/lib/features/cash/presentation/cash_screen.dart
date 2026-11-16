@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/label_value_row.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/format/ist_format.dart';
 import '../../../shared/paged_list_controller.dart';
@@ -169,37 +170,33 @@ class _EntryTile extends StatelessWidget {
       key: Key('cash-entry-${entry.id}'),
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(icon, color: theme.colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleSmall),
-                  Text(
-                    [
-                      istTime(context, entry.recordedAt),
-                      if (entry.note != null) entry.note!,
-                    ].join(' · '),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  Text(
-                    l10n.cashBalanceAfter(formatRupees(entry.balanceAfter)),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
+        child: LabelValueRow(
+          leading: Icon(icon, color: theme.colorScheme.primary),
+          label: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: theme.textTheme.titleSmall),
+              Text(
+                [
+                  istTime(context, entry.recordedAt),
+                  if (entry.note != null) entry.note!,
+                ].join(' · '),
+                style: theme.textTheme.bodySmall,
               ),
-            ),
-            Text(
-              formatRupees(entry.amount),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: negative ? theme.colorScheme.error : null,
+              Text(
+                l10n.cashBalanceAfter(formatRupees(entry.balanceAfter)),
+                style: theme.textTheme.bodySmall,
               ),
+            ],
+          ),
+          value: Text(
+            formatRupees(entry.amount),
+            textAlign: TextAlign.end,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: negative ? theme.colorScheme.error : null,
             ),
-          ],
+          ),
         ),
       ),
     );

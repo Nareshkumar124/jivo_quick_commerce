@@ -11,6 +11,7 @@ Showing a link is never the permission check: every target view and ModelAdmin e
 
 from dataclasses import dataclass
 from functools import partial
+from urllib.parse import parse_qs
 
 from django.urls import NoReverseMatch, reverse
 from django.utils.functional import lazy
@@ -464,6 +465,40 @@ def _unfold_permission(item: NavItem, request) -> bool:
     return item.allowed(request.user)
 
 
+def _current_item(request) -> NavItem | None:
+    """The one sidebar link for the page being shown, or None.
+
+    Unfold's own check marks every link whose path appears in the page path and ignores the
+    query string. "Stock per store", "Low stock" and "Stock inward" all live under
+    /admin/inventory/storeinventory/, so all three lit up together. Here a link counts only when
+    the page path starts with its path and the request has every query value the link has; the
+    longest path wins, then the link with the most query values. Worked out once per request.
+    """
+    if not hasattr(request, "_jqc_nav_current"):
+        best, best_score = None, None
+        for section in MODULES:
+            for item in section.items:
+                try:
+                    path = reverse(item.url_name)
+                except NoReverseMatch:
+                    continue
+                if not request.path.startswith(path):
+                    continue
+                query = parse_qs(item.query)
+                if any(request.GET.getlist(key) != values for key, values in query.items()):
+                    continue
+                score = (len(path), len(query))
+                if best_score is None or score > best_score:
+                    best, best_score = item, score
+        request._jqc_nav_current = best
+    return request._jqc_nav_current
+
+
+def _unfold_active(item: NavItem, request) -> bool:
+    # `==`, not `is`: unfold deep-copies the sidebar config (and these partials) per request.
+    return _current_item(request) == item
+
+
 def unfold_sidebar() -> list[dict]:
     """`UNFOLD["SIDEBAR"]["navigation"]`: the same registry in unfold's format. Unfold hides a
     group whose items are all refused."""
@@ -478,6 +513,7 @@ def unfold_sidebar() -> list[dict]:
                     "icon": item.icon,
                     "link": item.lazy_url(),
                     "permission": partial(_unfold_permission, item),
+                    "active": partial(_unfold_active, item),
                 }
                 for item in section.items
             ],

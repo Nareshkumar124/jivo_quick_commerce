@@ -13,6 +13,7 @@ import '../../cash/presentation/cash_providers.dart';
 import '../../offers/presentation/offer_controller.dart';
 import '../../shift/presentation/home_providers.dart';
 import '../../support/presentation/support_providers.dart';
+import '../../task/domain/task_repositories.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
 import '../data/api_device_registry.dart';
@@ -208,7 +209,7 @@ class PushMessageHandler {
   ///   the full-screen offer (the server's `expires_at` drives the
   ///   countdown, never the push body).
   /// - `offer.withdrawn`: end the open offer ("Order cancelled") and remove
-  ///   its alert.
+  ///   its alert; `offer.expired` the same with "Offer expired" (P8).
   /// - `task.updated`: re-read the current task.
   /// - `cash.updated`: re-read the cash summary and ledger; tapped, open
   ///   the cash ledger.
@@ -233,8 +234,15 @@ class PushMessageHandler {
         final offers = _ref.read(offerControllerProvider.notifier);
         if (_ref.read(offerControllerProvider).isEnded) offers.acknowledge();
         unawaited(offers.refresh());
-      case OfferWithdrawnPush(:final offerId):
-        _ref.read(offerControllerProvider.notifier).withdrawn(offerId);
+      case OfferWithdrawnPush(:final offerId, :final expired):
+        _ref
+            .read(offerControllerProvider.notifier)
+            .withdrawn(
+              offerId,
+              reason: expired
+                  ? OfferEndReason.expired
+                  : OfferEndReason.cancelled,
+            );
         unawaited(
           _ref
               .read(offerAlertNotificationsProvider)

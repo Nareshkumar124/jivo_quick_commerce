@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
 import 'package:jivo_core/jivo_core.dart';
 
@@ -102,9 +104,21 @@ class FakeRiderOnboardingBackend implements RiderOnboardingRepository {
     return _profile();
   }
 
+  /// When set, an upload reports half its bytes sent and waits for it (a
+  /// slow mobile connection).
+  Completer<void>? holdUpload;
+
   @override
-  Future<RiderDocument> uploadDocument(DocumentUpload upload) async {
+  Future<RiderDocument> uploadDocument(
+    DocumentUpload upload, {
+    UploadProgress? onProgress,
+  }) async {
     await _call('uploadDocument ${upload.type.wireValue}');
+    final total = upload.image.length;
+    onProgress?.call(total ~/ 2, total);
+    final hold = holdUpload;
+    if (hold != null) await hold.future;
+    onProgress?.call(total, total);
     final rider = _rider();
     final profile = _profile();
     if (upload.image.length > kKycImageMaxBytes) {
@@ -382,8 +396,10 @@ class UnavailableRiderOnboardingRepository
   Future<RiderProfile> fetchProfile() async => throw _error;
 
   @override
-  Future<RiderDocument> uploadDocument(DocumentUpload upload) async =>
-      throw _error;
+  Future<RiderDocument> uploadDocument(
+    DocumentUpload upload, {
+    UploadProgress? onProgress,
+  }) async => throw _error;
 
   @override
   Future<BankAccountSummary> saveBankAccount(BankAccountInput input) async =>

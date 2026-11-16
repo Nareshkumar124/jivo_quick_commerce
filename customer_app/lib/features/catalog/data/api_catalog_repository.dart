@@ -200,6 +200,7 @@ HomeBanner _banner(api.HomeBanner b) {
     api.BannerLinkTypeEnum.product when value.isNotEmpty => ProductBannerLink(
       value,
     ),
+    api.BannerLinkTypeEnum.referral => const ReferralBannerLink(),
     api.BannerLinkTypeEnum.url => switch (Uri.tryParse(value)) {
       final Uri uri when uri.scheme == 'https' => UrlBannerLink(uri),
       _ => const NoBannerLink(),
@@ -236,8 +237,10 @@ CatalogVariant variantFromApi(api.VariantSummary v) => CatalogVariant(
   orderableQuantity: v.orderableQuantity,
   unitsLeft: v.unitsLeft,
   maxQtyPerOrder: v.maxQtyPerOrder,
+  minQtyPerOrder: v.minQtyPerOrder,
   unitPrice: _unitPrice(v.unitPrice),
   imageUrl: v.image?.medium,
+  priceTiers: _tiers(v.priceTiers),
 );
 
 CatalogVariant _variantDetail(api.VariantDetail v) => CatalogVariant(
@@ -251,11 +254,19 @@ CatalogVariant _variantDetail(api.VariantDetail v) => CatalogVariant(
   orderableQuantity: v.orderableQuantity,
   unitsLeft: v.unitsLeft,
   maxQtyPerOrder: v.maxQtyPerOrder,
+  minQtyPerOrder: v.minQtyPerOrder,
   unitPrice: _unitPrice(v.unitPrice),
   imageUrl: v.image?.medium,
   images: [for (final i in v.images) i.large],
   netQuantity: v.netQuantity,
+  priceTiers: _tiers(v.priceTiers),
 );
+
+/// `price_tiers` as sent (lowest first); the app never computes a price.
+List<PriceTier> _tiers(List<api.PriceTier> tiers) => [
+  for (final t in tiers)
+    PriceTier(minOrderUnits: t.minOrderUnits, price: t.price),
+];
 
 CatalogProduct _card(api.ProductCard p) => CatalogProduct(
   id: p.id,

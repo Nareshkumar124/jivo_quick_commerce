@@ -74,7 +74,11 @@ const storeJson = {
   'opens_at': null,
 };
 
-Map<String, Object?> variantJson({int id = 101}) => {
+Map<String, Object?> variantJson({
+  int id = 101,
+  int minQty = 1,
+  List<Map<String, Object?>> priceTiers = const [],
+}) => {
   'id': id,
   'name': '1 L',
   'mrp': '299.00',
@@ -86,6 +90,8 @@ Map<String, Object?> variantJson({int id = 101}) => {
   'orderable_quantity': 2,
   'units_left': 2,
   'max_qty_per_order': 5,
+  'min_qty_per_order': minQty,
+  'price_tiers': priceTiers,
   'image': null,
 };
 
@@ -280,14 +286,21 @@ void main() {
           isA<ApiServiceabilityRepository>(),
           reason: env.flavor.name,
         );
-        expect(container.read(cartAvailableProvider), isFalse);
+        // Staging has the real cart and orders (opened for device testing on
+        // jqc.jivo.in); prod keeps them off until launch.
+        final isStaging = env.flavor == Flavor.staging;
+        expect(container.read(cartAvailableProvider), isStaging);
         expect(
           container.read(cartRepositoryProvider),
-          isA<UnavailableCartRepository>(),
+          isStaging
+              ? isA<ApiCartRepository>()
+              : isA<UnavailableCartRepository>(),
         );
         expect(
           container.read(orderRepositoryProvider),
-          isA<UnavailableOrderRepository>(),
+          isStaging
+              ? isA<ApiOrderRepository>()
+              : isA<UnavailableOrderRepository>(),
         );
         // Real Razorpay only: no fake behind it.
         final launcher = container.read(paymentLauncherProvider);
@@ -462,6 +475,119 @@ void main() {
     final page = await repository.products(category: 'edible-oils');
     expect(page.nextPage, 2);
     expect(http.requests.last.queryParameters['page_size'], 20);
+  });
+
+  test('min_qty_per_order maps onto cards and detail variants', () async {
+    Map<String, Object?> water(Map<String, Object?> v) => {
+      ...v,
+      'orderable_quantity': 20,
+      'stock_status': 'IN_STOCK',
+      'units_left': null,
+      'max_qty_per_order': 1000,
+      'min_qty_per_order': 5,
+    };
+    final http = FakeHttp((request) {
+      if (request.path == '/api/v1/products/jivo-canola-oil/') {
+        final detail = detailJson();
+        final variant = (detail['variants']! as List).single as Map;
+        return (
+          200,
+          {
+            ...detail,
+            'variants': [water(variant.cast<String, Object?>())],
+          },
+        );
+      }
+      return (
+        200,
+        {
+          'count': 1,
+          'next': null,
+          'previous': null,
+          'results': [
+            {
+              ...cardJson(),
+              'variants': [water(variantJson())],
+            },
+          ],
+        },
+      );
+    });
+    final repository = ApiCatalogRepository(http.api(), () => 7);
+
+    final card = (await repository.products()).items.single.defaultVariant;
+    expect(card.minQtyPerOrder, 5);
+    expect(card.hasMinQty, isTrue);
+    expect(card.inStock, isTrue);
+    final detail = (await repository.product('jivo-canola-oil')).defaultVariant;
+    expect(detail.minQty, 5);
+
+    // The default contract value is 1: no minimum.
+    final plain = await ApiCatalogRepository(
+      FakeHttp(backend).api(),
+      () => 7,
+    ).home();
+    expect(
+      plain.collections.single.items.single.defaultVariant.hasMinQty,
+      isFalse,
+    );
+  });
+
+  test('price_tiers map onto cards and detail variants as sent', () async {
+    const tiers = <Map<String, Object?>>[
+      {'min_order_units': 5, 'price': '90.00'},
+      {'min_order_units': 25, 'price': '87.00'},
+      {'min_order_units': 250, 'price': '80.00'},
+    ];
+    final http = FakeHttp((request) {
+      if (request.path == '/api/v1/products/jivo-canola-oil/') {
+        final detail = detailJson();
+        final variant = (detail['variants']! as List).single as Map;
+        return (
+          200,
+          {
+            ...detail,
+            'variants': [
+              {...variant.cast<String, Object?>(), 'price_tiers': tiers},
+            ],
+          },
+        );
+      }
+      return (
+        200,
+        {
+          'count': 1,
+          'next': null,
+          'previous': null,
+          'results': [
+            {
+              ...cardJson(),
+              'variants': [variantJson(priceTiers: tiers)],
+            },
+          ],
+        },
+      );
+    });
+    final repository = ApiCatalogRepository(http.api(), () => 7);
+    List<(int, String)> rows(CatalogVariant v) => [
+      for (final t in v.priceTiers) (t.minOrderUnits, t.price),
+    ];
+
+    final card = (await repository.products()).items.single.defaultVariant;
+    expect(card.hasPriceTiers, isTrue);
+    expect(rows(card), [(5, '90.00'), (25, '87.00'), (250, '80.00')]);
+    final detail = (await repository.product('jivo-canola-oil')).defaultVariant;
+    expect(rows(detail), [(5, '90.00'), (25, '87.00'), (250, '80.00')]);
+
+    // [] = no volume prices.
+    final plain = await ApiCatalogRepository(
+      FakeHttp(backend).api(),
+      () => 7,
+    ).home();
+    expect(
+      plain.collections.single.items.single.defaultVariant.hasPriceTiers,
+      isFalse,
+    );
   });
 
   test('without a store the catalog asks for the location again', () async {

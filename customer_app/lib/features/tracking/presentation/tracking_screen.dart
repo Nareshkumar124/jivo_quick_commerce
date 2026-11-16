@@ -5,9 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../app/launch_state.dart';
+import '../../../app/providers.dart';
 import '../../../app/redirect.dart';
+import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
+import '../../orders/domain/order.dart';
 import '../../orders/domain/order_history.dart';
 import '../../orders/presentation/order_history_controllers.dart';
 import '../../orders/presentation/order_detail_screen.dart' show homeBackButton;
@@ -83,6 +88,26 @@ class _TrackBody extends ConsumerWidget {
     final codDue = detail != null && detail.status == track.status
         ? detail.codAmountDue
         : null;
+    final status = track.status;
+    final active = status.isActive;
+    final failed =
+        status == OrderStatus.deliveryFailed || status == OrderStatus.returned;
+    final cancelled =
+        status == OrderStatus.cancelled || status == OrderStatus.paymentFailed;
+    final delivered = status == OrderStatus.delivered;
+    final deliveredAt = delivered && detail != null
+        ? detail.history
+              .where((e) => e.status == OrderStatus.delivered)
+              .map((e) => e.at)
+              .firstOrNull
+        : null;
+    final assigning =
+        rider == null &&
+        const {
+          DeliveryTaskStatus.searching,
+          DeliveryTaskStatus.offered,
+          DeliveryTaskStatus.unassigned,
+        }.contains(track.taskStatus);
     return ListView(
       key: const Key('tracking'),
       physics: const AlwaysScrollableScrollPhysics(),
@@ -91,43 +116,88 @@ class _TrackBody extends ConsumerWidget {
         Semantics(
           liveRegion: true,
           child: Text(
-            orderStatusLabel(l10n, track.status),
+            orderStatusLabel(l10n, status),
             key: const Key('tracking-status'),
             style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
-        if (eta != null && track.status.isActive) EtaCountdown(etaAt: eta),
-        if (stage != null) ...[
+        if (eta != null && active && !failed) ...[
           const SizedBox(height: JivoSpacing.md),
-          DeliveryStageCard(
-            stage: stage,
-            refundNote: detail == null ? null : refundNoteFor(l10n, detail),
+          EtaCountdown(etaAt: eta, status: status, orderId: track.orderId),
+        ],
+        if (deliveredAt != null) ...[
+          const SizedBox(height: JivoSpacing.xs),
+          Text(
+            l10n.trackingDeliveredAt(formatTime(deliveredAt)),
+            key: const Key('tracking-delivered-at'),
+            style: theme.textTheme.titleMedium,
           ),
         ],
+        if (cancelled) ...[
+          const SizedBox(height: JivoSpacing.md),
+          Text(
+            l10n.trackingCancelledBody,
+            key: const Key('tracking-cancelled'),
+          ),
+        ],
+        if (active && !failed) ...[
+          const SizedBox(height: JivoSpacing.md),
+          _FreshnessLine(orderId: track.orderId),
+        ],
         const SizedBox(height: JivoSpacing.lg),
-        TrackMap(track: track),
-        const SizedBox(height: JivoSpacing.lg),
-        if (otp != null) ...[
-          DeliveryOtpCard(otp: otp),
+        if (otp != null && status == OrderStatus.outForDelivery) ...[
+          DeliveryOtpCard(otp: otp, atDoor: stage == DeliveryStage.arriving),
           const SizedBox(height: JivoSpacing.lg),
         ],
         if (codDue != null) ...[
           CodDueCard(amount: codDue),
           const SizedBox(height: JivoSpacing.lg),
         ],
-        if (rider != null)
-          RiderCard(rider: rider)
-        else if (track.status.isActive)
+        if (rider != null) ...[
+          RiderCard(rider: rider),
+          const SizedBox(height: JivoSpacing.lg),
+        ] else if (assigning && active) ...[
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.hourglass_top),
             title: Text(l10n.trackingRiderAssigning),
           ),
-        const SizedBox(height: JivoSpacing.lg),
-        OrderTimeline(steps: trackTimeline(track)),
+          const SizedBox(height: JivoSpacing.lg),
+        ],
+        if (stage != null) ...[
+          DeliveryStageCard(
+            stage: stage,
+            refundNote: detail == null ? null : refundNoteFor(l10n, detail),
+          ),
+          const SizedBox(height: JivoSpacing.lg),
+        ],
+        if (active && !failed) ...[
+          TrackMap(track: track),
+          const SizedBox(height: JivoSpacing.lg),
+        ],
+        if (!cancelled)
+          OrderTimeline(
+            steps: detail == null
+                ? trackTimeline(track)
+                : timelineFor(
+                    status,
+                    history: detail.history,
+                    placedAt: detail.placedAt,
+                  ),
+          ),
+        if (delivered && ref.watch(ratingAvailableProvider)) ...[
+          FilledButton(
+            key: const Key('tracking-rate'),
+            style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+            onPressed: () => context.push(Routes.rateOrder(track.orderId)),
+            child: Text(l10n.trackingRateOrder),
+          ),
+          const SizedBox(height: JivoSpacing.md),
+        ],
         OutlinedButton(
+          style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
           onPressed: () => context.push(Routes.order(track.orderId)),
           child: Text(l10n.trackingViewDetails),
         ),
@@ -136,20 +206,102 @@ class _TrackBody extends ConsumerWidget {
   }
 }
 
+/// "Live" / "Updated 3:45 pm" / "Can't update right now" (`§3`).
+class _FreshnessLine extends ConsumerWidget {
+  const _FreshnessLine({required this.orderId});
+
+  final int orderId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colors = context.jivoColors;
+    final notifier = ref.read(trackProvider(orderId).notifier);
+    return ValueListenableBuilder<TrackFreshness>(
+      valueListenable: notifier.freshness,
+      builder: (context, fresh, _) {
+        final at = fresh.lastUpdatedAt;
+        final time = at == null ? '' : formatTime(at);
+        final small = theme.textTheme.bodySmall;
+        switch (fresh.mode) {
+          case TrackFreshMode.live:
+            return Row(
+              key: const Key('tracking-fresh-live'),
+              children: [
+                Icon(Icons.circle, size: 8, color: colors.success),
+                const SizedBox(width: JivoSpacing.xs),
+                Text(
+                  l10n.trackingLive,
+                  style: small?.copyWith(color: colors.success),
+                ),
+              ],
+            );
+          case TrackFreshMode.polling:
+            return Row(
+              key: const Key('tracking-fresh-polling'),
+              children: [
+                Icon(Icons.sync, size: 16, color: theme.colorScheme.outline),
+                const SizedBox(width: JivoSpacing.xs),
+                Flexible(
+                  child: Text(l10n.trackingUpdatedAt(time), style: small),
+                ),
+              ],
+            );
+          case TrackFreshMode.stale:
+            return Semantics(
+              liveRegion: true,
+              container: true,
+              child: Container(
+                key: const Key('tracking-fresh-stale'),
+                padding: const EdgeInsets.all(JivoSpacing.sm),
+                decoration: BoxDecoration(
+                  color: colors.warning.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(JivoRadii.sm),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_off, size: 16, color: colors.warning),
+                    const SizedBox(width: JivoSpacing.sm),
+                    Expanded(
+                      child: Text(l10n.trackingStale(time), style: small),
+                    ),
+                  ],
+                ),
+              ),
+            );
+        }
+      },
+    );
+  }
+}
+
 /// "Arriving in 8 mins", counting down every 30 s from the server's ETA.
-class EtaCountdown extends StatefulWidget {
-  const EtaCountdown({required this.etaAt, this.now, super.key});
+class EtaCountdown extends ConsumerStatefulWidget {
+  const EtaCountdown({
+    required this.etaAt,
+    this.status,
+    this.orderId,
+    this.now,
+    super.key,
+  });
 
   final DateTime etaAt;
+
+  /// Picks the late wording; null never shows the late notice.
+  final OrderStatus? status;
+  final int? orderId;
 
   /// The clock (tests).
   final DateTime Function()? now;
 
   @override
-  State<EtaCountdown> createState() => _EtaCountdownState();
+  ConsumerState<EtaCountdown> createState() => _EtaCountdownState();
 }
 
-class _EtaCountdownState extends State<EtaCountdown> {
+class _EtaCountdownState extends ConsumerState<EtaCountdown> {
+  static const _lateAfter = Duration(minutes: 5);
+
   Timer? _timer;
 
   @override
@@ -174,12 +326,81 @@ class _EtaCountdownState extends State<EtaCountdown> {
     final left = widget.etaAt.toUtc().difference(now);
     // Round up: 7 min 10 s left reads "8 mins".
     final minutes = (left.inSeconds + 59) ~/ 60;
+    final status = widget.status;
+    if (status != null && -left > _lateAfter) {
+      return _lateNotice(context, status);
+    }
     return Text(
       minutes <= 0
           ? l10n.trackingArrivingNow
           : l10n.trackingEtaMinutes(minutes),
       key: const Key('tracking-eta'),
       style: Theme.of(context).textTheme.titleMedium,
+    );
+  }
+
+  Widget _lateNotice(BuildContext context, OrderStatus status) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colors = context.jivoColors;
+    final preparing = status != OrderStatus.outForDelivery;
+    final orderId = widget.orderId;
+    final phone = ref.watch(launchStateProvider).config?.supportPhone;
+    final VoidCallback? onHelp;
+    final String helpLabel;
+    if (orderId != null && ref.watch(supportAvailableProvider)) {
+      helpLabel = l10n.trackingGetHelp;
+      onHelp = () => context.push(Routes.newTicket(orderId: orderId));
+    } else if (phone != null && phone.isNotEmpty) {
+      helpLabel = l10n.callSupport;
+      onHelp = () =>
+          ref.read(urlOpenerProvider).open(Uri(scheme: 'tel', path: phone));
+    } else {
+      helpLabel = '';
+      onHelp = null;
+    }
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        key: const Key('tracking-late'),
+        padding: const EdgeInsets.all(JivoSpacing.md),
+        decoration: BoxDecoration(
+          color: colors.warning.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(JivoRadii.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.schedule, color: colors.warning),
+                const SizedBox(width: JivoSpacing.sm),
+                Expanded(
+                  child: Text(
+                    preparing
+                        ? l10n.trackingLatePreparing
+                        : l10n.trackingLateOnTheWay,
+                    key: const Key('tracking-eta'),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            if (onHelp != null)
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: TextButton(
+                  key: const Key('tracking-get-help'),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  onPressed: onHelp,
+                  child: Text(helpLabel),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

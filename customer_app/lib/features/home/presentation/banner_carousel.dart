@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,11 +8,7 @@ import '../../../app/redirect.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/product_image.dart';
 import '../../catalog/domain/catalog_models.dart';
-
-/// How often the home banners advance; null turns auto-scroll off (tests).
-final bannerAutoScrollProvider = Provider<Duration?>(
-  (ref) => const Duration(seconds: 4),
-);
+import 'banner_viewer.dart';
 
 /// Opens what a banner links to (`03 §2.5`).
 void openBannerLink(BuildContext context, WidgetRef ref, BannerLink link) {
@@ -27,13 +21,15 @@ void openBannerLink(BuildContext context, WidgetRef ref, BannerLink link) {
       context.push(Routes.product(slug));
     case UrlBannerLink(:final url):
       ref.read(urlOpenerProvider).open(url);
+    case ReferralBannerLink():
+      context.push(Routes.referral);
     case NoBannerLink():
       break;
   }
 }
 
-/// Admin-managed banners, auto-scrolling (`03 §2.5`). Auto-scroll stops
-/// when the system asks for reduced motion.
+/// Admin-managed banners, swiped by hand only (`03 §2.5`): customers read
+/// them, so they never move on their own. A tap opens the banner full screen.
 class BannerCarousel extends ConsumerStatefulWidget {
   const BannerCarousel({required this.banners, super.key});
 
@@ -45,33 +41,10 @@ class BannerCarousel extends ConsumerStatefulWidget {
 
 class _BannerCarouselState extends ConsumerState<BannerCarousel> {
   final _controller = PageController();
-  Timer? _timer;
   int _page = 0;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _timer?.cancel();
-    final interval = ref.read(bannerAutoScrollProvider);
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    if (interval != null && !reduceMotion && widget.banners.length > 1) {
-      _timer = Timer.periodic(interval, (_) => _advance());
-    }
-  }
-
-  void _advance() {
-    if (!_controller.hasClients) return;
-    final next = (_page + 1) % widget.banners.length;
-    _controller.animateToPage(
-      next,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-    );
-  }
-
-  @override
   void dispose() {
-    _timer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -105,7 +78,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                     borderRadius: BorderRadius.circular(JivoRadii.lg),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: () => openBannerLink(context, ref, banner.link),
+                      onTap: () => showBannerViewer(context, banner),
                       child: banner.imageUrl == null
                           ? Padding(
                               padding: const EdgeInsets.all(JivoSpacing.lg),

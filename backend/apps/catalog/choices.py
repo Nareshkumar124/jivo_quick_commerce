@@ -28,7 +28,16 @@ class BannerLinkType(models.TextChoices):
     COLLECTION = "collection", "Collection page whose slug is link_value"
     PRODUCT = "product", "Product detail whose slug is link_value"
     URL = "url", "External https URL in link_value (open in the browser)"
+    REFERRAL = "referral", "Opens the app's Refer & earn screen; link_value empty"
     NONE = "none", "Not tappable"
+
+
+class BannerAudience(models.TextChoices):
+    """Who sees a home banner. "New" = never had an order reach PLACED (anonymous counts as new)."""
+
+    ALL = "ALL", "Everyone"
+    NEW_CUSTOMERS = "NEW_CUSTOMERS", "New customers (no order placed yet)"
+    RETURNING_CUSTOMERS = "RETURNING_CUSTOMERS", "Returning customers (placed an order)"
 
 
 class SuggestionType(models.TextChoices):

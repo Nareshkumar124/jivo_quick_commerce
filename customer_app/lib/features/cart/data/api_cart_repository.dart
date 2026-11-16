@@ -3,6 +3,7 @@ import 'package:jivo_api/jivo_api.dart' as api;
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../catalog/data/api_catalog_repository.dart' show variantFromApi;
+import '../../catalog/domain/catalog_models.dart' show PriceTier;
 import '../../orders/data/api_order_repository.dart' show paymentMethodFromApi;
 import '../domain/cart.dart';
 import 'cart_repository.dart';
@@ -114,6 +115,17 @@ CartSnapshot cartFromApi(api.Cart c) => CartSnapshot.fromLines(
     amountToMinOrder: c.thresholds.amountToMinOrder,
     freeDeliveryThreshold: c.thresholds.freeDeliveryThreshold,
     amountToFreeDelivery: c.thresholds.amountToFreeDelivery,
+    minOrderUnits: c.thresholds.minOrderUnits,
+    unitsToMinOrder: c.thresholds.unitsToMinOrder,
+    orderUnitLabel: c.thresholds.orderUnitLabel,
+    tierUnits: c.thresholds.tierUnits,
+    nextPriceTier: switch (c.thresholds.nextPriceTier) {
+      null => null,
+      final next => NextPriceTier(
+        minOrderUnits: next.minOrderUnits,
+        unitsToNextTier: next.unitsToNextTier,
+      ),
+    },
   ),
   paymentOptions: [
     for (final option in c.paymentMethods)
@@ -170,6 +182,15 @@ CartLine _line(api.CartLine l) => CartLine(
   quantity: l.quantity,
   lineMrpTotal: l.lineMrpTotal,
   lineTotal: l.lineTotal,
+  pricePerUnit: l.pricePerUnit,
+  priceTier: switch (l.priceTier) {
+    null => null,
+    final tier => PriceTier(
+      minOrderUnits: tier.minOrderUnits,
+      price: tier.price,
+    ),
+  },
+  nextTierPrice: l.nextTierPrice,
   issue: switch (l.issue) {
     null => null,
     final issue => CartLineIssue(
@@ -177,6 +198,8 @@ CartLine _line(api.CartLine l) => CartLine(
         api.CartLineIssueCodeEnum.OUT_OF_STOCK => CartIssueCode.outOfStock,
         api.CartLineIssueCodeEnum.QUANTITY_UNAVAILABLE =>
           CartIssueCode.quantityUnavailable,
+        api.CartLineIssueCodeEnum.MIN_QTY_REQUIRED =>
+          CartIssueCode.minQtyRequired,
         _ => CartIssueCode.unknown,
       },
       message: issue.message,
@@ -195,8 +218,12 @@ CheckoutBlockerCode _blockerCode(api.CheckoutBlockerCodeEnum code) =>
         CheckoutBlockerCode.storeClosed,
       api.CheckoutBlockerCodeEnum.STOCK_UNAVAILABLE =>
         CheckoutBlockerCode.stockUnavailable,
+      api.CheckoutBlockerCodeEnum.MIN_QTY_REQUIRED =>
+        CheckoutBlockerCode.minQtyRequired,
       api.CheckoutBlockerCodeEnum.MIN_ORDER_NOT_MET =>
         CheckoutBlockerCode.minOrderNotMet,
+      api.CheckoutBlockerCodeEnum.MIN_UNITS_NOT_MET =>
+        CheckoutBlockerCode.minUnitsNotMet,
       api.CheckoutBlockerCodeEnum.COUPON_INVALID =>
         CheckoutBlockerCode.couponInvalid,
       api.CheckoutBlockerCodeEnum.COUPON_EXPIRED =>
@@ -229,6 +256,8 @@ CouponOffer _offer(api.CouponOffer o) => CouponOffer(
   message: o.message,
   amountToUnlock: o.amountToUnlock,
   endsAt: o.endsAt,
+  isPersonal: o.isPersonal,
+  minOrderValue: o.minOrderValue,
 );
 
 InstructionTag? _chipFromApi(

@@ -18,7 +18,12 @@ CartLine cartLine({
   String lineTotal = '498.00',
   String lineMrpTotal = '598.00',
   int orderable = 5,
+  int minQty = 1,
   CartIssueCode? issue,
+  List<PriceTier> priceTiers = const [],
+  String? pricePerUnit,
+  PriceTier? priceTier,
+  String? nextTierPrice,
 }) => CartLine(
   id: id,
   productName: name,
@@ -30,11 +35,16 @@ CartLine cartLine({
     stockStatus: orderable > 0 ? StockStatus.inStock : StockStatus.outOfStock,
     orderableQuantity: orderable,
     maxQtyPerOrder: 5,
+    minQtyPerOrder: minQty,
+    priceTiers: priceTiers,
   ),
   quantity: quantity,
   lineMrpTotal: lineMrpTotal,
   lineTotal: lineTotal,
   issue: issue == null ? null : CartLineIssue(code: issue, message: 'x'),
+  pricePerUnit: pricePerUnit,
+  priceTier: priceTier,
+  nextTierPrice: nextTierPrice,
 );
 
 /// A bill whose numbers deliberately do **not** add up: any screen that
@@ -116,8 +126,15 @@ class StubCartRepository implements CartRepository {
   @override
   Future<CartSnapshot> clear() => _answer('clear');
 
+  List<CouponOffer> couponList = const [];
+  Object? couponError;
+
   @override
-  Future<List<CouponOffer>> coupons() async => const [];
+  Future<List<CouponOffer>> coupons() async {
+    final error = couponError;
+    if (error != null) throw error;
+    return couponList;
+  }
 
   @override
   Future<CartSnapshot> applyCoupon(String code) => _answer('coupon:$code');
@@ -137,6 +154,7 @@ CatalogVariant oil({
   int id = 101,
   int orderable = 5,
   String price = '249.00',
+  int minQty = 1,
 }) => CatalogVariant(
   id: id,
   name: '1 L',
@@ -145,4 +163,5 @@ CatalogVariant oil({
   stockStatus: StockStatus.inStock,
   orderableQuantity: orderable,
   maxQtyPerOrder: 5,
+  minQtyPerOrder: minQty,
 );

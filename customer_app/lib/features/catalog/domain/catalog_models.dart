@@ -20,6 +20,20 @@ enum StockStatus { inStock, lowStock, outOfStock }
 /// `UnitPrice`: e.g. ₹27.90 per 100 ml (Legal Metrology).
 typedef UnitPrice = ({String amount, String per});
 
+/// A volume (slab) price (`PriceTier`, ADR 0001): from [minOrderUnits]
+/// units in one order, counting every item that has tiers together (any
+/// mix of sizes), each unit costs [price]. The server applies it in the
+/// cart; the app only shows it.
+@immutable
+class PriceTier {
+  const PriceTier({required this.minOrderUnits, required this.price});
+
+  final int minOrderUnits;
+
+  /// The server's decimal string, inclusive of all taxes.
+  final String price;
+}
+
 /// A sellable variant (SKU) with its price and stock at the store
 /// (`VariantSummary`; the detail-page fields are filled from
 /// `VariantDetail`).
@@ -33,6 +47,7 @@ class CatalogVariant {
     required this.stockStatus,
     required this.orderableQuantity,
     required this.maxQtyPerOrder,
+    this.minQtyPerOrder = 1,
     this.discountAmount = '0.00',
     this.discountPercent = 0,
     this.unitsLeft,
@@ -40,6 +55,7 @@ class CatalogVariant {
     this.imageUrl,
     this.images = const [],
     this.netQuantity,
+    this.priceTiers = const [],
   });
 
   final int id;
@@ -64,6 +80,11 @@ class CatalogVariant {
   /// Set only for [StockStatus.lowStock]: "Only 2 left".
   final int? unitsLeft;
   final int maxQtyPerOrder;
+
+  /// The fewest units one order may have of this variant
+  /// (`min_qty_per_order`, at least 1). ADD adds this many at once and
+  /// minus at this quantity removes the line. Use [minQty].
+  final int minQtyPerOrder;
   final UnitPrice? unitPrice;
   final String? imageUrl;
 
@@ -73,11 +94,26 @@ class CatalogVariant {
   /// Detail page only: net quantity as on the pack.
   final String? netQuantity;
 
-  bool get inStock =>
-      stockStatus != StockStatus.outOfStock && orderableQuantity > 0;
+  /// Volume prices (`price_tiers`), lowest [PriceTier.minOrderUnits]
+  /// first; empty when the variant has none (then [sellingPrice] always
+  /// applies). Shown as the wholesale rate table.
+  final List<PriceTier> priceTiers;
 
-  /// The ADD stepper's cap.
-  int get maxSelectable => orderableQuantity < 0 ? 0 : orderableQuantity;
+  /// The variant has volume prices: show the wholesale rates.
+  bool get hasPriceTiers => priceTiers.isNotEmpty;
+
+  bool get inStock =>
+      stockStatus != StockStatus.outOfStock && maxSelectable > 0;
+
+  /// [minQtyPerOrder], never below 1.
+  int get minQty => minQtyPerOrder < 1 ? 1 : minQtyPerOrder;
+
+  /// The variant has a minimum above one unit: show the "Min N" hint.
+  bool get hasMinQty => minQty > 1;
+
+  /// The ADD stepper's cap. 0 (out of stock) when fewer than [minQty] can
+  /// be ordered; the server sends 0 then too.
+  int get maxSelectable => orderableQuantity < minQty ? 0 : orderableQuantity;
 
   /// Units for "Only N left", or null.
   int? get lowStockUnits =>
@@ -194,6 +230,11 @@ class ProductBannerLink extends BannerLink {
 class UrlBannerLink extends BannerLink {
   const UrlBannerLink(this.url);
   final Uri url;
+}
+
+/// Opens the Refer & earn screen (`link_type` referral).
+class ReferralBannerLink extends BannerLink {
+  const ReferralBannerLink();
 }
 
 class NoBannerLink extends BannerLink {

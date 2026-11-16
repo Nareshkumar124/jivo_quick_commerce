@@ -193,7 +193,7 @@ void main() {
   testWidgets('switching to another store asks before clearing the cart', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(800, 3000);
+    tester.view.physicalSize = const Size(800, 7000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final app = TestApp(tokens: signedInTokens);
@@ -211,6 +211,8 @@ void main() {
     );
     await app.pump(tester);
     await tester.tap(find.byKey(const ValueKey('add-1001')).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('qty-update'))); // prefilled 1
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('cart-bar')), findsOneWidget);
 

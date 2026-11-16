@@ -91,6 +91,17 @@ class CategoryQuery extends ProductQuery {
   int get hashCode => Object.hash(slug, sort);
 }
 
+/// Every active product of the store (Home's "All products").
+class AllProductsQuery extends ProductQuery {
+  const AllProductsQuery();
+
+  @override
+  bool operator ==(Object other) => other is AllProductsQuery;
+
+  @override
+  int get hashCode => 7;
+}
+
 class CollectionQuery extends ProductQuery {
   const CollectionQuery(this.slug);
 
@@ -119,6 +130,7 @@ class SearchQuery extends ProductQuery {
 @immutable
 class PagedProducts {
   const PagedProducts({
+    this.storeId,
     this.items = const [],
     this.nextPage,
     this.title,
@@ -126,6 +138,8 @@ class PagedProducts {
     this.loadMoreError,
   });
 
+  /// The store these products (prices, stock) belong to.
+  final int? storeId;
   final List<CatalogProduct> items;
   final int? nextPage;
 
@@ -144,6 +158,7 @@ class PagedProducts {
     Object? loadMoreError,
     bool clearError = false,
   }) => PagedProducts(
+    storeId: storeId,
     items: items ?? this.items,
     nextPage: clearNextPage ? null : (nextPage ?? this.nextPage),
     title: title,
@@ -168,6 +183,7 @@ class PagedProductsController extends AsyncNotifier<PagedProducts> {
           sort: sort,
           page: page,
         ),
+        AllProductsQuery() => repository.products(page: page),
         CollectionQuery(:final slug) => repository.collection(slug, page: page),
         SearchQuery(:final text) => repository.search(text, page: page),
       },
@@ -176,9 +192,10 @@ class PagedProductsController extends AsyncNotifier<PagedProducts> {
 
   @override
   Future<PagedProducts> build() async {
-    ref.watch(storeScopeProvider);
+    final (storeId, _) = ref.watch(storeScopeProvider);
     final first = await _fetch(1);
     return PagedProducts(
+      storeId: storeId,
       items: first.items,
       nextPage: first.nextPage,
       title: first.title,

@@ -31,7 +31,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from apps.accounts.serializers import AddressSerializer
 from apps.cart import services as cart_services
 from apps.cart.choices import PaymentUnavailableReason
-from apps.cart.models import Cart, CartItem
+from apps.cart.models import Cart, CartItem, empty_instructions
 from apps.cms.models import AppConfig
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
@@ -338,10 +338,17 @@ def _check_cart(state, *, user, payment_method: str, expected: Decimal) -> None:
             "orderable_quantity": line.summary["orderable_quantity"],
         }
         for line in state.lines
-        if line.issue
+        if line.has_stock_issue
     ]
     if short:
         raise ApiError(ErrorCode.STOCK_UNAVAILABLE, details={"items": short})
+    below = next((line for line in state.lines if line.below_minimum), None)
+    if below is not None:  # e.g. the minimum was raised after the line was added
+        raise cart_services.min_qty_error(
+            below.variant.pk,
+            below.variant.min_qty_per_order,
+            f"{below.variant.product.name} {below.variant.name}",
+        )
     rules, total = state.rules, state.bill.item_total
     if total < rules.min_order_value:
         missing = rules.min_order_value - total
@@ -353,6 +360,18 @@ def _check_cart(state, *, user, payment_method: str, expected: Decimal) -> None:
                 "min_order_value": money_str(rules.min_order_value),
                 "item_total": money_str(total),
                 "amount_to_min_order": money_str(missing),
+            },
+        )
+    units_missing = state.units_to_min_order
+    if units_missing is not None:
+        raise ApiError(
+            ErrorCode.MIN_UNITS_NOT_MET,
+            cart_services.min_units_message(rules, units_missing),
+            details={
+                "min_order_units": rules.min_order_units,
+                "order_units": state.order_units,
+                "units_to_min_order": units_missing,
+                "order_unit_label": rules.order_unit_label,
             },
         )
     if state.coupon_check is not None and not state.coupon_check.ok:
@@ -479,7 +498,10 @@ def _place(
         store.pk,
         [
             inventory.ReservationLine(
-                line.variant.pk, line.item.quantity, line.variant.max_qty_per_order
+                line.variant.pk,
+                line.item.quantity,
+                line.variant.max_qty_per_order,
+                line.variant.min_qty_per_order,
             )
             for line in state.lines
         ],
@@ -517,12 +539,14 @@ def _order_items(order: Order, lines) -> list[OrderItem]:
 
 def _clear_ordered_lines(cart: Cart, order: Order) -> None:
     """T2/T3 "cart cleared" (PM decision): remove the lines that were ordered, keep anything the
-    customer added since, and drop the coupon (it now belongs to the order)."""
+    customer added since, and drop the coupon (it now belongs to the order). The tip and the
+    delivery instructions/note also reset, so the next order starts fresh (user, 2026-11-14)."""
     ordered = order.items.values_list("variant_id", flat=True)
     CartItem.objects.filter(cart=cart, variant_id__in=ordered).delete()
-    if cart.coupon_id is not None:
-        cart.coupon = None
-        cart.save(update_fields=["coupon", "updated_at"])
+    cart.coupon = None
+    cart.tip = Decimal("0.00")
+    cart.instructions = empty_instructions()
+    cart.save(update_fields=["coupon", "tip", "instructions", "updated_at"])
 
 
 # --------------------------------------------------------------------------- payment capture
@@ -632,11 +656,12 @@ def capture_payment(
             events.emit(events.PLACED, order.pk)
             return CaptureResult(order, "placed")
         if order.status in (OrderStatus.PAYMENT_FAILED, OrderStatus.CANCELLED):
+            from apps.payments.order_refunds import settle
+
             request_refund(
                 payment, payment.amount, reason=LATE_CAPTURE, key=f"capture:{payment_id}"
             )
-            order.payment_status = PaymentStatus.REFUND_PENDING
-            order.save(update_fields=["payment_status", "updated_at"])
+            settle(order)  # REFUND_PENDING until this and the order's other refunds are done
             events.emit(events.LATE_CAPTURE, order.pk)
             return CaptureResult(order, "late_capture")
         request_refund(
@@ -881,30 +906,41 @@ EXPIRY_LOCK_SECONDS = 5 * 60
 
 class _run_lock:
     """T-403c: one `expire_unpaid_orders` run at a time (beat every minute; a slow gateway can
-    make a run longer than that). A Redis `add` with a timeout, so a crashed run frees the lock.
-    If Redis is down the run goes ahead: every order is re-checked under its row lock anyway."""
+    make a run longer than that). A Redis lock with a timeout, so a crashed run frees the lock,
+    and a **unique token** (redis-py `Lock`: `SET NX PX`, released by an atomic Lua
+    compare-and-delete), so a run that outlived its lock never frees the newer run's lock (code
+    review). The key is the cache's own key (`cache.make_and_validate_key`), in the cache's
+    Redis DB and namespace. If Redis is down the run goes ahead: every order is re-checked under
+    its row lock anyway."""
 
     def __init__(self, key: str) -> None:
-        self.key, self.acquired = key, False
+        self.key, self.lock = key, None
 
     def __enter__(self) -> bool:
         from django.core.cache import cache
 
         try:
-            self.acquired = cache.add(self.key, "1", EXPIRY_LOCK_SECONDS)
+            client = cache._cache.get_client(None, write=True)
+            lock = client.lock(cache.make_and_validate_key(self.key), timeout=EXPIRY_LOCK_SECONDS)
+            if not lock.acquire(blocking=False):
+                return False
         except Exception:
             logger.warning("expire_unpaid_orders: lock unavailable, running without it")
             return True
-        return self.acquired
+        self.lock = lock
+        return True
 
     def __exit__(self, *exc) -> None:
-        if self.acquired:
-            from django.core.cache import cache
+        if self.lock is None:
+            return
+        from redis.exceptions import LockNotOwnedError
 
-            try:
-                cache.delete(self.key)
-            except Exception:
-                logger.warning("expire_unpaid_orders: lock not released (expires by itself)")
+        try:
+            self.lock.release()
+        except LockNotOwnedError:
+            logger.warning("expire_unpaid_orders: run outlived its lock; the newer lock is kept")
+        except Exception:
+            logger.warning("expire_unpaid_orders: lock not released (expires by itself)")
 
 
 def _expire_due(now: datetime, limit: int) -> dict:
@@ -954,17 +990,24 @@ def reorder(user, store: StoreArea, order_id: int) -> tuple[list[dict], int]:
                 and variant.inv_id is not None
                 and cart_services.is_sellable(variant)
             )
-            orderable = 0
+            orderable, minimum = 0, 1
             if sellable:
+                minimum = variant.min_qty_per_order
                 orderable = availability(
                     on_hand=variant.inv_on_hand,
                     reserved=variant.inv_reserved,
                     is_available=variant.inv_is_available,
                     max_qty_per_order=variant.max_qty_per_order,
+                    min_qty_per_order=minimum,
                 ).orderable_quantity
             line = lines.get(item.variant_id)
             current = line.quantity if line is not None else 0
             target = max(current, min(wanted, orderable))
+            # Never more than was ordered, and never a line below the minimum per order: a past
+            # order smaller than today's minimum is not put back (MIN_QTY_REQUIRED).
+            below_minimum = 0 < target < minimum
+            if below_minimum:
+                target = current
             added += target > 0
             if target > current:
                 if line is None:
@@ -972,16 +1015,15 @@ def reorder(user, store: StoreArea, order_id: int) -> tuple[list[dict], int]:
                 else:
                     line.quantity = target
                     line.save(update_fields=["quantity", "updated_at"])
-            if orderable < wanted:
-                reason = (
-                    ReorderIssueReason.NOT_AVAILABLE
-                    if not sellable
-                    else (
-                        ReorderIssueReason.OUT_OF_STOCK
-                        if orderable == 0
-                        else ReorderIssueReason.LIMITED_STOCK
-                    )
-                )
+            if below_minimum or orderable < wanted:
+                if not sellable:
+                    reason = ReorderIssueReason.NOT_AVAILABLE
+                elif orderable == 0:
+                    reason = ReorderIssueReason.OUT_OF_STOCK
+                elif below_minimum:
+                    reason = ReorderIssueReason.MIN_QTY_REQUIRED
+                else:
+                    reason = ReorderIssueReason.LIMITED_STOCK
                 issues.append(
                     {
                         "variant_id": item.variant_id,

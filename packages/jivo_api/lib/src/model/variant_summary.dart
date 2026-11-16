@@ -6,6 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:jivo_api/src/model/stock_status_enum.dart';
 import 'package:jivo_api/src/model/unit_price.dart';
+import 'package:jivo_api/src/model/price_tier.dart';
 import 'package:jivo_api/src/model/image_set.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -43,6 +44,10 @@ class VariantSummary {
     required this.unitsLeft,
 
     required this.maxQtyPerOrder,
+
+    required this.minQtyPerOrder,
+
+    required this.priceTiers,
 
     required this.image,
   });
@@ -85,7 +90,7 @@ class VariantSummary {
   )
   final StockStatusEnum stockStatus;
 
-  /// Units a customer can add right now: min(units in stock at this store, `max_qty_per_order`). 0 when out of stock. Cap the ADD stepper here.
+  /// Units a customer can add right now: min(units in stock at this store, `max_qty_per_order`). 0 when out of stock, including when fewer than `min_qty_per_order` units can be sold. Cap the ADD stepper here.
   // minimum: 0
   @JsonKey(name: r'orderable_quantity', required: true, includeIfNull: false)
   final int orderableQuantity;
@@ -99,6 +104,15 @@ class VariantSummary {
   // minimum: 1
   @JsonKey(name: r'max_qty_per_order', required: true, includeIfNull: false)
   final int maxQtyPerOrder;
+
+  /// Fewest units of this variant one order can have (1 = no minimum; never above `max_qty_per_order`). The first ADD sets this quantity, and the stepper never goes below it: stepping down from here removes the line (quantity 0). The cart refuses 1 to `min_qty_per_order` - 1 with 422 `MIN_QTY_REQUIRED`.
+  // minimum: 1
+  @JsonKey(name: r'min_qty_per_order', required: true, includeIfNull: false)
+  final int minQtyPerOrder;
+
+  /// Volume prices, lowest `min_order_units` first; [] when the variant has none (then `selling_price` always applies). The cart applies the highest tier reached by the units of all tiered items together and shows it per line (`price_per_unit`, `price_tier`). For the rate chart on the product page.
+  @JsonKey(name: r'price_tiers', required: true, includeIfNull: false)
+  final List<PriceTier> priceTiers;
 
   /// The variant's own first image, else the product's. Null when none.
   @JsonKey(name: r'image', required: true, includeIfNull: true)
@@ -119,6 +133,8 @@ class VariantSummary {
           other.orderableQuantity == orderableQuantity &&
           other.unitsLeft == unitsLeft &&
           other.maxQtyPerOrder == maxQtyPerOrder &&
+          other.minQtyPerOrder == minQtyPerOrder &&
+          other.priceTiers == priceTiers &&
           other.image == image;
 
   @override
@@ -134,6 +150,8 @@ class VariantSummary {
       orderableQuantity.hashCode +
       (unitsLeft == null ? 0 : unitsLeft.hashCode) +
       maxQtyPerOrder.hashCode +
+      minQtyPerOrder.hashCode +
+      priceTiers.hashCode +
       (image == null ? 0 : image.hashCode);
 
   factory VariantSummary.fromJson(Map<String, dynamic> json) =>

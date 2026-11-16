@@ -13,6 +13,7 @@ CatalogVariant variant({
   int orderable = 5,
   int? unitsLeft,
   int maxQty = 5,
+  int minQty = 1,
 }) => CatalogVariant(
   id: id,
   name: name,
@@ -24,6 +25,7 @@ CatalogVariant variant({
   orderableQuantity: orderable,
   unitsLeft: unitsLeft,
   maxQtyPerOrder: maxQty,
+  minQtyPerOrder: minQty,
 );
 
 /// A one-variant product card.

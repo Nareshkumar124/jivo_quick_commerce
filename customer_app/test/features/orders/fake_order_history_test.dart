@@ -169,6 +169,19 @@ void main() {
     expect(full.unavailable, isEmpty);
   });
 
+  test('reorder never puts a line back below a raised minimum', () async {
+    final placed = await place(PaymentMethod.cod);
+    backend.advanceOrder(placed.id, OrderStatus.delivered);
+    backend.minimums[mustard.id] = 5; // the order had 1
+    final result = await backend.reorder(placed.id);
+    final skipped = result.unavailable.single;
+    expect(skipped.variantId, mustard.id);
+    expect(skipped.reason, ReorderSkipReason.belowMinimum);
+    expect(skipped.addedQuantity, 0);
+    expect(result.cart!.quantityOf(mustard.id), 0);
+    expect(result.cart!.quantityOf(canola.id), 2);
+  });
+
   test('the invoice exists once delivered', () async {
     final placed = await place(PaymentMethod.cod);
     await expectLater(

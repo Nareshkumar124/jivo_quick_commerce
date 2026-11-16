@@ -126,6 +126,22 @@ class _DocumentCaptureScreenState extends ConsumerState<DocumentCaptureScreen> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final state = ref.watch(documentCaptureControllerProvider(_type));
+    final uploading = state.step == CaptureStep.uploading;
+    // RA-04: point at the part the server refused, in the app's words.
+    final fieldError = uploadFieldErrorOf(state.uploadError);
+    final String? barError = switch (fieldError) {
+      UploadFieldError.number => null, // shown under the number field
+      UploadFieldError.photo => l10n.capturePhotoNotAccepted,
+      null =>
+        state.uploadError == null
+            ? null
+            : onboardingErrorText(context, state.uploadError!),
+    };
+    final String? numberError = _numberError != null
+        ? fieldErrorText(l10n, _numberError!)
+        : fieldError == UploadFieldError.number
+        ? l10n.captureNumberNotAccepted(documentName(l10n, _type))
+        : null;
 
     ref.listen(documentCaptureControllerProvider(_type), (previous, next) {
       if (next.step == CaptureStep.done && previous?.step != CaptureStep.done) {
@@ -206,12 +222,13 @@ class _DocumentCaptureScreenState extends ConsumerState<DocumentCaptureScreen> {
                             _type == KycDocumentType.aadhaarFront
                             ? TextCapitalization.none
                             : TextCapitalization.characters,
-                        errorText: _numberError == null
-                            ? null
-                            : fieldErrorText(l10n, _numberError!),
+                        errorText: numberError,
                         onChanged: (_) {
                           if (_numberError != null) {
                             setState(() => _numberError = null);
+                          }
+                          if (fieldError == UploadFieldError.number) {
+                            _controller.clearUploadError();
                           }
                         },
                       );
@@ -221,15 +238,23 @@ class _DocumentCaptureScreenState extends ConsumerState<DocumentCaptureScreen> {
               ],
             ),
           ),
+          if (uploading)
+            LinearProgressIndicator(
+              key: const Key('capture-upload-progress'),
+              minHeight: 4,
+              value: (state.uploadPercent ?? 0) / 100,
+            ),
           PrimaryActionBar(
             buttonKey: const Key('capture-upload'),
-            label: l10n.captureUpload,
-            busy: state.step == CaptureStep.uploading,
-            onPressed: _upload,
+            // While uploading the label says how far it got (the button is
+            // disabled, so nothing is sent twice).
+            label: uploading
+                ? l10n.captureUploadingPercent(state.uploadPercent ?? 0)
+                : l10n.captureUpload,
+            onPressed: uploading ? null : _upload,
+            hint: uploading && state.uploadSlow ? l10n.captureUploadSlow : null,
             errorKey: const Key('capture-upload-error'),
-            error: state.uploadError == null
-                ? null
-                : onboardingErrorText(context, state.uploadError!),
+            error: barError,
             secondary: [
               OutlinedButton.icon(
                 key: const Key('capture-retake'),

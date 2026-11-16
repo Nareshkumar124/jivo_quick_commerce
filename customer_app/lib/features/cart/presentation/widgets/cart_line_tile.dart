@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../../app/theme.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../shared/formatting/formatters.dart';
 import '../../../../shared/widgets/product_image.dart';
@@ -10,10 +11,15 @@ import '../../domain/cart.dart';
 import '../add_stepper.dart';
 import '../cart_controller.dart';
 import '../cart_texts.dart';
+import '../quantity_dialog.dart';
 
-/// One cart line (`03 §2.8`): image, name, pack size, the server's price
-/// and MRP, a stepper capped at `orderable_quantity`, the line total and a
-/// remove button. A stock problem shows a flag and its fix action.
+/// One cart line (`03 §2.8`): image, name, pack size, the server's billed
+/// price (`price_per_unit`; "₹87/box" with a "Wholesale rate" tag for items
+/// with volume prices) and MRP, the minimum per order when above 1, the
+/// quantity box (tap to
+/// type a quantity, capped at `orderable_quantity`; 0 removes the line), the
+/// line total and a remove button. A stock or minimum problem shows a flag and
+/// its fix action.
 class CartLineTile extends ConsumerWidget {
   const CartLineTile({required this.line, super.key});
 
@@ -35,6 +41,10 @@ class CartLineTile extends ConsumerWidget {
     final issueText = flagged ? lineIssueText(l10n, line) : null;
     final fixLabel = flagged ? lineFixText(l10n, line) : null;
     final outOfStock = flagged && line.orderableQuantity == 0;
+    // The flag already says "Order at least N".
+    final minHint =
+        line.variant.hasMinQty &&
+        line.issue?.code != CartIssueCode.minQtyRequired;
 
     return Padding(
       key: ValueKey('cart-line-$id'),
@@ -46,7 +56,10 @@ class CartLineTile extends ConsumerWidget {
             borderRadius: BorderRadius.circular(JivoRadii.sm),
             child: SizedBox.square(
               dimension: 56,
-              child: ProductImage(url: line.imageUrl),
+              child: ColoredBox(
+                color: context.customerColors.imageWell,
+                child: ProductImage(url: line.imageUrl, onWell: true),
+              ),
             ),
           ),
           const SizedBox(width: JivoSpacing.md),
@@ -69,7 +82,11 @@ class CartLineTile extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: JivoSpacing.xs),
-                PriceLine(price: line.sellingPrice, mrp: line.mrp),
+                if (line.variant.hasPriceTiers || line.priceTier != null)
+                  _TierRate(line: line)
+                else
+                  PriceLine(price: line.billedPrice, mrp: line.mrp),
+                if (minHint) MinQtyHint(variant: line.variant),
                 if (issueText != null)
                   Text(
                     issueText,
@@ -102,20 +119,27 @@ class CartLineTile extends ConsumerWidget {
               if (!outOfStock)
                 SizedBox(
                   width: 112,
-                  child: QuantityStepper(
-                    id: 'line-$id',
-                    quantity: line.quantity,
-                    productName: line.productName,
-                    onDecrement: pending
-                        ? null
-                        : () => run(
-                            () => cart.setLineQuantity(line, line.quantity - 1),
-                          ),
-                    onIncrement: pending
-                        ? null
-                        : () => run(
-                            () => cart.setLineQuantity(line, line.quantity + 1),
-                          ),
+                  child: DelayedPending(
+                    pending: pending,
+                    builder: (context, slow) => QuantityBox(
+                      id: 'line-$id',
+                      quantity: line.quantity,
+                      busy: slow,
+                      onTap: pending
+                          ? null
+                          : () async {
+                              final typed = await showQuantityDialog(
+                                context,
+                                current: line.quantity,
+                                max: line.orderableQuantity,
+                                min: line.minQty,
+                              );
+                              if (typed == null || !context.mounted) return;
+                              await run(
+                                () => cart.setLineQuantity(line, typed),
+                              );
+                            },
+                    ),
                   ),
                 ),
               const SizedBox(height: JivoSpacing.xs),
@@ -138,6 +162,66 @@ class CartLineTile extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// A line with volume prices: the billed rate ("₹87/box", the server's
+/// `price_per_unit`), the struck-out MRP when it differs, and a
+/// "Wholesale rate" tag while a tier applies (`price_tier`).
+class _TierRate extends StatelessWidget {
+  const _TierRate({required this.line});
+
+  final CartLine line;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colors = context.jivoColors;
+    final id = '${line.variantId}';
+    final rate = formatRupees(line.billedPrice);
+    final mrp = formatRupees(line.mrp);
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: JivoSpacing.xs,
+      runSpacing: 2,
+      children: [
+        Text(
+          l10n.pricePerBox(rate),
+          key: ValueKey('cart-line-rate-$id'),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (mrp != rate)
+          Text(
+            mrp,
+            semanticsLabel: l10n.mrpSemantics(mrp),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+        if (line.priceTier != null)
+          DecoratedBox(
+            key: ValueKey('cart-line-tier-$id'),
+            decoration: BoxDecoration(
+              color: colors.success.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(JivoRadii.sm / 2),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Text(
+                l10n.wholesaleRateTag,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colors.success,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

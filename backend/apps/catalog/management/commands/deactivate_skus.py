@@ -1,13 +1,17 @@
 """`manage.py deactivate_skus --csv <file> [--commit]`: deactivate the listed variants (column
-`sku`) and every product left with no active variant. Dry run unless --commit. See
-apps.catalog.bulk_load."""
+`sku`) and every product left with no active variant. Dry run unless --commit (plus --yes for a
+database that is not on this machine). See apps.catalog.bulk_load."""
 
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.catalog.bulk_load import deactivate_variants, read_sku_list
-from apps.catalog.management.commands._common import add_commit_arguments, finish
+from apps.catalog.management.commands._common import (
+    add_commit_arguments,
+    check_database,
+    finish,
+)
 
 
 class Command(BaseCommand):
@@ -24,6 +28,7 @@ class Command(BaseCommand):
         path: Path = options["csv"]
         if not path.is_file():
             raise CommandError(f"File not found: {path}")
+        check_database(self, options)
         skus, errors = read_sku_list(path)
         if errors:
             finish(self, errors, committed=False)

@@ -6,7 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// * `CART_EMPTY` - Add items to your cart. * `ADDRESS_REQUIRED` - Select a delivery address. * `NOT_SERVICEABLE` - We do not deliver to this address from this store. * `STORE_CLOSED` - The store is not accepting orders right now. * `STOCK_UNAVAILABLE` - Some items are not available as chosen. * `MIN_ORDER_NOT_MET` - The minimum order value is not met. * `COUPON_INVALID` - The coupon is not valid. * `COUPON_EXPIRED` - The coupon has expired. * `COUPON_NOT_ELIGIBLE` - This cart is not eligible for the coupon. * `COUPON_USAGE_EXCEEDED` - The coupon usage limit is reached.
+/// * `CART_EMPTY` - Add items to your cart. * `ADDRESS_REQUIRED` - Select a delivery address. * `NOT_SERVICEABLE` - We do not deliver to this address from this store. * `STORE_CLOSED` - The store is not accepting orders right now. * `STOCK_UNAVAILABLE` - Some items are not available as chosen. * `MIN_QTY_REQUIRED` - Some items are below their minimum per order. * `MIN_ORDER_NOT_MET` - The minimum order value is not met. * `MIN_UNITS_NOT_MET` - The minimum number of units per order is not met. * `COUPON_INVALID` - The coupon is not valid. * `COUPON_EXPIRED` - The coupon has expired. * `COUPON_NOT_ELIGIBLE` - This cart is not eligible for the coupon. * `COUPON_USAGE_EXCEEDED` - The coupon usage limit is reached.
 enum CheckoutBlockerCodeEnum {
   @JsonValue(r'CART_EMPTY')
   CART_EMPTY(r'CART_EMPTY'),
@@ -18,8 +18,12 @@ enum CheckoutBlockerCodeEnum {
   STORE_CLOSED(r'STORE_CLOSED'),
   @JsonValue(r'STOCK_UNAVAILABLE')
   STOCK_UNAVAILABLE(r'STOCK_UNAVAILABLE'),
+  @JsonValue(r'MIN_QTY_REQUIRED')
+  MIN_QTY_REQUIRED(r'MIN_QTY_REQUIRED'),
   @JsonValue(r'MIN_ORDER_NOT_MET')
   MIN_ORDER_NOT_MET(r'MIN_ORDER_NOT_MET'),
+  @JsonValue(r'MIN_UNITS_NOT_MET')
+  MIN_UNITS_NOT_MET(r'MIN_UNITS_NOT_MET'),
   @JsonValue(r'COUPON_INVALID')
   COUPON_INVALID(r'COUPON_INVALID'),
   @JsonValue(r'COUPON_EXPIRED')

@@ -76,8 +76,16 @@ class JivoCoreLocalizationsEn extends JivoCoreLocalizations {
       'You\'ve reached the maximum quantity for this item.';
 
   @override
+  String get errorMinQtyRequired =>
+      'This item has a minimum order quantity. Please add more.';
+
+  @override
   String get errorMinOrderNotMet =>
       'Your cart is below the minimum order value.';
+
+  @override
+  String get errorMinUnitsNotMet =>
+      'Your order is below the minimum quantity. Please add more items.';
 
   @override
   String get errorCouponInvalid => 'This coupon code isn\'t valid.';
@@ -147,6 +155,26 @@ class JivoCoreLocalizationsEn extends JivoCoreLocalizations {
       'This store isn\'t available any more. Please choose your location again.';
 
   @override
+  String get errorReferralCodeInvalid =>
+      'This referral code isn\'t valid. Check it and try again.';
+
+  @override
+  String get errorReferralSelf =>
+      'That\'s your own code. Enter a friend\'s code instead.';
+
+  @override
+  String get errorReferralAlreadyApplied =>
+      'You\'ve already used a referral code. It can\'t be changed.';
+
+  @override
+  String get errorReferralNotEligible =>
+      'Referral codes are only for new customers, before their first order.';
+
+  @override
+  String get errorReferralProgramPaused =>
+      'Refer & earn is paused right now. Please try again later.';
+
+  @override
   String errorOtpInvalidAttempts(int count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -157,6 +185,11 @@ class JivoCoreLocalizationsEn extends JivoCoreLocalizations {
           'That OTP is incorrect. No attempts left: please request a new OTP.',
     );
     return '$_temp0';
+  }
+
+  @override
+  String errorMinQtyRequiredCount(int count) {
+    return 'You need to order at least $count of this item.';
   }
 
   @override

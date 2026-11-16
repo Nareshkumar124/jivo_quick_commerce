@@ -68,6 +68,147 @@ void main() {
     expect(cart.quantityOf(1002), 3);
   });
 
+  test(
+    'MIN_QTY_REQUIRED: the line flag, the blocker and the minimum',
+    () async {
+      // The contract's cart with one line below a raised minimum.
+      final cart = Map<String, Object?>.from(
+        contractExample('cart_retrieve/200/ReadyToOrder')! as Map,
+      );
+      final line = Map<String, Object?>.from(
+        (cart['items']! as List).first as Map,
+      );
+      line['variant'] = {
+        ...(line['variant']! as Map).cast<String, Object?>(),
+        'min_qty_per_order': 5,
+      };
+      line['issue'] = {
+        'code': 'MIN_QTY_REQUIRED',
+        'message': 'At least 5 per order.',
+      };
+      cart['items'] = [line];
+      cart['checkout'] = {
+        'can_place_order': false,
+        'blockers': [
+          {
+            'code': 'MIN_QTY_REQUIRED',
+            'message': 'Some items are below their minimum per order.',
+          },
+        ],
+      };
+      answer = (_, _) => cart;
+
+      final snapshot = await repository.load();
+      final mapped = snapshot.lines.single;
+      expect(mapped.minQty, 5);
+      expect(mapped.issue!.code, CartIssueCode.minQtyRequired);
+      expect(
+        snapshot.checkout.blockers.single.code,
+        CheckoutBlockerCode.minQtyRequired,
+      );
+    },
+  );
+
+  test(
+    'a MIN_QTY_REQUIRED answer reaches the caller with its minimum',
+    () async {
+      answer = (_, _) =>
+          (422, contractExample('cart_items_add/422/MINQTYREQUIRED'));
+      await expectLater(
+        repository.setQuantity(1002, 1),
+        throwsA(
+          isA<ApiError>()
+              .having((e) => e.code, 'code', ApiErrorCode.minQtyRequired)
+              .having((e) => e.minQtyPerOrder, 'min', 2),
+        ),
+      );
+    },
+  );
+
+  test('MIN_UNITS_NOT_MET: the units thresholds and the blocker', () async {
+    final cart = Map<String, Object?>.from(
+      contractExample('cart_retrieve/200/ReadyToOrder')! as Map,
+    );
+    cart['thresholds'] = {
+      ...(cart['thresholds']! as Map).cast<String, Object?>(),
+      'min_order_units': 5,
+      'units_to_min_order': 2,
+      'order_unit_label': 'cartons',
+    };
+    cart['checkout'] = {
+      'can_place_order': false,
+      'blockers': [
+        {
+          'code': 'MIN_UNITS_NOT_MET',
+          'message': 'Add 2 more cartons to place your order.',
+        },
+      ],
+    };
+    answer = (_, _) => cart;
+
+    final snapshot = await repository.load();
+    expect(snapshot.thresholds!.minOrderUnits, 5);
+    expect(snapshot.thresholds!.unitsToMinOrder, 2);
+    expect(snapshot.thresholds!.orderUnitLabel, 'cartons');
+    expect(
+      snapshot.checkout.blockers.single.code,
+      CheckoutBlockerCode.minUnitsNotMet,
+    );
+
+    // The contract's default: the rule is off.
+    answer = (_, _) => contractExample('cart_retrieve/200/ReadyToOrder');
+    final plain = await repository.load();
+    expect(plain.thresholds!.minOrderUnits, 0);
+    expect(plain.thresholds!.unitsToMinOrder, isNull);
+  });
+
+  test(
+    'volume prices: the billed rate, the tier and the nudge, as sent',
+    () async {
+      final cart = Map<String, Object?>.from(
+        contractExample('cart_retrieve/200/ReadyToOrder')! as Map,
+      );
+      final line = Map<String, Object?>.from(
+        (cart['items']! as List).first as Map,
+      );
+      line['price_per_unit'] = '87.00';
+      line['price_tier'] = {'min_order_units': 25, 'price': '87.00'};
+      line['next_tier_price'] = '85.00';
+      line['line_total'] = '2610.00';
+      cart['items'] = [line];
+      cart['thresholds'] = {
+        ...(cart['thresholds']! as Map).cast<String, Object?>(),
+        'tier_units': 30,
+        'next_price_tier': {'min_order_units': 50, 'units_to_next_tier': 20},
+        'order_unit_label': 'cartons',
+      };
+      answer = (_, _) => cart;
+
+      final snapshot = await repository.load();
+      final mapped = snapshot.lines.single;
+      expect(mapped.pricePerUnit, '87.00');
+      expect(mapped.billedPrice, '87.00');
+      expect(mapped.priceTier!.minOrderUnits, 25);
+      expect(mapped.priceTier!.price, '87.00');
+      expect(mapped.nextTierPrice, '85.00');
+      expect(mapped.lineTotal, '2610.00');
+      final thresholds = snapshot.thresholds!;
+      expect(thresholds.tierUnits, 30);
+      expect(thresholds.nextPriceTier!.minOrderUnits, 50);
+      expect(thresholds.nextPriceTier!.unitsToNextTier, 20);
+    },
+  );
+
+  test('the contract default: no tier, no nudge', () async {
+    final cart = await repository.load();
+    for (final line in cart.lines) {
+      expect(line.priceTier, isNull);
+      expect(line.nextTierPrice, isNull);
+      expect(line.pricePerUnit, line.variant.sellingPrice);
+    }
+    expect(cart.thresholds!.nextPriceTier, isNull);
+  });
+
   test('every documented cart decodes', () async {
     for (final name in [
       'ReadyToOrder',
@@ -179,9 +320,10 @@ void main() {
       _ => contractExample('cart_coupon_remove/200/Removed'),
     };
     final offers = await repository.coupons();
-    expect(offers.first.code, 'OILS15');
-    expect(offers.first.isEligible, isTrue);
-    expect(offers.first.savings, '83.70');
+    // The example lists a personal referral reward first (2026-11-13).
+    final oils = offers.singleWhere((o) => o.code == 'OILS15');
+    expect(oils.isEligible, isTrue);
+    expect(oils.savings, '83.70');
     final locked = offers.where((o) => !o.isEligible);
     expect(locked, isNotEmpty);
     expect(locked.first.ineligibility, isNotNull);

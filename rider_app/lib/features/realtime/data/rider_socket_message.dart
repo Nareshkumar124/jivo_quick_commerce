@@ -74,6 +74,13 @@ class SocketCashUpdated extends RiderSocketMessage {
   const SocketCashUpdated();
 }
 
+/// `notification.new` (06 §4.2, api-requests #47): a new inbox entry for
+/// the rider app. The app re-reads the badge and the inbox instead of
+/// trusting the body (P8; it used to be ignored).
+class SocketNotificationNew extends RiderSocketMessage {
+  const SocketNotificationNew();
+}
+
 class UnknownSocketMessage extends RiderSocketMessage {
   const UnknownSocketMessage(this.type);
 
@@ -124,6 +131,8 @@ RiderSocketMessage parseRiderSocketMessage(Object? frame) {
         );
       case 'cash.updated':
         return const SocketCashUpdated();
+      case 'notification.new':
+        return const SocketNotificationNew();
     }
   } on Object {
     // A body the generated model cannot read (a missing required field):

@@ -1,13 +1,20 @@
 """P7 reports (05 §4) and dashboard order section (05 §1.1) on the backend's reports and
 dashboard services: role matrix (05 §3 "Reports"), store scoping, CSV errors, column headings
 (sales summary refund columns), HTMX partials. More report/export/dashboard cases are in
-test_p7_bound.py."""
+test_p7_bound.py.
+
+Test cases (qa/docs/02-test-case-repository.md): P7-TC-21 (report role matrix), P7-TC-22
+("own store" scope), P7-TC-23 (sales summary columns, DL-65), P7-TC-25 (refused ranges and
+runs), P7-TC-31 (KPI cards), P7-TC-32 (dashboard role matrix and store scope), P7-TC-40 (the
+reports page and dashboard in the console)."""
 
 import csv
 import io
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from freezegun import freeze_time
 
@@ -20,8 +27,8 @@ from apps.ops_console.tests.helpers import (
     login_with_stores,
 )
 from apps.ops_console.tests.orders_support import make_order
-from apps.orders.choices import ActorType, OrderStatus, PaymentMethod
-from apps.orders.models import Order
+from apps.orders.choices import ActorType, OrderStatus, PaymentMethod, RatingTarget
+from apps.orders.models import Order, Rating
 from apps.stores.tests.factories import DarkStoreFactory
 
 pytestmark = pytest.mark.django_db
@@ -32,6 +39,16 @@ TODAY = "2026-11-03"
 REPORT_ROLES = frozenset(
     {roles.SUPER_ADMIN, "superuser flag", roles.OPS, roles.STORE_MANAGER, roles.FINANCE}
 )
+# The dashboard order partial's queries per role (measured 2026-11-10 with the data of
+# TestDashboardOrders.test_query_count_does_not_grow). The numbers differ per role because the
+# permission checks, the store scope and the low-ratings alert differ.
+DASHBOARD_ORDERS_MAX_QUERIES = {
+    "superuser flag": 23,
+    roles.FINANCE: 29,
+    roles.OPS: 31,
+    roles.SUPER_ADMIN: 31,
+    roles.STORE_MANAGER: 36,
+}
 
 
 def priced(store, status, total: str, **kwargs):
@@ -70,6 +87,14 @@ def stores():
     return a, b
 
 
+def low_rating(store):
+    """A 1-star order rating at `store` (the dashboard's low-ratings alert)."""
+    order = priced(store, OrderStatus.DELIVERED, "300.00")
+    return Rating.objects.create(
+        order=order, user=order.user, target=RatingTarget.ORDER, stars=1, comment="Cold"
+    )
+
+
 def parse_csv(response) -> list[list[str]]:
     return list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"))))
 
@@ -84,6 +109,7 @@ def sales(client, **params):
 @freeze_time(NOON_IST)
 class TestSalesSummary:
     def test_csv_is_scoped_with_refund_columns(self, client, stores):
+        """P7-TC-22, P7-TC-23: a store manager's CSV has only their store; refund columns."""
         login_with_stores(client, roles.STORE_MANAGER, stores[0])
         response = sales(client, export="csv")
         assert response.status_code == 200
@@ -102,7 +128,8 @@ class TestSalesSummary:
         assert "BBB-01" not in response.content.decode()
 
     def test_uncollected_cod_is_shown_and_deducted_from_net(self, client, stores):
-        """DL-65: a failed COD order stays in GMV; the service deducts it from net revenue."""
+        """P7-TC-23, DL-65: a failed COD order stays in GMV; the service deducts it from net
+        revenue."""
         priced(
             stores[1],
             OrderStatus.DELIVERY_FAILED,
@@ -118,6 +145,7 @@ class TestSalesSummary:
         assert row["net_revenue"] == "777.00"
 
     def test_page_shows_the_refund_columns_and_notes(self, client, stores):
+        """P7-TC-23, P7-TC-40: the HTMX results partial with headings and column notes."""
         login_with_stores(client, roles.FINANCE)
         response = client.get(
             reverse("ops:report", args=["sales_summary"]),
@@ -140,6 +168,7 @@ class TestSalesSummary:
         assert "AOV" in titles
 
     def test_global_role_sees_all_stores_and_filters(self, client, stores):
+        """P7-TC-22: a global role sees every store and can filter to one."""
         login_with_stores(client, roles.FINANCE)
         codes = {row[1] for row in parse_csv(sales(client, export="csv"))[1:]}
         assert codes == {"AAA-01", "BBB-01"}
@@ -147,6 +176,7 @@ class TestSalesSummary:
         assert {row[1] for row in parse_csv(response)[1:]} == {"BBB-01"}
 
     def test_other_store_filter_is_a_form_error(self, client, stores):
+        """P7-TC-22: another store is refused (a filter error), never an empty report."""
         login_with_stores(client, roles.STORE_MANAGER, stores[0])
         response = sales(client, store=stores[1].pk)
         assert response.status_code == 200
@@ -163,6 +193,7 @@ class TestSalesSummary:
         ],
     )
     def test_invalid_ranges(self, client, stores, params):
+        """P7-TC-25: start after end, more than the max range, a future day, a bad date."""
         login_with_stores(client, roles.OPS)
         url = reverse("ops:report", args=["sales_summary"])
         page = client.get(url, params)
@@ -174,6 +205,7 @@ class TestSalesSummary:
         assert download.context["filter_error"]
 
     def test_row_cap_csv_is_400_with_the_message(self, client, stores, settings):
+        """P7-TC-25: a run the service refuses (the sync row cap) is a 400 with its message."""
         settings.REPORT_SYNC_MAX_ROWS = 1
         login_with_stores(client, roles.OPS)
         page = sales(client)
@@ -186,6 +218,7 @@ class TestSalesSummary:
 
     @pytest.mark.parametrize("principal", sorted(STAFF_PRINCIPALS))
     def test_csv_refused_for_other_roles(self, client, principal, stores):
+        """P7-TC-21: 05 §3 "Reports" row; refused roles get a 403 and no data."""
         login_with_stores(client, principal, stores[0])
         response = sales(client, export="csv")
         assert response.status_code == (200 if principal in REPORT_ROLES else 403)
@@ -194,6 +227,7 @@ class TestSalesSummary:
 
 
 def test_column_titles():
+    """P7-TC-40: report column headings."""
     assert column_title("net_revenue") == "Net revenue"
     assert column_title("gmv") == "GMV"
     assert column_title("hsn_code") == "HSN code"
@@ -205,6 +239,7 @@ def test_column_titles():
 class TestDashboardOrders:
     @pytest.mark.parametrize("principal", PRINCIPALS)
     def test_section_per_role(self, client, principal, stores):
+        """P7-TC-32: the order section and its partial for the "Reports" roles only."""
         login_with_stores(client, principal, stores[0])
         response = client.get(reverse("ops:dashboard"))
         if principal not in STAFF_PRINCIPALS:
@@ -216,6 +251,7 @@ class TestDashboardOrders:
         assert partial.status_code == (200 if principal in REPORT_ROLES else 403)
 
     def test_kpis_scoped_to_store_manager(self, client, stores):
+        """P7-TC-31, P7-TC-32: KPI cards for the manager's own store only."""
         login_with_stores(client, roles.STORE_MANAGER, stores[0])
         kpis = client.get(reverse("ops:dashboard")).context["orders_section"]["kpis"]
         assert kpis["orders"] == 3
@@ -224,6 +260,7 @@ class TestDashboardOrders:
         assert kpis["cancelled"] == 1
 
     def test_other_store_filter_is_an_error(self, client, stores):
+        """P7-TC-32: a store manager filtering to another store gets an error, no KPIs."""
         login_with_stores(client, roles.STORE_MANAGER, stores[0])
         response = client.get(
             reverse("ops:dashboard-orders"), {"store": stores[1].pk}, HTTP_HX_REQUEST="true"
@@ -233,6 +270,7 @@ class TestDashboardOrders:
         assert "kpis" not in response.context["orders_section"]
 
     def test_global_store_filter_and_alerts(self, client, stores):
+        """P7-TC-32, P7-TC-40: a global role filters to one store; the alerts panel."""
         make_order(stores[1], OrderStatus.PLACED, age_minutes=60)
         login_with_stores(client, roles.OPS)
         response = client.get(
@@ -245,19 +283,42 @@ class TestDashboardOrders:
         assert 'data-alert="acceptance"' in response.content.decode()
 
     def test_future_day_refused(self, client, stores):
+        """P7-TC-40: a future day is a filter error."""
         login_with_stores(client, roles.OPS)
         response = client.get(
             reverse("ops:dashboard-orders"), {"day": "2026-11-04"}, HTTP_HX_REQUEST="true"
         )
         assert response.context["orders_section"].get("order_errors")
 
-    def test_query_count_is_bounded(self, client, stores, django_assert_max_num_queries):
-        for _ in range(10):
-            make_order(stores[0], OrderStatus.DELIVERED, lines=3)
-        login_with_stores(client, roles.OPS)
-        with django_assert_max_num_queries(31):  # 30 + the low-ratings alert's items query
-            client.get(reverse("ops:dashboard-orders"), HTTP_HX_REQUEST="true")
+    @pytest.mark.parametrize("principal", sorted(REPORT_ROLES))
+    def test_query_count_does_not_grow(self, client, principal, stores):
+        """P7-TC-40 (09 §1): for every role that sees the section, the partial's query count
+        is the same with 1 or 4 orders of each kind (delivered with lines, waiting for
+        acceptance, low-rated), and stays within that role's measured count. (From 5 low
+        ratings on, one COUNT query is added on purpose: the alert counts only when the 5 shown
+        items may not be all.)"""
+        login_with_stores(client, principal, stores[0])
+        url = reverse("ops:dashboard-orders")
+
+        def add_orders(count):
+            for _ in range(count):
+                make_order(stores[0], OrderStatus.DELIVERED, lines=3)
+                make_order(stores[0], OrderStatus.PLACED, age_minutes=60)
+                low_rating(stores[0])
+
+        add_orders(1)
+        # Warm-up (review minor): a cold process-wide cache (content types, settings rows)
+        # would add queries to the first request only and make `few` differ from `many`.
+        assert client.get(url, HTTP_HX_REQUEST="true").status_code == 200
+        with CaptureQueriesContext(connection) as few:
+            assert client.get(url, HTTP_HX_REQUEST="true").status_code == 200
+        add_orders(3)  # 4 of each: the low-ratings alert stays under ALERT_ITEMS_SHOWN
+        with CaptureQueriesContext(connection) as many:
+            assert client.get(url, HTTP_HX_REQUEST="true").status_code == 200
+        assert len(many) == len(few)
+        assert len(many) <= DASHBOARD_ORDERS_MAX_QUERIES[principal]
 
     def test_capability_rows(self):
+        """P7-TC-21, P7-TC-32: the "Reports" and "Support tickets" capability rows."""
         assert capabilities.DEDICATED[capabilities.REPORTS] == (("reports.view_reports",),)
         assert capabilities.SUPPORT_TICKETS in capabilities.DEDICATED

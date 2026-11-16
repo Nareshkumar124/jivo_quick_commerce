@@ -18,6 +18,7 @@ JIVO50_OFFER = {
     "ineligible_reason": None,
     "message": None,
     "amount_to_unlock": None,
+    "is_personal": False,
 }
 OILS15_OFFER = {
     "code": "OILS15",
@@ -34,6 +35,7 @@ OILS15_OFFER = {
     "ineligible_reason": None,
     "message": None,
     "amount_to_unlock": None,
+    "is_personal": False,
 }
 JIVO10_OFFER = {
     "code": "JIVO10",
@@ -50,6 +52,7 @@ JIVO10_OFFER = {
     "ineligible_reason": None,
     "message": None,
     "amount_to_unlock": None,
+    "is_personal": False,
 }
 BIGSAVE200_OFFER = {
     "code": "BIGSAVE200",
@@ -66,6 +69,7 @@ BIGSAVE200_OFFER = {
     "ineligible_reason": "MIN_ORDER_VALUE",
     "message": "Add items worth ₹716 more to unlock.",
     "amount_to_unlock": "716.00",
+    "is_personal": False,
 }
 WELCOME100_OFFER = {
     "code": "WELCOME100",
@@ -82,8 +86,33 @@ WELCOME100_OFFER = {
     "ineligible_reason": "FIRST_ORDER_ONLY",
     "message": "Only for your first order.",
     "amount_to_unlock": None,
+    "is_personal": False,
+}
+REFERRAL_REWARD_OFFER = {
+    "code": "REFK7M2PQ9X",
+    "title": "₹90 off: referral reward",
+    "description": "Your reward for inviting a friend. One use, only for you.",
+    "discount_type": "FLAT",
+    "value": "90.00",
+    "max_discount": None,
+    "min_order_value": "0.00",
+    "ends_at": "2026-12-13T09:30:00Z",
+    "is_applied": False,
+    "is_eligible": True,
+    "savings": "90.00",
+    "ineligible_reason": None,
+    "message": None,
+    "amount_to_unlock": None,
+    "is_personal": True,
 }
 COUPON_LIST = {
-    "results": [OILS15_OFFER, JIVO10_OFFER, JIVO50_OFFER, BIGSAVE200_OFFER, WELCOME100_OFFER]
+    "results": [
+        REFERRAL_REWARD_OFFER,
+        OILS15_OFFER,
+        JIVO10_OFFER,
+        JIVO50_OFFER,
+        BIGSAVE200_OFFER,
+        WELCOME100_OFFER,
+    ]
 }
 COUPON_LIST_EMPTY = {"results": []}

@@ -5,6 +5,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/providers.dart';
 import '../../../app/repositories.dart';
 import '../../cart/presentation/cart_controller.dart';
+import '../../catalog/presentation/catalog_controllers.dart';
 import '../../orders/domain/order.dart';
 import '../../orders/presentation/pending_payment.dart';
 import '../domain/checkout_result.dart';
@@ -50,8 +51,9 @@ class CheckoutState {
 /// - COD: the server answers `PLACED` and the flow ends in success.
 /// - ONLINE: Razorpay opens; success is reported only after the server's
 ///   verify call confirms the order (`08 §4`).
-/// - `PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `MIN_ORDER_NOT_MET`,
-///   `COD_NOT_AVAILABLE` and the coupon errors reload the cart, so the
+/// - `PRICE_CHANGED`, `STOCK_UNAVAILABLE`, `MIN_QTY_REQUIRED`,
+///   `MIN_ORDER_NOT_MET`, `MIN_UNITS_NOT_MET`, `COD_NOT_AVAILABLE` and the
+///   coupon errors reload the cart, so the
 ///   screens show the server's new bill and flags; the message says what
 ///   changed, from the error's `details` (`cartErrorText`).
 /// - Another order awaiting payment: [CheckoutState.pendingOrderId].
@@ -162,7 +164,9 @@ class CheckoutController extends Notifier<CheckoutState> {
   static bool _cartChanged(ApiError error) => switch (error.code) {
     ApiErrorCode.priceChanged ||
     ApiErrorCode.stockUnavailable ||
+    ApiErrorCode.minQtyRequired ||
     ApiErrorCode.minOrderNotMet ||
+    ApiErrorCode.minUnitsNotMet ||
     ApiErrorCode.codNotAvailable ||
     ApiErrorCode.couponExpired ||
     ApiErrorCode.couponNotEligible ||
@@ -185,6 +189,8 @@ Future<void> onOrderConfirmed(Ref ref, PlacedOrder order) async {
         },
       );
   await ref.read(cartProvider.notifier).refresh();
+  // The server hides the welcome banner after a first order.
+  ref.invalidate(homeFeedProvider);
   refreshPendingPayment(ref);
 }
 

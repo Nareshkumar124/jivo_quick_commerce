@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     "apps.payments",
     "apps.delivery",
     "apps.support",
+    "apps.referrals",  # 2026-11-13: refer a friend (personal reward coupons)
     "apps.reports",  # Phase 7: dashboard metrics, reports, exports (05 §1.1, §4)
     "apps.realtime",  # Phase 6: WebSockets (06 §4)
     "apps.loadtest",  # P8 T-812: load-test data commands (no models, no API)
@@ -107,11 +108,14 @@ MIDDLEWARE = [
     "axes.middleware.AxesMiddleware",
 ]
 
-# Staff MFA (H2, DL-59): TOTP for Super Admin, Finance and Support (and Ops when set) on /admin/
-# and /ops/. apps/ops_console/mfa.py. Interim until Jivo SSO (D-04).
+# Staff MFA (H2, DL-59): TOTP for superusers, Super Admin, Finance, Support, Catalog Manager and
+# Store Manager (and Ops when STAFF_MFA_INCLUDE_OPS is set); see DL-70. Store Staff stays out.
+# On /admin/ and /ops/. apps/ops_console/mfa.py. Interim until Jivo SSO (D-04).
 STAFF_MFA_ENFORCED = env_bool("STAFF_MFA_ENFORCED", default=True)
 # Ops / Dispatch is in by default: it has the broadest customer PII and rider KYC access.
 STAFF_MFA_INCLUDE_OPS = env_bool("STAFF_MFA_INCLUDE_OPS", default=True)
+# A Super Admin's "allow setup" lapses after this many hours if the person has not confirmed.
+STAFF_MFA_SETUP_ALLOW_HOURS = env_int("STAFF_MFA_SETUP_ALLOW_HOURS", default=72)
 OTP_TOTP_ISSUER = "Jivo Ops"
 # django-otp throttling: after each wrong code the device waits 5 s, then 10, 20, ... seconds.
 OTP_TOTP_THROTTLE_FACTOR = 5
@@ -365,6 +369,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "notifications.sweep_stuck_sends",
         "schedule": 15 * 60.0,
     },
+    "reward-pending-referrals": {  # safety sweep for a lost order.delivered event
+        "task": "referrals.reward_pending_referrals",
+        "schedule": crontab(minute=25),
+    },
     "purge-old-notifications": {
         "task": "notifications.purge_old_notifications",
         "schedule": crontab(hour=21, minute=50),
@@ -500,7 +508,10 @@ SPECTACULAR_SETTINGS = {
         "Conventions (docs/02-system-architecture.md §5): JSON with snake_case keys; money as "
         "2-decimal strings; times in UTC ISO 8601; pagination with `page`/`page_size` "
         "(default 20, max 100). Apps send `X-App-Name`, `X-App-Version` and `X-Platform` on "
-        "every request. Errors use the envelope "
+        "every request. The access token's `app` claim decides which app a session belongs to: "
+        "`X-App-Name` must agree with it, `/rider/` endpoints need a rider-app token and the "
+        "cart, order and payment endpoints a customer-app token, else 403 `PERMISSION_DENIED` "
+        "(`details.reason` `APP_HEADER_MISMATCH` or `WRONG_APP_TOKEN`). Errors use the envelope "
         '`{"error": {"code", "message", "details"}}` (see the `ErrorEnvelope` schema). '
         "Any request whose body is larger than 2.5 MB gets 413 `PAYLOAD_TOO_LARGE`."
     ),
@@ -509,6 +520,8 @@ SPECTACULAR_SETTINGS = {
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",
         "apps.realtime.schema.add_websocket_components",
+        # T-219: the 403 of the token `app` claim check on every JWT operation.
+        "apps.accounts.schema.add_app_token_responses",
     ],
     "SERVE_INCLUDE_SCHEMA": False,
     "SERVE_PERMISSIONS": ["apps.core.permissions.ApiDocsPermission"],
@@ -570,6 +583,8 @@ SPECTACULAR_SETTINGS = {
         "CashEntryTypeEnum": "apps.delivery.choices.CashEntryType",
         "EarningTypeEnum": "apps.delivery.choices.EarningType",
         "PayoutStatusEnum": "apps.delivery.choices.PayoutStatus",
+        # 2026-11-13: referral program
+        "ReferralStatusEnum": "apps.referrals.choices.ReferralStatus",
     },
     "TAGS": [
         {"name": "health", "description": "Liveness and readiness probes. No authentication."},
@@ -898,6 +913,8 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
         "coupon_apply": env_str("COUPON_APPLY_RATE", default="20/hour"),
         "address_write": env_str("ADDRESS_WRITE_RATE", default="30/hour"),
         "invoice": env_str("INVOICE_RATE", default="30/hour"),
+        # 2026-11-13: entering a friend's referral code (no guessing codes).
+        "referral_apply": env_str("REFERRAL_APPLY_RATE", default="10/hour"),
     }
 )
 # H2 (DL-59): staff lockout per username (whatever the IP: rotating IPs cannot brute-force one

@@ -35,6 +35,7 @@ import '../features/orders/data/order_repository.dart';
 import '../features/profile/data/profile_repository.dart';
 import '../features/rating/data/api_rating_repository.dart';
 import '../features/rating/data/rating_repository.dart';
+import '../features/referral/data/referral_repository.dart';
 import '../features/support/data/api_support_repository.dart';
 import '../features/support/data/support_repository.dart';
 import '../features/support/data/ticket_photo_picker.dart';
@@ -68,6 +69,14 @@ final profileRepositoryProvider = Provider<ProfileRepository>(
   (ref) => _fake(ref)
       ? FakeProfileRepository()
       : ApiProfileRepository(ref.watch(jivoApiProvider)),
+);
+
+/// Refer a friend (`/account/referral/*`): the API, the fake with
+/// `FAKE_API`.
+final referralRepositoryProvider = Provider<ReferralRepository>(
+  (ref) => _fake(ref)
+      ? FakeReferralRepository()
+      : ApiReferralRepository(ref.watch(jivoApiProvider)),
 );
 
 final addressRepositoryProvider = Provider<AddressRepository>(
@@ -106,7 +115,7 @@ final serviceabilityRepositoryProvider = Provider<ServiceabilityRepository>(
 /// against the real backend at S3-B. Staging and prod show "cart coming
 /// soon" instead of ADD (DL-30/DL-32).
 final cartAvailableProvider = Provider<bool>(
-  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
+  (ref) => ref.watch(appEnvProvider).flavor != Flavor.prod,
 );
 
 /// The stand-in for the server cart and orders (`06 §2.5`, `§2.6`) for the
@@ -196,7 +205,7 @@ final ratingRepositoryProvider = Provider<RatingRepository>((ref) {
 /// fakes) since the P7 support API (T-713); staging and prod show only
 /// "Call support" until it is enabled there.
 final supportAvailableProvider = Provider<bool>(
-  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
+  (ref) => ref.watch(appEnvProvider).flavor != Flavor.prod,
 );
 
 /// FAQs and tickets: the API, the fake with `FAKE_API`.
@@ -216,7 +225,7 @@ final ticketPhotoPickerProvider = Provider<TicketPhotoPicker>(
 /// Whether Legal and About open in the in-app CMS viewer (dev flavor since
 /// T-713); otherwise the policy URLs from `config/app` open in the browser.
 final cmsAvailableProvider = Provider<bool>(
-  (ref) => ref.watch(appEnvProvider).flavor == Flavor.dev,
+  (ref) => ref.watch(appEnvProvider).flavor != Flavor.prod,
 );
 
 /// CMS pages: the API, the fake with `FAKE_API`.

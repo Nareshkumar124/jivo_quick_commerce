@@ -430,6 +430,10 @@ enum ReorderSkipReason {
   outOfStock('OUT_OF_STOCK'),
   quantityReduced('LIMITED_STOCK'),
   discontinued('NOT_AVAILABLE'),
+
+  /// The past order had fewer units than the variant's minimum per order
+  /// today: the line was not put back.
+  belowMinimum('MIN_QTY_REQUIRED'),
   unknown(null);
 
   const ReorderSkipReason(this.wireValue);

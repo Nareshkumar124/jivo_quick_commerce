@@ -169,6 +169,21 @@ class PricingConfig(TimeStampedModel):
 
     store = models.OneToOneField(DarkStore, on_delete=models.CASCADE, related_name="pricing")
     min_order_value = _money("99.00", help_text="Minimum item total to place an order.")
+    # `db_default` too: the previous release (during a deploy, or after a rollback) does not
+    # know these columns, and the database fills the rule-off values for it.
+    min_order_units = models.PositiveSmallIntegerField(
+        default=0,
+        db_default=0,
+        help_text=(
+            "Fewest units one order must have, any mix of items (e.g. 5 cartons). 0 = no minimum."
+        ),
+    )
+    order_unit_label = models.CharField(
+        max_length=20,
+        default="items",
+        db_default="items",
+        help_text='What a unit is called, in the plural, shown to customers (e.g. "cartons").',
+    )
     delivery_fee = _money("25.00")
     free_delivery_threshold = _money(
         "299.00", help_text="Delivery is free when the item total is at least this."

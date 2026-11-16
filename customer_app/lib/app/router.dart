@@ -14,6 +14,7 @@ import '../features/catalog/presentation/collection_screen.dart';
 import '../features/catalog/presentation/product_detail_screen.dart';
 import '../features/catalog/presentation/product_list_screen.dart';
 import '../features/cart/presentation/cart_screen.dart';
+import '../features/cart/presentation/my_coupons_screen.dart';
 import '../features/checkout/presentation/checkout_screen.dart';
 import '../features/checkout/presentation/order_success_screen.dart';
 import '../features/checkout/presentation/payment_failed_screen.dart';
@@ -24,6 +25,7 @@ import '../features/launch/presentation/onboarding_screen.dart';
 import '../features/launch/presentation/splash_screen.dart';
 import '../features/location/presentation/location_flow.dart';
 import '../features/location/presentation/location_screen.dart';
+import '../features/location/domain/delivery_location.dart';
 import '../features/location/presentation/map_picker_screen.dart';
 import '../features/location/presentation/not_serviceable_screen.dart';
 import '../features/orders/domain/order.dart';
@@ -33,6 +35,8 @@ import '../features/orders/presentation/order_detail_screen.dart';
 import '../features/orders/presentation/orders_screen.dart';
 import '../features/profile/presentation/account_screens.dart';
 import '../features/rating/presentation/rate_order_screen.dart';
+import '../features/referral/presentation/referral_screen.dart';
+import '../features/catalog/presentation/all_products_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/support/presentation/help_screen.dart';
 import '../features/support/presentation/ticket_screens.dart';
@@ -230,11 +234,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       route(Routes.search, 'search', (_) => const SearchScreen()),
+      route(
+        Routes.allProducts,
+        'all_products',
+        (_) => const AllProductsScreen(),
+      ),
       route(Routes.location, 'location', (_) => const LocationScreen()),
       route(
         Routes.mapPicker,
         'map_picker',
-        (state) => MapPickerScreen(initial: state.extra as GeoPoint?),
+        (state) => switch (state.extra) {
+          final MapPickerArgs args => MapPickerScreen(
+            initial: args.initial,
+            fromAddressForm: args.fromAddressForm,
+          ),
+          final extra => MapPickerScreen(initial: extra as GeoPoint?),
+        },
       ),
       route(
         Routes.notServiceable,
@@ -248,7 +263,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         (_) => const EditProfileScreen(),
       ),
       route(Routes.addresses, 'addresses', (_) => const AddressListScreen()),
-      route(Routes.newAddress, 'address_new', (_) => const AddressFormScreen()),
+      route(
+        Routes.newAddress,
+        'address_new',
+        // "Save this location" carries the chosen pin over (CA-07).
+        (state) => AddressFormScreen(initial: state.extra as DeliveryLocation?),
+      ),
       route(
         '${Routes.addresses}/:id',
         'address_edit',
@@ -261,6 +281,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         'delete_account',
         (_) => const DeleteAccountScreen(),
       ),
+      route(Routes.referral, 'referral', (_) => const ReferralScreen()),
+      route(Routes.myCoupons, 'my_coupons', (_) => const MyCouponsScreen()),
     ],
   );
   ref.onDispose(router.dispose);

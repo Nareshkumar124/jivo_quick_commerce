@@ -20,6 +20,13 @@ class CategoriesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final categories = ref.watch(categoriesProvider);
+    ref.listen(categoriesProvider, (previous, next) {
+      if (isFailedRefresh(previous, next)) {
+        showRefreshFailed(context, () => ref.invalidate(categoriesProvider));
+      }
+    });
+    // Also when a refresh failed: keep the tree on screen (CA-03).
+    final tree = categories.value;
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.tabCategories),
@@ -35,13 +42,13 @@ class CategoriesScreen extends ConsumerWidget {
         AsyncData(:final value) when value.isEmpty => EmptyView(
           message: l10n.categoriesEmpty,
         ),
-        AsyncData(:final value) => RefreshIndicator(
-          onRefresh: () => ref.refresh(categoriesProvider.future),
+        AsyncData() ||
+        AsyncError() when tree != null && tree.isNotEmpty => RefreshIndicator(
+          onRefresh: () =>
+              refreshQuietly(ref.refresh(categoriesProvider.future)),
           child: ListView(
             padding: const EdgeInsets.only(bottom: JivoSpacing.xl),
-            children: [
-              for (final top in value) _CategorySection(category: top),
-            ],
+            children: [for (final top in tree) _CategorySection(category: top)],
           ),
         ),
         AsyncError(:final error) => ErrorRetryView(
@@ -163,7 +170,18 @@ class CategoryTile extends StatelessWidget {
             SizedBox(
               height: 64,
               width: 64,
-              child: ProductImage(url: imageUrl, icon: Icons.category_outlined),
+              // Multiply with the page colour, so a photo's white
+              // background disappears into the screen (no white box).
+              child: ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  Theme.of(context).scaffoldBackgroundColor,
+                  BlendMode.multiply,
+                ),
+                child: ProductImage(
+                  url: imageUrl,
+                  icon: Icons.category_outlined,
+                ),
+              ),
             ),
             const SizedBox(height: JivoSpacing.xs),
             Text(

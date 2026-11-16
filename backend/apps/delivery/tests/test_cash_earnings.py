@@ -157,11 +157,13 @@ def test_earnings_endpoint(delivered, rider_client, make_rider):
     assert f.client.get(EARNINGS, {"from": "2025-01-01", "to": "2026-01-10"}).status_code == 400
 
 
-def test_records_need_a_rider_profile(auth_client, api_client):
-    """Unauthenticated -> 401; a customer without a rider profile -> 403 NONE."""
+def test_records_need_a_rider_profile(user, make_auth_client, api_client):
+    """Unauthenticated -> 401; a rider-app user without a rider profile -> 403 NONE (a
+    customer-app token is refused before that, T-219: apps/accounts/tests/test_app_claim.py)."""
+    client = make_auth_client(user, "rider")
     for url in (EARNINGS, LEDGER, PAYOUTS, "/api/v1/rider/tasks/history/"):
         assert api_client.get(url).status_code == 401
-        response = auth_client.get(url, headers={"X-App-Name": "rider"})
+        response = client.get(url, headers={"X-App-Name": "rider"})
         assert response.status_code == 403
         assert response.json()["error"]["details"]["rider_status"] == "NONE"
 

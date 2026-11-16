@@ -11,72 +11,93 @@ Support and Finance view; DL-45, DL-46).
 - Redemptions: read-only, one row per order that used a coupon (`apps.promotions.services` writes
   them). Customers are shown per the PII policy (`ops_console.pii`); the order number is plain
   text because not every coupon role may open orders.
+- Personal coupons (`owner`, added 2026-11-13; referral rewards are personal): the owner is
+  chosen only when a coupon is created (a customer id; the lookup opens the Customers admin for
+  roles that may see customers in full) and is read-only afterwards, so a coupon customers or
+  orders already use never changes hands. The owner is shown per the PII policy, never as
+  `str(user)` (the phone).
 """
+
+from urllib.parse import urlencode
 
 from django import forms
 from django.contrib import admin
-from django.db import IntegrityError, transaction
+from django.contrib.admin.views.main import TO_FIELD_VAR
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db.models import BooleanField, Count, Q, Value
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin
 from unfold.decorators import display
+from unfold.widgets import UnfoldForeignKeyRawIdWidget
 
 from apps.ops_console import status
 from apps.ops_console.admin_support import ReadOnlyHistoryAdmin
 from apps.ops_console.money import RupeeInput, inr
+from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.pii import can_view_full_phone, customer_label
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin
 from apps.promotions.choices import DiscountType
 from apps.promotions.models import COUNTED_STATUSES, Coupon, CouponRedemption
-from apps.promotions.services import normalise_code
+from apps.promotions.services import (
+    MSG_CODE_LOCKED,
+    MSG_CODE_TAKEN,
+    MSG_LIMIT_BELOW_USES,
+    counted_uses,
+    is_used,
+    normalise_code,
+    save_coupon,
+)
 
 # Redemptions that use up the coupon (HELD + APPLIED), as the usage limits count them.
 COUNTED = Q(redemptions__status__in=COUNTED_STATUSES)
 
 MSG_CAP_REQUIRED = "A percent coupon needs a maximum discount (cap) in rupees."
 MSG_NO_CAP_ON_FLAT = "A flat coupon has no cap: its value is the discount. Leave this empty."
-MSG_CODE_TAKEN = "A coupon with this code already exists (codes ignore upper and lower case)."
 MSG_CODE_SPACES = "Use letters and numbers without spaces, e.g. JIVO50."
-MSG_LIMIT_BELOW_USES = (
-    "This coupon has already been used {uses} time(s) (orders awaiting payment included); the "
-    "total limit cannot be lower. Switch the coupon off to stop further use."
-)
-MSG_CODE_LOCKED = (
-    "The code cannot change once the coupon has been used: customers and orders refer to it. "
-    "Create a new coupon instead."
-)
-# The database's case-insensitive uniqueness rule for codes (Coupon.Meta.constraints).
-CODE_UNIQUE_CONSTRAINT = "coupon_code_unique_ci"
+MSG_OWNER_NOT_CUSTOMER = "Enter the id of an active customer account (not a staff account)."
+PUBLIC_COUPON = "Public (everyone)"
 
 
-def counted_uses(coupon) -> int:
-    """Uses that count against the coupon's limits (HELD + APPLIED), as the services count."""
-    return coupon.redemptions.filter(status__in=COUNTED_STATUSES).count()
+def owner_choices():
+    """Who may own a personal coupon: active customer accounts."""
+    return get_user_model().objects.filter(is_staff=False, is_superuser=False, is_active=True)
 
 
-def is_used(coupon) -> bool:
-    """Any redemption or order refers to the coupon (its code is then fixed)."""
-    if coupon is None or coupon.pk is None:
-        return False
-    return coupon.redemptions.exists() or coupon.orders.exists()
+class CustomerRawIdWidget(UnfoldForeignKeyRawIdWidget):
+    """The owner's id input. Unlike Django's raw-id widget it never shows `str(user)` (the
+    phone): the label is the customer per the PII policy, and the lookup and link go to the
+    Customers admin only for roles that may open it (`accounts.view_customer`)."""
+
+    def __init__(self, rel, admin_site, *, full_pii: bool, attrs=None, using=None):
+        super().__init__(rel, admin_site, attrs, using)
+        self.full_pii = full_pii
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["related_url"] = None
+        if self.full_pii:
+            changelist = reverse("admin:accounts_customer_changelist")
+            context["related_url"] = f"{changelist}?{urlencode({TO_FIELD_VAR: 'id'})}"
+        return context
+
+    def label_and_url_for_value(self, value):
+        try:
+            customer = owner_choices().filter(pk=int(value)).first()
+        except (TypeError, ValueError):
+            customer = None
+        if customer is None:
+            return "", ""
+        url = reverse("admin:accounts_customer_change", args=[customer.pk]) if self.full_pii else ""
+        return customer_label(customer, full=self.full_pii), url
 
 
-class CodeTaken(Exception):
-    """Another coupon took this code between the form check and the save (two admins at once).
-    `CouponAdmin.changeform_view` turns it into a form error."""
-
-    def __init__(self, code: str):
-        super().__init__(code)
-        self.code = code
-
-
-def _is_code_conflict(error: IntegrityError) -> bool:
-    cause = error.__cause__
-    diag = getattr(cause, "diag", None)
-    name = getattr(diag, "constraint_name", None) or ""
-    return name == CODE_UNIQUE_CONSTRAINT or CODE_UNIQUE_CONSTRAINT in str(error)
+class _SaveRefused(Exception):
+    def __init__(self, error: ValidationError):
+        super().__init__(str(error))
+        self.error = error
 
 
 class CouponAdminForm(forms.ModelForm):
@@ -99,6 +120,7 @@ class CouponAdminForm(forms.ModelForm):
             "categories",
             "is_active",
             "is_visible",
+            "owner",  # on the add page only (CouponAdmin.get_fieldsets)
         )
         widgets = {
             "max_discount": RupeeInput,
@@ -108,10 +130,14 @@ class CouponAdminForm(forms.ModelForm):
             "value": "FLAT: rupees off. PERCENT: percent off, from 0.01 to 100.",
             "max_discount": "Percent coupons: the most the discount can be, in rupees "
             "(required). Flat coupons: leave empty.",
+            "owner": "Empty: a public coupon. A customer's id: a personal coupon that only this "
+            "customer sees and can use. It cannot be changed after saving.",
         }
+        labels = {"owner": "Personal coupon for (customer id)"}
 
-    # Set by CouponAdmin when a save lost the race for this code (`CodeTaken`).
-    conflicting_code: str | None = None
+    # Set by CouponAdmin when `save_coupon` refused the save (a raced code, a limit below the
+    # counted uses...): shown as errors of this form, nothing saved.
+    save_refusal: ValidationError | None = None
 
     def code_taken(self, code: str) -> bool:
         taken = Coupon.objects.filter(code__iexact=code)
@@ -126,7 +152,7 @@ class CouponAdminForm(forms.ModelForm):
         if self.instance.pk and code != self.instance.code and is_used(self.instance):
             # The admin shows the code read-only once used; this guards a crafted POST.
             raise forms.ValidationError(MSG_CODE_LOCKED)
-        if code and (code == self.conflicting_code or self.code_taken(code)):
+        if code and self.code_taken(code):
             raise forms.ValidationError(MSG_CODE_TAKEN)
         return code
 
@@ -140,6 +166,8 @@ class CouponAdminForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if self.save_refusal is not None:
+            self.add_error(None, self.save_refusal)
         kind = cleaned.get("discount_type")
         cap = cleaned.get("max_discount")
         if kind == DiscountType.PERCENT and cap is None and "max_discount" not in self.errors:
@@ -172,6 +200,24 @@ class CouponStateFilter(admin.SimpleListFilter):
         return queryset
 
 
+class CouponKindFilter(admin.SimpleListFilter):
+    """Personal coupons (one customer, e.g. referral rewards) or public ones."""
+
+    title = "personal or public"
+    parameter_name = "kind"
+
+    def lookups(self, request, model_admin):
+        return [("personal", "Personal (one customer)"), ("public", "Public")]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value == "personal":
+            return queryset.filter(owner__isnull=False)
+        if value == "public":
+            return queryset.filter(owner__isnull=True)
+        return queryset
+
+
 @admin.register(Coupon)
 class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
     form = CouponAdminForm
@@ -184,11 +230,13 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
         "uses",
         "per_user",
         "audience",
+        "owner_label",
         "state_badge",
     )
     list_display_links = ("code", "title")
     list_filter = (
         CouponStateFilter,
+        CouponKindFilter,
         "discount_type",
         "first_order_only",
         "is_visible",
@@ -199,7 +247,8 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
     ordering = ("code",)
     list_per_page = 50
     filter_horizontal = ("stores", "categories")
-    readonly_fields = ("state_badge", "usage_summary", "created_at", "updated_at")
+    raw_id_fields = ("owner",)  # widget: CustomerRawIdWidget (formfield_for_foreignkey)
+    readonly_fields = ("state_badge", "usage_summary", "owner_label", "created_at", "updated_at")
     fieldsets = (
         (
             "Coupon",
@@ -208,6 +257,18 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
                 "description": (
                     "Hidden codes (not listed in the app) still work when typed. Codes are "
                     "stored in capitals; customers may type them in any case."
+                ),
+            },
+        ),
+        (
+            "Who can use it",
+            {
+                # "owner" on the add page, "owner_label" (read-only) afterwards: get_fieldsets.
+                "fields": ("owner",),
+                "description": (
+                    "A personal coupon is listed and works only for its customer (referral "
+                    "rewards are personal coupons). The customer is set when the coupon is "
+                    "created and cannot be changed."
                 ),
             },
         ),
@@ -234,14 +295,45 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
         return (
             super()
             .get_queryset(request)
-            .annotate(counted_uses=Count("redemptions", filter=COUNTED))
+            .annotate(
+                counted_uses=Count("redemptions", filter=COUNTED),
+                full_pii=Value(can_view_full_phone(request.user), output_field=BooleanField()),
+            )
+            .select_related("owner")
             .prefetch_related("categories")
         )
 
     def get_fieldsets(self, request, obj=None):
         if obj is None:
             return self.fieldsets[:-1]  # nothing to report on a new coupon
-        return self.fieldsets
+        # An existing coupon never changes hands: its owner is shown, not a field (so a crafted
+        # POST cannot set it either: the form has no `owner` field).
+        return tuple(
+            (
+                title,
+                {
+                    **options,
+                    "fields": tuple(
+                        "owner_label" if name == "owner" else name for name in options["fields"]
+                    ),
+                },
+            )
+            for title, options in self.fieldsets
+        )
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "owner":
+            kwargs["queryset"] = owner_choices()
+            kwargs["widget"] = CustomerRawIdWidget(
+                db_field.remote_field,
+                self.admin_site,
+                full_pii=can_view_full_phone(request.user),
+                using=kwargs.get("using"),
+            )
+            formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
+            formfield.error_messages["invalid_choice"] = MSG_OWNER_NOT_CUSTOMER
+            return formfield
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def get_readonly_fields(self, request, obj=None):
         fields = list(super().get_readonly_fields(request, obj))
@@ -251,30 +343,27 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
 
     def get_form(self, request, obj=None, change=False, **kwargs):
         form = super().get_form(request, obj, change, **kwargs)
-        conflict = getattr(request, "_coupon_code_conflict", None)
-        if conflict:
-            form = type(form.__name__, (form,), {"conflicting_code": conflict})
+        refusal = getattr(request, "_coupon_save_refusal", None)
+        if refusal is not None:
+            form = type(form.__name__, (form,), {"save_refusal": refusal})
         return form
 
     def save_model(self, request, obj, form, change):
-        """The form checks the code is free, but another admin may save the same code between
-        that check and this save: the database refuses it (`coupon_code_unique_ci`). A savepoint
-        keeps the request's transaction usable; `changeform_view` shows it as a form error."""
+        """`apps.promotions.services.save_coupon` is the one door (T-406c): it re-checks the
+        edit guards on the locked row and turns a raced code into an error. Its refusal is a
+        `ValidationError` (dict); `changeform_view` shows it as form errors, never a 500."""
         try:
-            with transaction.atomic():
-                super().save_model(request, obj, form, change)
-        except IntegrityError as error:
-            if _is_code_conflict(error):
-                raise CodeTaken(obj.code) from error
-            raise
+            save_coupon(obj)
+        except ValidationError as error:
+            raise _SaveRefused(error) from error
 
     def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
         try:
             return super().changeform_view(request, object_id, form_url, extra_context)
-        except CodeTaken as conflict:
+        except _SaveRefused as refused:
             # Everything of the first attempt was rolled back. Show the form again with the
-            # code marked as taken (nothing is saved: the form is invalid this time).
-            request._coupon_code_conflict = conflict.code
+            # refusal as its errors (nothing is saved: the form is invalid this time).
+            request._coupon_save_refusal = refused.error
             return super().changeform_view(request, object_id, form_url, extra_context)
 
     def has_delete_permission(self, request, obj=None) -> bool:
@@ -328,12 +417,19 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
 
     @display(description="Audience")
     def audience(self, obj) -> str:
-        parts = []
+        parts = ["Personal"] if obj.owner_id else []
         if obj.first_order_only:
             parts.append("First order")
         if not obj.is_visible:
             parts.append("Hidden code")
         return ", ".join(parts) or "Everyone"
+
+    @display(description="Personal for")
+    def owner_label(self, obj) -> str:
+        if obj is None or obj.owner_id is None:
+            return PUBLIC_COUPON
+        # Masked unless this viewer sees customers in full (history pages: always masked).
+        return customer_label(obj.owner, full=getattr(obj, "full_pii", False))
 
     @display(description="State", label=status.label_tones(status.COUPON))
     def state_badge(self, obj) -> str:
@@ -382,9 +478,10 @@ class RedemptionCouponFilter(admin.SimpleListFilter):
         value = self.value()
         if not value:
             return queryset
-        if not value.isdigit():
+        coupon_id = parse_ascii_id(value)
+        if coupon_id is None:
             return queryset.none()
-        return queryset.filter(coupon_id=int(value))
+        return queryset.filter(coupon_id=coupon_id)
 
 
 @admin.register(CouponRedemption)

@@ -43,6 +43,20 @@ class UnitPriceSerializer(serializers.Serializer):
     per = serializers.CharField(help_text='The unit quantity, e.g. "100 ml", "100 g", "1 kg".')
 
 
+class PriceTierSerializer(serializers.Serializer):
+    """A volume (slab) price: from `min_order_units` units in one order, each unit costs
+    `price` (ADR 0001)."""
+
+    min_order_units = serializers.IntegerField(
+        min_value=1,
+        help_text=(
+            "From this many units in the order, counting every item that has price tiers "
+            "together (any mix)."
+        ),
+    )
+    price = money("Price per unit at this tier (inclusive of all taxes).")
+
+
 class VariantSummarySerializer(serializers.Serializer):
     """A sellable variant (SKU) with its price and stock at the store."""
 
@@ -67,7 +81,8 @@ class VariantSummarySerializer(serializers.Serializer):
         min_value=0,
         help_text=(
             "Units a customer can add right now: min(units in stock at this store, "
-            "`max_qty_per_order`). 0 when out of stock. Cap the ADD stepper here."
+            "`max_qty_per_order`). 0 when out of stock, including when fewer than "
+            "`min_qty_per_order` units can be sold. Cap the ADD stepper here."
         ),
     )
     units_left = serializers.IntegerField(
@@ -80,6 +95,24 @@ class VariantSummarySerializer(serializers.Serializer):
     )
     max_qty_per_order = serializers.IntegerField(
         min_value=1, help_text="Per-order limit for this variant (also enforced by the cart)."
+    )
+    min_qty_per_order = serializers.IntegerField(
+        min_value=1,
+        help_text=(
+            "Fewest units of this variant one order can have (1 = no minimum; never above "
+            "`max_qty_per_order`). The first ADD sets this quantity, and the stepper never goes "
+            "below it: stepping down from here removes the line (quantity 0). The cart refuses "
+            "1 to `min_qty_per_order` - 1 with 422 `MIN_QTY_REQUIRED`."
+        ),
+    )
+    price_tiers = PriceTierSerializer(
+        many=True,
+        help_text=(
+            "Volume prices, lowest `min_order_units` first; [] when the variant has none (then "
+            "`selling_price` always applies). The cart applies the highest tier reached by the "
+            "units of all tiered items together and shows it per line (`price_per_unit`, "
+            "`price_tier`). For the rate chart on the product page."
+        ),
     )
     image = ImageSetSerializer(
         allow_null=True,
@@ -144,7 +177,8 @@ class HomeBannerSerializer(serializers.Serializer):
         allow_blank=True,
         help_text=(
             "category/collection/product: the target's slug. url: an absolute https URL. "
-            'none: "". Ignore a banner whose target no longer opens (404).'
+            'referral: "" (open the Refer & earn screen). none: "". '
+            "Ignore a banner whose target no longer opens (404)."
         ),
     )
 

@@ -5,60 +5,91 @@ Money fields: `DecimalField(max_digits=12, decimal_places=2)`. Geo fields: SRID 
 
 ## 1. Entity-relationship overview
 
-Updated in Phase 2 (T-204): Phase 1 entities (`OTP_REQUEST`, `APP_CONFIG`, `APP_VERSION_POLICY`) and the Phase 2 additions (`SERVICEABILITY_REQUEST`, `TRENDING_SEARCH`, variant images, collection/banner store scoping). `OTPRequest` has no foreign key: it is linked to a user by phone. Built so far: accounts, cms, stores, catalog, inventory; Phase 3 R2a adds cart, promotions, orders, payments and `STOCK_RESERVATION` (models and migrations; the order and payment flows land in R2b).
+Updated in Phase 2 (T-204), refreshed in the P2 follow-ups (2026-11-10) to match the models of every app built so far (P0-P8): key relations only. Not shown: the simple-history `Historical*` tables, the `Customer` proxy of `User`, and the many staff `User` foreign keys (`created_by`, `reviewed_by`, `approved_by`, `recorded_by` and so on). `OTPRequest` has no foreign key: it is linked to a user by phone (dotted line). Entities without lines stand alone (configuration, logs, templates).
 
 ```mermaid
 erDiagram
+    %% accounts, cms (P1)
     USER ||--o{ ADDRESS : has
     USER ||--o{ DEVICE : registers
-    USER ||--o{ OTP_REQUEST : "phone verified by"
+    USER |o..o{ OTP_REQUEST : "same phone (no FK)"
     APP_CONFIG ||--o{ APP_VERSION_POLICY : "per app + platform"
     USER ||--o| RIDER : "may be"
-    USER ||--o{ SERVICEABILITY_REQUEST : "notify me"
     USER ||--o{ STAFF_STORE_ACCESS : "staff scoped to"
     DARK_STORE ||--o{ STAFF_STORE_ACCESS : ""
+    %% stores, catalog, inventory (P2)
+    USER |o--o{ SERVICEABILITY_REQUEST : "notify me"
     DARK_STORE ||--|| PRICING_CONFIG : has
     DARK_STORE ||--o{ STORE_TIMING : opens
     DARK_STORE ||--o{ STORE_INVENTORY : stocks
-    CATEGORY ||--o{ CATEGORY : parent
+    CATEGORY |o--o{ CATEGORY : parent
     CATEGORY ||--o{ PRODUCT : contains
     PRODUCT ||--o{ PRODUCT_VARIANT : "sold as"
     PRODUCT ||--o{ PRODUCT_IMAGE : shows
+    PRODUCT_VARIANT |o--o{ PRODUCT_IMAGE : "own images"
     PRODUCT_VARIANT ||--o{ STORE_INVENTORY : ""
-    STORE_INVENTORY ||--o{ STOCK_MOVEMENT : ledger
+    DARK_STORE ||--o{ STOCK_MOVEMENT : "ledger (store + variant)"
+    PRODUCT_VARIANT ||--o{ STOCK_MOVEMENT : ""
     COLLECTION ||--o{ COLLECTION_ITEM : lists
     PRODUCT_VARIANT ||--o{ COLLECTION_ITEM : ""
-    PRODUCT_VARIANT ||--o{ PRODUCT_IMAGE : "own images"
     DARK_STORE }o--o{ COLLECTION : "shown at (empty = all)"
     DARK_STORE }o--o{ BANNER : "shown at (empty = all)"
     TRENDING_SEARCH
-    USER ||--o{ CART : owns
-    CART ||--o{ CART_ITEM : contains
+    %% cart, promotions, orders, payments (P3-P4)
+    USER ||--o| CART : owns
     DARK_STORE ||--o{ CART : "scoped to"
+    CART ||--o{ CART_ITEM : contains
+    PRODUCT_VARIANT ||--o{ CART_ITEM : ""
+    COUPON |o--o{ CART : "applied to"
+    DARK_STORE }o--o{ COUPON : "valid at (empty = all)"
     COUPON ||--o{ COUPON_REDEMPTION : used
     USER ||--o{ ORDER : places
     DARK_STORE ||--o{ ORDER : fulfils
     ORDER ||--o{ ORDER_ITEM : contains
+    PRODUCT_VARIANT ||--o{ ORDER_ITEM : ""
     ORDER ||--o{ ORDER_STATUS_HISTORY : logs
     ORDER ||--o{ STOCK_RESERVATION : holds
+    ORDER |o--o{ STOCK_MOVEMENT : "sale / return"
+    ORDER ||--o| COUPON_REDEMPTION : applies
     ORDER ||--o{ PAYMENT : "paid by"
     PAYMENT ||--o{ REFUND : "refunded by"
     ORDER ||--o| INVOICE : billed
-    ORDER ||--o| COUPON_REDEMPTION : applies
-    ORDER ||--o{ DELIVERY_TASK : "delivered via"
-    RIDER ||--o{ DELIVERY_TASK : performs
+    DARK_STORE ||--o{ INVOICE_SEQUENCE : "numbers invoices"
+    PAYMENT_WEBHOOK_EVENT
+    %% delivery (P5)
+    DARK_STORE ||--o{ RIDER : "preferred / home store"
+    ORDER ||--o| DELIVERY_TASK : "delivered via"
+    DARK_STORE ||--o{ DELIVERY_TASK : dispatches
+    RIDER |o--o{ DELIVERY_TASK : performs
     DELIVERY_TASK ||--o{ DELIVERY_OFFER : offered
     RIDER ||--o{ DELIVERY_OFFER : receives
+    DELIVERY_TASK ||--o{ COD_QR : "COD UPI QR"
+    PAYMENT |o--o| COD_QR : "paid through"
     RIDER ||--o{ RIDER_DOCUMENT : uploads
     RIDER ||--o{ RIDER_SHIFT : works
     RIDER ||--o{ RIDER_LOCATION : pings
     RIDER ||--o{ RIDER_CASH_LEDGER : holds
     RIDER ||--o{ RIDER_EARNING : earns
+    DELIVERY_TASK |o--o{ RIDER_EARNING : "pays for"
     RIDER ||--o{ PAYOUT : "paid via"
+    PAYOUT |o--o{ RIDER_EARNING : settles
+    EARNING_RULE
+    %% ratings, support, notifications, CMS, reports, audit (P6-P8)
     ORDER ||--o{ RATING : rated
+    RIDER |o--o{ RATING : "rider stars"
     USER ||--o{ SUPPORT_TICKET : raises
+    ORDER |o--o{ SUPPORT_TICKET : about
+    DELIVERY_TASK |o--o{ SUPPORT_TICKET : "rider ticket"
+    PAYOUT |o--o{ SUPPORT_TICKET : "rider ticket"
     SUPPORT_TICKET ||--o{ TICKET_MESSAGE : thread
+    SUPPORT_TICKET ||--o{ TICKET_ATTACHMENT : photos
+    CANNED_REPLY
     USER ||--o{ NOTIFICATION : receives
+    NOTIFICATION_TEMPLATE
+    PAGE
+    FAQ
+    USER ||--o{ REPORT_EXPORT : requests
+    USER |o--o{ AUDIT_LOG : actor
 ```
 
 ## 2. Entities
@@ -96,7 +127,7 @@ erDiagram
 
 **StoreTiming**: `store`, `weekday` (0 = Monday … 6), `opens_at`, `closes_at` (IST wall-clock, `closes_at > opens_at`). Several rows per day are allowed (split shifts). A window past midnight is two rows (`…–23:59`, which runs to midnight, and `00:00–…`). A store with no rows is never open.
 
-**PricingConfig** (1:1 store): `min_order_value`, `delivery_fee`, `free_delivery_threshold`, `small_cart_fee`, `small_cart_threshold`, `handling_fee`, `cod_enabled`, `cod_max_order_value`. Defaults are the D-09 values since Phase 3 (99 / 25 / 299 / 15 / 149 / 0 / COD on / 2000; PM default ⚠); migration `stores.0004` gives them to rows still at the old all-zero defaults and leaves edited rows alone. A store without a row is billed with the defaults.
+**PricingConfig** (1:1 store): `min_order_value`, `delivery_fee`, `free_delivery_threshold`, `small_cart_fee`, `small_cart_threshold`, `handling_fee`, `cod_enabled`, `cod_max_order_value`, `min_order_units` (default 0 = off; fewest units per order, any mix of items, e.g. 5 cartons; added 2026-11-13) and `order_unit_label` (plural, default "items"; both also database defaults for deploy and rollback safety). Defaults are the D-09 values since Phase 3 (99 / 25 / 299 / 15 / 149 / 0 / COD on / 2000; PM default ⚠); migration `stores.0004` gives them to rows still at the old all-zero defaults and leaves edited rows alone. A store without a row is billed with the defaults.
 
 **ServiceabilityRequest**: `location` (Point), `user` (nullable), `phone` (nullable), `address_text`.
 
@@ -110,14 +141,16 @@ erDiagram
 
 **Product**: `name`, `slug` (unique, never all digits), `category`, `brand` (default "Jivo"), `short_description`, `description` (**plain text**, paragraphs separated by a blank line; changed from "rich text" in Phase 2 R1 so the app needs no HTML renderer), `highlights` (JSON list), `attributes` (JSON, the label information of 09 §4; keys published in the API: `ingredients`, `nutrition` = `{columns: [str], rows: [{name, values: [str], is_sub_row}]}`, `shelf_life`, `storage_instructions`, `country_of_origin`, `manufacturer`, `marketer`, `importer`, `consumer_care`, `fssai_license_no`), `is_veg`, `hsn_code`, `gst_rate` (e.g., 5.00), `search_keywords`, `is_active`, `sort_order`.
 
-**ProductVariant (SKU)**: `product`, `sku` (unique), `name` (e.g., "1 L"), `net_quantity` (as on the pack, e.g. "2 x 1 L"; Legal Metrology, added in Phase 2 R1), `unit_value` + `unit` (for "₹/100 ml" display: the API's `unit_price {amount, per}`), `mrp`, `selling_price` (≤ mrp), `max_qty_per_order`, `barcode`, `sap_item_code` (nullable), `weight_grams`, `is_active`, `sort_order`.
+**ProductVariant (SKU)**: `product`, `sku` (unique), `name` (e.g., "1 L"), `net_quantity` (as on the pack, e.g. "2 x 1 L"; Legal Metrology, added in Phase 2 R1), `unit_value` + `unit` (for "₹/100 ml" display: the API's `unit_price {amount, per}`), `mrp`, `selling_price` (≤ mrp), `max_qty_per_order`, `min_qty_per_order` (default 1, also as a database default so the previous release can still insert rows during a deploy or rollback; ≥ 1 and ≤ `max_qty_per_order`, both DB check constraints; added 2026-11-13 for items sold only in bulk, e.g. at least 5 water cartons; see 08 §6.1), `barcode`, `sap_item_code` (nullable), `weight_grams`, `is_active`, `sort_order`.
 
-**ProductImage**: `product`, `variant` (nullable), `image`, `alt_text`, `sort_order`.
+**VariantPriceTier** (added 2026-11-13, ADR 0001): `variant` (FK, `price_tiers`), `min_order_units` (≥ 1), `price` (> 0, ≤ the variant's `mrp`: checked in `clean()` and when the MRP changes), with history. Unique (`variant`, `min_order_units`). A volume (slab) price: see 08 §6.2. No tiers = the normal price. Set by `manage.py set_price_tiers` or the admin inline.
+
+**ProductImage**: `product`, `variant` (nullable), `image`, `alt_text`, `sort_order`, `source_sha256` (SHA-256 of the source file, set only by `import_catalog_images`; empty for admin uploads). Unique (`product`, `variant`, `source_sha256`) where `source_sha256` is not empty, with NULL variants counted as equal (`productimage_source_unique`, PostgreSQL 15+ `NULLS NOT DISTINCT`).
 
 **Collection**: `name`, `slug`, `show_on_home`, `sort_order`, `is_active`, `stores` (M2M, empty = all). At most 100 items (the collection page is not paginated).
 **CollectionItem**: `collection`, `variant`, `sort_order`.
 
-**Banner**: `title`, `image`, `link_type` (category/collection/product/url/none), `link_value`, `stores` (M2M, empty = all), `starts_at`, `ends_at`, `sort_order`, `is_active`.
+**Banner**: `title`, `image`, `link_type` (category/collection/product/url/referral/none), `link_value`, `audience` (ALL default / NEW_CUSTOMERS / RETURNING_CUSTOMERS), `stores` (M2M, empty = all), `starts_at`, `ends_at`, `sort_order`, `is_active`.
 
 **TrendingSearch** (added in Phase 2): `term` (unique), `sort_order`, `is_active`. Admin-defined trending searches (03 §2.7), returned by `search/suggest` for a blank query.
 
@@ -142,6 +175,13 @@ Images (`Category.image`, `ProductImage.image`, `Banner.image`) are public media
 **Coupon**: `code` (unique, case-insensitive), `title`, `description`, `discount_type` (FLAT/PERCENT), `value`, `max_discount`, `min_order_value`, `starts_at`, `ends_at`, `usage_limit_total`, `usage_limit_per_user`, `first_order_only`, `stores` (M2M), `categories` (M2M, applies to item subtotal in those categories), `is_active`, `is_visible` (listed in the app or hidden code).
 Coupon (built in Phase 3 R2a): `code` stored in capitals, unique on `upper(code)`; `usage_limit_per_user` defaults to 1 (empty = unlimited); `starts_at`/`ends_at` nullable (no bound); check constraints: value > 0, PERCENT ≤ 100, `max_discount` > 0 when set, `ends_at` > `starts_at`. History kept (simple-history).
 **CouponRedemption**: `coupon`, `user`, `order` (unique), `discount_amount`, `status` (HELD/APPLIED/RELEASED/REVERSED; Phase 3 adds HELD = the order awaits online payment and RELEASED = that hold ended without a sale). HELD and APPLIED count against the usage limits; using a coupon locks its row and re-checks them.
+**Personal coupons** (added 2026-11-13, migration `promotions.0002`): `Coupon.owner` (FK User, nullable, PROTECT, related name `personal_coupons`). Empty = a public coupon (unchanged behaviour). Set = only that customer sees it in the coupon sheet and can apply or use it; for anyone else it is `COUPON_INVALID`. Referral rewards are personal coupons with a generated code (`REF` + 8 characters), FLAT, `usage_limit_total` = `usage_limit_per_user` = 1, `ends_at` = reward time + validity days.
+
+### 2.5a Referrals (`referrals`, added 2026-11-13)
+
+**ReferralSettings** (one row, id 1, like `AppConfig`; history kept): `is_enabled` (default true), `reward_amount` (Decimal, default 90.00, ₹1 to ₹1,000), `reward_validity_days` (default 30, 1 to 365), `reward_min_order_value` (Decimal, default 0.00, ≥ 0). Check constraints: singleton, amount > 0, minimum ≥ 0, validity ≥ 1.
+**ReferralCode**: `user` (1:1, CASCADE, related name `referral_code`), `code` (char 12, unique; 6 characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, created on the customer's first `GET /account/referral/`, never changed).
+**Referral**: `referrer` (FK User, PROTECT, related name `referrals_made`), `referred` (1:1 User, PROTECT, related name `referral`: a customer enters a code at most once), `code` (the code entered), `status` (PENDING/REWARDED/VOID), `reward_order` (FK Order, nullable, PROTECT: the delivered order that triggered the reward or the VOID), `reward_amount` (nullable), `referrer_coupon` / `referred_coupon` (FK Coupon, nullable, PROTECT), `rewarded_at`, `note`, timestamps. Check constraints: referrer ≠ referred; a REWARDED row has both coupons, the order and `rewarded_at`. Index (`referrer`, `status`) for the friend counts.
 
 ### 2.6 Orders (`orders`)
 
@@ -270,6 +310,7 @@ Phase 1 implementation: `cms.AppConfig` is a single row (maintenance + message, 
 - `Order(user, idempotency_key)` unique.
 - `DeliveryOffer(task)` partial unique where `status='PENDING'`.
 - `Coupon(upper(code))` unique.
+- `ReferralCode.code` unique; `Referral.referred` unique (one code per customer, ever).
 
 ## 4. Data retention
 | Data | Retention |

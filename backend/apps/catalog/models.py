@@ -13,7 +13,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator, RegexVa
 from django.db import models
 from simple_history.models import HistoricalRecords
 
-from apps.catalog.choices import BannerLinkType
+from apps.catalog.choices import BannerAudience, BannerLinkType
 from apps.catalog.images import RandomImagePath, is_new_upload, prepare_image, validate_image_upload
 from apps.catalog.validators import (
     validate_highlights,
@@ -159,6 +159,16 @@ class ProductVariant(TimeStampedModel):
     mrp = models.DecimalField(max_digits=12, decimal_places=2)
     selling_price = models.DecimalField(max_digits=12, decimal_places=2)
     max_qty_per_order = models.PositiveSmallIntegerField(default=5)
+    # `db_default` too: the database fills 1 for code that does not know the column yet (the old
+    # release during a deploy, or after a code rollback). `default` keeps 1 on new Python objects.
+    min_qty_per_order = models.PositiveSmallIntegerField(
+        default=1,
+        db_default=1,
+        help_text=(
+            "Fewest units a customer can order in one order (e.g. 5 cartons). At most the "
+            "maximum per order. The item counts as out of stock when fewer can be sold."
+        ),
+    )
     barcode = models.CharField(max_length=32, blank=True)
     sap_item_code = models.CharField(max_length=40, null=True, blank=True, unique=True)
     weight_grams = models.PositiveIntegerField(null=True, blank=True)
@@ -175,6 +185,13 @@ class ProductVariant(TimeStampedModel):
             ),
             models.CheckConstraint(
                 condition=models.Q(max_qty_per_order__gte=1), name="variant_max_qty_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(min_qty_per_order__gte=1), name="variant_min_qty_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(min_qty_per_order__lte=models.F("max_qty_per_order")),
+                name="variant_min_qty_within_max",
             ),
             models.CheckConstraint(
                 condition=(
@@ -213,8 +230,73 @@ class ProductVariant(TimeStampedModel):
                         )
                     }
                 )
+            tiers_above = list(
+                self.price_tiers.filter(price__gt=self.mrp).values_list(
+                    "min_order_units", flat=True
+                )
+            )
+            if tiers_above:
+                raise ValidationError(
+                    {
+                        "mrp": (
+                            "Price tiers from "
+                            f"{', '.join(str(units) for units in tiers_above)} units are above the "
+                            "new MRP. Lower those tier prices first."
+                        )
+                    }
+                )
         if (self.unit_value is None) != (not self.unit):
             raise ValidationError({"unit": "Set both the unit value and the unit, or neither."})
+        if (
+            self.min_qty_per_order is not None
+            and self.max_qty_per_order is not None
+            and self.min_qty_per_order > self.max_qty_per_order
+        ):
+            raise ValidationError(
+                {"min_qty_per_order": "Cannot be above the maximum quantity per order."}
+            )
+
+
+class VariantPriceTier(TimeStampedModel):
+    """A volume (slab) price (ADR 0001, 08 §6.2): when one order has at least `min_order_units`
+    qualifying units (every unit of every variant that has tiers, any mix), each unit of this
+    variant costs `price`. The highest tier reached applies; below the lowest tier, the normal
+    price does. A variant without tiers is priced as before."""
+
+    variant = models.ForeignKey(
+        ProductVariant, on_delete=models.CASCADE, related_name="price_tiers"
+    )
+    min_order_units = models.PositiveSmallIntegerField(
+        help_text="From this many qualifying units in the order (all tiered items together)."
+    )
+    price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="Price per unit (GST inclusive) at this tier. Above 0 and at most the MRP.",
+    )
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["variant", "min_order_units"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["variant", "min_order_units"], name="variantpricetier_unique_units"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(min_order_units__gte=1), name="variantpricetier_units_positive"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(price__gt=0), name="variantpricetier_price_positive"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.variant_id}: from {self.min_order_units} units at {self.price}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.price is not None and self.variant_id is not None and self.price > self.variant.mrp:
+            raise ValidationError({"price": "Cannot be above the MRP."})
 
 
 class ProductImage(ProcessedImageMixin, TimeStampedModel):
@@ -244,6 +326,17 @@ class ProductImage(ProcessedImageMixin, TimeStampedModel):
 
     class Meta:
         ordering = ["sort_order", "id"]
+        constraints = [
+            # One loaded file per product (or variant), even when two loader runs overlap.
+            # Admin uploads leave source_sha256 empty and are not limited. NULL variants count
+            # as equal (NULLS NOT DISTINCT, PostgreSQL 15+), so product-level images are covered.
+            models.UniqueConstraint(
+                fields=["product", "variant", "source_sha256"],
+                condition=~models.Q(source_sha256=""),
+                nulls_distinct=False,
+                name="productimage_source_unique",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"Image {self.pk} of {self.product_id}"
@@ -321,6 +414,12 @@ class Banner(ProcessedImageMixin, TimeStampedModel):
         blank=True,
         help_text="Slug for category/collection/product, https URL for url, empty for none.",
     )
+    audience = models.CharField(
+        max_length=20,
+        choices=BannerAudience.choices,
+        default=BannerAudience.ALL,
+        help_text="Who sees it. New = no order placed yet (signed-out visitors count as new).",
+    )
     stores = models.ManyToManyField(
         "stores.DarkStore", blank=True, related_name="banners", help_text="Empty = all stores."
     )
@@ -348,9 +447,9 @@ class Banner(ProcessedImageMixin, TimeStampedModel):
     def clean(self) -> None:
         super().clean()
         value = self.link_value.strip()
-        if self.link_type == BannerLinkType.NONE:
+        if self.link_type in (BannerLinkType.NONE, BannerLinkType.REFERRAL):
             if value:
-                raise ValidationError({"link_value": "Leave empty when the banner has no link."})
+                raise ValidationError({"link_value": "Leave empty when the banner has no target."})
         elif self.link_type == BannerLinkType.URL:
             if not value.startswith("https://"):
                 raise ValidationError({"link_value": "Enter an https:// URL."})

@@ -22,6 +22,8 @@ class FakeBillRules {
     this.smallCartFee = 1500,
     this.handlingFee = 500,
     this.minimumOrder = 4900,
+    this.minimumUnits = 0,
+    this.orderUnitLabel = 'items',
     this.codMaxOrderValue = 150000,
     this.maxTip = 50000,
     this.paymentWindow = const Duration(minutes: 15),
@@ -37,6 +39,13 @@ class FakeBillRules {
   final int smallCartFee;
   final int handlingFee;
   final int minimumOrder;
+
+  /// `min_order_units`: the fewest units (any mix of products) an order
+  /// must have; 0 = no such rule (the default).
+  final int minimumUnits;
+
+  /// `order_unit_label`, e.g. "cartons".
+  final String orderUnitLabel;
   final int codMaxOrderValue;
 
   /// `CART_MAX_TIP`.
@@ -155,6 +164,10 @@ class FakeCommerceBackend
   /// `orderable_quantity` (simulates stock dropping after adding).
   final stock = <int, int>{};
 
+  /// Minimum per order per variant id, overriding the tile's
+  /// `min_qty_per_order` (simulates the minimum being raised after adding).
+  final minimums = <int, int>{};
+
   /// Coupons this customer has used up (`COUPON_USAGE_EXCEEDED`).
   final usedCoupons = <String>{};
 
@@ -213,7 +226,16 @@ class FakeCommerceBackend
     final known = preview ?? line?.preview;
     if (known == null) _fail(ApiErrorCode.notFound, status: 404);
     final current = line?.quantity ?? 0;
-    // A decrease is always accepted; an increase is checked.
+    // 1 to min - 1 is refused, up or down (0, above, always removes).
+    final minimum = _minimum(known.variant);
+    if (quantity < minimum) {
+      _fail(
+        ApiErrorCode.minQtyRequired,
+        status: 422,
+        details: {'variant_id': variantId, 'min_qty_per_order': minimum},
+      );
+    }
+    // A decrease is otherwise always accepted; an increase is checked.
     if (quantity > current) {
       final variant = known.variant;
       if (quantity > variant.maxQtyPerOrder) {
@@ -413,19 +435,31 @@ class FakeCommerceBackend
       );
     }
     if (!storeOpen) _fail(ApiErrorCode.storeClosed, status: 422);
-    if (cart.hasProblems) {
+    final short = cart.problemLines.where((line) => !_belowMinimum(line));
+    if (short.isNotEmpty) {
       _fail(
         ApiErrorCode.stockUnavailable,
         status: 409,
         details: {
           'items': [
-            for (final line in cart.problemLines)
+            for (final line in short)
               {
                 'variant_id': line.variantId,
                 'requested_quantity': line.quantity,
                 'orderable_quantity': line.orderableQuantity,
               },
           ],
+        },
+      );
+    }
+    final below = cart.problemLines.where(_belowMinimum).firstOrNull;
+    if (below != null) {
+      _fail(
+        ApiErrorCode.minQtyRequired,
+        status: 422,
+        details: {
+          'variant_id': below.variantId,
+          'min_qty_per_order': below.minQty,
         },
       );
     }
@@ -438,6 +472,17 @@ class FakeCommerceBackend
           'min_order_value': cart.thresholds!.minOrderValue,
           'item_total': bill.itemTotal,
           'amount_to_min_order': toMinimum,
+        },
+      );
+    }
+    final toUnits = cart.thresholds?.unitsToMinOrder;
+    if (toUnits != null) {
+      _fail(
+        ApiErrorCode.minUnitsNotMet,
+        status: 422,
+        details: {
+          'min_order_units': rules.minimumUnits,
+          'units_to_min_order': toUnits,
         },
       );
     }
@@ -482,6 +527,7 @@ class FakeCommerceBackend
             line.quantity,
             lineMrpTotal: line.lineMrpTotal,
             lineTotal: line.lineTotal,
+            unitPrice: line.billedPrice,
           ),
       ],
       bill: bill,
@@ -661,7 +707,10 @@ class FakeCommerceBackend
       final gone = discontinued.contains(variant.id);
       final current = _lines[variant.id]?.quantity ?? 0;
       final room = gone ? 0 : math.max(0, _orderable(variant) - current);
-      final take = math.min(room, line.quantity);
+      var take = math.min(room, line.quantity);
+      // A line is never put back below today's minimum per order.
+      final belowMinimum = take > 0 && current + take < _minimum(variant);
+      if (belowMinimum) take = 0;
       if (take > 0) {
         final existing = _lines[variant.id];
         if (existing == null) {
@@ -678,6 +727,8 @@ class FakeCommerceBackend
             variantName: variant.name,
             reason: gone
                 ? ReorderSkipReason.discontinued
+                : belowMinimum
+                ? ReorderSkipReason.belowMinimum
                 : take == 0
                 ? ReorderSkipReason.outOfStock
                 : ReorderSkipReason.quantityReduced,
@@ -900,7 +951,7 @@ class FakeCommerceBackend
             variantName: line.preview.variant.name,
             imageUrl: line.preview.variant.imageUrl,
             mrp: line.preview.variant.mrp,
-            sellingPrice: line.preview.variant.sellingPrice,
+            sellingPrice: line.unitPrice ?? line.preview.variant.sellingPrice,
             quantity: line.quantity,
             lineMrpTotal: line.lineMrpTotal,
             lineTotal: line.lineTotal,
@@ -1036,14 +1087,54 @@ class FakeCommerceBackend
   int _orderable(CatalogVariant variant) {
     final cap = variant.maxSelectable;
     final available = stock[variant.id];
-    return available == null ? cap : math.max(0, math.min(cap, available));
+    final orderable = available == null
+        ? cap
+        : math.max(0, math.min(cap, available));
+    // Fewer than the minimum per order can't be sold: out of stock.
+    return orderable < _minimum(variant) ? 0 : orderable;
   }
 
-  int _itemTotal() => _lines.values.fold(
-    0,
-    (sum, line) =>
-        sum + _paise(line.preview.variant.sellingPrice) * line.quantity,
-  );
+  int _minimum(CatalogVariant variant) =>
+      minimums[variant.id] ?? variant.minQty;
+
+  static bool _belowMinimum(CartLine line) =>
+      line.issue?.code == CartIssueCode.minQtyRequired;
+
+  /// The cart's item total in paise, priced like the cart (volume tiers
+  /// included).
+  int _itemTotal() => _paise(_snapshot().bill!.itemTotal);
+
+  /// The highest of [tiers] that [units] reach, or null.
+  static PriceTier? _tierAt(List<PriceTier> tiers, int units) {
+    PriceTier? best;
+    for (final tier in tiers) {
+      if (tier.minOrderUnits <= units &&
+          (best == null || tier.minOrderUnits > best.minOrderUnits)) {
+        best = tier;
+      }
+    }
+    return best;
+  }
+
+  /// [variant]'s unit price in paise when the cart has [units] tier units.
+  static int _priceAt(CatalogVariant variant, int units) =>
+      _paise(_tierAt(variant.priceTiers, units)?.price ?? variant.sellingPrice);
+
+  /// `next_price_tier`: the lowest tier minimum above [units] at which some
+  /// line's price drops; null when there is none.
+  static int? _nextTierUnits(List<CatalogVariant> variants, int units) {
+    final candidates = {
+      for (final variant in variants)
+        for (final tier in variant.priceTiers)
+          if (tier.minOrderUnits > units) tier.minOrderUnits,
+    }.toList()..sort();
+    for (final candidate in candidates) {
+      if (variants.any((v) => _priceAt(v, candidate) < _priceAt(v, units))) {
+        return candidate;
+      }
+    }
+    return null;
+  }
 
   ({int discount, CouponIneligibility? reason, int? toUnlock}) _evaluate(
     FakeCoupon coupon,
@@ -1082,9 +1173,23 @@ class FakeCommerceBackend
     var mrpTotal = 0;
     var itemTotal = 0;
     var units = 0;
+    // Volume prices (ADR 0001): every line with tiers counts
+    // min(quantity, orderable) towards one total that picks the tier.
+    var tierUnits = 0;
+    for (final line in _lines.values) {
+      final variant = line.preview.variant;
+      if (variant.hasPriceTiers) {
+        tierUnits += math.min(line.quantity, _orderable(variant));
+      }
+    }
+    final nextTier = _nextTierUnits([
+      for (final line in _lines.values)
+        if (line.preview.variant.hasPriceTiers) line.preview.variant,
+    ], tierUnits);
     for (final line in _lines.values) {
       final variant = line.preview.variant;
       final orderable = _orderable(variant);
+      final minimum = _minimum(variant);
       final issue = orderable <= 0
           ? const CartLineIssue(
               code: CartIssueCode.outOfStock,
@@ -1095,8 +1200,15 @@ class FakeCommerceBackend
               code: CartIssueCode.quantityUnavailable,
               message: 'Only $orderable left',
             )
+          : line.quantity < minimum
+          ? CartLineIssue(
+              code: CartIssueCode.minQtyRequired,
+              message: 'At least $minimum per order.',
+            )
           : null;
-      final price = _paise(variant.sellingPrice);
+      final tier = _tierAt(variant.priceTiers, tierUnits);
+      final price = _paise(tier?.price ?? variant.sellingPrice);
+      final nextPrice = nextTier == null ? null : _priceAt(variant, nextTier);
       final mrp = _paise(variant.mrp);
       mrpTotal += mrp * line.quantity;
       itemTotal += price * line.quantity;
@@ -1105,10 +1217,15 @@ class FakeCommerceBackend
         CartLine(
           id: line.id,
           productName: line.preview.productName,
-          variant: _withOrderable(variant, orderable),
+          variant: _withOrderable(variant, orderable, minimum),
           quantity: line.quantity,
           lineMrpTotal: _amount(mrp * line.quantity),
           lineTotal: _amount(price * line.quantity),
+          pricePerUnit: _amount(price),
+          priceTier: tier,
+          nextTierPrice: nextPrice != null && nextPrice < price
+              ? _amount(nextPrice)
+              : null,
           issue: issue,
         ),
       );
@@ -1151,9 +1268,14 @@ class FakeCommerceBackend
     final productDiscount = mrpTotal - itemTotal;
     final toFreeDelivery = rules.freeDeliveryThreshold - itemTotal;
     final toMinimum = rules.minimumOrder - itemTotal;
+    // Units over every line (any mix of products); 0 when the rule is off.
+    final toMinUnits = rules.minimumUnits > 0 ? rules.minimumUnits - units : 0;
     final address = addressId ?? _savedAddressId;
     final codAvailable = grandTotal <= rules.codMaxOrderValue;
-    final hasProblems = lines.any((line) => line.issue != null);
+    final hasProblems = lines.any(
+      (line) => line.issue != null && !_belowMinimum(line),
+    );
+    final belowMinimum = lines.any(_belowMinimum);
 
     final blockers = <CheckoutBlocker>[
       if (empty)
@@ -1177,10 +1299,22 @@ class FakeCommerceBackend
             code: CheckoutBlockerCode.stockUnavailable,
             message: 'Some items are not available as chosen.',
           ),
+        if (belowMinimum)
+          const CheckoutBlocker(
+            code: CheckoutBlockerCode.minQtyRequired,
+            message: 'Some items are below their minimum per order.',
+          ),
         if (toMinimum > 0)
           CheckoutBlocker(
             code: CheckoutBlockerCode.minOrderNotMet,
             message: 'Add items worth ${_rupees(toMinimum)} more to order.',
+          ),
+        if (toMinUnits > 0)
+          CheckoutBlocker(
+            code: CheckoutBlockerCode.minUnitsNotMet,
+            message:
+                'Add $toMinUnits more ${rules.orderUnitLabel} to place your '
+                'order (minimum ${rules.minimumUnits}).',
           ),
         if (coupon != null && !coupon.isApplicable)
           const CheckoutBlocker(
@@ -1212,6 +1346,16 @@ class FakeCommerceBackend
       thresholds: CartThresholds(
         minOrderValue: _amount(rules.minimumOrder),
         amountToMinOrder: toMinimum > 0 ? _amount(toMinimum) : null,
+        minOrderUnits: rules.minimumUnits,
+        unitsToMinOrder: toMinUnits > 0 ? toMinUnits : null,
+        orderUnitLabel: rules.orderUnitLabel,
+        tierUnits: tierUnits,
+        nextPriceTier: nextTier == null
+            ? null
+            : NextPriceTier(
+                minOrderUnits: nextTier,
+                unitsToNextTier: nextTier - tierUnits,
+              ),
         freeDeliveryThreshold: _amount(rules.freeDeliveryThreshold),
         amountToFreeDelivery: toFreeDelivery > 0
             ? _amount(toFreeDelivery)
@@ -1237,21 +1381,26 @@ class FakeCommerceBackend
     );
   }
 
-  static CatalogVariant _withOrderable(CatalogVariant v, int orderable) =>
-      CatalogVariant(
-        id: v.id,
-        name: v.name,
-        sellingPrice: v.sellingPrice,
-        mrp: v.mrp,
-        stockStatus: orderable <= 0 ? StockStatus.outOfStock : v.stockStatus,
-        orderableQuantity: orderable,
-        maxQtyPerOrder: v.maxQtyPerOrder,
-        discountAmount: v.discountAmount,
-        discountPercent: v.discountPercent,
-        unitsLeft: v.unitsLeft,
-        unitPrice: v.unitPrice,
-        imageUrl: v.imageUrl,
-      );
+  static CatalogVariant _withOrderable(
+    CatalogVariant v,
+    int orderable,
+    int minimum,
+  ) => CatalogVariant(
+    id: v.id,
+    name: v.name,
+    sellingPrice: v.sellingPrice,
+    mrp: v.mrp,
+    stockStatus: orderable <= 0 ? StockStatus.outOfStock : v.stockStatus,
+    orderableQuantity: orderable,
+    maxQtyPerOrder: v.maxQtyPerOrder,
+    minQtyPerOrder: minimum,
+    discountAmount: v.discountAmount,
+    discountPercent: v.discountPercent,
+    unitsLeft: v.unitsLeft,
+    unitPrice: v.unitPrice,
+    imageUrl: v.imageUrl,
+    priceTiers: v.priceTiers,
+  );
 
   static String _yymmdd(DateTime t) =>
       '${(t.year % 100).toString().padLeft(2, '0')}'
@@ -1340,12 +1489,16 @@ class _FakeOrderLine {
     this.quantity, {
     required this.lineMrpTotal,
     required this.lineTotal,
+    this.unitPrice,
   });
 
   final CartLinePreview preview;
   final int quantity;
   final String lineMrpTotal;
   final String lineTotal;
+
+  /// The price each unit was billed at (a volume tier's when one applied).
+  final String? unitPrice;
 }
 
 class _FakeRefund {
