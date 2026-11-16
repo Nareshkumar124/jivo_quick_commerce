@@ -170,6 +170,24 @@ void main() {
       expect(state.submitting, isFalse);
       expect(await form.submit(''), isNotNull);
     });
+
+    test('rated meanwhile: a refused submit re-reads the rating so the '
+        'screen shows it (P7-TC-37)', () async {
+      final formSub = container.listen(ratingFormProvider(1), (_, _) {});
+      final ratingSub = container.listen(orderRatingProvider(1), (_, _) {});
+      addTearDown(formSub.close);
+      addTearDown(ratingSub.close);
+      expect(await container.read(orderRatingProvider(1).future), isNull);
+      repo.ratings[1] = OrderRating(
+        orderStars: 4,
+        createdAt: DateTime.utc(2026, 11, 16),
+      );
+      final form = container.read(ratingFormProvider(1).notifier)
+        ..setOrderStars(5);
+      expect(await form.submit(''), isNull);
+      final existing = await container.read(orderRatingProvider(1).future);
+      expect(existing?.orderStars, 4);
+    });
   });
 
   group('rate screen', () {

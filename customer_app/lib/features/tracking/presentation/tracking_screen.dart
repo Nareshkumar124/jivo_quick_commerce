@@ -81,7 +81,7 @@ class _TrackBody extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final rider = track.rider;
-    final otp = track.deliveryOtp;
+    final otp = track.visibleDeliveryOtp;
     final eta = track.etaAt;
     final stage = track.stage;
     final detail = order;
@@ -156,7 +156,7 @@ class _TrackBody extends ConsumerWidget {
           const SizedBox(height: JivoSpacing.lg),
         ],
         if (rider != null) ...[
-          RiderCard(rider: rider),
+          RiderCard(rider: rider, canCall: track.outForDelivery),
           const SizedBox(height: JivoSpacing.lg),
         ] else if (assigning && active) ...[
           ListTile(

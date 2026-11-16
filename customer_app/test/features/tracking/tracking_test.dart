@@ -191,5 +191,40 @@ void main() {
       expect(call, findsOneWidget);
       expect(tester.getSize(call).height, greaterThanOrEqualTo(48));
     });
+
+    testWidgets('canCall false (not out for delivery): no call button even '
+        'with a phone', (tester) async {
+      await tester.pumpWidget(
+        harness(
+          const RiderCard(
+            rider: TrackRider(name: 'Ravi K.', phone: '+919811122233'),
+            canCall: false,
+          ),
+        ),
+      );
+      expect(find.byKey(const Key('rider-card')), findsOneWidget);
+      expect(find.byKey(const Key('call-rider')), findsNothing);
+    });
+  });
+
+  test('DL-56: the OTP is shown only while out for delivery', () {
+    OrderTrack track(OrderStatus status) => OrderTrack(
+      orderId: 1,
+      orderNumber: 'JV-1',
+      status: status,
+      store: const TrackPoint(28.6, 77.2),
+      destination: const TrackPoint(28.61, 77.21),
+      deliveryOtp: '4321',
+    );
+    expect(track(OrderStatus.outForDelivery).visibleDeliveryOtp, '4321');
+    expect(track(OrderStatus.outForDelivery).outForDelivery, isTrue);
+    for (final status in [
+      OrderStatus.packed,
+      OrderStatus.delivered,
+      OrderStatus.deliveryFailed,
+    ]) {
+      expect(track(status).visibleDeliveryOtp, isNull);
+      expect(track(status).outForDelivery, isFalse);
+    }
   });
 }

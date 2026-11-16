@@ -77,6 +77,14 @@ class OrderTrack {
   /// Sent only while `OUT_FOR_DELIVERY` (`06 §2.6`).
   final String? deliveryOtp;
 
+  /// DL-56: the delivery OTP and the rider's phone are for
+  /// `OUT_FOR_DELIVERY` only. The server sends null otherwise; the screens
+  /// also hide them on any other status (P5-TC-124).
+  bool get outForDelivery => status == OrderStatus.outForDelivery;
+
+  /// [deliveryOtp] while [outForDelivery], else null.
+  String? get visibleDeliveryOtp => outForDelivery ? deliveryOtp : null;
+
   /// The delivery task's state (`08 §2`, `track/` `task_status`); null
   /// before there is a task, and [stage] falls back to the order status.
   final DeliveryTaskStatus? taskStatus;

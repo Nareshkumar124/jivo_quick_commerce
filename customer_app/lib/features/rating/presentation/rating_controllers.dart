@@ -115,6 +115,9 @@ class RatingFormController extends Notifier<RatingFormState> {
     } catch (error) {
       if (ref.mounted) {
         state = state.copyWith(submitting: false, error: error);
+        // Rated meanwhile (another tap, device or the push): re-read so the
+        // screen shows the rating instead of the form (P7-TC-37).
+        ref.invalidate(orderRatingProvider(orderId));
       }
       return null;
     }

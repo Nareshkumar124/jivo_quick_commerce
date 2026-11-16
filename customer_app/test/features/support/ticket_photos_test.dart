@@ -25,22 +25,23 @@ void main() {
       ];
       repo.failNextUpload = const ApiError(code: ApiErrorCode.network);
       await expectLater(
-        uploadTicketPhotos(repo, 1, photos),
+        uploadTicketPhotos(photos, (f) => repo.uploadPhoto(1, f)),
         throwsA(isA<ApiError>()),
       );
-      final keys = await uploadTicketPhotos(repo, 1, photos);
+      final keys = await uploadTicketPhotos(photos, (f) => repo.uploadPhoto(1, f));
       expect(keys, hasLength(2));
       expect(repo.uploads, hasLength(2));
       // Already uploaded: nothing goes up again.
-      expect(await uploadTicketPhotos(repo, 1, photos), keys);
+      expect(await uploadTicketPhotos(photos, (f) => repo.uploadPhoto(1, f)), keys);
       expect(repo.uploads, hasLength(2));
     });
 
     test('more than three photos are refused', () {
       expect(
-        uploadTicketPhotos(FakeSupportRepository(), 1, [
-          for (var i = 0; i < 4; i++) PendingTicketPhoto(pngPhoto()),
-        ]),
+        uploadTicketPhotos(
+          [for (var i = 0; i < 4; i++) PendingTicketPhoto(pngPhoto())],
+          (f) => FakeSupportRepository().uploadPhoto(1, f),
+        ),
         throwsA(isA<TicketPhotoException>()),
       );
     });
@@ -284,7 +285,7 @@ void main() {
         find.text("Ticket created. We'll reply here soon."),
         findsOneWidget,
       );
-      final ticketId = support.uploads.single.$1;
+      final ticketId = support.uploads.single.$1!;
       final thread = await support.ticket(ticketId);
       expect(thread.messages.first.body, 'My profile photo is wrong');
       expect(thread.messages.last.body, 'Photos of the issue');
@@ -333,6 +334,78 @@ void main() {
         findsOneWidget,
       );
       expect(support.replyPhotoKeys, isEmpty);
+    });
+
+    group('photos on create (attachment_keys)', () {
+      setUp(() => support = FakeSupportRepository(photosOnCreate: true));
+
+      Future<void> fillNewTicket(WidgetTester tester) async {
+        await openHelp(tester);
+        await tester.tap(find.byKey(const Key('help-new-ticket')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('category-ACCOUNT')));
+        await tester.enterText(
+          find.byKey(const Key('ticket-message')),
+          'My profile photo is wrong',
+        );
+        await showIn(
+          tester,
+          'new-ticket',
+          find.byKey(const Key('ticket-add-photo')),
+        );
+        await tester.tap(find.byKey(const Key('ticket-add-photo')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('photo-gallery')));
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> submit(WidgetTester tester) async {
+        await showIn(
+          tester,
+          'new-ticket',
+          find.byKey(const Key('ticket-submit')),
+        );
+        await tester.tap(find.byKey(const Key('ticket-submit')));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('uploaded first, then one message with the photo', (
+        tester,
+      ) async {
+        picker.queue.add(pngPhoto());
+        await fillNewTicket(tester);
+        await submit(tester);
+
+        expect(find.byKey(const Key('ticket-thread')), findsOneWidget);
+        expect(
+          find.text("Ticket created. We'll reply here soon."),
+          findsOneWidget,
+        );
+        expect(support.uploads.single.$1, isNull);
+        expect(support.createPhotoKeys.single, ['photo1']);
+        expect(support.replyPhotoKeys, isEmpty);
+        final thread = await support.ticket(2);
+        final mine = thread.messages.where((m) => !m.fromSupport).toList();
+        expect(mine.single.body, 'My profile photo is wrong');
+        expect(mine.single.photos.single.key, 'photo1');
+      });
+
+      testWidgets('a failed upload opens no ticket; the retry keeps the form '
+          'and creates it with the photo', (tester) async {
+        picker.queue.add(pngPhoto());
+        await fillNewTicket(tester);
+        support.failNextUpload = const ApiError(code: ApiErrorCode.network);
+        await submit(tester);
+
+        expect(find.byKey(const Key('ticket-thread')), findsNothing);
+        expect(support.createPhotoKeys, isEmpty);
+        expect(find.byKey(const Key('remove-photo-0')), findsOneWidget);
+
+        await submit(tester);
+        expect(find.byKey(const Key('ticket-thread')), findsOneWidget);
+        expect(support.createPhotoKeys.single, hasLength(1));
+        expect(support.uploads, hasLength(1));
+      });
     });
   });
 }

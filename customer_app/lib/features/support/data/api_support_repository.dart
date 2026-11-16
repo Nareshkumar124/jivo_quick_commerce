@@ -25,10 +25,20 @@ import 'support_repository.dart';
 /// The screens show them through jivo_core's messages. Photos the API won't
 /// take (type, size, HTTP 413 from the server or a proxy) are
 /// [TicketPhotoException]s.
+///
+/// Photos on a new ticket: once `jivo_api` is regenerated from a schema
+/// whose `TicketCreateRequest` has `attachment_keys` (backend P8 follow-up),
+/// [photosOnCreate] turns on by itself ([jivoApiHasCreateAttachmentKeys])
+/// and photos go up first (`POST /support/attachments/`) and attach to the
+/// first message. Until then the older two-message flow is used.
 class ApiSupportRepository implements SupportRepository {
-  const ApiSupportRepository(this._api);
+  const ApiSupportRepository(this._api, {this._photosOnCreate});
 
   final api.JivoApi _api;
+  final bool? _photosOnCreate;
+
+  @override
+  bool get photosOnCreate => _photosOnCreate ?? jivoApiHasCreateAttachmentKeys;
 
   @override
   Future<List<Faq>> faqs() => _guard(() async {
@@ -58,13 +68,27 @@ class ApiSupportRepository implements SupportRepository {
     required TicketCategory category,
     required String message,
     int? orderId,
+    List<String> photoKeys = const [],
   }) => _guard(() async {
+    if (photoKeys.isNotEmpty && !jivoApiHasCreateAttachmentKeys) {
+      // The generated request would drop the keys and lose the photos.
+      throw StateError('attachment_keys on create needs a newer jivo_api');
+    }
+    var request = api.TicketCreateRequest(
+      category: categoryToApi(category),
+      message: message.trim(),
+      orderId: orderId,
+    );
+    if (photoKeys.isNotEmpty) {
+      // TODO(api): pass `attachmentKeys: photoKeys` to the constructor once
+      // jivo_api is regenerated with the field (then drop this round trip).
+      request = api.TicketCreateRequest.fromJson({
+        ...request.toJson(),
+        'attachment_keys': photoKeys,
+      });
+    }
     final created = (await _api.getSupportApi().supportTicketsCreate(
-      ticketCreateRequest: api.TicketCreateRequest(
-        category: categoryToApi(category),
-        message: message.trim(),
-        orderId: orderId,
-      ),
+      ticketCreateRequest: request,
     )).data!;
     return threadFromApi(created);
   });
@@ -87,21 +111,45 @@ class ApiSupportRepository implements SupportRepository {
   );
 
   @override
-  Future<TicketPhoto> uploadPhoto(int ticketId, TicketPhotoFile photo) async {
+  Future<TicketPhoto> uploadPhoto(int ticketId, TicketPhotoFile photo) =>
+      _upload(
+        photo,
+        (file) async => (await _api
+            .getSupportApi()
+            .supportTicketsAttachmentsCreate(id: ticketId, file: file)).data!,
+      );
+
+  @override
+  Future<TicketPhoto> uploadNewTicketPhoto(TicketPhotoFile photo) =>
+      _upload(photo, (file) async {
+        // TODO(api): use the generated `supportAttachmentsCreate(file:)`
+        // once jivo_api is regenerated (backend P8 follow-up adds
+        // `POST /api/v1/support/attachments/`, 201 `TicketAttachment`).
+        final response = await _api.dio.post<Map<String, dynamic>>(
+          newTicketAttachmentsPath,
+          data: FormData.fromMap({'file': file}),
+          options: Options(contentType: 'multipart/form-data'),
+        );
+        return api.TicketAttachment.fromJson(response.data!);
+      });
+
+  Future<TicketPhoto> _upload(
+    TicketPhotoFile photo,
+    Future<api.TicketAttachment> Function(MultipartFile file) send,
+  ) async {
     final problem = checkTicketPhoto(photo);
     if (problem != null) throw TicketPhotoException(problem);
     final type = photo.type!;
     try {
-      final uploaded =
-          (await _api.getSupportApi().supportTicketsAttachmentsCreate(
-            id: ticketId,
-            file: MultipartFile.fromBytes(
-              photo.bytes,
-              filename: 'photo.${type.extension}',
-              contentType: DioMediaType.parse(type.mimeType),
-            ),
-          )).data!;
-      return photoFromApi(uploaded);
+      return photoFromApi(
+        await send(
+          MultipartFile.fromBytes(
+            photo.bytes,
+            filename: 'photo.${type.extension}',
+            contentType: DioMediaType.parse(type.mimeType),
+          ),
+        ),
+      );
     } on DioException catch (e) {
       if (e.response?.statusCode == 413) {
         throw const TicketPhotoException(TicketPhotoProblem.rejectedSize);
@@ -110,6 +158,24 @@ class ApiSupportRepository implements SupportRepository {
     }
   }
 }
+
+/// `support_attachments_create`: a photo for a ticket not created yet.
+const newTicketAttachmentsPath = '/api/v1/support/attachments/';
+
+/// Whether the generated `TicketCreateRequest` carries `attachment_keys`,
+/// i.e. `jivo_api` was regenerated after the backend added photos on
+/// ticket create. An older model drops the unknown key when parsing.
+final bool jivoApiHasCreateAttachmentKeys = () {
+  try {
+    return api.TicketCreateRequest.fromJson({
+      'category': 'OTHER',
+      'message': 'capability probe',
+      'attachment_keys': ['probe'],
+    }).toJson().containsKey('attachment_keys');
+  } on Object {
+    return false;
+  }
+}();
 
 Future<T> _guard<T>(Future<T> Function() call) async {
   try {
