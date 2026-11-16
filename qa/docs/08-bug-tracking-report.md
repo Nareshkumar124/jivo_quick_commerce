@@ -102,3 +102,26 @@ Verified fixes: none yet (first run).
 | OBS-S3-04 | `order.delivered` now links to `jivo://orders/{id}/rate` (P7, api-requests #55). | Intended. QA's P6-TC-40 oracle updated. |
 
 **Open by severity (2026-11-10):** P0 0 · P1 0 · P2 2 (BUG-0010, **BUG-0021**) · P3 6 (BUG-0006, 0008, 0011, 0013, 0020, **0022**).
+
+
+## QA stage 4: P5/P6/P7 (2026-11-10, develop `f8db671`, QA worktree `qa/stage-4`, new Windows PC)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0021](../bugs/BUG-0021.md) | Rider pickup (T9) sends no `order.status` OUT_FOR_DELIVERY to the order socket or the ops feed | backend: delivery task flow / order events | P2 Major (Medium) | P1 | django-backend-dev | **Verified** (stage 4, `f8db671`, fix `ca8e69c`) | P6-TC-59, P6-TC-14 |
+| [BUG-0022](../bugs/BUG-0022.md) | `rider.location` always carries `heading: null` | backend: rider location ingest | P3 Minor (Low) | P3 | django-backend-dev | **Verified** (stage 4, `f8db671`, fix `ca8e69c`) | P6-TC-14, P6-TC-34 |
+| [BUG-0023](../bugs/BUG-0023.md) | A late accept after the offer expiry was processed answers `OFFER_TAKEN` ("taken by another rider") instead of `OFFER_EXPIRED` | backend: dispatch (`accept_offer`) | P3 Minor (Low) | P3 | django-backend-dev | **Open (new)** | P5-TC-42, P5-TC-42b |
+| [BUG-0024](../bugs/BUG-0024.md) | A Store Manager cannot change the cash limit of their own store's riders: the admin action answers 403 | admin panel: Riders admin | P2 Major (Medium) | P2 | admin-panel-dev | **Open (new)** | P5-TC-117 |
+| [BUG-0006](../bugs/BUG-0006.md) | Staff session policy (8 h / 2 h idle) | backend: staff sessions | P3 Minor (Low) | P3 | django-backend-dev | **Verified** (stage 4: shortsession idle/absolute timeline passes, `f8db671`) | P1-TC-95 |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | Open (fix in another worktree, not in this build; not re-verified) | P5-TC-16 |
+| [BUG-0020](../bugs/BUG-0020.md) | Oversized socket message → 1011 instead of 1009 on daphne | backend: realtime consumers | P3 Minor (Low) | P2 | django-backend-dev | Open (fix in another worktree, not in this build; not re-verified) | P6-TC-50 |
+
+**Correction of the stage-3 open list:** BUG-0008, BUG-0010 and BUG-0011 were already **Verified** on 2026-11-09 (`4ac5dae`; see their files). The stage-3 line "P2 1 (BUG-0010) · P3 … 0008, 0011" was stale.
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| OBS-S4-01 | On the new PC, MinIO was initialised empty, so the KYC files of riders approved on the old PC (R1, R2, QA F/G uploads before today) are missing: their signed links answer 404 (`kyc/4/photo-….jpg`). The DB rows still point at them. | Environment (data not migrated), not product. P5-TC-110 used fresh uploads by QA G. Cases that fetch R1/R2 files (e.g. P5-TC-20) will fail on this PC until the riders re-upload; do not read that as a regression. |
+| OBS-S4-02 | Invoices: `orders.generate_invoice` logs `cannot load library 'libgobject-2.0-0'` (WeasyPrint's GTK/Pango runtime is not installed on this PC) and `GET /orders/{id}/invoice/` answers 503 SERVICE_UNAVAILABLE. | The documented clean degradation (`docs/dev-environment.md`). P5-TC-77 stays ⏭ until a host with the GTK runtime (staging). |
+| OBS-S4-03 | Rider pushes (`rider.order_ready`, `rider.cod_amount_changed`, …) are stored with `order_id` NULL and the task id in `data`. | By design of `send_push` (ids in `data`). QA oracles updated (P5-TC-50, 51). |
+| OBS-S4-04 | P5-TC-58 over the whole day mixed the old PC's morning runs (2 s per Redis connect, OBS-S3-01): p95 9.85 s. On this build and host: ACCEPTED → first offer p50 0.24 s, p95 0.39 s (n = 31). | Measured on this session only. The 09 §1 targets are for staging (P8). |
+
+**Open by severity (2026-11-10, stage 4):** P0 0 · P1 0 · P2 1 (**BUG-0024**) · P3 3 (BUG-0013, BUG-0020, **BUG-0023**). **Verified this stage:** BUG-0021, BUG-0022, BUG-0006.

@@ -69,3 +69,16 @@
 | Ratings → `Rider.rating_avg`; reports / dashboard ↔ SQL | ✅ | P7-TC-01–08, 23, 31 |
 | QR webhook / `fake_cod_qr_payment` → CodQr PAID → deliver UPI, no ledger row | ✅ | P5-TC-89, 90, 91 |
 | Rider document upload → MinIO (private, signed links) | ✅ (with MinIO up); with MinIO down the upload hangs to the client timeout (OBS-S3-03) | P5-TC-04, 14, 20 |
+
+
+## QA stage 4 (2026-11-10, develop `f8db671`)
+| Integration | Result | Cases |
+|---|---|---|
+| T9 pickup → `order.status` OUT_FOR_DELIVERY on the order socket + ops feed, one push | ✅ (BUG-0021 verified) | P6-TC-59 |
+| Rider ping → `rider.location` with heading (customer + ops) | ✅ (BUG-0022 verified) | P6-TC-14, 34 |
+| Ops Console report export → Celery (QA broker) → MinIO private file → signed download | ✅ | P7-TC-40d |
+| T8a (store) → rider task `cod_amount_due` + `rider.cod_amount_changed` push row | ✅ | P5-TC-51 |
+| Beat `dispatch-sweep` / countdowns → expiry, UNASSIGNED, `DISPATCH_UNASSIGNED` alert, new round | ✅ | P5-TC-47 |
+| Auto-accept countdown + acceptance SLA → `ACCEPTANCE_SLA_BREACHED` alert on the store feed | ✅ | P6-TC-33 |
+| Invoice → WeasyPrint | ⏭: 503 on this PC (no GTK runtime, OBS-S4-02) | P5-TC-77 |
+| KYC files from the old PC → this MinIO | ⚠ missing (OBS-S4-01, environment) | P5-TC-110 used fresh uploads |

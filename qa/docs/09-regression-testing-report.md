@@ -79,3 +79,19 @@ Smoke P0–P7 not run as a set this session (stopped for a PC shutdown). Regress
 - **Total:** **138 passed, 1 skipped** (P0 staging profile), **2 xfailed** (BUG-0021, BUG-0022).
 
 **P5 🔥 cases:** all passed inside today's full P5 runs (see 10, stage 3). **Regression found:** none in P0–P4. The two new bugs are P6 functionality (BUG-0021, BUG-0022). BUG-0013 and BUG-0020 xfails still hold (not fixed).
+
+## QA stage 4 (2026-11-10, develop `f8db671`, QA instance :8004 on the new Windows PC)
+**🔥 smoke, P0–P7 (P5 included this time; 181 cases, with the new 🔥 cases P5-TC-110, P7-TC-40a/b/c/e/f):**
+- **Command:** `QA_WORKER_CONCURRENCY=16 uv run pytest -m smoke -rfEsx` (local profile, QA worker + QA beat on Redis DB 7).
+- **Result:** SMOKE_LINE
+SMOKE_NOTES
+
+**Fix verification and affected areas:**
+- **BUG-0021 / BUG-0022:** `test_p6_t612.py -k "tc14 or tc59 or tc34"` → 3 passed. The conditional xfails became hard assertions, and there are new checks: ops-feed OFD, ops-feed heading, one T9 notification.
+- **BUG-0006:** `shortsession` timeline → 1 passed.
+- **Known-bug guards still holding (fix not in this build):** BUG-0013 (`test_p5_tc16…`) and BUG-0020 (`test_p6_tc50…`).
+- **New guards:**
+  - BUG-0023: `test_p5_tc42b…` xfail strict; `test_p5_tc42…` xfails with the per-trial codes.
+  - BUG-0024: `test_p5_tc117…` xfails after every other role check passes.
+
+**Regression found:** none. Both new bugs are in cases executed for the first time (P5-TC-42, P5-TC-117), not in previously passing cases.

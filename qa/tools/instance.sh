@@ -15,6 +15,8 @@
 #                 SSL redirect off, NUM_PROXIES=0. Used for DEBUG-off envelope checks only.
 #   redis-down    local, but every Redis URL points at a closed port (6399): resilience checks.
 #   daylimit      local with OTP_SEND_LIMIT_PER_10_MIN=50, so the 10/day cap can be reached.
+#   dispatchfast / riderclock / triggerplaced / gwdown / cancelplaced / wsrecheck: local with the
+#                 timers or switches of 01 §9.2 and §6 (see the case statement below).
 #   shortsession  local with the staff session limits shortened (idle 90 s, absolute 180 s) so
 #                 BUG-0006 can be verified black-box. The app's touch interval is 60 s.
 #   clock         local with the process clock shifted (QA harness, like libfaketime): set
@@ -47,12 +49,28 @@ backend_env() {  # $1 = .env | .env.localdb
 ENV_FILE="$(backend_env .env "${QA_BACKEND_ENV:-}")"
 LOCALDB_FILE="$(backend_env .env.localdb "${QA_BACKEND_ENV_LOCALDB:-}")"
 
-pid_on_port() {
-  { ss -ltnpH "sport = :$PORT" 2>/dev/null | grep -o "pid=[0-9]*" | head -1 | cut -d= -f2; } || true
+# Windows (Git Bash, stage 4, 2026-11-10): no `ss`, no real symlinks (`ln -s` would COPY
+# backend/.env into the export) and Git Bash `kill` cannot stop a native process. There the
+# instance runs in place from this checkout's backend/ (it must be clean at <commit>), the PID is
+# read from `netstat -ano` and stopped with `taskkill`.
+WINDOWS=0
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) WINDOWS=1 ;; esac
+
+pid_on_port() {  # $1 = port (default $PORT)
+  local port="${1:-$PORT}"
+  if [[ "$WINDOWS" == 1 ]]; then
+    { netstat -ano -p tcp 2>/dev/null | awk -v a="$HOST:$port" '$2 == a && $4 == "LISTENING" {print $5; exit}'; } || true
+  else
+    { ss -ltnpH "sport = :$port" 2>/dev/null | grep -o "pid=[0-9]*" | head -1 | cut -d= -f2; } || true
+  fi
 }
 
-check_8001() {
-  if ss -ltnH "sport = :8001" | grep -q LISTEN; then echo "dev server 8001: still listening (untouched)"; else echo "WARNING: nothing listening on 8001"; fi
+kill_pid() {
+  if [[ "$WINDOWS" == 1 ]]; then taskkill //PID "$1" //T //F >/dev/null 2>&1 || true; else kill "$1"; fi
+}
+
+check_8001() {  # 8001 is never touched (on the stage-4 PC it belongs to another project)
+  if [[ -n "$(pid_on_port 8001)" ]]; then echo "port 8001: listening (untouched)"; else echo "port 8001: not listening (untouched)"; fi
 }
 
 cmd="${1:-status}"
@@ -61,14 +79,24 @@ case "$cmd" in
     profile="${2:-local}"
     commit="${3:-HEAD}"
     sha="$(git -C "$REPO" rev-parse --short "$commit")"
-    export_dir="/tmp/jivo-qa-$sha"
     if [[ -n "$(pid_on_port)" ]]; then echo "port $PORT busy (pid $(pid_on_port)); run stop first"; exit 1; fi
-    if [[ ! -d "$export_dir/backend" ]]; then
-      mkdir -p "$export_dir"
-      git -C "$REPO" archive "$sha" | tar -x -C "$export_dir"
-    fi
     [[ -f "$ENV_FILE" ]] || { echo "backend .env not found (set QA_BACKEND_ENV)"; exit 1; }
-    ln -sfn "$ENV_FILE" "$export_dir/backend/.env"
+    if [[ "$WINDOWS" == 1 || "${QA_INPLACE:-0}" == 1 ]]; then
+      head_sha="$(git -C "$REPO" rev-parse --short HEAD)"
+      [[ "$sha" == "$head_sha" ]] || { echo "in-place mode tests HEAD only ($head_sha), not $sha"; exit 2; }
+      if [[ -n "$(git -C "$REPO" status --porcelain -- backend)" ]]; then
+        echo "backend/ has uncommitted changes: the in-place instance would not be $sha"; exit 2
+      fi
+      [[ -f "$REPO/backend/.env" ]] || { echo "in-place mode needs backend/.env in this checkout"; exit 1; }
+      export_dir="$REPO"
+    else
+      export_dir="/tmp/jivo-qa-$sha"
+      if [[ ! -d "$export_dir/backend" ]]; then
+        mkdir -p "$export_dir"
+        git -C "$REPO" archive "$sha" | tar -x -C "$export_dir"
+      fi
+      ln -sfn "$ENV_FILE" "$export_dir/backend/.env"
+    fi
     (cd "$export_dir/backend" && uv sync --frozen --quiet)
     mkdir -p "$LOG_DIR"
     log="$LOG_DIR/instance-$profile-$(date +%Y%m%d-%H%M%S).log"
@@ -79,8 +107,13 @@ case "$cmd" in
       "CELERY_BROKER_URL=redis://127.0.0.1:6380/7"
       "OTP_TEST_NUMBERS=$QA_OTP_NUMBERS"
       "DJANGO_SETTINGS_MODULE=config.settings.local"
+      "SMS_BACKEND=apps.notifications.sms.ConsoleSmsBackend"
       "PYTHONUNBUFFERED=1"
+      "PYTHONIOENCODING=utf-8"
     )
+    # Extra settings for this run only (same values must reach the QA worker: QA_EXTRA_ENV is
+    # also read by tests/p4_support.py). Format: "KEY=value KEY2=value2".
+    for kv in ${QA_EXTRA_ENV:-}; do env_vars+=("$kv"); done
     case "$profile" in
       local) ;;
       daylimit) env_vars+=("OTP_SEND_LIMIT_PER_10_MIN=50") ;;
@@ -104,6 +137,19 @@ case "$cmd" in
           "DJANGO_STAFF_SESSION_IDLE_SECONDS=90"
           "DJANGO_STAFF_SESSION_MAX_AGE_SECONDS=180"
         ) ;;
+      # Timer and switch profiles from 01 §9.2 / §6 (environment only, no code):
+      dispatchfast) env_vars+=("OFFER_TIMEOUT_SECONDS=10" "DISPATCH_TIMEOUT_SECONDS=60"
+                               "DISPATCH_UNASSIGNED_PAUSE_SECONDS=15" "DISPATCH_RETRY_SECONDS=5") ;;
+      riderclock) env_vars+=("RIDER_NOT_REACHABLE_WAIT_SECONDS=20" "RIDER_RECENT_TASK_SECONDS=60") ;;
+      triggerplaced) env_vars+=("DISPATCH_TRIGGER=PLACED") ;;
+      # stage 4: dispatchfast timers + a 40 s auto-accept delay and a 20 s acceptance SLA, so a
+      # QA-02 order stays PLACED long enough to observe (P5-TC-38/47/57, P6-TC-33).
+      s4timers) env_vars+=("OFFER_TIMEOUT_SECONDS=10" "DISPATCH_TIMEOUT_SECONDS=60"
+                           "DISPATCH_UNASSIGNED_PAUSE_SECONDS=15" "DISPATCH_RETRY_SECONDS=5"
+                           "AUTO_ACCEPT_DELAY_SECONDS=40" "STORE_ACCEPTANCE_SLA_SECONDS=20") ;;
+      gwdown) env_vars+=("FAKE_GATEWAY_DOWN=1") ;;
+      cancelplaced) env_vars+=("CUSTOMER_CANCEL_UNTIL=PLACED") ;;
+      wsrecheck) env_vars+=("WS_RIDER_RECHECK_SECONDS=5" "WS_OPS_RECHECK_SECONDS=5") ;;
       clock)
         [[ -n "${QA_FAKE_NOW:-}" ]] || { echo "clock profile needs QA_FAKE_NOW"; exit 2; }
         mkdir -p "$QA_DIR/private"; rm -f "$QA_DIR/private/.instance-clock-offset"
@@ -151,7 +197,7 @@ case "$cmd" in
   stop)
     pid="$(pid_on_port)"
     if [[ -z "$pid" ]]; then echo "nothing on $PORT"; else
-      kill "$pid"; for _ in $(seq 1 20); do [[ -z "$(pid_on_port)" ]] && break; sleep 0.5; done
+      kill_pid "$pid"; for _ in $(seq 1 20); do [[ -z "$(pid_on_port)" ]] && break; sleep 0.5; done
       echo "stopped pid $pid on $PORT"
     fi
     rm -f "$QA_DIR/private/.instance-profile"
