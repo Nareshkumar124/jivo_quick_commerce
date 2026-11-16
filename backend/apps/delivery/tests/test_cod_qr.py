@@ -305,6 +305,61 @@ def test_wrong_amount_credit_is_refunded(at_customer, api_client):
     assert f.client.post(qr_url(f)).json()["qr_id"] != qr["qr_id"]
 
 
+def test_expired_unreplaced_qr_paid_late_is_refunded_once(
+    at_customer, api_client, settings, django_capture_on_commit_callbacks, monkeypatch
+):
+    """P5-TC-92c (BUG-0025): a credit on a QR past `expires_at` that the rider never replaced
+    does not pay the order (08 T10, 06 slice 5.4): one full refund keyed on the payment id, the
+    QR closed EXPIRED (not collected); a webhook replay refunds nothing more."""
+    settings.COD_QR_EXPIRY_SECONDS = 60  # inside the 15-minute access token
+    alerts = []
+    monkeypatch.setattr(hooks, "ops_alert", lambda kind, data: alerts.append(kind))
+    f = at_customer
+    qr = f.client.post(qr_url(f)).json()
+    later = timezone.now() + timedelta(seconds=settings.COD_QR_EXPIRY_SECONDS + 5)
+    with freeze_time(later):
+        with django_capture_on_commit_callbacks(execute=True):
+            response = pay(api_client, qr, payment_id="pay_QrExpiredLate1", event_id="evt_x_1")
+        assert response.status_code == 200, response.content
+        # Replay: same event id, then a new event id for the same payment.
+        replay = pay(api_client, qr, payment_id="pay_QrExpiredLate1", event_id="evt_x_1")
+        assert replay.status_code == 200
+        replay = pay(api_client, qr, payment_id="pay_QrExpiredLate1", event_id="evt_x_2")
+        assert replay.status_code == 200
+        current = f.client.get("/api/v1/rider/tasks/current/").json()["task"]["cod_qr"]
+    stored = CodQr.objects.get(gateway_qr_id=qr["qr_id"])
+    assert stored.status == CodQrStatus.EXPIRED
+    assert stored.payment is None
+    assert stored.paid_at is None
+    assert current["status"] == "EXPIRED"
+    refund = Refund.objects.get(order=f.order)  # exactly one
+    assert refund.idempotency_key == "codqr:pay_QrExpiredLate1"
+    assert refund.reason == COD_QR_UNUSED
+    assert refund.amount == f.order.grand_total == Decimal(qr["amount"])
+    assert Payment.objects.filter(gateway_payment_id="pay_QrExpiredLate1").count() == 1
+    assert alerts == ["COD_QR_REFUNDED"]
+    f.order.refresh_from_db()
+    assert f.order.payment_status != PaymentStatus.COD_COLLECTED
+    # Not collected: UPI delivery is refused; the rider takes cash.
+    assert f.deliver(cod={"mode": "upi", "amount": qr["amount"]}).status_code == 400
+    assert f.deliver().status_code == 200
+    f.order.refresh_from_db()
+    assert f.order.payment_status == PaymentStatus.COD_COLLECTED
+    assert Refund.objects.filter(order=f.order).count() == 1
+
+
+def test_qr_paid_just_before_expiry_is_accepted(at_customer, api_client, settings):
+    """P5-TC-92c control (BUG-0025): a credit before `expires_at` still pays the order."""
+    settings.COD_QR_EXPIRY_SECONDS = 60
+    f = at_customer
+    qr = f.client.post(qr_url(f)).json()
+    with freeze_time(timezone.now() + timedelta(seconds=settings.COD_QR_EXPIRY_SECONDS - 5)):
+        assert pay(api_client, qr).status_code == 200
+    assert CodQr.objects.get(gateway_qr_id=qr["qr_id"]).status == CodQrStatus.PAID
+    assert not Refund.objects.filter(order=f.order).exists()
+    assert f.deliver(cod={"mode": "upi", "amount": qr["amount"]}).status_code == 200
+
+
 def test_failed_delivery_refunds_a_paid_qr(at_customer, api_client, monkeypatch):
     """P5-TC-47: T13 on a COD order whose QR was paid: nothing is due, so the UPI payment is
     refunded in full; COD payment_status FAILED."""
