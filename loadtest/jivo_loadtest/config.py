@@ -1,5 +1,9 @@
 """Run settings, read from the environment (the CLI sets them from its flags) so the locustfile
-and the CLI agree. Every value has a default that fits the demo store GGN-01 on staging."""
+and the CLI agree. Every value has a default that fits the staging server (jqc.jivo.in).
+
+The customer location (`LOADTEST_LAT` / `LOADTEST_LNG`, or `--lat` / `--lng`) must fall inside
+the load-test store's service area. The default is the staging store point
+(`DEFAULT_LAT`, `DEFAULT_LNG`); for the local demo store GGN-01 pass `GGN01_LAT`, `GGN01_LNG`."""
 
 import os
 from dataclasses import dataclass, field
@@ -24,6 +28,13 @@ RIDER_PHONES: tuple[str, ...] = tuple(
 
 API = "/api/v1"
 
+# The staging store point (inside its service area): the default customer location.
+DEFAULT_LAT = Decimal("28.631878")
+DEFAULT_LNG = Decimal("77.128798")
+# The seed_demo store GGN-01 (local servers).
+GGN01_LAT = Decimal("28.471000")
+GGN01_LNG = Decimal("77.044000")
+
 
 def _env(name: str, default: str) -> str:
     return os.environ.get(name, default).strip() or default
@@ -32,8 +43,8 @@ def _env(name: str, default: str) -> str:
 @dataclass(frozen=True)
 class RunConfig:
     profile: str = "smoke"
-    lat: Decimal = Decimal("28.471000")  # GGN-01 store point (inside its service area)
-    lng: Decimal = Decimal("77.044000")
+    lat: Decimal = DEFAULT_LAT  # LOADTEST_LAT / --lat
+    lng: Decimal = DEFAULT_LNG  # LOADTEST_LNG / --lng
     otp: str = "123456"
     app_version: str = "1.0.0"
     platform: str = "android"

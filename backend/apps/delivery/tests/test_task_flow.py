@@ -535,3 +535,49 @@ def test_cash_in_hand_blocks_cod_offers_after_collection(flow, settings):
     Rider.objects.filter(pk=f.rider.pk).update(cash_limit=Decimal("100.00"))
     me = f.client.get("/api/v1/rider/me/").json()
     assert me["cash"]["limit_reached"] is True
+
+
+def test_customer_pii_reaches_the_rider_only_from_accept_until_1h_after_the_end(flow):
+    """09 §3.2 (P8 security review): the offer carries the locality only; the task body has the
+    full address and phone from accept; 1 h after the task ended it is blanked (same shape,
+    coarse point), and the history list and detail never carry it."""
+    from apps.delivery.services import presenters
+
+    f = flow("ONLINE")
+    dispatch.dispatch_order(f.order.pk)
+    offer = f.client.get("/api/v1/rider/offers/current/").json()["offer"]
+    snapshot = f.order.address_snapshot
+    phone, name = snapshot["receiver_phone"], snapshot["receiver_name"]
+    assert phone
+    assert name
+    assert phone not in str(offer)
+    assert name not in str(offer)
+    f.accept()
+    task = f.client.get("/api/v1/rider/tasks/current/").json()["task"]
+    assert task["customer_address"]["receiver_phone"] == phone
+    assert f.at_store().status_code == 200
+    f.steps.pack(f.order)
+    assert f.pickup().status_code == 200
+    assert f.at_customer().status_code == 200
+    assert f.deliver(cod=None).status_code == 200
+    ended = DeliveryTask.objects.get(pk=f.task_id).ended_at
+
+    def body():
+        return presenters.task_body(presenters.task_queryset().get(pk=f.task_id))
+
+    with freeze_time(ended + timedelta(minutes=59)):
+        assert body()["customer_address"]["receiver_phone"] == phone
+    with freeze_time(ended + timedelta(minutes=61)):
+        late = body()
+    address = late["customer_address"]
+    assert set(address) == set(snapshot)  # the contract keeps its shape
+    for field in ("receiver_name", "receiver_phone", "house", "building_street", "landmark"):
+        assert address[field] == ""
+    assert late["instructions"]["note"] == ""
+    assert address["lat"] == round(float(snapshot["lat"]), 2)
+    history = f.client.get("/api/v1/rider/tasks/history/").json()
+    detail = f.client.get(f"/api/v1/rider/tasks/history/{f.task_id}/").json()
+    for response in (history, detail):
+        assert phone not in str(response)
+        assert name not in str(response)
+        assert "customer_address" not in str(response)

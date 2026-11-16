@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from jivo_loadtest import profiles
-from jivo_loadtest.config import PHONES, RIDER_PHONES, RunConfig
+from jivo_loadtest.config import DEFAULT_LAT, DEFAULT_LNG, PHONES, RIDER_PHONES, RunConfig
 from jivo_loadtest.safety import ALLOWED_HOSTS_ENV, UnsafeTarget, check_target
 from jivo_loadtest.thresholds import (
     ERROR_RATE_MAX,
@@ -40,8 +40,12 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--host", required=True, help="Server root, e.g. https://staging-api.x")
     run.add_argument("--profile", default="smoke", choices=sorted(profiles.PROFILES))
     run.add_argument("--results-dir", default="results", help="Where run folders go.")
-    run.add_argument("--lat", help="Customer location latitude (default: GGN-01).")
-    run.add_argument("--lng", help="Customer location longitude (default: GGN-01).")
+    run.add_argument(
+        "--lat", help=f"Customer location latitude (default: staging store, {DEFAULT_LAT})."
+    )
+    run.add_argument(
+        "--lng", help=f"Customer location longitude (default: staging store, {DEFAULT_LNG})."
+    )
     run.add_argument("--online-share", type=float, help="Share of ONLINE checkouts (0.3).")
     run.add_argument("--cancel-share", type=float, help="Share of orders cancelled (0.3).")
     run.add_argument(

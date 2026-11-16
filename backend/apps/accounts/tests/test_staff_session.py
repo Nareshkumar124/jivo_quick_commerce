@@ -125,6 +125,33 @@ class TestSessionLimits:
             expiry = client.session.get_expiry_date()
         assert expiry == datetime(2026, 11, 3, 12, 0, tzinfo=UTC)  # 04:00 UTC + 8 h
 
+    def test_background_ops_refreshes_do_not_keep_a_session_alive(self, client, ops_user):
+        """BUG-0006: timed polls / live refreshes (htmx + `X-Ops-Background: 1`) are not
+        activity, so an open Ops tab goes idle after 2 h; a real htmx action still counts."""
+        background = {"HX-Request": "true", "X-Ops-Background": "1"}
+        with freeze_time(START) as frozen:
+            _login(client, ops_user)
+            first = client.session[LAST_SEEN_KEY]
+            for _ in range(11):  # every 10 minutes for 1 h 50 min
+                frozen.tick(timedelta(minutes=10))
+                client.get(ADMIN, headers=background)
+                assert _signed_in(client)
+            assert client.session[LAST_SEEN_KEY] == first
+            frozen.tick(timedelta(minutes=11))  # 2 h 1 min after the last real request
+            client.get(ADMIN, headers=background)
+            assert not _signed_in(client)
+
+    def test_htmx_without_the_background_header_is_activity(self, client, ops_user):
+        with freeze_time(START) as frozen:
+            _login(client, ops_user)
+            first = client.session[LAST_SEEN_KEY]
+            frozen.tick(timedelta(hours=1))
+            client.get(ADMIN, headers={"HX-Request": "true"})
+            assert client.session[LAST_SEEN_KEY] > first
+            frozen.tick(timedelta(hours=1, minutes=30))  # 2 h 30 min after login, 1 h 30 idle
+            assert client.get(ADMIN).status_code == 200
+            assert _signed_in(client)
+
     def test_activity_is_written_at_most_once_a_minute(self, client, ops_user):
         with freeze_time(START) as frozen:
             _login(client, ops_user)

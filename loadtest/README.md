@@ -95,7 +95,10 @@ you can re-run it:
    export LOADTEST_ALLOWED_HOSTS=staging-api.example.com
    uv run jivo-loadtest run --host https://staging-api.example.com --profile smoke
    ```
-4. **The gate**: `--profile target` (about 20 minutes) and optionally `--profile ramp` (13 minutes,
+   **Shared staging (DL-75)**: run only `--profile light` (20 sessions for 5 minutes: 4 buyers,
+   16 browsers, no riders, 4 orders/min) while watching the other sites on the host; abort the
+   run if they slow down. Its latency thresholds are reported, but it is not the 09 §1 gate.
+4. **The gate** (a dedicated server only): `--profile target` (about 20 minutes) and optionally `--profile ramp` (13 minutes,
    a step ramp that shows where latency starts to climb). Use `--dry-run` first to see the plan.
 5. **Clean up**: wait for the Celery queue to drain, then run `manage.py loadtest_cleanup`, read
    the dry run, then `manage.py loadtest_cleanup --yes`. **Cleanup cancels open orders through
@@ -127,6 +130,18 @@ placed order. COD orders cover placement throughput.
 Options: `--online-share`, `--cancel-share`, `--riders N` (0 to disable), `--lat/--lng`, `--otp`
 and `--app-version`. Each also has a `LOADTEST_*` environment variable (see
 `jivo_loadtest/config.py`).
+
+**Customer location.** Every session checks serviceability and sets its address at
+`--lat/--lng` (or `LOADTEST_LAT` / `LOADTEST_LNG`), which must be inside the load-test store's
+service area. The default is the **staging store point, 28.631878, 77.128798**
+(`config.DEFAULT_LAT/DEFAULT_LNG`). Against a local server seeded with `seed_demo`, pass the
+GGN-01 point: `--lat 28.471000 --lng 77.044000`. Use the same point for
+`manage.py loadtest_seed --lat/--lng` (it defaults to the store's own point).
+
+**Checkout blockers.** A buyer fixes `STOCK_UNAVAILABLE` (lowers the quantity),
+`MIN_ORDER_NOT_MET` and `MIN_UNITS_NOT_MET` (adds another product, or one more of a line, until
+the store's minimum value and units are met). Any other blocker ends that journey as
+`checkout blocked`.
 
 ### Riders
 

@@ -788,6 +788,9 @@ DELIVERY_OTP_MAX_ATTEMPTS = env_int("DELIVERY_OTP_MAX_ATTEMPTS", default=5)
 PICKUP_CODE_MAX_ATTEMPTS = env_int("PICKUP_CODE_MAX_ATTEMPTS", default=5)
 # `GET /rider/tasks/current/` returns the rider's last ended task as `recent_task` this long.
 RIDER_RECENT_TASK_SECONDS = env_int("RIDER_RECENT_TASK_SECONDS", default=600)
+# 09 §3.2: the customer's name, phone and full address reach the rider only after accept, and
+# are hidden again this long after the task ended (DELIVERED / RETURNED / CANCELLED).
+RIDER_CUSTOMER_PII_SECONDS = env_int("RIDER_CUSTOMER_PII_SECONDS", default=3600)
 # 08 §5 dispatch (slice 5.3): a candidate's last location must have arrived within this; riders
 # within DISPATCH_AT_STORE_RADIUS_M of the store come first (longest idle first); with no
 # candidate the search runs again after DISPATCH_RETRY_SECONDS; after UNASSIGNED the auto-retry

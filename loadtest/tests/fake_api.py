@@ -28,6 +28,7 @@ def money(value: Decimal) -> str:
 class FakeApi:
     serviceable: bool = True
     min_order: Decimal = Decimal("99.00")
+    min_units: int = 0  # the store's min_order_units (0 = off)
     cod_max: Decimal = Decimal("2000.00")
     key_id: str = gateway.FAKE_KEY_ID
     pending_order_once: bool = False
@@ -110,8 +111,11 @@ class FakeApi:
             blockers.append({"code": "CART_EMPTY"})
         elif any(i["issue"] for i in items):
             blockers.append({"code": "STOCK_UNAVAILABLE"})
-        elif total < self.min_order:
-            blockers.append({"code": "MIN_ORDER_NOT_MET"})
+        else:
+            if total < self.min_order:
+                blockers.append({"code": "MIN_ORDER_NOT_MET"})
+            if sum(self.cart.values()) < self.min_units:
+                blockers.append({"code": "MIN_UNITS_NOT_MET"})
         if items and self.address_id is None:
             blockers.append({"code": "ADDRESS_REQUIRED"})
         grand = total + (Decimal(25) if total and total < 299 else 0)

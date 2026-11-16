@@ -363,6 +363,16 @@ class RiderConsumer(JwtSocketConsumer):
         from apps.accounts.choices import AppName
 
         if identity.app != AppName.RIDER:
+            # DL-74: say why first (the REST rider API's `details.reason`), then close 4403.
+            from apps.accounts import app_access
+
+            await self.send_message(
+                contract.ERROR,
+                {
+                    "code": app_access.REASON_WRONG_APP_TOKEN,
+                    "message": app_access.MSG_WRONG_APP_TOKEN[AppName.RIDER],
+                },
+            )
             return contract.CLOSE_FORBIDDEN
         rider_id = await database_sync_to_async(active_rider_id)(identity.user)
         if rider_id is None:

@@ -288,11 +288,16 @@ def test_app_sockets_need_no_origin_but_any_origin_is_fine(order):
 
 
 def test_rider_socket_refuses_a_customer_app_token(user):
+    """P6-TC-19, DL-74: an `error` message with code WRONG_APP_TOKEN, then close 4403."""
     token = token_for(user, "customer")
 
     async def scenario():
         socket, _, _ = await open_socket("/ws/v1/rider/")
         await socket.send_json_to({"type": "auth", "token": token})
+        message = await receive(socket)
+        assert message["type"] == contract.ERROR
+        assert message["data"]["code"] == "WRONG_APP_TOKEN"
+        assert "rider app" in message["data"]["message"].lower()
         await expect_close(socket, contract.CLOSE_FORBIDDEN)
 
     run(scenario)
@@ -533,6 +538,7 @@ def test_rider_reauth_with_a_customer_app_token_closes_with_4403(user, monkeypat
         await socket.send_json_to({"type": "auth", "token": rider_token})
         assert (await receive(socket))["type"] == "auth.ok"
         await socket.send_json_to({"type": "auth", "token": customer_token})
+        assert (await receive(socket))["data"]["code"] == "WRONG_APP_TOKEN"  # DL-74
         await expect_close(socket, contract.CLOSE_FORBIDDEN)
 
     run(scenario)

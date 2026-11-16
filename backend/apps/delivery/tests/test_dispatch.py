@@ -185,6 +185,28 @@ def test_late_accept_is_offer_expired_and_redispatches(accepted, make_rider, rid
     assert offer_of(accepted).rider == second
 
 
+@pytest.mark.parametrize("task_status", [TS.SEARCHING, TS.UNASSIGNED])
+def test_late_accept_after_processed_expiry_is_offer_expired(
+    accepted, make_rider, rider_client, task_status
+):
+    """BUG-0023 (P5-TC-42b): one rider, the expiry already processed (task SEARCHING, or
+    UNASSIGNED after the last attempt), nobody else offered: the late accept is OFFER_EXPIRED,
+    not OFFER_TAKEN, and changes nothing."""
+    rider = make_rider()
+    dispatch.dispatch_order(accepted.pk)
+    offer = offer_of(accepted)
+    DeliveryOffer.objects.filter(pk=offer.pk).update(expires_at=timezone.now())
+    assert dispatch.expire_offer(offer.pk) == "expired"
+    DeliveryTask.objects.filter(order=accepted).update(status=task_status)
+    response = rider_client(rider).post(accept_url(offer))
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "OFFER_EXPIRED"
+    offer.refresh_from_db()
+    task = DeliveryTask.objects.get(order=accepted)
+    assert offer.status == OfferStatus.EXPIRED
+    assert (task.status, task.rider_id) == (task_status, None)
+
+
 def test_accept_after_cancellation_is_offer_taken(accepted, make_rider, rider_client, admin):
     from apps.orders import store_ops
 

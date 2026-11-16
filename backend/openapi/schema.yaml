@@ -29596,7 +29596,9 @@ components:
       - expires_at
     WsErrorData:
       type: object
-      description: A non-fatal error about a client message (the socket stays open).
+      description: 'A non-fatal error about a client message (the socket stays open).
+        Exception: `WRONG_APP_TOKEN` on `/ws/v1/rider/` (DL-74) is sent just before
+        the 4403 close.'
       properties:
         code:
           type: string

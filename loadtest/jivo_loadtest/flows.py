@@ -36,6 +36,9 @@ from urllib.parse import urlencode
 from jivo_loadtest import gateway
 from jivo_loadtest.config import API, RunConfig
 
+# Checkout blockers fixed by adding one unit at a time (another product, or one more of a line).
+MINIMUM_BLOCKERS = frozenset({"MIN_ORDER_NOT_MET", "MIN_UNITS_NOT_MET"})
+FIX_ROUNDS = 12  # cart updates per checkout attempt (a store minimum of a few units fits)
 ACCESS_REFRESH_AFTER_S = 13 * 60  # access tokens live 15 minutes; refresh like the app does
 
 
@@ -416,8 +419,9 @@ class Session:
 
     def _fix_blockers(self, cart: dict, variants: list[Variant]) -> dict:
         """Act on checkout blockers the way a customer would: add items below the minimum
-        order, lower quantities above stock. Anything else ends the journey."""
-        for _ in range(4):
+        order value or the minimum units (`MIN_ORDER_NOT_MET`, `MIN_UNITS_NOT_MET`; one more unit
+        helps both), lower quantities above stock. Anything else ends the journey."""
+        for _ in range(FIX_ROUNDS):
             blockers = {b["code"] for b in (cart.get("checkout") or {}).get("blockers", [])}
             if not blockers:
                 return cart
@@ -428,7 +432,7 @@ class Session:
                             line["variant"]["id"], line["variant"].get("orderable_quantity", 0)
                         )
                 continue
-            if blockers == {"MIN_ORDER_NOT_MET"}:
+            if blockers <= MINIMUM_BLOCKERS:
                 in_cart = {line["variant"]["id"]: line for line in cart.get("items") or []}
                 more = [v for v in variants if v.id not in in_cart]
                 if more:
