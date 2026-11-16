@@ -83,8 +83,7 @@ Smoke P0–P7 not run as a set this session (stopped for a PC shutdown). Regress
 ## QA stage 4 (2026-11-10, develop `f8db671`, QA instance :8004 on the new Windows PC)
 **🔥 smoke, P0–P7 (P5 included this time; 181 cases, with the new 🔥 cases P5-TC-110, P7-TC-40a/b/c/e/f):**
 - **Command:** `QA_WORKER_CONCURRENCY=16 uv run pytest -m smoke -rfEsx` (local profile, QA worker + QA beat on Redis DB 7).
-- **Result:** SMOKE_LINE
-SMOKE_NOTES
+- **Result:** not recorded. The stage-4 session ended before the smoke result was written into this report, and no output file was kept (noted 2026-11-16; not reconstructed).
 
 **Fix verification and affected areas:**
 - **BUG-0021 / BUG-0022:** `test_p6_t612.py -k "tc14 or tc59 or tc34"` → 3 passed. The conditional xfails became hard assertions, and there are new checks: ops-feed OFD, ops-feed heading, one T9 notification.
@@ -95,3 +94,15 @@ SMOKE_NOTES
   - BUG-0024: `test_p5_tc117…` xfails after every other role check passes.
 
 **Regression found:** none. Both new bugs are in cases executed for the first time (P5-TC-42, P5-TC-117), not in previously passing cases.
+
+## QA on main (2026-11-16, main `f6ed556`)
+**🔥 smoke P0–P7:** `QA_WORKER_CONCURRENCY=16 uv run pytest -m smoke -rfs` (local profile, QA worker on Redis DB 7) → **94 passed, 20 failed, 64 errors, 3 skipped, 1 xfailed** in 14 min (`qa/private/runs/m1-smoke.txt`).
+- **64 errors + 19 failures: OBS-M-01** (the shared DB lacks six main migrations). Set-up of every P3–P7 order flow fails on `DELETE /api/v1/cart/ -> 500`; the P2 catalog, P3 coupon admin, P7 report driver (`min_qty_per_order` in SQL) and P7 console cases fail on 500s. **Not a regression in the code: not testable until the DB is migrated.**
+- **1 failure, QA defect:** P6-TC-29 [Catalog Manager] (helper raised when the server closed 4403 before the first frame). Fixed in `tests/p6_support.py`, rerun 7/7 ✅.
+- **P0, P1 and P2 (non-catalog) smoke cases: all pass.**
+
+**Fix verification:** BUG-0013 (P5-TC-16) and BUG-0020 (P6-TC-50): the strict xfail guards turned XPASS on main, now plain asserts, 5/5 pass. **Verified.**
+
+**Affected areas re-run on main:** P0 + P1 full (196 passed after 18 test-side oracle/environment fixes, no product regression); P2 serviceability / DB / security (82 passed, 7 blocked); P2 clock TC-11 ✅; redis-down P0/P1 cases ✅.
+
+**Regression found:** none in what could run. **Not regression-tested on main:** P3–P7 order flows and the P2 catalog (OBS-M-01). Re-run the full smoke set after the migrations.

@@ -82,3 +82,6 @@
 | Auto-accept countdown + acceptance SLA → `ACCEPTANCE_SLA_BREACHED` alert on the store feed | ✅ | P6-TC-33 |
 | Invoice → WeasyPrint | ⏭: 503 on this PC (no GTK runtime, OBS-S4-02) | P5-TC-77 |
 | KYC files from the old PC → this MinIO | ⚠ missing (OBS-S4-01, environment) | P5-TC-110 used fresh uploads |
+
+## QA on main (2026-11-16, `f6ed556`)
+Not run: the integration flows (order → dispatch → delivery → refunds, sockets on order events) need the cart and order endpoints, which answer 500 on main against the unmigrated shared DB (OBS-M-01). The new integration cases P5-TC-50 (b) (T8 packing triggers dispatch before the retry) and P5-TC-92 (COD UPI QR after T8a, expired QR, failed task) are automated in `tests/test_p5_main.py` and wait for the migrations. The redis-down resilience cases P0-TC-03b and P1-TC-63/63b/63c pass on main; P2-TC-12b is blocked.

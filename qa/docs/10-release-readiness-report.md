@@ -1,5 +1,7 @@
 # 10: Release Readiness Report
 
+**Latest verdicts:** "Fresh verdicts P0–P7 on main (2026-11-16)" at the end of this file. Earlier sections are kept as history.
+
 **Date:** 2026-11-02 (QA run 1) · **Build:** backend commit `4960527` (released P0+P1). The apps were statically reviewed at the same commit · **Gate rules:** `docs/10-testing-strategy.md` §5.2.
 
 ## Phase 0: Foundation. Verdict: **Not ready (gate incomplete)**
@@ -258,7 +260,7 @@ Backend code for delivery, realtime and orders is unchanged on develop `3f6fc42`
 | P6-TC-09 | real 15 min token expiry on an open socket | **1 passed** |
 | `shortsession` (BUG-0006) | `uv run pytest tests/test_p1_staff_session.py -k tc95b` | **1 passed**. BUG-0006 **Verified** |
 | P5 SQL invariants after the session | `uv run pytest tests/test_p5_db.py` | **3 passed** (QA-02 stock, cash ledger, task/order consistency) |
-| 🔥 smoke P0–P7 | `uv run pytest -m smoke` (local) | SMOKE_RESULT |
+| 🔥 smoke P0–P7 | `uv run pytest -m smoke` (local) | Not recorded (the session ended before the result was written; noted 2026-11-16) |
 | Logs | instance and worker logs of the session | No 500. The only 5xx were 2 invoice 503s (documented degradation). The tracebacks in the log are the 403 `PermissionDenied` refusals of the role tests. Worker ERROR lines are the SLA alerts of old PLACED orders in the shared DB (by design) |
 
 **Case status (`02`, totals table "QA stage 4"):**
@@ -305,3 +307,59 @@ Backend code for delivery, realtime and orders is unchanged on develop `3f6fc42`
    - QA G (+919000000107) re-uploaded PHOTO and PAN (still PENDING_KYC).
 
 **Next QA session:** P5-TC-92 and TC-50 (b); re-verify BUG-0013, BUG-0020, BUG-0023 and BUG-0024 when merged; device cases with the PM; staging.
+
+## Fresh verdicts P0–P7 on main (2026-11-16, main `f6ed556`, worktree `qa/main`)
+**Build and environment:** main `f6ed556` (contains the stage-4 QA work and the BUG-0013 / BUG-0020 fixes). QA instance `127.0.0.1:8004`, run in place from the worktree's clean `backend/` (`qa/tools/instance.sh`), profiles `local`, `clock`, `redis-down`, plus `local` with `QA_EXTRA_ENV="DISPATCH_RETRY_SECONDS=300 DISPATCH_TIMEOUT_SECONDS=900 COD_QR_EXPIRY_SECONDS=20"` for the new P5 cases. Redis `127.0.0.1:6380` DBs 5/6/7, MinIO `127.0.0.1:9000`, shared remote DB (read-only SQL from QA). Port 8001 and jqc.jivo.in were never touched. The instance was stopped at the end.
+
+**Blocker found at the start (OBS-M-01, reported to the PM mid-run):** the shared DB lacks six main migrations (`catalog` 0004–0006, `promotions` 0002, `referrals` 0001, `stores` 0005). On main, home, products, search, suggest, collections, the cart and every order flow answer **500**, as do the admin banner, inventory and stock-movement pages. This is an environment state, not a product bug, and QA may not migrate. **Consequence: P3–P7 could not be regression-tested on main, and every P2 catalog case and P5-TC-50 (b) / TC-92 are blocked.**
+
+**What ran (outputs in `qa/private/runs/m1-*`):**
+| Run | Command (from `qa/`) | Result |
+|---|---|---|
+| BUG-0013 / BUG-0020 re-check | `uv run pytest tests/test_p5_kyc.py -k tc16` / `tests/test_p6_ws.py -k tc50` | 4 strict xfails turned **XPASS**; markers removed, rerun **5 passed, 1 skipped**. Both bugs **Verified** |
+| P5-TC-50 (b), P5-TC-92 (new `tests/test_p5_main.py`) | `QA_EXTRA_ENV=… uv run pytest tests/test_p5_main.py` | **5 errors at set-up**: `DELETE /api/v1/cart/ -> 500` (OBS-M-01). Not executed |
+| P0 + P1 | `uv run pytest tests/test_p0_foundation.py tests/test_p1_*.py` | 178 passed, 9 skipped (profile cases), **18 failed**: all test-side (address_write throttle, Windows path, `cp1252` read of the schema, 3 stale oracles after T-219 / T-814 M2, user C is now rider R1). After the fixes: **31/31 passed**. Net: **196 passed, 0 failed, 9 skipped** |
+| P2 serviceability, DB, security | `uv run pytest tests/test_p2_serviceability.py tests/test_p2_db.py tests/test_p2_security.py` | 81 passed, 8 failed → after the per-store grid fix to TC-03: **82 passed, 7 failed** (all 7 on the 500s of OBS-M-01) |
+| P2 catalog | `uv run pytest tests/test_p2_catalog.py` | **16 passed, 27 failed, 1 skipped**: every failure is a 500 of OBS-M-01 (categories, the 404 and validation sub-cases pass) |
+| P2 new cases | `uv run pytest tests/test_p2_main.py` | TC-08 ✅, TC-52 ✅ (61st request 429); TC-53 role matrix: **every refusal correct**, allowed banner/inventory/movement pages 500; TC-54 blocked (adjust page 500) |
+| P2 `clock` | `QA_FAKE_NOW=…T23:30 … -k tc09`; `…T22:59:15 … -k tc11` | TC-09 blocked (home 500); **TC-11 passed** |
+| P2 `redis-down` | `uv run pytest tests/test_profile_redis_down.py` | 4 passed (P0-TC-03b, P1-TC-63/63b/63c); P2-TC-12b blocked (home 500) |
+| 🔥 smoke P0–P7 | `QA_WORKER_CONCURRENCY=16 uv run pytest -m smoke` | **94 passed, 20 failed, 64 errors, 3 skipped, 1 xfailed** (14 min). Every error (set-up of P3–P7 order flows: `DELETE /cart/` 500) and 19 of the 20 failures are OBS-M-01. The 20th, P6-TC-29 [Catalog Manager → 4403], was a QA helper defect: the server now closes with 4403 before the client's first frame, and `ops_close_code` raised on the send. Fixed; rerun **7/7 passed**. P0/P1 smoke: all pass. The xfail is a known-bug guard (not itemised: the run used `-rfs`) |
+| Logs | instance logs of the session | The only 500s are the `ProgrammingError`s of OBS-M-01. No other traceback |
+
+**Test changes (QA suite only, no product code):** `conftest.py` clears the T-814 per-IP scopes before each test (`keep_throttles` marker opts out); P2-TC-03 grid per store; P0-TC-11 and `qa_support.schema()` read the schema as UTF-8; P1-TC-26b finds `local.py` in place on Windows; P1-TC-24c expects T-814 M2 (reuse revokes the family); P1-TC-60 expects 403 `APP_HEADER_MISMATCH` (T-219); P1-TC-37 takes user C's rider status from the DB; BUG-0013 / BUG-0020 guards are plain asserts. New: `test_p2_main.py` (P2-TC-08, 52, 53, 54), `test_p5_main.py` (P5-TC-50 b, 92 a–d).
+
+**Record sync:** `02`, `08` and this report now agree with the bug files: BUG-0001…0012, 0021, 0022 Verified (earlier runs); BUG-0013 and BUG-0020 Verified today; BUG-0023 and BUG-0024 Open (fixes in progress, PM). The ❌ rows still pointing at verified bugs (P0-TC-08b, P1-TC-04/13/14b/24c/52/57/96, P4-TC-32/33/40) are ✅. P3-TC-64 is ✅ from the user's phone run on 2026-11-04 (T-306, PM; not executed by QA). The stage-4 `SMOKE_*` placeholders in 09/10 were never filled and are marked "not recorded".
+
+**Case status (`02`, after this session):**
+| Phase | Cases | ✅ | ◐ | ❌ | ⬜ | ⏭ | Pri P0/P1 passed | All passed | Last regression on this build |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | 25 | 22 | 0 | 0 | 1 (TC-23 CI) | 2 (TC-21/22 apps build, client) | 16 / 19 | 88.0 % | ✅ main `f6ed556` |
+| 1 | 105 | 86 | 0 | 0 | 13 (device) | 6 (TC-45, 46, 61, 62, 67, 93) | 81 / 98 | 81.9 % | ✅ main `f6ed556` |
+| 2 | 57 | 26 | 3 | 0 | 26 (19 blocked by OBS-M-01, 2 not automated, 5 device) | 2 (TC-12, 22) | 25 / 54 | 45.6 % | partial on main (blocked) |
+| 3 | 69 | 67 | 0 | 0 | 0 | 2 (TC-26, 63 → P4 by DL-50) | 65 / 67 | 97.1 % | `9ed7ffc`; **blocked on main** |
+| 4 | 60 | 49 | 1 (TC-60) | 0 | 7 (device) | 3 (TC-16, 17, 57) | 47 / 56 | 81.7 % | `f744508`; **blocked on main** |
+| 5 | 133 | 122 | 0 | 3 (TC-42, 42b BUG-0023; TC-117 BUG-0024) | 2 (TC-50 b, 92: blocked) | 6 | 119 / 129 | 91.7 % | `f8db671`; **blocked on main** |
+| 6 | 59 | 54 | 0 | 0 | 0 | 5 (device TC-17, 57; TC-44, 45, 54) | 52 / 57 | 91.5 % | `f8db671` (TC-50 on main) |
+| 7 | 38 | 35 | 0 | 0 | 0 | 3 (device TC-37–39) | 34 / 37 | 92.1 % | `f8db671`; **blocked on main** |
+
+**Open bugs:** P0 0 · P1 0 · P2 1 (BUG-0024) · P3 1 (BUG-0023). **New bugs this session:** none.
+
+| Phase | Verdict | Why |
+|---|---|---|
+| **0** | **Not ready (gate incomplete)** | Backend criteria met and re-passed on main; no open bug. Not passed: P0-TC-21/22 (app build and generated client: Flutter not run by QA) and P0-TC-23 (CI evidence). 88 % < 95 %. |
+| **1** | **Not ready (gate incomplete)** | No ❌ any more: every bug-linked case passes on main (BUG-0002/0003/0005/0007 re-checked). Not passed: 13 device cases (P1-TC-80…92), P1-TC-61/62 (426 and 503 need a QA-owned `AppConfig`), P1-TC-67 (the admin role-matrix test is still a skip stub), P1-TC-46 (30-day anonymisation). 81.9 %. |
+| **2** | **Not ready (blocked)** | No product defect found, and no unauthorised access (TC-44, every TC-53 refusal) or stock/money corruption (TC-45–47 SQL). But 19 cases, including 9 Pri P0 🔥 catalog cases (TC-21, 23, 26–28, 30, 31) and the stock-adjustment case TC-54, are blocked by OBS-M-01. Device cases TC-58–62 are with the PM. 45.6 %. |
+| **3** | **Not ready on main** (was Ready for sign-off on the QA instance at `9ed7ffc`) | 97.1 % with every P0 case passed, P3-TC-64 included. But §5.2 needs the smoke set to pass on the build under gate, and on main the cart and checkout answer 500 (OBS-M-01). Re-run the P3 smoke and the payment/refund files after the migrations. |
+| **4** | **Not ready** | Device cases TC-51–54, 56, 58 (four P0) are ⬜; TC-16/17/57 still need a DELIVERED order with a working invoice host (OBS-S4-02). Not regression-tested on main (OBS-M-01). |
+| **5** | **Not ready** | P0 TC-42 fails on BUG-0023 (P3, safe state, wrong code) and P1 TC-117 on BUG-0024 (P2); both are being fixed. TC-50 (b) and TC-92 are written but blocked. Device cases TC-19, 33, 124, 131 and TC-77 (GTK runtime) remain. BUG-0013 is now Verified (TC-16 ✅). |
+| **6** | **Not ready (gate incomplete)** | BUG-0020 is Verified, so every executable P6 case passes (54/54). Remaining: device TC-17 and TC-57 (both P0), TC-44 (no fault-injection backend), TC-45/54 (config reviews). 91.5 % < 95 %. The order-socket regression on main needs order flows (OBS-M-01). |
+| **7** | **Not ready on main** (Ready for sign-off on the QA instance at `f8db671`, backend + console) | 35/35 executable cases pass, no P7 bug. But main was not regression-tested (orders blocked by OBS-M-01), and device cases TC-37–39 remain. |
+
+**For the PM:**
+1. **Apply the six main migrations to the shared DB** (shared-db-migrate, with the user's approval). Until then any :8001 from main answers 500 on the catalog and the cart, on the phone too. Then send QA back: P2 blocked cases (TC-21, 23–34, 37–39, 41b, 53, 54, 09/10, 12b, 55), P5-TC-50 (b) and 92, and the P3–P7 smoke and order flows on main.
+2. BUG-0023 / BUG-0024 / DL-74: QA re-tests after your follow-up (P5-TC-42, 42b, 117; the rider API refusing a customer-app token).
+3. Doc question: 05 §3 has no row for the notify-me leads screen (P2-TC-57).
+4. OBS-M-03 (expired COD QR credit accepted in code, not reproduced): P5-TC-92c will decide once unblocked.
+
+**Device cases still owed (PM, phone):** P1-TC-80…92 (13); P2-TC-58–62 (5, new); P4-TC-51–54, 56, 58 (6); P5-TC-19, 33, 124, 131 (4); P6-TC-17, 57 (2); P7-TC-37–39 (3). Also P0-TC-21/22 (app builds and the generated client, any Flutter-capable run).

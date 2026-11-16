@@ -328,3 +328,9 @@ Out of scope: real FCM (D-19, push backend disabled/console), real SMS delivery 
   - `fail_photo_info` is a read-only check of a QA order's stored failure photo;
   - `anonymise_rider_user` runs only on QA H after an API account deletion;
   - `purge_kyc_for` refuses to run when any rider other than the QA one is due.
+
+## Phase 2 test plan and main-branch QA (added 2026-11-16)
+- **Scope:** stores and serviceability (06 §2.3), notify-me, catalog, home, search and collections (06 §2.4), inventory constraints and ledger (07 §2.4), the P2 admin modules and their 05 §3 role rows (T-213), stock adjustment through the admin on QA-02, and the customer-app screens (device, PM). Cases P2-TC-01…62 in `02`.
+- **Approach:** black-box API with independent oracles (PostGIS `ST_Contains`, the ETA formula and the price/discount rules recomputed from read-only SQL); admin through seeded staff sessions; writes only on the QA-only store QA-02 and netting to zero; clock and redis-down profiles for hours and resilience.
+- **Entry criteria on main:** the shared DB must be migrated to main's head. On 2026-11-16 it was not (OBS-M-01), so the catalog, cart and order flows of P2–P7 were blocked, and the phases cannot pass §5.2 on main until it is.
+- **Throttles (T-814):** QA clears the per-IP `serviceability`, `search`, `anon`, `user` and `address_write` scopes before each test in the QA Redis DB. The limits are checked by dedicated cases (P2-TC-19, P2-TC-52). Never run two QA pytest processes at once: each clears the other's throttle state (seen 2026-11-16 with P2-TC-52).

@@ -743,7 +743,7 @@ def test_p6_tc49_max_sockets_per_user(a, a_order):
     assert ok_again and ok_again["type"] == "auth.ok", ok_again
 
 
-@pytest.mark.xfail(strict=True, reason="BUG-0020: 1011 instead of 1009 on daphne")
+# BUG-0020 fixed on main (verified 2026-11-16, f6ed556): daphne now sends 1009 (apps.realtime.daphne_compat).
 @pytest.mark.parametrize("when", ["before_auth", "after_auth"])
 def test_p6_tc50_message_over_4096_bytes_1009(a, a_order, when):
     """P6-TC-50 a 5,000-byte message → closed 1009, before and after auth."""

@@ -123,7 +123,10 @@ def test_p1_tc37_mass_assignment_ignored(api, user_c):
     assert r.status_code == 200, describe(r)
     me = r.json()
     assert me["phone"] == QA_PHONES["c"] and me["id"] == user_c.user["id"]
-    assert me["rider_status"] == "NONE" and me["is_profile_complete"] is True
+    # QA user C has been rider R1 since Phase 5: the oracle is C's real rider status (DB), which the
+    # sent "ACTIVE" must not change either way.
+    rider = db_query("select r.status from delivery_rider r where r.user_id=%s", (user_c.user["id"],))
+    assert me["rider_status"] == (rider[0][0] if rider else "NONE") and me["is_profile_complete"] is True
     ((is_staff, is_super, active, deleted),) = db_query(
         "select is_staff, is_superuser, is_active, deleted_at from accounts_user where id=%s",
         (me["id"],),

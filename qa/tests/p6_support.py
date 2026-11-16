@@ -17,10 +17,9 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
+from qa_support import APP_HEADERS, BASE_URL, _delete_matching, bearer, redact
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed, InvalidStatus
-
-from qa_support import APP_HEADERS, BASE_URL, _delete_matching, bearer, redact
 
 WS_BASE = BASE_URL.replace("http://", "ws://", 1).replace("https://", "wss://", 1)
 ORIGIN = BASE_URL  # http://127.0.0.1:8004 (in ALLOWED_HOSTS of config.settings.local)
@@ -119,7 +118,11 @@ async def ops_close_code(cookie: str | None, origin: str | None = ORIGIN, wait: 
         kw["origin"] = origin
     try:
         async with ws_open("/ws/ops/live/", **kw) as ws:
-            await ws.send(json.dumps({"type": "ping"}))
+            try:
+                await ws.send(json.dumps({"type": "ping"}))
+            except ConnectionClosed as exc:
+                # main (2026-11-16): the server may close (e.g. 4403) before our first frame is sent
+                return (exc.rcvd.code if exc.rcvd else None), []
             return await until_closed(ws, wait)
     except InvalidStatus as exc:
         return "refused", exc.response.status_code

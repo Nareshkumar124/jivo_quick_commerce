@@ -72,7 +72,6 @@ def test_p1_tc60_no_426_without_full_client_info(user_a):
         {"X-Platform": "", "X-App-Version": "0.0.0"},
         {"X-App-Version": "abc"},
         {"X-App-Version": "0"},
-        {"X-App-Name": "rider", "X-App-Version": "0.0.0+0"},
         {"X-Platform": "ios", "X-App-Version": "0.0.0"},
     ]
     for headers in variants:
@@ -81,6 +80,13 @@ def test_p1_tc60_no_426_without_full_client_info(user_a):
             assert r.status_code == 200, f"{headers}: {describe(r)}"
             r = c.post("/api/v1/auth/otp/request/", json={"phone": QA_PHONES["d"], "app": "customer"})
             assert r.status_code == 200, f"{headers}: {describe(r)}"
+    # T-219 (06 §2.1 "Header mismatch"): a customer token sent with X-App-Name: rider is refused
+    # 403 APP_HEADER_MISMATCH (ignored before T-219; OBS-06 resolved). Still no 426.
+    with client({"X-App-Name": "rider", "X-App-Version": "0.0.0+0"}) as c:
+        r = c.get("/api/v1/me/", headers=user_a.headers)
+        assert_error(r, 403, "PERMISSION_DENIED")
+        assert r.json()["error"]["details"] == {"reason": "APP_HEADER_MISMATCH", "header_app": "rider",
+                                                "token_app": "customer"}, r.json()
 
 
 def test_p1_tc61_force_update_426():

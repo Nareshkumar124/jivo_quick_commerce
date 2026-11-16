@@ -1,4 +1,4 @@
-# 02: Test Case Repository: Phases 0, 1, 3, 4 and 5
+# 02: Test Case Repository: Phases 0 to 7
 
 This is the first written test case set for P0/P1, because `docs/plan/` does not exist yet. It uses the format from `docs/10-testing-strategy.md` §5.4.
 
@@ -23,7 +23,7 @@ Sources: 03 §2.1/2.2/2.4/2.11, 04 §2.1, 05 §2–§3 (P1 rows), 06 §2.0/2.1/2
 | P0-TC-06 | BE | P1 | Form-encoded and `text/plain` body to a JSON endpoint | 415 `UNSUPPORTED_MEDIA_TYPE` | ✅ |
 | P0-TC-07 | BE | P2 | `Accept: application/xml` | 406 `NOT_ACCEPTABLE` | ✅ |
 | P0-TC-08 | BE | P1 | Truncated JSON; bare `NaN` literal | 400 `VALIDATION_ERROR` (message names the parse error) | ✅ |
-| P0-TC-08b | BE | P2 | ~3 MB JSON body (over Django's 2.5 MB limit) | 400/413, never 500 | ❌ [BUG-0001](../bugs/BUG-0001.md) |
+| P0-TC-08b | BE | P2 | ~3 MB JSON body (over Django's 2.5 MB limit) | 400/413, never 500 | ✅ [BUG-0001](../bugs/BUG-0001.md) Verified (run 2, `0b801d1`); staging-profile case, not re-run on main 2026-11-16 |
 | P0-TC-09 | BE | P1 | Trigger a 500 (via BUG-0001) | Bare `SERVER_ERROR` envelope, no traceback, class name or path | ✅ |
 | P0-TC-10 | BE | P1 | `/api/schema/`, `/api/docs/`: anonymous (local), then anonymous and customer JWT (staging) | Local: public 200. Staging: anonymous 401/403, customer 403 | ✅ local + staging |
 | P0-TC-11 | BE | P1 | Compare served `/api/schema/` with committed `backend/openapi/schema.yaml` | Paths and components identical | ✅ |
@@ -48,7 +48,7 @@ Sources: 03 §2.1/2.2/2.4/2.11, 04 §2.1, 05 §2–§3 (P1 rows), 06 §2.0/2.1/2
 | P1-TC-01 🔥 | BE | P0 | `POST /auth/otp/request/ {phone, app}` (also `purpose: login`) | 200 `{otp_length: 6, expires_in_seconds: 300, resend_after_seconds: 30}` | ✅ |
 | P1-TC-02 | BE | P0 | Request for a known phone, an unknown phone, and `delete_account` for a phone with no account | Identical 200 bodies; no OTP row stored for the `delete_account`/no-account case | ✅ |
 | P1-TC-03 | BE | P1 | Invalid phones: no `+91`, no `+`, spaces, dashes, 9/11 digits, starts with 5, letters, +1, empty, 200 chars | 400 `VALIDATION_ERROR`, `details.phone` | ✅ (12 variants) |
-| P1-TC-04 | BE | P1 | Phones with non-ASCII digits (Devanagari, full-width, Arabic-Indic, mixed) | 400 | ❌ [BUG-0002](../bugs/BUG-0002.md) (some variants accepted) |
+| P1-TC-04 | BE | P1 | Phones with non-ASCII digits (Devanagari, full-width, Arabic-Indic, mixed) | 400 | ✅ [BUG-0002](../bugs/BUG-0002.md) Verified (run 2); re-passed on main `f6ed556` 2026-11-16 |
 | P1-TC-05 | BE | P1 | Missing phone/app; app `admin`/`Customer`; purpose `reset`; phone as number/null/list; body `[]`/`"x"` | 400 `VALIDATION_ERROR` | ✅ |
 | P1-TC-06 🔥 | BE | P0 | Verify with a fixed test OTP | 200 `{access, refresh, user, is_new_user, rider_status: NONE, deletion_cancelled: false}`; JWTs with `app` claim; `is_new_user` true only when created | ✅ |
 | P1-TC-07 | BE | P1 | Verify again for the same phone | `is_new_user: false`, same user id | ✅ |
@@ -57,9 +57,9 @@ Sources: 03 §2.1/2.2/2.4/2.11, 04 §2.1, 05 §2–§3 (P1 rows), 06 §2.0/2.1/2
 | P1-TC-10 | BE | P1 | Request twice, verify twice (DB check) | Older row `expires_at` moved to issue time; only one verify succeeds; TTL 300 s | ✅ |
 | P1-TC-11 | BE | P1 | OTP for app=customer verified with app=rider; body app vs `X-App-Name` | `OTP_EXPIRED`; the body `app` is authoritative (token claim = body app) | ✅ |
 | P1-TC-12 | BE | P0 | Strict sequence: a `delete_account` OTP cannot sign in; a login OTP cannot delete; the login OTP is not consumed by the failed delete | As stated | ✅ |
-| P1-TC-13 | BE | P1 | Verify validation: OTP 5/7 digits, letters, full-width digits; missing `terms_version`; `terms_version` > 32; bad app/phone | 400 `VALIDATION_ERROR`, no attempt consumed | ❌ [BUG-0002](../bugs/BUG-0002.md) (full-width OTP passes validation and costs an attempt); other variants ✅ |
+| P1-TC-13 | BE | P1 | Verify validation: OTP 5/7 digits, letters, full-width digits; missing `terms_version`; `terms_version` > 32; bad app/phone | 400 `VALIDATION_ERROR`, no attempt consumed | ✅ [BUG-0002](../bugs/BUG-0002.md) Verified (run 2); re-passed on main `f6ed556` 2026-11-16 |
 | P1-TC-14 🔥 | BE | P0 | 4 sends to one non-test phone in 10 min (customer, customer, rider, rider) | 4th → 429 `OTP_RATE_LIMITED`, `details.retry_after_seconds` ≤ 600, `Retry-After` header; other phones unaffected | ✅ |
-| P1-TC-14b | BE | P1 | Security guard for BUG-0002 (case and test kept in `qa/private/` until fixed) | See private file | ❌ [BUG-0002](../bugs/BUG-0002.md) |
+| P1-TC-14b | BE | P1 | Security guard for BUG-0002 (case and test kept in `qa/private/` until fixed) | See private file | ✅ [BUG-0002](../bugs/BUG-0002.md) Verified (run 2); re-passed on main `f6ed556` 2026-11-16 |
 | P1-TC-15 | BE | P1 | 11 sends to one phone in 24 h (daylimit profile: 10-minute cap raised to 50) | 11th → 429 with `retry_after_seconds` > 600 | ✅ |
 | P1-TC-16 | BE | P1 | 31 sends from one client IP across 11 phones | 31st → 429; test numbers still exempt | ✅ |
 | P1-TC-17 | BE | P1 | 61 verifies from one client IP | 61st → 429 `OTP_RATE_LIMITED` | ✅ |
@@ -75,7 +75,7 @@ Sources: 03 §2.1/2.2/2.4/2.11, 04 §2.1, 05 §2–§3 (P1 rows), 06 §2.0/2.1/2
 |---|---|---|---|---|---|
 | P1-TC-24 🔥 | BE | P0 | Refresh; reuse the old refresh token | 200 new pair; reuse → 401 `TOKEN_INVALID` ("blacklisted"); the new access token works; **since T-814 (06 §2.1) the reuse also revokes the new refresh token** (401) | ✅ (oracle updated 2026-11-10, `efb3c3d`) |
 | P1-TC-24b | BE | P1 | DB after rotation | New jti outstanding (not blacklisted); old jti blacklisted | ✅ |
-| P1-TC-24c | BE | P1 | Security guard for BUG-0003 (case and test kept in `qa/private/` until fixed) | Refresh token single use holds in all conditions | ❌ [BUG-0003](../bugs/BUG-0003.md) |
+| P1-TC-24c | BE | P1 | Security guard for BUG-0003 (case and test kept in `qa/private/` until fixed) | Refresh token single use holds in all conditions | ✅ [BUG-0003](../bugs/BUG-0003.md) Verified (run 2); re-passed on main `f6ed556` 2026-11-16 with the T-814 M2 oracle (a reused refresh token revokes every refresh token of the user, the winner's new one included) |
 | P1-TC-25 | BE | P1 | Refresh with `{}`, `""`, missing, `garbage`, `a.b.c`, an access token | 400 `VALIDATION_ERROR` / 401 `TOKEN_INVALID` | ✅ |
 | P1-TC-26 | BE | P0 | `/me/` with a tampered payload (user_id swapped), `alg=none`, a wrong key, a refresh token as Bearer, garbage | 401 `TOKEN_INVALID` | ✅ |
 | P1-TC-26b | BE | P1 | Expired access token (local profile) | 401 `TOKEN_INVALID` | ✅ |
@@ -119,13 +119,13 @@ Sources: 03 §2.1/2.2/2.4/2.11, 04 §2.1, 05 §2–§3 (P1 rows), 06 §2.0/2.1/2
 | P1-TC-49 | BE | P1 | GET own; PATCH landmark + lat; PUT | 200; partial update; 405 | ✅ |
 | P1-TC-50 | BE | P1 | 22 invalid bodies: missing/blank required fields, every max length, label enum, PIN code (5/7 digits, leading 0, letters), receiver phone, missing lat/lng | 400 naming the field | ✅ |
 | P1-TC-51 | BE | P0 | lat 90.000001/-91, lng 180.5/-181, `abc`, `nan`, `NaN`, `inf`, `-Infinity`, `1e400`, list; boundaries; 6-dp rounding (DB `28.123457`) | 400, never 500; ±90/±180/0 accepted; numbers returned | ✅ (OBS-03: JSON `true` → 1.0) |
-| P1-TC-52 | BE | P2 | Non-ASCII digits in PIN code / receiver phone | 400 | ❌ [BUG-0002](../bugs/BUG-0002.md) |
+| P1-TC-52 | BE | P2 | Non-ASCII digits in PIN code / receiver phone | 400 | ✅ [BUG-0002](../bugs/BUG-0002.md) Verified (run 2); re-passed on main `f6ed556` 2026-11-16 |
 | P1-TC-53 🔥 | BE | P0 | set-default on the 3rd of 3, twice | 200; exactly one default; listed first | ✅ |
 | P1-TC-54 | BE | P0 | Delete default / non-default / last; reuse a deleted id | 204; most recently updated promoted; deleted → 404 for GET/PATCH/DELETE/set-default and not listed; new first address default | ✅ |
 | P1-TC-55 🔥 | BE | P0 | **IDOR:** B GET/PATCH/DELETE/set-default on A's address; anonymous GET | 404 `NOT_FOUND` ×4, A's address unchanged, lists disjoint; anonymous → 401 | ✅ |
 | P1-TC-55b | BE | P1 | Unknown, 0, negative, decimal, injection-like ids; bigint overflow (fuzz) | 404, never 500 | ✅ |
 | P1-TC-56 | BE | P1 | `is_default`/`id`/`created_at` in create or patch | Ignored | ✅ |
-| P1-TC-57 | BE | P0 | 10 concurrent set-defaults; 8 concurrent creates for an address-less user (DB) | Exactly one live default | ❌ [BUG-0007](../bugs/BUG-0007.md) (intermittent: zero defaults in 1 of 8 trials; concurrent creates ✅) |
+| P1-TC-57 | BE | P0 | 10 concurrent set-defaults; 8 concurrent creates for an address-less user (DB) | Exactly one live default | ✅ [BUG-0007](../bugs/BUG-0007.md) Verified (run 2); re-passed on main `f6ed556` 2026-11-16 |
 
 ### App configuration and guard (06 §2.1, 03 §2.1, 04 §2.1)
 | ID | Area | Pri | Steps | Expected | Status |
@@ -166,7 +166,7 @@ Sources: 03 §2.1/2.2/2.4/2.11, 04 §2.1, 05 §2–§3 (P1 rows), 06 §2.0/2.1/2
 | P1-TC-77 | BE | P1 | Grep the QA instance logs | No unmasked `+91` numbers, no JWTs, no OTP codes for QA traffic | ✅ (0 unmasked phones and 0 JWTs in all 7 instance logs of the run) |
 | P1-TC-78 | BE | P1 | ~30 sequential calls per main endpoint; bursts of 20 | p95 within 09 §1 read target (< 300 ms); no 5xx caused by the app | ✅ baseline recorded (07 report); env risk OBS-01 |
 | P1-TC-79 | BE | P1 | schemathesis (12 examples × 13 ops, OTP/delete excluded) | No app 5xx; documented statuses; schema conformance | ✅ after triage. The automated run was **not green** (7 failing operations): every failure was triaged by manual replay to BUG-0004, OBS-01 (remote-DB connect timeouts → 500) or OBS-04 (local DEBUG HTML 404). The check tweak afterwards was not re-run. |
-| P1-TC-96 | BE | P1 | Production settings: SMS backend and system checks | Deployed env refuses the console/locmem SMS backend | ❌ [BUG-0005](../bugs/BUG-0005.md) |
+| P1-TC-96 | BE | P1 | Production settings: SMS backend and system checks | Deployed env refuses the console/locmem SMS backend | ✅ [BUG-0005](../bugs/BUG-0005.md) Verified (run 2, `0b801d1`) |
 
 ### Mobile apps (executed as static review only this run; device cases pending)
 | ID | Area | Pri | Steps | Expected | Status |
@@ -186,6 +186,99 @@ Sources: 03 §2.1/2.2/2.4/2.11, 04 §2.1, 05 §2–§3 (P1 rows), 06 §2.0/2.1/2
 | P1-TC-92 | RID | P1 | Rider force update / maintenance | Per 04 §2.1 | ⬜ device + QA-owned config |
 | P1-TC-93 | E2E | P1 | Re-run both apps' `integration_test` login flows against a QA backend | Pass | ⏭ No Flutter this run |
 | P1-TC-94 | CUS/RID | P1 | Static review: tokens/PII in logs, hard-coded URLs or secrets, client-side money, missing states | None found | ✅ (`qa/private/runs/mobile-static-review-4960527.txt`; OBS-05 obfuscation not configured yet) |
+
+## Phase 2: Stores, serviceability, catalog, inventory, home and admin (written 2026-11-16 on main)
+**Build:** `qa/main` = main `f6ed556`. QA instance `127.0.0.1:8004` (profiles `local`, `clock`, `redis-down`), Redis `127.0.0.1:6380` DBs 5/6/7, shared remote DB (read-only SQL from QA). The cases come from the QA run 2 suite (`eb69ccf`, ids in the test docstrings, never written up here), plus the gaps the phase plan lists: the admin role matrix (T-213), stock adjustment, the second store and the T-814 throttle.
+
+Sources: 06 §2 (T-814 limits), §2.3, §2.4; 03 §2.3–2.7; 05 §2 (Dark stores, Products, Banners, Inventory, Serviceability requests), §3 (rows "Stores & service areas", "Catalog, collections, banners", "Inventory adjust/view"); 07 §2.2–§2.4, §3; 09 §3.2, §3.3, §3.6, §4; `docs/plan/phase-2-stores-catalog-inventory.md`. Automated in `qa/tests/test_p2_*.py`, `test_profile_redis_down.py::test_p2_tc12b` and `test_p2_main.py` (new).
+
+**Blocked on 2026-11-16 (OBS-M-01, environment, not a product bug):** the shared DB lacks six migrations that main's code needs (`catalog` 0004–0006, `promotions` 0002, `referrals` 0001, `stores` 0005). `home`, `products` (list and detail), `search`, `suggest`, `collections`, the cart, and the admin banner, inventory and stock-movement pages answer **500** (`column catalog_productvariant.min_qty_per_order does not exist`, `column promotions_coupon.owner_id does not exist`). Cases that need those endpoints are ⬜ **blocked** until the PM applies the migrations (shared-db-migrate, user approval). Serviceability, notify-me, addresses, the category tree, the DB checks and the admin role refusals do not touch the missing columns and were run.
+
+Retired ids (never defined in any QA source): P2-TC-13, 14, 35, 36, 42, 43.
+
+### Stores, serviceability and notify-me (06 §2.3, 03 §2.3/§2.4, 07 §2.2)
+| ID | Area | Pri | Steps | Expected | Status |
+|---|---|---|---|---|---|
+| P2-TC-01 🔥 | BE | P0 | `GET /serviceability/?lat&lng` at GGN-01's own point in opening hours | 200 serviceable, `store {id, name, is_open, opens_at:null}`, `eta_minutes` = prep + 3 + 0 + 2, `message` null, strict schema | ✅ (f6ed556, 2026-11-16) |
+| P2-TC-02 🔥 | BE | P0 | Points outside every area (Mumbai, each side of the GGN polygon, 0,0, Sydney) | 200 (never NOT_SERVICEABLE), serviceable false, store null, eta null, a message | ✅ (f6ed556) |
+| P2-TC-03 | BE | P1 | 13×13 grid over each active store's polygon extent (GGN-01 and QA-02) | `serviceable` = PostGIS `ST_Contains` for every point (338 points) | ✅ (f6ed556; the grid is per store since QA-02 exists, test updated) |
+| P2-TC-04 | BE | P1 | 3 points inside GGN-01 | ETA = ceil(prep + 3 + km × 1.3 / 20 × 60 + 2), computed from the store row | ✅ (f6ed556) |
+| P2-TC-05 | BE | P1 | Missing/blank/non-numeric/out-of-range/NaN/inf/hex/NUL lat or lng; boundary and exponent forms | 400 VALIDATION_ERROR naming the field, never 500; boundaries 200 | ✅ (f6ed556) |
+| P2-TC-06 | BE | P2 | Devanagari / full-width digits in lat/lng | Normalised by `float()`, same answer as ASCII (OBS-09; nothing stored) | ✅ (f6ed556) |
+| P2-TC-07 | BE | P1 | Garbage Bearer on serviceability; POST/PUT/PATCH/DELETE on serviceability and the 7 catalog operations | Public: token ignored (200); writes 405 METHOD_NOT_ALLOWED | ✅ (f6ed556) |
+| P2-TC-08 | BE | P1 | Point inside QA-02's polygon and GGN-01's point (two active stores) | Each answer names the store whose polygon contains the point (oracle `ST_Contains`) | ✅ (f6ed556, new) |
+| P2-TC-09/10 🔥 | BE | P0 | `clock` profile at 23:30 IST (closed) | Still serviceable, `is_open` false, `opens_at` next opening (UTC), eta null, message names the IST opening time; home `store` block identical; catalog browsable | ⬜ blocked: the serviceability part runs, the home part answers 500 (OBS-M-01) |
+| P2-TC-11 | BE | P1 | `clock` profile 45 s before 23:00 IST | State before the boundary as expected, flips right after (never cached; `closes_at` exclusive) | ✅ (f6ed556, clock profile `QA_FAKE_NOW=2026-11-16T22:59:15+05:30`) |
+| P2-TC-12 | BE | P2 | Change a store's hours or area through the admin; check again | The snapshot is invalidated at once | ⏭ would change a shared store (GGN-01) or QA-02's timings used by P5; backend unit tests cover the invalidation |
+| P2-TC-12b | BE | P1 | `redis-down` profile: serviceability and every catalog operation | Serviceability loads the snapshot from PostGIS; catalog served without the cache; no 500 | ⬜ blocked: home answers 500 (OBS-M-01); the other 4 redis-down cases ✅ |
+| P2-TC-15 🔥 | BE | P0 | Anonymous notify-me with phone and address text | 201 `{id, lat, lng, phone, address_text (trimmed), created_at}`; row stored with the point, no user | ✅ (f6ed556) |
+| P2-TC-16 | BE | P1 | Signed-in notify-me without phone; invalid token | Linked to the user, phone defaults to theirs; invalid token 401 TOKEN_INVALID | ✅ (f6ed556) |
+| P2-TC-17 | BE | P1 | Invalid lat/lng/phone/address_text, non-ASCII digit in the phone | 400 naming the field (BUG-0002 class) | ✅ (f6ed556) |
+| P2-TC-18 | BE | P0 | Anonymous repeat within 24 h / 100 m; 1 km away | Never merged: own lead echoing only its own values ([BUG-0008](../bugs/BUG-0008.md)) | ✅ (f6ed556; BUG-0008 Verified 2026-11-09) |
+| P2-TC-18b | BE | P1 | Signed-in repeat within 24 h / 100 m | Merged into the user's own lead (same id) | ✅ (f6ed556) |
+| P2-TC-19 | BE | P1 | 11 anonymous notify-me from one IP in an hour | 11th → 429 RATE_LIMITED, `retry_after_seconds`, Retry-After; no extra rows | ✅ (f6ed556) |
+| P2-TC-20 🔥 | BE | P0 | Address inside / outside; send `is_serviceable` | Read-only `is_serviceable` true / false; unserviceable save allowed; sent value ignored | ✅ (f6ed556) |
+| P2-TC-52 | BE | P1 | 61 serviceability checks from one IP within a minute (T-814) | 61st → 429 RATE_LIMITED with `retry_after_seconds` and Retry-After; other endpoints unaffected | ✅ (f6ed556, new) |
+
+### Catalog, home and search (06 §2.4, 03 §2.5–2.7, 09 §4)
+| ID | Area | Pri | Steps | Expected | Status |
+|---|---|---|---|---|---|
+| P2-TC-21 🔥 | BE | P0 | `X-Store-Id` missing / blank / malformed (letters, 0, -1, 1.0, Unicode digits, 19 digits, two headers) / unknown / "01" on all 7 catalog operations | 400 "This header is required." / "A valid store id is required."; unknown 404 STORE_NOT_FOUND `details.store_id`; "01" = the store | ⬜ blocked: `categories_list` ✅, the other 6 operations answer 500 (OBS-M-01) |
+| P2-TC-22 | BE | P1 | Catalog call with a deactivated store's id | 404 STORE_NOT_FOUND | ⏭ no inactive store in the shared DB; deactivating one would break the PM's phone tests |
+| P2-TC-23 🔥 | BE | P0 | Anonymous home | Strict schema; store status; active banners with link types and https url; top-level categories; rails ≤ 10 with out-of-stock last; `buy_again` [] | ⬜ blocked (500, OBS-M-01) |
+| P2-TC-24 | BE | P1 | Home with a valid / garbage / tampered token; other operations with a garbage token | Valid 200; bad token 401 TOKEN_INVALID; others ignore credentials | ⬜ blocked (500) |
+| P2-TC-25 🔥 | BE | P0 | `GET /categories/` | Two levels; only categories with products sold at the store; children under their parent; admin order | ✅ (f6ed556) |
+| P2-TC-26 🔥 | BE | P0 | `/products/`: scope, pages of 5 chained, count; invalid page / unknown filter; bad sort / NUL; sorts; category by slug and id; collection filter | Exactly the visible store products, no duplicates; 404 NOT_FOUND for bad pages and unknown filters (BUG-0004); 400 naming the field; in-stock first for every sort | ⬜ blocked: the 404 sub-cases (TC-26b) ✅, every 200 path answers 500 |
+| P2-TC-27 🔥 | BE | P0 | Every variant on every tile | `mrp`/`selling_price`/`discount_amount` 2-dp strings = SQL (store override applied), `discount_percent` = floor; never a float | ⬜ blocked (500) |
+| P2-TC-28 🔥 | BE | P0 | Stock fields on every tile and detail | `stock_status`/`orderable_quantity`/`units_left` per contract (LOW 1–3); no on_hand/reserved keys; exact on_hand never shown (DL-26) | ⬜ blocked (500) |
+| P2-TC-29 | BE | P1 | `default_variant_id` | First in-stock variant in display order; collection item's variant in a collection; always one of the card's variants | ⬜ blocked (500) |
+| P2-TC-30 🔥 | BE | P0 | Detail by id and by slug; label fields | Identical; strict schema; 09 §4 label fields; variants with sku, net quantity, images; similar ≤ 10, same category, never itself; MRP, net quantity, manufacturer, origin, consumer care, FSSAI non-empty | ⬜ blocked (500) |
+| P2-TC-31 🔥 | BE | P0 | A product with no variant sold at the store | 404 by id and slug; absent from list, search, suggest, collections, category counts | ⬜ blocked (500) |
+| P2-TC-32 | BE | P1 | Search: q missing/blank/101 chars, bad sort; "oil", "olive oil", case, `%` and `_` | 400 naming the field; AND terms; case-insensitive; wildcards literal; store products only | ⬜ blocked: validation ✅, results 500 |
+| P2-TC-33 | BE | P1 | Suggest blank / "can" / q > 100 | Trending keywords; product and category items ≤ 10 whose slugs open; 400 | ⬜ blocked (500) |
+| P2-TC-34 | BE | P1 | Collection page, unknown and wrong-case slug, an id | Strict schema; item order, out-of-stock last, ≤ 100; 404 NOT_FOUND | ⬜ blocked (500) |
+| P2-TC-55 | BE | P1 | Variants with `min_qty_per_order` and wholesale `price_tiers` (ADR 0001, catalog 0004/0005) on tiles and detail | Tier prices as 2-dp strings, consistent with the bill (P3) | ⬜ blocked: the columns are the missing migrations (OBS-M-01); not automated yet |
+
+### Security, contract and database (09 §3, 07 §2.2–§2.4, §3)
+| ID | Area | Pri | Steps | Expected | Status |
+|---|---|---|---|---|---|
+| P2-TC-37 | BE | P1 | Junk / reordered params, injected X-Forwarded-Host, other Host headers on cached list and search pages | `next`/`previous` built only from validated parameters for the requested host; unlisted Host 400 | ⬜ blocked (products/search 500) |
+| P2-TC-38 | BE | P1 | Image URLs of every product | Absolute, public media bucket, random 32-hex keys with 256/512/1024 renditions, no signature; a fetch is WEBP without EXIF | ⬜ blocked (no product body) |
+| P2-TC-39 | BE | P1 | Unicode digits, NUL, zero-width, overflow in path ids/slugs and query parameters | 200/400/404 envelope, never 500 | ⬜ blocked: every path case ✅; the query case on `/products/` answers 500 (OBS-M-01, not the input) |
+| P2-TC-40 | BE | P0 | Serviceability and every catalog body | No phone, email, user id or staff field; store block `{id, name, is_open, opens_at}` | ◐ ✅ for serviceability and categories (f6ed556); catalog bodies blocked |
+| P2-TC-41 | BE | P1 | The 9 P2 operationIds, error codes, X-Store-Id documented; served schema = committed; strict response validation | All present; schemas equal | ◐ contract inventory ✅ (f6ed556); strict validation of each 200 blocked (500) |
+| P2-TC-44 🔥 | ADM | P0 | Anonymous caller and a customer JWT on every Ops Console page and P2 admin page | Redirect to login, no data; JWT not accepted | ✅ (f6ed556) |
+| P2-TC-45 🔥 | BE | P0 | SQL: StoreInventory constraints | on_hand ≥ 0, reserved ≥ 0, reserved ≤ on_hand, price_override > 0, (store, variant) unique; no violation | ✅ (f6ed556) |
+| P2-TC-46 🔥 | BE | P0 | SQL: ledger | Σ StockMovement.delta = on_hand and latest `on_hand_after` = on_hand for every row; no zero deltas | ✅ (f6ed556) |
+| P2-TC-47 | BE | P1 | SQL: prices | mrp > 0, 0 < selling_price ≤ mrp, no override above MRP; numeric(12,2), no float columns | ✅ (f6ed556) |
+| P2-TC-48 | BE | P1 | SQL: orphans and FKs | No orphans; categories ≤ 2 levels; FKs present | ✅ (f6ed556) |
+| P2-TC-49 🔥 | BE | P0 | SQL: geometry | service_area MultiPolygon 4326 valid, GiST index; location inside its area; Address.location = lat/lng; StoreTiming windows valid | ✅ (f6ed556) |
+| P2-TC-50 | BE | P1 | SQL: slugs and uniques | Slugs never all digits; slugs, SKUs, store codes, invoice prefixes unique | ✅ (f6ed556) |
+| P2-TC-51 | BE | P1 | SQL: notify-me rows; non-ASCII leftovers (BUG-0002) | ASCII E.164 or null phones, valid points, existing users | ✅ (f6ed556) |
+
+### Admin panel (05 §2, §3; T-213)
+| ID | Area | Pri | Steps | Expected | Status |
+|---|---|---|---|---|---|
+| P2-TC-53 🔥 | ADM | P0 | 7 seeded roles × list and add pages of dark stores, categories, products, collections, banners, inventory, stock movements; inventory add for everyone | 200 exactly for the 05 §3 roles, 403 otherwise; inventory rows never added by anyone | ◐ (f6ed556): **every refusal is correct** (all expected 403s; no unauthorised access), and every allowed stores / category / product / collection page is 200. The allowed banner, inventory and stock-movement lists answer 500 for every allowed role (OBS-M-01) |
+| P2-TC-54 | ADM | P0 | QA-02 Store Manager: adjust +1 inward then −1 damage with a reason; damage above available; GGN-01 manager, Ops, Finance, Catalog, Store Staff, Support try to adjust the QA-02 row | Two StockMovement rows (delta, on_hand_after, reason), on_hand back to start; over-removal refused with nothing written; GGN-01 manager 404, others 403; no movement from refused calls | ⬜ blocked: the adjust page answers 500 (OBS-M-01). Test in `tests/test_p2_main.py` |
+| P2-TC-56 | ADM | P1 | Bulk inward CSV (`sku,quantity`) preview then confirm on QA-02; product CSV export | Preview shows the rows, confirm writes one INWARD per row, errors per line; export matches the DB | ⬜ not automated yet (next session; needs the migrations) |
+| P2-TC-57 | ADM | P2 | Notify-me leads list and map as each role | Visible to the roles that see stores | ⬜ not automated yet (05 §3 has no row for leads: doc question for the PM) |
+
+### Customer app (device; the PM's phone run)
+| ID | Area | Pri | Steps | Expected | Status |
+|---|---|---|---|---|---|
+| P2-TC-58 🔥 | CUS | P0 | Location permission, map pin picker, serviceable point | Store resolved, home loads with `X-Store-Id` | ⬜ device (PM) |
+| P2-TC-59 🔥 | CUS | P0 | Pin outside every area | Not-serviceable screen; Notify me sends the lead | ⬜ device (PM) |
+| P2-TC-60 | CUS | P1 | Store closed (outside 07:00–23:00) | Store-closed banner with the opening time; browsing works | ⬜ device (PM) |
+| P2-TC-61 🔥 | CUS | P0 | Home → category → product list → detail; tile ADD stepper | Server prices and "Only N left" as sent; loading, empty and error states; no crash | ⬜ device (PM) |
+| P2-TC-62 | CUS | P1 | Search with 300 ms debounce, recent searches, suggestions | One request per pause; recents kept; suggestions open | ⬜ device (PM) |
+
+### Totals (Phase 2, main `f6ed556`, 2026-11-16)
+| | Cases | ✅ | ◐ | ❌ | ⬜ blocked (OBS-M-01) | ⬜ other | ⏭ |
+|---|---|---|---|---|---|---|---|
+| Phase 2 | 57 (TC-09/10 is one row) | 26 | 3 (TC-40, 41, 53) | 0 | 19 | 7 (TC-56, 57 not automated; TC-58–62 device) | 2 (TC-12, 22) |
+
+Pass rate 26/57 = 45.6 %; Pri P0/P1 passed 25/54. **No ❌: nothing that ran failed on a product defect.** Every non-pass except the device cases, the two ⏭ and two not-yet-automated cases is the migration gap. No unauthorised access (TC-44, 53 refusals), no stock or money corruption in the DB (TC-45–47).
 
 ## Phase 3: Cart, coupons, orders and payments (stage 1, 2026-11-04)
 **Build:** `qa/phase-2` at `c2c153a` (`develop` merged in: backend R2b WIP and admin T-304 WIP). QA instance `127.0.0.1:8004`, local settings, FakeRazorpayGateway, shared remote DB. **R2b** = re-run after the backend R2b review-fix merge. **T-304** = re-run after the admin T-304 merge.
@@ -259,7 +352,7 @@ Oracle: the bill is recomputed independently from the DB (`coalesce(price_overri
 | P3-TC-61 | BE | P1 | Coupon usage limits exhausted (per user, total); expired / not-started coupons | 422 `COUPON_USAGE_EXCEEDED` {scope} / `COUPON_EXPIRED` / `COUPON_INVALID` | ✅ stage 2 with QA coupons `QAP3*` (hidden, made in admin as Super Admin, switched off afterwards): expired → COUPON_EXPIRED; not started or inactive → COUPON_INVALID; expired after applying → blocker + 422, nothing created; per_user and total limits count HELD; T5 gives the use back; last-use race of 3 → `[201, 422, 422]` |
 | P3-TC-62 | BE | P1 | COD for a `cod_blocked` user; store COD disabled | 422 `COD_NOT_AVAILABLE` NOT_ALLOWED / COD_DISABLED | ✅ stage 2 (cod_blocked part, QA user E via the Customers admin action, then reset): COD NOT_ALLOWED in the cart and 422 on placement; allowed again after reset. Store COD-disabled ⏭ by PM instruction (the demo store's COD is in use on the phone) |
 | P3-TC-63 | BE | P1 | Gateway unreachable at placement / retry | 503 `SERVICE_UNAVAILABLE`, nothing created | ⏭ cannot be induced black-box with the fake gateway |
-| P3-TC-64 | CUS | P0 | Customer app cart → checkout → pay (fake key) / COD → success; retry/cancel screens | Per 03 §2.8–2.9 | ⬜ the user's phone test (in progress; PM) |
+| P3-TC-64 | CUS | P0 | Customer app cart → checkout → pay (fake key) / COD → success; retry/cancel screens | Per 03 §2.8–2.9 | ✅ the user's phone test on 2026-11-04 (T-306, run by the PM; not executed by QA) |
 | P3-TC-65 | BE | P0 | `refund.processed` (no receipt) arrives before `process_refund` recorded the id; the gateway retries the same event id before and after the task runs | 503 `SERVICE_UNAVAILABLE` ×2, nothing stored; after the task: 200 `processed`; replay `duplicate`; one refund, REFUNDED once | ✅ `9ed7ffc` (QA-started worker, deterministic) |
 | P3-TC-66 | BE | P0 | `refund.processed` with the refund's receipt before the task, then the task runs | 200 `processed` via the receipt; the task skips; one refund; order unchanged by the task | ✅ `9ed7ffc` |
 | P3-TC-67 | BE | P1 | While payment A has an unrecorded PENDING refund: refund events for another payment (no receipt / A's receipt / malformed payment id) | 200 `ignored` ×3 (never 503); A's refund untouched, then settled by the task | ✅ `9ed7ffc` |
@@ -322,15 +415,15 @@ Data notes: the shared dev DB has a single store (GGN-01), so the cross-store sc
 | P4-TC-29 | ADM | P1 | Staff cancel without a reason / with a customer-only reason | Refused | ✅ console (stage 2 `f744508`) + service |
 | P4-TC-30 🔥 | ADM | P0 | Store Staff / Manager of GGN-01: another store's console URL; accept / cancel / unavailable on another store's order id | 404 (or 403); nothing changes; other stores' orders never listed | ✅ QA-02 (stage 2 `f744508`) |
 | P4-TC-31 🔥 | ADM | P0 | 05 §3 P4 rows × 7 roles: live board, packing console, cancel, refund, audit log (pages and POST actions) | Exactly per the matrix, enforced server-side | ✅ pages + POSTs (stage 2 `f744508`) + service (stage 1) |
-| P4-TC-32 | ADM | P0 | Support refunds 500.00 and 500.01; Finance any amount; refund above refundable; two concurrent manual refunds | 500.00 ok, 500.01 refused (`SUPPORT_REFUND_LIMIT`); cap enforced; never above refundable | ❌ console: no manual refund form (BUG-0010); service level ✅ stage 1 |
-| P4-TC-33 | ADM | P0 | Manual partial then full refund (GOODWILL); double submit | PARTIALLY_REFUNDED → REFUNDED; `amount_refunded` = Σ processed; one refund per submit | ❌ console: no manual refund form (BUG-0010); service level ✅ stage 1 |
+| P4-TC-32 | ADM | P0 | Support refunds 500.00 and 500.01; Finance any amount; refund above refundable; two concurrent manual refunds | 500.00 ok, 500.01 refused (`SUPPORT_REFUND_LIMIT`); cap enforced; never above refundable | ✅ [BUG-0010](../bugs/BUG-0010.md) Verified 2026-11-09 (`4ac5dae`): console manual refund form with a one-time token |
+| P4-TC-33 | ADM | P0 | Manual partial then full refund (GOODWILL); double submit | PARTIALLY_REFUNDED → REFUNDED; `amount_refunded` = Σ processed; one refund per submit | ✅ [BUG-0010](../bugs/BUG-0010.md) Verified 2026-11-09 (`4ac5dae`) |
 | P4-TC-34 | ADM | P1 | Retry a FAILED refund from the ops screen; try to retry a PENDING / PROCESSED one | New refund `<key>:retry-1`; only FAILED retryable; customer sees PENDING (never FAILED) | ✅ console (stage 2 `f744508`): retry action; same form twice → 'already sent', one retry (OBS-P4-01 verified) |
 | P4-TC-35 | BE | P1 | Refund PENDING without a gateway answer for > `REFUND_STUCK_MINUTES`; `sync_refund_status` runs | Re-sent once; the gateway lookup prevents a second refund | ✅ `1b3552d` (2 resends + original task → 1 gateway refund) |
 | P4-TC-36 | BE | P1 | Store with auto-accept: new PLACED order | ACCEPTED after `AUTO_ACCEPT_DELAY_SECONDS` (+ beat); history `actor_type` system | ✅ QA-02 (stage 2 `f744508`): ACCEPTED by system within seconds |
 | P4-TC-37 | BE | P1 | Order not accepted within `STORE_ACCEPTANCE_SLA_SECONDS` (60 s); one accepted in time | Ops alert raised once (not on the next sweep); none for the accepted one | ✅ `1b3552d` (alerted/already/skipped; service level) |
 | P4-TC-38 | ADM | P1 | Live board `/ops/orders/live/` | Columns Placed → Out for delivery + exceptions lane; card fields and age timer (amber/red vs SLA); filters store / payment / SLA breach; 10 s HTMX poll returns the partial; no full phone | ✅ (stage 2 `f744508`): Placed…Packed + Out for delivery + Exceptions lanes, filters, 10 s poll, no phone |
 | P4-TC-39 | ADM | P1 | Packing console `/ops/store/<store>/` | New-orders queue with SLA countdown and sound; pick list; slip with order number, 4-char code, QR, item count; accepting-orders switch (Store Manager only) | ✅ (stage 2 `f744508`): queue, slip, switch on QA-02 (Super Admin), switch offered to SM not SS |
-| P4-TC-40 | ADM | P1 | Orders admin: filters, detail, actions, CSV export | Timeline, payments, refunds; cancel/refund only with permission; CSV formula-injection escaped | ❌ (stage 2 `f744508`): filters/detail ✅; no refund action (BUG-0010), no CSV export (BUG-0011) |
+| P4-TC-40 | ADM | P1 | Orders admin: filters, detail, actions, CSV export | Timeline, payments, refunds; cancel/refund only with permission; CSV formula-injection escaped | ✅ [BUG-0010](../bugs/BUG-0010.md) / [BUG-0011](../bugs/BUG-0011.md) Verified 2026-11-09 (`4ac5dae`): refund action and CSV export |
 | P4-TC-41 🔥 | ADM | P0 | Each staff action (accept, start packing, pack, unavailable, cancel, refund), then the audit log | One row per action with actor, action, object, changes; no customer PII; read-only; only Super Admin and Finance can open it | ✅ console (stage 2 `f744508`): row shown, read-only, Super/Finance only |
 | P4-TC-42 | ADM | P0 | Console POST without a CSRF token; GET on action URLs | 403, nothing changes; GET never changes state | ✅ (stage 2 `f744508`) |
 | P4-TC-43 | ADM | P1 | Customer detail (Customers admin, P4) per role | Orders listed; phone masked for Store Manager/Staff; full for Super Admin/Ops/Support | ✅ (stage 2 `f744508`) |
@@ -439,7 +532,7 @@ Nothing in this section has been executed: every status is ⬜, or ⏭ with the 
 | P5-TC-13 | ADM | P1 | 5.1 | 06 §3 (#9); 04 §2.2 | PENDING_KYC rider | OPS rejects the rider with a reason (and once with an empty reason); the rider reads `/rider/me/`, then re-uploads the rejected document | Empty reason refused. REJECTED with `rejection_reason` shown; back to PENDING_KYC by itself once nothing required is missing or rejected | ✅ (efb3c3d, 2026-11-10, stage 3; fresh rider 106 (`QA_P5_KYC2_PHONE`)) |
 | P5-TC-14 | ADM | P1 | 5.1 | 06 §3 (#25) | R2 offline; then R2 ON | OPS rejects R2's DL; R2 calls `shift/start`; R2 re-uploads, OPS approves; repeat with R2 online when the DL is rejected | Stays ACTIVE; `shift/start` → 409 `DOCUMENTS_NOT_APPROVED` with `doc_types` [DL]; online again after approval. Online variant: behaviour recorded against A18 (no new offers expected) | ✅ (efb3c3d, 2026-11-10, stage 3; rerun after MinIO restart) |
 | P5-TC-15 | ADM | P0 | 5.1 | 05 §2 Riders; 06 §3 (5.3 notes "Going offline") | ON(R1) with OFR, ON(R2) | OPS suspends R1 with a reason; R1 calls `shift/start` and the records endpoints; OPS reinstates R1 | R1 offline (shift `end_reason` ADMIN, `ended_by` ops); offer withdrawn and R2 offered; `shift/start` → 403 `RIDER_NOT_ACTIVE`; records 200; reinstated rider can go online | ✅ (efb3c3d, 2026-11-09) |
-| P5-TC-16 | BE | P0 | 5.1–5.4 | 06 §3 Access | Users with no profile, PENDING_KYC, REJECTED, ACTIVE, SUSPENDED | Call me, documents, bank, shift, locations, heartbeat, offers, tasks, history, earnings, ledger and payouts as each | No profile → 403 `PERMISSION_DENIED` `details.rider_status` NONE (including `/rider/me/`). Not ACTIVE on shift/location/offer/task → 403 `details.reason` `RIDER_NOT_ACTIVE`. Records open in any status | ❌ BUG-0013 (fix not in this build; xfail still holds at f8db671) |
+| P5-TC-16 | BE | P0 | 5.1–5.4 | 06 §3 Access | Users with no profile, PENDING_KYC, REJECTED, ACTIVE, SUSPENDED | Call me, documents, bank, shift, locations, heartbeat, offers, tasks, history, earnings, ledger and payouts as each | No profile → 403 `PERMISSION_DENIED` `details.rider_status` NONE (including `/rider/me/`). Not ACTIVE on shift/location/offer/task → 403 `details.reason` `RIDER_NOT_ACTIVE`. Records open in any status | ✅ [BUG-0013](../bugs/BUG-0013.md) Verified on main `f6ed556` 2026-11-16 (the strict xfails turned XPASS; now plain asserts, 3/3 pass) |
 | P5-TC-17 | BE | P2 | 5.1 | 06 §3 Rate limits | PENDING_KYC rider; QA Redis counters cleared | 31 document uploads in an hour; 21 register/bank writes | The 31st and 21st → 429 `RATE_LIMITED` with `retry_after_seconds` and `Retry-After` | ✅ (efb3c3d, 2026-11-09) |
 | P5-TC-18 | BE | P1 | 5.1 | 06 §3 Erasure; DL-57; 07 §4 | Spare-number rider with documents, bank and location history | Delete the account (grace period by driver), anonymise; then run `purge_offboarded_kyc` with `kyc_purge_after` in the past (driver) | Name, dob, emergency contact, vehicle number and bank blanked; location history and history rows deleted; `kyc_purge_after` = today + 365. After the purge the document rows and files are gone (old signed link fails) | ✅ (f8db671, 2026-11-10, stage 4: QA H; fields blanked, locations deleted, kyc_purge_after = today + 365; guarded purge deleted 4 documents; old link refused) |
 | P5-TC-19 | RID | P1 | 5.1 | 04 §2.2, §5 | Rider dev build against :8001, user's phone | Register → documents (camera, compressed ≤ 1 MB) → bank → status; ops rejects one document → re-upload | Screens bound to the real API; masked numbers only; no crash after Android kills the app while the camera is open | ⏭ device run (PM) |
@@ -482,7 +575,7 @@ Nothing in this section has been executed: every status is ⬜, or ⏭ with the 
 | P5-TC-47 | BE | P1 | 5.3 | 08 §5.6 | `dispatchfast` profile; ON(R1) only | R1 lets every offer expire; watch the task through the give-up and the pause | After `MAX_OFFER_ATTEMPTS` (5) offers or `DISPATCH_TIMEOUT_SECONDS`: UNASSIGNED with `unassigned_at`, ops alert `DISPATCH_UNASSIGNED`; after the pause a new round (SEARCHING). R1 is not re-offered (already offered this task): behaviour recorded against A15 | ✅ (f8db671, 2026-11-10, stage 4, s4timers: offer expired, R1 not re-offered in round 1, UNASSIGNED with unassigned_at, DISPATCH_UNASSIGNED on the QA-02 feed only; after the 15 s pause a new round in which R1 (kept fresh) IS offered again = DL-61 (e), which replaced A15) |
 | P5-TC-48 | BE | P1 | 5.3 | 08 §5.1; 06 §5 `dispatch_sweep` | No rider online | Place COD(A); 20 s later R1 goes online | Task SEARCHING; offered to R1 within `DISPATCH_RETRY_SECONDS` (15) + the sweep | ✅ (efb3c3d, 2026-11-09) |
 | P5-TC-49 | BE | P1 | 5.3 | 08 T11/T12, §9; 04 §2.4 | (a) OFR; (b) ASG (order ACCEPTED); (c) ATS + PKD | (a) A cancels; (b) A cancels; (c) OPS cancels (T12) | Offer WITHDRAWN (`offers/current` empty) or task CANCELLED with `cancelled_at`; `recent_task` shows CANCELLED for `RIDER_RECENT_TASK_SECONDS`; R1 freed (gets the next offer); notifications `rider.offer_withdrawn` / `rider.task_cancelled` recorded | ✅ (efb3c3d, 2026-11-09) |
-| P5-TC-50 | BE | P1 | 5.3 | 08 T8 | (a) ASG; (b) a task SEARCHING with its next retry in the future | OPS: start packing, mark packed | (a) `ready_for_pickup` true, notification `rider.order_ready`; (b) dispatch runs at once (offer without waiting for the retry) | ⬜ partial: (a) ✅ (f8db671, 2026-11-10, stage 4: ready_for_pickup true, one rider.order_ready); (b) packing triggers dispatch before the retry: not run (needs a stale-ping set-up) |
+| P5-TC-50 | BE | P1 | 5.3 | 08 T8 | (a) ASG; (b) a task SEARCHING with its next retry in the future | OPS: start packing, mark packed | (a) `ready_for_pickup` true, notification `rider.order_ready`; (b) dispatch runs at once (offer without waiting for the retry) | ⬜ partial: (a) ✅ (f8db671, stage 4). (b) automated in `tests/test_p5_main.py` (DISPATCH_RETRY_SECONDS=300 so only T8 can trigger the offer) but **blocked** on main 2026-11-16: the shared DB lacks 6 main migrations, so `DELETE /cart/` answers 500 (OBS-M-01) |
 | P5-TC-51 | BE | P0 | 5.3 | 08 T8a, §6.3 | COD(A) of 2 × JV-SUN-1L, ASG | OPS marks 1 unit unavailable; R1 reads the task; later delivers with the old amount | `cod_amount_due` = the new `grand_total` (QA oracle), `cod_amount_previous` = the old one; notification `rider.cod_amount_changed`; delivering with the old amount → 400 | ✅ (f8db671, 2026-11-10, stage 4: cod_amount_due = oracle, cod_amount_previous = old, one rider.cod_amount_changed quoting both, old amount 400, new 200, one unit committed) |
 | P5-TC-52 | BE | P1 | 5.3 | D-16 default; 06 §3 (5.3 notes) | OFR | Read `estimated_payout` and `distance_km` on the offer and the task | `estimated_payout` = 30.00 + 5.00 × `distance_km` (QA oracle, 2 dp, half-up); both 2-dp strings, never floats; `distance_km` = store-to-drop distance, not the GPS trail | ✅ (efb3c3d, 2026-11-09) |
 | P5-TC-53 | BE | P0 | 5.3 | 08 §5.1 (v1 one order at a time) | ON(R1) only | Place two COD orders (A, B) a second apart | R1 offered one; the other stays SEARCHING until R1 is free; never two PENDING offers or two active tasks for R1 (SQL) | ✅ (efb3c3d, 2026-11-09) |
@@ -540,7 +633,7 @@ Nothing in this section has been executed: every status is ⬜, or ⏭ with the 
 | P5-TC-89 | BE | P0 | 5.4 | 04 §2.6; 08 T10 | TC-88 QR | Simulate the QR payment (fake gateway, signed); poll `tasks/current`; deliver with `mode: upi` and the amount | `cod_qr.status` PAID; deliver → DELIVERED; **no** cash-ledger row; one payment recorded; `payment_status` as the 5.4 contract (A17) | ✅ (efb3c3d, 2026-11-10, stage 3; rerun 2026-11-10: 3 passed; stage 2 failure = R1 cash near limit (environment)) |
 | P5-TC-90 | BE | P0 | 5.4 | 08 §4 rule 2; 09 §3.4 | TC-88 QR | Replay the QR-payment event 3 times and 3 in parallel; a payment of a different amount | One payment (duplicates answered `duplicate`); a wrong amount does not mark the QR PAID and is refunded | ✅ (efb3c3d, 2026-11-09) |
 | P5-TC-91 | BE | P0 | 5.4 | 06 §3 ("A QR paid after cash was taken is refunded automatically") | COD(A) with an open QR | Deliver with cash; then the QR payment arrives | The QR payment is refunded in full; the ledger has only the cash row; the customer pays once | ✅ (efb3c3d, 2026-11-09) |
-| P5-TC-92 | BE | P1 | 5.4 | 08 T8a; 04 §2.6; A17 | COD(A) of 2 units reduced by T8a before pickup (as TC-51), then OFD and ATC; a second order whose QR is left unpaid past `expires_at`, and one whose task is then failed | Generate the QR on the first; wait out the second's expiry and pay it late; fail the third and pay its QR | First: QR amount = the new due (not the offer's `cod_amount`). Expired or failed-task QR: status EXPIRED/CANCELLED, and a late payment to it is refunded, never counted as collected | ⬜ not run in stage 4 (COD UPI QR with T8a / expired / failed task needs the fake-gateway QR webhook set-up; time went to the P0 cases) |
+| P5-TC-92 | BE | P1 | 5.4 | 08 T8a; 04 §2.6; A17 | COD(A) of 2 units reduced by T8a before pickup (as TC-51), then OFD and ATC; a second order whose QR is left unpaid past `expires_at`, and one whose task is then failed | Generate the QR on the first; wait out the second's expiry and pay it late; fail the third and pay its QR | First: QR amount = the new due (not the offer's `cod_amount`). Expired or failed-task QR: status EXPIRED/CANCELLED, and a late payment to it is refunded, never counted as collected | ⬜ automated in `tests/test_p5_main.py` (4 sub-cases: QR after T8a, replaced expired QR, unreplaced expired QR, failed task) but **blocked** on main 2026-11-16: cart and order flows answer 500 against the shared DB (OBS-M-01) |
 | P5-TC-93 🔥 | ADM | P0 | 5.4 | 06 §6 `PICKUP_CODE_LOCKED`; 08 5.3 note (T10); A3 | OTP locked (TC-71); pickup locked (TC-63) | OPS unlocks each | Attempts reset, `locked` false; R1 completes with the right code or OTP; audit; roles per TC-117 | ✅ (efb3c3d, 2026-11-10, stage 3; rerun 2026-11-10: passed (API/driver unlock); stage 2 failure = R1 cash near limit (environment)) |
 | P5-TC-94 | BE | P0 | 5.4 | 04 §2.7; 06 §3 (#21, #24) | R1 after 2 COD deliveries and 1 deposit | `GET /rider/cash/ledger/` with `before_id` paging; `GET /rider/me/` | COD_COLLECTED rows (order number) and DEPOSIT rows (negative) with running `balance_after`; `next` carries `before_id`, `previous` null; `cash.cash_in_hand` = the latest balance; `limit_reached` at ≥ limit; 2-dp strings | ✅ (efb3c3d, 2026-11-09) |
 | P5-TC-95 🔥 | ADM | P0 | 5.4 | 05 §1.5; 04 §2.7 | R1 with cash 498.00 | SMQ records a deposit of 498.00 at `/ops/cash/` | Ledger DEPOSIT −498.00, balance 0.00; R1 sees it at once; audit | ✅ (efb3c3d, 2026-11-09) |
@@ -705,7 +798,7 @@ Plan, environment and ambiguities: `01-test-plan.md` §10. Automated cases are `
 | ID | Area | Pri | Task | Ref | Pre | Steps | Expected | Status |
 |---|---|---|---|---|---|---|---|---|
 | P6-TC-49 🔥 | BE | P0 | T-611 | 06 §4.1 4429 | A | Open 6 authorised sockets; close one; open another | 6th closed 4429; after a close a new one is accepted | ✅ (8f87d7b, 2026-11-06) |
-| P6-TC-50 | BE | P0 | T-611 | 06 §4.1 1009 | A | Send 5,000 bytes before auth; after auth | Closed 1009 both times | ❌ BUG-0020 (fix not in this build; xfail still holds at f8db671, stage 4 smoke) |
+| P6-TC-50 | BE | P0 | T-611 | 06 §4.1 1009 | A | Send 5,000 bytes before auth; after auth | Closed 1009 both times | ✅ [BUG-0020](../bugs/BUG-0020.md) Verified on main `f6ed556` 2026-11-16 (closed 1009 before and after auth on daphne; the log shows a WARNING, no traceback) |
 | P6-TC-51 | BE | P1 | T-611 | 06 §4.1 4400 | A authorised | 11 malformed/unknown messages | 10 `error` replies, then closed 4400 | ✅ (8f87d7b, 2026-11-06) |
 | P6-TC-52 | BE | P1 | T-611 | 09; 06 §4.1 | A | Binary frame, invalid JSON, deep nesting, huge numbers, unicode | Never a server crash; `/health/live` 200 afterwards; another open socket unaffected | ✅ (8f87d7b, 2026-11-06) |
 | P6-TC-53 | BE | P2 | T-611 | 06 §4.1 leases | A | 20 rapid connect/auth/close cycles (≤ 5 open at once) | No leaked slots: 5 fresh sockets then authorise | ✅ (8f87d7b, 2026-11-06) |
@@ -808,4 +901,18 @@ New case this stage: **P5-TC-42b** (late accept after a processed expiry → `OF
 | 5 | 133 | 121 | 4 (TC-16 BUG-0013, TC-42 and TC-42b BUG-0023, TC-117 BUG-0024) | 2 (TC-50 part b, TC-92) | 6 (device TC-19, 33, 124, 131; TC-77 no GTK runtime; TC-132 P6/D-19) | 118 / 129 | 91.0 % |
 | 6 | 59 | 53 | 1 (TC-50 BUG-0020) | 0 | 5 (device TC-17, 57; TC-44 no fault backend; TC-45, 54 config review) | 51 / 57 | 89.8 % |
 | 7 | 38 | 35 | 0 | 0 | 3 (device TC-37–39) | 34 / 37 | 92.1 % |
+
+### Totals (main `f6ed556`, 2026-11-16, all phases, synced with the bug files)
+| Phase | Cases | ✅ | ◐ | ❌ | ⬜ | ⏭ | Pri P0/P1 passed | Pass rate |
+|---|---|---|---|---|---|---|---|---|
+| 0 | 25 | 22 | 0 | 0 | 1 | 2 | 16 / 19 | 88.0 % |
+| 1 | 105 | 86 | 0 | 0 | 13 (device) | 6 | 81 / 98 | 81.9 % |
+| 2 | 57 | 26 | 3 | 0 | 26 (19 blocked by OBS-M-01, 2 not automated, 5 device) | 2 | 25 / 54 | 45.6 % |
+| 3 | 69 | 67 | 0 | 0 | 0 | 2 | 65 / 67 | 97.1 % |
+| 4 | 60 | 49 | 1 | 0 | 7 (device) | 3 | 47 / 56 | 81.7 % |
+| 5 | 133 | 122 | 0 | 3 (TC-42, 42b BUG-0023; TC-117 BUG-0024) | 2 (TC-50 b, 92: blocked) | 6 | 119 / 129 | 91.7 % |
+| 6 | 59 | 54 | 0 | 0 | 0 | 5 | 52 / 57 | 91.5 % |
+| 7 | 38 | 35 | 0 | 0 | 0 | 3 | 34 / 37 | 92.1 % |
+
+Changes this session: BUG-0013 and BUG-0020 Verified (P5-TC-16, P6-TC-50 ✅); rows still ❌ on already-verified bugs set to ✅ (P0-TC-08b, P1-TC-04/13/14b/24c/52/57/96, P4-TC-32/33/40); P3-TC-64 ✅ from the PM's phone run (2026-11-04, T-306); the Phase 2 section is new. P3/P4/P5/P7 ✅ were last executed on develop builds (`9ed7ffc`, `f744508`, `f8db671`) and could not be re-run on main (OBS-M-01).
 

@@ -67,3 +67,6 @@ Not a load test (09 §1 load belongs to Phase 8 on staging). Findings while runn
 
 ## QA stage 4 (2026-11-10, `f8db671`): dispatch latency on the new PC
 Not a load test (Phase 8, staging). P5-TC-58 (P2), server side, measured from the DB for this session's QA-02 orders (n = 31, the current build and host): **ACCEPTED → first offer p50 0.24 s, p95 0.39 s, max 0.42 s** (target < 3 s, 09 §1). Over the whole day, including the old PC's morning runs, the p95 was 9.85 s (OBS-S4-04: the 2 s Redis connect of OBS-S3-01). Real-time cases passed their 3 s bounds: OUT_FOR_DELIVERY on the order socket < 3 s after pickup (P6-TC-59). Setup: a QA worker with 16 threads and Redis on `127.0.0.1`. Re-measure on staging.
+
+## QA on main (2026-11-16, `f6ed556`)
+No performance measurement this session. Catalog and order endpoints answer 500 against the unmigrated shared DB (OBS-M-01). The light staging load test of 2026-11-16 (DL-70, devops) is recorded in `docs/deployment.md`, not re-run by QA.

@@ -191,7 +191,7 @@ def schema_path() -> Path:
 
 @functools.cache
 def openapi() -> dict:
-    return yaml.safe_load(schema_path().read_text())
+    return yaml.safe_load(schema_path().read_text(encoding="utf-8"))
 
 
 def _convert(node: Any, strict: bool) -> Any:

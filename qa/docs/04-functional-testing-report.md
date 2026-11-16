@@ -109,3 +109,6 @@ The dev agents report 62 customer, 112 rider and 75 `jivo_core` tests plus real-
   - timer cases: dispatch trigger (TC-38), give-up / pause / new round (TC-47; DL-61 (e) confirmed), console retry (TC-57).
 - **Not run:** TC-92 (COD QR edge cases), TC-50 (b). ⏭: TC-77 (no GTK runtime on this PC).
 - **P6:** BUG-0021 and BUG-0022 verified (TC-59, TC-14); TC-09, 20, 32 and 33 executed and passing.
+
+## QA on main (2026-11-16, `f6ed556`)
+Functional results per case are in `02`; the verdicts are in `10`. Summary: P0/P1 functional flows all pass on main (196 passed). P2 serviceability, notify-me, address serviceability, category tree, store hours (TC-11 boundary) and the second store (TC-08) pass. Catalog, home, search, cart and order flows are blocked by OBS-M-01 (the shared DB lacks main's migrations), so the P2 catalog cases and P3–P7 functional regression were not executed on main.

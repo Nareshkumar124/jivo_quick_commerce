@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import base64
 import hashlib
 import hmac
@@ -44,7 +46,10 @@ def _sign(payload: dict, key: str, alg: str = "HS256") -> str:
 
 def _dev_key() -> str:
     """The development-only fallback key, read from the commit under test (never stored in qa/)."""
-    text = open(f"/tmp/jivo-qa-{instance_commit()}/backend/config/settings/local.py").read()
+    exported = Path(f"/tmp/jivo-qa-{instance_commit()}/backend/config/settings/local.py")
+    # Windows (stage 4+): the instance runs in place from this checkout's clean backend/ (instance.sh)
+    path = exported if exported.exists() else Path(__file__).resolve().parents[2] / "backend/config/settings/local.py"
+    text = path.read_text(encoding="utf-8")
     return re.search(r'SECRET_KEY = SECRET_KEY or "([^"]+)"', text).group(1)
 
 
@@ -277,8 +282,10 @@ def test_p1_tc24c_concurrent_reuse_of_one_refresh_token(api, trial):
             assert_error(r, 401, "TOKEN_INVALID")
     assert _outstanding_count(s.user["id"]) == before + 1
     winner = next(r for r in responses if r.status_code == 200).json()
+    # main (T-814 M2, 06 §2): the 9 losers presented an already-revoked, validly signed token, which
+    # is refresh-token reuse: every refresh token of the user is revoked, the winner's new one too.
     r = _refresh(api, winner["refresh"])
-    assert r.status_code == 200, describe(r)
+    assert_error(r, 401, "TOKEN_INVALID")
 
 
 def _outstanding_count(user_id: int) -> int:

@@ -199,7 +199,7 @@ def test_p0_tc10b_api_docs_staff_only_outside_local():
 def test_p0_tc11_served_schema_matches_committed(api):
     """P0-TC-11 The served schema equals the committed backend/openapi/schema.yaml (no drift)."""
     served = api.get("/api/schema/").json()
-    committed = yaml.safe_load(schema_path().read_text())
+    committed = yaml.safe_load(schema_path().read_text(encoding="utf-8"))  # cp1252 on Windows
     assert served["paths"].keys() == committed["paths"].keys()
     assert served["components"]["schemas"] == committed["components"]["schemas"]
     assert served["paths"] == committed["paths"]

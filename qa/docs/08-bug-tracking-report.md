@@ -1,9 +1,48 @@
 # 08: Bug Tracking Report
 
-**Updated:** 2026-11-04 (Phase 3 QA stage 1). **Builds:** backend `4960527` (run 1), `0b801d1` (run 2: BUG-0008), `c2c153a` (P3 stage 1: BUG-0009).
+**Updated:** 2026-11-16 (QA on main `f6ed556`, worktree `qa/main`). The table below is the **current status of every bug**, synced with the files in `qa/bugs/` (the file is the authority). The sections after it are the history of each QA run, kept as they were written; their "Open" statuses are historical.
 
 Severity uses `docs/10-testing-strategy.md` §5.3, with the brief's equivalent in brackets: P0 Blocker = Critical · P1 Critical = High · P2 Major = Medium · P3/P4 = Low. Security bugs keep their exploit detail in `qa/private/` (gitignored) until fixed.
 
+## Current status (2026-11-16)
+| ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
+|---|---|---|---|---|---|---|---|
+| [BUG-0001](../bugs/BUG-0001.md) | Request body over 2.5 MB returns 500 instead of a 4xx | backend: core error envelope | P3 Minor (Low) | P2 | django-backend-dev | Verified (run 2, `0b801d1`) | P0-TC-08b |
+| [BUG-0002](../bugs/BUG-0002.md) | Numeric input validators accept non-ASCII digits (security aspect private) | backend: accounts validators | P2 Major (Medium) | P1 | django-backend-dev | Verified (run 2, `0b801d1`); re-passed on main 2026-11-16 | P1-TC-04, 13, 14b, 52 |
+| [BUG-0003](../bugs/BUG-0003.md) | Refresh-token single use not enforced in all conditions (details private) | backend: token refresh | P2 Major (Medium) | P2 | django-backend-dev | Verified (run 2, `0b801d1`); re-passed on main 2026-11-16 | P1-TC-24c |
+| [BUG-0004](../bugs/BUG-0004.md) | `addresses_list` 404 for an invalid page not documented | backend: OpenAPI contract | P3 Minor (Low) | P3 | django-backend-dev | Verified (run 2, `0b801d1`) | P1-TC-48, 79 |
+| [BUG-0005](../bugs/BUG-0005.md) | Production settings default to the console SMS backend | backend: settings | P3 Minor (Low) | P2 | django-backend-dev | Verified (run 2, `0b801d1`) | P1-TC-96 |
+| [BUG-0006](../bugs/BUG-0006.md) | Staff session policy (8 h / 2 h idle) | backend: staff sessions | P3 Minor (Low) | P3 | django-backend-dev | Verified (stage 4, `f8db671`) | P1-TC-95 |
+| [BUG-0007](../bugs/BUG-0007.md) | Concurrent set-default can leave no default address | backend: addresses | P2 Major (Medium) | P3 | django-backend-dev | Verified (run 2, `0b801d1`); re-passed on main 2026-11-16 | P1-TC-57 |
+| [BUG-0008](../bugs/BUG-0008.md) | Anonymous notify-me repeat returned an earlier lead's data (privacy) | backend: notify-me | P3 Minor (Low) | P2 | django-backend-dev | Verified (2026-11-09, `4ac5dae`); re-passed on main 2026-11-16 | P2-TC-18 |
+| [BUG-0009](../bugs/BUG-0009.md) | Signed webhook with an over-long payment id → 500 | backend: payments webhook | P3 Minor (Low) | P3 | django-backend-dev | Verified (P3 stage 2, `f84482f`) | P3-TC-57 |
+| [BUG-0010](../bugs/BUG-0010.md) | No manual refund in the panel | admin panel: Orders / Refunds | P2 Major (Medium) | P1 | admin-panel-dev | Verified (2026-11-09, `4ac5dae`) | P4-TC-32, 33, 40 |
+| [BUG-0011](../bugs/BUG-0011.md) | Orders admin has no CSV export | admin panel: Orders | P3 Minor (Low) | P3 | admin-panel-dev | Verified (2026-11-09, `4ac5dae`) | P4-TC-40 |
+| [BUG-0012](../bugs/BUG-0012.md) | Dispatch crashes outside test settings, so no rider is offered an order | backend: dispatch | P0 Blocker (Critical) | P0 | django-backend-dev | Verified (fix `f5d39ff`, 2026-11-06) | P5-TC-34, 39 |
+| [BUG-0013](../bugs/BUG-0013.md) | No rider profile + invalid body → 400 instead of 403 | backend: rider API | P3 Minor (Low) | P3 | django-backend-dev | **Verified (2026-11-16, main `f6ed556`)** | P5-TC-16 |
+| [BUG-0020](../bugs/BUG-0020.md) | Oversized socket message → 1011 instead of 1009 on daphne | backend: realtime consumers | P3 Minor (Low) | P2 | django-backend-dev | **Verified (2026-11-16, main `f6ed556`)** | P6-TC-50 |
+| [BUG-0021](../bugs/BUG-0021.md) | T9 pickup sends no `order.status` OUT_FOR_DELIVERY on the sockets | backend: delivery / order events | P2 Major (Medium) | P1 | django-backend-dev | Verified (stage 4, `f8db671`) | P6-TC-59, 14 |
+| [BUG-0022](../bugs/BUG-0022.md) | `rider.location` heading always null | backend: rider location | P3 Minor (Low) | P3 | django-backend-dev | Verified (stage 4, `f8db671`) | P6-TC-14, 34 |
+| [BUG-0023](../bugs/BUG-0023.md) | Late accept after a processed expiry answers `OFFER_TAKEN` instead of `OFFER_EXPIRED` | backend: dispatch | P3 Minor (Low) | P3 | django-backend-dev | Open (fix in progress, PM 2026-11-16; not re-tested) | P5-TC-42, 42b |
+| [BUG-0024](../bugs/BUG-0024.md) | Store Manager gets 403 on "Change cash limit" for own store's riders | admin panel: Riders | P2 Major (Medium) | P2 | admin-panel-dev | Open (fix in progress, PM 2026-11-16; not re-tested) | P5-TC-117 |
+
+BUG-0014 to BUG-0019 were never assigned.
+
+**Open by severity (2026-11-16):** P0 0 · P1 0 · P2 1 (BUG-0024) · P3 1 (BUG-0023). **Verified today:** BUG-0013, BUG-0020. **New today:** none.
+
+## QA on main (2026-11-16, `f6ed556`)
+**No new bug.** One environment blocker and two observations:
+
+| ID | Observation | Why not a bug / next step |
+|---|---|---|
+| OBS-M-01 | **The shared DB is behind main.** Six main migrations are not applied (`showmigrations`, read-only): `catalog` 0004_variant_min_qty_per_order, 0005_variant_price_tiers, 0006_banner_audience_referral; `promotions` 0002_coupon_owner; `referrals` 0001_initial; `stores` 0005_pricing_min_order_units. Main's code then answers 500 on home, products, product detail, search, suggest, collections, the cart and every order flow, and on the admin banner, inventory and stock-movement pages. Log: `column catalog_productvariant.min_qty_per_order does not exist`, `column promotions_coupon.owner_id does not exist`. | Not a product defect: the code and its migrations agree; the DB was never migrated. **PM:** apply them through `shared-db-migrate` with the user's approval. Any :8001 started from main (and the user's phone) sees the same 500s. Blocks P2 catalog/admin cases, P5-TC-50 (b), P5-TC-92 and every P3–P7 order-flow regression on main. Reported to the PM mid-run. |
+| OBS-M-02 | T-814 added per-IP throttles (`serviceability` 60/min, `search` 60/min, anonymous API 300/min). Several QA suites send more than that from one IP. | Intended (06 §2). QA clears those scopes before each test (QA Redis DB only, `tests/conftest.py`) and checks the limit itself in P2-TC-52 (✅). |
+| OBS-M-03 | `cod_qr.record_credit` (06 §2 slice 5.4) accepts a credit on a QR whose `expires_at` has passed if its row is still PENDING (no expiry check in the acceptance condition). 06 and 08 T10 say a credit on an expired QR is refunded. | Seen in the code only, **not reproduced** (P5-TC-92c is written but blocked by OBS-M-01). Razorpay closes the QR at `close_by`, so a real late payment may be impossible. If P5-TC-92c fails once unblocked, it will be filed against django-backend-dev with the evidence. |
+| OBS-06 (resolved) | The JWT `app` claim was not enforced. | T-219 enforces it: a customer token with `X-App-Name: rider` → 403 `APP_HEADER_MISMATCH` (P1-TC-60 oracle updated, ✅ on main). DL-74 (rider API rider-app only) is being finished by the backend agent; QA will re-test after the follow-up. |
+
+## History
+
+### QA runs 1–2 and Phase 3 stage 1 (2026-11-02 … 2026-11-04)
 | ID | Title | Module | Severity | Priority | Owner agent | Status | Test / case |
 |---|---|---|---|---|---|---|---|
 | [BUG-0001](../bugs/BUG-0001.md) | Request body over 2.5 MB returns 500 SERVER_ERROR instead of a 4xx | backend: core error envelope | P3 Minor (Low) | P2 | django-backend-dev | Verified (run 2, `0b801d1`) | P0-TC-08b |
