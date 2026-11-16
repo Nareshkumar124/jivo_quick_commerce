@@ -93,3 +93,14 @@ Exploit-level details of open security findings are in `qa/private/` (gitignored
 - **Erasure:** anonymisation erases rating comments and ticket text ✅ (P7-TC-30).
 - **OBS-06 (open, doc decision):** REST `/rider/*` accepts the same person's customer-app token. No cross-user access.
 - No new security bug; nothing new in `qa/private/`.
+
+
+## QA stage 4 (2026-11-10, develop `f8db671`, QA instance :8004, new Windows PC)
+- **Signed links (P5-TC-110, P0):** ✅. QA G's fresh KYC photo and document links work as issued. The same link is refused (400/403) with another object key, a stretched expiry, or no signature. The 300 s staff KYC link is refused once it expires. R2's `/rider/me/` and `/rider/documents/` never carry another rider's `kyc/<id>/` path. Customer A sees the rider's photo link only through its own order's `track`, and no longer after delivery. The failure photo is stored re-encoded without EXIF, behind a signed URL; unsigned access is refused (P5-TC-84 ✅). Report exports: a signed private URL; unsigned access is refused (P7-TC-40d ✅).
+- **Role matrix, real pages (P7-TC-40, P5-TC-12, P5-TC-117):** ✅ for every seeded role (SA, OPS, FIN, SM GGN-01, the QA-02 SM, SUP, SS, CAT) on the dashboard order section, the 12-report index, report pages and CSV, export downloads (Finance cannot download OPS's export), the support console (list, detail, actions), the ratings admin (read-only for every role, including Super Admin) and rider approval. Store scoping: the GGN-01 manager gets a filter error or 404, never QA-02 numbers. One finding: **BUG-0024** (P2), where the QA-02 Store Manager is refused the cash-limit action DL-61 allows. That is a refusal that is **too strict**, not unauthorised access.
+- **CSRF:** a console POST without a token → 403 (report export, ticket reply).
+- **XSS:** customer ticket text with `<img onerror>` / `<script>` is rendered escaped in the support console (P7-TC-40g ✅).
+- **PII:** the ratings admin shows "Customer <id>", never the phone; customer phones appear in the support console only for the roles with `accounts.view_customer` (SUP/OPS/SA, by design 05 §3).
+- **Socket session checks:** a suspended rider's open socket is closed 4403 at the re-check (P6-TC-20 ✅); logging out of the panel closes the open ops feed 4401 (P6-TC-32 ✅); an access token expiring on an open order socket closes it 4401 at `exp` (P6-TC-09 ✅). The staff session idle/absolute policy holds (BUG-0006 verified).
+- **Fuzzing:** schemathesis on 19 rider operations (8 examples each, QA G's token): no 5xx, every response schema-valid (P5-TC-129 ✅).
+- No new security bug; nothing new in `qa/private/` (BUG-0023 and BUG-0024 are functional).

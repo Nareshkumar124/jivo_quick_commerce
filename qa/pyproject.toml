@@ -39,6 +39,8 @@ markers = [
     "profile_dispatchfast: needs the instance started with short dispatch timers (OFFER_TIMEOUT_SECONDS=10, DISPATCH_TIMEOUT_SECONDS=60, DISPATCH_UNASSIGNED_PAUSE_SECONDS=15, DISPATCH_RETRY_SECONDS=5)",
     "profile_riderclock: needs the instance started with RIDER_NOT_REACHABLE_WAIT_SECONDS=20, RIDER_RECENT_TASK_SECONDS=60",
     "profile_triggerplaced: needs the instance started with DISPATCH_TRIGGER=PLACED",
+    "profile_s4timers: needs the stage-4 timer profile (dispatchfast timers + AUTO_ACCEPT_DELAY_SECONDS=40, STORE_ACCEPTANCE_SLA_SECONDS=20)",
+    "profile_wsrecheck: needs the instance started with WS_RIDER_RECHECK_SECONDS=5, WS_OPS_RECHECK_SECONDS=5",
     "db: read-only SQL checks against the shared database",
     "slow: long-running (minutes); runs only with QA_SLOW=1 (e.g. the P3 15-minute payment-window expiry)",
     "fuzz: schemathesis property-based fuzzing (low example counts)",

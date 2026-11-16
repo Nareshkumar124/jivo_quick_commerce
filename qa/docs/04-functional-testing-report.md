@@ -90,3 +90,22 @@ The dev agents report 62 customer, 112 rider and 75 `jivo_core` tests plus real-
 - **P5 riders and delivery:** KYC registration, documents (EXIF stripped, formats, size), vehicle change, reject/resubmit (fresh QA riders 106/107); shifts; dispatch and offers; the T9/T10/T13/T14 task flow with pickup code and delivery OTP and their locks/unlocks; COD cash and COD UPI QR (paid, replayed, wrong amount, cash-then-QR refund); ledger, deposits, earnings, history, payouts; DL-61 rules. Every automated case ✅. 21 cases have no automated test yet (01 §9; P0: TC-12, 42, 45, 51, 110).
 - **P6 real-time:** order socket (snapshot, status, ETA, gate ASSIGNED…AT_CUSTOMER, owner-only), rider socket (offer.new / expired / withdrawn, task.updated, cash.updated), ops feed (order.created / status, task.status, rider.status / location, store scoping), inbox (`notification.new`, unread count), polling-fallback parity ✅. **Gaps:** no OUT_FOR_DELIVERY `order.status` at T9 (BUG-0021); heading null (BUG-0022).
 - **P7:** ratings (rate once, parallel, not delivered, IDOR, validation, order-only, rider list without PII, staff scope), ticket per-app scoping and rider categories, store-manager reports, sales summary = SQL oracle incl. DL-65 uncollected COD, dashboard KPIs / no-rider alert / charts, erasure of comments and ticket text ✅. TC-40 (admin screens) not run.
+
+
+## QA stage 4 (2026-11-10, develop `f8db671`)
+- **P7 admin console (P7-TC-40):**
+  - dashboard order KPIs, alerts and charts per role and store;
+  - reports index, pages, CSV and async export with a signed download;
+  - support console: queue with the SLA filter and badge, ticket detail, reply / status / priority, CLOSED handling;
+  - ratings admin, read-only.
+
+  All match the service-level numbers verified against SQL in stage 3. ✅
+- **P5 rest:**
+  - admin rider approval (TC-12);
+  - T8a during a task changes the COD due (TC-51);
+  - races: accept ‖ expiry (TC-42: invariants ✅, the code is BUG-0023) and console manual assign ‖ accept (TC-45);
+  - mocked location (TC-26), presence from the receipt time (TC-29), pickup rate limit (TC-64);
+  - failure photo (TC-84), day-end cash report (TC-97), reads in any rider status (TC-103), ops action roles (TC-117, BUG-0024), rider erasure and KYC purge (TC-18);
+  - timer cases: dispatch trigger (TC-38), give-up / pause / new round (TC-47; DL-61 (e) confirmed), console retry (TC-57).
+- **Not run:** TC-92 (COD QR edge cases), TC-50 (b). ⏭: TC-77 (no GTK runtime on this PC).
+- **P6:** BUG-0021 and BUG-0022 verified (TC-59, TC-14); TC-09, 20, 32 and 33 executed and passing.

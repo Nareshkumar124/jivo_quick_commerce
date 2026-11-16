@@ -27,7 +27,7 @@ from p5_support import (  # noqa: F401 (fixtures)
     qa_worker, r1, r2, rider_id_of, rider_op,
 )
 from p6_support import ORIGIN, WS_BASE, clear_socket_slots, staff_cookie
-from qa_support import APP_HEADERS, QA_PHONES, bearer, clear_throttle, describe
+from qa_support import APP_HEADERS, QA_PHONES, bearer, clear_throttle, db_query, describe
 
 pytestmark = pytest.mark.usefixtures("_slots612")
 
@@ -133,7 +133,8 @@ def test_p6_tc14_tc15_tc16_location_gate_eta_and_scope(r1, p5_shop_a, p5_shop_b)
         data = got[1]["data"]
         assert set(data) == {"order_id", "lat", "lng", "heading", "recorded_at"}, data
         assert data["order_id"] == oid and abs(data["lat"] - pt[0]) < 1e-6
-        heading_dropped = data["heading"] != 72.5  # BUG-0022: checked last so the rest still runs
+        # BUG-0022 (fixed in ca8e69c, verified stage 4): the ping's heading reaches the customer
+        assert data["heading"] == 72.5, f"BUG-0022: rider.location heading {data['heading']!r}, the ping sent 72.5"
         # pickup → OUT_FOR_DELIVERY
         assert r1.arrived_store(ctx["task_id"]).status_code == 200
         pack(oid)
@@ -171,8 +172,6 @@ def test_p6_tc14_tc15_tc16_location_gate_eta_and_scope(r1, p5_shop_a, p5_shop_b)
         assert leak == [], f"B's socket got A's live data: {leak[:2]}"
         for _, m in a_ws.msgs:
             assert "delivery_otp" not in json.dumps(m) and otp not in json.dumps(m.get("data", {}).get("body", "")), m
-        if heading_dropped:
-            pytest.xfail(f"BUG-0022: rider.location heading {data['heading']!r}, the ping sent 72.5")
     finally:
         a_ws.close()
         if b_ws is not None:
@@ -329,6 +328,7 @@ def test_p6_tc34_rider_status_location_task_status_to_store_feeds(r1, p5_shop_a)
         ping_at(r1, offset(QA02, north_m=50))
         loc = ops.wait("rider.location", 10, t1, rider_id=rid)
         assert loc and loc[1]["data"]["store_id"] == QA02_ID, loc
+        assert loc[1]["data"].get("heading") == 45.0, f"BUG-0022 on the ops feed: {loc[1]['data']}"
         time.sleep(1)
         leak = [m for _, m in sm.msgs if m.get("data", {}).get("store_id") == QA02_ID
                 or m.get("data", {}).get("rider_id") == rid]
@@ -356,13 +356,27 @@ def test_p6_tc59_polling_fallback_matches_socket(r1, p5_shop_a):
     oid, tid = ctx["order_id"], ctx["task_id"]
     a_ws = Listener(f"/ws/v1/orders/{oid}/", p5_shop_a.session.access)
     r_ws = Listener("/ws/v1/rider/", r1.session.access)
+    _, ops_cookie = staff_cookie(OPS)
+    _, sm_cookie = staff_cookie(MANAGER)
+    ops_ws = Listener("/ws/ops/live/", cookie=ops_cookie)
+    sm_ws = Listener("/ws/ops/live/", cookie=sm_cookie)
     track_url = f"{ORIGIN}/api/v1/orders/{oid}/track/"
     try:
         assert a_ws.wait("auth.ok", 5) and r_ws.wait("auth.ok", 5)
         assert r1.arrived_store(tid).status_code == 200
         pack(oid)
+        t_pick = time.monotonic()
         assert r1.pickup(tid, pickup_code(oid)).status_code == 200
-        ofd_pushed = bool(a_ws.wait("order.status", 10, status="OUT_FOR_DELIVERY"))  # BUG-0021, checked last
+        # BUG-0021 (fixed in ca8e69c, verified stage 4): order.status OUT_FOR_DELIVERY at T9 on the
+        # order socket and on the store's ops feed (06 §4.2; 08 §9 "board"), within 3 s (09 §1).
+        ofd = a_ws.wait("order.status", 10, t_pick, status="OUT_FOR_DELIVERY")
+        assert ofd, "BUG-0021: no order.status OUT_FOR_DELIVERY on the order socket"
+        assert ofd[0] - t_pick < 3.0, f"order.status OUT_FOR_DELIVERY after {ofd[0] - t_pick:.1f} s"
+        ops_ofd = ops_ws.wait("order.status", 10, t_pick, order_id=oid, status="OUT_FOR_DELIVERY")
+        assert ops_ofd, "BUG-0021: no order.status OUT_FOR_DELIVERY on the QA-02 ops feed"
+        assert ops_ofd[1]["data"].get("store_id") == QA02_ID, ops_ofd[1]["data"]
+        assert len(a_ws.of("order.status", t_pick, status="OUT_FOR_DELIVERY")) == 1, "duplicate OFD on the order socket"
+        ofd_pushed = True
         time.sleep(31)  # ETA throttle (30 s) after the status-change ETA
         t1 = time.monotonic()
         pt = offset(DROP, north_m=800)
@@ -389,9 +403,17 @@ def test_p6_tc59_polling_fallback_matches_socket(r1, p5_shop_a):
         allowed = {"ORDER_PACKED", "ORDER_CANCELLED", "AMOUNT_CHANGED", "REASSIGNED", "ASSIGNED", "STATUS_CHANGED"}
         assert all(m["data"].get("change") in allowed for m in upd), [m["data"] for m in upd]
         otp = tr["delivery_otp"]
+        # the GGN-01 manager's feed never sees the QA-02 order (05 §3 store scope)
+        assert [m for _, m in sm_ws.msgs if m.get("data", {}).get("order_id") == oid] == [], "GGN-01 feed got QA-02"
     finally:
         a_ws.close()
         r_ws.close()
+        ops_ws.close()
+        sm_ws.close()
+    # BUG-0021 fix note: the new event sends no second T9 push/notification
+    n_ofd = db_query("select count(*) from notifications_notification where order_id=%s and event='order.out_for_delivery'",
+                     (oid,))[0][0]
+    assert n_ofd == 1, f"{n_ofd} order.out_for_delivery notifications for one pickup"
     # sockets closed (app offline / socket dropped): the apps poll REST
     assert r1.arrived_customer(tid).status_code == 200
     due = r1.task().json()["task"]["cod_amount_due"]
@@ -400,5 +422,3 @@ def test_p6_tc59_polling_fallback_matches_socket(r1, p5_shop_a):
     assert tr["status"] == "DELIVERED" and tr["delivery_otp"] is None and tr["live_eta_minutes"] is None, tr
     assert tr["rider"] is None or tr["rider"].get("phone") is None, tr["rider"]
     assert r1.task().json()["task"] is None
-    if not ofd_pushed:
-        pytest.xfail("BUG-0021: T9 pickup sends no order.status OUT_FOR_DELIVERY on the order socket")

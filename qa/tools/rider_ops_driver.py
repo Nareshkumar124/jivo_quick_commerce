@@ -198,6 +198,13 @@ def run(step: dict) -> dict:
 
         offer = DeliveryOffer.objects.select_related("task__order__user").get(pk=step["offer_id"])
         guard_order(offer.task.order_id)
+        if step.get("at_epoch"):  # stage 4 (P5-TC-42): fire at a wall-clock instant (race trials)
+            import time as _time
+
+            from django.db import connection
+
+            connection.ensure_connection()  # connect before the instant, not after it
+            _time.sleep(max(0.0, float(step["at_epoch"]) - _time.time()))
         return {"ok": True, "result": {"outcome": dispatch.expire_offer(offer.pk)}}
     if op == "dispatch_sweep":
         from apps.delivery.services import dispatch
@@ -259,6 +266,55 @@ def run(step: dict) -> dict:
         if not _qa_phone(user):
             raise SystemExit("refusing: not a QA customer")
         return {"ok": True, "result": {"lifted": dops.lift_cod_block(user.pk, by=by)}}
+
+    # ---------------------------------------------------------------- failure photo (P5-TC-84, stage 4)
+    if op == "fail_photo_info":
+        # Read-only: what was stored for a QA order's failed task (the staff-side view of the file).
+        from django.core.files.storage import default_storage
+
+        from apps.delivery.models import DeliveryTask
+
+        task = DeliveryTask.objects.get(order_id=oid)
+        name = task.fail_photo.name if task.fail_photo else ""
+        if not name:
+            return {"ok": True, "result": {"name": ""}}
+        with default_storage.open(name, "rb") as fh:
+            blob = fh.read()
+        url = default_storage.url(name)
+        return {"ok": True, "result": {"name": name, "size": len(blob), "head": blob[:4].hex(),
+                                       "has_exif": b"Exif" in blob or b"eXIf" in blob,
+                                       "has_marker": b"QAEXIFMARKER" in blob,
+                                       "signed": "Signature" in url, "url": url}}
+
+    # ---------------------------------------------------------------- erasure (P5-TC-18, stage 4)
+    if op == "anonymise_rider_user":
+        # QA H (+919000000108) only, and only after the rider deleted the account through the API.
+        from apps.accounts.services.auth import anonymise_user
+
+        if step["phone"] != "+919000000108":
+            raise SystemExit("refusing: anonymise_rider_user only runs on QA H")
+        user = User.objects.get(phone=step["phone"])
+        if user.deleted_at is None:
+            raise SystemExit("refusing: the account was not deleted through the API")
+        rider = Rider.objects.get(user=user)
+        return {"ok": True, "result": {"user_id": user.pk, "rider_id": rider.pk,
+                                       "anonymised": anonymise_user(user.pk)}}
+    if op == "purge_kyc_for":
+        # The beat job with `today` = the QA rider's purge date, only when every rider due by then
+        # is that QA rider (the job is DB-wide: it must never touch anyone else's documents).
+        from datetime import date as _date
+
+        from apps.delivery.services.privacy import purge_offboarded_kyc
+
+        rider = Rider.objects.get(pk=step["rider_id"])
+        if rider.anonymised_at is None or rider.kyc_purge_after is None:
+            raise SystemExit("refusing: rider not anonymised by the QA flow")
+        today = _date.fromisoformat(step["today"])
+        due = set(Rider.objects.filter(kyc_purge_after__isnull=False, kyc_purge_after__lte=today,
+                                       documents__isnull=False).values_list("pk", flat=True))
+        if due - {rider.pk}:
+            raise SystemExit(f"refusing: {len(due - {rider.pk})} other rider(s) would be purged")
+        return {"ok": True, "result": {"deleted": purge_offboarded_kyc(today=today)}}
 
     # ---------------------------------------------------------------- cleanup of a QA rider
     if op == "cleanup_rider":
