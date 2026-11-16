@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
-import '../../task/presentation/task_providers.dart';
 import '../data/api_today_summary.dart';
 import '../data/fake_today_summary.dart';
 import '../domain/today_summary.dart';
@@ -12,9 +11,6 @@ final fakeTodaySummaryProvider = Provider<FakeTodaySummary>(
 );
 
 final todaySummaryRepositoryProvider = Provider<TodaySummaryRepository>((ref) {
-  if (!ref.watch(riderWorkEnabledProvider)) {
-    return const UnavailableTodaySummary();
-  }
   if (ref.watch(appEnvProvider).useFakeApi) {
     return ref.watch(fakeTodaySummaryProvider);
   }

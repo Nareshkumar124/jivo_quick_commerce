@@ -31,7 +31,6 @@ String? redirect(
   bool showDevTools = true,
   bool hasRiderTask = false,
   bool hasOffer = false,
-  bool recordsEnabled = true,
 }) => riderRedirect(
   location: location,
   appControl: appControl,
@@ -43,7 +42,6 @@ String? redirect(
   showDevTools: showDevTools,
   hasRiderTask: hasRiderTask,
   hasOffer: hasOffer,
-  recordsEnabled: recordsEnabled,
 );
 
 void main() {
@@ -249,28 +247,6 @@ void main() {
         );
       }
       expect(Routes.isAccountRoute('/earningsx'), isFalse);
-    });
-
-    test('records where those routes are not built (staging, prod): '
-        'a stray link goes home', () {
-      for (final route in [
-        Routes.earnings,
-        Routes.cash,
-        Routes.history,
-        Routes.payouts,
-        Routes.profileDocuments,
-      ]) {
-        expect(
-          redirect(
-            route,
-            sessionStatus: SessionStatus.signedIn,
-            account: loaded(RiderStatusEnum.ACTIVE),
-            recordsEnabled: false,
-          ),
-          Routes.home,
-          reason: route,
-        );
-      }
     });
 
     test('task and offer flags never open work screens for other '

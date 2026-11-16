@@ -3356,6 +3356,12 @@ abstract class AppLocalizations {
   /// **'You are offline. Go online again to continue.'**
   String get riderOfflineError;
 
+  /// DL-74: the rider API refused a token from another Jivo app (403 WRONG_APP_TOKEN / APP_HEADER_MISMATCH); the rider is logged out and shown this on the login screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Please log in with the Jivo Rider app.'**
+  String get wrongAppError;
+
   /// No description provided for @failWaitNotElapsed.
   ///
   /// In en, this message translates to:

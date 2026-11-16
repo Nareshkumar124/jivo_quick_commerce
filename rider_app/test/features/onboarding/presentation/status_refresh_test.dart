@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
+import 'package:rider_app/features/onboarding/presentation/onboarding_status_screen.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../helpers/onboarding_fixtures.dart';
@@ -41,42 +41,12 @@ void main() {
     });
   });
 
-  group('static status screen (prod)', () {
-    late RiderTestHarness h;
-
-    setUp(() => h = RiderTestHarness(flavor: Flavor.prod));
-
-    testWidgets('"Check status" follows an approval to home', (tester) async {
-      await h.signedInBefore(pendingPhone);
-      await h.pump(tester);
-      expect(find.text('Documents under review'), findsOneWidget);
-      expect(byKey('call-support'), findsOneWidget);
-
-      h.backend.riderStatusChange = RiderStatusEnum.ACTIVE;
-      await tester.tap(byKey('status-check'));
-      await tester.pumpAndSettle();
-      expect(byKey('home-flavor'), findsOneWidget);
-    });
-
-    testWidgets('a failed check stays on the screen and says why', (
-      tester,
-    ) async {
-      await h.signedInBefore(pendingPhone);
-      await h.pump(tester);
-      h.backend.fetchMeError = const ApiError(code: ApiErrorCode.network);
-      await tester.tap(byKey('status-check'));
-      await tester.pumpAndSettle();
-      expect(find.text('Documents under review'), findsOneWidget);
-      expect(find.byType(SnackBar), findsOneWidget);
-      expect(h.session.isSignedIn, isTrue);
-    });
-
-    testWidgets('a return to the app checks again', (tester) async {
-      await h.signedInBefore(pendingPhone);
-      await h.pump(tester);
-      h.backend.riderStatusChange = RiderStatusEnum.ACTIVE;
-      await resume(tester);
-      expect(byKey('home-flavor'), findsOneWidget);
-    });
+  testWidgets('prod: the same application hub as dev (no static placeholder)', (
+    tester,
+  ) async {
+    final h = RiderTestHarness(flavor: Flavor.prod);
+    await h.signedInBefore(pendingPhone);
+    await h.pump(tester);
+    expect(find.byType(OnboardingStatusScreen), findsOneWidget);
   });
 }

@@ -1158,6 +1158,10 @@
   "pickupLockedTitle": "Code entry locked",
   "pickupCallStore": "Call store",
   "riderOfflineError": "You are offline. Go online again to continue.",
+  "wrongAppError": "Please log in with the Jivo Rider app.",
+  "@wrongAppError": {
+    "description": "DL-74: the rider API refused a token from another Jivo app (403 WRONG_APP_TOKEN / APP_HEADER_MISMATCH); the rider is logged out and shown this on the login screen."
+  },
   "failWaitNotElapsed": "Wait 10 minutes at the drop location before choosing this.",
   "failNeedsCalls": "Call the customer at least 2 times first.",
   "codAmountChangedCollect": "The amount changed. Collect exactly {amount}.",

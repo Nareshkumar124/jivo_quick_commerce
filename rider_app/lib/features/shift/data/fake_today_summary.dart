@@ -37,11 +37,3 @@ class FakeTodaySummary implements TodaySummaryRepository {
     return summary;
   }
 }
-
-class UnavailableTodaySummary implements TodaySummaryRepository {
-  const UnavailableTodaySummary();
-
-  @override
-  Future<TodaySummary> fetch() async =>
-      throw const ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-}

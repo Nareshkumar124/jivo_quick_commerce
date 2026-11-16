@@ -5,21 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../shift/presentation/shift_controller.dart';
-import '../../task/presentation/task_providers.dart';
 import '../data/service_isolate_api.dart';
 import '../data/foreground_location_service.dart';
 import '../domain/location_service_client.dart';
 import '../domain/tracker_stats.dart';
 import '../domain/tracking_config.dart';
 
-/// The foreground location service. It uploads to the real API where the
-/// shift API is bound (dev without `FAKE_API`), else to the fake.
+/// The foreground location service. It uploads to the real API, or to the
+/// fake with `FAKE_API`.
 final locationServiceClientProvider = Provider<LocationServiceClient>(
   (ref) => ForegroundLocationService(
-    api: ServiceApiSettings.fromEnv(
-      ref.watch(appEnvProvider),
-      live: ref.watch(riderWorkEnabledProvider),
-    ),
+    api: ServiceApiSettings.fromEnv(ref.watch(appEnvProvider), live: true),
   ),
 );
 

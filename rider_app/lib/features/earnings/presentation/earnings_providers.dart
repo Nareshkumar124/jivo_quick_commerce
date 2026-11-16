@@ -1,10 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../../shared/paged_list_controller.dart';
-import '../../../shared/paging.dart';
-import '../../task/presentation/task_providers.dart';
 import '../data/api_earnings_repository.dart';
 import '../data/fake_earnings_backend.dart';
 import '../domain/earnings.dart';
@@ -18,7 +15,6 @@ final fakeEarningsBackendProvider = Provider<FakeEarningsBackend>(
 /// with `FAKE_API`. The screens stay where the rider work screens run (dev
 /// flavor, DL-30/DL-32).
 final earningsRepositoryProvider = Provider<EarningsRepository>((ref) {
-  if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
   if (ref.watch(appEnvProvider).useFakeApi) {
     return ref.watch(fakeEarningsBackendProvider);
   }
@@ -71,18 +67,3 @@ final payoutsProvider =
         return (result, null);
       }, keyOf: (payout) => payout.id),
     );
-
-/// Staging and prod until the rider API lands: never reached (the routes
-/// and the home menu exist only in the dev flavor); every call fails with
-/// `NOT_FOUND`.
-class _Unavailable implements EarningsRepository {
-  const _Unavailable();
-
-  static const _error = ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-
-  @override
-  Future<EarningsSummary> fetchEarnings(DateRange range) async => throw _error;
-
-  @override
-  Future<Page<Payout>> fetchPayouts({int? cursor}) async => throw _error;
-}

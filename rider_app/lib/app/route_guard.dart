@@ -21,10 +21,8 @@ import 'routes.dart';
 /// 7. signed in and ACTIVE: the task screens while a task is active (or its
 ///    end is unread), else the offer screen while an offer is open, else
 ///    the permissions gate (also reachable during a task), home or the
-///    rider's records (earnings, cash, history, profile) in
-///    builds that have them ([recordsEnabled]; dev flavor until the rider
-///    API lands), and help, tickets, My rating and the legal pages in
-///    every flavor;
+///    rider's records (earnings, cash, history, inbox, profile), and help,
+///    tickets, My rating and the legal pages, in every flavor;
 /// 8. signed in: the screen for `rider_status`. `PENDING_KYC` and
 ///    `REJECTED` riders may also open the application steps under it
 ///    (documents, bank details); everyone else gets exactly that screen.
@@ -39,7 +37,6 @@ String? riderRedirect({
   required bool showDevTools,
   bool hasRiderTask = false,
   bool hasOffer = false,
-  bool recordsEnabled = false,
 }) {
   if (showDevTools && Routes.isDevRoute(location)) return null;
 
@@ -78,7 +75,7 @@ String? riderRedirect({
     if (permissions) return null;
     // Between orders: home and the rider's own records, where those routes
     // exist (a stray link elsewhere goes home, not to an error page).
-    if (recordsEnabled && Routes.isAccountRoute(location)) return null;
+    if (Routes.isAccountRoute(location)) return null;
     // Help, tickets, My rating and the legal pages run in every flavor.
     if (Routes.isSupportRoute(location)) return null;
   }

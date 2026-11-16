@@ -27,13 +27,9 @@ final fakeShiftBackendProvider = Provider<FakeShiftBackend>(
   (ref) => FakeShiftBackend(),
 );
 
-/// `rider_shift_*` and `rider_heartbeat` (P5 slice 5.2, live), where the
-/// rider work screens run (dev flavor until the whole rider API is live,
-/// DL-30); the fake with `FAKE_API`.
+/// `rider_shift_*` and `rider_heartbeat` (P5 slice 5.2): the generated
+/// client in every flavor; the fake with `FAKE_API`.
 final shiftRepositoryProvider = Provider<ShiftRepository>((ref) {
-  if (!ref.watch(riderWorkEnabledProvider)) {
-    return const UnavailableShiftRepository();
-  }
   if (ref.watch(appEnvProvider).useFakeApi) {
     return ref.watch(fakeShiftBackendProvider);
   }

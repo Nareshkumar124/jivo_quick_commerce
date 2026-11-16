@@ -28,9 +28,8 @@ import 'shift_controller.dart';
 /// deposit banner, today tiles and the records, with the 72 dp online
 /// control (or the current-task card) pinned at the bottom.
 ///
-/// Builds without the rider work screens (staging and prod until the rider
-/// API lands) keep the Phase 1 placeholder, with help and My rating (P7,
-/// real API in every flavor).
+/// Every flavor runs the rider API (dev-only gates removed 2026-11-16).
+/// Until the account is an ACTIVE rider the Phase 1 placeholder shows.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -213,8 +212,6 @@ class _DevOfferButtons extends ConsumerWidget {
   }
 }
 
-/// The rider's own records (screens 15–18). Only where the records fake
-/// runs (dev flavor) until the rider API lands.
 /// The placeholder home's links that work in every flavor: help and
 /// support (tickets, FAQs, legal pages) and My rating. ACTIVE riders only.
 class _SupportMenu extends ConsumerWidget {
@@ -249,6 +246,7 @@ class _SupportMenu extends ConsumerWidget {
   }
 }
 
+/// The rider's own records (screens 15–18), every flavor.
 class _RecordsMenu extends ConsumerWidget {
   const _RecordsMenu();
 

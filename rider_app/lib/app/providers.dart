@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/helpers.dart';
@@ -7,6 +9,7 @@ import 'package:jivo_api/jivo_api.dart' show JivoApi;
 
 import '../shared/platform/url_opener.dart';
 import '../shared/session/store_synced_token_refresher.dart';
+import '../shared/session/wrong_app_interceptor.dart';
 
 /// The `X-App-Name` this app sends.
 const riderAppName = 'rider';
@@ -43,15 +46,48 @@ final appControlSignalsProvider = Provider<AppControlSignals>(
 /// `GuardedTokenStore`). Null in tests that use an in-memory store.
 final sharedTokenStoreProvider = Provider<GuardedTokenStore?>((ref) => null);
 
-/// The Dio instance for every backend call: client-info headers, then the
-/// bearer token / refresh, then 426/503 detection (jivo_core order).
+/// Whether the session ended because the rider API refused a token from
+/// another Jivo app (DL-74). The login screen says so; a new login clears
+/// it.
+final wrongAppNoticeProvider = NotifierProvider<WrongAppNotice, bool>(
+  WrongAppNotice.new,
+);
+
+class WrongAppNotice extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void show() => state = true;
+
+  void clear() => state = false;
+}
+
+/// Signs the rider out after a DL-74 wrong-app refusal (REST 403 or the
+/// rider socket's `error` message), once.
+final wrongAppSignOutProvider = Provider<void Function()>((ref) {
+  return () {
+    final session = ref.read(sessionManagerProvider);
+    if (!session.isSignedIn) return;
+    ref.read(wrongAppNoticeProvider.notifier).show();
+    unawaited(session.signOut(reason: SignOutReason.sessionExpired));
+  };
+});
+
+/// The Dio instance for every backend call: client-info headers
+/// (`X-App-Name: rider`), then the bearer token / refresh, then 426/503
+/// detection (jivo_core order), then the DL-74 wrong-app sign-out.
 final dioProvider = Provider<Dio>((ref) {
+  final session = ref.watch(sessionManagerProvider);
   final dio = createJivoDio(
     env: ref.watch(appEnvProvider),
     clientInfo: ref.watch(clientInfoProvider),
     interceptors: [
-      AuthInterceptor(ref.watch(sessionManagerProvider)),
+      AuthInterceptor(session),
       AppControlInterceptor(ref.watch(appControlSignalsProvider)),
+      WrongAppInterceptor(
+        session: session,
+        onWrongApp: () => ref.read(wrongAppNoticeProvider.notifier).show(),
+      ),
     ],
   );
   ref.onDispose(dio.close);

@@ -1,3 +1,5 @@
+import '../../../shared/errors/wrong_app.dart';
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -46,12 +48,10 @@ final socketBackoffFactoryProvider = Provider<Backoff Function()>(
       ),
 );
 
-/// Whether this build runs the rider socket at all: the API builds where
-/// the rider work screens run. `FAKE_API` builds use the fake's events.
+/// Whether this build runs the rider socket at all: every API build.
+/// `FAKE_API` builds use the fake's events.
 final riderSocketEnabledProvider = Provider<bool>(
-  (ref) =>
-      ref.watch(riderWorkEnabledProvider) &&
-      !ref.watch(appEnvProvider).useFakeApi,
+  (ref) => !ref.watch(appEnvProvider).useFakeApi,
 );
 
 final riderSocketClientProvider = Provider<RiderSocketClient>((ref) {
@@ -197,6 +197,8 @@ class RiderSocketController extends Notifier<RiderSocketStatus> {
         ref
           ..invalidate(inboxUnreadCountProvider)
           ..invalidate(inboxControllerProvider);
+      case SocketError(:final code) when WrongApp.isWrongAppSocketCode(code):
+        ref.read(wrongAppSignOutProvider)();
       case SocketAuthOk() || SocketPong() || SocketError():
       case UnknownSocketMessage():
         break;
