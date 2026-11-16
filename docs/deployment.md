@@ -456,3 +456,52 @@ Kept per environment in the secrets manager; never in git or in images:
 - **`RAZORPAY_WEBHOOK_SECRET`:** §5.
 - **Database password:** set the new password on the role, update the secret, roll `web`, `worker` and `beat` in that order, then confirm no connection still uses the old one. **Least privilege:** staging and production must use a role that owns only the app's database (never a superuser), plus the separate read-only `jqc_metrics` role (§10.4).
 - After any rotation, check Sentry for auth errors, `/health/ready`, and the webhook-events list.
+
+## 13. P8 drill results 2026-11-16 (staging `jqc.jivo.in`, DL-70)
+
+Light drill only, on the shared server (backend `8369b0b`, compose project `jqc`). Logs on the server: `/srv/jqc/logs/p8-*-20261116.txt`.
+
+### 12.1 Restore drill: PASS
+- **Backup:** fresh full dump with `infra/backup/backup_db.sh` (run in a one-off `postgis/postgis:16-3.4` container on `jqc_net`): 784 KB, 1 s, sha256 + manifest in `/srv/jqc/backups/drill-20261116/`.
+- **Restore:** `restore_db.sh` into `test_jivo_quick_commerce_restore_20261116` beside the live DB (checksum checked first), 3.8 s. The live DB was only read.
+- **Verify:** `verify_restore.py --full --counts --source-db jivo_quick_commerce` (run with the `jqc-backend` image): **26 PASS, 0 WARN, 0 FAIL**. Every table's row count matched the live DB, the migration state and schema matched, the money and stock constraints were present, and all the 08 §6 invariants passed.
+- **Cleanup:** the restore DB was dropped with `restore_db.sh --drop-only`. Only the live DB remains.
+- **RTO (data):** 5.5 s from the start of the restore to a verified DB. The DB is small (largest table: 4,819 rider locations). This does not include repointing the app, which is a compose restart (seconds).
+- **RPO:** **there are no scheduled backups yet.** Before the drill, the newest dump was the pre-deploy dump of 2026-11-14 10:13 UTC, about **43 hours old**, and it sits on the same disk. Until D7/D8 add a scheduled, offsite backup, the real RPO is "since the last deploy".
+
+### 12.2 Light load test (20 sessions, 5 min): reads PASS, no impact on other sites
+- **Harness:** `loadtest/` (T-812) from this Windows PC to `https://jqc.jivo.in`. It used a `light` profile defined in a scratch wrapper that loads the harness's `locustfile.py` unchanged, with the same safety checks. The profile was 4 logged-in buyers (cart plus a COD order) and 16 anonymous browsers, with 0 riders and no online payments. The test data came from `loadtest_seed --users 4 --stock-floor 50` and was removed with `loadtest_cleanup --yes`: 5 orders, 4 customers, 8 OTP requests and 332 top-up units were reversed, and a re-check found 0 left.
+- **Temporary staging env** for the window, reverted afterwards (env restored from `backend.env.pre-p8-20261116`, web and worker recreated, healthy):
+  - `LOADTEST_DATA_ALLOWED=true`
+  - the 4 load-test numbers added to `OTP_TEST_NUMBERS`
+  - `API_ANON_RATE` / `SERVICEABILITY_RATE` / `SEARCH_RATE` raised, because all 20 sessions share one client IP
+- **Run 1 was discarded.** The harness's default point (28.471, 77.044) is outside the staging GGN-01 area. Run 2 used the store point (28.631878, 77.128798).
+
+Run 2, 05:04:53 to 05:10:08 UTC: **2,517 requests, 0 HTTP errors**, about 8.3 req/s. Latency is in ms, measured from the client over the internet:
+
+| Endpoint | n | p50 | p95 | p99 | 09 §1 target (p95) | |
+|---|---:|---:|---:|---:|---:|---|
+| GET serviceability | 348 | 19 | 28 | 60 | 150 | pass |
+| GET home | 348 | 19 | 23 | 32 | 300 | pass |
+| GET categories | 348 | 20 | 28 | 53 | 300 | pass |
+| GET products (list) | 348 | 19 | 24 | 47 | 300 | pass |
+| GET product detail | 348 | 20 | 35 | 65 | 300 | pass |
+| GET search | 347 | 19 | 38 | 55 | 300 | pass |
+| GET search suggest | 347 | 20 | 46 | 140 | 300 | pass |
+| GET config/app | 20 | 88 | 300 | 300 | 300 | pass (at the limit, 20 samples) |
+| Cart writes (POST/PATCH/DELETE) | 37 | 40-56 | 56-120 | 56-120 | 800 | pass |
+| POST orders | 1 | 120 | 120 | 120 | 800 | pass (1 sample) |
+| GET orders/{id} | 3 | 31 | 360 | 360 | 300 | 1 slow sample out of 3, not significant |
+| All requests | 2,515 | 19 | 39 | 84 | | error rate 0.00% |
+
+- The harness reported FAIL only because of 7 `JOURNEY checkout blocked: MIN_UNITS_NOT_MET` rows and the 3-sample `orders/{id}` p95. **Harness gap:** `flows._fix_blockers` handles `MIN_ORDER_NOT_MET` but not the store's minimum-units blocker `MIN_UNITS_NOT_MET`, so most staging carts stop before checkout. Order placement throughput was therefore not measured; this needs a harness fix.
+- **Server during the run:**
+  - host CPU 88-96% idle, load 1.1-2.3 on 14 cores
+  - RAM: about 15.5-15.9 GB used, 11.6 GB available; swap steady at about 8.9 GB, already in use before the test
+  - jqc-web: 2-11% CPU, with one sample at 94% (of its 2-CPU cap) in the last minute; 423-463 MiB
+  - jqc-postgres: under 7% CPU, about 130 MiB
+- **Other 24 sites** were checked every minute through the local nginx against a 5-sample median baseline. Abort rule: status change, or time over 2x baseline and over baseline + 100 ms.
+  - 13 checks across both runs, **0 violations, 0 status changes, no abort**.
+  - The worst times were within about 20 ms of baseline (for example `hr.jivo.in` 261 to 279 ms and `whatsapp.jivo.in` 68 to 85 ms).
+  - Two samples went over a strict 2x but stayed far under the noise floor: `einvoice.jivo.in` 12 to 40 ms once during run 1, and `datasync.jivo.in` 6 to 13 ms in the check after run 2 ended.
+- **Verdict:** at this light load, all read paths are far inside the 09 §1 targets and the other sites were not affected. The full 09 §1 capacity test (500 sessions, 50 orders/min) still waits for a dedicated server (DL-70).
