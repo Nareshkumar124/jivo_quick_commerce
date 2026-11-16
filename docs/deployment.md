@@ -404,6 +404,16 @@ Nothing in Redis is a system of record (09 §2), so it is **not backed up** and 
 - Backups are readable only through the on-call break-glass role, with access logged (CloudTrail). The backup job's role can write new objects but not delete them.
 - The scripts read credentials from the libpq variables or `--env-file` (only the `POSTGRES_*` connection keys are read), never print them, and print neither host nor role unless `JQC_SHOW_HOST=1`. Dumps are created with umask 077 (bash) or a user-only ACL (PowerShell).
 
+### 7.7 Staging nightly backups (`jqc.jivo.in`, since 2026-11-16)
+- **Schedule:** `30 2 * * *` (02:30 IST; the server clock is IST) in the `superadmin` user's own crontab. It is not a root or system cron. A copy of the crontab from before the change is at `/srv/jqc/logs/crontab-superadmin-before-backup-20261116.txt`.
+- **Job:** `/srv/jqc/tools/backup-nightly.sh` (server only, mode 700). It runs `infra/backup/backup_db.sh` from `/srv/jqc/tools/f6ed556/` (shipped from `main` with `git -c core.autocrlf=false archive`) in a one-off `postgis/postgis:16-3.4` container on `jqc_net` (`--rm`, 512 MB cap, runs as `superadmin`). The connection keys come from `/srv/jqc/env/backend.env`, mounted read-only. After the dump it checks `sha256sum -c` and `pg_restore -l`. A `flock` stops two runs from overlapping.
+- **Output:** `/srv/jqc/backups/nightly/` (dir 700, files 600). Each run writes `jivo_quick_commerce_<UTC stamp>.dump`, `.dump.sha256` and `.manifest.json`.
+- **Retention:** 14 days. Only after a verified dump, it deletes files older than 14 days that match `jivo_quick_commerce_<stamp>Z.(dump|dump.sha256|manifest.json)` in that folder. The pre-deploy dumps in `/srv/jqc/backups/` are never touched.
+- **Logs:** `/srv/jqc/logs/backup-nightly.log`; failures also go to `journalctl -t jqc-backup-nightly`. First run: 2026-11-16 05:50 UTC, 792,537 bytes, sha256 OK, 948 TOC entries.
+- **Upgrade the tools:** ship the new commit to `/srv/jqc/tools/<sha>/` and change `TOOLS=` in the job script.
+- **Disable:** remove the two `JQC staging` lines with `crontab -e`. The dumps stay where they are.
+- **Gap:** every copy is on the same disk as the database, so a lost server loses the backups too. Offsite copies wait on Jivo (D7). MinIO is not mirrored yet.
+
 ## 8. Deploy, release step and rollback
 
 ### 8.1 Deploy-time configuration checks (P8 OWASP M8)
