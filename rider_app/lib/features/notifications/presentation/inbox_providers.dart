@@ -5,7 +5,6 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/providers.dart';
 import '../../../shared/paged_list_controller.dart';
 import '../../auth/presentation/rider_account_controller.dart';
-import '../../../shared/paging.dart';
 import '../../task/presentation/task_providers.dart';
 import '../data/api_inbox_repository.dart';
 import '../data/fake_inbox_backend.dart';
@@ -19,7 +18,6 @@ final fakeInboxBackendProvider = Provider<FakeInboxBackend>(
 /// The inbox: the generated client, the fake with `FAKE_API`. Where the
 /// rider work screens run (dev flavor, DL-30/DL-32).
 final inboxRepositoryProvider = Provider<InboxRepository>((ref) {
-  if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
   if (ref.watch(appEnvProvider).useFakeApi) {
     return ref.watch(fakeInboxBackendProvider);
   }
@@ -115,23 +113,4 @@ class InboxController extends PagedListNotifier<InboxEntry, void> {
       if (ref.mounted) ref.invalidate(inboxUnreadCountProvider);
     }
   }
-}
-
-/// Staging and prod while gated: never reached; every call fails.
-class _Unavailable implements InboxRepository {
-  const _Unavailable();
-
-  static const _error = ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-
-  @override
-  Future<Page<InboxEntry>> fetchPage({int? page}) async => throw _error;
-
-  @override
-  Future<InboxEntry> markRead(int id) async => throw _error;
-
-  @override
-  Future<int> markAllRead() async => throw _error;
-
-  @override
-  Future<int> fetchUnreadCount() async => throw _error;
 }

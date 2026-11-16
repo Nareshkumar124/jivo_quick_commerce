@@ -15,30 +15,16 @@ import '../domain/kyc_document.dart';
 import '../domain/rider_onboarding_repository.dart';
 import '../domain/rider_profile.dart';
 
-/// Whether the registration / KYC screens (04 §2.2, P5 lookahead) run.
-///
-/// TODO(api): there is no rider API until the end of P4, so they run only
-/// against the fake, and only in the dev flavor (DL-30), with or without
-/// `FAKE_API` (so a real Phase 1 login with `rider_status: NONE` reaches the
-/// form). Staging and prod keep the Phase 1 placeholders, even with
-/// `FAKE_API`: these fakes never run there.
-final riderOnboardingEnabledProvider = Provider<bool>(
-  (ref) => ref.watch(appEnvProvider).flavor != Flavor.prod,
-);
-
 /// The fake rider backend (TODO(api)). Overridden in tests (no delay).
 final fakeRiderOnboardingBackendProvider = Provider<FakeRiderOnboardingBackend>(
   (ref) => FakeRiderOnboardingBackend(clock: ref.watch(clockProvider)),
 );
 
-/// Registration and KYC: the generated client (P5 slice 5.1, live) where
-/// onboarding runs (dev flavor, DL-30); the fake with `FAKE_API`.
+/// Registration and KYC: the generated client (P5 slice 5.1) in every
+/// flavor; the fake with `FAKE_API`.
 final riderOnboardingRepositoryProvider = Provider<RiderOnboardingRepository>((
   ref,
 ) {
-  if (!ref.watch(riderOnboardingEnabledProvider)) {
-    return const UnavailableRiderOnboardingRepository();
-  }
   if (!ref.watch(appEnvProvider).useFakeApi) {
     return ApiRiderOnboardingRepository(ref.watch(jivoApiProvider));
   }

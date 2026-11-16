@@ -1,3 +1,5 @@
+import '../../../shared/errors/wrong_app.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -216,6 +218,10 @@ class RiderSocketClient {
         _pongDeadline = null;
       case SocketError(:final code):
         debugPrint('RiderSocket: server error $code');
+        // DL-74: a customer-app token; the app signs the rider out.
+        if (WrongApp.isWrongAppSocketCode(code) && !_messages.isClosed) {
+          _messages.add(message);
+        }
       case UnknownSocketMessage(:final type):
         debugPrint('RiderSocket: ignored message type $type');
       case SocketOfferNew() ||

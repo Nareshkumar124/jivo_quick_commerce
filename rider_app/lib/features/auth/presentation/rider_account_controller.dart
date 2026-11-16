@@ -142,6 +142,7 @@ class RiderAccountController extends Notifier<RiderAccountState> {
   /// announces `signedIn`, so the router goes straight to the right screen.
   Future<void> signedIn(AuthSession session) async {
     state = AccountLoaded(user: session.user, riderStatus: session.riderStatus);
+    ref.read(wrongAppNoticeProvider.notifier).clear();
     try {
       await _session.signIn(
         AuthTokens(access: session.access, refresh: session.refresh),

@@ -1,9 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../../shared/paged_list_controller.dart';
-import '../../task/presentation/task_providers.dart';
 import '../data/api_cash_repository.dart';
 import '../data/fake_cash_backend.dart';
 import '../domain/cash_ledger.dart';
@@ -17,7 +15,6 @@ final fakeCashBackendProvider = Provider<FakeCashBackend>(
 /// `FAKE_API`. The screens stay where the rider work screens run (dev
 /// flavor, DL-30/DL-32).
 final cashRepositoryProvider = Provider<CashRepository>((ref) {
-  if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
   if (ref.watch(appEnvProvider).useFakeApi) {
     return ref.watch(fakeCashBackendProvider);
   }
@@ -38,14 +35,3 @@ final cashLedgerProvider =
         return (result.entries, result.summary);
       }, keyOf: (entry) => entry.id),
     );
-
-/// Staging and prod until the rider API lands: never reached (the routes
-/// and the home menu exist only in the dev flavor); every call fails with
-/// `NOT_FOUND`.
-class _Unavailable implements CashRepository {
-  const _Unavailable();
-
-  @override
-  Future<CashLedgerPage> fetchLedger({int? cursor}) async =>
-      throw const ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-}

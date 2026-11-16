@@ -66,6 +66,7 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
     final expired =
         ref.watch(sessionManagerProvider).lastSignOutReason ==
         SignOutReason.sessionExpired;
+    final wrongApp = ref.watch(wrongAppNoticeProvider);
     final serverError = state.error;
 
     return Scaffold(
@@ -94,10 +95,15 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                         color: theme.colorScheme.secondaryContainer,
                         child: Padding(
                           padding: const EdgeInsets.all(12),
-                          child: Text(
-                            l10n.loginSessionExpired,
-                            key: const Key('login-session-expired'),
-                          ),
+                          child: wrongApp
+                              ? Text(
+                                  l10n.wrongAppError,
+                                  key: const Key('login-wrong-app'),
+                                )
+                              : Text(
+                                  l10n.loginSessionExpired,
+                                  key: const Key('login-session-expired'),
+                                ),
                         ),
                       ),
                     ],

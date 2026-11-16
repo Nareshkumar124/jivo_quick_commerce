@@ -3,6 +3,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../l10n/app_localizations.dart';
 import 'rider_error_codes.dart';
+import 'wrong_app.dart';
 
 /// jivo_core's error message, with the rider's own wording where it differs.
 /// The rider endpoints are throttled (P5 contract): a 429 reads calmly as
@@ -10,6 +11,7 @@ import 'rider_error_codes.dart';
 /// Rider-only codes ([RiderErrorCode]) are mapped here too.
 String riderApiErrorMessage(BuildContext context, ApiError error) {
   final l10n = AppLocalizations.of(context);
+  if (WrongApp.isWrongApp(error)) return l10n.wrongAppError;
   switch (error.riderCode) {
     case RiderErrorCode.pickupCodeInvalid:
       final left = error.attemptsRemaining;

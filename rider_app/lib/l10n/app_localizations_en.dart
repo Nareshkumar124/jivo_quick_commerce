@@ -1958,6 +1958,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'You are offline. Go online again to continue.';
 
   @override
+  String get wrongAppError => 'Please log in with the Jivo Rider app.';
+
+  @override
   String get failWaitNotElapsed =>
       'Wait 10 minutes at the drop location before choosing this.';
 

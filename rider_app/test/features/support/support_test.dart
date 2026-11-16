@@ -696,7 +696,7 @@ void main() {
       expect(h.urls.opened.last, Uri(scheme: 'tel', path: '+911800123456'));
     });
 
-    testWidgets('prod: help and My rating are on the home and open', (
+    testWidgets('prod: the records and help are on the home and open', (
       tester,
     ) async {
       final h = RiderTestHarness(flavor: Flavor.prod);
@@ -705,8 +705,8 @@ void main() {
         supportRepositoryProvider.overrideWithValue(h.support),
       ];
       await pumpActiveHome(tester, h);
-      expect(byKey('home-earnings'), findsNothing);
-      expect(byKey('home-rating'), findsOneWidget);
+      // The full home, as in dev (My rating is in the profile there).
+      expect(byKey('home-earnings'), findsOneWidget);
       await scrollTo(
         tester,
         byKey('home-help'),

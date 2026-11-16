@@ -31,11 +31,8 @@ import '../features/onboarding/domain/kyc_document.dart';
 import '../features/onboarding/presentation/bank_details_screen.dart';
 import '../features/onboarding/presentation/document_capture_screen.dart';
 import '../features/onboarding/presentation/documents_screen.dart';
-import '../features/onboarding/presentation/onboarding_providers.dart';
 import '../features/onboarding/presentation/onboarding_status_screen.dart';
-import '../features/onboarding/presentation/register_placeholder_screen.dart';
 import '../features/onboarding/presentation/registration_screen.dart';
-import '../features/onboarding/presentation/rider_status_screen.dart';
 import '../features/permissions/presentation/location_disclosure_screen.dart';
 import '../features/permissions/presentation/permissions_gate_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
@@ -43,7 +40,6 @@ import '../features/shift/presentation/home_screen.dart';
 import '../features/task/presentation/failed_delivery_screen.dart';
 import '../features/task/presentation/pickup_scan_screen.dart';
 import '../features/task/presentation/task_flow_controller.dart';
-import '../features/task/presentation/task_providers.dart';
 import '../features/task/presentation/task_screen.dart';
 import 'env.dart';
 import 'providers.dart';
@@ -61,8 +57,6 @@ final routerProvider = Provider<GoRouter>((ref) {
   final env = ref.read(appEnvProvider);
   final session = ref.read(sessionManagerProvider);
   final signals = ref.read(appControlSignalsProvider);
-  final onboarding = ref.read(riderOnboardingEnabledProvider);
-  final work = ref.read(riderWorkEnabledProvider);
 
   // Rider-side state that also affects routing.
   final local = ValueNotifier<int>(0);
@@ -98,7 +92,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         showDevTools: env.showDevTools,
         hasRiderTask: ref.read(taskFlowControllerProvider).hasTask,
         hasOffer: ref.read(offerControllerProvider).isOpen,
-        recordsEnabled: work,
       );
     },
     routes: [
@@ -131,48 +124,41 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // Registration and KYC (04 §2.2) run against the fake until the rider
-      // API lands; builds without it keep the Phase 1 placeholders.
+      // Registration and KYC (04 §2.2): the rider API in every flavor.
       GoRoute(
         path: Routes.register,
         name: 'register',
-        builder: (_, _) => onboarding
-            ? const RegistrationScreen()
-            : const RegisterPlaceholderScreen(),
+        builder: (_, _) => const RegistrationScreen(),
       ),
       GoRoute(
         path: Routes.riderStatus,
         name: 'rider_status',
-        builder: (_, _) => onboarding
-            ? const OnboardingStatusScreen()
-            : const RiderStatusScreen(),
+        builder: (_, _) => const OnboardingStatusScreen(),
         routes: [
-          if (onboarding) ...[
-            GoRoute(
-              path: 'documents',
-              name: 'documents',
-              builder: (_, _) => const DocumentsScreen(),
-              routes: [
-                GoRoute(
-                  path: ':type',
-                  name: 'document_capture',
-                  redirect: (_, state) =>
-                      _documentType(state) == null ? Routes.documents : null,
-                  builder: (_, state) => DocumentCaptureScreen(
-                    type: _documentType(state)!,
-                    recovered: state.extra is PickedImage
-                        ? state.extra! as PickedImage
-                        : null,
-                  ),
+          GoRoute(
+            path: 'documents',
+            name: 'documents',
+            builder: (_, _) => const DocumentsScreen(),
+            routes: [
+              GoRoute(
+                path: ':type',
+                name: 'document_capture',
+                redirect: (_, state) =>
+                    _documentType(state) == null ? Routes.documents : null,
+                builder: (_, state) => DocumentCaptureScreen(
+                  type: _documentType(state)!,
+                  recovered: state.extra is PickedImage
+                      ? state.extra! as PickedImage
+                      : null,
                 ),
-              ],
-            ),
-            GoRoute(
-              path: 'bank',
-              name: 'bank_details',
-              builder: (_, _) => const BankDetailsScreen(),
-            ),
-          ],
+              ),
+            ],
+          ),
+          GoRoute(
+            path: 'bank',
+            name: 'bank_details',
+            builder: (_, _) => const BankDetailsScreen(),
+          ),
         ],
       ),
       GoRoute(
@@ -180,70 +166,68 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'home',
         builder: (_, _) => const HomeScreen(),
       ),
-      if (work) ...[
-        GoRoute(
-          path: Routes.earnings,
-          name: 'earnings',
-          builder: (_, _) => const EarningsScreen(),
-        ),
-        GoRoute(
-          path: Routes.payouts,
-          name: 'payouts',
-          builder: (_, _) => const PayoutsScreen(),
-        ),
-        GoRoute(
-          path: Routes.cash,
-          name: 'cash',
-          builder: (_, _) => const CashScreen(),
-        ),
-        GoRoute(
-          path: Routes.history,
-          name: 'history',
-          builder: (_, _) => const HistoryScreen(),
-          routes: [
-            GoRoute(
-              path: ':taskId',
-              name: 'history-detail',
-              builder: (_, state) => HistoryDetailScreen(
-                taskId: int.tryParse(state.pathParameters['taskId']!) ?? 0,
-              ),
+      GoRoute(
+        path: Routes.earnings,
+        name: 'earnings',
+        builder: (_, _) => const EarningsScreen(),
+      ),
+      GoRoute(
+        path: Routes.payouts,
+        name: 'payouts',
+        builder: (_, _) => const PayoutsScreen(),
+      ),
+      GoRoute(
+        path: Routes.cash,
+        name: 'cash',
+        builder: (_, _) => const CashScreen(),
+      ),
+      GoRoute(
+        path: Routes.history,
+        name: 'history',
+        builder: (_, _) => const HistoryScreen(),
+        routes: [
+          GoRoute(
+            path: ':taskId',
+            name: 'history-detail',
+            builder: (_, state) => HistoryDetailScreen(
+              taskId: int.tryParse(state.pathParameters['taskId']!) ?? 0,
             ),
-          ],
-        ),
-        GoRoute(
-          path: Routes.inbox,
-          name: 'inbox',
-          builder: (_, _) => const InboxScreen(),
-        ),
-        GoRoute(
-          path: Routes.profile,
-          name: 'profile',
-          builder: (_, _) => const ProfileScreen(),
-          routes: [
-            GoRoute(
-              path: 'documents',
-              name: 'profile_documents',
-              builder: (_, _) => const DocumentsScreen(fromProfile: true),
-              routes: [
-                GoRoute(
-                  path: ':type',
-                  name: 'profile_document_capture',
-                  redirect: (_, state) => _documentType(state) == null
-                      ? Routes.profileDocuments
+          ),
+        ],
+      ),
+      GoRoute(
+        path: Routes.inbox,
+        name: 'inbox',
+        builder: (_, _) => const InboxScreen(),
+      ),
+      GoRoute(
+        path: Routes.profile,
+        name: 'profile',
+        builder: (_, _) => const ProfileScreen(),
+        routes: [
+          GoRoute(
+            path: 'documents',
+            name: 'profile_documents',
+            builder: (_, _) => const DocumentsScreen(fromProfile: true),
+            routes: [
+              GoRoute(
+                path: ':type',
+                name: 'profile_document_capture',
+                redirect: (_, state) => _documentType(state) == null
+                    ? Routes.profileDocuments
+                    : null,
+                builder: (_, state) => DocumentCaptureScreen(
+                  type: _documentType(state)!,
+                  fromProfile: true,
+                  recovered: state.extra is PickedImage
+                      ? state.extra! as PickedImage
                       : null,
-                  builder: (_, state) => DocumentCaptureScreen(
-                    type: _documentType(state)!,
-                    fromProfile: true,
-                    recovered: state.extra is PickedImage
-                        ? state.extra! as PickedImage
-                        : null,
-                  ),
                 ),
-              ],
-            ),
-          ],
-        ),
-      ],
+              ),
+            ],
+          ),
+        ],
+      ),
       // Help and support, My rating and the legal pages (P7): the real API
       // in every flavor.
       GoRoute(

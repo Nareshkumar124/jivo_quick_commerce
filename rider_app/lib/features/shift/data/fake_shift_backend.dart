@@ -78,22 +78,3 @@ class FakeShiftBackend implements ShiftRepository {
     );
   }
 }
-
-/// Builds without the rider work screens: every call fails with
-/// `NOT_FOUND`. Never reached, because the toggle is only shown where they
-/// run.
-class UnavailableShiftRepository implements ShiftRepository {
-  const UnavailableShiftRepository();
-
-  static const _error = ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-
-  @override
-  Future<ShiftStart> start(GeoPoint at, {double? accuracy}) async =>
-      throw _error;
-
-  @override
-  Future<void> end() async => throw _error;
-
-  @override
-  Future<ShiftStatus> status() async => throw _error;
-}

@@ -1,10 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../../shared/paged_list_controller.dart';
-import '../../../shared/paging.dart';
-import '../../task/presentation/task_providers.dart';
 import '../data/api_history_repository.dart';
 import '../data/fake_history_backend.dart';
 import '../domain/task_history.dart';
@@ -18,7 +15,6 @@ final fakeHistoryBackendProvider = Provider<FakeHistoryBackend>(
 /// `FAKE_API`. The screens stay where the rider work screens run (dev
 /// flavor, DL-30/DL-32).
 final taskHistoryRepositoryProvider = Provider<TaskHistoryRepository>((ref) {
-  if (!ref.watch(riderWorkEnabledProvider)) return const _Unavailable();
   if (ref.watch(appEnvProvider).useFakeApi) {
     return ref.watch(fakeHistoryBackendProvider);
   }
@@ -45,18 +41,3 @@ final taskHistoryDetailProvider = FutureProvider.autoDispose
       (ref, taskId) =>
           ref.watch(taskHistoryRepositoryProvider).fetchDetail(taskId),
     );
-
-/// Staging and prod until the rider API lands: never reached (the routes
-/// and the home menu exist only in the dev flavor); every call fails with
-/// `NOT_FOUND`.
-class _Unavailable implements TaskHistoryRepository {
-  const _Unavailable();
-
-  @override
-  Future<Page<TaskHistoryEntry>> fetchHistory({int? cursor}) async =>
-      throw const ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-
-  @override
-  Future<TaskHistoryDetail> fetchDetail(int taskId) async =>
-      throw const ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-}

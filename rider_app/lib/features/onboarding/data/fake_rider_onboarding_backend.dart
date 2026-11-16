@@ -374,34 +374,3 @@ class FakeRiderOnboardingBackend implements RiderOnboardingRepository {
     details: details,
   );
 }
-
-/// Staging and prod until the rider contract lands: there is no rider API
-/// yet and fakes never run there, so every call fails with `NOT_FOUND`. The
-/// router keeps the Phase 1 placeholder screens in these builds, so this is
-/// only a safety net.
-class UnavailableRiderOnboardingRepository
-    implements RiderOnboardingRepository {
-  const UnavailableRiderOnboardingRepository();
-
-  static const _error = ApiError(code: ApiErrorCode.notFound, statusCode: 404);
-
-  @override
-  Future<List<StoreOption>> fetchStores() async => throw _error;
-
-  @override
-  Future<RiderProfile> register(RiderRegistration registration) async =>
-      throw _error;
-
-  @override
-  Future<RiderProfile> fetchProfile() async => throw _error;
-
-  @override
-  Future<RiderDocument> uploadDocument(
-    DocumentUpload upload, {
-    UploadProgress? onProgress,
-  }) async => throw _error;
-
-  @override
-  Future<BankAccountSummary> saveBankAccount(BankAccountInput input) async =>
-      throw _error;
-}
