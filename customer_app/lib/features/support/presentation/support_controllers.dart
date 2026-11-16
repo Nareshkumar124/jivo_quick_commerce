@@ -108,7 +108,10 @@ class TicketThreadController extends AsyncNotifier<TicketThread> {
     List<PendingTicketPhoto> photos = const [],
   }) async {
     final repository = ref.read(supportRepositoryProvider);
-    final keys = await uploadTicketPhotos(repository, ticketId, photos);
+    final keys = await uploadTicketPhotos(
+      photos,
+      (file) => repository.uploadPhoto(ticketId, file),
+    );
     final thread = await repository.reply(
       ticketId,
       message.trim(),
@@ -120,21 +123,18 @@ class TicketThreadController extends AsyncNotifier<TicketThread> {
   }
 }
 
-/// Uploads the [photos] not uploaded yet, in order, and returns all their
-/// keys. Throws on the first failure (earlier uploads keep their keys).
+/// Uploads the [photos] not uploaded yet with [upload], in order, and
+/// returns all their keys. Throws on the first failure (earlier uploads
+/// keep their keys).
 Future<List<String>> uploadTicketPhotos(
-  SupportRepository repository,
-  int ticketId,
   List<PendingTicketPhoto> photos,
+  Future<TicketPhoto> Function(TicketPhotoFile file) upload,
 ) async {
   if (photos.length > ticketPhotosPerMessage) {
     throw const TicketPhotoException(TicketPhotoProblem.tooMany);
   }
   for (final photo in photos) {
-    photo.uploadedKey ??= (await repository.uploadPhoto(
-      ticketId,
-      photo.file,
-    )).key;
+    photo.uploadedKey ??= (await upload(photo.file)).key;
   }
   return [for (final photo in photos) photo.uploadedKey!];
 }
@@ -167,11 +167,18 @@ class NewTicketController extends Notifier<NewTicketState> {
   @override
   NewTicketState build() => const NewTicketState();
 
-  /// Opens the ticket, then adds [photos] to it: the API takes photos only
-  /// on a reply, so they go up as a second message, [photosMessage].
+  /// Opens the ticket with [photos].
+  ///
+  /// When the API takes photos on create
+  /// ([SupportRepository.photosOnCreate]) they are uploaded first and
+  /// attach to the first message; a failed upload means no ticket (the
+  /// error is kept, uploaded photos keep their keys for the retry).
+  /// Otherwise (older API) the ticket is opened first and the photos go up
+  /// as a second message, [photosMessage].
+  ///
   /// Returns the ticket (with [NewTicketResult.photoError] when only the
-  /// photos failed), or null when the ticket wasn't created (the error is
-  /// kept in [NewTicketState.error]) or while a submit runs.
+  /// photos failed, older API only), or null when the ticket wasn't created
+  /// (the error is kept in [NewTicketState.error]) or while a submit runs.
   Future<NewTicketResult?> submit({
     required TicketCategory category,
     required String message,
@@ -182,22 +189,29 @@ class NewTicketController extends Notifier<NewTicketState> {
     if (state.submitting) return null;
     state = const NewTicketState(submitting: true);
     final repository = ref.read(supportRepositoryProvider);
+    final photosOnCreate = repository.photosOnCreate && photos.isNotEmpty;
     TicketThread thread;
     try {
       thread = await repository.createTicket(
         category: category,
         message: message.trim(),
         orderId: orderId,
+        photoKeys: photosOnCreate
+            ? await uploadTicketPhotos(photos, repository.uploadNewTicketPhoto)
+            : const [],
       );
     } catch (error) {
       if (ref.mounted) state = NewTicketState(error: error);
       return null;
     }
     Object? photoError;
-    if (photos.isNotEmpty) {
+    if (photos.isNotEmpty && !photosOnCreate) {
       try {
         final ticketId = thread.ticket.id;
-        final keys = await uploadTicketPhotos(repository, ticketId, photos);
+        final keys = await uploadTicketPhotos(
+          photos,
+          (file) => repository.uploadPhoto(ticketId, file),
+        );
         thread = await repository.reply(
           ticketId,
           photosMessage,

@@ -17,12 +17,27 @@ abstract interface class SupportRepository {
   /// else's). Throws [ApiError].
   Future<TicketThread> ticket(int id);
 
-  /// Opens a ticket; [message] is the first message. Throws [ApiError].
+  /// Opens a ticket; [message] is the first message. When
+  /// [photosOnCreate], [photoKeys] (from [uploadNewTicketPhoto], at most
+  /// [ticketPhotosPerMessage]) attach to that first message; otherwise they
+  /// must be empty. Throws [ApiError] (`VALIDATION_ERROR` for an expired
+  /// photo key: the keys stay usable after a failed create).
   Future<TicketThread> createTicket({
     required TicketCategory category,
     required String message,
     int? orderId,
+    List<String> photoKeys = const [],
   });
+
+  /// Whether the API takes photos on [createTicket] (`attachment_keys`,
+  /// uploaded first with [uploadNewTicketPhoto]). When false, photos for a
+  /// new ticket go up after it is created, with a second message ([reply]).
+  bool get photosOnCreate;
+
+  /// Uploads one photo for a ticket not created yet (`photosOnCreate`);
+  /// send its key with [createTicket] within an hour. Throws
+  /// [TicketPhotoException] for a file the API won't take, else [ApiError].
+  Future<TicketPhoto> uploadNewTicketPhoto(TicketPhotoFile photo);
 
   /// Adds the customer's reply with up to [ticketPhotosPerMessage] photos
   /// uploaded by [uploadPhoto] ([photoKeys]). Throws [ApiError]
@@ -60,7 +75,15 @@ class UnavailableSupportRepository implements SupportRepository {
     required TicketCategory category,
     required String message,
     int? orderId,
+    List<String> photoKeys = const [],
   }) async => throw _error;
+
+  @override
+  bool get photosOnCreate => false;
+
+  @override
+  Future<TicketPhoto> uploadNewTicketPhoto(TicketPhotoFile photo) async =>
+      throw _error;
 
   @override
   Future<TicketThread> reply(
@@ -81,12 +104,21 @@ class FakeSupportRepository implements SupportRepository {
     DateTime Function()? clock,
     this.pageSize = 20,
     bool seed = true,
+    this.photosOnCreate = false,
   }) : _clock = clock ?? DateTime.now {
     if (seed) _seed();
   }
 
   final DateTime Function() _clock;
   final int pageSize;
+
+  /// Whether this fake behaves like the API with `attachment_keys` on
+  /// ticket create (tests switch it on).
+  @override
+  final bool photosOnCreate;
+
+  /// Every create's photo keys, in order (tests).
+  final List<List<String>> createPhotoKeys = [];
 
   final List<Faq> faqList = [
     const Faq(
@@ -124,11 +156,13 @@ class FakeSupportRepository implements SupportRepository {
   final Map<int, SupportTicket> _tickets = {};
   final Map<int, List<TicketMessage>> _messages = {};
 
-  /// Uploaded photos not yet sent with a reply, by key.
-  final Map<String, (int, TicketPhoto)> _unclaimed = {};
+  /// Uploaded photos not yet sent with a message, by key, with their
+  /// ticket id (null: uploaded before the ticket existed).
+  final Map<String, (int?, TicketPhoto)> _unclaimed = {};
 
-  /// Every upload, in order (tests).
-  final List<(int, TicketPhotoFile)> uploads = [];
+  /// Every upload, in order, with its ticket id (null: before create)
+  /// (tests).
+  final List<(int?, TicketPhotoFile)> uploads = [];
 
   /// Every reply's photo keys, in order (tests).
   final List<List<String>> replyPhotoKeys = [];
@@ -172,6 +206,7 @@ class FakeSupportRepository implements SupportRepository {
     required String message,
     required DateTime at,
     int? orderId,
+    List<TicketPhoto> photos = const [],
   }) {
     final id = _nextTicket++;
     final ticket = SupportTicket(
@@ -189,7 +224,7 @@ class FakeSupportRepository implements SupportRepository {
     );
     _tickets[id] = ticket;
     _messages[id] = [];
-    _addMessage(id, message, fromSupport: false, at: at);
+    _addMessage(id, message, fromSupport: false, at: at, photos: photos);
     return ticket;
   }
 
@@ -279,19 +314,25 @@ class FakeSupportRepository implements SupportRepository {
     required TicketCategory category,
     required String message,
     int? orderId,
+    List<String> photoKeys = const [],
   }) async {
     _maybeFail();
     final body = message.trim();
     if (body.length < ticketMessageMinLength ||
-        (category.needsOrder && orderId == null)) {
+        (category.needsOrder && orderId == null) ||
+        (photoKeys.isNotEmpty && !photosOnCreate) ||
+        photoKeys.length > ticketPhotosPerMessage ||
+        photoKeys.any((k) => !_unclaimed.containsKey(k))) {
       throw const ApiError(code: ApiErrorCode.validationError, statusCode: 400);
     }
+    createPhotoKeys.add(List.unmodifiable(photoKeys));
     final now = _clock().toUtc();
     final ticket = _open(
       category: category,
       message: body,
       orderId: orderId,
       at: now,
+      photos: [for (final k in photoKeys) _unclaimed.remove(k)!.$2],
     );
     _addMessage(
       ticket.id,
@@ -314,7 +355,10 @@ class FakeSupportRepository implements SupportRepository {
     if (!current.canReply ||
         body.isEmpty ||
         photoKeys.length > ticketPhotosPerMessage ||
-        photoKeys.any((k) => _unclaimed[k]?.$1 != ticketId)) {
+        photoKeys.any((k) {
+          final owner = _unclaimed[k];
+          return owner == null || (owner.$1 != null && owner.$1 != ticketId);
+        })) {
       throw const ApiError(code: ApiErrorCode.validationError, statusCode: 400);
     }
     replyPhotoKeys.add(List.unmodifiable(photoKeys));
@@ -354,6 +398,28 @@ class FakeSupportRepository implements SupportRepository {
       url: 'https://storage.example.com/support/$ticketId/$key.webp',
     );
     _unclaimed[key] = (ticketId, uploaded);
+    return uploaded;
+  }
+
+  @override
+  Future<TicketPhoto> uploadNewTicketPhoto(TicketPhotoFile photo) async {
+    final failure = failNextUpload;
+    if (failure != null) {
+      failNextUpload = null;
+      throw failure;
+    }
+    final problem = checkTicketPhoto(photo);
+    if (problem != null) throw TicketPhotoException(problem);
+    if (!photosOnCreate) {
+      throw const ApiError(code: ApiErrorCode.notFound, statusCode: 404);
+    }
+    uploads.add((null, photo));
+    final key = 'photo${_nextPhoto++}';
+    final uploaded = TicketPhoto(
+      key: key,
+      url: 'https://storage.example.com/support/new/$key.webp',
+    );
+    _unclaimed[key] = (null, uploaded);
     return uploaded;
   }
 }

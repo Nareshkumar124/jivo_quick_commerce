@@ -110,7 +110,7 @@ class _OrderBody extends ConsumerWidget {
       });
     }
     final rider = track?.rider;
-    final otp = track?.deliveryOtp;
+    final otp = track?.visibleDeliveryOtp;
     // The task state comes with `track/` (when sent); otherwise the order
     // status alone decides (`deliveryStageFor`).
     final stage = track != null && track.status == order.status
@@ -195,7 +195,7 @@ class _OrderBody extends ConsumerWidget {
         ],
         if (rider != null && order.isActive) ...[
           const SizedBox(height: JivoSpacing.sm),
-          RiderCard(rider: rider),
+          RiderCard(rider: rider, canCall: track?.outForDelivery ?? false),
         ],
         if (order.status == OrderStatus.delivered &&
             ref.watch(ratingAvailableProvider))

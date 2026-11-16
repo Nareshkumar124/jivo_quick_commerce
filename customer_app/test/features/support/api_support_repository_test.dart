@@ -365,4 +365,70 @@ void main() {
       );
     });
   });
+
+  group('photos on create (attachment_keys)', () {
+    test('on by itself only when jivo_api has the field', () {
+      expect(support().photosOnCreate, jivoApiHasCreateAttachmentKeys);
+      expect(
+        ApiSupportRepository(http.api(), photosOnCreate: true).photosOnCreate,
+        isTrue,
+      );
+    });
+
+    test('a new-ticket photo goes to POST /support/attachments/', () async {
+      answer = (_) =>
+          example('support_tickets_attachments_create/201/Uploaded');
+      final photo = await support().uploadNewTicketPhoto(
+        TicketPhotoFile(bytes: pngBytes, filename: 'IMG_0001.png'),
+      );
+      final sent = http.requests.single;
+      expect(sent.method, 'POST');
+      expect(sent.uri.path, '/api/v1/support/attachments/');
+      final file = (sent.data as FormData).files.single;
+      expect(file.key, 'file');
+      expect(file.value.filename, 'photo.png');
+      expect(file.value.contentType.toString(), 'image/png');
+      expect(photo.key, '9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19');
+    });
+
+    test('a new-ticket photo over the proxy limit (413) is a photo '
+        'problem; a bad file sends nothing', () async {
+      answer = (_) => (413, null);
+      await expectLater(
+        support().uploadNewTicketPhoto(
+          TicketPhotoFile(bytes: pngBytes, filename: 'a.png'),
+        ),
+        throwsA(isA<TicketPhotoException>()),
+      );
+      await expectLater(
+        support().uploadNewTicketPhoto(
+          TicketPhotoFile(
+            bytes: Uint8List.fromList('GIF89a....'.codeUnits),
+            filename: 'a.gif',
+          ),
+        ),
+        throwsA(isA<TicketPhotoException>()),
+      );
+      expect(http.requests, hasLength(1));
+    });
+
+    test('create sends attachment_keys once jivo_api has the field', () async {
+      answer = (_) => example('support_tickets_create/201/Created');
+      final create = support().createTicket(
+        category: TicketCategory.damagedItems,
+        message: 'The oil bottle cap was broken when it arrived.',
+        orderId: 1002,
+        photoKeys: const ['k1', 'k2'],
+      );
+      if (!jivoApiHasCreateAttachmentKeys) {
+        // Older jivo_api would drop the keys: refuse rather than lose them.
+        await expectLater(create, throwsStateError);
+        expect(http.requests, isEmpty);
+        return;
+      }
+      await create;
+      expect(http.body(0)['attachment_keys'], ['k1', 'k2']);
+      expect(http.body(0)['order_id'], 1002);
+    });
+  });
 }

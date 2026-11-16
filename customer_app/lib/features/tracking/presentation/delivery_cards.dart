@@ -79,9 +79,12 @@ class DeliveryOtpCard extends StatelessWidget {
 /// The assigned rider: photo (or a placeholder), name, when the location
 /// was last seen, and a call button (`03 §2.10`).
 class RiderCard extends ConsumerWidget {
-  const RiderCard({required this.rider, super.key});
+  const RiderCard({required this.rider, this.canCall = true, super.key});
 
   final TrackRider rider;
+
+  /// False hides the call button (DL-56: only while out for delivery).
+  final bool canCall;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -98,7 +101,7 @@ class RiderCard extends ConsumerWidget {
             ? l10n.trackingRiderLabel
             : l10n.trackingRiderUpdated(_whenText(l10n, updatedAt)),
       ),
-      trailing: phone == null || phone.isEmpty
+      trailing: !canCall || phone == null || phone.isEmpty
           ? null
           : IconButton.filledTonal(
               key: const Key('call-rider'),

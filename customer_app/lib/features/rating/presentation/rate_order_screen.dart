@@ -79,7 +79,19 @@ class _RateOrderScreenState extends ConsumerState<RateOrderScreen> {
 
     // Opened from a notification or the inbox on an order already rated:
     // show the rating instead of a form the server would refuse.
-    final existing = ref.watch(orderRatingProvider(widget.orderId)).value;
+    final existingState = ref.watch(orderRatingProvider(widget.orderId));
+    final existing = existingState.value;
+    // Until it is known whether the order is rated, show neither (no form
+    // flashing before the rated view, P7-TC-37). A failed read shows the
+    // form: the server refuses a second rating anyway.
+    if (existingState.isLoading && !existingState.hasValue) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.rateOrderTitle)),
+        body: const Center(
+          child: CircularProgressIndicator(key: Key('rate-order-loading')),
+        ),
+      );
+    }
     if (existing != null && !form.submitting) {
       return Scaffold(
         appBar: AppBar(title: Text(l10n.rateOrderTitle)),
