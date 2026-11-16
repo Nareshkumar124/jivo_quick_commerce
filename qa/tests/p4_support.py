@@ -40,6 +40,9 @@ _ENV = {
     "SMS_BACKEND": "apps.notifications.sms.ConsoleSmsBackend",
     "OTP_TEST_NUMBERS": "+919000000101:123456,+919000000102:123456,+919000000103:123456,+919000000104:123456,+919000000105:123456",
     "PYTHONIOENCODING": "utf-8",
+    # Stage 4: the instance profile's timers (`QA_EXTRA_ENV="KEY=v KEY2=v"`, see tools/instance.sh)
+    # must reach the worker and the drivers too, or countdowns run on the defaults.
+    **dict(kv.split("=", 1) for kv in os.environ.get("QA_EXTRA_ENV", "").split() if "=" in kv),
 }
 
 

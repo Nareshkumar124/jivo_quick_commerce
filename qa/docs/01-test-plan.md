@@ -313,3 +313,18 @@ Out of scope: real FCM (D-19, push backend disabled/console), real SMS delivery 
 - Socket leases live in Redis DB 5 for 20 minutes; a crashed test could hold slots and give false 4429s, so the suite clears `ws:sockets:*` in DB 5 first.
 - Shared DB latency (~10 ms/query) inflates event latency measurements; the < 3 s offer target is measured end to end and recorded with that caveat.
 - Doc ambiguities to raise: (P6-A1) the coordinator brief lists `offer.expired` and `cash.updated`, but 06 §4 has only `offer.withdrawn` with reason EXPIRED and no cash message; (P6-A2) 06 §4 lists only DISPATCH/… alerts, not when `rider.status` is sent; (P6-A3) the order socket does not check the token's `app` claim (a rider-app token of the owner can open the order socket); harmless, but unspecified.
+
+
+## 11. QA stage 4 additions (2026-11-10, new Windows PC)
+- **Instance:** `qa/tools/instance.sh` runs in place from the worktree's clean `backend/` on Windows (no symlink, so `backend/.env` is never copied; `netstat` + `taskkill`). New profiles:
+  - `s4timers`: OFFER_TIMEOUT 10 s, DISPATCH_TIMEOUT 60 s, pause 15 s, retry 5 s, AUTO_ACCEPT_DELAY 40 s, STORE_ACCEPTANCE_SLA 20 s;
+  - `wsrecheck`: rider and ops socket re-checks every 5 s;
+  - `gwdown`, `cancelplaced`, `dispatchfast`, `riderclock`, `triggerplaced` (environment only).
+
+  `QA_EXTRA_ENV="K=v …"` passes the same settings to the instance, the QA worker and the drivers.
+- **Celery:** the QA worker (threads, 16) and a separate QA beat with celery's file scheduler (`qa/private/qa_celery.sh`). The beat never writes the shared DB's beat tables.
+- **Drivers:**
+  - `expire_offer` accepts `at_epoch` (race trials);
+  - `fail_photo_info` is a read-only check of a QA order's stored failure photo;
+  - `anonymise_rider_user` runs only on QA H after an API account deletion;
+  - `purge_kyc_for` refuses to run when any rider other than the QA one is due.

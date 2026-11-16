@@ -235,3 +235,73 @@ Backend code for delivery, realtime and orders is unchanged on develop `3f6fc42`
 4. The QA build needs develop `3f6fc42` merged for TC-40.
 
 **Next QA session:** merge develop into the QA worktree; P7-TC-40; the remaining P5 ⬜ cases (P0 first: TC-12, 42, 45, 51, 110); the P6 profile cases; verify BUG-0021/0022 when fixed.
+
+## Phases 5, 6 and 7: QA stage 4 (2026-11-10, develop f8db671)
+**Build and environment:**
+- QA worktree `qa/stage-4` at develop `f8db671`. It contains the admin P7 merge `6f92706` and the BUG-0021/0022 fix `ca8e69c`. The unmerged fixes in the `backend`, `backend2`, `backend3` and `admin` worktrees (BUG-0013, BUG-0020, P4 carry-overs, catalog loader) are **not** in this build and were not verified.
+- **New Windows PC.** QA instance `127.0.0.1:8004`, run in place from the worktree's clean `backend/` (`qa/tools/instance.sh` now supports Windows: `netstat` + `taskkill`, no `.env` copy). Redis `127.0.0.1:6380` DBs 5/6/7 only, MinIO `127.0.0.1:9000`, shared remote DB (read-only SQL from QA).
+- QA Celery worker (threads, 16) and a **separate QA beat** (`qa/private/qa_celery.sh`, gitignored), both on the QA broker DB 7. The beat uses celery's file scheduler, so it never writes the shared DB's django-celery-beat tables.
+- Mailpit is not installed (no email case was in scope). Port 8001 (another project) was never touched.
+- Profiles used: `local`, `s4timers` (new: dispatchfast timers + a 40 s auto-accept delay + a 20 s acceptance SLA), `triggerplaced` (+ the 40 s delay), `wsrecheck` (5 s socket re-checks), `shortsession`.
+- Everything was stopped at the end of the session.
+
+**What ran (outputs in `qa/private/runs/s4-*`):**
+| Run | Command (from `qa/`) | Result |
+|---|---|---|
+| BUG-0021 / BUG-0022 re-check | `uv run pytest tests/test_p6_t612.py -k "tc14 or tc59 or tc34"` | **3 passed** (both bugs **Verified**) |
+| P7-TC-40, admin P7 screens | `uv run pytest tests/test_p7_console.py` | 4 passed + 1 test defect (API field `from_support`), rerun **3 passed**, then **1 passed** (XSS probe). **8/8 sub-cases pass** |
+| P5 P0 cases | `uv run pytest tests/test_p5_stage4.py` | TC-12 **passed**. TC-45, TC-51, TC-110 **passed** (TC-51 and TC-110 after two test fixes: rider pushes are keyed by `task_id`; the old PC's KYC files are not in this MinIO, OBS-S4-01). TC-42 **xfailed**: BUG-0023, new. TC-42b **xfailed**: BUG-0023 |
+| P5 P1/P2 rest (local) | `uv run pytest tests/test_p5_stage4b.py tests/test_p6_stage4.py -k "not tc09 and not tc20 and not tc32"` | 10 passed, 1 skipped (TC-77: invoice 503, no GTK runtime), 3 failed. TC-58: oracle mixed in the old PC's morning orders. TC-18: test shift point outside the geofence. TC-117: BUG-0024, new. Rerun: **2 passed** (TC-58, TC-18), TC-117 **xfailed** (BUG-0024) |
+| `s4timers` | `uv run pytest tests/test_p5_stage4_profiles.py -k "tc38a or tc47"` | **2 passed**. TC-47 rerun with R1 kept fresh: **1 passed** (DL-61 (e) confirmed) |
+| `triggerplaced` | `-k tc38b` | **1 passed** |
+| `wsrecheck` | `uv run pytest tests/test_p6_stage4.py -k "tc20 or tc32"` | **2 passed** |
+| P6-TC-09 | real 15 min token expiry on an open socket | **1 passed** |
+| `shortsession` (BUG-0006) | `uv run pytest tests/test_p1_staff_session.py -k tc95b` | **1 passed**. BUG-0006 **Verified** |
+| P5 SQL invariants after the session | `uv run pytest tests/test_p5_db.py` | **3 passed** (QA-02 stock, cash ledger, task/order consistency) |
+| 🔥 smoke P0–P7 | `uv run pytest -m smoke` (local) | SMOKE_RESULT |
+| Logs | instance and worker logs of the session | No 500. The only 5xx were 2 invoice 503s (documented degradation). The tracebacks in the log are the 403 `PermissionDenied` refusals of the role tests. Worker ERROR lines are the SLA alerts of old PLACED orders in the shared DB (by design) |
+
+**Case status (`02`, totals table "QA stage 4"):**
+| Phase | Cases | ✅ | ❌ | ⬜ | ⏭ | Pri P0/P1 passed | All passed |
+|---|---|---|---|---|---|---|---|
+| 5 | 133 (+ TC-42b) | 121 | 4: TC-16 (BUG-0013), TC-42 and TC-42b (BUG-0023), TC-117 (BUG-0024) | 2: TC-50 (b), TC-92 | 6: device TC-19, 33, 124, 131; TC-77 (no GTK runtime on this PC); TC-132 (P6/D-19) | 118 / 129 | 91.0 % |
+| 6 | 59 | 53 | 1: TC-50 (BUG-0020) | 0 | 5: device TC-17, 57; TC-44 (no fault-injection backend); TC-45, 54 (config review) | 51 / 57 | 89.8 % |
+| 7 | 38 | 35 | 0 | 0 | 3: device TC-37–39 | 34 / 37 | 92.1 % |
+
+**Bugs:**
+- **Verified:** BUG-0021 (P2, OUT_FOR_DELIVERY on the order socket and the ops feed); BUG-0022 (P3, heading); BUG-0006 (P3, staff session idle/absolute timeline).
+- **New:**
+  - **BUG-0023** (P3 Minor / Low, owner `django-backend-dev`): a late accept after the server processed the offer expiry answers 409 `OFFER_TAKEN` ("taken by another rider") instead of `OFFER_EXPIRED` when no other rider took the task. The race itself is safe in 10/10 trials.
+  - **BUG-0024** (P2 Major / Medium, owner `admin-panel-dev`): a Store Manager gets 403 on the admin "Change cash limit" action for their own store's riders, although DL-61 (a) and the service allow it. Ops and Super Admin are the workaround.
+- **Still open, fix not in this build:** BUG-0013 (P3), BUG-0020 (P3).
+- **Open by severity:** P0 0 · P1 0 · P2 1 (BUG-0024) · P3 3 (BUG-0013, BUG-0020, BUG-0023). No P0/P1 bug is open.
+
+**What the P0 cases showed:**
+- **No unauthorised access.** Role matrices hold server-side for every role:
+  - the dashboard, reports (index, page, CSV, export download), support console and ratings admin (P7-TC-40);
+  - force offline, cash limit and unlock OTP (P5-TC-117; the only deviation is the too-strict BUG-0024);
+  - the admin rider approval pages (P5-TC-12).
+- **Store scoping:** the GGN-01 manager never sees QA-02 numbers, tickets, ratings, alerts or riders. Signed links only work as issued and expire (P5-TC-110). Customer text is escaped in the console (P7-TC-40g).
+- **No duplicate money or stock corruption:**
+  - T8a during a task: COD due = oracle, the old amount is refused, one unit is committed (P5-TC-51).
+  - Day-end cash report = SQL (P5-TC-97).
+  - Races: accept ‖ expiry never leaves ASSIGNED + EXPIRED (TC-42); manual assign ‖ accept binds exactly one rider (TC-45).
+- **No crash:** no 500 in the session.
+
+| Phase | Verdict | Why |
+|---|---|---|
+| **5** | **Not ready** | 1. Pri P0 TC-42 fails on BUG-0023 (P3: wrong 409 code, safe state) and P0 TC-16 on BUG-0013 (P3, fix not merged). §5.2 needs 100 % of P0/P1 cases: fix both, or the PM waives them as P3. 2. P1 TC-117 fails on BUG-0024 (P2). 3. TC-92 and TC-50 (b) were not run. 4. The device cases (TC-19, 33, 124, 131) are with the PM. 5. TC-77 needs a host with the GTK runtime (staging). All P5 money, stock, IDOR and race invariants hold. |
+| **6** | **Not ready (gate incomplete)** | BUG-0021 and BUG-0022 are verified, and every executable P6 case passes except TC-50 (BUG-0020, P3, fix not in this build). Open: device cases TC-17 and TC-57; TC-44 (no fault-injection backend); config reviews TC-45 and TC-54. 89.8 % < 95 %. |
+| **7** | **Ready for sign-off on the QA instance (backend + admin console); formal gate pending** | 35/35 executable cases pass, including P7-TC-40 (all 8 console sub-cases). No P7 bug is open. Remaining: device cases TC-37–39 (PM) and the staging run. |
+
+**For the PM:**
+1. Send **BUG-0023** to django-backend-dev (one check reordered, plus a test) and **BUG-0024** to admin-panel-dev (the cash-limit action needs its own rider lookup).
+2. Merge the BUG-0013 and BUG-0020 fixes, then QA re-verifies P5-TC-16 and P6-TC-50 (both are xfail-strict guards, so they turn XPASS).
+3. **OBS-S4-01:** this PC's MinIO has no files for KYC rows uploaded on the old PC. R1/R2 photo and document links answer 404 here. Re-upload, or copy the bucket, before device tests that show rider photos.
+4. **OBS-S4-02:** invoices need WeasyPrint's GTK runtime on this PC (or test them on staging).
+5. QA data changes this stage (QA numbers only):
+   - QA F (+919000000106) is now an **ACTIVE rider at QA-02** (P5-TC-12 approved it through the admin).
+   - QA H (+919000000108) was registered, then deleted and anonymised (P5-TC-18). Its 4 KYC documents were purged by the guarded driver op, which refuses to run if any non-QA rider is due.
+   - QA G (+919000000107) re-uploaded PHOTO and PAN (still PENDING_KYC).
+
+**Next QA session:** P5-TC-92 and TC-50 (b); re-verify BUG-0013, BUG-0020, BUG-0023 and BUG-0024 when merged; device cases with the PM; staging.

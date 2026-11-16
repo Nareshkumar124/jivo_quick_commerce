@@ -63,3 +63,7 @@ Not a load test (09 §1 load belongs to Phase 8 on staging). Findings while runn
 - **OBS-S3-01:** `redis://localhost:6380` costs **2.04 s** per new connection on this Windows host (IPv6 `::1` tried first; Redis listens on IPv4 only); `127.0.0.1` costs 0.001 s. Before the switch each `publish_*` / `broadcast_ws` task took ~2–8 s; after, 0.14–0.2 s.
 - **OBS-S3-02:** with 4 worker threads, `PREFETCH_MULTIPLIER=1` and `ACKS_LATE`, tasks reached the Windows worker in ~4 s bursts (cancel response → task received 5.8 s), while a raw broker probe takes 1–2 ms. With 16 threads: P6-TC-11 cancel → `order.status` on the socket within 3 s ✅; offer.new within 3 s of `offered_at` ✅ (P6-TC-21).
 - These are local-environment effects. Measure the 09 §1 targets (offer < 3 s, store alert < 3 s, location → map < 5 s) on staging (prefork workers, Linux).
+
+
+## QA stage 4 (2026-11-10, `f8db671`): dispatch latency on the new PC
+Not a load test (Phase 8, staging). P5-TC-58 (P2), server side, measured from the DB for this session's QA-02 orders (n = 31, the current build and host): **ACCEPTED → first offer p50 0.24 s, p95 0.39 s, max 0.42 s** (target < 3 s, 09 §1). Over the whole day, including the old PC's morning runs, the p95 was 9.85 s (OBS-S4-04: the 2 s Redis connect of OBS-S3-01). Real-time cases passed their 3 s bounds: OUT_FOR_DELIVERY on the order socket < 3 s after pickup (P6-TC-59). Setup: a QA worker with 16 threads and Redis on `127.0.0.1`. Re-measure on staging.
