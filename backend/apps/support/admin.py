@@ -183,6 +183,8 @@ class TicketAttachmentAdmin(ReadOnlyMixin, ModelAdmin):
 
     @display(description="Ticket")
     def ticket_link(self, obj):
+        if obj.ticket_id is None:
+            return "unclaimed"
         return format_html(
             '<a href="{}">{}</a>',
             reverse("ops:support-ticket", args=[obj.ticket_id]),
