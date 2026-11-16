@@ -1,0 +1,276 @@
+# Signed Android release builds (Phase 8; docs/deployment.md §12). Manual only.
+#
+# Builds the PROD flavor of the customer and/or rider app as a signed AAB (for Play) and a signed
+# APK (for side-loading / internal testing), with --obfuscate --split-debug-info, and uploads the
+# bundles, the Dart symbols and the R8 mapping as run artifacts. It publishes nothing to any store
+# (D-11 is pending) and touches no cloud account.
+#
+# Fails clearly, naming each missing item, until the release secrets exist (deployment.md §12.2).
+# It refuses to hand over a build that is not signed with the upload key (e.g. the debug key while
+# the app's Gradle signingConfig is not wired yet, §12.3).
+#
+# Who can run it: dispatch from a PROTECTED `main` or `develop` only. The signing secrets live in
+# the GitHub environment `release` (required reviewers, deployment branches main/develop), never
+# as repository secrets.
+name: release-android
+
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: Which app to build
+        type: choice
+        options: [both, customer_app, rider_app]
+        default: both
+      build_number:
+        description: >-
+          Android versionCode (must be higher than every build already uploaded to Play).
+          Empty = this workflow's run number.
+        type: string
+        required: false
+        default: ""
+
+concurrency:
+  group: release-android-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.9"
+  JAVA_VERSION: "17"
+  ANDROID_PLATFORM: "platforms;android-37.0"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  preflight:
+    name: Check ref and inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      build_number: ${{ steps.plan.outputs.build_number }}
+    steps:
+      - name: Plan
+        id: plan
+        env:
+          APP: ${{ inputs.app }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          REF: ${{ github.ref }}
+          REF_PROTECTED: ${{ github.ref_protected }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          if [[ "$REF" != "refs/heads/main" && "$REF" != "refs/heads/develop" ]]; then
+            echo "::error::Release builds run only from main or develop (got $REF)."
+            exit 1
+          fi
+          if [[ "$REF_PROTECTED" != "true" ]]; then
+            echo "::error::$REF is not a protected branch. Protect it before building releases (deployment.md §8.4)."
+            exit 1
+          fi
+          build_number="${BUILD_NUMBER:-$RUN_NUMBER}"
+          if ! [[ "$build_number" =~ ^[1-9][0-9]{0,9}$ ]] || (( build_number > 2100000000 )); then
+            echo "::error::build_number must be a positive integer <= 2100000000 (got '$build_number')."
+            exit 1
+          fi
+          customer='{"app":"customer_app","prefix":"CUSTOMER","app_id":"in.jivo.quick","mappls":true}'
+          rider='{"app":"rider_app","prefix":"RIDER","app_id":"in.jivo.rider","mappls":false}'
+          case "$APP" in
+            both) matrix="[$customer,$rider]" ;;
+            customer_app) matrix="[$customer]" ;;
+            rider_app) matrix="[$rider]" ;;
+            *) echo "::error::unknown app '$APP'"; exit 1 ;;
+          esac
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
+          echo "Building $APP, versionCode $build_number, from $REF."
+
+  build:
+    name: Signed prod build (${{ matrix.app }})
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.preflight.outputs.matrix) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    env:
+      # Secrets of the `release` environment, per app (names: deployment.md §12.2). Only this app's
+      # secrets are mapped into this job.
+      UPLOAD_KEYSTORE_BASE64: ${{ secrets[format('{0}_UPLOAD_KEYSTORE_BASE64', matrix.prefix)] }}
+      UPLOAD_KEYSTORE_PASSWORD: ${{ secrets[format('{0}_UPLOAD_KEYSTORE_PASSWORD', matrix.prefix)] }}
+      UPLOAD_KEY_ALIAS: ${{ secrets[format('{0}_UPLOAD_KEY_ALIAS', matrix.prefix)] }}
+      UPLOAD_KEY_PASSWORD: ${{ secrets[format('{0}_UPLOAD_KEY_PASSWORD', matrix.prefix)] }}
+      SENTRY_DSN: ${{ secrets[format('{0}_SENTRY_DSN', matrix.prefix)] }}
+      MAPPLS_OLF_BASE64: ${{ matrix.mappls && secrets[format('{0}_MAPPLS_OLF_BASE64', matrix.prefix)] || '' }}
+      MAPPLS_CONF_BASE64: ${{ matrix.mappls && secrets[format('{0}_MAPPLS_CONF_BASE64', matrix.prefix)] || '' }}
+      # Environment variables (not secrets) of `release`.
+      API_BASE_URL: ${{ vars.PROD_API_BASE_URL }}
+      APP_LINK_HOSTS: ${{ vars.CUSTOMER_APP_LINK_HOSTS }}
+      BUILD_NUMBER: ${{ needs.preflight.outputs.build_number }}
+      PREFIX: ${{ matrix.prefix }}
+      NEEDS_MAPPLS: ${{ matrix.mappls }}
+    steps:
+      # Before any download, so a missing secret fails in seconds with a list of what to add.
+      - name: Release configuration is complete
+        run: |
+          missing=()
+          for name in UPLOAD_KEYSTORE_BASE64 UPLOAD_KEYSTORE_PASSWORD UPLOAD_KEY_ALIAS UPLOAD_KEY_PASSWORD; do
+            [[ -n "${!name}" ]] || missing+=("secret ${PREFIX}_${name}")
+          done
+          if [[ "$NEEDS_MAPPLS" == "true" ]]; then
+            [[ -n "$MAPPLS_OLF_BASE64" ]] || missing+=("secret ${PREFIX}_MAPPLS_OLF_BASE64")
+            [[ -n "$MAPPLS_CONF_BASE64" ]] || missing+=("secret ${PREFIX}_MAPPLS_CONF_BASE64")
+          fi
+          if [[ -z "$API_BASE_URL" ]]; then
+            missing+=("variable PROD_API_BASE_URL")
+          elif ! [[ "$API_BASE_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$ ]]; then
+            echo "::error::PROD_API_BASE_URL must be an https origin such as https://api.example.in (AppEnv refuses anything else for prod)."
+            exit 1
+          fi
+          if (( ${#missing[@]} )); then
+            for m in "${missing[@]}"; do echo "::error::Missing in the GitHub environment 'release': $m"; done
+            echo "::error::Release signing is not set up yet (D-11). See docs/deployment.md §12.2."
+            exit 1
+          fi
+          [[ -n "$SENTRY_DSN" ]] || echo "::warning::${PREFIX}_SENTRY_DSN is not set: this build reports no crashes (D-19)."
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Install the Android platform the apps compile against
+        run: yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --install "${ANDROID_PLATFORM}" > /dev/null
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          # No caches in a signing job: nothing restored from a cache another branch wrote.
+          cache: false
+          pub-cache: false
+
+      - name: Check the pinned Flutter version
+        run: flutter --version | grep -q "Flutter ${FLUTTER_VERSION} "
+
+      # Keystore and key.properties go only to the runner's temp dir and the gitignored
+      # android/key.properties; nothing is echoed. The last step removes them.
+      - name: Install the upload key
+        run: |
+          umask 077
+          keystore="$RUNNER_TEMP/upload-keystore.jks"
+          printf '%s' "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          if ! keytool -list -keystore "$keystore" -storepass:env UPLOAD_KEYSTORE_PASSWORD \
+              -alias "$UPLOAD_KEY_ALIAS" > /dev/null 2>&1; then
+            echo "::error::${PREFIX}_UPLOAD_KEYSTORE_BASE64 / _PASSWORD / ${PREFIX}_UPLOAD_KEY_ALIAS do not open a key: wrong base64, password or alias."
+            exit 1
+          fi
+          {
+            printf 'storeFile=%s\n' "$keystore"
+            printf 'storePassword=%s\n' "$UPLOAD_KEYSTORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$UPLOAD_KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$UPLOAD_KEY_PASSWORD"
+          } > android/key.properties
+          # Expected certificate, to verify the outputs below.
+          keytool -list -v -keystore "$keystore" -storepass:env UPLOAD_KEYSTORE_PASSWORD \
+              -alias "$UPLOAD_KEY_ALIAS" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | head -1 | tr -d ':' | tr 'A-F' 'a-f' \
+            > "$RUNNER_TEMP/upload-cert.sha256"
+          test -s "$RUNNER_TEMP/upload-cert.sha256"
+          echo "Upload certificate SHA-256: $(cat "$RUNNER_TEMP/upload-cert.sha256")"
+
+      # Mappls SDK config (secret; bound to the prod package name and the upload/app-signing
+      # certificates in the Mappls console). The mappls_gl Gradle plugin picks it up from android/app.
+      - name: Install the Mappls config
+        if: matrix.mappls
+        env:
+          APP_ID: ${{ matrix.app_id }}
+        run: |
+          umask 077
+          printf '%s' "$MAPPLS_OLF_BASE64" | base64 --decode > "android/app/${APP_ID}.a.olf"
+          printf '%s' "$MAPPLS_CONF_BASE64" | base64 --decode > "android/app/${APP_ID}.a.conf"
+          test -s "android/app/${APP_ID}.a.olf" && test -s "android/app/${APP_ID}.a.conf"
+
+      - name: Resolve dependencies (committed lockfile)
+        run: flutter pub get --enforce-lockfile
+
+      - name: Build the signed AAB and APK (prod, obfuscated)
+        run: |
+          defines=(--dart-define=API_BASE_URL="$API_BASE_URL")
+          [[ -n "$SENTRY_DSN" ]] && defines+=(--dart-define=SENTRY_DSN="$SENTRY_DSN")
+          [[ "$PREFIX" == CUSTOMER && -n "$APP_LINK_HOSTS" ]] && defines+=(--dart-define=APP_LINK_HOSTS="$APP_LINK_HOSTS")
+          common=(--release --flavor prod -t lib/main_prod.dart --obfuscate
+                  --split-debug-info=build/symbols --build-number="$BUILD_NUMBER" "${defines[@]}")
+          flutter build appbundle "${common[@]}"
+          flutter build apk "${common[@]}"
+
+      # Refuses a build signed by anything but the upload key: in particular the debug key, which
+      # android/app/build.gradle.kts still uses for release until the app owners wire key.properties.
+      - name: Outputs are signed with the upload key
+        run: |
+          expected="$(cat "$RUNNER_TEMP/upload-cert.sha256")"
+          aab=build/app/outputs/bundle/prodRelease/app-prod-release.aab
+          apk=build/app/outputs/flutter-apk/app-prod-release.apk
+          test -f "$aab" && test -f "$apk"
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          apk_certs="$("$apksigner" verify --print-certs "$apk" \
+            | sed -n 's/^Signer #[0-9]* certificate SHA-256 digest: //p' | tr 'A-F' 'a-f')"
+          aab_certs="$(keytool -printcert -jarfile "$aab" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' | tr -d ':' | tr 'A-F' 'a-f')"
+          ok=1
+          for kind in apk aab; do
+            certs="$([[ $kind == apk ]] && echo "$apk_certs" || echo "$aab_certs")"
+            if [[ "$certs" != "$expected" ]]; then
+              echo "::error::The $kind is not signed with the upload key alone (signer SHA-256: ${certs:-none})."
+              ok=0
+            fi
+          done
+          if (( ! ok )); then
+            echo "::error::Wire the release signingConfig to android/key.properties in android/app/build.gradle.kts (deployment.md §12.3; owner: the app agent)."
+            exit 1
+          fi
+          echo "AAB and APK are signed with the upload key ($expected)."
+          sha256sum "$aab" "$apk"
+
+      - name: Collect artifacts
+        env:
+          APP: ${{ matrix.app }}
+        run: |
+          out="$RUNNER_TEMP/release/$APP"
+          mkdir -p "$out"
+          cp build/app/outputs/bundle/prodRelease/app-prod-release.aab "$out/$APP-prod-$BUILD_NUMBER.aab"
+          cp build/app/outputs/flutter-apk/app-prod-release.apk "$out/$APP-prod-$BUILD_NUMBER.apk"
+          tar -C build -czf "$out/$APP-prod-$BUILD_NUMBER-dart-symbols.tar.gz" symbols
+          mapping=build/app/outputs/mapping/prodRelease/mapping.txt
+          if [[ -f "$mapping" ]]; then cp "$mapping" "$out/$APP-prod-$BUILD_NUMBER-r8-mapping.txt"; fi
+          (cd "$out" && sha256sum -- * > SHA256SUMS)
+          cat "$out/SHA256SUMS"
+
+      # The repository is public: run artifacts can be downloaded by any signed-in GitHub user.
+      # Bundles hold nothing that the store copy does not; symbols and mapping only de-obfuscate.
+      # Short retention; keep the copies you upload to Play and Sentry, not these.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.app }}-prod-${{ needs.preflight.outputs.build_number }}
+          path: ${{ runner.temp }}/release/${{ matrix.app }}
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Remove the key material
+        if: always()
+        env:
+          APP_ID: ${{ matrix.app_id }}
+        run: |
+          rm -f "$RUNNER_TEMP/upload-keystore.jks" "$RUNNER_TEMP/upload-cert.sha256" android/key.properties \
+            "android/app/${APP_ID}.a.olf" "android/app/${APP_ID}.a.conf"

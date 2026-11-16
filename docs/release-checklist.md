@@ -2,6 +2,23 @@
 
 Use it in Phase 8, before the public launch. Each item points to the doc that defines it. The QA agent's `qa/docs/10-release-readiness-report.md` gives the verdict on the quality items.
 
+## 0. Status: prepared vs waiting on Jivo (updated 2026-11-16)
+
+What engineering has prepared without spending money or using external accounts, and what each remaining item waits on. Tick the detailed items in §1–§8 as they close.
+
+| Area | Prepared (in the repo) | Waiting on | Owner of the wait |
+|---|---|---|---|
+| CI | `backend`, `infra`, `mobile` workflows; the 2026-11-10 `backend`/`infra` failures on `main` fixed on `devops/p8-ci` (re-run after merge) | A green run on `main` after the fix is merged | PM |
+| Signed Android builds | `release-android.yml`: prod flavor, AAB + APK, `--obfuscate --split-debug-info`, upload-key check, fails clearly without secrets ([`deployment.md`](deployment.md) §12) | App Gradle `signingConfig` reading `key.properties` (§12.3, app agents); upload keys and `release` environment secrets (§12.2) | App agents; user / Jivo IT |
+| Play Store | Package IDs `in.jivo.quick`, `in.jivo.rider` (D-06 defaults) | **D-11**: Play Console account, app entries, Play App Signing, listings, data safety, rider background-location declaration and video | Jivo IT |
+| App Store (customer iOS) | Nothing yet (needs a macOS runner) | **D-11**: Apple Developer organisation account (D-U-N-S) | Jivo IT |
+| Push (FCM) | Backend push backends and the deploy check `notifications.E001` | **D-19**: Firebase projects (staging, prod), `google-services.json` per app, FCM credentials as secrets | Tech lead / Jivo IT |
+| Crash reporting | `SENTRY_DSN` support in the backend and apps; per-app DSN secrets in the release workflow (optional) | **D-19**: Sentry organisation and projects | Tech lead |
+| Payments | Gateway interface, webhook runbook ([`deployment.md`](deployment.md) §5), fail-closed deploy checks `payments.E001`/`E004` | **D-01**: Razorpay KYC and test keys (staging), then live keys and the live webhook | Jivo Finance |
+| OTP SMS | SMS backend interface; production refuses the console backend (`accounts.E003`) and `OTP_TEST_NUMBERS` | **D-02**: provider (MSG91 or Jivo's), DLT entity, sender ID and approved templates | Jivo IT |
+| Hosting, domains | Image, compose, entrypoint checks, staging preflight, backup/restore, monitoring as code ([`deployment.md`](deployment.md) §7–§11) | **D-05**: hosting, domains/DNS/TLS, `PROD_API_BASE_URL` | Jivo IT; user approval for any spend |
+| Maps | Mappls config as release secrets (§12.2) | Mappls prod keys registered with the upload and Play app-signing certificate SHA-256 | Jivo IT |
+
 ## 1. Quality gates (`10 §2`, `§5`)
 - [ ] Every phase P0–P7 shows 🏁 in [`plan/00-roadmap.md`](plan/00-roadmap.md), with sign-off recorded.
 - [ ] CI green on `main`: lint, tests, coverage (backend ≥ 80%, and ≥ 90% on the orders/payments/inventory/cart/delivery services), migrations, schema, `pip-audit`.
@@ -15,7 +32,7 @@ Use it in Phase 8, before the public launch. Each item points to the doc that de
 - [ ] Secrets only in the secrets manager, with separate keys per environment and no secrets in git (history scanned).
 - [ ] KYC files are in a private bucket with signed URLs, and sensitive fields are encrypted.
 - [ ] PII is masked in logs, and Sentry scrubbing is on.
-- [ ] Release builds use `--obfuscate --split-debug-info`. The only public keys are restricted ones (Razorpay `key_id`, the Maps key).
+- [ ] Release builds use `--obfuscate --split-debug-info` (Android: `release-android.yml`, [`deployment.md`](deployment.md) §12), and are signed with the upload key (the workflow verifies it). The only public keys are restricted ones (Razorpay `key_id`, the Maps key).
 - [ ] The GitHub repository is private, or a public repo has been reviewed and approved.
 - [ ] Production refuses `OTP_TEST_NUMBERS`, apart from the single app-store reviewer number (D-15).
 
@@ -54,6 +71,8 @@ Use it in Phase 8, before the public launch. Each item points to the doc that de
 - [ ] Monitoring: Sentry (backend and apps), structured logs, dashboards, on-call contacts.
 
 ## 6. App stores (D-06, D-11)
+- [ ] **Signing:** Play App Signing enabled for both apps; upload keys generated offline and held by two people; `release` environment secrets set; a `release-android` run produced verified signed AABs ([`deployment.md`](deployment.md) §12).
+- [ ] Dart symbols and R8 mappings of each store build uploaded to Sentry (and the mapping to Play).
 - [ ] **Customer app:** Play Store and App Store listings, data safety and privacy labels, a reviewer test account, the account deletion link.
 - [ ] **Rider app:** Play listing, plus the background-location declaration and its video approved.
 - [ ] Force-update policy set (`min_supported_version`), and the store URLs configured.

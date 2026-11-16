@@ -90,6 +90,10 @@ jobs:
             if ($LASTEXITCODE -ne 2) { Write-Host "::error::expected exit 2, got $LASTEXITCODE for: $c"; $bad++ }
           }
           if ($bad) { exit 1 }
+          # The runner appends `exit $LASTEXITCODE` (2, from the last case). pwsh -Command maps
+          # any script exit code other than 0/1 to 1, so a passing step failed. End explicitly.
+          $global:LASTEXITCODE = 0
+          exit 0
 
       - name: Entrypoint tests (failing check blocks start; skip refused under deployed settings)
         run: bash infra/scripts/test_entrypoint.sh
