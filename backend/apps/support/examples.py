@@ -93,6 +93,12 @@ CREATE_WITHOUT_ORDER = {
     "category": "ACCOUNT",
     "message": "How do I change the phone number on my account?",
 }
+CREATE_WITH_PHOTOS = {
+    "category": "DAMAGED_ITEMS",
+    "message": "The oil bottle arrived broken, photos attached.",
+    "order_id": 1002,
+    "attachment_keys": ["9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19"],
+}
 REPLY = {"message": "Thank you, I can see the refund now."}
 REPLY_WITH_PHOTO = {
     "message": "Here is a photo of the bottle.",

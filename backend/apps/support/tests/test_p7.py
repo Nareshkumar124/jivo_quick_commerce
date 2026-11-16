@@ -372,3 +372,120 @@ class TestTicketsPerApp:
         assert list(services.own_tickets(user)) == [ticket]
         assert list(services.own_tickets(user, "rider")) == []
         assert services.ticket_app("something") == "customer"
+
+
+ATTACHMENTS = "/api/v1/support/attachments/"
+
+
+class TestPhotosOnTicketCreate:
+    """Photos sent with ticket create land on the first message (one message, not two)."""
+
+    def test_create_with_photos_makes_one_message(self, auth_client, user):
+        keys = []
+        for _ in range(2):
+            response = auth_client.post(ATTACHMENTS, {"file": image_file()}, format="multipart")
+            assert response.status_code == 201, response.content
+            assert response.json()["url"]
+            keys.append(response.json()["key"])
+        unbound = TicketAttachment.objects.get(key=keys[0])
+        assert unbound.ticket_id is None
+        assert unbound.file.name == f"support/new/{keys[0]}.webp"
+        assert str(unbound).startswith("unclaimed attachment")
+
+        response = auth_client.post(
+            TICKETS,
+            {"category": "OTHER", "message": "Photos of the problem.", "attachment_keys": keys},
+            format="json",
+        )
+        assert response.status_code == 201, response.content
+        messages = response.json()["messages"]
+        assert len(messages) == 1
+        assert [a["key"] for a in messages[0]["attachments"]] == keys
+        ticket_id = response.json()["id"]
+        claimed = TicketAttachment.objects.filter(key__in=keys)
+        assert {a.ticket_id for a in claimed} == {ticket_id}
+        assert SupportTicket.objects.get(pk=ticket_id).messages.get().attachments == keys
+        # used once
+        again = auth_client.post(
+            TICKETS,
+            {"category": "OTHER", "message": "Photos of the problem.", "attachment_keys": keys},
+            format="json",
+        )
+        assert again.status_code == 400
+        assert "attachment_keys" in again.json()["error"]["details"]
+
+    def test_rider_create_with_photo(self, make_auth_client, rider_setup):
+        rider, task, _ = rider_setup
+        client = make_auth_client(rider.user, "rider")
+        key = client.post(ATTACHMENTS, {"file": image_file()}, format="multipart").json()["key"]
+        response = client.post(
+            TICKETS,
+            {
+                "category": "TASK",
+                "message": "The gate was locked, see photo.",
+                "task_id": task.pk,
+                "attachment_keys": [key],
+            },
+            format="json",
+        )
+        assert response.status_code == 201, response.content
+        assert [a["key"] for a in response.json()["messages"][0]["attachments"]] == [key]
+
+    def test_create_without_keys_still_works(self, auth_client):
+        response = auth_client.post(
+            TICKETS, {"category": "OTHER", "message": "No photos this time."}, format="json"
+        )
+        assert response.status_code == 201
+        assert response.json()["messages"][0]["attachments"] == []
+
+    def test_other_users_or_bound_keys_are_refused(self, make_auth_client, auth_client, user):
+        """IDOR: another user's unbound key, or a key already bound to another ticket, cannot
+        be claimed by a new ticket; a failed create leaves no ticket behind."""
+        other = make_auth_client(UserFactory())
+        foreign = other.post(ATTACHMENTS, {"file": image_file()}, format="multipart").json()["key"]
+        existing = services.create_ticket(user, category="OTHER", message="An older ticket.")
+        bound = services.upload_attachment(user, existing.pk, image_file()).key
+        before = SupportTicket.objects.count()
+        for key in (foreign, bound):
+            response = auth_client.post(
+                TICKETS,
+                {"category": "OTHER", "message": "Trying a key.", "attachment_keys": [key]},
+                format="json",
+            )
+            assert response.status_code == 400
+            assert "attachment_keys" in response.json()["error"]["details"]
+        assert SupportTicket.objects.count() == before
+        assert TicketAttachment.objects.get(key=foreign).message_id is None
+
+    def test_too_many_expired_and_validation(self, auth_client, user):
+        keys = [services.upload_new_ticket_attachment(user, image_file()).key for _ in range(4)]
+        body = {"category": "OTHER", "message": "Too many photos.", "attachment_keys": keys}
+        assert auth_client.post(TICKETS, body, format="json").status_code == 400
+        with pytest.raises(ApiError):
+            services.create_ticket(
+                user, category="OTHER", message="Too many photos.", attachment_keys=keys
+            )
+        with freeze_time(timezone.now() - timedelta(hours=2)):
+            old = services.upload_new_ticket_attachment(user, image_file()).key
+        with pytest.raises(ApiError):
+            services.create_ticket(
+                user, category="OTHER", message="An expired photo.", attachment_keys=[old]
+            )
+        text = SimpleUploadedFile("a.jpg", b"not an image", content_type="image/jpeg")
+        assert auth_client.post(ATTACHMENTS, {"file": text}, format="multipart").status_code == 400
+
+    def test_unbound_key_also_works_on_a_reply(self, user, ticket):
+        key = services.upload_new_ticket_attachment(user, image_file()).key
+        services.add_customer_message(user, ticket.pk, "Here it is", attachment_keys=[key])
+        assert TicketAttachment.objects.get(key=key).ticket_id == ticket.pk
+
+    def test_unauthenticated(self, api_client):
+        response = api_client.post(ATTACHMENTS, {"file": image_file()}, format="multipart")
+        assert response.status_code == 401
+
+    def test_unclaimed_unbound_photo_is_purged(self, user, django_capture_on_commit_callbacks):
+        with freeze_time(timezone.now() - timedelta(hours=2)):
+            services.upload_new_ticket_attachment(user, image_file())
+        with django_capture_on_commit_callbacks(execute=True):
+            assert services.purge_unclaimed_attachments() == 1
+        assert not TicketAttachment.objects.exists()

@@ -21917,6 +21917,147 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/support/attachments/:
+    post:
+      operationId: support_attachments_create
+      description: 'Upload a photo before opening the ticket, then send its `key`
+        in `attachment_keys` of `support_tickets_create` (or of a reply) within an
+        hour, or it is deleted. Multipart `file`: a JPEG, PNG or WebP image of at
+        most 5 MB, stored re-encoded (WebP, EXIF removed) in private storage; returned
+        with its `key` and a short-lived signed `url`. Shares the per-user limit of
+        `support_tickets_attachments_create` (`SUPPORT_ATTACHMENTS_RATE`, default
+        30 per hour).'
+      summary: Upload a photo for a new ticket
+      tags:
+      - support
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TicketAttachmentUploadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketAttachment'
+              examples:
+                Uploaded:
+                  value:
+                    key: 9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19
+                    url: https://storage.example.com/private/support/12/9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19.webp?X-Amz-Expires=600&X-Amz-Signature=abc123
+          description: Stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                NotAnImage:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        file:
+                        - Upload a JPEG, PNG or WebP image.
+                  summary: Not an image
+          description: Missing file, or not a JPEG/PNG/WebP image of at most 5 MB.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 120 seconds.
+                      details:
+                        retry_after_seconds: 120
+                  summary: RATE_LIMITED
+          description: Too many requests from this account. Wait `details.retry_after_seconds`
+            (also in `Retry-After`), then try again with the same request.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/support/tickets/:
     get:
       operationId: support_tickets_list
@@ -22093,12 +22234,14 @@ paths:
             or not a number. Go back to page 1.'
     post:
       operationId: support_tickets_create
-      description: Creates an OPEN ticket whose first message is `message`. MISSING_ITEMS,
+      description: 'Creates an OPEN ticket whose first message is `message`. MISSING_ITEMS,
         DAMAGED_ITEMS, WRONG_ITEMS and LATE_DELIVERY are about an order and need `order_id`;
-        the other categories may name one. The order must be the caller's own. To
-        add photos, upload them to the new ticket (`support_tickets_attachments_create`)
-        and send them with a reply (`attachment_keys`). Rate limited per user (`SUPPORT_TICKETS_CREATE_RATE`,
-        default 10 per hour).
+        the other categories may name one. The order must be the caller''s own. Photos:
+        upload each first with `support_attachments_create` and send up to 3 `attachment_keys`;
+        they attach to the first message (one message, not two). The older flow (create,
+        upload to the ticket, reply with the keys) still works. A failed create attaches
+        nothing and the keys stay usable. Rate limited per user (`SUPPORT_TICKETS_CREATE_RATE`,
+        default 10 per hour).'
       summary: Open a support ticket
       tags:
       - support
@@ -22125,6 +22268,14 @@ paths:
                   message: The customer's gate was locked and nobody answered.
                   task_id: 310
                 summary: 'Rider: about a task'
+              WithPhotos:
+                value:
+                  category: DAMAGED_ITEMS
+                  message: The oil bottle arrived broken, photos attached.
+                  order_id: 1002
+                  attachment_keys:
+                  - 9f1c2b7e4d5a4c3b8a7f6e5d4c3b2a19
+                summary: With photos
         required: true
       security:
       - jwtAuth: []
@@ -22210,6 +22361,15 @@ paths:
                         message:
                         - Ensure this field has at least 10 characters.
                   summary: Message too short
+                UnknownOrExpiredPhoto:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        attachment_keys:
+                        - 'Upload the photo again: it was not found or has expired.'
+                  summary: Unknown or expired photo
           description: 'Invalid input: unknown category, message shorter than 10 or
             longer than 1000 characters, an order category without `order_id`, or
             an `order_id` that is not one of the caller''s orders.'
@@ -22667,10 +22827,10 @@ paths:
       operationId: support_tickets_messages_create
       description: 'Adds the caller''s message and returns the whole ticket. A RESOLVED
         ticket is reopened (OPEN). A CLOSED ticket refuses replies with 400 `VALIDATION_ERROR`
-        (`details.ticket`): offer a new ticket instead. Photos: upload each with `support_tickets_attachments_create`,
-        then send up to 3 `attachment_keys` (keys the caller uploaded to this ticket
-        in the last hour, not used yet). Rate limited per user (`SUPPORT_MESSAGES_RATE`,
-        default 60 per hour).'
+        (`details.ticket`): offer a new ticket instead. Photos: upload each with `support_tickets_attachments_create`
+        (or `support_attachments_create`), then send up to 3 `attachment_keys` (keys
+        the caller uploaded in the last hour, not used yet). Rate limited per user
+        (`SUPPORT_MESSAGES_RATE`, default 60 per hour).'
       summary: Reply on my ticket
       parameters:
       - in: path
@@ -28488,6 +28648,16 @@ components:
           minimum: 1
           nullable: true
           description: 'Rider app: one of the caller''s payouts (else 400 not found).'
+        attachment_keys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 32
+          description: 'Optional, at most 3: keys returned by `POST /support/attachments/`
+            to the caller in the last hour, not yet used. The photos attach to the
+            ticket''s first message.'
+          maxItems: 3
       required:
       - category
       - message
@@ -28532,8 +28702,8 @@ components:
             minLength: 1
             maxLength: 32
           description: 'Optional, at most 3: keys returned by `POST /support/tickets/{id}/attachments/`
-            for this ticket by the caller in the last hour, not yet used by another
-            message (Phase 7).'
+            for this ticket (or by `POST /support/attachments/`) to the caller in
+            the last hour, not yet used by another message (Phase 7).'
           maxItems: 3
       required:
       - message

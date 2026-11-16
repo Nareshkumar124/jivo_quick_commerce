@@ -129,6 +129,16 @@ class TicketCreateSerializer(serializers.Serializer):
         min_value=1,
         help_text="Rider app: one of the caller's payouts (else 400 not found).",
     )
+    attachment_keys = serializers.ListField(
+        child=serializers.CharField(max_length=32),
+        required=False,
+        max_length=MAX_ATTACHMENTS_PER_MESSAGE,
+        help_text=(
+            f"Optional, at most {MAX_ATTACHMENTS_PER_MESSAGE}: keys returned by "
+            "`POST /support/attachments/` to the caller in the last hour, not yet used. The "
+            "photos attach to the ticket's first message."
+        ),
+    )
 
 
 class TicketReplySerializer(serializers.Serializer):
@@ -139,8 +149,9 @@ class TicketReplySerializer(serializers.Serializer):
         max_length=MAX_ATTACHMENTS_PER_MESSAGE,
         help_text=(
             f"Optional, at most {MAX_ATTACHMENTS_PER_MESSAGE}: keys returned by "
-            "`POST /support/tickets/{id}/attachments/` for this ticket by the caller in the last "
-            "hour, not yet used by another message (Phase 7)."
+            "`POST /support/tickets/{id}/attachments/` for this ticket (or by "
+            "`POST /support/attachments/`) to the caller in the last hour, not yet used by "
+            "another message (Phase 7)."
         ),
     )
 
