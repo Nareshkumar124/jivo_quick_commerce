@@ -283,6 +283,7 @@ def test_p4_tc36_auto_accept_qa02(qa02_shop, ops_users):
     """P4-TC-36 QA-02 has auto-accept on (AUTO_ACCEPT_DELAY_SECONDS 0): a COD order there is
     ACCEPTED by the system (history actor_type system, no actor) within seconds, with a pickup
     code; the customer sees "Order confirmed"."""
+    start_worker("worker-p4s2.log")  # run 3: auto-accept runs on the QA worker; don't rely on test order
     o = cod_order(qa02_shop, {V_SUN_1L: 1})
     try:
         end = time.monotonic() + 60

@@ -147,7 +147,7 @@ def t8a_oracle(old: dict, lines: list[tuple[Decimal, Decimal, int]]) -> dict:
 def _qa_worker_pids() -> list[int]:
     ps = (
         "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'celery.exe' -and "
-        "($_.CommandLine -like '*worktrees?qa?backend*' -or $_.CommandLine -like '*qa-dev?backend*') -and $_.CommandLine -like '*worker*' } "
+        "($_.CommandLine -like '*worktrees?*qa?backend*' -or $_.CommandLine -like '*qa-dev?backend*') -and $_.CommandLine -like '*worker*' } "
         "| ForEach-Object { $_.ProcessId }"
     )
     out = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True).stdout

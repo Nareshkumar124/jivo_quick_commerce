@@ -334,14 +334,10 @@ def test_p5_tc117_ops_actions_role_matrix(r1, p5_shop_a):
         finally:
             c.close()
     print("TC-117 force offline / cash limit per role:", results)
-    known_bug = []
     for who, (fcode, online, lim) in results.items():
         if who in DL61_ALLOWED:
             assert fcode == 302 and online is False, (who, fcode, online)
-            if who == SMQ and lim == 403:
-                known_bug.append(who)  # BUG-0024: the admin action needs review_rider
-            else:
-                assert lim == 302, (who, lim)
+            assert lim == 302, (who, lim)  # BUG-0024 (SMQ was 403) verified on main b6736cf
         elif who == SM:
             assert fcode == 404 and online is True and lim in (403, 404), (who, fcode, online, lim)
         else:
@@ -375,8 +371,6 @@ def test_p5_tc117_ops_actions_role_matrix(r1, p5_shop_a):
         smq.close()
     assert task_row(oid)["otp_attempts"] == 0
     assert r1.deliver(tid, ctx["otp"], {"mode": "cash", "amount": due}).status_code == 200
-    if known_bug:
-        pytest.xfail("BUG-0024: the QA-02 Store Manager gets 403 on the admin cash-limit action (DL-61 a allows it)")
 
 
 # =========================================================================== 5.1 erasure (QA H)

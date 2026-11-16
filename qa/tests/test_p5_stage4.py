@@ -165,19 +165,15 @@ def test_p5_tc42_accept_vs_expiry_race(r1, p5_shop_a):
         else:
             assert r.status_code == 409, (trial, describe(r))
             code = r.json()["error"]["code"]
-            assert code in ("OFFER_EXPIRED", "OFFER_TAKEN"), (trial, describe(r))
+            assert code == "OFFER_EXPIRED", (trial, describe(r))  # BUG-0023 verified on main b6736cf
             assert o_status == "EXPIRED" and t["status"] != "ASSIGNED", (trial, o_status, t)
             outcomes.append((f"409 {code}", jitter, drv[0]["result"]["outcome"] if drv and drv[0]["ok"] else drv))
         assert not (t["status"] == "ASSIGNED" and o_status == "EXPIRED"), (trial, t, o_status)
         assert p5_shop_a.cancel(oid).status_code == 200  # frees R1 for the next trial
     print("TC-42 outcomes:", outcomes)
     assert len(outcomes) == len(JITTER)
-    wrong = [o for o in outcomes if o[0] == "409 OFFER_TAKEN"]
-    if wrong:  # the race itself is safe; only the error code of a late accept is wrong
-        pytest.xfail(f"BUG-0023: late accept on an expired offer answered OFFER_TAKEN in {len(wrong)} trial(s): {wrong}")
 
 
-@pytest.mark.xfail(strict=True, reason="BUG-0023: late accept after a processed expiry answers OFFER_TAKEN")
 def test_p5_tc42b_late_accept_after_expiry_is_offer_expired(r1, p5_shop_a):
     """P5-TC-42b (stage 4, from TC-42) only R1 online; R1 lets the offer expire and waits until the
     expiry is processed (offer EXPIRED in the DB, task back to SEARCHING/UNASSIGNED); then accepts:

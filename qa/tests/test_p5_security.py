@@ -14,9 +14,9 @@ import pytest
 from conftest import login
 from p5_support import (  # noqa: F401 (fixtures)
     P5_53, QA02, RiderClient, bring_to, offset, p5_shop_a, p5_shop_b, pickup_code, qa_worker,
-    r1, r2, task_row, wait_order_status,
+    R1_PHONE, R2_PHONE, r1, r2, task_row, wait_order_status,
 )
-from qa_support import QA_PHONES, RIDER_HEADERS, assert_error, describe, validate_response
+from qa_support import APP_HEADERS, QA_PHONES, RIDER_HEADERS, assert_error, bearer, db_query, describe, validate_response
 
 pytestmark = P5_53
 
@@ -73,7 +73,13 @@ def test_p5_tc106_id_enumeration_reveals_nothing(r1, r2, p5_shop_a):
     missing = r2.post("tasks/999999999/arrived-store/", {"lat": QA02[0], "lng": QA02[1]})
     assert foreign.status_code == missing.status_code == 404
     assert foreign.json() == missing.json()
+    # run 3: R2's own tasks in the range may answer 409 (state); only foreign/missing ids must be 404
+    own = {row[0] for row in db_query(
+        "select t.id from delivery_deliverytask t join delivery_rider r on r.id=t.rider_id "
+        "join accounts_user u on u.id=r.user_id where u.phone=%s", (R2_PHONE,))}
     for task_id in range(ctx["task_id"] - 25, ctx["task_id"] + 25):
+        if task_id in own:
+            continue
         r = r2.post(f"tasks/{task_id}/arrived-store/", {"lat": QA02[0], "lng": QA02[1]})
         assert r.status_code == 404, describe(r)
     for offer_id in range(ctx["offer"]["id"] - 25, ctx["offer"]["id"] + 25):
@@ -81,15 +87,26 @@ def test_p5_tc106_id_enumeration_reveals_nothing(r1, r2, p5_shop_a):
 
 
 def test_p5_tc107_customer_on_rider_endpoints(r1, p5_shop_a, api):
-    """P5-TC-107 a user without a rider profile: 403 PERMISSION_DENIED, rider_status NONE."""
+    """P5-TC-107 a customer (A, no rider profile) on the rider API. Run 3 (DL-74, T-219): the
+    customer-app token is refused before any rider lookup: 403 PERMISSION_DENIED with
+    `details.reason` APP_HEADER_MISMATCH (X-App-Name rider) or WRONG_APP_TOKEN (customer header).
+    A's rider-app token (no rider profile) -> 403 PERMISSION_DENIED, rider_status NONE. R1's offer
+    is untouched."""
     r1.online_at()
     ctx = bring_to("OFR", shop=p5_shop_a, rider=r1)
-    h = {**RIDER_HEADERS, **p5_shop_a.session.headers}
-    for method, path in (("get", "me/"), ("get", "offers/current/"), ("get", "tasks/current/"),
-                         ("post", f"offers/{ctx['offer']['id']}/accept/"), ("post", "shift/start/")):
-        r = getattr(api, method)(f"/api/v1/rider/{path}", headers=h, **({"json": {}} if method == "post" else {}))
+    a_rider = login(QA_PHONES["a"], app="rider")
+    calls = (("get", "me/"), ("get", "offers/current/"), ("get", "tasks/current/"),
+             ("post", f"offers/{ctx['offer']['id']}/accept/"), ("post", "shift/start/"))
+    for method, path in calls:
+        kw = {"json": {}} if method == "post" else {}
+        url = f"/api/v1/rider/{path}"
+        r = getattr(api, method)(url, headers={**RIDER_HEADERS, **p5_shop_a.session.headers}, **kw)
+        assert assert_error(r, 403, "PERMISSION_DENIED")["details"]["reason"] == "APP_HEADER_MISMATCH"
+        r = getattr(api, method)(url, headers={**APP_HEADERS, **bearer(p5_shop_a.session.access)}, **kw)
+        assert assert_error(r, 403, "PERMISSION_DENIED")["details"]["reason"] == "WRONG_APP_TOKEN"
+        r = getattr(api, method)(url, headers={**RIDER_HEADERS, **bearer(a_rider.access)}, **kw)
         err = assert_error(r, 403, "PERMISSION_DENIED")
-        assert err["details"].get("rider_status") == "NONE"
+        assert err["details"].get("rider_status") == "NONE", err
     assert r1.offer().json()["offer"]["id"] == ctx["offer"]["id"]
 
 
@@ -98,9 +115,17 @@ def test_p5_tc108_track_is_owner_only(r1, p5_shop_a, p5_shop_b, api):
     r1.online_at()
     ctx = bring_to("OFD", shop=p5_shop_a, rider=r1, method="ONLINE")
     assert_error(p5_shop_b.track(ctx["order_id"]), 404, "NOT_FOUND")
-    rider_as_customer = api.get(f"/api/v1/orders/{ctx['order_id']}/track/",
-                                headers={**RIDER_HEADERS, **r1.session.headers})
-    assert_error(rider_as_customer, 404, "NOT_FOUND")
+    # run 3 (DL-74 / T-219): the rider-app token is refused by the app rule before any lookup (the
+    # same 403 for every id, so nothing leaks); R1's own customer-app token gets the 404
+    rider_token = api.get(f"/api/v1/orders/{ctx['order_id']}/track/",
+                          headers={**RIDER_HEADERS, **r1.session.headers})
+    assert assert_error(rider_token, 403, "PERMISSION_DENIED")["details"]["reason"] in (
+        "WRONG_APP_TOKEN", "APP_HEADER_MISMATCH")
+    other = api.get("/api/v1/orders/999999999/track/", headers={**RIDER_HEADERS, **r1.session.headers})
+    assert other.status_code == 403 and other.json() == rider_token.json()
+    r1_customer = login(R1_PHONE)
+    assert_error(api.get(f"/api/v1/orders/{ctx['order_id']}/track/",
+                         headers={**APP_HEADERS, **bearer(r1_customer.access)}), 404, "NOT_FOUND")
 
 
 def test_p5_tc119_track_visibility_by_state(r1, p5_shop_a):
