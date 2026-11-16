@@ -7,6 +7,7 @@ This file records what is **actually set up today**, plus the target for the env
 | Environment | Status |
 |-------------|--------|
 | **local** (developer machine) | ✅ working (described below) |
+| **CI** (GitHub Actions) | ⚠️ `mobile` green on `main`; `backend` and `infra` red on `main` `8e42ec0` (2026-11-10), fixed on `devops/p8-ci` (2026-11-16): runner lacked GDAL after the PostGIS engine switch, four new settings missing from the env example, and the PowerShell restore test's exit code (§2). T-404c (2026-11-04) added parallel backend tests and the env-example and Razorpay pin checks. |
 | **CI** (GitHub Actions) | ✅ green on `main` (`.github/workflows/backend.yml`, `mobile.yml`). T-404c (2026-11-04) added parallel backend tests and the env-example and Razorpay pin checks. 2026-11-10: secret scanning (`secret-scan.yml`) and dependency advisories (`dependency-scan.yml`) added (§2.1, §2.2); not yet run on GitHub. |
 | **staging** | ⬜ **not set up.** Needs D-05 (hosting), domains/TLS, Razorpay test keys, and the Firebase staging project |
 | **production** | ⬜ **not set up** (Phase 8, [`release-checklist.md`](release-checklist.md)) |
@@ -133,6 +134,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
 - **`deploy-staging.yml`** (manual, protected branches only, environment `staging` with required reviewers, §8.4): builds the production image tagged with the checked-out commit and runs its deploy checks against the real staging env file (§8.1); the deploy step is a placeholder until D-05.
 - **`secret-scan.yml`** (every PR, pushes to `develop`/`main`, weekly, manual): gitleaks looks for committed secrets (§2.1).
 - **`dependency-scan.yml`** (PRs and pushes that change a lockfile, weekly, manual): osv-scanner looks for known vulnerabilities in the locked dependencies of the backend, both apps and the shared packages (§2.2).
+- **`release-android.yml`** (manual, protected `main`/`develop` only, environment `release`): signed prod-flavor AAB + APK per app with `--obfuscate --split-debug-info`; fails until the release secrets exist (§12).
+- **Runner system libraries:** the backend test job installs `gdal-bin`, Pango and HarfBuzz with apt (the same set as `backend/Dockerfile`), because the DB engine is PostGIS and importing Django loads libgdal. Their versions follow the pinned `ubuntu-24.04` image.
+- **PowerShell steps:** the runner wraps `shell: pwsh` scripts in `pwsh -Command` and appends `exit $LASTEXITCODE`; `pwsh -Command` turns any exit code other than 0/1 into 1. A step that runs a native command expected to fail must end with an explicit `exit 0`.
 - **Pins and local runs:**
   - Every action is pinned by commit SHA, with its version in a comment. Downloaded tools (gitleaks, osv-scanner) are pinned by version and sha256.
   - Run the scripts locally with `python3 infra/scripts/<script>.py`. They use only the standard library and support `--help`.
@@ -569,6 +573,77 @@ Kept per environment in the secrets manager; never in git or in images:
 - **`RAZORPAY_WEBHOOK_SECRET`:** §5.
 - **Database password:** set the new password on the role, update the secret, roll `web`, `worker` and `beat` in that order, then confirm no connection still uses the old one. **Least privilege:** staging and production must use a role that owns only the app's database (never a superuser), plus the separate read-only `jqc_metrics` role (§10.4).
 - After any rotation, check Sentry for auth errors, `/health/ready`, and the webhook-events list.
+
+## 12. Android release builds (Phase 8; D-06, D-11)
+
+### 12.1 What exists
+- **`.github/workflows/release-android.yml`** (manual). Inputs: `app` (`both`, `customer_app`, `rider_app`) and `build_number` (Android `versionCode`, default the run number; it must be higher than every build already uploaded to Play). The version name comes from each app's `pubspec.yaml`.
+- It builds the **prod** flavor (`in.jivo.quick`, `in.jivo.rider`) as an AAB and an APK, with `--obfuscate --split-debug-info`, and checks that both are signed with the upload key alone. It uploads the AAB, APK, Dart symbols, R8 mapping and `SHA256SUMS` as run artifacts (3-day retention).
+- It publishes nothing to Play and needs no cloud account. iOS (customer app) needs a macOS runner and an Apple account (D-11); not prepared yet.
+- **The repo is public**, so run artifacts are downloadable by any signed-in GitHub user. The bundles hold nothing the store copy doesn't; the symbols and mapping only de-obfuscate. Download them, upload the AAB to Play and the symbols to Sentry, and keep your own copies.
+
+### 12.2 One-time setup (needs the user; no cost)
+1. **Environment `release`** (Settings > Environments): required reviewers, "Prevent self-review", deployment branches `main` and `develop` only. Create it **before** adding secrets (a run that references a missing environment creates an unprotected one).
+2. **Upload keys:** one per app, generated offline by the key owner, never on a shared machine:
+   `keytool -genkeypair -v -keystore customer-upload.jks -keyalg RSA -keysize 4096 -validity 10000 -alias upload`
+   Keep the `.jks` and its passwords in Jivo's password manager (two people). With **Play App Signing** (recommended), Google holds the app-signing key and a lost upload key can be reset.
+3. **Environment secrets** in `release` (names exactly; values never in git, chat or logs):
+
+   | Secret | Customer app | Rider app |
+   |---|---|---|
+   | Keystore, `base64 -w0 <file>.jks` | `CUSTOMER_UPLOAD_KEYSTORE_BASE64` | `RIDER_UPLOAD_KEYSTORE_BASE64` |
+   | Keystore password | `CUSTOMER_UPLOAD_KEYSTORE_PASSWORD` | `RIDER_UPLOAD_KEYSTORE_PASSWORD` |
+   | Key alias | `CUSTOMER_UPLOAD_KEY_ALIAS` | `RIDER_UPLOAD_KEY_ALIAS` |
+   | Key password | `CUSTOMER_UPLOAD_KEY_PASSWORD` | `RIDER_UPLOAD_KEY_PASSWORD` |
+   | Sentry DSN (optional; warning if empty, D-19) | `CUSTOMER_SENTRY_DSN` | `RIDER_SENTRY_DSN` |
+   | Mappls config, `base64 -w0 in.jivo.quick.a.olf` / `.a.conf` (required) | `CUSTOMER_MAPPLS_OLF_BASE64`, `CUSTOMER_MAPPLS_CONF_BASE64` | n/a |
+
+4. **Environment variables** in `release`: `PROD_API_BASE_URL` (required, an https origin such as `https://api.<domain>`; waits on D-05) and `CUSTOMER_APP_LINK_HOSTS` (optional, comma-separated App Links hosts).
+5. **Mappls console:** register the prod package name with the SHA-256 of the upload certificate (printed by the workflow) and of the Play app-signing certificate (Play Console > App integrity).
+
+With any of the required items missing, the "Release configuration is complete" step fails in seconds and lists each missing secret or variable by name.
+
+### 12.3 App side (owners: `flutter-customer-dev`, `flutter-rider-dev`)
+The workflow writes `<app>/android/key.properties` (gitignored) with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. Both `android/app/build.gradle.kts` files still sign `release` with the debug key, so until they read that file the "Outputs are signed with the upload key" step fails on purpose. Needed in each app (standard Flutter pattern; keeps debug signing when the file is absent, so local `flutter run --release` still works):
+
+```kotlin
+import java.util.Properties
+
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("key.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+android {
+    signingConfigs {
+        create("release") {
+            if (!keystoreProperties.isEmpty) {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName(
+                if (keystoreProperties.isEmpty) "debug" else "release",
+            )
+        }
+    }
+}
+```
+
+### 12.4 Runbook: cut a release build
+1. Merge the release candidate to `main` (or use `develop` for an internal-testing build).
+2. Actions > `release-android` > Run workflow on that branch; choose the app and a `build_number` above the last Play upload. A `release` reviewer approves the job.
+3. Download the artifact; check `SHA256SUMS`; upload the AAB to the Play internal track (D-11), the Dart symbols and R8 mapping to Sentry (and the mapping to Play).
+4. **Rollback:** Play cannot take back an installed build. Halt the staged rollout in Play Console, then ship a fix with a higher `build_number`. Server-side, raise `min_supported_version` only once the fixed build is live.
+
+### 12.5 Rotation
+- **Upload key compromised or lost:** with Play App Signing, request an upload key reset in Play Console, generate a new key (§12.2 step 2), replace the four `*_UPLOAD_*` secrets, and re-register the new certificate SHA-256 in the Mappls console.
+- **Sentry DSN / Mappls config:** replace the secret; the next build picks it up. Older builds keep the old value until users update.
 
 ## 13. P8 drill results 2026-11-16 (staging `jqc.jivo.in`, DL-75)
 
