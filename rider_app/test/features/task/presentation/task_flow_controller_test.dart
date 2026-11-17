@@ -701,4 +701,93 @@ void main() {
       expect(state().task!.storeProgress, StoreOrderProgress.ready);
     });
   });
+
+  // Device test 2026-11-17: after "Arrived at store" succeeded (server
+  // AT_STORE) the screen still showed "Go to the store" until a manual
+  // refresh.
+  group("the rider's own action is on screen at once", () {
+    test('the answer of "Arrived" is applied when the call returns', () async {
+      await start(seeded: task(TaskStatus.assigned));
+      final states = <TaskStatus?>[];
+      c.listen(
+        taskFlowControllerProvider.select((s) => s.task?.status),
+        (_, next) => states.add(next),
+      );
+      expect(await flow().arrivedAtStore(), isTrue);
+      expect(state().task!.status, TaskStatus.atStore);
+      expect(state().busy, isNull);
+      expect(states.last, TaskStatus.atStore);
+    });
+
+    test('a later fetch that still reads the older step does not put it '
+        'back; the same answer twice is the server decides', () async {
+      await start(seeded: task(TaskStatus.assigned));
+      expect(await flow().arrivedAtStore(), isTrue);
+      final id = state().task!.id;
+
+      // A lagging read (started after the action) still says ASSIGNED.
+      server().seedTask(task(TaskStatus.assigned));
+      expect(server().task!.id, id);
+      await flow().load();
+      expect(state().task!.status, TaskStatus.atStore);
+      expect(state().refreshing, isFalse);
+
+      // Said again: 08 §3 has no way back, but the server decides.
+      await flow().load();
+      expect(state().task!.status, TaskStatus.assigned);
+    });
+
+    // Review: the "older step" memory is reset when the task leaves the
+    // screen's normal path (ended, gone), so a later lagging read is still
+    // dropped once instead of being taken as the server's word.
+    test('an ended task resets the memory: a lagging older step is still '
+        'dropped once', () async {
+      await start(seeded: task(TaskStatus.returning));
+      server().seedTask(task(TaskStatus.failed));
+      await flow().load(); // older than RETURNING: dropped, remembered
+      expect(state().task!.status, TaskStatus.returning);
+
+      server().seedTask(task(TaskStatus.returning));
+      server().markReturned();
+      await flow().load(); // ended: shown from `recent_task`
+      expect(state().task!.status, TaskStatus.returned);
+
+      server().seedTask(task(TaskStatus.failed));
+      await flow().load();
+      expect(state().task!.status, TaskStatus.returned);
+    });
+
+    test('a newer step from the server is always applied', () async {
+      await start(seeded: task(TaskStatus.assigned));
+      expect(await flow().arrivedAtStore(), isTrue);
+      server().markPacked();
+      await flow().load();
+      expect(state().task!.storeProgress, StoreOrderProgress.ready);
+      expect(state().task!.status, TaskStatus.atStore);
+    });
+
+    test('after a step-changing action the server is asked again within '
+        '${TaskFlowController.confirmAfterAction.inSeconds} s', () async {
+      await start(seeded: task(TaskStatus.assigned));
+      expect(await flow().arrivedAtStore(), isTrue);
+      int fetches() =>
+          server().calls.where((c) => c == 'fetchCurrentTask').length;
+      final before = fetches();
+      await Future<void>.delayed(
+        TaskFlowController.confirmAfterAction +
+            const Duration(milliseconds: 300),
+      );
+      expect(fetches(), before + 1);
+      expect(state().task!.status, TaskStatus.atStore);
+    });
+  });
+
+  test('TaskStatus.precedes follows 08 §3', () {
+    expect(TaskStatus.assigned.precedes(TaskStatus.atStore), isTrue);
+    expect(TaskStatus.assigned.precedes(TaskStatus.atCustomer), isTrue);
+    expect(TaskStatus.atStore.precedes(TaskStatus.assigned), isFalse);
+    expect(TaskStatus.atStore.precedes(TaskStatus.atStore), isFalse);
+    expect(TaskStatus.pickedUp.precedes(TaskStatus.returning), isTrue);
+    expect(TaskStatus.returning.precedes(TaskStatus.pickedUp), isFalse);
+  });
 }

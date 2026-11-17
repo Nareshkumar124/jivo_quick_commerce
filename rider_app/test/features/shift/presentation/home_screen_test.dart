@@ -104,6 +104,100 @@ void main() {
     expect(find.text('Before you go online'), findsOneWidget);
   });
 
+  // Device test 2026-11-17: "Go online" looked enabled (green) with
+  // permissions missing; the card only came after a tap, scrolled under the
+  // app bar.
+  group('permissions guard up front', () {
+    void resume(WidgetTester tester) {
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+    }
+
+    testWidgets('missing on load: the card shows and "Go online" is '
+        'disabled before any tap', (tester) async {
+      perms.current = freshInstall;
+      await pumpActiveHome(tester, h);
+
+      expect(byKey('shift-problem'), findsOneWidget);
+      expect(
+        textOf(tester, 'shift-problem-text'),
+        'Allow location and notifications',
+      );
+      final toggle = tester.widget<FilledButton>(byKey('shift-toggle'));
+      expect(toggle.onPressed, isNull);
+      expect(h.shift.calls, isEmpty);
+    });
+
+    testWidgets('granted in Settings: back in the app the card goes and '
+        '"Go online" is enabled', (tester) async {
+      perms.current = allGranted.copyWith(notifications: Grant.denied);
+      await pumpActiveHome(tester, h);
+      expect(byKey('shift-problem'), findsOneWidget);
+
+      perms.current = allGranted;
+      resume(tester);
+      await tester.pumpAndSettle();
+
+      expect(byKey('shift-problem'), findsNothing);
+      final toggle = tester.widget<FilledButton>(byKey('shift-toggle'));
+      expect(toggle.onPressed, isNotNull);
+    });
+
+    testWidgets('revoked while away: the card is back on return', (
+      tester,
+    ) async {
+      await pumpActiveHome(tester, h);
+      expect(byKey('shift-problem'), findsNothing);
+
+      perms.current = allGranted.copyWith(
+        locationWhenInUse: Grant.denied,
+        locationAlways: Grant.denied,
+      );
+      resume(tester);
+      await tester.pumpAndSettle();
+
+      expect(byKey('shift-problem'), findsOneWidget);
+      expect(
+        tester.widget<FilledButton>(byKey('shift-toggle')).onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets('a refused tap on a scrolled home brings the whole card into '
+        'view below the app bar', (tester) async {
+      h.surface = const Size(1080, 1500);
+      await pumpActiveHome(tester, h);
+      // Scrolled to the bottom of home: the card's place is out of view.
+      await tester.drag(byKey('home-list'), const Offset(0, -2000));
+      await tester.pumpAndSettle();
+
+      // Revoked without a return to the app: only the tap finds out.
+      perms.current = allGranted.copyWith(notifications: Grant.denied);
+      await tapToggle(tester);
+
+      expect(byKey('shift-problem'), findsOneWidget);
+      final card = tester.getRect(byKey('shift-problem'));
+      final list = tester.getRect(byKey('home-list'));
+      final appBar = tester.getRect(find.byType(AppBar));
+      expect(card.top, greaterThanOrEqualTo(appBar.bottom), reason: '$card');
+      expect(card.top, greaterThanOrEqualTo(list.top));
+      expect(card.bottom, lessThanOrEqualTo(list.bottom));
+      expect(textOf(tester, 'shift-problem-text'), isNotEmpty);
+      expect(
+        tester.widget<FilledButton>(byKey('shift-toggle')).onPressed,
+        isNull,
+      );
+    });
+  });
+
   // UX audit RA-12: "Try again" on the general guard only hid the card.
   testWidgets('an unexpected refusal: "Try again" goes online again; the '
       'close button only dismisses', (tester) async {

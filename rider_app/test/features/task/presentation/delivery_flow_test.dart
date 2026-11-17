@@ -95,19 +95,24 @@ void main() {
       await tester.enterText(byKey('pickup-code'), 'AAAA');
       await tester.pump();
       await tap(tester, 'task-pickup');
-      expect(
-        barError(tester),
-        "That code doesn't match this order. 4 tries left.",
-      );
+      // Device test 2026-11-17: said once, next to the field, not again in
+      // the action bar; the wrong code is cleared and the field focused.
+      expect(barError(tester), isNull);
       expect(
         find.text("That code doesn't match this order. 4 tries left."),
-        findsNWidgets(2),
-        reason: 'bar error and the attempts line',
+        findsOneWidget,
       );
-      // The wrong code is selected, so typing replaces it.
+      expect(byKey('pickup-attempts-left'), findsOneWidget);
       final field = tester.widget<TextField>(byKey('pickup-code'));
-      expect(field.controller!.selection.start, 0);
-      expect(field.controller!.selection.end, 4);
+      expect(field.controller!.text, isEmpty);
+      expect(field.focusNode!.hasFocus, isTrue);
+      // Typing again keeps the tries left on screen.
+      await tester.enterText(byKey('pickup-code'), 'B');
+      await tester.pump();
+      expect(
+        find.text("That code doesn't match this order. 4 tries left."),
+        findsOneWidget,
+      );
 
       await tap(tester, 'pickup-scan');
       await tap(tester, 'fake-scan-HELLO-WORLD');
@@ -204,6 +209,23 @@ void main() {
   });
 
   group('delivery OTP', () {
+    // Device test 2026-11-17: the keyboard offered "-", "," and ".".
+    testWidgets('digits only: a number pad without sign or decimal, '
+        'anything else dropped, 4 at most', (tester) async {
+      await resume(tester, TaskStatus.atCustomer);
+      final field = tester.widget<TextField>(byKey('delivery-otp'));
+      expect(field.keyboardType, const TextInputType.numberWithOptions());
+      expect(field.keyboardType.signed, isFalse);
+      expect(field.keyboardType.decimal, isFalse);
+
+      await tester.enterText(byKey('delivery-otp'), '1-2.3,4 5');
+      await tester.pump();
+      expect(field.controller!.text, '1234');
+      await tester.enterText(byKey('delivery-otp'), '123456');
+      await tester.pump();
+      expect(field.controller!.text, '1234');
+    });
+
     testWidgets('prepaid: wrong code shows attempts left, right code '
         'delivers', (tester) async {
       await resume(tester, TaskStatus.atCustomer);

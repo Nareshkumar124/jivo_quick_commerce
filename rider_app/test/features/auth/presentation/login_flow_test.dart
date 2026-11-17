@@ -56,6 +56,66 @@ void main() {
       );
     });
 
+    // Device test 2026-11-17: the field turned red while the number was
+    // still being typed, and the title went under the status bar with the
+    // keyboard open.
+    testWidgets('no error state while typing; a complete invalid number '
+        'says why at once', (tester) async {
+      await h.pump(tester);
+      String? errorText() =>
+          tester.widget<TextField>(phoneField()).decoration!.errorText;
+
+      for (final partial in ['9', '98765', '987654321']) {
+        await tester.enterText(phoneField(), partial);
+        await tester.pump();
+        expect(errorText(), isNull, reason: partial);
+      }
+
+      // After a refused submit, typing clears the error until complete.
+      await tester.tap(getOtp());
+      await tester.pump();
+      expect(errorText(), 'Enter all 10 digits.');
+      await tester.enterText(phoneField(), '98765432');
+      await tester.pump();
+      expect(errorText(), isNull);
+
+      await tester.enterText(phoneField(), '5876543210');
+      await tester.pump();
+      expect(
+        errorText(),
+        'Enter a valid Indian mobile number starting with 6, 7, 8 or 9.',
+      );
+      await tester.enterText(phoneField(), '9876543210');
+      await tester.pump();
+      expect(errorText(), isNull);
+      expect(h.backend.calls, isEmpty);
+    });
+
+    testWidgets('keyboard open: the title stays fully in view above the '
+        'number field', (tester) async {
+      await h.pump(tester);
+      // A 360x640 dp phone with a 300 dp keyboard.
+      tester.view.physicalSize = const Size(1080, 1920);
+      tester.view.devicePixelRatio = 3;
+      tester.view.padding = const FakeViewPadding(top: 72);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+      addTearDown(tester.view.reset);
+      await tester.enterText(phoneField(), '98765');
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      final title = tester.getRect(find.byKey(const Key('login-title')));
+      final field = tester.getRect(phoneField());
+      expect(
+        title.top,
+        greaterThanOrEqualTo(24),
+        reason: 'below the status bar',
+      );
+      expect(field.top, greaterThan(title.bottom));
+      expect(field.bottom, lessThanOrEqualTo(640 - 300));
+      expect(find.text('Log in to Jivo Rider'), findsOneWidget);
+    });
+
     testWidgets('only digits, at most 10, behind a fixed +91', (tester) async {
       await h.pump(tester);
       await tester.enterText(phoneField(), '98a76-54321099');

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PLACEHOLDER launcher icon until Jivo supplies the logo (H-19, D-06):
+     white "JR" (Jivo Rider) on the brand green background. Keep inside the
+     66 dp safe zone (21..87 of the 108 viewport). The legacy PNGs in
+     mipmap-*/ic_launcher.png are generated from the same shapes by
+     rider_app/tool/gen_placeholder_launcher_icon.py. Replace all of them,
+     and ic_stat_rider.xml, with the brand assets. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- J: cap, stem and hook -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M34,32H51V39H34Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M44,32H51V64A11,11 0,0 1,29 64V60H36V64A4,4 0,0 0,44 64Z" />
+    <!-- R: stem, bowl and leg -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M58,32H65V75H58Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M65,32H70A10,10 0,0 1,70 52H65V45H70A3,3 0,0 0,70 39H65Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M67,52H75L82,75H74Z" />
+</vector>

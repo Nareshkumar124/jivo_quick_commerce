@@ -292,12 +292,11 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
     if (error != null &&
         (error.riderCode == RiderErrorCode.pickupCodeInvalid ||
             error.code == ApiErrorCode.validationError)) {
-      // Wrong code: select it all so typing replaces it (pickup.md §2).
+      // Wrong code: clear it and focus the field for the next try, as the
+      // delivery OTP does (device test 2026-11-17; pickup.md §2). The
+      // message stays next to the field until the rider types.
       unawaited(HapticFeedback.mediumImpact());
-      _code.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _code.text.length,
-      );
+      setState(_code.clear);
       _focus.requestFocus();
     }
   }
@@ -319,6 +318,21 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
     final scanButtonLabel = Text(l10n.pickupScan);
     const scanIcon = Icon(Icons.qr_code_scanner);
 
+    // A wrong code is said once, next to the field (with the tries left),
+    // not again in the action bar (device test 2026-11-17).
+    final wrongCode = state.error?.riderCode == RiderErrorCode.pickupCodeInvalid
+        ? taskErrorText(context, state.error!, action: TaskAction.pickup)
+        : null;
+    final left = state.pickupAttemptsRemaining;
+    final fieldMessage =
+        wrongCode ??
+        (left != null && left < kMaxPickupAttempts
+            ? l10n.pickupCodeWrongLeft(left)
+            : null);
+    final barError = wrongCode != null
+        ? null
+        : taskStepError(context, state, action: TaskAction.pickup);
+
     final PrimaryActionBar actions;
     if (complete) {
       actions = PrimaryActionBar(
@@ -327,7 +341,7 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
         busy: busy,
         onPressed: () => _confirm(_code.text),
         errorKey: const Key('task-error'),
-        error: taskStepError(context, state, action: TaskAction.pickup),
+        error: barError,
         secondary: [
           OutlinedButton.icon(
             key: const Key('pickup-scan'),
@@ -338,7 +352,7 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
         ],
       );
     } else {
-      final error = taskStepError(context, state, action: TaskAction.pickup);
+      final error = barError;
       actions = PrimaryActionBar(
         buttonKey: const Key('pickup-scan'),
         label: l10n.pickupScan,
@@ -371,12 +385,11 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
         const SizedBox(height: 16),
         Text(l10n.pickupCodeHelp, style: theme.textTheme.bodyLarge),
         const SizedBox(height: 8),
-        if (state.pickupAttemptsRemaining case final left?
-            when left < kMaxPickupAttempts)
+        if (fieldMessage != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              l10n.pickupCodeWrongLeft(left),
+              fieldMessage,
               key: const Key('pickup-attempts-left'),
               style: TextStyle(
                 fontSize: 18,

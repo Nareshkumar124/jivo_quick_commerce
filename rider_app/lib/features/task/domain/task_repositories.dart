@@ -158,14 +158,21 @@ class LocationUnavailable implements Exception {
   const LocationUnavailable();
 }
 
-/// Rings and vibrates for an offer through the high-priority offer channel
-/// (04 §2.4), also over the lock screen.
+/// Rings and vibrates for an offer (04 §2.4), also over the lock screen.
+///
+/// [ring] with `inForeground: false` posts the high-priority offer
+/// notification (heads-up, full-screen intent over the lock screen). With
+/// `inForeground: true` the offer screen is in front: the same sound and
+/// vibration play in the app and no heads-up is posted (one already posted
+/// is removed), so nothing covers the title and countdown (device test
+/// 2026-11-17). Calling it again for the same offer switches between the two.
 abstract interface class OfferAlerter {
   Future<void> ring(
     DeliveryOffer offer, {
     required String title,
     required String body,
     required Duration timeout,
+    required bool inForeground,
   });
 
   Future<void> stop();

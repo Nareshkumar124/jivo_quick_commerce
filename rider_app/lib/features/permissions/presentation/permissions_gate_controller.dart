@@ -95,8 +95,8 @@ class PermissionsGateController extends AsyncNotifier<GateEvaluation> {
     ref.read(disclosureAcceptedProvider.notifier).accept();
     ref.read(gateNoticesProvider.notifier).set(disclosureDeclined: false);
     final evaluation = await refresh();
-    final next = evaluation.next;
-    if (next != null && next.step != GateStep.disclosure) await fix(next);
+    final next = evaluation.nextAfterDisclosure;
+    if (next != null) await fix(next);
   }
 
   /// The rider declined the disclosure: no location request is made (Play

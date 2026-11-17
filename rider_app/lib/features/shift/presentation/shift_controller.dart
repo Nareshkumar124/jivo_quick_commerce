@@ -274,17 +274,48 @@ class ShiftController extends Notifier<ShiftState> {
       // On a task without tracking (an earlier resume found no network):
       // ask the server again.
       await _resumeForTask();
-    } else if (state.problem == ShiftProblem.permissionsMissing) {
-      // Back from Settings: clear the guard once the gate passes.
-      try {
-        final gate = await ref
-            .read(permissionsGateControllerProvider.notifier)
-            .refresh();
-        if (ref.mounted && gate.canGoOnline) dismissProblem();
-      } on Object catch (error) {
-        debugPrint('ShiftController.sync: gate: $error');
-      }
+    } else if (state.problem == null ||
+        state.problem == ShiftProblem.permissionsMissing) {
+      await checkPermissions();
     }
+  }
+
+  /// Offline: reads the permissions gate live and shows (or clears) the
+  /// permissions guard up front, so "Go online" is disabled before the
+  /// rider taps it (device test 2026-11-17). Runs on home load and on
+  /// every return to the app; the tap itself checks again ([goOnline]).
+  /// Never replaces another notice (auto-offline, a server refusal).
+  Future<void> checkPermissions() async {
+    if (state.phase != ShiftPhase.offline || state.busy) return;
+    final GateEvaluation gate;
+    try {
+      gate = await ref
+          .read(permissionsGateControllerProvider.notifier)
+          .refresh();
+    } on Object catch (error) {
+      debugPrint('ShiftController.checkPermissions: $error');
+      return;
+    }
+    if (!ref.mounted || state.phase != ShiftPhase.offline || state.busy) {
+      return;
+    }
+    final problem = state.problem;
+    if (gate.canGoOnline) {
+      // Back from Settings: clear the guard once the gate passes.
+      if (problem == ShiftProblem.permissionsMissing) dismissProblem();
+      return;
+    }
+    if (problem != null && problem != ShiftProblem.permissionsMissing) return;
+    final step = gate.next?.step;
+    if (problem == ShiftProblem.permissionsMissing &&
+        state.missingStep == step) {
+      return;
+    }
+    state = ShiftState(
+      problem: ShiftProblem.permissionsMissing,
+      missingStep: step,
+      endPending: state.endPending,
+    );
   }
 
   /// The service runs: ask the server whether the shift is still on

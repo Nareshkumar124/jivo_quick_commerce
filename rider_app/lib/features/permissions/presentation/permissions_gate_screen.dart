@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +12,9 @@ import 'permissions_gate_controller.dart';
 
 /// Permissions checklist the rider must clear before going online (04 §2.1).
 /// One primary action at a time: the button always fixes the next missing
-/// item. Re-checks when the rider comes back from a settings page.
+/// item. Every row is read live from the OS each time the screen is shown
+/// and on every return to the app (from a settings page or elsewhere): an
+/// earlier answer is never shown as current (device test 2026-11-17).
 class PermissionsGateScreen extends ConsumerStatefulWidget {
   const PermissionsGateScreen({super.key});
 
@@ -22,13 +26,29 @@ class PermissionsGateScreen extends ConsumerStatefulWidget {
 class _PermissionsGateScreenState extends ConsumerState<PermissionsGateScreen> {
   late final AppLifecycleListener _lifecycle;
 
+  /// The first live read since this screen opened has answered. Until then
+  /// a spinner shows, never the evaluation an earlier screen left behind.
+  bool _fresh = false;
+
   PermissionsGateController get _controller =>
       ref.read(permissionsGateControllerProvider.notifier);
 
   @override
   void initState() {
     super.initState();
-    _lifecycle = AppLifecycleListener(onResume: () => _controller.refresh());
+    _lifecycle = AppLifecycleListener(onResume: _recheck);
+    _recheck();
+  }
+
+  void _recheck() {
+    unawaited(
+      _controller
+          .refresh()
+          .then<void>((_) {}, onError: (Object _) {})
+          .whenComplete(() {
+            if (mounted && !_fresh) setState(() => _fresh = true);
+          }),
+    );
   }
 
   @override
@@ -68,6 +88,7 @@ class _PermissionsGateScreenState extends ConsumerState<PermissionsGateScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.permissionsTitle)),
       body: switch (gate) {
+        _ when !_fresh => const Center(child: CircularProgressIndicator()),
         AsyncData(:final value) => _GateBody(
           evaluation: value,
           notices: notices,

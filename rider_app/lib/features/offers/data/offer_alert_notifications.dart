@@ -155,6 +155,10 @@ class OfferAlertNotifications {
   /// The notification id of real offers (one offer at a time).
   static const offerNotificationId = 9002;
 
+  /// Removes the real offer's notification only (its sound stops with it).
+  /// The app keeps showing over the lock screen: the offer screen is open.
+  Future<void> cancelOffer() => _plugin.cancel(id: offerNotificationId);
+
   /// Removes the alert and stops showing the app over the lock screen.
   Future<void> dismiss({int id = testNotificationId}) async {
     await _plugin.cancel(id: id);

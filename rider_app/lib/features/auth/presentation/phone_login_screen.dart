@@ -31,8 +31,25 @@ class PhoneLoginScreen extends ConsumerStatefulWidget {
 class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
   final _phone = TextEditingController();
 
-  /// Shown only after the rider tried to continue.
+  /// Shown only after the rider tried to continue, or for a complete
+  /// 10-digit number that can't be an Indian mobile. Never while a number
+  /// is still being typed (device test 2026-11-17: the field went red
+  /// mid-typing).
   PhoneInputError? _inputError;
+
+  /// Below this height (the keyboard is open on a phone) the logo is left
+  /// out, so the title and the number field both stay in view.
+  static const _compactHeight = 520.0;
+
+  /// National digits of an Indian mobile number (after +91).
+  static const _phoneDigits = 10;
+
+  void _onPhoneChanged(String value) {
+    final complete = value.length == _phoneDigits;
+    final error = complete ? IndianMobile.validate(value) : null;
+    if (error != _inputError) setState(() => _inputError = error);
+    ref.read(phoneLoginControllerProvider.notifier).clearError();
+  }
 
   @override
   void dispose() {
@@ -72,118 +89,135 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: ListView(
-                  children: [
-                    const SizedBox(height: 24),
-                    Icon(
-                      Icons.delivery_dining,
-                      size: 64,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(l10n.loginTitle, style: theme.textTheme.headlineSmall),
-                    const SizedBox(height: 8),
-                    Text(l10n.loginSubtitle, style: theme.textTheme.bodyLarge),
-                    if (expired) ...[
-                      const SizedBox(height: 16),
-                      Card(
-                        color: theme.colorScheme.secondaryContainer,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: wrongApp
-                              ? Text(
-                                  l10n.wrongAppError,
-                                  key: const Key('login-wrong-app'),
-                                )
-                              : Text(
-                                  l10n.loginSessionExpired,
-                                  key: const Key('login-session-expired'),
-                                ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    TextField(
-                      key: const Key('login-phone'),
-                      controller: _phone,
-                      autofocus: true,
-                      keyboardType: TextInputType.phone,
-                      textInputAction: TextInputAction.done,
-                      autofillHints: const [
-                        AutofillHints.telephoneNumberNational,
-                      ],
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(10),
-                      ],
-                      style: theme.textTheme.headlineSmall,
-                      decoration: InputDecoration(
-                        labelText: l10n.loginPhoneLabel,
-                        hintText: l10n.loginPhoneHint,
-                        prefixText: '+91 ',
-                        errorText: _inputErrorText(l10n),
-                      ),
-                      onChanged: (_) {
-                        if (_inputError != null) {
-                          setState(() => _inputError = null);
-                        }
-                        ref
-                            .read(phoneLoginControllerProvider.notifier)
-                            .clearError();
-                      },
-                      onSubmitted: (_) => _submit(),
-                    ),
-                    if (serverError != null) ...[
-                      const SizedBox(height: 12),
-                      ErrorLine(
-                        authErrorText(context, serverError),
-                        textKey: const Key('login-error'),
-                      ),
-                    ],
-                  ],
+        child: LayoutBuilder(
+          builder: (context, constraints) => Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // The title sits above the scrolling part: with the keyboard
+                // open the field scrolls into view without pushing the title
+                // under the status bar (device test 2026-11-17). The logo
+                // scrolls, and is left out when the keyboard leaves little
+                // room.
+                Text(
+                  l10n.loginTitle,
+                  key: const Key('login-title'),
+                  style: theme.textTheme.headlineSmall,
                 ),
-              ),
-              // The consent and the button never take more than half the
-              // screen; at 200 % text they scroll, button kept last (RA-03).
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.sizeOf(context).height * 0.5,
-                ),
-                child: SingleChildScrollView(
-                  reverse: true,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView(
+                    key: const Key('login-list'),
                     children: [
-                      if (policies != null)
-                        _ConsentText(
-                          terms: Uri.tryParse(policies.terms),
-                          privacy: Uri.tryParse(policies.privacy),
+                      if (constraints.maxHeight >= _compactHeight) ...[
+                        const SizedBox(height: 8),
+                        Icon(
+                          Icons.delivery_dining,
+                          size: 64,
+                          color: theme.colorScheme.primary,
                         ),
-                      const SizedBox(height: 8),
-                      FilledButton(
-                        key: const Key('login-get-otp'),
-                        onPressed: state.submitting ? null : _submit,
-                        child: state.submitting
-                            ? const SizedBox.square(
-                                dimension: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 3,
-                                ),
-                              )
-                            : Text(l10n.loginGetOtp),
+                        const SizedBox(height: 16),
+                      ],
+                      Text(
+                        l10n.loginSubtitle,
+                        style: theme.textTheme.bodyLarge,
                       ),
+                      if (expired) ...[
+                        const SizedBox(height: 16),
+                        Card(
+                          color: theme.colorScheme.secondaryContainer,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: wrongApp
+                                ? Text(
+                                    l10n.wrongAppError,
+                                    key: const Key('login-wrong-app'),
+                                  )
+                                : Text(
+                                    l10n.loginSessionExpired,
+                                    key: const Key('login-session-expired'),
+                                  ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      TextField(
+                        key: const Key('login-phone'),
+                        controller: _phone,
+                        autofocus: true,
+                        keyboardType: TextInputType.phone,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [
+                          AutofillHints.telephoneNumberNational,
+                        ],
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(_phoneDigits),
+                        ],
+                        // Room for the error line under the field.
+                        scrollPadding: const EdgeInsets.fromLTRB(
+                          20,
+                          20,
+                          20,
+                          64,
+                        ),
+                        style: theme.textTheme.headlineSmall,
+                        decoration: InputDecoration(
+                          labelText: l10n.loginPhoneLabel,
+                          hintText: l10n.loginPhoneHint,
+                          prefixText: '+91 ',
+                          errorText: _inputErrorText(l10n),
+                        ),
+                        onChanged: _onPhoneChanged,
+                        onSubmitted: (_) => _submit(),
+                      ),
+                      if (serverError != null) ...[
+                        const SizedBox(height: 12),
+                        ErrorLine(
+                          authErrorText(context, serverError),
+                          textKey: const Key('login-error'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ),
-            ],
+                // The consent and the button never take more than half the
+                // screen; at 200 % text they scroll, button kept last (RA-03).
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: constraints.maxHeight * 0.4,
+                  ),
+                  child: SingleChildScrollView(
+                    reverse: true,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (policies != null)
+                          _ConsentText(
+                            terms: Uri.tryParse(policies.terms),
+                            privacy: Uri.tryParse(policies.privacy),
+                          ),
+                        const SizedBox(height: 8),
+                        FilledButton(
+                          key: const Key('login-get-otp'),
+                          onPressed: state.submitting ? null : _submit,
+                          child: state.submitting
+                              ? const SizedBox.square(
+                                  dimension: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 3,
+                                  ),
+                                )
+                              : Text(l10n.loginGetOtp),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

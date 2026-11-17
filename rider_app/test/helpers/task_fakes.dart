@@ -27,6 +27,9 @@ class FakeLocationReader implements CurrentLocationReader {
 /// Records rings instead of posting notifications.
 class RecordingOfferAlerter implements OfferAlerter {
   final rings = <(int, Duration)>[];
+
+  /// `inForeground` of each ring, in order (same length as [rings]).
+  final ringsInForeground = <bool>[];
   int stops = 0;
 
   @override
@@ -35,7 +38,11 @@ class RecordingOfferAlerter implements OfferAlerter {
     required String title,
     required String body,
     required Duration timeout,
-  }) async => rings.add((offer.id, timeout));
+    required bool inForeground,
+  }) async {
+    rings.add((offer.id, timeout));
+    ringsInForeground.add(inForeground);
+  }
 
   @override
   Future<void> stop() async => stops++;

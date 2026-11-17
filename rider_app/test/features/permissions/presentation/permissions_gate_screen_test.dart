@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:jivo_core/helpers.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rider_app/app/app.dart';
@@ -110,5 +111,66 @@ void main() {
     expect(find.text('Full-screen order alerts'), findsOneWidget);
     await tester.tap(find.text('Allow full-screen alerts'));
     verify(() => perms.service.openFullScreenIntentSettings()).called(1);
+  });
+
+  // Device test 2026-11-17: "Location access: Done" while Android had no
+  // location permission. Every row is read live when the screen is shown
+  // and on every return to the app.
+  group('rows follow the live OS state', () {
+    String statusOf(WidgetTester tester, String step) {
+      final row = find.byKey(Key('gate-row-$step'));
+      for (final text in ['Done', 'Needed', 'Blocked: open settings']) {
+        if (find
+            .descendant(of: row, matching: find.text(text))
+            .evaluate()
+            .isNotEmpty) {
+          return text;
+        }
+      }
+      return '?';
+    }
+
+    final revoked = allGranted.copyWith(
+      locationWhenInUse: Grant.denied,
+      locationAlways: Grant.denied,
+    );
+
+    testWidgets('location revoked while away: "Needed" on return', (
+      tester,
+    ) async {
+      await pumpGate(tester, allGranted);
+      expect(statusOf(tester, 'locationWhenInUse'), 'Done');
+
+      perms.current = revoked;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(statusOf(tester, 'disclosure'), 'Needed');
+      expect(statusOf(tester, 'locationWhenInUse'), 'Needed');
+      expect(statusOf(tester, 'locationAlways'), 'Needed');
+      expect(find.text('All set. You can go online.'), findsNothing);
+    });
+
+    testWidgets('opening the checklist again never shows the earlier answer', (
+      tester,
+    ) async {
+      await pumpGate(tester, allGranted);
+      expect(statusOf(tester, 'locationWhenInUse'), 'Done');
+
+      perms.current = revoked;
+      GoRouter.of(tester.element(primary())).push(Routes.permissions);
+      await tester.pump();
+      // Before the live read answers: a spinner, not the stale "Done".
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      expect(statusOf(tester, 'locationWhenInUse'), 'Needed');
+      expect(statusOf(tester, 'disclosure'), 'Needed');
+    });
   });
 }

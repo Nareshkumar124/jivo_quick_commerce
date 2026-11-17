@@ -268,11 +268,45 @@ bool guardBlocksGoingOnline(HomeGuard? guard) =>
     guard == HomeGuard.permissions ||
     guard == HomeGuard.gps;
 
-class GuardCard extends ConsumerWidget {
+class GuardCard extends ConsumerStatefulWidget {
   const GuardCard({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GuardCard> createState() => _GuardCardState();
+}
+
+class _GuardCardState extends ConsumerState<GuardCard> {
+  /// Brings the whole card (not only its button) into view below the app
+  /// bar when it appears or changes, e.g. after a refused "Go online" on a
+  /// scrolled home (device test 2026-11-17). A card already in view stays
+  /// where it is.
+  void _revealAfterLayout() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_reveal()));
+  }
+
+  Future<void> _reveal() async {
+    // Bottom edge first (a card below the fold), then the top edge, so a
+    // card taller than the viewport shows its title.
+    for (final policy in const [
+      ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+      ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+    ]) {
+      if (!mounted) return;
+      final box = context.findRenderObject();
+      if (box is! RenderBox || !box.hasSize || box.size.isEmpty) return;
+      await Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 150),
+        alignmentPolicy: policy,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(shiftControllerProvider.select(homeGuardOf), (previous, next) {
+      if (next != null && next != previous) _revealAfterLayout();
+    });
     final state = ref.watch(shiftControllerProvider);
     final guard = homeGuardOf(state);
     if (guard == null) return const SizedBox.shrink();

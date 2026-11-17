@@ -34,7 +34,13 @@ void main() {
       final steps = <GateStep?>[];
       var s = freshInstall;
       steps.add(nextStep(s));
-      steps.add(nextStep(s, disclosure: true));
+      // Accepting the disclosure leads to the location prompt.
+      steps.add(
+        PermissionGate.evaluate(
+          s,
+          disclosureAccepted: true,
+        ).nextAfterDisclosure?.step,
+      );
       s = s.copyWith(locationWhenInUse: Grant.granted);
       steps.add(nextStep(s, disclosure: true));
       s = s.copyWith(locationAlways: Grant.granted);
@@ -96,10 +102,41 @@ void main() {
 
     test('permanently denied items are flagged for the settings page', () {
       final s = freshInstall.copyWith(locationWhenInUse: Grant.blocked);
-      final next = PermissionGate.evaluate(s, disclosureAccepted: true).next!;
+      final gate = PermissionGate.evaluate(s, disclosureAccepted: true);
+      final next = gate.nextAfterDisclosure!;
 
       expect(next.step, GateStep.locationWhenInUse);
       expect(next.blocked, isTrue);
+    });
+
+    // Device test 2026-11-17: the checklist said "Done" for the disclosure
+    // and for location while Android had no location permission at all.
+    group('"Done" only for what is really granted', () {
+      test('an accepted disclosure is not "Done" while location is not '
+          'granted (refused, or revoked later)', () {
+        for (final grant in [Grant.denied, Grant.blocked]) {
+          final s = allGranted.copyWith(
+            locationWhenInUse: grant,
+            locationAlways: grant,
+          );
+          final gate = PermissionGate.evaluate(s, disclosureAccepted: true);
+          GateItem item(GateStep step) =>
+              gate.items.firstWhere((i) => i.step == step);
+
+          expect(item(GateStep.disclosure).done, isFalse, reason: '$grant');
+          expect(item(GateStep.locationWhenInUse).done, isFalse);
+          expect(item(GateStep.locationAlways).done, isFalse);
+          expect(gate.canGoOnline, isFalse);
+          expect(gate.next!.step, GateStep.disclosure);
+        }
+      });
+
+      test('the disclosure is "Done" once accepted and location granted', () {
+        final s = freshInstall.copyWith(locationWhenInUse: Grant.granted);
+        final gate = PermissionGate.evaluate(s, disclosureAccepted: true);
+        expect(gate.items.first.done, isTrue);
+        expect(gate.next!.step, GateStep.locationAlways);
+      });
     });
 
     test('a missing full-screen-intent permission is advisory on Android '

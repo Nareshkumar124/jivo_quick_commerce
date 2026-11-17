@@ -176,7 +176,10 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
             controller: _otp,
             focusNode: _otpFocus,
             autofocus: true,
-            keyboardType: TextInputType.number,
+            // Digits only (device test 2026-11-17): no sign, no decimal
+            // point. Keyboards may still draw "-", "," and "." keys on a
+            // number pad; the digits-only formatter drops them.
+            keyboardType: const TextInputType.numberWithOptions(),
             autocorrect: false,
             enableSuggestions: false,
             textAlign: TextAlign.center,
