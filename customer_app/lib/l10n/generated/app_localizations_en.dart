@@ -2471,4 +2471,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String bannerSemanticsOf(String title, int index, int count) {
     return 'Offer: $title, banner $index of $count';
   }
+
+  @override
+  String get pushChannelOrdersName => 'Order updates';
+
+  @override
+  String get pushChannelOrdersDescription =>
+      'Order status, delivery and support replies';
+
+  @override
+  String get pushChannelGeneralName => 'Offers and news';
+
+  @override
+  String get pushChannelGeneralDescription =>
+      'Offers, new products and other messages from Jivo';
 }

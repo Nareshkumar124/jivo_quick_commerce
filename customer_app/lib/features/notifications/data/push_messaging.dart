@@ -2,11 +2,12 @@ import 'dart:async';
 
 /// The push channel (FCM, D-19): the device token and notification taps.
 ///
-/// The app talks to this interface only. Until the Firebase projects exist
-/// (D-19, Phase 6) the build uses [NoopPushMessaging]: no token, no taps,
-/// so nothing is registered and nothing is routed. The Firebase adapter
-/// (`firebase_messaging`) implements this interface when the projects and
-/// their per-flavor config land; nothing else changes.
+/// The app talks to this interface only. A build with the flavor's
+/// `google-services.json` uses `FirebasePushMessaging`
+/// (`firebase_push_messaging.dart`, chosen by `initializePush()` at
+/// start-up). A build without it (CI, a flavor whose Firebase project
+/// doesn't exist yet) uses [NoopPushMessaging]: no token, no taps, so
+/// nothing is registered and nothing is routed.
 abstract interface class PushMessaging {
   /// Whether this build has a push provider configured.
   bool get isConfigured;
@@ -21,6 +22,11 @@ abstract interface class PushMessaging {
 
   /// New tokens after a rotation.
   Stream<String> get onTokenRefresh;
+
+  /// Drops this device's token (after sign-out), so pushes meant for the
+  /// signed-out user stop arriving even if the server was not told. The
+  /// next [getToken] returns a new token.
+  Future<void> deleteToken();
 
   /// The data payload of a notification the user tapped while the app was
   /// running or in the background (`08 §9`, api-requests #30).
@@ -47,6 +53,9 @@ class NoopPushMessaging implements PushMessaging {
   Stream<String> get onTokenRefresh => const Stream.empty();
 
   @override
+  Future<void> deleteToken() async {}
+
+  @override
   Stream<Map<String, Object?>> get onNotificationTap => const Stream.empty();
 
   @override
@@ -61,6 +70,7 @@ class FakePushMessaging implements PushMessaging {
   Map<String, Object?>? initialNotification;
   bool permissionGranted = true;
   int permissionRequests = 0;
+  int tokenDeletions = 0;
 
   final _refresh = StreamController<String>.broadcast();
   final _taps = StreamController<Map<String, Object?>>.broadcast();
@@ -90,6 +100,13 @@ class FakePushMessaging implements PushMessaging {
 
   @override
   Future<String?> getToken() async => token;
+
+  /// Like FCM, the next [getToken] after a delete returns a new token.
+  @override
+  Future<void> deleteToken() async {
+    tokenDeletions++;
+    if (token != null) token = 'tok-new-$tokenDeletions';
+  }
 
   @override
   Stream<String> get onTokenRefresh => _refresh.stream;

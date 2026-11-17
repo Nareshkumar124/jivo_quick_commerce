@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,13 +9,17 @@ import '../../../app/redirect.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
+import '../../notifications/presentation/push_registration.dart';
 import '../../orders/domain/order.dart';
 import '../../orders/presentation/order_providers.dart';
 
 /// Order placed (`03 §2.9`, screen #24): animation, order number, ETA and
 /// "Track order". Reached only after the server confirmed the order. Back
 /// goes Home, never to checkout.
-class OrderSuccessScreen extends ConsumerWidget {
+///
+/// The first time it opens on this install it asks for notification
+/// permission (order updates are the reason to allow them, `03 §2.12`).
+class OrderSuccessScreen extends ConsumerStatefulWidget {
   const OrderSuccessScreen({required this.orderId, this.order, super.key});
 
   final int orderId;
@@ -23,9 +29,28 @@ class OrderSuccessScreen extends ConsumerWidget {
   final PlacedOrder? order;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrderSuccessScreen> createState() => _OrderSuccessScreenState();
+}
+
+class _OrderSuccessScreenState extends ConsumerState<OrderSuccessScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        ref
+            .read(pushPermissionPromptProvider)
+            .maybeAsk(PushPermissionMoment.firstOrder),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final orderId = widget.orderId;
     final l10n = AppLocalizations.of(context);
-    final known = order;
+    final known = widget.order;
     final Widget body;
     if (known != null) {
       body = _Confirmed(order: known);

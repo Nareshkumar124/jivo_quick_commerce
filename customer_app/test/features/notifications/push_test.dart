@@ -128,7 +128,9 @@ void main() {
         platform: 'android',
         appVersion: '1.0.0+1',
       ));
-      expect(messaging.permissionRequests, 1);
+      // No prompt given: permission is asked by PushPermissionPrompt
+      // (fcm_push_test.dart).
+      expect(messaging.permissionRequests, 0);
     });
 
     test('signed in at start: registers once; a refresh re-registers', () async {
@@ -168,7 +170,8 @@ void main() {
       await session.signIn(signedInTokens);
       await settle();
       await settle();
-      expect(devices.calls, hasLength(2));
+      // The local token was deleted at sign-out: a new one is registered.
+      expect(devices.calls.map((c) => c.fcmToken), ['tok-1', 'tok-new-1']);
     });
 
     test('no push provider: no permission prompt, no call', () async {

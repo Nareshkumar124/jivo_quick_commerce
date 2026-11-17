@@ -1343,5 +1343,13 @@
 "detectingLocation": "Finding your location… This can take a few seconds.",
   "@detectingLocation": {"description": "Under Detect my location while GPS runs (CA-09)."},
   "bannerSemanticsOf": "Offer: {title}, banner {index} of {count}",
-  "@bannerSemanticsOf": {"description": "Screen-reader label of a home banner with its position (CA-16).", "placeholders": {"title": {"type": "String"}, "index": {"type": "int"}, "count": {"type": "int"}}}
+  "@bannerSemanticsOf": {"description": "Screen-reader label of a home banner with its position (CA-16).", "placeholders": {"title": {"type": "String"}, "index": {"type": "int"}, "count": {"type": "int"}}},
+  "pushChannelOrdersName": "Order updates",
+  "@pushChannelOrdersName": {"description": "Android notification channel name (system settings) for order status, delivery and support replies."},
+  "pushChannelOrdersDescription": "Order status, delivery and support replies",
+  "@pushChannelOrdersDescription": {"description": "Android notification channel description for the orders channel."},
+  "pushChannelGeneralName": "Offers and news",
+  "@pushChannelGeneralName": {"description": "Android notification channel name for promotions and other messages."},
+  "pushChannelGeneralDescription": "Offers, new products and other messages from Jivo",
+  "@pushChannelGeneralDescription": {"description": "Android notification channel description for the general channel."}
 }
