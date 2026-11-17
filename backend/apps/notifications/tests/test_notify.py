@@ -200,7 +200,11 @@ def test_rider_task_events_use_task_updated(run_on_commit):
             "ref": "7001:250.00",
         },
     )
-    assert push.outbox[0].data == {"type": "task.updated", "task_id": "7001"}
+    assert push.outbox[0].data == {
+        "type": "task.updated",
+        "task_id": "7001",
+        "link": "jivo://rider/task",
+    }
     assert "₹250.00" in push.outbox[0].body
 
 
@@ -445,6 +449,11 @@ def test_fcm_payload_falls_back_to_the_link():
     assert services.fcm_payload("rider", {"type": "task.updated", "task_id": "3"}) == {
         "type": "task.updated",
         "task_id": "3",
+    }
+    rider_cash = {"type": "cash.updated", "link": "jivo://rider/cash", "event": "x"}
+    assert services.fcm_payload("rider", rider_cash) == {
+        "type": "cash.updated",
+        "link": "jivo://rider/cash",
     }
 
 
@@ -699,7 +708,10 @@ def test_support_reply_specs_and_fcm_ticket_id(user, run_on_commit, event, app, 
     assert "TK-000077" in notification.body
     [message] = push.outbox
     assert len(message.tokens) == 1  # only the device of that app
-    assert message.data == {"type": "ticket", "ticket_id": "77"}
+    expected = {"type": "ticket", "ticket_id": "77"}
+    if app == "rider":  # rider payloads carry the link too (PM 2026-11-17)
+        expected["link"] = link.format(id=77)
+    assert message.data == expected
     assert sms.outbox == []
 
 

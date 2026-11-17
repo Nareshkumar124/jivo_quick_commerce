@@ -17,8 +17,13 @@ ALLOWED_HOSTS = env_list(
 
 API_DOCS_PUBLIC = env_bool("API_DOCS_PUBLIC", default=True)
 
-# Phase 6: log pushes (title and body) until FCM exists (D-19).
-PUSH_BACKEND = env_str("PUSH_BACKEND", default="apps.notifications.push.ConsolePushBackend")
+# Log pushes (title only, body redacted) unless a Firebase key is set (FCM_CREDENTIALS_FILE in
+# backend/.env): then real FCM, the same backend as staging and production (D-19).
+PUSH_BACKEND = env_str("PUSH_BACKEND", default="") or (  # empty = choose by the key file
+    "apps.notifications.push.FcmPushBackend"
+    if FCM_CREDENTIALS_FILE
+    else "apps.notifications.push.ConsolePushBackend"
+)
 
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,

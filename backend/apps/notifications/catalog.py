@@ -146,7 +146,7 @@ SPECS: dict[str, EventSpec] = {
             "Order {{order_number}} was updated by the store team. Open the app for the next step.",
             app=AppName.RIDER,
             inbox=False,
-            link="",
+            link="jivo://rider/task",
             data_type="task.updated",
         ),
         EventSpec(

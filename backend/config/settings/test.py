@@ -104,6 +104,9 @@ SMS_BACKEND = "apps.notifications.sms.LocmemSmsBackend"
 SMS_OTP_DLT_TEMPLATE_ID = "1007000000000000001"
 # Phase 6: push into a list, DLT ids for every notification event with SMS, fast auth timeout.
 PUSH_BACKEND = "apps.notifications.push.LocmemPushBackend"
+# Tests never read a real Firebase key, whatever backend/.env says (FCM tests use a fake file).
+FCM_CREDENTIALS_FILE = ""
+FCM_PROJECT_ID = ""
 SMS_DLT_TEMPLATE_IDS = {
     "order.placed": "1007000000000000101",
     "order.items_adjusted": "1007000000000000102",

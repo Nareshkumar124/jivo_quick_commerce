@@ -5,6 +5,7 @@ what differs. Every value that changes between environments is read from an envi
 see ``infra/env/backend.env.example`` for the full list.
 """
 
+import os
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -469,9 +470,21 @@ SMS_RETRIEVER_APP_HASHES = {
 ACCOUNT_DELETION_GRACE_DAYS = env_int("ACCOUNT_DELETION_GRACE_DAYS", default=30)  # 07 §4
 
 # --------------------------------------------------------------------------- notifications (P6)
-# Push (08 §9) behind apps.notifications.push. FCM waits for D-19: until then the default sends
-# nothing (DisabledPushBackend: notifications are recorded, push is SKIPPED). local.py logs them.
-PUSH_BACKEND = env_str("PUSH_BACKEND", default="apps.notifications.push.DisabledPushBackend")
+# Push (08 §9) behind apps.notifications.push. Every environment uses the same FCM backend (D-19,
+# FCM HTTP v1); only the key file differs. FCM_CREDENTIALS_FILE is the PATH of the Firebase
+# service-account JSON key (never the JSON itself; a read-only mounted secret file on servers,
+# 09 §3). FCM_PROJECT_ID defaults to the key's project_id. With a key file the default backend is
+# FcmPushBackend; without one DisabledPushBackend (notifications are recorded, push is SKIPPED).
+# local.py logs pushes instead when no key is set. Check notifications.E002 validates the file.
+FCM_CREDENTIALS_FILE = os.path.expandvars(
+    os.path.expanduser(env_str("FCM_CREDENTIALS_FILE", default=""))
+)
+FCM_PROJECT_ID = env_str("FCM_PROJECT_ID", default="")
+PUSH_BACKEND = env_str("PUSH_BACKEND", default="") or (  # empty = choose by the key file
+    "apps.notifications.push.FcmPushBackend"
+    if FCM_CREDENTIALS_FILE
+    else "apps.notifications.push.DisabledPushBackend"
+)
 # TRAI DLT template id per notification event with SMS ("order.placed:1007...,order.cancelled:
 # 1007..."). An event without one sends no SMS (logged). OTP keeps SMS_OTP_DLT_TEMPLATE_ID.
 SMS_DLT_TEMPLATE_IDS: dict[str, str] = env_dict("SMS_DLT_TEMPLATE_IDS", default={})
