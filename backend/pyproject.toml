@@ -36,6 +36,8 @@ dependencies = [
     "uvicorn-worker==0.4.0",
     "nh3==0.3.7",                           # P7: CMS page HTML allow-list (bleach is deprecated)
     "django-otp==1.7.5",
+    "google-auth==2.62.2",                  # D-19: OAuth2 token for FCM HTTP v1 (service account)
+    "urllib3==2.8.0",                       #   and its HTTP client (already locked via botocore)
 ]
 
 [dependency-groups]

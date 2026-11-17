@@ -34,6 +34,12 @@ Every development agent reads this before running anything. It records how the s
 - **Celery on Windows:** run `celery -A config worker --pool threads` and `celery -A config beat` as **separate** processes. `-B` is refused on Windows.
 - **Text files:** always open them with `encoding="utf-8"`, because the Windows default is cp1252. Git uses `core.autocrlf=true`, so checked-out text files have CRLF. Tests must not compare file bytes against string constants unless `.gitattributes` forces LF for that file type (see `.gitattributes`).
 - Native libraries: GDAL and GEOS come from `GDAL_LIBRARY_PATH` / `GEOS_LIBRARY_PATH` in `.env`. WeasyPrint's Pango/GTK libraries may be missing. If so, degrade cleanly, skip the render tests with a clear reason, and report it. Never install system software yourself.
+- **Push (FCM, D-19).** Local settings log pushes (`ConsolePushBackend`) unless `FCM_CREDENTIALS_FILE` is set. The dev Firebase project is `jivo-quick`; its service-account key is at `%USERPROFILE%\.config\jivo-quick-commerce\firebase\dev\service-account.json` (secret: never print, copy or commit it). To switch :8001 to real FCM (PM only):
+  1. Add to `backend/.env`: `FCM_CREDENTIALS_FILE=C:/Users/89 USER/.config/jivo-quick-commerce/firebase/dev/service-account.json` (forward slashes; `~` and `%USERPROFILE%` are also expanded). Leave `PUSH_BACKEND` unset or empty.
+  2. Restart the dev server **and** the Celery worker (pushes are sent by the worker). `uv run python manage.py check` must show no `notifications.E002`.
+  3. Sign in on the phone so the app registers its FCM token, then `uv run python manage.py send_test_push --user +919000000001` (customer) or `--user +919000000003 --event rider.offer_new --data offer_id=1 --data task_id=1` (rider). It sends synchronously and prints how many devices were reached, never the tokens.
+  4. To go back to console logging, remove `FCM_CREDENTIALS_FILE` and restart.
+  Tests never use the key: test settings force `LocmemPushBackend` and blank `FCM_*`.
 
 ## Flutter
 - Run Flutter as **`C:\dev\flutter\bin\flutter`**, a junction to the SDK. The normal path contains a space, which breaks native-asset build hooks (`objective_c`).

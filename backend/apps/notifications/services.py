@@ -19,7 +19,7 @@ import logging
 import re
 import uuid
 from collections.abc import Mapping
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from django.conf import settings
@@ -162,8 +162,18 @@ FCM_KEYS = {
     # api-requests #30: {type: order|product|collection|category, order_id | slug}
     AppName.CUSTOMER: ("order_id", "slug", "ticket_id"),  # ticket_id: P7 support replies
     # api-requests #41: {type: offer.new|offer.withdrawn|task.updated, offer_id?, task_id?}
-    AppName.RIDER: ("offer_id", "task_id", "ticket_id"),  # ticket_id: P7 support replies
+    AppName.RIDER: ("offer_id", "task_id", "ticket_id", "expires_at"),  # ticket_id: P7 support
+    # replies; expires_at: offer.new (PM 2026-11-17: the app skips ringing for a late push)
 }
+
+
+def fcm_value(value: Any) -> str:
+    """An FCM data value: a string; a datetime as ISO 8601 UTC (`2026-11-17T06:30:00Z`)."""
+    if isinstance(value, datetime):
+        if timezone.is_naive(value):
+            value = timezone.make_aware(value, UTC)
+        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    return str(value)
 
 
 def push_data(spec: EventSpec, context: Mapping[str, Any]) -> dict[str, str]:
@@ -172,7 +182,7 @@ def push_data(spec: EventSpec, context: Mapping[str, Any]) -> dict[str, str]:
     data = {"event": spec.event, "type": spec.data_type}
     for key in FCM_KEYS.get(spec.app, ()):
         if context.get(key) not in (None, ""):
-            data[key] = str(context[key])
+            data[key] = fcm_value(context[key])
     if spec.link and (link := render(spec.link, context)):
         data["link"] = link
     return data
@@ -180,13 +190,17 @@ def push_data(spec: EventSpec, context: Mapping[str, Any]) -> dict[str, str]:
 
 def fcm_payload(app: str, data: Mapping[str, Any]) -> dict[str, str]:
     """The FCM data payload exactly as the apps parse it (06 §4.3): `type` plus its ids. A
-    customer notification with no `type`-routable id falls back to `{link}`."""
+    customer notification with no `type`-routable id falls back to `{link}` (#30). Rider
+    payloads also carry the event's `jivo://rider/...` link when it has one."""
     payload = {"type": str(data["type"])} if data.get("type") else {}
     for key in FCM_KEYS.get(app, ()):
         if data.get(key) not in (None, ""):
-            payload[key] = str(data[key])
+            payload[key] = fcm_value(data[key])
     if app == AppName.CUSTOMER and len(payload) <= 1:
         return {"link": str(data["link"])} if data.get("link") else payload
+    if app == AppName.RIDER and data.get("link"):
+        # PM 2026-11-17: the rider app opens `link` first, else routes on `type`.
+        payload["link"] = str(data["link"])
     return payload
 
 
@@ -352,6 +366,18 @@ def fail(notification_id: int, channel: str) -> None:
     _finish(notification_id, channel, DeliveryStatus.FAILED)
 
 
+def deactivate_devices(tokens) -> int:
+    """Devices whose FCM token the push service reported unregistered or invalid stop getting
+    pushes (the app registers a fresh token on its next start)."""
+    from apps.accounts.models import Device
+
+    if not tokens:
+        return 0
+    return Device.objects.filter(fcm_token__in=tuple(tokens), is_active=True).update(
+        is_active=False, updated_at=timezone.now()
+    )
+
+
 def deliver_push(notification_id: int) -> str:
     """Send the push of one notification to the user's active devices of that app. Raises
     `PushError` (transient) after putting the channel back to PENDING."""
@@ -375,19 +401,27 @@ def deliver_push(notification_id: int) -> str:
         data=fcm_payload(notification.app, notification.data),
         event=notification.event,
         app=notification.app,
+        category=notification.category,
+        collapse_key=f"jqc-n{notification_id}",
     )
     try:
         result = push_backend.get_backend().send(message)
     except push_backend.PushDisabled:
         _finish(notification_id, Channel.PUSH, DeliveryStatus.SKIPPED)
         return "disabled"
-    except push_backend.PushError:
+    except push_backend.PushError as exc:
+        deactivate_devices(exc.invalid_tokens)
         release_claim(notification_id, Channel.PUSH)
         raise
-    if result.invalid_tokens:
-        Device.objects.filter(fcm_token__in=result.invalid_tokens).update(
-            is_active=False, updated_at=timezone.now()
+    except push_backend.PushRejected as exc:
+        # Refused for good (bad payload, key or permission): FAILED, never retried.
+        deactivate_devices(exc.invalid_tokens)
+        _finish(notification_id, Channel.PUSH, DeliveryStatus.FAILED)
+        logger.error(
+            "Push rejected: notification=%s event=%s: %s", notification_id, notification.event, exc
         )
+        return "rejected"
+    deactivate_devices(result.invalid_tokens)
     status = DeliveryStatus.SENT if result.sent else DeliveryStatus.SKIPPED
     _finish(notification_id, Channel.PUSH, status)
     logger.info(
