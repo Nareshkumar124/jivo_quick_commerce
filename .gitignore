@@ -50,3 +50,10 @@ dump.rdb
 
 # Personal Claude Code permissions (deploy server access)
 .claude/settings.local.json
+
+# Firebase: google-services.json, GoogleService-Info.plist and service-account keys are never committed
+# (real copies live in ~/.config/jivo-quick-commerce/firebase/<env>/)
+google-services.json
+GoogleService-Info.plist
+*service-account*.json
+jivo-quick-*.json
