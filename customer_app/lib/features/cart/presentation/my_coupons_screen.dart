@@ -188,7 +188,7 @@ class MyCouponCard extends StatelessWidget {
             ),
             if (showMin)
               Text(
-                l10n.couponMinOrder(formatRupees(minOrder)),
+                l10n.couponMinOrder(displayRupees(minOrder)),
                 style: theme.textTheme.bodySmall?.copyWith(color: muted),
               ),
             if (endsAt != null)

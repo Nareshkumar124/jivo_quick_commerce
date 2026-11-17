@@ -117,6 +117,24 @@ class _LocationOptionsState extends ConsumerState<LocationOptions> {
           ),
           onTap: _detect,
         ),
+        // GPS indoors can take the full 15 s: say so (CA-09).
+        if (_busy)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              JivoSpacing.gutter,
+              0,
+              JivoSpacing.gutter,
+              JivoSpacing.sm,
+            ),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                l10n.detectingLocation,
+                key: const Key('detecting-location'),
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ),
         if (failure != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: JivoSpacing.gutter),

@@ -20,7 +20,7 @@ class BillDetails extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final success = context.jivoColors.success;
-    String minus(String amount) => l10n.minusAmount(formatRupees(amount));
+    String minus(String amount) => l10n.minusAmount(displayRupees(amount));
     final code = coupon?.code;
     final savings = bill.totalSavings;
 
@@ -36,7 +36,7 @@ class BillDetails extends StatelessWidget {
         _BillRow(
           rowKey: 'mrp-total',
           label: l10n.billItemTotal,
-          value: formatRupees(bill.mrpTotal),
+          value: displayRupees(bill.mrpTotal),
         ),
         if (!isZeroAmount(bill.productDiscount))
           _BillRow(
@@ -59,32 +59,32 @@ class BillDetails extends StatelessWidget {
           label: l10n.billDeliveryFee,
           value: isZeroAmount(bill.deliveryFee)
               ? l10n.billFree
-              : formatRupees(bill.deliveryFee),
+              : displayRupees(bill.deliveryFee),
           valueColor: isZeroAmount(bill.deliveryFee) ? success : null,
         ),
         if (!isZeroAmount(bill.smallCartFee))
           _BillRow(
             rowKey: 'small-cart-fee',
             label: l10n.billSmallCartFee,
-            value: formatRupees(bill.smallCartFee),
+            value: displayRupees(bill.smallCartFee),
           ),
         if (!isZeroAmount(bill.handlingFee))
           _BillRow(
             rowKey: 'handling-fee',
             label: l10n.billHandlingFee,
-            value: formatRupees(bill.handlingFee),
+            value: displayRupees(bill.handlingFee),
           ),
         if (!isZeroAmount(bill.tip))
           _BillRow(
             rowKey: 'tip',
             label: l10n.billTip,
-            value: formatRupees(bill.tip),
+            value: displayRupees(bill.tip),
           ),
         const Divider(height: JivoSpacing.xl),
         _BillRow(
           rowKey: 'to-pay',
           label: l10n.billToPay,
-          value: formatRupees(bill.grandTotal),
+          value: displayRupees(bill.grandTotal),
           emphasised: true,
         ),
         if (!isZeroAmount(savings)) ...[
@@ -159,7 +159,7 @@ class SavingsBanner extends StatelessWidget {
           const SizedBox(width: JivoSpacing.sm),
           Expanded(
             child: Text(
-              AppLocalizations.of(context).billSavings(formatRupees(amount)),
+              AppLocalizations.of(context).billSavings(displayRupees(amount)),
               style: TextStyle(
                 color: colors.success,
                 fontWeight: FontWeight.w600,

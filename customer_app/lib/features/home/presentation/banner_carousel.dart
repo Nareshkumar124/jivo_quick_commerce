@@ -71,7 +71,13 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                 ),
                 child: Semantics(
                   button: banner.link is! NoBannerLink,
-                  label: l10n.bannerSemantics(banner.title),
+                  label: banners.length > 1
+                      ? l10n.bannerSemanticsOf(
+                          banner.title,
+                          i + 1,
+                          banners.length,
+                        )
+                      : l10n.bannerSemantics(banner.title),
                   excludeSemantics: true,
                   child: Material(
                     color: theme.colorScheme.primaryContainer,

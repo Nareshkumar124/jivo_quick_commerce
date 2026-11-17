@@ -39,7 +39,8 @@ class OrderTimeline extends StatelessWidget {
                 TimelineStepState.done => success,
                 TimelineStepState.current =>
                   bad ? scheme.error : scheme.primary,
-                TimelineStepState.upcoming => scheme.outlineVariant,
+                // 3:1 for a meaningful icon (CA-29).
+                TimelineStepState.upcoming => scheme.outline,
               };
               final stateText = switch (step.state) {
                 TimelineStepState.done => l10n.orderStepDone,
@@ -77,7 +78,7 @@ class OrderTimeline extends StatelessWidget {
                                     width: 2,
                                     color: step.state == TimelineStepState.done
                                         ? success
-                                        : scheme.outlineVariant,
+                                        : scheme.outline,
                                   ),
                                 ),
                             ],

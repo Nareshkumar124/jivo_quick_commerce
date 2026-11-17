@@ -124,6 +124,8 @@ String? resolveRedirect({
   if (session == SessionStatus.signedOut) {
     if (!onboardingSeen) return go(Routes.onboarding);
     if (location == Routes.otp && hasOtpChallenge) return null;
+    // The terms and privacy pages are public, linked from login (CA-05).
+    if (location.startsWith('/pages/')) return null;
     return go(Routes.login);
   }
 

@@ -113,6 +113,10 @@ void main() {
     expect(order.paymentStatus, PaymentStatus.refundPending);
     expect(order.refunds.single.amount, '279.00');
     expect(order.refunds.single.status, RefundStatus.pending);
+    // CA-27: the reason is kept, so the screen can explain the refund.
+    expect(order.refunds.single.reason, RefundReason.itemsUnavailable);
+    expect(order.unavailableItemsRefund, same(order.refunds.single));
+    expect(order.unsuppliedLines, [order.lines.first]);
     // "0.00" refunded so far is no amount.
     expect(order.amountRefunded, isNull);
     final steps = buildTimeline(order);
@@ -194,20 +198,21 @@ void main() {
 
   test('reorder: LIMITED_STOCK maps to a reduced quantity; added_count 0 '
       'means nothing was added', () async {
-    final body = Map<String, Object?>.from(
-      contractExample('orders_reorder/200/SomeItemsUnavailable')! as Map,
-    )
-      ..['added_count'] = 0
-      ..['unavailable'] = [
-        {
-          'variant_id': 1002,
-          'product_name': 'Jivo Cold Pressed Canola Oil',
-          'variant_name': '5 L',
-          'requested_quantity': 3,
-          'added_quantity': 2,
-          'reason': 'LIMITED_STOCK',
-        },
-      ];
+    final body =
+        Map<String, Object?>.from(
+            contractExample('orders_reorder/200/SomeItemsUnavailable')! as Map,
+          )
+          ..['added_count'] = 0
+          ..['unavailable'] = [
+            {
+              'variant_id': 1002,
+              'product_name': 'Jivo Cold Pressed Canola Oil',
+              'variant_name': '5 L',
+              'requested_quantity': 3,
+              'added_quantity': 2,
+              'reason': 'LIMITED_STOCK',
+            },
+          ];
     answer = (_) => body;
     final result = await repository.reorder(4870);
     final limited = result.unavailable.single;

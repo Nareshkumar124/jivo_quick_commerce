@@ -4,7 +4,8 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../shared/formatting/formatters.dart';
 
-/// The Indian veg / non-veg mark: a square with a dot.
+/// The Indian veg / non-veg mark: a square with a dot (veg) or a triangle
+/// (non-veg, FSSAI 2020).
 class VegMark extends StatelessWidget {
   const VegMark({required this.isVeg, this.size = 16, super.key});
 
@@ -29,11 +30,68 @@ class VegMark extends StatelessWidget {
           borderRadius: BorderRadius.circular(2),
         ),
         alignment: Alignment.center,
-        child: Container(
-          width: size / 2,
-          height: size / 2,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
+        // Shape carries the meaning too (CA-12): veg is a dot, non-veg a
+        // triangle pointing up, so it doesn't rest on colour alone.
+        child: isVeg
+            ? Container(
+                key: const Key('veg-dot'),
+                width: size / 2,
+                height: size / 2,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              )
+            : CustomPaint(
+                key: const Key('non-veg-triangle'),
+                size: Size.square(size * 0.55),
+                painter: _TrianglePainter(color),
+              ),
+      ),
+    );
+  }
+}
+
+class _TrianglePainter extends CustomPainter {
+  const _TrianglePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(_TrianglePainter old) => old.color != color;
+}
+
+/// The diet mark with its word next to it ("Veg" / "Non-veg"), for product
+/// detail (CA-12). The word is the screen-reader label too.
+class VegMarkWithLabel extends StatelessWidget {
+  const VegMarkWithLabel({required this.isVeg, super.key});
+
+  final bool isVeg;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return MergeSemantics(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          VegMark(isVeg: isVeg, size: 18),
+          const SizedBox(width: JivoSpacing.xs),
+          ExcludeSemantics(
+            child: Text(
+              isVeg ? l10n.vegShort : l10n.nonVegShort,
+              style: theme.textTheme.labelMedium,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -88,8 +146,8 @@ class PriceLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final selling = formatRupees(price);
-    final listed = formatRupees(mrp);
+    final selling = displayRupees(price);
+    final listed = displayRupees(mrp);
     final showMrp = listed != selling;
     Widget oneLine(Widget amount) => FittedBox(
       fit: BoxFit.scaleDown,

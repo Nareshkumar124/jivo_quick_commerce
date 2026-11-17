@@ -7,9 +7,11 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/launch_state.dart';
 import '../../../app/providers.dart';
 import '../../../app/redirect.dart';
+import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/validation/validators.dart';
 import '../../../shared/widgets/state_views.dart';
+import '../../cms/data/cms_repository.dart';
 import 'auth_flow.dart';
 
 /// Phone login with +91 validation and consent text (`03 §2.2`).
@@ -53,6 +55,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ref.watch(sessionProvider).lastSignOutReason ==
         SignOutReason.sessionExpired;
     final policies = ref.watch(launchStateProvider).config?.policies;
+    // Without policy links in config/app, the in-app pages (public API):
+    // the consent sentence never ends without its links (CA-05).
+    final inAppPages = policies == null && ref.watch(cmsAvailableProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -85,6 +90,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               TextField(
                 key: LoginScreen.phoneFieldKey,
                 controller: _phone,
+                // The keyboard opens with the screen (CA-05).
+                autofocus: true,
                 keyboardType: TextInputType.phone,
                 autofillHints: const [AutofillHints.telephoneNumberNational],
                 inputFormatters: [
@@ -130,6 +137,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     _PolicyLink(
                       label: l10n.privacyPolicy,
                       url: policies.privacy,
+                    ),
+                  ],
+                )
+              else if (inAppPages)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    TextButton(
+                      key: const Key('login-terms'),
+                      onPressed: () =>
+                          context.push(Routes.page(CmsSlugs.terms)),
+                      child: Text(l10n.termsOfService),
+                    ),
+                    TextButton(
+                      key: const Key('login-privacy'),
+                      onPressed: () =>
+                          context.push(Routes.page(CmsSlugs.privacy)),
+                      child: Text(l10n.privacyPolicy),
                     ),
                   ],
                 ),

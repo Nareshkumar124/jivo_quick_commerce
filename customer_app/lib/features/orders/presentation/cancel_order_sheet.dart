@@ -55,7 +55,7 @@ String cancelRefundText(AppLocalizations l10n, OrderDetail order) {
   return switch (order.paymentMethod) {
     PaymentMethod.cod => l10n.cancelRefundCod,
     _ when order.paymentStatus == PaymentStatus.paid => l10n.cancelRefundOnline(
-      formatRupees(order.bill.grandTotal),
+      displayRupees(order.bill.grandTotal),
     ),
     _ => l10n.cancelRefundUnpaid,
   };
@@ -174,16 +174,23 @@ class _CancelOrderSheetState extends ConsumerState<CancelOrderSheet> {
                   style: theme.textTheme.bodySmall,
                 ),
               ),
+            // The safe choice first and as big; the confirm is red
+            // (CA-28).
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                key: const Key('cancel-keep'),
+                onPressed: busy ? null : () => Navigator.pop(context),
+                child: Text(l10n.keepOrder),
+              ),
+            ),
+            const SizedBox(height: JivoSpacing.sm),
             BusyButton(
               key: const Key('cancel-confirm'),
               label: l10n.cancelConfirmAction,
               busy: busy,
+              destructive: true,
               onPressed: _reason == null ? null : _confirm,
-            ),
-            const SizedBox(height: JivoSpacing.sm),
-            TextButton(
-              onPressed: busy ? null : () => Navigator.pop(context),
-              child: Text(l10n.keepOrder),
             ),
           ],
         ),

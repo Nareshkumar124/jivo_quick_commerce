@@ -243,21 +243,50 @@ class CartComingSoonLabel extends StatelessWidget {
   }
 }
 
+/// The full-width "Out of stock" pill where ADD would be (CA-11): text and
+/// an icon at full contrast, the same 48 dp height, so the layout doesn't
+/// jump.
 class OutOfStockLabel extends StatelessWidget {
   const OutOfStockLabel({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
+    final scheme = theme.colorScheme;
+    return Container(
+      key: const Key('out-of-stock-pill'),
       height: kJivoMinTouchTarget,
-      child: Center(
-        child: Text(
-          AppLocalizations.of(context).outOfStock,
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: JivoSpacing.sm),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(JivoRadii.pill),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ExcludeSemantics(
+            child: Icon(
+              Icons.remove_shopping_cart_outlined,
+              size: 20,
+              color: scheme.onSurfaceVariant,
+            ),
           ),
-        ),
+          const SizedBox(width: JivoSpacing.xs),
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                AppLocalizations.of(context).outOfStock,
+                maxLines: 1,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: scheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

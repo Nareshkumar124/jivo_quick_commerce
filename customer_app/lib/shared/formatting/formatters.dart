@@ -23,6 +23,12 @@ String formatRupees(String amount) =>
     formatRupeeAmount(amount) ??
     (throw FormatException('Not a money amount', amount));
 
+/// [formatRupees] for widgets (CA-33): a malformed or missing amount shows
+/// "—" instead of throwing, so one bad value never breaks a whole bill,
+/// tile or list. Where the amount gates an action (paying), check
+/// [formatRupeesOrNull] and block the action instead.
+String displayRupees(String? amount) => formatRupeeAmount(amount) ?? '—';
+
 /// [formatRupeeAmount]: null for a null or unparseable amount.
 String? formatRupeesOrNull(String? amount) => formatRupeeAmount(amount);
 

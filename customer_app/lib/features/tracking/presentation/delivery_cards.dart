@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
@@ -297,7 +296,7 @@ class CodDueCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l10n.codPayRiderTitle(formatRupees(amount)),
+                    l10n.codPayRiderTitle(displayRupees(amount)),
                     key: const Key('cod-due-amount'),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,

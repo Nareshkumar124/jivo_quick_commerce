@@ -5,6 +5,7 @@ import 'package:customer_app/features/cart/data/cart_repository.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/cart/domain/cart.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
+import 'package:customer_app/features/catalog/presentation/widgets/price_tags.dart';
 import 'package:customer_app/features/catalog/presentation/widgets/product_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -215,18 +216,48 @@ void main() {
     expect(find.text('You can add up to 3 of this item'), findsOneWidget);
   });
 
-  testWidgets('out of stock: greyed out, no ADD', (tester) async {
+  testWidgets('out of stock: only the image is greyed, pill, no ADD (CA-11)', (
+    tester,
+  ) async {
     await pumpTile(
       tester,
       product(only: variant(status: StockStatus.outOfStock, orderable: 0)),
     );
     expect(find.text('Out of stock'), findsOneWidget);
+    expect(find.byKey(const Key('out-of-stock-pill')), findsOneWidget);
     expect(find.text('ADD'), findsNothing);
     expect(find.textContaining('left'), findsNothing);
-    final opacity = tester.widget<Opacity>(
+    expect(
       find.ancestor(of: find.byType(Card), matching: find.byType(Opacity)),
+      findsNothing,
+      reason: 'the card is not dimmed, so its text keeps full contrast',
     );
-    expect(opacity.opacity, lessThan(1));
+    final image = tester.widget<OutOfStockImage>(find.byType(OutOfStockImage));
+    expect(image.outOfStock, isTrue);
+    expect(
+      find.descendant(
+        of: find.byType(OutOfStockImage),
+        matching: find.byType(ColorFiltered),
+      ),
+      findsOneWidget,
+    );
+    final name = tester.widget<Text>(find.text(product().name));
+    expect(
+      find.ancestor(of: find.byWidget(name), matching: find.byType(Opacity)),
+      findsNothing,
+    );
+  });
+
+  testWidgets('veg is a dot, non-veg a triangle (CA-12)', (tester) async {
+    await tester.pumpWidget(
+      harness(
+        const Row(children: [VegMark(isVeg: true), VegMark(isVeg: false)]),
+      ),
+    );
+    expect(find.byKey(const Key('veg-dot')), findsOneWidget);
+    expect(find.byKey(const Key('non-veg-triangle')), findsOneWidget);
+    expect(find.bySemanticsLabel('Vegetarian'), findsOneWidget);
+    expect(find.bySemanticsLabel('Non-vegetarian'), findsOneWidget);
   });
 
   testWidgets('ADD ignores taps while a change is in flight', (tester) async {

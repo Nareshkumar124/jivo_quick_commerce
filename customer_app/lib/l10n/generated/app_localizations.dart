@@ -3926,6 +3926,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cash on delivery. Pay by cash or UPI when your order arrives.'**
   String get codPayRiderHint;
+
+  /// Screen-reader label/tooltip of the menu on a saved address (CA-08).
+  ///
+  /// In en, this message translates to:
+  /// **'More options for {label}'**
+  String addressMoreOptions(String label);
+
+  /// Word next to the veg mark on product detail (CA-12).
+  ///
+  /// In en, this message translates to:
+  /// **'Veg'**
+  String get vegShort;
+
+  /// Word next to the non-veg mark on product detail (CA-12).
+  ///
+  /// In en, this message translates to:
+  /// **'Non-veg'**
+  String get nonVegShort;
+
+  /// Under the cart total while a cart change is in flight (CA-20).
+  ///
+  /// In en, this message translates to:
+  /// **'Updating…'**
+  String get cartUpdating;
+
+  /// Checkout notice title after PRICE_CHANGED (CA-19).
+  ///
+  /// In en, this message translates to:
+  /// **'Your total changed'**
+  String get priceChangedNoticeTitle;
+
+  /// Checkout notice after PRICE_CHANGED; amounts are the server's old and new totals (CA-19).
+  ///
+  /// In en, this message translates to:
+  /// **'from {before} to {after}. Check the bill below, then pay.'**
+  String priceChangedNoticeBody(String before, String after);
+
+  /// Snackbar after removing a cart line; name is product and pack size (CA-18).
+  ///
+  /// In en, this message translates to:
+  /// **'Removed {name}'**
+  String removedFromCart(String name);
+
+  /// Snackbar action that restores a removed cart line (CA-18).
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// Order detail notice: units the store marked unavailable (08 T8a, CA-27).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item couldn\'t be supplied} other{{count} items couldn\'t be supplied}}'**
+  String unsuppliedTitle(int count);
+
+  /// Order detail notice: one line, unavailable units out of the ordered quantity (CA-27).
+  ///
+  /// In en, this message translates to:
+  /// **'{name}: {missing} of {ordered}'**
+  String unsuppliedLine(String name, int missing, int ordered);
+
+  /// Order detail notice: further lines not listed (CA-27).
+  ///
+  /// In en, this message translates to:
+  /// **'and {count} more'**
+  String unsuppliedMore(int count);
+
+  /// Order detail notice: the server's ITEMS_UNAVAILABLE refund, still pending (CA-27).
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} is being refunded to your original payment method.'**
+  String unsuppliedRefundPending(String amount);
+
+  /// Refund line: a processed ITEMS_UNAVAILABLE refund (CA-27).
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} refunded for items the store couldn\'t supply.'**
+  String refundUnsuppliedCompleted(String amount);
+
+  /// Refund line: a pending ITEMS_UNAVAILABLE refund (CA-27).
+  ///
+  /// In en, this message translates to:
+  /// **'Refund of {amount} for items the store couldn\'t supply has started. It reaches your original payment method in 5–7 working days.'**
+  String refundUnsuppliedInProgress(String amount);
+
+  /// Pill on a ticket thread: support replied while the customer was scrolled up; tap scrolls down (CA-30).
+  ///
+  /// In en, this message translates to:
+  /// **'New reply'**
+  String get ticketNewReply;
+
+  /// Screen-reader label of the reply counter (CA-30).
+  ///
+  /// In en, this message translates to:
+  /// **'{used} of {max} characters used'**
+  String charactersUsed(int used, int max);
+
+  /// Screen-reader label of read-only stars (CA-34).
+  ///
+  /// In en, this message translates to:
+  /// **'Rated {stars} out of 5'**
+  String ratedOutOfFive(int stars);
+
+  /// Under Detect my location while GPS runs (CA-09).
+  ///
+  /// In en, this message translates to:
+  /// **'Finding your location… This can take a few seconds.'**
+  String get detectingLocation;
+
+  /// Screen-reader label of a home banner with its position (CA-16).
+  ///
+  /// In en, this message translates to:
+  /// **'Offer: {title}, banner {index} of {count}'**
+  String bannerSemanticsOf(String title, int index, int count);
 }
 
 class _AppLocalizationsDelegate

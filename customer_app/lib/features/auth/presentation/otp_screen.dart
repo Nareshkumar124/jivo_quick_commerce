@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,6 +64,13 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       return;
     }
     await ref.read(authFlowProvider.notifier).verify(_otp.text);
+    // A wrong code: clear it so the customer can type again at once, keep
+    // the focus and the error (CA-06).
+    if (mounted &&
+        isApiError(ref.read(authFlowProvider).error, ApiErrorCode.otpInvalid)) {
+      _otp.clear();
+      unawaited(HapticFeedback.mediumImpact());
+    }
   }
 
   Future<void> _resend() async {

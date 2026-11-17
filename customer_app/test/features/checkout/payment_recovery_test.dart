@@ -254,22 +254,89 @@ void main() {
     );
   });
 
-  testWidgets('PRICE_CHANGED says what the total changed to', (tester) async {
+  testWidgets('PRICE_CHANGED: a notice that stays above the payment '
+      'methods until the method changes (CA-19)', (tester) async {
+    final app = await appWithCart();
+    await openCheckout(tester, app);
+    // The reloaded cart's total (₹503) is the server's new total.
+    app.cart.failNext = const ApiError(
+      code: ApiErrorCode.priceChanged,
+      details: {'expected_grand_total': '478.00', 'grand_total': '503.00'},
+    );
+    await tester.tap(find.byKey(const Key('place-order')));
+    await tester.pumpAndSettle();
+    final notice = find.byKey(const Key('price-changed-notice'));
+    expect(notice, findsOneWidget);
+    expect(
+      find.descendant(
+        of: notice,
+        matching: find.textContaining('from ₹478 to ₹503'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(SnackBar), findsNothing, reason: 'not a snackbar');
+    expect(find.byType(CheckoutScreen), findsOneWidget);
+
+    // Still there after a while (not a 4 s snackbar).
+    await tester.pump(const Duration(seconds: 10));
+    expect(notice, findsOneWidget);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CheckoutScreen)),
+    );
+    container.read(checkoutProvider.notifier).selectMethod(PaymentMethod.cod);
+    await tester.pumpAndSettle();
+    expect(notice, findsNothing);
+  });
+
+  testWidgets('PRICE_CHANGED notice is gone after back to the cart, a '
+      'quantity change and checkout again (CA-19)', (tester) async {
     final app = await appWithCart();
     await openCheckout(tester, app);
     app.cart.failNext = const ApiError(
       code: ApiErrorCode.priceChanged,
-      details: {'expected_grand_total': '503.00', 'grand_total': '528.00'},
+      details: {'expected_grand_total': '478.00', 'grand_total': '503.00'},
     );
     await tester.tap(find.byKey(const Key('place-order')));
     await tester.pumpAndSettle();
-    expect(
-      find.text(
-        'Your total changed from ₹503 to ₹528. Please check the updated bill.',
-      ),
-      findsOneWidget,
+    final notice = find.byKey(const Key('price-changed-notice'));
+    expect(notice, findsOneWidget);
+
+    routerOf(tester).pop();
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CartScreen)),
     );
+    final line = container.read(cartProvider).snapshot.lines.single;
+    await container.read(cartProvider.notifier).setLineQuantity(line, 3);
+    await tester.pumpAndSettle();
+
+    routerOf(tester).push(Routes.checkout);
+    await tester.pumpAndSettle();
     expect(find.byType(CheckoutScreen), findsOneWidget);
+    expect(notice, findsNothing);
+    expect(container.read(checkoutProvider).priceChange, isNull);
+  });
+
+  testWidgets('PRICE_CHANGED notice hides once the bill no longer shows the '
+      'changed total (CA-19)', (tester) async {
+    final app = await appWithCart();
+    await openCheckout(tester, app);
+    app.cart.failNext = const ApiError(
+      code: ApiErrorCode.priceChanged,
+      details: {'expected_grand_total': '478.00', 'grand_total': '503.00'},
+    );
+    await tester.tap(find.byKey(const Key('place-order')));
+    await tester.pumpAndSettle();
+    final notice = find.byKey(const Key('price-changed-notice'));
+    expect(notice, findsOneWidget);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CheckoutScreen)),
+    );
+    final line = container.read(cartProvider).snapshot.lines.single;
+    await container.read(cartProvider.notifier).setLineQuantity(line, 3);
+    await tester.pumpAndSettle();
+    expect(notice, findsNothing);
   });
 
   testWidgets('STOCK_UNAVAILABLE names the item and how many are left', (

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:customer_app/app/bootstrap.dart';
 import 'package:customer_app/app/redirect.dart';
 import 'package:customer_app/app/repositories.dart';
@@ -367,18 +369,22 @@ void main() {
       return texts.where((t) => t != 'Add more').join(' ');
     }
 
-    testWidgets('a line shows the billed rate per carton and the server total', (
-      tester,
-    ) async {
-      await openWith(tester, [water()]);
+    testWidgets(
+      'a line shows the billed rate per carton and the server total',
+      (tester) async {
+        await openWith(tester, [water()]);
 
-      expect(textOf(tester, 'cart-line-rate-1501'), '₹87/carton');
-      expect(find.byKey(const ValueKey('cart-line-tier-1501')), findsOneWidget);
-      expect(find.text('Wholesale rate'), findsOneWidget);
-      expect(textOf(tester, 'cart-line-total-1501'), '₹2,611');
-      // The struck MRP (₹90) is the server's, not derived.
-      expect(find.text('₹90'), findsOneWidget);
-    });
+        expect(textOf(tester, 'cart-line-rate-1501'), '₹87/carton');
+        expect(
+          find.byKey(const ValueKey('cart-line-tier-1501')),
+          findsOneWidget,
+        );
+        expect(find.text('Wholesale rate'), findsOneWidget);
+        expect(textOf(tester, 'cart-line-total-1501'), '₹2,611');
+        // The struck MRP (₹90) is the server's, not derived.
+        expect(find.text('₹90'), findsOneWidget);
+      },
+    );
 
     testWidgets('below the first slab: the normal rate, no tag', (
       tester,
@@ -523,7 +529,10 @@ void main() {
         tokens: signedInTokens,
         commerce: FakeCommerceBackend(
           latency: Duration.zero,
-          rules: const FakeBillRules(minimumUnits: 5, orderUnitLabel: 'cartons'),
+          rules: const FakeBillRules(
+            minimumUnits: 5,
+            orderUnitLabel: 'cartons',
+          ),
         ),
       );
       CatalogVariant size(int id, String name, String price) => CatalogVariant(
@@ -888,4 +897,73 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  group('CA-20 checkout bar', () {
+    Future<TestApp> pumpCart(
+      WidgetTester tester,
+      double scale, {
+      StubCartRepository? stub,
+    }) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final app = TestApp(tokens: signedInTokens, cartRepository: stub);
+      if (stub == null) {
+        await app.cart.setQuantity(
+          101,
+          2,
+          preview: CartLinePreview.of(oil(), 'Jivo Canola Oil'),
+        );
+      }
+      await app.pump(tester);
+      GoRouter.of(tester.element(find.byType(HomeScreen))).push(Routes.cart);
+      await tester.pumpAndSettle();
+      return app;
+    }
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'total and button ${scale >= 1.5 ? 'stack' : 'side by '
+                  'side'} at ${scale}x',
+        (tester) async {
+          await pumpCart(tester, scale);
+          final total = tester.getRect(
+            find.byKey(const Key('checkout-bar-total')),
+          );
+          final button = tester.getRect(
+            find.byKey(const Key('proceed-to-checkout')),
+          );
+          if (scale >= 1.5) {
+            expect(button.top, greaterThanOrEqualTo(total.bottom));
+            expect(button.width, greaterThan(300));
+          } else {
+            expect(button.left, greaterThan(total.right));
+          }
+          // Nothing on screen overflows, Home's cart bar under this route
+          // included.
+          final error = tester.takeException();
+          if (error is FlutterError) fail(error.toStringDeep());
+          expect(error, isNull);
+        },
+      );
+    }
+
+    testWidgets('"Updating…" under the total while a change is in flight', (
+      tester,
+    ) async {
+      final stub = StubCartRepository(cartSnapshot());
+      await pumpCart(tester, 1, stub: stub);
+      expect(find.byKey(const Key('checkout-bar-updating')), findsNothing);
+      final gate = stub.gate = Completer<void>();
+      await tester.tap(find.byKey(const ValueKey('cart-line-remove-101')));
+      await tester.pump();
+      expect(find.text('Updating…'), findsOneWidget);
+      gate.complete();
+      stub.gate = null;
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('checkout-bar-updating')), findsNothing);
+    });
+  });
 }

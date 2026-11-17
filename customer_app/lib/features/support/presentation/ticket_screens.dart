@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -430,7 +432,20 @@ class _OrderPickerSheet extends ConsumerWidget {
   }
 }
 
-/// A ticket's thread with the reply box (none once closed).
+/// How often an open ticket's thread is re-read while on screen
+/// (`customer.motion.ticketPoll`, CA-30). Overridable in tests.
+final ticketPollIntervalProvider = Provider<Duration>(
+  (ref) => const Duration(seconds: 15),
+);
+
+/// From this many characters the reply box shows its counter (CA-30).
+const ticketCounterFrom = 900;
+
+/// A ticket's thread with the reply box (none once closed). While the
+/// ticket isn't closed, the thread is re-read every 15 s and when the app
+/// comes back to the foreground, so support's replies appear (CA-30). It
+/// opens on the newest message; a reply that arrives while the customer is
+/// scrolled up shows a "New reply" pill.
 class TicketDetailScreen extends ConsumerStatefulWidget {
   const TicketDetailScreen({required this.ticketId, super.key});
 
@@ -442,13 +457,114 @@ class TicketDetailScreen extends ConsumerStatefulWidget {
 
 class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
   final _reply = TextEditingController();
+  final _scroll = ScrollController();
   final List<PendingTicketPhoto> _photos = [];
   bool _sending = false;
+  Timer? _poll;
+  AppLifecycleListener? _lifecycle;
+
+  /// Support messages seen so far (null before the first load).
+  int? _supportSeen;
+  bool _newReply = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startPolling();
+    // No polling in the background; catch up and restart on resume.
+    _lifecycle = AppLifecycleListener(
+      onPause: _stopPolling,
+      onResume: () {
+        _refresh();
+        _startPolling();
+      },
+    );
+    _scroll.addListener(() {
+      if (_newReply && _atBottom()) setState(() => _newReply = false);
+    });
+  }
 
   @override
   void dispose() {
+    _poll?.cancel();
+    _lifecycle?.dispose();
+    _scroll.dispose();
     _reply.dispose();
     super.dispose();
+  }
+
+  void _startPolling() {
+    _poll?.cancel();
+    _poll = Timer.periodic(
+      ref.read(ticketPollIntervalProvider),
+      (_) => _refresh(),
+    );
+  }
+
+  void _stopPolling() {
+    _poll?.cancel();
+    _poll = null;
+  }
+
+  @override
+  void didUpdateWidget(TicketDetailScreen old) {
+    super.didUpdateWidget(old);
+    if (old.ticketId != widget.ticketId) {
+      // Another ticket in the same route: nothing carries over.
+      _supportSeen = null;
+      _newReply = false;
+      _photos.clear();
+      _reply.clear();
+    }
+  }
+
+  /// Polling is running (tests).
+  @visibleForTesting
+  bool get polling => _poll?.isActive ?? false;
+
+  void _refresh() {
+    final thread = ref.read(ticketThreadProvider(widget.ticketId)).value;
+    // Nothing to wait for on a closed ticket; the send itself refreshes.
+    if (_sending || thread == null || !thread.canReply) return;
+    ref.read(ticketThreadProvider(widget.ticketId).notifier).refreshQuietly();
+  }
+
+  bool _atBottom() =>
+      !_scroll.hasClients ||
+      _scroll.position.pixels >= _scroll.position.maxScrollExtent - 48;
+
+  /// The list builds lazily, so its end is only an estimate until the
+  /// last messages are laid out: jump again until it holds (a few frames).
+  void _scrollToEnd([int tries = 4]) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final position = _scroll.position;
+      if (position.pixels < position.maxScrollExtent) {
+        _scroll.jumpTo(position.maxScrollExtent);
+        if (tries > 1) {
+          _scrollToEnd(tries - 1);
+          WidgetsBinding.instance.scheduleFrame();
+        }
+      }
+    });
+  }
+
+  /// A new thread arrived: open at the newest message the first time;
+  /// later, follow new support messages when at the bottom, otherwise
+  /// show the "New reply" pill.
+  void _onThread(TicketThread thread) {
+    final support = thread.messages.where((m) => m.fromSupport).length;
+    final seen = _supportSeen;
+    _supportSeen = support;
+    if (seen == null) {
+      _scrollToEnd();
+    } else if (support > seen) {
+      if (_atBottom()) {
+        _scrollToEnd();
+      } else {
+        setState(() => _newReply = true);
+      }
+    }
   }
 
   Future<void> _addPhoto() async {
@@ -476,6 +592,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
           .reply(text, photos: List.of(_photos));
       _reply.clear();
       if (mounted) setState(_photos.clear);
+      _scrollToEnd();
     } catch (error) {
       if (mounted) showMessage(context, describeSupportError(context, error));
     } finally {
@@ -487,6 +604,10 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final thread = ref.watch(ticketThreadProvider(widget.ticketId));
+    ref.listen(ticketThreadProvider(widget.ticketId), (_, next) {
+      if (next.value case final value?) _onThread(value);
+    });
+    if (_supportSeen == null && thread.value != null) _onThread(thread.value!);
     return Scaffold(
       appBar: AppBar(
         title: Text(switch (thread) {
@@ -500,19 +621,47 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
             _TicketHeader(ticket: value.ticket),
             const Divider(height: 1),
             Expanded(
-              child: RefreshIndicator(
-                onRefresh: () => ref
-                    .read(ticketThreadProvider(widget.ticketId).notifier)
-                    .reload(),
-                child: ListView(
-                  key: const Key('ticket-thread'),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(JivoSpacing.gutter),
-                  children: [
-                    for (final message in value.messages)
-                      _MessageBubble(message: message),
-                  ],
-                ),
+              child: Stack(
+                children: [
+                  RefreshIndicator(
+                    onRefresh: () => ref
+                        .read(ticketThreadProvider(widget.ticketId).notifier)
+                        .reload(),
+                    child: ListView(
+                      key: const Key('ticket-thread'),
+                      controller: _scroll,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(JivoSpacing.gutter),
+                      children: [
+                        for (final message in value.messages)
+                          _MessageBubble(message: message),
+                      ],
+                    ),
+                  ),
+                  if (_newReply)
+                    Positioned(
+                      bottom: JivoSpacing.sm,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Semantics(
+                          liveRegion: true,
+                          child: FilledButton.tonalIcon(
+                            key: const Key('ticket-new-reply'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, kJivoMinTouchTarget),
+                            ),
+                            onPressed: () {
+                              setState(() => _newReply = false);
+                              _scrollToEnd();
+                            },
+                            icon: const Icon(Icons.arrow_downward),
+                            label: Text(l10n.ticketNewReply),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             if (value.canReply)
@@ -680,10 +829,24 @@ class _ReplyBox extends StatelessWidget {
           maxLines: 4,
           maxLength: ticketMessageMaxLength,
           textCapitalization: TextCapitalization.sentences,
-          decoration: InputDecoration(
-            hintText: l10n.ticketReplyHint,
-            counterText: '',
-          ),
+          decoration: InputDecoration(hintText: l10n.ticketReplyHint),
+          // The 1000-character limit shows from 900 characters (CA-30).
+          buildCounter:
+              (
+                context, {
+                required currentLength,
+                required isFocused,
+                required maxLength,
+              }) => currentLength < ticketCounterFrom
+              ? null
+              : Text(
+                  '$currentLength/$maxLength',
+                  key: const Key('ticket-reply-counter'),
+                  semanticsLabel: l10n.charactersUsed(
+                    currentLength,
+                    maxLength ?? ticketMessageMaxLength,
+                  ),
+                ),
         ),
       ),
       const SizedBox(width: JivoSpacing.sm),

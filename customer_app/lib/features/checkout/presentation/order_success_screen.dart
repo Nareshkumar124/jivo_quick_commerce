@@ -72,7 +72,7 @@ class _Confirmed extends StatelessWidget {
     final theme = Theme.of(context);
     final success = context.jivoColors.success;
     final eta = order.etaAt;
-    final amount = formatRupees(order.grandTotal);
+    final amount = displayRupees(order.grandTotal);
 
     return Center(
       child: SingleChildScrollView(

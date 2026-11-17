@@ -77,7 +77,10 @@ class HelpScreen extends ConsumerWidget {
                 ),
                 child: Semantics(
                   header: true,
-                  child: Text(l10n.faqTitle, style: theme.textTheme.titleMedium),
+                  child: Text(
+                    l10n.faqTitle,
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
               ),
               const _FaqSection(),
@@ -112,7 +115,11 @@ class _FaqSection extends ConsumerWidget {
                 JivoSpacing.gutter,
                 0,
               ),
-              child: Text(category, style: theme.textTheme.titleSmall),
+              // A header for screen readers (CA-34).
+              child: Semantics(
+                header: true,
+                child: Text(category, style: theme.textTheme.titleSmall),
+              ),
             ),
             for (final faq in faqs)
               ExpansionTile(

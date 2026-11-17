@@ -99,7 +99,8 @@ void main() {
       var state = await container.read(inboxProvider.future);
       expect(state.items, hasLength(2));
       expect(state.hasMore, isTrue);
-      expect(await container.read(inboxUnreadProvider.future), 1);
+      // The server's count covers every page, not just the first (CA-34).
+      expect(await container.read(inboxUnreadProvider.future), 2);
 
       await container.read(inboxProvider.notifier).loadMore();
       state = container.read(inboxProvider).value!;
@@ -108,12 +109,23 @@ void main() {
 
       await container.read(inboxProvider.notifier).markRead(3);
       expect(repo.readCalls, [3]);
-      expect(await container.read(inboxUnreadProvider.future), 0);
+      expect(await container.read(inboxUnreadProvider.future), 1);
 
       await container.read(inboxProvider.notifier).markAllRead();
       state = container.read(inboxProvider).value!;
       expect(state.items.every((n) => n.read), isTrue);
       expect(state.hasUnread, isFalse);
+      expect(await container.read(inboxUnreadProvider.future), 0);
+    });
+
+    test('unread count comes from the unread-count endpoint', () async {
+      final http = FakeHttp((_) => (200, {'unread': 12}));
+      final repo = ApiNotificationRepository(http.api());
+      expect(await repo.unreadCount(), 12);
+      expect(
+        http.requests.single.path,
+        '/api/v1/me/notifications/unread-count/',
+      );
     });
 
     test('a failed next page keeps the list and offers retry', () async {

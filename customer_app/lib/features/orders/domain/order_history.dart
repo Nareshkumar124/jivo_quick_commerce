@@ -188,6 +188,25 @@ enum RefundStatus {
   );
 }
 
+/// `Refund.reason` (`OrderRefundReasonEnum`): why the money goes back.
+enum RefundReason {
+  orderCancelled('ORDER_CANCELLED'),
+  itemsUnavailable('ITEMS_UNAVAILABLE'),
+  deliveryFailed('DELIVERY_FAILED'),
+  paymentIssue('PAYMENT_ISSUE'),
+  goodwill('GOODWILL'),
+  unknown(null);
+
+  const RefundReason(this.wireValue);
+
+  final String? wireValue;
+
+  static RefundReason fromWire(String? value) => values.firstWhere(
+    (reason) => reason.wireValue != null && reason.wireValue == value,
+    orElse: () => unknown,
+  );
+}
+
 /// A refund on the order (`08 §4` rule 4, `§6.4`).
 @immutable
 class OrderRefund {
@@ -196,10 +215,15 @@ class OrderRefund {
     required this.status,
     required this.createdAt,
     this.processedAt,
+    this.reason = RefundReason.unknown,
   });
 
   final String amount;
   final RefundStatus status;
+
+  /// Why (CA-27): `ITEMS_UNAVAILABLE` is the partial refund after the
+  /// store couldn't supply some units (`08` T8a).
+  final RefundReason reason;
   final DateTime createdAt;
   final DateTime? processedAt;
 }
@@ -268,6 +292,21 @@ class OrderDetail {
   final OrderCancellationInfo? cancellation;
 
   bool get isActive => status.isActive;
+
+  /// Lines with units the store couldn't supply (`08` T8a, CA-27).
+  List<OrderLineItem> get unsuppliedLines => [
+    for (final line in lines)
+      if (line.quantityUnavailable > 0) line,
+  ];
+
+  /// The latest `ITEMS_UNAVAILABLE` refund, if any (CA-27).
+  OrderRefund? get unavailableItemsRefund {
+    OrderRefund? found;
+    for (final refund in refunds) {
+      if (refund.reason == RefundReason.itemsUnavailable) found = refund;
+    }
+    return found;
+  }
 
   /// Active, but past the customer cancellation window (`08 §7`): the
   /// screen offers "Contact support" instead of Cancel.

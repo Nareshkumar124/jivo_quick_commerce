@@ -46,124 +46,236 @@ class CartLineTile extends ConsumerWidget {
         line.variant.hasMinQty &&
         line.issue?.code != CartIssueCode.minQtyRequired;
 
+    Future<void> remove() async {
+      // The tile goes away with the line: keep the messenger (and its
+      // context) for the Undo snackbar.
+      final messenger = ScaffoldMessenger.of(context);
+      var removed = false;
+      await run(() async {
+        await cart.removeLine(line);
+        removed = true;
+      });
+      if (!removed || !messenger.mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.removedFromCart('${line.productName} ${line.variantName}'),
+            ),
+            // An out-of-stock line can't come back; nothing to undo.
+            action: outOfStock
+                ? null
+                : SnackBarAction(
+                    key: ValueKey('cart-line-undo-$id'),
+                    label: l10n.undo,
+                    // The same server call as ADD: the server still checks
+                    // stock and price. The tile is gone, so a refusal is
+                    // shown through the kept messenger, with the line named
+                    // ("Only 1 of <name> can be ordered now").
+                    onPressed: () => _undo(
+                      messenger,
+                      () => cart.setVariantQuantity(
+                        line.variant,
+                        line.quantity,
+                        productName: line.productName,
+                      ),
+                      name: '${line.productName} ${line.variantName}',
+                      variantId: line.variantId,
+                    ),
+                  ),
+          ),
+        );
+    }
+
+    final image = ClipRRect(
+      borderRadius: BorderRadius.circular(JivoRadii.sm),
+      child: SizedBox.square(
+        dimension: 56,
+        child: ColoredBox(
+          color: context.customerColors.imageWell,
+          child: ProductImage(url: line.imageUrl, onWell: true),
+        ),
+      ),
+    );
+    final info = <Widget>[
+      Text(
+        line.productName,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      Text(
+        line.variantName,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      const SizedBox(height: JivoSpacing.xs),
+      if (line.variant.hasPriceTiers || line.priceTier != null)
+        _TierRate(line: line)
+      else
+        PriceLine(price: line.billedPrice, mrp: line.mrp),
+      if (minHint) MinQtyHint(variant: line.variant),
+    ];
+    final issue = <Widget>[
+      if (issueText != null)
+        Text(
+          issueText,
+          key: ValueKey('cart-line-issue-$id'),
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.error,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      if (fixLabel != null)
+        TextButton(
+          key: ValueKey('cart-line-fix-$id'),
+          onPressed: pending ? null : () => run(() => cart.fixLine(line)),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: JivoSpacing.sm),
+          ),
+          child: Text(fixLabel),
+        ),
+    ];
+    final stepper = outOfStock
+        ? null
+        : SizedBox(
+            width: 112,
+            child: DelayedPending(
+              pending: pending,
+              builder: (context, slow) => QuantityBox(
+                id: 'line-$id',
+                quantity: line.quantity,
+                busy: slow,
+                onTap: pending
+                    ? null
+                    : () async {
+                        final typed = await showQuantityDialog(
+                          context,
+                          current: line.quantity,
+                          max: line.orderableQuantity,
+                          min: line.minQty,
+                        );
+                        if (typed == null || !context.mounted) return;
+                        await run(() => cart.setLineQuantity(line, typed));
+                      },
+              ),
+            ),
+          );
+    final total = Text(
+      displayRupees(line.lineTotal),
+      key: ValueKey('cart-line-total-$id'),
+      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+    );
+    final removeButton = IconButton(
+      key: ValueKey('cart-line-remove-$id'),
+      tooltip: l10n.removeItem(line.productName),
+      onPressed: pending ? null : remove,
+      icon: const Icon(Icons.delete_outline),
+    );
+
+    // From 1.3x text the trailing column would squeeze the name to a few
+    // characters: stack the line instead (CA-18). Image and details, then
+    // the stepper with the total and remove, then the issue and its fix.
+    final stacked = MediaQuery.textScalerOf(context).scale(14) / 14 >= 1.3;
+    if (stacked) {
+      return Padding(
+        key: ValueKey('cart-line-$id'),
+        padding: const EdgeInsets.symmetric(vertical: JivoSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                image,
+                const SizedBox(width: JivoSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: info,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: JivoSpacing.sm),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: JivoSpacing.sm,
+              runSpacing: JivoSpacing.xs,
+              children: [
+                ?stepper,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [total, removeButton],
+                ),
+              ],
+            ),
+            ...issue.map(
+              (w) =>
+                  Align(alignment: AlignmentDirectional.centerStart, child: w),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       key: ValueKey('cart-line-$id'),
       padding: const EdgeInsets.symmetric(vertical: JivoSpacing.sm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(JivoRadii.sm),
-            child: SizedBox.square(
-              dimension: 56,
-              child: ColoredBox(
-                color: context.customerColors.imageWell,
-                child: ProductImage(url: line.imageUrl, onWell: true),
-              ),
-            ),
-          ),
+          image,
           const SizedBox(width: JivoSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  line.productName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  line.variantName,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: JivoSpacing.xs),
-                if (line.variant.hasPriceTiers || line.priceTier != null)
-                  _TierRate(line: line)
-                else
-                  PriceLine(price: line.billedPrice, mrp: line.mrp),
-                if (minHint) MinQtyHint(variant: line.variant),
-                if (issueText != null)
-                  Text(
-                    issueText,
-                    key: ValueKey('cart-line-issue-$id'),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: theme.colorScheme.error,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                if (fixLabel != null)
-                  TextButton(
-                    key: ValueKey('cart-line-fix-$id'),
-                    onPressed: pending
-                        ? null
-                        : () => run(() => cart.fixLine(line)),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: JivoSpacing.sm,
-                      ),
-                    ),
-                    child: Text(fixLabel),
-                  ),
-              ],
+              children: [...info, ...issue],
             ),
           ),
           const SizedBox(width: JivoSpacing.sm),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (!outOfStock)
-                SizedBox(
-                  width: 112,
-                  child: DelayedPending(
-                    pending: pending,
-                    builder: (context, slow) => QuantityBox(
-                      id: 'line-$id',
-                      quantity: line.quantity,
-                      busy: slow,
-                      onTap: pending
-                          ? null
-                          : () async {
-                              final typed = await showQuantityDialog(
-                                context,
-                                current: line.quantity,
-                                max: line.orderableQuantity,
-                                min: line.minQty,
-                              );
-                              if (typed == null || !context.mounted) return;
-                              await run(
-                                () => cart.setLineQuantity(line, typed),
-                              );
-                            },
-                    ),
-                  ),
-                ),
+              ?stepper,
               const SizedBox(height: JivoSpacing.xs),
-              Text(
-                formatRupees(line.lineTotal),
-                key: ValueKey('cart-line-total-$id'),
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              IconButton(
-                key: ValueKey('cart-line-remove-$id'),
-                tooltip: l10n.removeItem(line.productName),
-                onPressed: pending
-                    ? null
-                    : () => run(() => cart.removeLine(line)),
-                icon: const Icon(Icons.delete_outline),
-              ),
+              total,
+              removeButton,
             ],
           ),
         ],
       ),
     );
   }
+}
+
+/// Runs an Undo [change]; a refusal goes to [messenger] (the line's tile is
+/// already gone).
+Future<void> _undo(
+  ScaffoldMessengerState messenger,
+  Future<void> Function() change, {
+  required String name,
+  required int variantId,
+}) async {
+  String? problem;
+  try {
+    await change();
+  } on CartLimitException catch (e) {
+    if (!messenger.mounted) return;
+    problem = AppLocalizations.of(messenger.context).maxQtyReached(e.max);
+  } catch (error) {
+    if (!messenger.mounted) return;
+    problem = cartErrorText(messenger.context, error, names: {variantId: name});
+  }
+  if (problem == null || !messenger.mounted) return;
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(problem)));
 }
 
 /// A line with volume prices: the billed rate ("₹87/box", the server's
@@ -180,8 +292,8 @@ class _TierRate extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = context.jivoColors;
     final id = '${line.variantId}';
-    final rate = formatRupees(line.billedPrice);
-    final mrp = formatRupees(line.mrp);
+    final rate = displayRupees(line.billedPrice);
+    final mrp = displayRupees(line.mrp);
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: JivoSpacing.xs,
