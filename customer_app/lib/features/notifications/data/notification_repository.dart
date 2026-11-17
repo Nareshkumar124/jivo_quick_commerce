@@ -52,10 +52,15 @@ abstract interface class NotificationRepository {
 
   /// Marks every entry read; returns how many changed.
   Future<int> markAllRead();
+
+  /// Unread entries across all pages, for the badge
+  /// (`me_notifications_unread_count`, api-requests #45).
+  Future<int> unreadCount();
 }
 
 /// `me_notifications_list`, `me_notifications_read`,
-/// `me_notifications_read_all`. Another user's id is 404.
+/// `me_notifications_read_all`, `me_notifications_unread_count`. Another
+/// user's id is 404.
 class ApiNotificationRepository implements NotificationRepository {
   const ApiNotificationRepository(this._api);
 
@@ -94,6 +99,18 @@ class ApiNotificationRepository implements NotificationRepository {
       throw ApiError.fromDioException(e);
     }
   }
+
+  @override
+  Future<int> unreadCount() async {
+    try {
+      final result = await _api
+          .getNotificationsApi()
+          .meNotificationsUnreadCount();
+      return result.data?.unread ?? 0;
+    } on DioException catch (e) {
+      throw ApiError.fromDioException(e);
+    }
+  }
 }
 
 /// Maps the generated entry. Only a `jivo://` link is kept (anything else
@@ -122,6 +139,9 @@ class UnavailableNotificationRepository implements NotificationRepository {
 
   @override
   Future<int> markAllRead() async => 0;
+
+  @override
+  Future<int> unreadCount() async => 0;
 }
 
 /// Demo inbox (`FAKE_API=true` and tests).
@@ -159,6 +179,12 @@ class FakeNotificationRepository implements NotificationRepository {
       items: _items.sublist(start, end),
       nextPage: end < _items.length ? page + 1 : null,
     );
+  }
+
+  @override
+  Future<int> unreadCount() async {
+    _maybeFail();
+    return _items.where((n) => !n.read).length;
   }
 
   @override

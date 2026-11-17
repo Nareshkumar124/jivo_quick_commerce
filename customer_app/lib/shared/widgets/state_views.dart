@@ -137,6 +137,7 @@ class BusyButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.busy = false,
+    this.destructive = false,
     super.key,
   });
 
@@ -144,10 +145,20 @@ class BusyButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool busy;
 
+  /// Red (`danger.fg` / `danger.on`, 6.46:1) for an action that can't be
+  /// undone, such as cancelling an order (CA-28).
+  final bool destructive;
+
   @override
   Widget build(BuildContext context) => SizedBox(
     width: double.infinity,
     child: FilledButton(
+      style: destructive
+          ? FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            )
+          : null,
       onPressed: busy ? null : onPressed,
       child: busy
           ? SizedBox.square(

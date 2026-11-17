@@ -32,21 +32,32 @@ class ProductImage extends StatelessWidget {
     if (source == null || source.isEmpty) return placeholder;
     // Planned performance work: cached_network_image (disk cache across launches); the
     // catalog API serves image URLs since Phase 2.
-    final image = Image.network(
-      source,
-      fit: fit,
-      excludeFromSemantics: true,
-      errorBuilder: (_, _, _) => placeholder,
-      loadingBuilder: (context, child, progress) =>
-          progress == null ? child : placeholder,
-    );
-    if (!onWell) return image;
-    return ColorFiltered(
-      colorFilter: ColorFilter.mode(
-        context.customerColors.imageWell,
-        BlendMode.multiply,
-      ),
-      child: image,
+    // Decoded at the size it is drawn (CA-15): a 1000 px photo in a 56 dp
+    // thumbnail costs 56 dp x devicePixelRatio, not the full bitmap.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final cacheWidth = width.isFinite && width > 0
+            ? (width * MediaQuery.devicePixelRatioOf(context)).round()
+            : null;
+        final image = Image.network(
+          source,
+          fit: fit,
+          cacheWidth: cacheWidth,
+          excludeFromSemantics: true,
+          errorBuilder: (_, _, _) => placeholder,
+          loadingBuilder: (context, child, progress) =>
+              progress == null ? child : placeholder,
+        );
+        if (!onWell) return image;
+        return ColorFiltered(
+          colorFilter: ColorFilter.mode(
+            context.customerColors.imageWell,
+            BlendMode.multiply,
+          ),
+          child: image,
+        );
+      },
     );
   }
 }

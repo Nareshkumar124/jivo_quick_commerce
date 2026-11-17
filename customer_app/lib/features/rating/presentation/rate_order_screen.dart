@@ -242,6 +242,34 @@ class StarRatingPicker extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final color = context.jivoColors.warning;
     final onChanged = this.onChanged;
+    if (onChanged == null) {
+      // Read-only (CA-34): one screen-reader stop, "Rated 4 out of 5", not
+      // five disabled buttons; empty stars in text.secondary, not the 38%
+      // disabled colour.
+      final empty = Theme.of(context).colorScheme.onSurfaceVariant;
+      return Semantics(
+        label: l10n.ratedOutOfFive(value),
+        excludeSemantics: true,
+        child: Row(
+          key: const Key('stars-read-only'),
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var star = 1; star <= 5; star++)
+              SizedBox.square(
+                key: Key('star-$star'),
+                dimension: 48,
+                child: Icon(
+                  star <= value
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
+                  size: 36,
+                  color: star <= value ? color : empty,
+                ),
+              ),
+          ],
+        ),
+      );
+    }
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -253,7 +281,7 @@ class StarRatingPicker extends StatelessWidget {
               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
               iconSize: 36,
               tooltip: l10n.rateStars(star),
-              onPressed: onChanged == null ? null : () => onChanged(star),
+              onPressed: () => onChanged(star),
               icon: Icon(
                 star <= value ? Icons.star_rounded : Icons.star_border_rounded,
                 color: star <= value ? color : null,

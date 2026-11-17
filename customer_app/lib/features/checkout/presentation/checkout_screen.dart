@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/redirect.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_texts.dart';
 import '../../cart/presentation/widgets/bill_details.dart';
+import '../../cart/presentation/widgets/checkout_blocker.dart';
 import '../../cart/presentation/widgets/delivery_address_card.dart';
 import '../../location/presentation/delivery_controller.dart';
 import '../../orders/domain/order.dart';
@@ -23,11 +25,26 @@ import 'payment_failed_screen.dart';
 /// Cash on Delivery is offered only when the server says the cart is
 /// eligible. The button is disabled while the order is placed and paid
 /// (double-tap protection), and Back is blocked until the flow ends.
-class CheckoutScreen extends ConsumerWidget {
+class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
+}
+
+class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // The checkout state lives for the session: a notice from an earlier
+    // visit is stale on a fresh one (CA-19).
+    Future.microtask(() {
+      if (mounted) ref.read(checkoutProvider.notifier).clearPriceChange();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final checkout = ref.watch(checkoutProvider);
@@ -68,6 +85,9 @@ class CheckoutScreen extends ConsumerWidget {
           );
           return;
         }
+        // A changed total stays on screen as a notice above the payment
+        // methods instead of a snackbar that is easy to miss (CA-19).
+        if (priceChangeOf(error) != null) return;
         // What changed, from the error's details; the cart was reloaded.
         showMessage(context, cartErrorText(context, error, cart: snapshot));
         // Flagged lines, and too few units, are fixed on the cart screen.
@@ -137,6 +157,13 @@ class CheckoutScreen extends ConsumerWidget {
           children: [
             const DeliveryAddressCard(),
             const SizedBox(height: JivoSpacing.lg),
+            // Only while the bill on screen is the changed one: after the
+            // cart changes again the notice is stale (CA-19).
+            if (checkout.priceChange case final change?
+                when isSameAmount(change.after, bill.grandTotal)) ...[
+              PriceChangedNotice(change: change),
+              const SizedBox(height: JivoSpacing.lg),
+            ],
             Semantics(
               header: true,
               child: Text(l10n.payWith, style: theme.textTheme.titleMedium),
@@ -207,16 +234,7 @@ class CheckoutScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (blocker != null && !checkout.busy)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
-                      child: Text(
-                        blocker,
-                        key: const Key('checkout-blocked'),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
-                      ),
-                    ),
+                    CheckoutBlockerText(blocker),
                   if (progress != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
@@ -280,6 +298,68 @@ Future<void> _showPendingOrder(BuildContext context, int orderId) async {
   );
   if ((open ?? false) && context.mounted) {
     await context.push(Routes.paymentFailed(orderId));
+  }
+}
+
+/// The total changed at Place order (`PRICE_CHANGED`, CA-19): a notice that
+/// stays until an order is placed or the method changes. Both amounts are
+/// the server's, from the error's details.
+class PriceChangedNotice extends StatelessWidget {
+  const PriceChangedNotice({required this.change, super.key});
+
+  final PriceChange change;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colors = context.customerColors;
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        key: const Key('price-changed-notice'),
+        padding: const EdgeInsets.all(JivoSpacing.md),
+        decoration: BoxDecoration(
+          color: colors.warningTint,
+          borderRadius: BorderRadius.circular(JivoRadii.md),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExcludeSemantics(
+              child: Icon(
+                Icons.info_outline,
+                color: context.jivoColors.warning,
+              ),
+            ),
+            const SizedBox(width: JivoSpacing.sm),
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: l10n.priceChangedNoticeTitle,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const TextSpan(text: ' '),
+                    TextSpan(
+                      text: l10n.priceChangedNoticeBody(
+                        displayRupees(change.before),
+                        displayRupees(change.after),
+                      ),
+                    ),
+                  ],
+                ),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

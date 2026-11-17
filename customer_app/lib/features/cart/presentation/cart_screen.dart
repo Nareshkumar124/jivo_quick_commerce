@@ -14,6 +14,7 @@ import 'cart_controller.dart';
 import 'cart_texts.dart';
 import 'widgets/bill_details.dart';
 import 'widgets/cart_line_tile.dart';
+import 'widgets/checkout_blocker.dart';
 import 'widgets/coupon_sheet.dart';
 import 'widgets/delivery_address_card.dart';
 import 'widgets/instructions_selector.dart';
@@ -116,6 +117,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           : _CheckoutBar(
               snapshot: snapshot,
               busy: cart.busy || _proceeding,
+              updating: cart.busy,
               proceeding: _proceeding,
               onProceed: _proceed,
             ),
@@ -206,7 +208,7 @@ class _CartContent extends StatelessWidget {
           _Notice(
             key: const Key('free-delivery-nudge'),
             icon: Icons.local_shipping_outlined,
-            text: l10n.freeDeliveryNudge(formatRupees(nudge)),
+            text: l10n.freeDeliveryNudge(displayRupees(nudge)),
             color: context.jivoColors.success,
           ),
         ],
@@ -281,7 +283,7 @@ class _CouponRow extends ConsumerWidget {
         ),
         // The server's reason has no amount to fill into an ARB string.
         subtitle: applies
-            ? Text(l10n.couponSaves(formatRupees(applied.discount)))
+            ? Text(l10n.couponSaves(displayRupees(applied.discount)))
             : (applied.message == null ? null : Text(applied.message!)),
         onTap: () => showCouponSheet(context),
         trailing: TextButton(
@@ -338,12 +340,16 @@ class _CheckoutBar extends ConsumerWidget {
   const _CheckoutBar({
     required this.snapshot,
     required this.busy,
+    required this.updating,
     required this.proceeding,
     required this.onProceed,
   });
 
   final CartSnapshot snapshot;
   final bool busy;
+
+  /// A cart change is in flight: the total shown is about to change.
+  final bool updating;
   final bool proceeding;
   final VoidCallback onProceed;
 
@@ -356,6 +362,45 @@ class _CheckoutBar extends ConsumerWidget {
     final blocked = snapshot.checkout.canPlaceOrder
         ? null
         : checkoutBlockerText(l10n, snapshot);
+    // A total that can't be shown can't be checked out (CA-33).
+    final total = formatRupeesOrNull(snapshot.bill!.grandTotal);
+    final totalBlock = MergeSemantics(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(l10n.billToPay, style: theme.textTheme.labelMedium),
+          Text(
+            total ?? '—',
+            key: const Key('checkout-bar-total'),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          // CA-20: the total is being re-priced by the server.
+          if (updating)
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                l10n.cartUpdating,
+                key: const Key('checkout-bar-updating'),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    final button = BusyButton(
+      key: const Key('proceed-to-checkout'),
+      label: l10n.proceedToCheckout,
+      busy: proceeding,
+      onPressed: !snapshot.checkout.canPlaceOrder || busy || total == null
+          ? null
+          : onProceed,
+    );
+    final stacked = stackCheckoutBar(context);
 
     return Material(
       elevation: 8,
@@ -368,51 +413,19 @@ class _CheckoutBar extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (blocked != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
-                  child: Text(
-                    blocked,
-                    key: const Key('checkout-blocked'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.error,
-                    ),
-                  ),
+              if (blocked != null) CheckoutBlockerText(blocked),
+              if (stacked) ...[
+                totalBlock,
+                const SizedBox(height: JivoSpacing.sm),
+                button,
+              ] else
+                Row(
+                  children: [
+                    totalBlock,
+                    const SizedBox(width: JivoSpacing.lg),
+                    Expanded(child: button),
+                  ],
                 ),
-              Row(
-                children: [
-                  MergeSemantics(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          l10n.billToPay,
-                          style: theme.textTheme.labelMedium,
-                        ),
-                        Text(
-                          formatRupees(snapshot.bill!.grandTotal),
-                          key: const Key('checkout-bar-total'),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: JivoSpacing.lg),
-                  Expanded(
-                    child: BusyButton(
-                      key: const Key('proceed-to-checkout'),
-                      label: l10n.proceedToCheckout,
-                      busy: proceeding,
-                      onPressed: !snapshot.checkout.canPlaceOrder || busy
-                          ? null
-                          : onProceed,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),

@@ -45,7 +45,7 @@ bool needsMinQtyHint(List<CatalogProduct> items) =>
 ({String price, int from})? bulkPriceOf(CatalogVariant variant) {
   if (variant.priceTiers.length < 2) return null;
   final last = priceTierRows(variant.priceTiers).last;
-  if (formatRupees(last.price) == formatRupees(variant.sellingPrice)) {
+  if (displayRupees(last.price) == displayRupees(variant.sellingPrice)) {
     return null;
   }
   return (price: last.price, from: last.from);
@@ -53,7 +53,8 @@ bool needsMinQtyHint(List<CatalogProduct> items) =>
 
 /// A product card (`03 §2.5`): image well, discount badge, veg mark, name,
 /// pack size, bold price per carton, the gold bulk-price label, stock label
-/// and the gold ADD button. Out-of-stock cards are greyed out. With several
+/// and the gold ADD button. Out-of-stock cards grey only the image and show
+/// the stock pill instead of ADD (CA-11). With several
 /// variants, ADD opens a variant picker.
 class ProductTile extends StatelessWidget {
   const ProductTile({required this.product, super.key});
@@ -69,8 +70,8 @@ class ProductTile extends StatelessWidget {
     final discount = variant.discountPercent;
     final unitsLeft = variant.lowStockUnits;
     final bulk = bulkPriceOf(variant);
-    final selling = formatRupees(variant.sellingPrice);
-    final listed = formatRupees(variant.mrp);
+    final selling = displayRupees(variant.sellingPrice);
+    final listed = displayRupees(variant.mrp);
     final pill = BoxDecoration(
       color: theme.colorScheme.primaryContainer,
       borderRadius: BorderRadius.circular(JivoRadii.pill),
@@ -91,10 +92,13 @@ class ProductTile extends StatelessWidget {
               Positioned.fill(
                 child: Padding(
                   padding: const EdgeInsets.all(8),
-                  child: ProductImage(
-                    url: variant.imageUrl ?? product.imageUrl,
-                    fit: BoxFit.contain,
-                    onWell: true,
+                  child: OutOfStockImage(
+                    outOfStock: !product.inStock,
+                    child: ProductImage(
+                      url: variant.imageUrl ?? product.imageUrl,
+                      fit: BoxFit.contain,
+                      onWell: true,
+                    ),
                   ),
                 ),
               ),
@@ -122,27 +126,29 @@ class ProductTile extends StatelessWidget {
       ],
     );
     final pills = Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            MergeSemantics(child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: pill,
-              child: Text(
-                product.hasOptions
-                    ? l10n.variantOptions(variant.name, product.variants.length)
-                    : variant.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
+      spacing: 6,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        MergeSemantics(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: pill,
+            child: Text(
+              product.hasOptions
+                  ? l10n.variantOptions(variant.name, product.variants.length)
+                  : variant.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onPrimaryContainer,
               ),
-            )),
-            if (variant.hasMinQty) MinQtyHint(variant: variant, compact: true),
-          ],
-        );
+            ),
+          ),
+        ),
+        if (variant.hasMinQty) MinQtyHint(variant: variant, compact: true),
+      ],
+    );
     final bottom = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -202,7 +208,7 @@ class ProductTile extends StatelessWidget {
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
-                    l10n.bulkPriceFrom(formatRupees(bulk.price), bulk.from),
+                    l10n.bulkPriceFrom(displayRupees(bulk.price), bulk.from),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelMedium?.copyWith(
@@ -226,36 +232,64 @@ class ProductTile extends StatelessWidget {
       ],
     );
 
-    return Opacity(
-      opacity: product.inStock ? 1 : 0.6,
-      child: Card(
-        key: ValueKey('tile-${product.id}'),
-        margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => context.push(Routes.product(product.slug)),
-          child: Padding(
-            padding: const EdgeInsets.all(_padding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                MergeSemantics(child: top),
-                const SizedBox(height: 4),
-                pills,
-                MergeSemantics(child: bottom),
-                const Spacer(),
-                const SizedBox(height: 8),
-                if (product.hasOptions)
-                  _OptionsControl(product: product)
-                else
-                  AddStepper(variant: variant, productName: product.name),
-              ],
-            ),
+    // Out of stock: only the image is greyed (CA-11); every text keeps its
+    // full contrast and the stock pill replaces ADD.
+    return Card(
+      key: ValueKey('tile-${product.id}'),
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => context.push(Routes.product(product.slug)),
+        child: Padding(
+          padding: const EdgeInsets.all(_padding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              MergeSemantics(child: top),
+              const SizedBox(height: 4),
+              pills,
+              MergeSemantics(child: bottom),
+              const Spacer(),
+              const SizedBox(height: 8),
+              if (product.hasOptions)
+                _OptionsControl(product: product)
+              else
+                AddStepper(variant: variant, productName: product.name),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+/// Greys a product image (saturation 0, half opacity) when the product is
+/// out of stock. Only the image: text on the card keeps full contrast
+/// (CA-11).
+class OutOfStockImage extends StatelessWidget {
+  const OutOfStockImage({
+    required this.outOfStock,
+    required this.child,
+    super.key,
+  });
+
+  final bool outOfStock;
+  final Widget child;
+
+  static const _greyscale = ColorFilter.matrix(<double>[
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0.2126, 0.7152, 0.0722, 0, 0, //
+    0, 0, 0, 1, 0, //
+  ]);
+
+  @override
+  Widget build(BuildContext context) => outOfStock
+      ? Opacity(
+          opacity: 0.5,
+          child: ColorFiltered(colorFilter: _greyscale, child: child),
+        )
+      : child;
 }
 
 /// ADD (or the total in the cart) for a product with several variants:
@@ -404,6 +438,12 @@ class ProductRail extends StatelessWidget {
 
   static const tileWidth = 160.0;
 
+  /// Wider tiles at large text, up to 1.5x (CA-14), so names stay readable.
+  static double tileWidthFor(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    return tileWidth * scale.clamp(1.0, 1.5);
+  }
+
   @override
   Widget build(BuildContext context) => SizedBox(
     height: productTileExtent(context, minQtyHint: needsMinQtyHint(items)),
@@ -413,7 +453,7 @@ class ProductRail extends StatelessWidget {
       itemCount: items.length,
       separatorBuilder: (_, _) => const SizedBox(width: JivoSpacing.sm),
       itemBuilder: (_, i) => SizedBox(
-        width: tileWidth,
+        width: tileWidthFor(context),
         child: ProductTile(product: items[i]),
       ),
     ),

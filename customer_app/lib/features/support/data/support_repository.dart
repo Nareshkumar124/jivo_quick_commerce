@@ -264,6 +264,10 @@ class FakeSupportRepository implements SupportRepository {
     lastMessage: last ?? t.lastMessage,
   );
 
+  /// Support answers [ticketId] (tests, CA-30).
+  void supportReplies(int ticketId, String body) =>
+      _addMessage(ticketId, body, fromSupport: true, at: _clock());
+
   /// Support closes [ticketId] (tests).
   void close(int ticketId) => _tickets[ticketId] = _with(
     _tickets[ticketId]!,

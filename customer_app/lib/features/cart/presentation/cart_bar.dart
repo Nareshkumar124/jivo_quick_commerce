@@ -29,6 +29,44 @@ class CartBar extends ConsumerWidget {
       ?formatRupeesOrNull(total),
     ].join(' · ');
 
+    // From 1.5x text the summary and "View cart" no longer fit on one
+    // line on a 360 dp phone: the pill moves under the summary.
+    final stacked = MediaQuery.textScalerOf(context).scale(14) / 14 >= 1.5;
+    const icon = Icon(Icons.shopping_bag_rounded, color: Colors.white);
+    const gap = SizedBox(width: JivoSpacing.md);
+    final summaryText = Expanded(
+      child: Text(
+        summary,
+        style: Theme.of(context).textTheme.titleSmall
+            ?.copyWith(color: Colors.white),
+      ),
+    );
+    final pill = DecoratedBox(
+      decoration: BoxDecoration(
+        color: cc.gold,
+        borderRadius: BorderRadius.circular(JivoRadii.pill),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 9, 8, 9),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                l10n.viewCart,
+                style: TextStyle(
+                  color: cc.onGold,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 20, color: cc.onGold),
+          ],
+        ),
+      ),
+    );
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -54,47 +92,24 @@ class CartBar extends ConsumerWidget {
                   horizontal: JivoSpacing.lg,
                   vertical: JivoSpacing.sm,
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.shopping_bag_rounded, color: Colors.white),
-                    const SizedBox(width: JivoSpacing.md),
-                    Expanded(
-                      child: Text(
-                        summary,
-                        style: Theme.of(context).textTheme.titleSmall
-                            ?.copyWith(color: Colors.white),
+                child: stacked
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(children: [icon, gap, summaryText]),
+                          const SizedBox(height: JivoSpacing.sm),
+                          Align(alignment: Alignment.centerRight, child: pill),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          icon,
+                          gap,
+                          summaryText,
+                          const SizedBox(width: JivoSpacing.sm),
+                          pill,
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: JivoSpacing.sm),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: cc.gold,
-                        borderRadius: BorderRadius.circular(JivoRadii.pill),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 9, 8, 9),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              l10n.viewCart,
-                              style: TextStyle(
-                                color: cc.onGold,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              size: 20,
-                              color: cc.onGold,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),

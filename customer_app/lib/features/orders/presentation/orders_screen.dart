@@ -93,22 +93,29 @@ class _OrderList extends ConsumerWidget {
           ),
         ),
     ];
+    bool nearEnd(ScrollMetrics metrics) {
+      if (metrics.extentAfter < 400 &&
+          state.hasMore &&
+          state.loadMoreError == null) {
+        controller.loadMore();
+      }
+      return false;
+    }
+
     return RefreshIndicator(
       onRefresh: controller.refresh,
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification.metrics.extentAfter < 400 &&
-              state.hasMore &&
-              state.loadMoreError == null) {
-            controller.loadMore();
-          }
-          return false;
-        },
-        child: ListView(
-          key: const Key('orders-list'),
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: JivoSpacing.xl),
-          children: rows,
+      // Metrics too: a first page shorter than the screen never scrolls,
+      // so it loads the next page after layout (CA-29).
+      child: NotificationListener<ScrollMetricsNotification>(
+        onNotification: (notification) => nearEnd(notification.metrics),
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) => nearEnd(notification.metrics),
+          child: ListView(
+            key: const Key('orders-list'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: JivoSpacing.xl),
+            children: rows,
+          ),
         ),
       ),
     );
@@ -174,7 +181,7 @@ class OrderListTile extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      formatRupees(order.grandTotal),
+                      displayRupees(order.grandTotal),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),

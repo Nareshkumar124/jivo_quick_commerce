@@ -74,7 +74,7 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
               content: Text(
                 l10n.couponAppliedMessage(
                   applied.code,
-                  formatRupees(applied.discount),
+                  displayRupees(applied.discount),
                 ),
               ),
             ),
@@ -257,7 +257,7 @@ class _CouponCard extends StatelessWidget {
                       ),
                     if (eligible && savings != null)
                       Text(
-                        l10n.couponSavesOnCart(formatRupees(savings)),
+                        l10n.couponSavesOnCart(displayRupees(savings)),
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: context.jivoColors.success,
                         ),

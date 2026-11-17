@@ -2383,4 +2383,92 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get codPayRiderHint =>
       'Cash on delivery. Pay by cash or UPI when your order arrives.';
+
+  @override
+  String addressMoreOptions(String label) {
+    return 'More options for $label';
+  }
+
+  @override
+  String get vegShort => 'Veg';
+
+  @override
+  String get nonVegShort => 'Non-veg';
+
+  @override
+  String get cartUpdating => 'Updating…';
+
+  @override
+  String get priceChangedNoticeTitle => 'Your total changed';
+
+  @override
+  String priceChangedNoticeBody(String before, String after) {
+    return 'from $before to $after. Check the bill below, then pay.';
+  }
+
+  @override
+  String removedFromCart(String name) {
+    return 'Removed $name';
+  }
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String unsuppliedTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items couldn\'t be supplied',
+      one: '1 item couldn\'t be supplied',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String unsuppliedLine(String name, int missing, int ordered) {
+    return '$name: $missing of $ordered';
+  }
+
+  @override
+  String unsuppliedMore(int count) {
+    return 'and $count more';
+  }
+
+  @override
+  String unsuppliedRefundPending(String amount) {
+    return '$amount is being refunded to your original payment method.';
+  }
+
+  @override
+  String refundUnsuppliedCompleted(String amount) {
+    return '$amount refunded for items the store couldn\'t supply.';
+  }
+
+  @override
+  String refundUnsuppliedInProgress(String amount) {
+    return 'Refund of $amount for items the store couldn\'t supply has started. It reaches your original payment method in 5–7 working days.';
+  }
+
+  @override
+  String get ticketNewReply => 'New reply';
+
+  @override
+  String charactersUsed(int used, int max) {
+    return '$used of $max characters used';
+  }
+
+  @override
+  String ratedOutOfFive(int stars) {
+    return 'Rated $stars out of 5';
+  }
+
+  @override
+  String get detectingLocation =>
+      'Finding your location… This can take a few seconds.';
+
+  @override
+  String bannerSemanticsOf(String title, int index, int count) {
+    return 'Offer: $title, banner $index of $count';
+  }
 }

@@ -100,53 +100,16 @@ class AddressListScreen extends ConsumerWidget {
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, i) {
               final address = value[i];
-              return ListTile(
-                leading: Icon(switch (address.input.label) {
-                  AddressLabel.home => Icons.home_outlined,
-                  AddressLabel.work => Icons.work_outline,
-                  AddressLabel.other => Icons.location_on_outlined,
-                }),
-                title: Row(
-                  children: [
-                    Flexible(child: Text(labelText(l10n, address))),
-                    if (!address.isServiceable) ...[
-                      const SizedBox(width: JivoSpacing.sm),
-                      Chip(
-                        label: Text(l10n.addressNotServiceable),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
-                    if (address.isDefault) ...[
-                      const SizedBox(width: JivoSpacing.sm),
-                      Chip(
-                        label: Text(l10n.defaultAddress),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
-                  ],
+              return AddressListTile(
+                address: address,
+                onEdit: () => context.push(Routes.editAddress(address.id)),
+                onSetDefault: () => _run(
+                  context,
+                  () => ref
+                      .read(addressListProvider.notifier)
+                      .setDefault(address.id),
                 ),
-                subtitle: Text(address.summary),
-                trailing: PopupMenuButton<String>(
-                  onSelected: (action) => switch (action) {
-                    'edit' => context.push(Routes.editAddress(address.id)),
-                    'default' => _run(
-                      context,
-                      () => ref
-                          .read(addressListProvider.notifier)
-                          .setDefault(address.id),
-                    ),
-                    _ => _delete(context, ref, address),
-                  },
-                  itemBuilder: (_) => [
-                    PopupMenuItem(value: 'edit', child: Text(l10n.edit)),
-                    if (!address.isDefault)
-                      PopupMenuItem(
-                        value: 'default',
-                        child: Text(l10n.setAsDefault),
-                      ),
-                    PopupMenuItem(value: 'delete', child: Text(l10n.delete)),
-                  ],
-                ),
+                onDelete: () => _delete(context, ref, address),
               );
             },
           ),
@@ -157,6 +120,72 @@ class AddressListScreen extends ConsumerWidget {
         ),
         _ => const SkeletonList(),
       },
+    );
+  }
+}
+
+/// One saved address in the list. The label and its flags wrap (CA-08),
+/// so nothing is clipped at large text; each flag carries an icon as well
+/// as its colour, and the menu names the address for screen readers.
+class AddressListTile extends StatelessWidget {
+  const AddressListTile({
+    required this.address,
+    required this.onEdit,
+    required this.onSetDefault,
+    required this.onDelete,
+    super.key,
+  });
+
+  final SavedAddress address;
+  final VoidCallback onEdit;
+  final VoidCallback onSetDefault;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final label = labelText(l10n, address);
+    return ListTile(
+      leading: Icon(switch (address.input.label) {
+        AddressLabel.home => Icons.home_outlined,
+        AddressLabel.work => Icons.work_outline,
+        AddressLabel.other => Icons.location_on_outlined,
+      }),
+      title: Wrap(
+        spacing: JivoSpacing.sm,
+        runSpacing: JivoSpacing.xs,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(label),
+          if (!address.isServiceable)
+            Chip(
+              avatar: const Icon(Icons.location_off, size: 18),
+              label: Text(l10n.addressNotServiceable),
+              visualDensity: VisualDensity.compact,
+            ),
+          if (address.isDefault)
+            Chip(
+              avatar: const Icon(Icons.star, size: 18),
+              label: Text(l10n.defaultAddress),
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
+      subtitle: Text(address.summary),
+      trailing: PopupMenuButton<String>(
+        tooltip: l10n.addressMoreOptions(label),
+        onSelected: (action) => switch (action) {
+          'edit' => onEdit(),
+          'default' => onSetDefault(),
+          _ => onDelete(),
+        },
+        itemBuilder: (_) => [
+          PopupMenuItem(value: 'edit', child: Text(l10n.edit)),
+          if (!address.isDefault)
+            PopupMenuItem(value: 'default', child: Text(l10n.setAsDefault)),
+          PopupMenuItem(value: 'delete', child: Text(l10n.delete)),
+        ],
+      ),
     );
   }
 }

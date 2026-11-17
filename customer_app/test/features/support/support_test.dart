@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
 import 'package:customer_app/features/support/data/support_repository.dart';
 import 'package:customer_app/features/support/domain/support_models.dart';
 import 'package:customer_app/features/support/presentation/help_screen.dart';
+import 'package:customer_app/shared/widgets/state_views.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
@@ -296,6 +299,139 @@ void main() {
       expect(find.text('Open'), findsOneWidget);
     });
 
+    testWidgets('CA-30: a support reply appears on the open thread by '
+        'itself; the counter shows from 900 characters', (tester) async {
+      await openHelp(tester, app());
+      await tester.tap(find.byKey(const Key('help-tickets')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ticket-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('We are checking with the store'), findsNothing);
+
+      support.supportReplies(1, 'We are checking with the store');
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(find.text('We are checking with the store'), findsOneWidget);
+
+      expect(find.byKey(const Key('ticket-reply-counter')), findsNothing);
+      await tester.enterText(find.byKey(const Key('ticket-reply')), 'x' * 900);
+      await tester.pump();
+      expect(find.text('900/1000'), findsOneWidget);
+    });
+
+    Future<void> openTicket1(WidgetTester tester) async {
+      await openHelp(tester, app());
+      await tester.tap(find.byKey(const Key('help-tickets')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ticket-1')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('CA-30: a poll that started before a send does not '
+        'overwrite the sent reply', (tester) async {
+      final gated = _GatedSupport();
+      support = gated;
+      await openTicket1(tester);
+
+      final before = gated.reads;
+      gated.gate = Completer<void>();
+      await tester.pump(const Duration(seconds: 15)); // poll starts, waits
+      expect(gated.reads, before + 1);
+
+      await tester.enterText(find.byKey(const Key('ticket-reply')), 'Fresh');
+      await tester.tap(find.byKey(const Key('ticket-send')));
+      await tester.pumpAndSettle();
+      expect(find.text('Fresh'), findsOneWidget);
+
+      gated.gate!.complete(); // the stale thread (without "Fresh") lands
+      gated.gate = null;
+      await tester.pumpAndSettle();
+      expect(find.text('Fresh'), findsOneWidget);
+    });
+
+    testWidgets('CA-30: polls never overlap', (tester) async {
+      final gated = _GatedSupport();
+      support = gated;
+      await openTicket1(tester);
+      final before = gated.reads;
+      gated.gate = Completer<void>();
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pump(const Duration(seconds: 15));
+      expect(gated.reads, before + 1, reason: 'one poll in flight at a time');
+      gated.gate!.complete();
+      gated.gate = null;
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('CA-30: a failed poll keeps the thread', (tester) async {
+      await openTicket1(tester);
+      support.failNext = const ApiError(code: ApiErrorCode.network);
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('ticket-thread')), findsOneWidget);
+      expect(find.byType(ErrorRetryView), findsNothing);
+    });
+
+    testWidgets('CA-30: a reply while scrolled up shows "New reply"; the '
+        'pill scrolls to it', (tester) async {
+      for (var i = 0; i < 30; i++) {
+        support.supportReplies(1, 'Older message $i');
+      }
+      await openTicket1(tester);
+      final list = find.byKey(const Key('ticket-thread'));
+      final position = tester
+          .state<ScrollableState>(
+            find.descendant(of: list, matching: find.byType(Scrollable)),
+          )
+          .position;
+      expect(
+        position.pixels,
+        position.maxScrollExtent,
+        reason:
+            'opens at '
+            'the newest message',
+      );
+
+      position.jumpTo(0);
+      await tester.pump();
+      support.supportReplies(1, 'Newest answer');
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('ticket-new-reply')), findsOneWidget);
+      expect(position.pixels, 0);
+
+      await tester.tap(find.byKey(const Key('ticket-new-reply')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('ticket-new-reply')), findsNothing);
+      expect(position.pixels, position.maxScrollExtent);
+      expect(find.text('Newest answer'), findsOneWidget);
+    });
+
+    testWidgets('CA-30: no polling after leaving the thread', (tester) async {
+      final gated = _GatedSupport();
+      support = gated;
+      await openTicket1(tester);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      final before = gated.reads;
+      await tester.pump(const Duration(seconds: 60));
+      expect(gated.reads, before);
+    });
+
+    testWidgets('CA-30: no polling on a closed ticket', (tester) async {
+      support.close(1);
+      await openHelp(tester, app());
+      await tester.tap(find.byKey(const Key('help-tickets')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ticket-1')));
+      await tester.pumpAndSettle();
+      support.supportReplies(1, 'Late note');
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pumpAndSettle();
+      expect(find.text('Late note'), findsNothing);
+    });
+
     testWidgets('no tickets: empty state', (tester) async {
       support = FakeSupportRepository(seed: false);
       await openHelp(tester, app());
@@ -304,4 +440,20 @@ void main() {
       expect(find.byKey(const Key('tickets-empty')), findsOneWidget);
     });
   });
+}
+
+/// Counts thread reads; while [gate] is set, a read returns the thread as
+/// it was when the read started, once the gate opens (a slow network).
+class _GatedSupport extends FakeSupportRepository {
+  Completer<void>? gate;
+  int reads = 0;
+
+  @override
+  Future<TicketThread> ticket(int id) async {
+    reads++;
+    final snapshot = await super.ticket(id);
+    final wait = gate;
+    if (wait != null) await wait.future;
+    return snapshot;
+  }
 }

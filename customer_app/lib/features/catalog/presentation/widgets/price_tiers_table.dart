@@ -94,7 +94,7 @@ class _TierRowView extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final range = priceTierRangeText(l10n, row);
-    final price = formatRupees(row.price);
+    final price = displayRupees(row.price);
     return Semantics(
       label: l10n.priceTierRowSemantics(range, price),
       excludeSemantics: true,
@@ -152,7 +152,7 @@ class PriceTiersCompact extends StatelessWidget {
               Semantics(
                 label: l10n.priceTierRowSemantics(
                   priceTierRangeText(l10n, row),
-                  formatRupees(row.price),
+                  displayRupees(row.price),
                 ),
                 excludeSemantics: true,
                 child: DecoratedBox(
@@ -170,7 +170,7 @@ class PriceTiersCompact extends StatelessWidget {
                         null => l10n.priceTierFromShort(row.from),
                         final to when to == row.from => '$to',
                         final to => l10n.priceTierRangeShort(row.from, to),
-                      }, formatRupees(row.price)),
+                      }, displayRupees(row.price)),
                       style: chipStyle,
                     ),
                   ),

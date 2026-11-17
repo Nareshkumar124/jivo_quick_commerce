@@ -95,7 +95,36 @@ class TicketThreadController extends AsyncNotifier<TicketThread> {
   Future<TicketThread> build() =>
       ref.read(supportRepositoryProvider).ticket(ticketId);
 
+  /// Re-reads the thread in the background (CA-30: support replies while
+  /// the screen is open). A failure keeps the thread on screen; the next
+  /// poll tries again.
+  /// One poll at a time; [_writes] counts sends and reloads, so a poll
+  /// that started before one of them can't overwrite its newer thread.
+  bool _polling = false;
+  int _writes = 0;
+
+  Future<void> refreshQuietly() async {
+    if (_polling) return;
+    _polling = true;
+    final started = _writes;
+    try {
+      final thread = await ref.read(supportRepositoryProvider).ticket(ticketId);
+      if (!ref.mounted || started != _writes) return;
+      final shown = state.value;
+      // Never go back to an older thread than the one on screen.
+      if (shown != null && thread.messages.length < shown.messages.length) {
+        return;
+      }
+      state = AsyncData(thread);
+    } catch (_) {
+      // Keep what is shown.
+    } finally {
+      _polling = false;
+    }
+  }
+
   Future<void> reload() async {
+    _writes++;
     ref.invalidateSelf();
     await future;
   }
@@ -112,12 +141,14 @@ class TicketThreadController extends AsyncNotifier<TicketThread> {
       photos,
       (file) => repository.uploadPhoto(ticketId, file),
     );
+    _writes++;
     final thread = await repository.reply(
       ticketId,
       message.trim(),
       photoKeys: keys,
     );
     if (!ref.mounted) return;
+    _writes++;
     state = AsyncData(thread);
     ref.invalidate(ticketListProvider);
   }

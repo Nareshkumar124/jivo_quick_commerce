@@ -128,14 +128,12 @@ final inboxProvider =
       InboxController.new,
     );
 
-/// Unread entries for the badge, counted on the first page only.
-/// TODO(api): an `unread_count` on the list response would make this exact
-/// (api-requests, T-613). Zero when the inbox can't be read: the badge is
-/// never an error.
+/// Unread entries for the badge, across all pages: the server's count
+/// (`GET /me/notifications/unread-count/`, api-requests #45, CA-34). Zero
+/// when it can't be read: the badge is never an error.
 final inboxUnreadProvider = FutureProvider.autoDispose<int>((ref) async {
   try {
-    final first = await ref.read(notificationRepositoryProvider).list();
-    return first.items.where((n) => !n.read).length;
+    return await ref.read(notificationRepositoryProvider).unreadCount();
   } catch (_) {
     return 0;
   }

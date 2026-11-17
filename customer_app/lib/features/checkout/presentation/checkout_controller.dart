@@ -11,6 +11,21 @@ import '../../orders/presentation/pending_payment.dart';
 import '../domain/checkout_result.dart';
 import '../domain/idempotency_key.dart';
 
+/// The server's totals from a `PRICE_CHANGED` error (money strings, never
+/// computed in the app).
+typedef PriceChange = ({String before, String after});
+
+/// [PriceChange] from a `PRICE_CHANGED` error's details, when both totals
+/// are there.
+PriceChange? priceChangeOf(ApiError error) {
+  if (error.code != ApiErrorCode.priceChanged) return null;
+  final before = error.details['expected_grand_total'];
+  final after = error.details['grand_total'];
+  return before is String && after is String
+      ? (before: before, after: after)
+      : null;
+}
+
 /// Where the place-order flow is.
 enum CheckoutStep { idle, placing, paying, verifying }
 
@@ -22,6 +37,7 @@ class CheckoutState {
     this.result,
     this.error,
     this.pendingOrderId,
+    this.priceChange,
   });
 
   final PaymentMethod method;
@@ -38,6 +54,11 @@ class CheckoutState {
   /// `INVALID_STATE_TRANSITION` with `details.pending_order_id`): offer to
   /// retry or cancel that one (DL-44).
   final int? pendingOrderId;
+
+  /// The last `PRICE_CHANGED` at Place order: the server's old and new
+  /// totals from the error's details (CA-19). The screen keeps a notice up
+  /// until an order is placed or the payment method changes.
+  final PriceChange? priceChange;
 
   /// The Place order button stays disabled (double-tap protection).
   bool get busy => step != CheckoutStep.idle;
@@ -72,7 +93,12 @@ class CheckoutController extends Notifier<CheckoutState> {
   CheckoutState build() => const CheckoutState();
 
   void selectMethod(PaymentMethod method) {
-    if (!state.busy) state = CheckoutState(method: method);
+    if (state.busy) return;
+    // A new method is a new choice: the price-change notice goes.
+    state = CheckoutState(
+      method: method,
+      priceChange: method == state.method ? state.priceChange : null,
+    );
   }
 
   /// [expectedGrandTotal] is the server's total the customer is looking at.
@@ -82,7 +108,12 @@ class CheckoutController extends Notifier<CheckoutState> {
   }) async {
     if (state.busy) return;
     final method = state.method;
-    state = CheckoutState(method: method, step: CheckoutStep.placing);
+    var notice = state.priceChange;
+    state = CheckoutState(
+      method: method,
+      step: CheckoutStep.placing,
+      priceChange: notice,
+    );
     final request = PlaceOrderRequest(
       addressId: addressId,
       paymentMethod: method,
@@ -106,10 +137,19 @@ class CheckoutController extends Notifier<CheckoutState> {
       final pending = apiError.code == ApiErrorCode.invalidStateTransition
           ? apiError.details['pending_order_id']
           : null;
+      notice = priceChangeOf(apiError) ?? notice;
       if (ref.mounted) {
         state = pending is num
-            ? CheckoutState(method: method, pendingOrderId: pending.toInt())
-            : CheckoutState(method: method, error: apiError);
+            ? CheckoutState(
+                method: method,
+                pendingOrderId: pending.toInt(),
+                priceChange: notice,
+              )
+            : CheckoutState(
+                method: method,
+                error: apiError,
+                priceChange: notice,
+              );
       }
       return;
     }
@@ -120,7 +160,11 @@ class CheckoutController extends Notifier<CheckoutState> {
       return;
     }
     if (!ref.mounted) return;
-    state = CheckoutState(method: method, step: CheckoutStep.paying);
+    state = CheckoutState(
+      method: method,
+      step: CheckoutStep.paying,
+      priceChange: notice,
+    );
     final result = await ref
         .read(paymentFlowProvider)
         .pay(
@@ -130,6 +174,7 @@ class CheckoutController extends Notifier<CheckoutState> {
               state = CheckoutState(
                 method: method,
                 step: CheckoutStep.verifying,
+                priceChange: notice,
               );
             }
           },
@@ -152,8 +197,22 @@ class CheckoutController extends Notifier<CheckoutState> {
     }
   }
 
+  /// Drops the price-change notice (a fresh visit to checkout).
+  void clearPriceChange() {
+    if (state.priceChange == null || state.busy) return;
+    state = CheckoutState(
+      method: state.method,
+      result: state.result,
+      error: state.error,
+      pendingOrderId: state.pendingOrderId,
+    );
+  }
+
   /// The screen handled [CheckoutState.result] / [CheckoutState.error].
-  void acknowledge() => state = CheckoutState(method: state.method);
+  void acknowledge() => state = CheckoutState(
+    method: state.method,
+    priceChange: state.priceChange,
+  );
 
   static bool _sameRequest(PlaceOrderRequest? a, PlaceOrderRequest b) =>
       a != null &&

@@ -6,6 +6,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/launch_state.dart';
 import '../../../app/providers.dart';
 import '../../../app/redirect.dart';
+import '../../../app/theme.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
@@ -141,17 +142,8 @@ class _OrderBody extends ConsumerWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(JivoSpacing.gutter),
       children: [
-        // Status.
-        Row(
-          children: [
-            OrderStatusChip(status: order.status),
-            const Spacer(),
-            Text(
-              formatDateTime(order.placedAt ?? order.createdAt),
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
+        // Status: the chip and the date wrap at large text (CA-24).
+        OrderStatusRow(order: order),
         const SizedBox(height: JivoSpacing.sm),
         Text(
           orderStatusLabel(l10n, order.status),
@@ -166,6 +158,10 @@ class _OrderBody extends ConsumerWidget {
           l10n.orderStoreName(order.storeName),
           style: theme.textTheme.bodySmall,
         ),
+        if (order.unsuppliedLines.isNotEmpty) ...[
+          const SizedBox(height: JivoSpacing.md),
+          UnsuppliedItemsNotice(order: order),
+        ],
         if (order.status == OrderStatus.paymentPending) ...[
           const SizedBox(height: JivoSpacing.md),
           Text(l10n.orderAwaitingPayment),
@@ -288,7 +284,7 @@ class _OrderBody extends ConsumerWidget {
             onPressed: () => _cancel(context),
           )
         else if (order.needsSupportToCancel)
-          _ContactSupportCard(),
+          _ContactSupportCard(orderId: order.id),
         if (ref.watch(supportAvailableProvider))
           _ActionButton(
             buttonKey: const Key('order-help'),
@@ -427,6 +423,130 @@ class ReorderResultDialog extends StatelessWidget {
   }
 }
 
+/// The status chip and the order date (CA-24): a [Wrap], so a long status
+/// ("Packed, rider on the way to store") and the date never overflow at
+/// large text; the chip's own text wraps inside the available width.
+class OrderStatusRow extends StatelessWidget {
+  const OrderStatusRow({required this.order, super.key});
+
+  final OrderDetail order;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Wrap(
+      key: const Key('order-status-row'),
+      spacing: JivoSpacing.sm,
+      runSpacing: JivoSpacing.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+          child: OrderStatusChip(status: order.status),
+        ),
+        Text(
+          formatDateTime(order.placedAt ?? order.createdAt),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    ),
+  );
+}
+
+/// "1 item couldn't be supplied" near the top of the order (CA-27): which
+/// lines, and what it means for the money, from the server only: the
+/// `ITEMS_UNAVAILABLE` refund for an online order, or the new cash amount
+/// due for COD.
+class UnsuppliedItemsNotice extends StatelessWidget {
+  const UnsuppliedItemsNotice({required this.order, super.key});
+
+  final OrderDetail order;
+
+  static const _maxLines = 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final lines = order.unsuppliedLines;
+    // A count of units for the title, not money.
+    final units = lines.fold<int>(0, (n, l) => n + l.quantityUnavailable);
+    final refund = order.unavailableItemsRefund;
+    final codDue = order.codAmountDue;
+    final String? money;
+    if (codDue != null) {
+      money = l10n.codPayRiderTitle(displayRupees(codDue));
+    } else if (refund == null) {
+      money = null;
+    } else {
+      final amount = displayRupees(refund.amount);
+      money = switch (refund.status) {
+        RefundStatus.processed => l10n.refundCompleted(amount),
+        RefundStatus.failed => l10n.refundFailedNote(amount),
+        _ => l10n.unsuppliedRefundPending(amount),
+      };
+    }
+    final ink = theme.colorScheme.onSurface;
+    return Semantics(
+      container: true,
+      child: Container(
+        key: const Key('unsupplied-notice'),
+        padding: const EdgeInsets.all(JivoSpacing.md),
+        decoration: BoxDecoration(
+          color: context.customerColors.warningTint,
+          borderRadius: BorderRadius.circular(JivoRadii.md),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExcludeSemantics(
+              child: Icon(
+                Icons.info_outline,
+                color: context.jivoColors.warning,
+              ),
+            ),
+            const SizedBox(width: JivoSpacing.sm),
+            Expanded(
+              child: DefaultTextStyle.merge(
+                style: TextStyle(color: ink),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.unsuppliedTitle(units),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: ink,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    for (final line in lines.take(_maxLines))
+                      Text(
+                        l10n.unsuppliedLine(
+                          '${line.productName} ${line.variantName}',
+                          line.quantityUnavailable,
+                          line.quantity,
+                        ),
+                      ),
+                    if (lines.length > _maxLines)
+                      Text(l10n.unsuppliedMore(lines.length - _maxLines)),
+                    if (money != null) ...[
+                      const SizedBox(height: JivoSpacing.xs),
+                      Text(
+                        money,
+                        key: const Key('unsupplied-money'),
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _OrderLineRow extends StatelessWidget {
   const _OrderLineRow({required this.line});
 
@@ -454,7 +574,7 @@ class _OrderLineRow extends StatelessWidget {
                   Text(line.productName, style: theme.textTheme.bodyMedium),
                   Text(
                     '${line.variantName} · '
-                    '${l10n.orderLineQuantity(line.quantity, formatRupees(line.sellingPrice))}',
+                    '${l10n.orderLineQuantity(line.quantity, displayRupees(line.sellingPrice))}',
                     style: theme.textTheme.bodySmall,
                   ),
                   if (line.quantityUnavailable > 0)
@@ -469,7 +589,7 @@ class _OrderLineRow extends StatelessWidget {
             ),
             const SizedBox(width: JivoSpacing.sm),
             Text(
-              formatRupees(line.lineTotal),
+              displayRupees(line.lineTotal),
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
@@ -544,7 +664,7 @@ class _RefundLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final amount = formatRupees(refund.amount);
+    final amount = displayRupees(refund.amount);
     final processedAt = refund.processedAt;
     return Container(
       key: const Key('refund-line'),
@@ -556,9 +676,13 @@ class _RefundLine extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(switch (refund.status) {
-            RefundStatus.processed => l10n.refundCompleted(amount),
-            RefundStatus.failed => l10n.refundFailedNote(amount),
+          Text(switch ((refund.status, refund.reason)) {
+            (RefundStatus.processed, RefundReason.itemsUnavailable) =>
+              l10n.refundUnsuppliedCompleted(amount),
+            (RefundStatus.processed, _) => l10n.refundCompleted(amount),
+            (RefundStatus.failed, _) => l10n.refundFailedNote(amount),
+            (_, RefundReason.itemsUnavailable) =>
+              l10n.refundUnsuppliedInProgress(amount),
             _ => l10n.refundInProgress(amount),
           }),
           if (refund.status == RefundStatus.processed && processedAt != null)
@@ -648,6 +772,10 @@ class _RateOrderCard extends ConsumerWidget {
 }
 
 class _ContactSupportCard extends ConsumerWidget {
+  const _ContactSupportCard({required this.orderId});
+
+  final int orderId;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -674,6 +802,16 @@ class _ContactSupportCard extends ConsumerWidget {
                     .open(Uri(scheme: 'tel', path: phone)),
                 icon: const Icon(Icons.call_outlined),
                 label: Text(l10n.contactSupport),
+              ),
+            ] else if (ref.watch(supportAvailableProvider)) ...[
+              // No phone in config: never a card without an action (CA-28).
+              const SizedBox(height: JivoSpacing.sm),
+              OutlinedButton.icon(
+                key: const Key('contact-support-ticket'),
+                onPressed: () =>
+                    context.push(Routes.newTicket(orderId: orderId)),
+                icon: const Icon(Icons.support_agent),
+                label: Text(l10n.helpWithThisOrder),
               ),
             ],
           ],

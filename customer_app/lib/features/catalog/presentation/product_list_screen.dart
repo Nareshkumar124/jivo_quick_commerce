@@ -112,52 +112,127 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
           onRetry: () => ref.invalidate(categoriesProvider),
         ),
         AsyncData() when top == null => EmptyView(message: l10n.productsEmpty),
-        AsyncData() => Column(
-          children: [
-            if (store != null && !store.isOpen) StoreClosedBanner(store: store),
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _SubCategoryRail(
-                    category: top!,
+        AsyncData() => Builder(
+          builder: (context) {
+            final category = top!;
+            final grid = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: JivoSpacing.xs,
+                  ),
+                  child: TextButton.icon(
+                    key: const Key('sort-button'),
+                    onPressed: _chooseSort,
+                    icon: const Icon(Icons.sort),
+                    label: Text(l10n.sortButton(sortLabel(l10n, _sort))),
+                  ),
+                ),
+                Expanded(
+                  child: PagedProductGrid(
+                    query: CategoryQuery(_selected ?? category.slug, _sort),
+                    emptyMessage: l10n.productsEmpty,
+                  ),
+                ),
+              ],
+            );
+            void select(String? slug) => setState(() => _selected = slug);
+            // From 1.5x text the rail would fit a few characters per line:
+            // a row of chips under the app bar instead, and the grid takes
+            // the full width (CA-14).
+            final chips =
+                MediaQuery.textScalerOf(context).scale(14) / 14 >=
+                singleColumnTextScale;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (store != null && !store.isOpen)
+                  StoreClosedBanner(store: store),
+                if (chips)
+                  _SubCategoryChips(
+                    category: category,
                     selected: _selected,
-                    onSelected: (slug) => setState(() => _selected = slug),
+                    onSelected: select,
                   ),
-                  const VerticalDivider(width: 1),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: JivoSpacing.xs,
-                          ),
-                          child: TextButton.icon(
-                            key: const Key('sort-button'),
-                            onPressed: _chooseSort,
-                            icon: const Icon(Icons.sort),
-                            label: Text(
-                              l10n.sortButton(sortLabel(l10n, _sort)),
+                Expanded(
+                  child: chips
+                      ? grid
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _SubCategoryRail(
+                              category: category,
+                              selected: _selected,
+                              onSelected: select,
                             ),
-                          ),
+                            const VerticalDivider(width: 1),
+                            Expanded(child: grid),
+                          ],
                         ),
-                        Expanded(
-                          child: PagedProductGrid(
-                            query: CategoryQuery(_selected ?? top.slug, _sort),
-                            emptyMessage: l10n.productsEmpty,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
         _ => const ProductGridSkeleton(),
       },
+    );
+  }
+}
+
+/// The text scale from which the product list drops the side rail for a
+/// chip row and the grid becomes one column (`customer.textScale.
+/// singleColumnFrom`).
+const singleColumnTextScale = 1.5;
+
+List<({String? slug, String label, String? image})> _subCategoryEntries(
+  AppLocalizations l10n,
+  ProductCategory category,
+) => [
+  (slug: null, label: l10n.allInCategory, image: category.imageUrl),
+  for (final child in category.children)
+    (slug: child.slug, label: child.name, image: child.imageUrl),
+];
+
+/// The sub-categories as a horizontal row of chips, for large text (CA-14).
+class _SubCategoryChips extends StatelessWidget {
+  const _SubCategoryChips({
+    required this.category,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final ProductCategory category;
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = _subCategoryEntries(AppLocalizations.of(context), category);
+    return SingleChildScrollView(
+      key: const Key('sub-category-chips'),
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(
+        horizontal: JivoSpacing.gutter,
+        vertical: JivoSpacing.xs,
+      ),
+      child: Row(
+        children: [
+          for (final entry in entries)
+            Padding(
+              padding: const EdgeInsets.only(right: JivoSpacing.sm),
+              child: ChoiceChip(
+                key: ValueKey('rail-${entry.slug ?? 'all'}'),
+                materialTapTargetSize: MaterialTapTargetSize.padded,
+                selected: entry.slug == selected,
+                showCheckmark: true,
+                label: Text(entry.label),
+                onSelected: (_) => onSelected(entry.slug),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -179,15 +254,7 @@ class _SubCategoryRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final entries = [
-      (
-        slug: null as String?,
-        label: l10n.allInCategory,
-        image: category.imageUrl,
-      ),
-      for (final child in category.children)
-        (slug: child.slug, label: child.name, image: child.imageUrl),
-    ];
+    final entries = _subCategoryEntries(l10n, category);
     return SizedBox(
       width: width,
       child: ListView.builder(
@@ -233,7 +300,8 @@ class _SubCategoryRail extends StatelessWidget {
                       textAlign: TextAlign.center,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
+                      // 12 sp minimum for the rail labels (CA-14).
+                      style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: isSelected ? FontWeight.w700 : null,
                       ),
                     ),

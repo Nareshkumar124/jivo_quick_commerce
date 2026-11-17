@@ -55,11 +55,11 @@ String? checkoutBlockerText(AppLocalizations l10n, CartSnapshot cart) {
     CheckoutBlockerCode.minOrderNotMet => switch (thresholds) {
       CartThresholds(:final minOrderValue, :final amountToMinOrder?) =>
         l10n.minimumOrderShortfall(
-          formatRupees(minOrderValue),
-          formatRupees(amountToMinOrder),
+          displayRupees(minOrderValue),
+          displayRupees(amountToMinOrder),
         ),
       CartThresholds(:final minOrderValue) => l10n.minimumOrderNotMet(
-        formatRupees(minOrderValue),
+        displayRupees(minOrderValue),
       ),
       null => blocker.message,
     },
@@ -158,7 +158,7 @@ String? priceTierNudge(AppLocalizations l10n, CartSnapshot cart) {
 String couponIneligibleText(AppLocalizations l10n, CouponOffer offer) =>
     switch (offer.ineligibility) {
       CouponIneligibility.minOrderValue when offer.amountToUnlock != null =>
-        l10n.couponAddMore(formatRupees(offer.amountToUnlock!)),
+        l10n.couponAddMore(displayRupees(offer.amountToUnlock!)),
       CouponIneligibility.minOrderValue => l10n.couponBelowMinimum,
       CouponIneligibility.firstOrderOnly => l10n.couponFirstOrderOnly,
       CouponIneligibility.noEligibleItems => l10n.couponNoEligibleItems,
@@ -185,8 +185,8 @@ String cartErrorText(
       final after = details['grand_total'];
       if (before is String && after is String) {
         return l10n.priceChangedDetail(
-          formatRupees(before),
-          formatRupees(after),
+          displayRupees(before),
+          displayRupees(after),
         );
       }
     case ApiErrorCode.stockUnavailable:
@@ -209,8 +209,8 @@ String cartErrorText(
       final short = details['amount_to_min_order'];
       if (minimum is String && short is String) {
         return l10n.minimumOrderShortfall(
-          formatRupees(minimum),
-          formatRupees(short),
+          displayRupees(minimum),
+          displayRupees(short),
         );
       }
     case ApiErrorCode.minUnitsNotMet:
@@ -227,7 +227,7 @@ String cartErrorText(
       final reason = details['reason'];
       final toUnlock = details['amount_to_unlock'];
       if (reason == 'MIN_ORDER_VALUE' && toUnlock is String) {
-        return l10n.couponAddMore(formatRupees(toUnlock));
+        return l10n.couponAddMore(displayRupees(toUnlock));
       }
       if (reason == 'FIRST_ORDER_ONLY') return l10n.couponFirstOrderOnly;
       if (reason == 'NO_ELIGIBLE_ITEMS') return l10n.couponNoEligibleItems;

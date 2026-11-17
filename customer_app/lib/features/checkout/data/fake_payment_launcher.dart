@@ -148,7 +148,7 @@ Future<FakePaymentChoice?> showFakePaymentSheet(
                 ),
                 const SizedBox(height: JivoSpacing.xs),
                 Text(
-                  l10n.fakePaymentBody(formatRupees(request.grandTotal)),
+                  l10n.fakePaymentBody(displayRupees(request.grandTotal)),
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: JivoSpacing.sm),

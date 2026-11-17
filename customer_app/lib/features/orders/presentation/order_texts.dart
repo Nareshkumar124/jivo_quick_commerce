@@ -110,8 +110,11 @@ class OrderStatusChip extends StatelessWidget {
         color: colors.background,
         borderRadius: BorderRadius.circular(JivoRadii.sm),
       ),
+      // Wraps inside its width at large text instead of overflowing
+      // (CA-24).
       child: Text(
         orderStatusLabel(AppLocalizations.of(context), status),
+        softWrap: true,
         style: Theme.of(context).textTheme.labelMedium
             ?.copyWith(color: colors.foreground, fontWeight: FontWeight.w600),
       ),

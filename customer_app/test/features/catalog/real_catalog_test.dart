@@ -214,6 +214,13 @@ void main() {
         await startReal(tester);
         await open(tester, Routes.category('edible-oils'));
         expect(find.text('1 L Pouch · 6 options'), findsOneWidget);
+        // CA-14: from 1.5x the side rail becomes a row of chips and the
+        // grid takes the full width.
+        expect(
+          find.byKey(const Key('sub-category-chips')),
+          scale >= 1.5 ? findsOneWidget : findsNothing,
+        );
+        expect(find.byKey(const ValueKey('rail-all')), findsOneWidget);
         await tester.scrollUntilVisible(
           find.byKey(const ValueKey('tile-52')),
           300,

@@ -75,7 +75,7 @@ class TipSelector extends ConsumerWidget {
           children: [
             for (final rupees in presets)
               () {
-                final label = formatRupees(_amount(rupees));
+                final label = displayRupees(_amount(rupees));
                 final selected = isSameAmount(current, _amount(rupees));
                 return Semantics(
                   label: l10n.tipChipSemantics(label),
@@ -95,7 +95,7 @@ class TipSelector extends ConsumerWidget {
               }(),
             ChoiceChip(
               key: const Key('tip-custom'),
-              label: Text(isCustom ? formatRupees(current) : l10n.tipCustom),
+              label: Text(isCustom ? displayRupees(current) : l10n.tipCustom),
               selected: isCustom,
               onSelected: busy
                   ? null

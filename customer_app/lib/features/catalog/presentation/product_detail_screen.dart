@@ -150,7 +150,7 @@ class _ProductBodyState extends State<_ProductBody> {
                   const SizedBox(width: JivoSpacing.sm),
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: VegMark(isVeg: product.isVeg, size: 18),
+                    child: VegMarkWithLabel(isVeg: product.isVeg),
                   ),
                 ],
               ),
@@ -181,7 +181,7 @@ class _ProductBodyState extends State<_ProductBody> {
                             Text(v.name),
                             Text(
                               v.inStock
-                                  ? formatRupees(v.sellingPrice)
+                                  ? displayRupees(v.sellingPrice)
                                   : l10n.outOfStock,
                               style: theme.textTheme.labelSmall,
                             ),
@@ -208,14 +208,17 @@ class _ProductBodyState extends State<_ProductBody> {
               ),
               if (unitPrice != null)
                 Text(
-                  l10n.unitPrice(formatRupees(unitPrice.amount), unitPrice.per),
+                  l10n.unitPrice(
+                    displayRupees(unitPrice.amount),
+                    unitPrice.per,
+                  ),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               if (!isZeroAmount(variant.discountAmount))
                 Text(
-                  l10n.youSave(formatRupees(variant.discountAmount)),
+                  l10n.youSave(displayRupees(variant.discountAmount)),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: context.jivoColors.success,
                     fontWeight: FontWeight.w600,

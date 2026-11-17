@@ -170,6 +170,7 @@ OrderDetail orderDetailFromApi(api.Order o) => OrderDetail(
         status: RefundStatus.fromWire(r.status.value),
         createdAt: r.createdAt,
         processedAt: r.processedAt,
+        reason: RefundReason.fromWire(r.reason.value),
       ),
   ],
   amountRefunded: isZeroAmount(o.amountRefunded) ? null : o.amountRefunded,

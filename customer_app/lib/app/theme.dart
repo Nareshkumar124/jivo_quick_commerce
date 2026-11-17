@@ -16,7 +16,15 @@ class CustomerColors extends ThemeExtension<CustomerColors> {
   Color get imageWell => const Color(0xFFF6EFE3);
   Color get shadow => const Color(0xFF0B3B22);
 
-  List<Color> get headerGradient => const [Color(0xFF075C36), Color(0xFF0B7A47)];
+  /// `customer.color.warning.tint`: background of non-error attention
+  /// notices (price changed, items not supplied), text in onSurface
+  /// (15.62:1), icon in `jivoColors.warning`.
+  Color get warningTint => const Color(0xFFFFF4D6);
+
+  List<Color> get headerGradient => const [
+    Color(0xFF075C36),
+    Color(0xFF0B7A47),
+  ];
   List<Color> get offerGradient => const [Color(0xFFFFE9A8), Color(0xFFFFC24D)];
 
   @override
@@ -117,30 +125,31 @@ ThemeData buildCustomerTheme() {
       )
       .apply(bodyColor: ink, displayColor: ink);
 
-  final goldButton = FilledButton.styleFrom(
-    backgroundColor: c.gold,
-    foregroundColor: c.onGold,
-    minimumSize: const Size(64, 52),
-    elevation: 0,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(JivoRadii.md),
-      side: BorderSide(color: c.goldEdge),
-    ),
-    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-  ).copyWith(
-    side: WidgetStateProperty.resolveWith(
-      (s) => s.contains(WidgetState.disabled)
-          ? BorderSide.none
-          : BorderSide(color: c.goldEdge),
-    ),
-    overlayColor: WidgetStateProperty.resolveWith(
-      (s) => s.contains(WidgetState.pressed)
-          ? c.onGold.withValues(alpha: 0.12)
-          : s.contains(WidgetState.hovered)
-          ? c.onGold.withValues(alpha: 0.08)
-          : null,
-    ),
-  );
+  final goldButton =
+      FilledButton.styleFrom(
+        backgroundColor: c.gold,
+        foregroundColor: c.onGold,
+        minimumSize: const Size(64, 52),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(JivoRadii.md),
+          side: BorderSide(color: c.goldEdge),
+        ),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+      ).copyWith(
+        side: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.disabled)
+              ? BorderSide.none
+              : BorderSide(color: c.goldEdge),
+        ),
+        overlayColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.pressed)
+              ? c.onGold.withValues(alpha: 0.12)
+              : s.contains(WidgetState.hovered)
+              ? c.onGold.withValues(alpha: 0.08)
+              : null,
+        ),
+      );
 
   OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
     borderRadius: BorderRadius.circular(JivoRadii.md),
@@ -268,9 +277,7 @@ ThemeData buildCustomerTheme() {
       showDragHandle: true,
       dragHandleColor: outline,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(JivoRadii.xl),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(JivoRadii.xl)),
       ),
     ),
     dividerTheme: const DividerThemeData(color: edge, thickness: 1),

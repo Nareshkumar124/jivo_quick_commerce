@@ -77,7 +77,18 @@ Future<bool> chooseDeliveryLocation(
         ),
       );
       if (!(confirmed ?? false)) return false;
-      await controller.select(location, check.serviceability, clearCart: true);
+      try {
+        await controller.select(
+          location,
+          check.serviceability,
+          clearCart: true,
+        );
+      } catch (error) {
+        if (context.mounted) {
+          showMessage(context, describeErrorWithDetails(context, error));
+        }
+        return false;
+      }
       return true;
     case LocationOutcome.ok:
       await controller.select(location, check.serviceability);
