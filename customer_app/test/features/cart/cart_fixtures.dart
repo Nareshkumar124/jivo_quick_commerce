@@ -24,6 +24,7 @@ CartLine cartLine({
   String? pricePerUnit,
   PriceTier? priceTier,
   String? nextTierPrice,
+  String? previousSellingPrice,
 }) => CartLine(
   id: id,
   productName: name,
@@ -45,6 +46,7 @@ CartLine cartLine({
   pricePerUnit: pricePerUnit,
   priceTier: priceTier,
   nextTierPrice: nextTierPrice,
+  previousSellingPrice: previousSellingPrice,
 );
 
 /// A bill whose numbers deliberately do **not** add up: any screen that

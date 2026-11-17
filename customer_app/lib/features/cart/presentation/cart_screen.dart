@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/redirect.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/skeletons.dart';
@@ -218,6 +219,10 @@ class _CartContent extends StatelessWidget {
         const TipSelector(),
         gap,
         const InstructionsSelector(),
+        if (snapshot.priceChangedLines > 0) ...[
+          gap,
+          CartPricesChangedNotice(count: snapshot.priceChangedLines),
+        ],
         if (bill != null) ...[
           gap,
           BillDetails(bill: bill, coupon: snapshot.coupon),
@@ -290,6 +295,52 @@ class _CouponRow extends ConsumerWidget {
           key: const Key('remove-coupon'),
           onPressed: busy ? null : () => _remove(context, ref),
           child: Text(l10n.removeAction),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Prices of 2 items have changed since you last saw them…" above the bill
+/// when lines carry `previous_selling_price` (CA-19). Informational only:
+/// the bill already uses today's prices and checkout stays open. Worded so a
+/// store switch (another store's price) doesn't read as a mistake.
+class CartPricesChangedNotice extends StatelessWidget {
+  const CartPricesChangedNotice({required this.count, super.key});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      container: true,
+      child: Container(
+        key: const Key('cart-prices-changed'),
+        padding: const EdgeInsets.all(JivoSpacing.md),
+        decoration: BoxDecoration(
+          color: context.customerColors.warningTint,
+          borderRadius: BorderRadius.circular(JivoRadii.md),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExcludeSemantics(
+              child: Icon(
+                Icons.info_outline,
+                color: context.jivoColors.warning,
+              ),
+            ),
+            const SizedBox(width: JivoSpacing.sm),
+            Expanded(
+              child: Text(
+                AppLocalizations.of(context).cartPricesChangedSummary(count),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -19,7 +19,9 @@ import '../quantity_dialog.dart';
 /// quantity box (tap to
 /// type a quantity, capped at `orderable_quantity`; 0 removes the line), the
 /// line total and a remove button. A stock or minimum problem shows a flag and
-/// its fix action.
+/// its fix action. A store price that changed since the customer last set
+/// the quantity shows "Price changed: was ₹X, now ₹Y" (CA-19); it clears on
+/// the next quantity change, so it needs no extra tap.
 class CartLineTile extends ConsumerWidget {
   const CartLineTile({required this.line, super.key});
 
@@ -118,6 +120,7 @@ class CartLineTile extends ConsumerWidget {
         _TierRate(line: line)
       else
         PriceLine(price: line.billedPrice, mrp: line.mrp),
+      if (line.priceChanged) CartLinePriceChange(line: line),
       if (minHint) MinQtyHint(variant: line.variant),
     ];
     final issue = <Widget>[
@@ -276,6 +279,54 @@ Future<void> _undo(
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(problem)));
+}
+
+/// "Price changed: was ₹129, now ₹119" under a line whose store price
+/// changed since the customer last set its quantity (CA-19). Both prices are
+/// the server's strings (`previous_selling_price` and today's
+/// `selling_price`); nothing is computed. An icon, not only colour, marks
+/// it, and the text wraps at large text sizes.
+class CartLinePriceChange extends StatelessWidget {
+  const CartLinePriceChange({required this.line, super.key});
+
+  final CartLine line;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: JivoSpacing.xs),
+      child: MergeSemantics(
+        child: Row(
+          key: ValueKey('cart-line-price-changed-${line.variantId}'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExcludeSemantics(
+              child: Icon(
+                Icons.info_outline,
+                size: 16,
+                color: context.jivoColors.warning,
+              ),
+            ),
+            const SizedBox(width: JivoSpacing.xs),
+            Flexible(
+              child: Text(
+                l10n.cartLinePriceChanged(
+                  displayRupees(line.previousSellingPrice),
+                  displayRupees(line.sellingPrice),
+                ),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// A line with volume prices: the billed rate ("₹87/box", the server's

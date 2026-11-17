@@ -1876,6 +1876,18 @@ abstract class AppLocalizations {
   /// **'Some items changed since you added them. Fix them to continue.'**
   String get cartProblemsBanner;
 
+  /// Under a cart line whose store price changed since the customer last set its quantity (previous_selling_price, CA-19). Neutral: a store switch can cause it too. Both prices are the server's.
+  ///
+  /// In en, this message translates to:
+  /// **'Price changed: was {before}, now {now}'**
+  String cartLinePriceChanged(String before, String now);
+
+  /// Cart notice above the bill when lines carry previous_selling_price (CA-19). Must not imply a mistake.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{The price of 1 item has changed since you last saw it. The bill uses today\'s prices.} other{Prices of {count} items have changed since you last saw them. The bill uses today\'s prices.}}'**
+  String cartPricesChangedSummary(int count);
+
   /// Upsell nudge; the amount comes from the server.
   ///
   /// In en, this message translates to:
@@ -2690,6 +2702,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 item} other{{count} items}}'**
   String orderItemCount(int count);
+
+  /// Orders list: tile after the thumbnails for lines without a thumbnail (line_count - images, CA-29).
+  ///
+  /// In en, this message translates to:
+  /// **'+{count}'**
+  String orderMoreProductsTile(int count);
+
+  /// Screen-reader label of the +N thumbnail tile (CA-29).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{and 1 more product} other{and {count} more products}}'**
+  String orderMoreProductsSemantics(int count);
 
   /// Order date (IST).
   ///

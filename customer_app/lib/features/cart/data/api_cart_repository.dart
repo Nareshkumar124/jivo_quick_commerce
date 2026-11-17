@@ -191,6 +191,7 @@ CartLine _line(api.CartLine l) => CartLine(
     ),
   },
   nextTierPrice: l.nextTierPrice,
+  previousSellingPrice: l.previousSellingPrice,
   issue: switch (l.issue) {
     null => null,
     final issue => CartLineIssue(

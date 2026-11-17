@@ -51,6 +51,9 @@ void main() {
     expect(first.itemCount, 3);
     expect(first.grandTotal, '753.00');
     expect(first.imageUrls.first, endsWith('canola-1l-256.webp'));
+    // line_count (#57): distinct lines; the units stay in itemCount.
+    expect(first.lineCount, 2);
+    expect(first.moreLines, 0);
   });
 
   test('a next link means another page', () async {

@@ -1068,6 +1068,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'Some items changed since you added them. Fix them to continue.';
 
   @override
+  String cartLinePriceChanged(String before, String now) {
+    return 'Price changed: was $before, now $now';
+  }
+
+  @override
+  String cartPricesChangedSummary(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Prices of $count items have changed since you last saw them. The bill uses today\'s prices.',
+      one: 'The price of 1 item has changed since you last saw it. The bill uses today\'s prices.',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String freeDeliveryNudge(String amount) {
     return 'Add $amount more for FREE delivery';
   }
@@ -1604,6 +1621,22 @@ class AppLocalizationsEn extends AppLocalizations {
       locale: localeName,
       other: '$count items',
       one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String orderMoreProductsTile(int count) {
+    return '+$count';
+  }
+
+  @override
+  String orderMoreProductsSemantics(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'and $count more products',
+      one: 'and 1 more product',
     );
     return '$_temp0';
   }
