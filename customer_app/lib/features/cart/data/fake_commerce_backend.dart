@@ -268,9 +268,42 @@ class FakeCommerceBackend
     if (line == null) {
       _lines[variantId] = _FakeLine(_nextLineId++, known, quantity);
     } else {
-      line.quantity = quantity;
+      // Any quantity set, the same one included, records today's price.
+      line
+        ..quantity = quantity
+        ..seenPrice = line.preview.variant.sellingPrice;
     }
     return _snapshot();
+  }
+
+  /// Changes the store price of the line holding [variantId], as an
+  /// override or a store switch would: the line keeps the price the
+  /// customer last saw and reports it as `previous_selling_price`.
+  void changeSellingPrice(int variantId, String price) {
+    final line = _lines[variantId];
+    if (line == null) return;
+    final v = line.preview.variant;
+    line.preview = CartLinePreview(
+      productName: line.preview.productName,
+      variant: CatalogVariant(
+        id: v.id,
+        name: v.name,
+        sellingPrice: price,
+        mrp: v.mrp,
+        stockStatus: v.stockStatus,
+        orderableQuantity: v.orderableQuantity,
+        maxQtyPerOrder: v.maxQtyPerOrder,
+        minQtyPerOrder: v.minQtyPerOrder,
+        discountAmount: v.discountAmount,
+        discountPercent: v.discountPercent,
+        unitsLeft: v.unitsLeft,
+        unitPrice: v.unitPrice,
+        imageUrl: v.imageUrl,
+        images: v.images,
+        netQuantity: v.netQuantity,
+        priceTiers: v.priceTiers,
+      ),
+    );
   }
 
   @override
@@ -716,7 +749,9 @@ class FakeCommerceBackend
         if (existing == null) {
           _lines[variant.id] = _FakeLine(_nextLineId++, line.preview, take);
         } else {
-          existing.quantity += take;
+          existing
+            ..quantity += take
+            ..seenPrice = existing.preview.variant.sellingPrice;
         }
       }
       if (take < line.quantity) {
@@ -922,6 +957,7 @@ class FakeCommerceBackend
     imageUrls: [
       for (final line in order.lines.take(4)) ?line.preview.variant.imageUrl,
     ],
+    lineCount: order.lines.length,
     grandTotal: order.grandTotal,
     createdAt: order.createdAt,
     placedAt: order.placedAt,
@@ -1226,6 +1262,10 @@ class FakeCommerceBackend
           nextTierPrice: nextPrice != null && nextPrice < price
               ? _amount(nextPrice)
               : null,
+          previousSellingPrice:
+              _paise(line.seenPrice) != _paise(variant.sellingPrice)
+              ? line.seenPrice
+              : null,
           issue: issue,
         ),
       );
@@ -1434,11 +1474,16 @@ class FakeCommerceBackend
 }
 
 class _FakeLine {
-  _FakeLine(this.id, this.preview, this.quantity);
+  _FakeLine(this.id, this.preview, this.quantity)
+    : seenPrice = preview.variant.sellingPrice;
 
   final int id;
-  final CartLinePreview preview;
+  CartLinePreview preview;
   int quantity;
+
+  /// The selling price when the quantity was last set
+  /// (`previous_selling_price` when it differs from today's).
+  String seenPrice;
 }
 
 class _FakeOrder {

@@ -46,10 +46,14 @@ class OrderListItem {
     required this.grandTotal,
     required this.createdAt,
     this.imageUrls = const [],
+    this.lineCount = 0,
     this.placedAt,
     this.etaAt,
     this.canRetryPayment = false,
   });
+
+  /// The most thumbnails a row shows (the server sends at most 4).
+  static const maxThumbnails = 4;
 
   final int id;
   final String number;
@@ -63,6 +67,21 @@ class OrderListItem {
 
   /// Up to 4 thumbnails.
   final List<String> imageUrls;
+
+  /// Distinct order lines (`line_count`, API #57), lines found unavailable
+  /// included; [itemCount] stays the units.
+  final int lineCount;
+
+  /// The "+N" after the thumbnails (CA-29): lines without a thumbnail on
+  /// the row, `line_count` minus the thumbnails shown. Never negative.
+  int get moreLines {
+    final shown = imageUrls.length < maxThumbnails
+        ? imageUrls.length
+        : maxThumbnails;
+    final more = lineCount - shown;
+    return more > 0 ? more : 0;
+  }
+
   final String grandTotal;
   final DateTime createdAt;
   final DateTime? placedAt;

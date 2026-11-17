@@ -26,6 +26,29 @@ void main() {
     repository = ApiCartRepository(http.api(), () => storeId);
   });
 
+  test(
+    'previous_selling_price (#56) is carried as sent; bill unchanged',
+    () async {
+      answer = (_, _) =>
+          contractExample('cart_retrieve/200/PriceChangedSinceTheLineWasAdded');
+      final cart = await repository.load();
+
+      final line = cart.lines.single;
+      expect(line.previousSellingPrice, '129.00');
+      expect(line.sellingPrice, '119.00');
+      expect(line.priceChanged, isTrue);
+      expect(cart.priceChangedLines, 1);
+      expect(cart.hasProblems, isFalse);
+      expect(cart.checkout.canPlaceOrder, isTrue);
+      expect(cart.bill!.grandTotal, '159.00');
+
+      answer = (_, _) => contractExample('cart_retrieve/200/ReadyToOrder');
+      final plain = await repository.load();
+      expect(plain.lines.every((l) => l.previousSellingPrice == null), isTrue);
+      expect(plain.priceChangedLines, 0);
+    },
+  );
+
   test('GET /cart/ carries X-Store-Id and the address to check', () async {
     answer = (_, _) => contractExample(
       'cart_retrieve/200/StockChanged:LinesToFix,CODAboveLimit',

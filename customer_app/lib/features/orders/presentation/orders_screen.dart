@@ -191,21 +191,23 @@ class OrderListTile extends StatelessWidget {
                 ),
                 const SizedBox(height: JivoSpacing.sm),
                 if (order.imageUrls.isNotEmpty) ...[
-                  ExcludeSemantics(
-                    child: Row(
-                      children: [
-                        for (final url in order.imageUrls.take(4))
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              right: JivoSpacing.xs,
-                            ),
+                  Row(
+                    children: [
+                      for (final url in order.imageUrls.take(
+                        OrderListItem.maxThumbnails,
+                      ))
+                        Padding(
+                          padding: const EdgeInsets.only(right: JivoSpacing.xs),
+                          child: ExcludeSemantics(
                             child: SizedBox.square(
                               dimension: 40,
                               child: ProductImage(url: url),
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                      if (order.moreLines > 0)
+                        MoreLinesTile(count: order.moreLines),
+                    ],
                   ),
                   const SizedBox(height: JivoSpacing.sm),
                 ],
@@ -228,6 +230,45 @@ class OrderListTile extends StatelessWidget {
                     style: muted,
                   ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "+3" after an order row's thumbnails (CA-29): 40 dp, `surface.highest`,
+/// `labelLarge`; read as "and 3 more products". The text scales down to
+/// fit the tile at large text sizes.
+class MoreLinesTile extends StatelessWidget {
+  const MoreLinesTile({required this.count, super.key});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Semantics(
+      label: l10n.orderMoreProductsSemantics(count),
+      excludeSemantics: true,
+      child: Container(
+        key: const Key('order-more-lines'),
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(JivoRadii.sm),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            l10n.orderMoreProductsTile(count),
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ),

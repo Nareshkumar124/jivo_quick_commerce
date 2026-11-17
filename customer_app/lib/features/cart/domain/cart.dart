@@ -120,6 +120,10 @@ class CartSnapshot {
 
   bool get hasProblems => lines.any((line) => line.issue != null);
 
+  /// Lines whose store price changed since the customer last saw it
+  /// (`previous_selling_price`, CA-19). Not a problem: checkout stays open.
+  int get priceChangedLines => lines.where((line) => line.priceChanged).length;
+
   /// Whether the server offers [method] for this cart.
   bool offers(PaymentMethod method) => paymentOptions.any(
     (option) => option.method == method && option.available,
@@ -190,6 +194,7 @@ class CartLine {
     this.pricePerUnit,
     this.priceTier,
     this.nextTierPrice,
+    this.previousSellingPrice,
   });
 
   /// The server's line id.
@@ -219,6 +224,16 @@ class CartLine {
   /// `thresholds.next_price_tier` (`next_tier_price`); null when that tier
   /// doesn't lower it.
   final String? nextTierPrice;
+
+  /// The store price the customer last saw for this line, when it differs
+  /// from today's [sellingPrice] (`previous_selling_price`, API #56,
+  /// CA-19); null when unchanged. Display only: the bill already uses
+  /// today's price, and the server clears it on the line's next quantity
+  /// set.
+  final String? previousSellingPrice;
+
+  /// Whether the server flagged a price change on this line.
+  bool get priceChanged => previousSellingPrice != null;
 
   /// The server's billed unit price. The API always sends
   /// `price_per_unit`; only a line built without it (older fixtures) falls

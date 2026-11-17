@@ -113,6 +113,7 @@ OrderListItem orderListItemFromApi(api.OrderSummary s) => OrderListItem(
     for (final image in s.images)
       if (image.thumbnail.isNotEmpty) image.thumbnail,
   ],
+  lineCount: s.lineCount,
   grandTotal: s.grandTotal,
   createdAt: s.createdAt,
   placedAt: s.placedAt,
