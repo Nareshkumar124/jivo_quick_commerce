@@ -13,6 +13,7 @@ import '../../auth/presentation/rider_account_controller.dart';
 import '../../location/domain/location_service_client.dart';
 import '../../permissions/domain/permission_gate.dart';
 import '../../permissions/presentation/permissions_gate_controller.dart';
+import '../../cash/presentation/deposit_cash_banner.dart';
 import '../../task/domain/task_rules.dart';
 import '../../task/domain/task_status.dart';
 import '../../task/presentation/task_flow_controller.dart';
@@ -163,7 +164,10 @@ class ShiftStatusCard extends ConsumerWidget {
                   Text(
                     body,
                     key: const Key('shift-status-body'),
-                    maxLines: autoOffline || noConnection ? null : 2,
+                    // RA-13: 3 lines before the ellipsis (large text,
+                    // Hindi); the full text stays in the semantics.
+                    semanticsLabel: body,
+                    maxLines: autoOffline || noConnection ? null : 3,
                     overflow: autoOffline || noConnection
                         ? null
                         : TextOverflow.ellipsis,
@@ -669,7 +673,7 @@ class TodaySummaryTiles extends ConsumerWidget {
     final loading = async.isLoading && !async.hasValue;
     final summary = async.value;
 
-    String? money(String? amount) => tryFormatRupees(amount);
+    String? money(String? amount) => formatRupeeAmount(amount);
     final tiles = [
       _TileData(
         key: 'today-delivered',
@@ -847,78 +851,10 @@ class CashLimitBanner extends ConsumerWidget {
     if (summary == null || !summary.depositRequired) {
       return const SizedBox.shrink();
     }
-    final l10n = AppLocalizations.of(context);
-    final colors = RiderColors.of(context);
-    final limit = tryFormatRupees(summary.cashLimit) ?? '–';
-    return Container(
-      key: const Key('cash-limit-banner'),
+    return DepositCashBanner(
+      limitReached: summary.limitReached,
+      cashLimit: summary.cashLimit,
       margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: colors.codDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.warning, color: colors.codBorder, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                l10n.cashDepositTitle,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: colors.codText,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            summary.limitReached
-                ? l10n.cashDepositBody(limit)
-                : l10n.cashDepositSkippedBody(limit),
-            key: const Key('cash-limit-body'),
-            style: TextStyle(fontSize: 16, color: colors.codText),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            key: const Key('cash-limit-how'),
-            onPressed: () => _showHowTo(context),
-            child: Text(l10n.homeHowToDeposit),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static Future<void> _showHowTo(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return showModalBottomSheet<void>(
-      context: context,
-      builder: (sheet) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                l10n.homeHowToDepositBody,
-                style: Theme.of(sheet).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                key: const Key('cash-limit-see-ledger'),
-                onPressed: () {
-                  Navigator.of(sheet).pop();
-                  context.push(Routes.cash);
-                },
-                child: Text(l10n.homeSeeCashLedger),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

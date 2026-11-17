@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme.dart';
@@ -231,7 +232,7 @@ class _OfferScreenState extends ConsumerState<OfferScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                         child: Text(
-                          switch (tryFormatRupees(offer.codAmount)) {
+                          switch (formatRupeeAmount(offer.codAmount)) {
                             final amount? => l10n.offerCod(amount),
                             null => l10n.offerCodAmountMissing,
                           },

@@ -46,6 +46,11 @@ void main() {
       tester.widget<TextField>(byKey('bank-holder')).controller!.text,
       'Ravi Kumar',
     );
+    // RA-09: the name must match the bank's records.
+    expect(
+      find.text('Exactly as in your passbook or bank app.'),
+      findsOneWidget,
+    );
     expect(tester.getSize(byKey('bank-save')).height, greaterThanOrEqualTo(56));
 
     await save(tester);

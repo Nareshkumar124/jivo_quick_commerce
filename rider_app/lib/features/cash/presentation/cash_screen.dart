@@ -9,6 +9,7 @@ import '../../../shared/widgets/paged_list_view.dart';
 import '../../task/domain/task_rules.dart';
 import '../domain/cash_ledger.dart';
 import 'cash_providers.dart';
+import 'deposit_cash_banner.dart';
 
 /// Cash in hand and the ledger (04 §2.7, screen 16): COD collected per
 /// order, deposits recorded by the store manager, adjustments, by date.
@@ -52,35 +53,15 @@ class CashScreen extends ConsumerWidget {
         onRefresh: notifier.refresh,
         onLoadMore: notifier.loadMore,
         emptyText: l10n.cashEmpty,
+        emptyIcon: Icons.account_balance_wallet_outlined,
         header: [
           if (summary != null) ...[
             if (summary.depositRequired)
-              Card(
-                key: const Key('cash-limit-banner'),
-                color: theme.colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.cashDepositTitle,
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        summary.limitReached
-                            ? l10n.cashDepositBody(
-                                formatRupees(summary.cashLimit),
-                              )
-                            : l10n.cashDepositSkippedBody(
-                                formatRupees(summary.cashLimit),
-                              ),
-                        key: const Key('cash-limit-body'),
-                      ),
-                    ],
-                  ),
-                ),
+              DepositCashBanner(
+                limitReached: summary.limitReached,
+                cashLimit: summary.cashLimit,
+                showLedgerLink: false,
+                margin: const EdgeInsets.only(bottom: 8),
               ),
             Card(
               child: Padding(

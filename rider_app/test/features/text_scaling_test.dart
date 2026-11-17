@@ -8,6 +8,10 @@ import 'package:rider_app/app/routes.dart';
 import 'package:rider_app/features/offers/presentation/offer_screen.dart';
 import 'package:rider_app/features/onboarding/domain/vehicle_type.dart';
 import 'package:rider_app/features/permissions/presentation/permissions_gate_controller.dart';
+import 'package:rider_app/features/shift/domain/today_summary.dart';
+import 'package:rider_app/features/task/data/fake_task_backend.dart';
+import 'package:rider_app/features/task/domain/task_status.dart';
+import 'package:rider_app/shared/widgets/primary_action_bar.dart';
 
 import '../helpers/fake_permissions_service.dart';
 import '../helpers/onboarding_fixtures.dart';
@@ -134,6 +138,172 @@ void main() {
       final accept = tester.getRect(byKey('offer-accept'));
       expect(accept.bottom, lessThanOrEqualTo(640.01));
       expect(accept.height, greaterThanOrEqualTo(64));
+    });
+  }
+
+  // P8 UX follow-ups (RA-03, RA-07, RA-13, RA-17, RA-23) at 1.3x and 2.0x.
+  for (final scale in [1.3, 2.0]) {
+    final label = '${scale}x';
+
+    /// The whole rectangle of [key] is on the 360x640 dp screen.
+    void expectOnScreen(WidgetTester tester, String key) {
+      final rect = tester.getRect(byKey(key));
+      expect(
+        rect.top >= 0 && rect.bottom <= 640.01 && rect.right <= 360.01,
+        isTrue,
+        reason: '$key at $rect',
+      );
+    }
+
+    testWidgets('RA-03 login: consent buttons and Get OTP at $label', (
+      tester,
+    ) async {
+      scaleText(tester, scale);
+      await h.pump(tester);
+      await settle(tester);
+      expectOnScreen(tester, 'login-get-otp');
+      await tester.scrollUntilVisible(
+        byKey('login-terms-button'),
+        100,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await settle(tester);
+      expect(
+        tester.getSize(byKey('login-terms-button')).height,
+        greaterThanOrEqualTo(48),
+      );
+    });
+
+    testWidgets('RA-07 registration: vehicle check mark at $label', (
+      tester,
+    ) async {
+      await h.signedInBefore(nonePhone);
+      scaleText(tester, scale);
+      await h.pump(tester);
+      await scrollTo(
+        tester,
+        byKey('register-vehicle-SCOOTER'),
+        listKey: const Key('register-form'),
+      );
+      await tester.tap(byKey('register-vehicle-SCOOTER'));
+      await settle(tester);
+      expect(byKey('register-vehicle-SCOOTER-check'), findsOneWidget);
+      // The mark sits inside its own tile.
+      final tile = tester.getRect(byKey('register-vehicle-SCOOTER'));
+      final check = tester.getRect(byKey('register-vehicle-SCOOTER-check'));
+      expect(tile.contains(check.center), isTrue);
+    });
+
+    testWidgets('RA-13/RA-17 home: online status and deposit banner at '
+        '$label', (tester) async {
+      h.today.summary = const TodaySummary(
+        deliveredCount: 9,
+        earnedToday: '900.00',
+        onlineSeconds: 3600,
+        cashInHand: '4800.00',
+        cashLimit: '5000.00',
+        depositRequired: true,
+        homeStoreName: 'Sector 18 Noida Dark Store, Gate 2',
+      );
+      h.extraOverrides = [
+        permissionsServiceProvider.overrideWithValue(
+          StubbedPermissions(allGranted).service,
+        ),
+      ];
+      await h.signedInBefore(activeRiderPhone);
+      scaleText(tester, scale);
+      await h.pump(tester);
+      await settle(tester);
+      await tester.tap(byKey('shift-toggle'));
+      await settle(tester);
+      final body = tester.widget<Text>(byKey('shift-status-body'));
+      expect(body.maxLines, 3);
+      expect(body.semanticsLabel, body.data, reason: 'full text spoken');
+      await scrollTo(
+        tester,
+        byKey('cash-limit-how'),
+        listKey: const Key('home-list'),
+      );
+      await settle(tester);
+      expect(byKey('cash-limit-banner'), findsOneWidget);
+    });
+
+    testWidgets('RA-17 cash screen: the shared deposit banner at $label', (
+      tester,
+    ) async {
+      h.cash.limitReached = true;
+      scaleText(tester, scale);
+      await openFromHome(tester, h, 'home-cash');
+      await settle(tester);
+      expect(byKey('cash-limit-banner'), findsOneWidget);
+      expect(tester.getRect(byKey('cash-limit-banner')).right, lessThan(361));
+    });
+
+    testWidgets('RA-23 inbox entries at $label', (tester) async {
+      await h.signedInBefore(activeRiderPhone);
+      scaleText(tester, scale);
+      await h.pump(tester);
+      await tester.tap(byKey('home-appbar-inbox'));
+      await settle(tester);
+      expect(byKey('inbox-3-icon'), findsOneWidget);
+    });
+  }
+
+  // RD-12: every task step at 1.3x and 2.0x on 360x640: no overflow, and
+  // the bar's primary action is fully on screen.
+  for (final scale in [1.3, 2.0]) {
+    final label = '${scale}x';
+
+    void expectPrimaryOnScreen(WidgetTester tester) {
+      final primary = find.descendant(
+        of: find.byType(PrimaryActionBar),
+        matching: find.byType(FilledButton),
+      );
+      expect(primary, findsOneWidget);
+      final rect = tester.getRect(primary);
+      expect(
+        rect.top >= 0 && rect.bottom <= 640.01 && rect.right <= 360.01,
+        isTrue,
+        reason: 'primary at $rect',
+      );
+      expect(rect.height, greaterThanOrEqualTo(56));
+    }
+
+    for (final status in [
+      TaskStatus.assigned,
+      TaskStatus.atStore,
+      TaskStatus.pickedUp,
+      TaskStatus.atCustomer,
+    ]) {
+      testWidgets('task step ${status.name} (COD) at $label', (tester) async {
+        h.tasks.seedTask(h.tasks.newTask(cod: true, status: status));
+        await h.signedInBefore('+919811122231');
+        scaleText(tester, scale);
+        await h.pump(tester);
+        await settle(tester);
+        expectPrimaryOnScreen(tester);
+      });
+    }
+
+    testWidgets('COD collect and UPI QR steps at $label', (tester) async {
+      h.tasks.seedTask(
+        h.tasks.newTask(cod: true, status: TaskStatus.atCustomer),
+      );
+      await h.signedInBefore('+919811122231');
+      scaleText(tester, scale);
+      await h.pump(tester);
+      await tester.enterText(
+        byKey('delivery-otp'),
+        FakeTaskBackend.deliveryOtp,
+      );
+      await tester.pump();
+      await tester.tap(byKey('otp-continue'));
+      await settle(tester);
+      expectPrimaryOnScreen(tester);
+
+      await tester.tap(byKey('cod-upi'));
+      await settle(tester);
+      expectPrimaryOnScreen(tester);
     });
   }
 }

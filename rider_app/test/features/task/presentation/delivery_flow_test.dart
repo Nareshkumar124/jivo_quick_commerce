@@ -380,7 +380,12 @@ void main() {
       await tap(tester, 'cod-upi');
       expect(
         tester.widget<Text>(byKey('cod-upi-status')).data,
-        'Waiting for the payment…',
+        'Waiting for the payment… Checking automatically.',
+      );
+      // RD-10: the server's amount right above the QR.
+      expect(
+        tester.widget<Text>(byKey('cod-upi-scan-to-pay')).data,
+        'Scan to pay ₹1,249',
       );
       expect(
         tester.widget<FilledButton>(byKey('cod-upi-deliver')).onPressed,
@@ -433,11 +438,19 @@ void main() {
         tester.widget<Text>(byKey('cod-upi-status')).data,
         'The QR expired. Show a new one.',
       );
+      // RD-10: "Show new QR" is the primary (a FilledButton), and Mark
+      // delivered is not offered for an expired QR.
+      expect(
+        tester.widget<FilledButton>(byKey('cod-upi-again')).onPressed,
+        isNotNull,
+      );
+      expect(find.text('Show new QR'), findsOneWidget);
+      expect(byKey('cod-upi-deliver'), findsNothing);
 
       await tap(tester, 'cod-upi-again');
       expect(
         tester.widget<Text>(byKey('cod-upi-status')).data,
-        'Waiting for the payment…',
+        'Waiting for the payment… Checking automatically.',
       );
       expect(h.tasks.calls.where((c) => c == 'createCodQr'), hasLength(2));
     });

@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 
@@ -51,6 +51,20 @@ void main() {
     expect(byKey('cash-limit-banner'), findsOneWidget);
     expect(find.text('Deposit cash'), findsOneWidget);
     expect(textOf(tester, 'cash-in-hand'), '₹5,249');
+
+    // RA-17: the same COD-style banner as home, with the help sheet but
+    // without "See cash ledger" (the rider is already on it).
+    expect(
+      find.descendant(
+        of: byKey('cash-limit-banner'),
+        matching: find.byIcon(Icons.warning),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(byKey('cash-limit-how'));
+    await tester.pumpAndSettle();
+    expect(byKey('cash-limit-how-body'), findsOneWidget);
+    expect(byKey('cash-limit-see-ledger'), findsNothing);
   });
 
   testWidgets('a COD order skipped below the limit (DL-61 b): "Deposit '

@@ -1,6 +1,7 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
+import 'package:rider_app/app/theme.dart';
 
 import '../../../helpers/onboarding_fixtures.dart';
 import '../../../helpers/records_helpers.dart';
@@ -29,6 +30,21 @@ void main() {
     expect(find.text('Jivo Sector 18 → Sector 21, Noida'), findsWidgets);
     expect(find.text('2.0 km'), findsOneWidget);
     expect(textOf(tester, 'history-598-status'), 'Returned');
+    // RA-19: an icon with each status, colour never the only signal.
+    expect(
+      find.descendant(
+        of: byKey('history-600'),
+        matching: find.byIcon(Icons.check_circle),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: byKey('history-598'),
+        matching: find.byIcon(Icons.undo),
+      ),
+      findsOneWidget,
+    );
 
     await scrollTo(
       tester,
@@ -52,6 +68,16 @@ void main() {
 
     expect(textOf(tester, 'history-596-status'), 'Cancelled');
     final tile = byKey('history-596');
+    // RA-19: grey with a "cancel" icon, not red like "Not delivered".
+    Icon iconIn(String key) => tester.widget<Icon>(
+      find.descendant(of: byKey(key), matching: find.byType(Icon)).first,
+    );
+    expect(iconIn('history-596').icon, Icons.cancel);
+    expect(iconIn('history-596').color, RiderColors.light.textSecondary);
+    expect(
+      tester.widget<Text>(byKey('history-596-status')).style?.color,
+      RiderColors.light.textSecondary,
+    );
     expect(
       find.descendant(of: tile, matching: find.textContaining('km')),
       findsNothing,

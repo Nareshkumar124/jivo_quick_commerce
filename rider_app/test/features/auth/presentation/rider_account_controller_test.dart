@@ -6,6 +6,7 @@ import 'package:rider_app/features/auth/domain/account_repository.dart';
 import 'package:rider_app/features/auth/domain/rider_account.dart';
 import 'package:rider_app/features/auth/presentation/auth_providers.dart';
 import 'package:rider_app/features/auth/presentation/rider_account_controller.dart';
+import 'package:rider_app/features/onboarding/domain/onboarding_forms.dart';
 
 import '../../../helpers/rider_app_harness.dart';
 
@@ -148,4 +149,21 @@ void main() {
       expect(h.cleaner.clears, 1);
     },
   );
+
+  for (final reason in [
+    SignOutReason.userRequested,
+    SignOutReason.sessionExpired,
+  ]) {
+    test('sign-out (${reason.name}) deletes the saved registration form '
+        '(RA-07)', () async {
+      await h.signedInBefore('+919811122231');
+      final c = await h.container();
+      c.read(riderAccountControllerProvider);
+      h.registrationDraft.draft = const RegistrationDraft(fullName: 'Ravi');
+
+      await h.session.signOut(reason: reason);
+
+      expect(h.registrationDraft.draft, isNull);
+    });
+  }
 }

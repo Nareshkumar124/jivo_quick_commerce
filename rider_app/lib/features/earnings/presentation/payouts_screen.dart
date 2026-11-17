@@ -31,6 +31,7 @@ class PayoutsScreen extends ConsumerWidget {
         onRefresh: notifier.refresh,
         onLoadMore: notifier.loadMore,
         emptyText: l10n.payoutsEmpty,
+        emptyIcon: Icons.payments_outlined,
         itemBuilder: (context, payout) => _PayoutTile(payout: payout),
       ),
     );

@@ -33,6 +33,7 @@ class MyRatingScreen extends ConsumerWidget {
       onRefresh: notifier.refresh,
       onLoadMore: notifier.loadMore,
       emptyText: l10n.ratingNoneYet,
+      emptyIcon: Icons.star_outline,
       header: [if (summary != null) _SummaryCard(summary: summary)],
       itemBuilder: (context, rating) => _RatingTile(rating: rating),
     );

@@ -304,7 +304,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get splashLoading => 'Getting things ready…';
 
   @override
-  String get splashErrorTitle => 'Couldn\'t connect';
+  String get splashErrorNoInternet => 'No internet';
+
+  @override
+  String get splashErrorServer => 'Couldn\'t load Jivo Rider';
 
   @override
   String get updateRequiredTitle => 'Update required';
@@ -840,6 +843,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bankHolderName => 'Account holder name';
 
   @override
+  String get bankHolderHelp => 'Exactly as in your passbook or bank app.';
+
+  @override
   String get bankAccountNumber => 'Account number';
 
   @override
@@ -1163,6 +1169,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codUpiWaiting => 'Waiting for the payment…';
 
   @override
+  String codUpiScanToPay(String amount) {
+    return 'Scan to pay $amount';
+  }
+
+  @override
+  String get codUpiWaitingAuto =>
+      'Waiting for the payment… Checking automatically.';
+
+  @override
+  String get codUpiShowNew => 'Show new QR';
+
+  @override
   String get codUpiPaid => 'Payment received';
 
   @override
@@ -1455,6 +1473,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inboxEmpty => 'No notifications yet.';
+
+  @override
+  String inboxUnreadEntry(String title) {
+    return 'Unread. $title';
+  }
 
   @override
   String get inboxMarkAllRead => 'Mark all read';
@@ -2111,6 +2134,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ticketsEmpty => 'You have not raised any tickets.';
+
+  @override
+  String get listLoading => 'Loading';
 
   @override
   String get newTicketTitle => 'Raise a ticket';

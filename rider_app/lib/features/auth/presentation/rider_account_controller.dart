@@ -71,6 +71,12 @@ class RiderAccountController extends Notifier<RiderAccountState> {
       }
     }
     await discardInterruptedKycCapture(ref);
+    // The next rider on this phone must not get this one's form (RA-07).
+    try {
+      await ref.read(registrationDraftStoreProvider).clear();
+    } on Object catch (error) {
+      debugPrint('RiderAccountController: clearing the form: $error');
+    }
     try {
       await ref.read(offerAlertNotificationsProvider).dismiss();
     } on Object catch (error) {

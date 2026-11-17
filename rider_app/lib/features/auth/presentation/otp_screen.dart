@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/error_line.dart';
 
 import 'package:jivo_core/helpers.dart';
 
@@ -157,10 +158,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                     ),
                     if (error != null) ...[
                       const SizedBox(height: 12),
-                      Text(
+                      ErrorLine(
                         authErrorText(context, error),
-                        key: const Key('otp-error'),
-                        style: TextStyle(color: theme.colorScheme.error),
+                        textKey: const Key('otp-error'),
                       ),
                     ],
                     const SizedBox(height: 8),

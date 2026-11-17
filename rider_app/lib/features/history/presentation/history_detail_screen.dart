@@ -90,10 +90,13 @@ class _Detail extends StatelessWidget {
           l10n.taskOrderNumber(entry.orderNumber),
           style: theme.textTheme.titleLarge,
         ),
-        Text(
-          historyStatusText(l10n, entry.status),
-          key: const Key('history-detail-status'),
-          style: theme.textTheme.titleMedium,
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: HistoryStatusLabel(
+            status: entry.status,
+            textKey: const Key('history-detail-status'),
+            style: theme.textTheme.titleMedium,
+          ),
         ),
         if (detail.failReason case final reason?)
           Text(

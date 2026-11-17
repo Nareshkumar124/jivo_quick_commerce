@@ -294,22 +294,20 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
       final expired =
           qr.status == UpiQrStatus.expired ||
           qr.status == UpiQrStatus.cancelled;
+      // RD-10: an expired QR makes "Show new QR" the primary action, not a
+      // disabled "Mark delivered".
       actions = PrimaryActionBar(
-        buttonKey: const Key('cod-upi-deliver'),
-        label: l10n.taskDeliver,
+        buttonKey: Key(expired ? 'cod-upi-again' : 'cod-upi-deliver'),
+        label: expired ? l10n.codUpiShowNew : l10n.taskDeliver,
         busy: busy,
         hint: paid || expired ? null : l10n.codUpiWaiting,
-        onPressed: paid ? () => _deliver(const CodCollection.upi()) : null,
+        onPressed: expired
+            ? _showQr
+            : (paid ? () => _deliver(const CodCollection.upi()) : null),
         errorKey: const Key('task-error'),
         error: taskStepError(context, state, action: TaskAction.deliver),
         secondary: [
-          if (expired)
-            OutlinedButton(
-              key: const Key('cod-upi-again'),
-              onPressed: busy ? null : _showQr,
-              child: Text(l10n.codShowUpi),
-            )
-          else if (!paid)
+          if (!paid && !expired)
             OutlinedButton(
               key: const Key('cod-upi-check'),
               onPressed: busy ? null : _controller.load,
@@ -413,17 +411,45 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
         ],
         if (showQr) ...[
           const SizedBox(height: 16),
-          Center(child: _QrImage(url: qr.imageUrl)),
+          // RD-10: the amount right above the QR, as the customer scans.
           Text(
-            switch (qr.status) {
-              UpiQrStatus.paid => l10n.codUpiPaid,
-              UpiQrStatus.expired ||
-              UpiQrStatus.cancelled => l10n.codUpiExpired,
-              UpiQrStatus.pending => l10n.codUpiWaiting,
-            },
-            key: const Key('cod-upi-status'),
+            l10n.codUpiScanToPay(amount),
+            key: const Key('cod-upi-scan-to-pay'),
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(child: _QrImage(url: qr.imageUrl)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // A static icon, not a spinner: the poll runs on its own and
+              // a never-ending animation costs battery on budget phones.
+              if (qr.status == UpiQrStatus.pending) ...[
+                ExcludeSemantics(
+                  child: Icon(
+                    Icons.hourglass_top,
+                    color: RiderColors.of(context).textSecondary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Text(
+                  switch (qr.status) {
+                    UpiQrStatus.paid => l10n.codUpiPaid,
+                    UpiQrStatus.expired ||
+                    UpiQrStatus.cancelled => l10n.codUpiExpired,
+                    UpiQrStatus.pending => l10n.codUpiWaitingAuto,
+                  },
+                  key: const Key('cod-upi-status'),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+            ],
           ),
           const _DevPayUpi(),
         ],

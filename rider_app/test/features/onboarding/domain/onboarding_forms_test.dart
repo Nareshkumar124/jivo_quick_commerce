@@ -234,4 +234,33 @@ void main() {
       );
     });
   });
+
+  group('RegistrationDraft JSON (RA-07 saved form)', () {
+    test('round-trips every field', () {
+      final original = draft(
+        vehicle: VehicleType.motorbike,
+        vehicleNumber: 'UP16 AB 1234',
+      );
+      final back = RegistrationDraft.fromJson(original.toJson());
+      expect(back.fullName, original.fullName);
+      expect(back.dateOfBirth, DateTime.utc(1995, 6, 15));
+      expect(back.emergencyName, original.emergencyName);
+      expect(back.emergencyPhone, original.emergencyPhone);
+      expect(back.storeId, original.storeId);
+      expect(back.vehicleType, VehicleType.motorbike);
+      expect(back.vehicleNumber, 'UP16 AB 1234');
+    });
+
+    test('drops wrongly typed values and reports emptiness', () {
+      final back = RegistrationDraft.fromJson({
+        'full_name': 12,
+        'date_of_birth': 'not a date',
+        'store_id': '3',
+        'vehicle_type': 'TRUCK',
+      });
+      expect(back.isEmpty, isTrue);
+      expect(const RegistrationDraft().isEmpty, isTrue);
+      expect(const RegistrationDraft(storeId: 1).isEmpty, isFalse);
+    });
+  });
 }

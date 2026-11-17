@@ -10,6 +10,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/providers.dart';
 import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/error_line.dart';
 import '../../launch/presentation/launch_controller.dart';
 
 import 'package:jivo_core/helpers.dart';
@@ -140,30 +141,47 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                     ),
                     if (serverError != null) ...[
                       const SizedBox(height: 12),
-                      Text(
+                      ErrorLine(
                         authErrorText(context, serverError),
-                        key: const Key('login-error'),
-                        style: TextStyle(color: theme.colorScheme.error),
+                        textKey: const Key('login-error'),
                       ),
                     ],
                   ],
                 ),
               ),
-              if (policies != null)
-                _ConsentText(
-                  terms: Uri.tryParse(policies.terms),
-                  privacy: Uri.tryParse(policies.privacy),
+              // The consent and the button never take more than half the
+              // screen; at 200 % text they scroll, button kept last (RA-03).
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.5,
                 ),
-              const SizedBox(height: 16),
-              FilledButton(
-                key: const Key('login-get-otp'),
-                onPressed: state.submitting ? null : _submit,
-                child: state.submitting
-                    ? const SizedBox.square(
-                        dimension: 24,
-                        child: CircularProgressIndicator(strokeWidth: 3),
-                      )
-                    : Text(l10n.loginGetOtp),
+                child: SingleChildScrollView(
+                  reverse: true,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (policies != null)
+                        _ConsentText(
+                          terms: Uri.tryParse(policies.terms),
+                          privacy: Uri.tryParse(policies.privacy),
+                        ),
+                      const SizedBox(height: 8),
+                      FilledButton(
+                        key: const Key('login-get-otp'),
+                        onPressed: state.submitting ? null : _submit,
+                        child: state.submitting
+                            ? const SizedBox.square(
+                                dimension: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                ),
+                              )
+                            : Text(l10n.loginGetOtp),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -240,9 +258,42 @@ class _ConsentTextState extends ConsumerState<_ConsentText> {
         spans.add(TextSpan(text: part));
       }
     }
-    return Text.rich(
-      TextSpan(style: theme.textTheme.bodyMedium, children: spans),
-      key: const Key('login-consent'),
+    // UX audit RA-03: the inline links are about 20 dp tall, so the same
+    // two pages also open from 48 dp buttons under the sentence.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text.rich(
+          TextSpan(style: theme.textTheme.bodyMedium, children: spans),
+          key: const Key('login-consent'),
+        ),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            TextButton(
+              key: const Key('login-terms-button'),
+              style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+              onPressed: widget.terms == null
+                  ? null
+                  : () => _open(widget.terms),
+              child: Text(l10n.loginTermsLink),
+            ),
+            ExcludeSemantics(
+              child: Text('·', style: theme.textTheme.bodyLarge),
+            ),
+            TextButton(
+              key: const Key('login-privacy-button'),
+              style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+              onPressed: widget.privacy == null
+                  ? null
+                  : () => _open(widget.privacy),
+              child: Text(l10n.loginPrivacyLink),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
