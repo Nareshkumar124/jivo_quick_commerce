@@ -26,6 +26,13 @@ x-app: &app
     - path: ${JQC_ENV_DIR:-/srv/jqc/env}/backend.env
       required: true
   networks: [jqc_net]
+  # FCM push key (D-19, docs/deployment.md §11.1), read-only into release, web, worker and beat.
+  # JQC_FCM_KEY_FILE is the host path of the root-owned key file (0440, group = the image's `jivo`
+  # gid), set in /srv/jqc/compose/.env (a path, not a secret). Unset mounts /dev/null, so a host
+  # without a key still starts; backend.env then leaves FCM_CREDENTIALS_FILE unset (push disabled,
+  # notifications.W001). FCM_CREDENTIALS_FILE set without the key mounted fails closed (E002).
+  volumes:
+    - ${JQC_FCM_KEY_FILE:-/dev/null}:/run/secrets/fcm-service-account.json:ro
   restart: unless-stopped
   logging: *logging
   depends_on:
