@@ -41,9 +41,27 @@ class _OfferScreenState extends ConsumerState<OfferScreen> {
   static const urgentSeconds = 10;
   static const expiringSeconds = 5;
 
+  /// How the current offer rings: in the app (screen in front) or through
+  /// the notification (app hidden). Null before the first ring.
+  bool? _rangInForeground;
+
+  late final AppLifecycleListener _lifecycle;
+
+  static bool get _appInFront {
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    return lifecycle == null || lifecycle == AppLifecycleState.resumed;
+  }
+
   @override
   void initState() {
     super.initState();
+    // Hidden (home button, screen off): the notification takes over, with
+    // its heads-up and full-screen intent. Back in front: the app rings and
+    // the heads-up goes, so it never covers this screen.
+    _lifecycle = AppLifecycleListener(
+      onHide: () => _ring(ref.read(offerControllerProvider), inFront: false),
+      onResume: () => _ring(ref.read(offerControllerProvider), inFront: true),
+    );
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       ref.read(offerControllerProvider.notifier).tick();
       _hapticTick();
@@ -66,33 +84,56 @@ class _OfferScreenState extends ConsumerState<OfferScreen> {
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _ticker?.cancel();
     super.dispose();
   }
 
-  /// Rings once per offer, for the time it has left.
-  void _ringIfNew(OfferState state) {
+  /// Rings once per offer, for the time it has left, and again only to
+  /// switch between in-app and notification ringing.
+  void _ring(OfferState state, {required bool inFront}) {
+    if (!mounted) return;
     final offer = state.offer;
     final countdown = state.countdown;
     if (state.phase != OfferPhase.showing ||
         offer == null ||
         countdown == null ||
-        _rangFor == offer.id) {
+        (_rangFor == offer.id && _rangInForeground == inFront)) {
       return;
     }
     _rangFor = offer.id;
+    _rangInForeground = inFront;
     final l10n = AppLocalizations.of(context);
-    unawaited(
-      ref
-          .read(offerAlerterProvider)
-          .ring(
+    final alerter = ref.read(offerAlerterProvider);
+    final title = l10n.offerAlertTitle;
+    final body = l10n.offerAlertBody(offer.storeName, offer.dropLocality);
+    // One ring call at a time, in order (review): a quick hide → resume
+    // must not post the notification after the in-app ring removed it.
+    // A step is skipped once a newer one superseded it, or the offer
+    // stopped showing (accepted, rejected, expired: the controller stops
+    // the alert itself).
+    _ringQueue = _ringQueue
+        .then((_) async {
+          if (!mounted || _rangInForeground != inFront) return;
+          final now = ref.read(offerControllerProvider);
+          if (now.phase != OfferPhase.showing || now.offer?.id != offer.id) {
+            return;
+          }
+          await alerter.ring(
             offer,
-            title: l10n.offerAlertTitle,
-            body: l10n.offerAlertBody(offer.storeName, offer.dropLocality),
+            title: title,
+            body: body,
             timeout: countdown.remaining(ref.read(clockProvider)()),
-          ),
-    );
+            inForeground: inFront,
+          );
+        })
+        .catchError((Object error) {
+          debugPrint('OfferScreen.ring: ${error.runtimeType}');
+        });
   }
+
+  /// The ring calls, chained so they run one after another.
+  Future<void> _ringQueue = Future.value();
 
   Future<void> _reject() async {
     final l10n = AppLocalizations.of(context);
@@ -139,7 +180,7 @@ class _OfferScreenState extends ConsumerState<OfferScreen> {
         Navigator.of(context).pop();
       }
     });
-    _ringIfNew(state);
+    _ring(state, inFront: _appInFront);
     final controller = ref.read(offerControllerProvider.notifier);
     final offer = state.offer;
 

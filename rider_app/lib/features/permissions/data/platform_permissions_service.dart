@@ -19,13 +19,29 @@ class PlatformPermissionsService implements PermissionsService {
       ph.Permission.locationAlways.status,
       ph.Permission.notification.status,
     ]);
-    final whenInUse = _grant(results[0]);
+    // Live: the runtime permission corrected by the location app-op, read
+    // every time (never cached; device test 2026-11-17).
+    final ops = await _device.locationOps();
+    final coarseOp = LocationOpMode.fromWire(ops?['coarse']);
+    final whenInUse = liveLocationGrant(
+      _grant(results[0]),
+      coarseOp,
+      background: false,
+    );
+    final always = liveLocationGrant(
+      _grant(results[1]),
+      coarseOp,
+      background: true,
+    );
+    final fineOp = LocationOpMode.fromWire(ops?['fine']);
     return PermissionSnapshot(
       sdkInt: info.sdkInt,
       manufacturer: info.manufacturer,
       locationWhenInUse: whenInUse,
-      locationPrecise: whenInUse != Grant.granted || await _isPrecise(),
-      locationAlways: _grant(results[1]),
+      locationPrecise:
+          whenInUse != Grant.granted ||
+          (fineOp != LocationOpMode.denied && await _isPrecise()),
+      locationAlways: always,
       notifications: _grant(results[2]),
       batteryOptimisationIgnored:
           await ph.Permission.ignoreBatteryOptimizations.isGranted,

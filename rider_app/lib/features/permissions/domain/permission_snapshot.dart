@@ -80,3 +80,49 @@ class PermissionSnapshot {
     locationPrecise: locationPrecise ?? this.locationPrecise,
   );
 }
+
+/// Android's app-op mode for location (`AppOpsManager`), read next to the
+/// runtime permission. The permission alone can read "granted" while the
+/// op says the app gets no location (device test 2026-11-17: COARSE/FINE
+/// `ignore`), so the gate checks both.
+enum LocationOpMode {
+  /// MODE_ALLOWED: location at any time ("Allow all the time").
+  allowed,
+
+  /// MODE_FOREGROUND: only while the app is in use.
+  foreground,
+
+  /// MODE_IGNORED / MODE_ERRORED: no location.
+  denied,
+
+  /// MODE_DEFAULT or unreadable: the runtime permission decides.
+  unknown;
+
+  static LocationOpMode fromWire(Object? value) => switch (value) {
+    'allowed' => allowed,
+    'foreground' => foreground,
+    'ignored' || 'errored' => denied,
+    _ => unknown,
+  };
+}
+
+/// The live grant of a location permission: the runtime [permission]
+/// corrected by its app-op [op]. [background] is "Allow all the time",
+/// which needs the op allowed at any time, not only in the foreground.
+///
+/// A permission the system reports as granted while the op denies it can
+/// only be changed on the app's settings page, so it is [Grant.blocked].
+/// The same holds for "all the time" granted while the op is foreground
+/// only: asking again would return at once without a prompt.
+Grant liveLocationGrant(
+  Grant permission,
+  LocationOpMode op, {
+  required bool background,
+}) {
+  if (permission != Grant.granted) return permission;
+  return switch (op) {
+    LocationOpMode.unknown || LocationOpMode.allowed => Grant.granted,
+    LocationOpMode.foreground => background ? Grant.blocked : Grant.granted,
+    LocationOpMode.denied => Grant.blocked,
+  };
+}

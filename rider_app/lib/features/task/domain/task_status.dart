@@ -60,6 +60,25 @@ enum TaskStatus {
   /// Whether 08 §3 allows going from this state to [next].
   bool canTransitionTo(TaskStatus next) =>
       taskTransitions[this]?.contains(next) ?? false;
+
+  /// Whether [later] can follow this state for the same rider, through one
+  /// or more 08 §3 transitions between rider-visible states: this state is
+  /// an older picture of a task now in [later] (ASSIGNED before AT_STORE).
+  /// The way back through SEARCHING (ops reassignment) gives the task to
+  /// another assignment, so it does not count. False for the same state.
+  bool precedes(TaskStatus later) {
+    if (later == this || !isRiderTask || !later.isRiderTask) return false;
+    final seen = <TaskStatus>{this};
+    final queue = [this];
+    while (queue.isNotEmpty) {
+      for (final next in taskTransitions[queue.removeLast()] ?? const {}) {
+        if (!next.isRiderTask) continue;
+        if (next == later) return true;
+        if (seen.add(next)) queue.add(next);
+      }
+    }
+    return false;
+  }
 }
 
 /// The 08 §3 state diagram, exactly, plus the ops reassignment in its prose

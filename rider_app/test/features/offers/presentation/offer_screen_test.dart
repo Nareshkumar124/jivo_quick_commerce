@@ -57,6 +57,40 @@ void main() {
     expect(accept.top - reject.bottom, 16);
   });
 
+  // Device test 2026-11-17: the app's own heads-up ("New order offer")
+  // dropped over the offer screen, covering the title and countdown.
+  testWidgets('in front: rings in the app, no heads-up; hidden: the '
+      'notification takes over; back: in the app again', (tester) async {
+    final id = await openOffer(tester);
+    expect(h.alerter.rings.single.$1, id);
+    expect(h.alerter.ringsInForeground, [true]);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump();
+    expect(h.alerter.ringsInForeground, [true, false]);
+    expect(h.alerter.rings.last.$1, id);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(h.alerter.ringsInForeground, [true, false, true]);
+
+    // A quick hide → resume: the calls stay in order and end in the app,
+    // never with the notification posted last (review).
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(h.alerter.ringsInForeground.last, isTrue);
+
+    // A rebuild (the countdown ticks) does not ring again.
+    final rings = h.alerter.ringsInForeground.length;
+    await advance(tester, const Duration(seconds: 1));
+    expect(h.alerter.ringsInForeground, hasLength(rings));
+  });
+
   testWidgets('the last 10 s turn urgent: "s", then "Expiring" (RD-04)', (
     tester,
   ) async {

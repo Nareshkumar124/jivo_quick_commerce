@@ -68,6 +68,15 @@ class GateEvaluation {
   }
 
   bool get canGoOnline => next == null;
+
+  /// The first missing system step after the disclosure, or null. What
+  /// accepting the disclosure asks for next.
+  GateItem? get nextAfterDisclosure {
+    for (final item in items) {
+      if (!item.done && item.step != GateStep.disclosure) return item;
+    }
+    return null;
+  }
 }
 
 /// Pure decision logic of the permissions gate. The platform reads go into a
@@ -97,9 +106,16 @@ abstract final class PermissionGate {
 
     return GateEvaluation(
       items: [
-        // Once background location is granted the rider has already been
-        // through the disclosure, so it is not shown again.
-        GateItem(GateStep.disclosure, done: disclosureAccepted || always),
+        // Done only while location is really granted (device test
+        // 2026-11-17: "Done" next to a revoked permission misled the rider).
+        // Accepted in this session counts once the location prompt that
+        // followed it was allowed; a refusal shows the disclosure again
+        // before the next prompt. Once background location is granted the
+        // rider has been through it, so it is not shown again.
+        GateItem(
+          GateStep.disclosure,
+          done: always || (disclosureAccepted && granted),
+        ),
         GateItem(
           GateStep.locationWhenInUse,
           done: whenInUse,

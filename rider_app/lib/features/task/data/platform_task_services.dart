@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:jivo_core/helpers.dart';
 
+import '../../../shared/platform/device_channel.dart';
 import '../../offers/data/offer_alert_notifications.dart';
 import '../../offers/domain/delivery_offer.dart';
 import '../domain/rider_task.dart';
@@ -61,9 +62,14 @@ class GeolocatorCurrentLocation implements CurrentLocationReader {
 /// Rings through the Phase 0 offer channel (alarm stream, insistent,
 /// full-screen intent over the lock screen).
 class NotificationOfferAlerter implements OfferAlerter {
-  const NotificationOfferAlerter(this._alerts, {required this.channelName});
+  const NotificationOfferAlerter(
+    this._alerts, {
+    required this.channelName,
+    this._device = const DeviceChannel(),
+  });
 
   final OfferAlertNotifications _alerts;
+  final DeviceChannel _device;
   final String channelName;
 
   @override
@@ -72,7 +78,25 @@ class NotificationOfferAlerter implements OfferAlerter {
     required String title,
     required String body,
     required Duration timeout,
+    required bool inForeground,
   }) async {
+    if (inForeground) {
+      // The offer screen is in front: ring in the app, no heads-up on top
+      // of it. Cancelling keeps the lock-screen flags (a full-screen launch
+      // still shows the offer over the lock screen).
+      try {
+        await _alerts.cancelOffer();
+      } on Object catch (error) {
+        debugPrint('NotificationOfferAlerter.cancel: ${error.runtimeType}');
+      }
+      try {
+        await _device.startOfferRinging();
+      } on Object catch (error) {
+        debugPrint('NotificationOfferAlerter.inApp: ${error.runtimeType}');
+      }
+      return;
+    }
+    await _stopInApp();
     try {
       await _alerts.showOffer(
         offerId: offer.id,
@@ -86,8 +110,17 @@ class NotificationOfferAlerter implements OfferAlerter {
     }
   }
 
+  Future<void> _stopInApp() async {
+    try {
+      await _device.stopOfferRinging();
+    } on Object catch (error) {
+      debugPrint('NotificationOfferAlerter.stopInApp: ${error.runtimeType}');
+    }
+  }
+
   @override
   Future<void> stop() async {
+    await _stopInApp();
     try {
       await _alerts.dismiss(id: OfferAlertNotifications.offerNotificationId);
     } on Object catch (error) {

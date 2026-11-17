@@ -194,14 +194,21 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     _pollTimer = null;
   }
 
+  /// After a successful step-changing action, the next poll comes this soon:
+  /// the screen shows the action's answer at once and is confirmed against
+  /// `GET /rider/tasks/current/` right after (device test 2026-11-17).
+  static const confirmAfterAction = Duration(seconds: 2);
+
   /// Re-arms the poll for the task now on screen (one timer at a time).
-  void _armPoll() {
+  /// [soon] replaces the usual interval (never lengthens it).
+  void _armPoll({Duration? soon}) {
     _pollTimer?.cancel();
     _pollTimer = null;
     if (!ref.mounted || !_foreground) return;
     if (!ref.read(taskPollingEnabledProvider)) return;
-    final interval = taskPollInterval(state.task);
-    if (interval == null) return;
+    final usual = taskPollInterval(state.task);
+    if (usual == null) return;
+    final interval = soon != null && soon < usual ? soon : usual;
     _pollTimer = Timer(interval, () {
       _pollTimer = null;
       if (!ref.mounted) return;
@@ -263,6 +270,9 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     final current = state.task;
     final fetched = answer.task;
     final visible = fetched != null && fetched.status.isRiderTask;
+    // A task that ended or went away resets the "older step" memory; only
+    // a visible same-task answer below can set it again.
+    if (!visible) _droppedBehind = null;
     final recent = answer.recentTask;
     if (!visible &&
         current != null &&
@@ -304,6 +314,21 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       return;
     }
     final sameTask = current?.id == fetched.id;
+    if (sameTask &&
+        afterUncertain == null &&
+        fetched.status.precedes(current!.status)) {
+      // An older picture than the one on screen (the step the rider's own
+      // action already left: a lagging fetch put ASSIGNED back over
+      // AT_STORE, device test 2026-11-17). 08 §3 never goes back, so it is
+      // dropped once; the same answer again is taken as the server's word.
+      final seen = (fetched.id, fetched.status);
+      if (_droppedBehind != seen) {
+        _droppedBehind = seen;
+        state = state.copyWith(refreshing: false, loaded: true);
+        return;
+      }
+    }
+    _droppedBehind = null;
     _setTask(fetched);
     state = state.copyWith(
       task: fetched,
@@ -315,6 +340,9 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     );
     _syncPickup(fetched);
   }
+
+  /// The last fetched (task, status) dropped as older than the screen.
+  (int, TaskStatus)? _droppedBehind;
 
   /// Restores the pickup-code lock and attempts from the server's task
   /// (`pickup_code`), so a restart at the store does not forget them.
@@ -510,10 +538,13 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       final updated = await call(task);
       if (!ref.mounted) return false;
       _changes++;
+      _droppedBehind = null;
+      // The rider's own action: its answer is on screen now, not at the
+      // next poll or push.
       _setTask(updated);
       state = state.copyWith(task: updated, clearBusy: true);
       _syncPickup(updated);
-      _armPoll();
+      _armPoll(soon: action.leadsTo != null ? confirmAfterAction : null);
       return true;
     } on Object catch (e) {
       final error = ApiError.from(e);
