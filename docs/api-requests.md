@@ -61,3 +61,5 @@ App agents raise API gaps in their reports (`development-phase.md` §4). This fi
 | 56 | customer (P8, CA-19) | P8 | **Price change on cart lines:** the previous selling price when it changed since the line was added, e.g. `previous_selling_price: string|null` on the cart line, or a line issue `PRICE_CHANGED` with `details.before`. | open |
 | 57 | customer (P8, CA-29) | P8 | **Distinct line count on the orders list:** `line_count: int` on `GET /orders/` items (`item_count` counts units), for the "+N" thumbnail tile. | open |
 | 58 | customer (P8, CA-27) | P8 | **Push on unavailable items (T8a):** notify the customer when items are marked unavailable. Waits for D-19 (Firebase). | open (blocked on D-19) |
+| 59 | rider (P8, RA-09) | P8 | **IFSC lookup (optional):** `GET /rider/ifsc/{ifsc}/` → `{"bank", "branch"}` so the bank form can confirm the IFSC. | open (optional) |
+| 60 | rider (P8, RA-23) | P8 | **Inbox category for cash/payouts:** `InboxNotificationCategoryEnum` is `order, promo, system, support`; add `cash`/`payout`, or confirm payout and cash notices belong under `system`. | open (question) |
