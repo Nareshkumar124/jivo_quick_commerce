@@ -211,6 +211,66 @@ The iOS config pair (`.i.olf`/`.i.conf`) is still pending. On a Mac:
 
 Until then iOS always shows the no-map fallback.
 
+## Push: Firebase Cloud Messaging (D-19)
+
+Push uses `firebase_core` 5.2.0 + `firebase_messaging` 17.1.0, and
+`flutter_local_notifications` 22.3.3 for the channels and foreground
+notifications. **Every environment uses the same mechanism; only the config
+file differs:** each flavor reads its own
+`android/app/src/<flavor>/google-services.json` (private, gitignored).
+
+| Env (Firebase project) | Flavor | Android app id | Config source |
+|---|---|---|---|
+| dev (`jivo-quick`) | `dev` | `in.jivo.quick.dev` | `~/.config/jivo-quick-commerce/firebase/dev/google-services.json` |
+| staging (not created yet) | `staging` | `in.jivo.quick.staging` | `…/firebase/staging/google-services.json` |
+| prod (not created yet) | `prod` | `in.jivo.quick` | `…/firebase/prod/google-services.json` |
+
+```bash
+customer_app/tool/setup_firebase.sh --copy                # dev flavor <- dev env
+customer_app/tool/setup_firebase.sh --copy --env staging  # when that project exists
+customer_app/tool/setup_firebase.sh --copy --env all      # every env that has a file
+customer_app/tool/setup_firebase.sh --remove [--env ...]  # back to "push off"
+FIREBASE_CONFIG_DIR=/other/folder customer_app/tool/setup_firebase.sh --copy
+```
+
+The script copies (mode 600), checks that the file registers the flavor's
+application id and that the destination is gitignored, and prints file names
+only. It never reads `service-account.json` (a server credential that may
+sit in the same folder). Rebuild after copying.
+
+**Without the file** (CI, a fresh checkout, a flavor whose project doesn't
+exist yet) the build still succeeds:
+- `android/app/build.gradle.kts` applies the `com.google.gms.google-services`
+  plugin (4.5.0) only when at least one flavor has its file, and then with
+  `missingGoogleServicesStrategy = WARN`, so the other flavors build too.
+- At run time `initializePush()` (`lib/features/notifications/data/push_setup.dart`)
+  calls `Firebase.initializeApp()`; with no config it fails and the app runs
+  with `NoopPushMessaging`: no permission prompt, no token, no registration.
+  Everything else works. Logcat shows `Push: Firebase is not configured for
+  this build`.
+
+**Behaviour** (03 §2.12):
+- Channels `orders` (high importance: order status, delivery OTP, support
+  replies) and `general` (default: offers and the rest) are created at
+  start-up. A message without `android.notification.channel_id` goes to
+  `general` (manifest default), so the backend must name `orders` for order
+  and support events.
+- Notification permission (Android 13+ `POST_NOTIFICATIONS`) is asked right
+  after sign-in and again on the first order's "Order placed" screen, each
+  at most once per install; never on cold start.
+- The token is registered with `POST /me/devices/` on sign-in, on each start
+  while signed in and on token refresh. Logout sends it as `fcm_token`; after
+  any sign-out (also an expired session) the local token is deleted, so the
+  next sign-in registers a fresh one.
+- Background/terminated: the system shows the notification; a tap opens its
+  screen through `deep_links.dart` (`getInitialMessage` / `onMessageOpenedApp`).
+  Foreground: shown as a local notification on the same channel; a tap routes
+  the same way. No Dart background handler is registered (no data-only
+  messages in v1).
+- iOS: TODO. Needs `GoogleService-Info.plist` per flavor and the APNs key in
+  the Firebase project; until then `Firebase.initializeApp()` fails on iOS and
+  push is off there.
+
 ## Payments: Razorpay (D-01)
 
 `razorpay_flutter` **1.4.7, pinned exactly** sits behind `PaymentLauncher`
@@ -256,7 +316,7 @@ the order's server status) confirms it (`08 §4`).
 Everything the release manifest adds beyond what the app's own code asks
 for, checked in the merged manifest
 (`build/app/outputs/logs/manifest-merger-dev-release-report.txt`) with
-`com.razorpay:checkout` 1.6.41. None of these shows a runtime prompt.
+`com.razorpay:checkout` 1.6.41. Only the app's own location and notification permissions show a runtime prompt.
 
 | Permission or component | From | Why | Kept? |
 |---|---|---|---|
@@ -266,6 +326,8 @@ for, checked in the merged manifest
 | `USE_BIOMETRIC`, `USE_FINGERPRINT` | `androidx.biometric` 1.1.0, through `androidx.credentials` used by `smart_auth` (OTP autofill, since Phase 1), not Razorpay | Credential Manager's biometric prompts | Yes: not proven unneeded by `smart_auth` without a device test |
 | `ACCESS_WIFI_STATE` | Mappls SDK 9.0.4 (Phase 2) | map SDK network checks | Yes |
 | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` | the app (`geolocator`, Phase 2) | delivery location | Yes |
+| `POST_NOTIFICATIONS` (runtime prompt on Android 13+, after sign-in or the first order) | the app (FCM, D-19) | order and support notifications | Yes |
+| `WAKE_LOCK`, `VIBRATE`; `FirebaseMessagingService`, `FirebaseInstanceIdReceiver`, `FirebaseInitProvider`, `ComponentDiscoveryService` | `firebase_messaging` / Firebase SDK, `flutter_local_notifications` (2026-11-17) | receiving pushes, notification vibration | Yes (checked in the dev-release merged manifest) |
 | `com.razorpay.CheckoutActivity` (not exported) | Razorpay `checkout` | the checkout screen | Yes |
 | `com.razorpay.DeeplinkActivity`, **exported**, `razorpay://<applicationId>` (per flavor) | Razorpay `core` | the return link after a UPI app or bank page. Its bytecode only records the URL in Razorpay's SDK analytics, disables itself and finishes; it passes nothing to the app. | Yes |
 | `MagicXActivity`, `UpiChooserSelectionReceiver` (not exported) | Razorpay | UPI app chooser | Yes |
@@ -336,3 +398,7 @@ These were set up on Linux, so only the Android flavors exist so far.
   Allow local networking for the dev configuration only (for example
   `NSAllowsLocalNetworking` in a dev-only Info.plist), never for prod.
 - **iOS build check.** Run `flutter build ios --no-codesign` on a Mac.
+- **Push (D-19).** Add `GoogleService-Info.plist` per flavor (gitignored, like
+  the Android file), enable the Push Notifications and Background Modes →
+  Remote notifications capabilities, and upload the APNs key to the Firebase
+  project. Until then push is off on iOS (`initializePush()` falls back).

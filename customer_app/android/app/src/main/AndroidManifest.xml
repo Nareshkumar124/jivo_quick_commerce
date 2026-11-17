@@ -4,6 +4,9 @@
     <!-- Delivery location: detect (GPS) and the map pin picker. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Push notifications (FCM, D-19). Android 13+ asks at run time, after
+         sign-in or the first order, never on cold start (03 §2.12). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- No backups of app data (address, recent searches, tokens):
          allowBackup/fullBackupContent up to Android 11, dataExtractionRules
          from Android 12. HTTPS only; the dev flavor's
@@ -38,6 +41,20 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- FCM notification messages shown by the system while the app is in
+             the background: icon, accent and the channel used when the
+             message names none. The channels are created at start-up
+             (lib/features/notifications/data/push_channels.dart); "orders"
+             is high importance, "general" default. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_jivo" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

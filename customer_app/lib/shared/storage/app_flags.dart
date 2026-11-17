@@ -23,6 +23,17 @@ class AppFlags {
 
   Future<void> dismissReferralPrompt(int userId) =>
       _prefs.setBool(referralPromptDismissedKey(userId), true);
+
+  /// The notification permission was asked at [moment] (`signIn`,
+  /// `firstOrder`) on this install; each moment asks at most once.
+  static String pushPermissionAskedKey(String moment) =>
+      'push_permission_asked_$moment';
+
+  bool pushPermissionAsked(String moment) =>
+      _prefs.getBool(pushPermissionAskedKey(moment)) ?? false;
+
+  Future<void> markPushPermissionAsked(String moment) =>
+      _prefs.setBool(pushPermissionAskedKey(moment), true);
 }
 
 /// Signs out a session left over from a previous install.

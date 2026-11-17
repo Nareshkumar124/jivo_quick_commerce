@@ -8,6 +8,9 @@ import 'package:jivo_core/jivo_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/auth/data/fake_token_refresher.dart';
+import '../features/notifications/data/push_messaging.dart';
+import '../features/notifications/data/push_setup.dart';
+import '../features/notifications/presentation/push_registration.dart';
 import '../shared/formatting/formatters.dart';
 import '../shared/storage/app_flags.dart';
 import 'app.dart';
@@ -16,6 +19,9 @@ import 'providers.dart';
 /// Starts the app for [flavor]. Called by `main_<flavor>.dart`.
 Future<void> bootstrap(Flavor flavor) async {
   WidgetsFlutterBinding.ensureInitialized();
+  // FCM when this flavor has its google-services.json, else push off
+  // (D-19); runs alongside the rest of the start-up.
+  final pushReady = initializePush();
   final env = AppEnv.fromEnvironment(flavor);
   final clientInfo = await ClientInfo.fromPlatform(appName: customerAppName);
   await initializeFormatting();
@@ -25,6 +31,7 @@ Future<void> bootstrap(Flavor flavor) async {
   await clearStaleSessionOnFreshInstall(prefs, store);
   final session = createSession(env: env, clientInfo: clientInfo, store: store);
   await session.restore();
+  final push = await pushReady;
 
   await runWithSentry(
     dsn: env.sentryDsn,
@@ -37,6 +44,7 @@ Future<void> bootstrap(Flavor flavor) async {
         session: session,
         signals: AppControlSignals(),
         prefs: prefs,
+        push: push,
       ),
     ),
   );
@@ -68,6 +76,7 @@ Widget customerAppRoot({
   required SessionManager session,
   required AppControlSignals signals,
   required SharedPreferences prefs,
+  PushMessaging? push,
   List<Override> overrides = const [],
 }) => ProviderScope(
   retry: noAutomaticRetry,
@@ -77,6 +86,7 @@ Widget customerAppRoot({
     sessionProvider.overrideWithValue(session),
     appControlProvider.overrideWithValue(signals),
     sharedPreferencesProvider.overrideWithValue(prefs),
+    if (push != null) pushMessagingProvider.overrideWithValue(push),
     ...overrides,
   ],
   child: const JivoCustomerApp(),

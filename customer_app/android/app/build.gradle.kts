@@ -15,6 +15,30 @@ val keystoreProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+// Firebase Cloud Messaging (D-19). Each flavor reads its own config from
+// src/<flavor>/google-services.json (dev now; staging and prod get theirs from
+// their own Firebase projects). The files are private and gitignored; run
+// `tool/setup_firebase.sh --copy` to place them. Every environment uses this
+// same mechanism; only the file differs.
+//
+// Without any file (CI, a fresh checkout) the google-services plugin is not
+// applied at all. With a file for some flavors only, the others build with a
+// warning. A build without a config has no Firebase resources, so
+// Firebase.initializeApp() fails at run time and the app runs with push off
+// (NoopPushMessaging, see lib/features/notifications/data/push_setup.dart).
+val firebaseConfiguredFlavors: List<String> =
+    listOf("dev", "staging", "prod").filter { file("src/$it/google-services.json").isFile }
+if (firebaseConfiguredFlavors.isEmpty()) {
+    logger.lifecycle("Firebase config not found in android/app/src/<flavor>: building with push off.")
+} else {
+    apply(plugin = "com.google.gms.google-services")
+    extensions.configure<com.google.gms.googleservices.GoogleServicesPlugin.GoogleServicesPluginConfig> {
+        missingGoogleServicesStrategy =
+            com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy.WARN
+    }
+    logger.lifecycle("Firebase config found for: ${firebaseConfiguredFlavors.joinToString()}.")
+}
+
 android {
     namespace = "in.jivo.quick"
     compileSdk = flutter.compileSdkVersion
@@ -23,6 +47,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by flutter_local_notifications (push channels).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -115,6 +141,8 @@ dependencies {
     // mappls_gl; this must stay the exact version mappls_gl 2.0.7 resolves
     // (mappls-android-sdk 9.0.4 -> rest-apis 6.0.3 -> mappls-core 1.0.2).
     compileOnly("com.mappls.sdk:mappls-core:1.0.2")
+    // Required by flutter_local_notifications; same version as rider_app.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 // Mappls must never start at app launch (README "Why Mappls starts lazily").

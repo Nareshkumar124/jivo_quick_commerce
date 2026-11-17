@@ -4040,6 +4040,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Offer: {title}, banner {index} of {count}'**
   String bannerSemanticsOf(String title, int index, int count);
+
+  /// Android notification channel name (system settings) for order status, delivery and support replies.
+  ///
+  /// In en, this message translates to:
+  /// **'Order updates'**
+  String get pushChannelOrdersName;
+
+  /// Android notification channel description for the orders channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Order status, delivery and support replies'**
+  String get pushChannelOrdersDescription;
+
+  /// Android notification channel name for promotions and other messages.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers and news'**
+  String get pushChannelGeneralName;
+
+  /// Android notification channel description for the general channel.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers, new products and other messages from Jivo'**
+  String get pushChannelGeneralDescription;
 }
 
 class _AppLocalizationsDelegate
