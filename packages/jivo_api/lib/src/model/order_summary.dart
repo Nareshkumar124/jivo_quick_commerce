@@ -38,6 +38,8 @@ class OrderSummary {
 
     required this.itemCount,
 
+    required this.lineCount,
+
     required this.images,
 
     required this.grandTotal,
@@ -86,9 +88,15 @@ class OrderSummary {
   @JsonKey(name: r'store', required: true, includeIfNull: false)
   final OrderStore store;
 
+  /// Units still coming (sum of quantities), as on `Order`.
   // minimum: 1
   @JsonKey(name: r'item_count', required: true, includeIfNull: false)
   final int itemCount;
+
+  /// Distinct order lines (API request #57), counted like `Order.items` and `images` (lines found unavailable included), for the '+N' thumbnail tile: N = `line_count` - `images.length`.
+  // minimum: 1
+  @JsonKey(name: r'line_count', required: true, includeIfNull: false)
+  final int lineCount;
 
   /// Pictures of up to the first 4 lines, for the row thumbnails.
   @JsonKey(name: r'images', required: true, includeIfNull: false)
@@ -125,6 +133,7 @@ class OrderSummary {
           other.paymentStatus == paymentStatus &&
           other.store == store &&
           other.itemCount == itemCount &&
+          other.lineCount == lineCount &&
           other.images == images &&
           other.grandTotal == grandTotal &&
           other.createdAt == createdAt &&
@@ -142,6 +151,7 @@ class OrderSummary {
       paymentStatus.hashCode +
       store.hashCode +
       itemCount.hashCode +
+      lineCount.hashCode +
       images.hashCode +
       grandTotal.hashCode +
       createdAt.hashCode +

@@ -33,6 +33,8 @@ class CartLine {
 
     required this.pricePerUnit,
 
+    required this.previousSellingPrice,
+
     required this.priceTier,
 
     required this.nextTierPrice,
@@ -63,6 +65,10 @@ class CartLine {
   @JsonKey(name: r'price_per_unit', required: true, includeIfNull: false)
   final String pricePerUnit;
 
+  /// Display only, never billed (API request #56): the store's selling price when the customer last set this line's quantity, when it differs from today's `variant.selling_price` (show 'Price changed from ₹X'). Both are the store's price before volume tiers, so a tier reached by the cart's own units is not a price change (see `price_tier`). Null when the price is unchanged, or for lines added before this field existed. Clears on the next quantity set for the line (`POST /cart/items/` or `PATCH /cart/items/{id}/`, the same quantity included, which is how the app acknowledges it). Not a checkout blocker: the bill already uses today's price.
+  @JsonKey(name: r'previous_selling_price', required: true, includeIfNull: true)
+  final String? previousSellingPrice;
+
   /// The volume tier applied to this line (ADR 0001): reached by the units of all tiered items in the cart together. Null when the normal price applies.
   @JsonKey(name: r'price_tier', required: true, includeIfNull: true)
   final PriceTier? priceTier;
@@ -92,6 +98,7 @@ class CartLine {
           other.variant == variant &&
           other.quantity == quantity &&
           other.pricePerUnit == pricePerUnit &&
+          other.previousSellingPrice == previousSellingPrice &&
           other.priceTier == priceTier &&
           other.nextTierPrice == nextTierPrice &&
           other.lineMrpTotal == lineMrpTotal &&
@@ -105,6 +112,7 @@ class CartLine {
       variant.hashCode +
       quantity.hashCode +
       pricePerUnit.hashCode +
+      (previousSellingPrice == null ? 0 : previousSellingPrice.hashCode) +
       (priceTier == null ? 0 : priceTier.hashCode) +
       (nextTierPrice == null ? 0 : nextTierPrice.hashCode) +
       lineMrpTotal.hashCode +

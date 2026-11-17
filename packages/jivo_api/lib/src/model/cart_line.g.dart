@@ -17,6 +17,8 @@ abstract class _$CartLineCWProxy {
 
   CartLine pricePerUnit(String pricePerUnit);
 
+  CartLine previousSellingPrice(String? previousSellingPrice);
+
   CartLine priceTier(PriceTier? priceTier);
 
   CartLine nextTierPrice(String? nextTierPrice);
@@ -39,6 +41,7 @@ abstract class _$CartLineCWProxy {
     VariantSummary variant,
     int quantity,
     String pricePerUnit,
+    String? previousSellingPrice,
     PriceTier? priceTier,
     String? nextTierPrice,
     String lineMrpTotal,
@@ -70,6 +73,10 @@ class _$CartLineCWProxyImpl implements _$CartLineCWProxy {
       this(pricePerUnit: pricePerUnit);
 
   @override
+  CartLine previousSellingPrice(String? previousSellingPrice) =>
+      this(previousSellingPrice: previousSellingPrice);
+
+  @override
   CartLine priceTier(PriceTier? priceTier) => this(priceTier: priceTier);
 
   @override
@@ -99,6 +106,7 @@ class _$CartLineCWProxyImpl implements _$CartLineCWProxy {
     Object? variant = const $CopyWithPlaceholder(),
     Object? quantity = const $CopyWithPlaceholder(),
     Object? pricePerUnit = const $CopyWithPlaceholder(),
+    Object? previousSellingPrice = const $CopyWithPlaceholder(),
     Object? priceTier = const $CopyWithPlaceholder(),
     Object? nextTierPrice = const $CopyWithPlaceholder(),
     Object? lineMrpTotal = const $CopyWithPlaceholder(),
@@ -126,6 +134,10 @@ class _$CartLineCWProxyImpl implements _$CartLineCWProxy {
           ? _value.pricePerUnit
           // ignore: cast_nullable_to_non_nullable
           : pricePerUnit as String,
+      previousSellingPrice: previousSellingPrice == const $CopyWithPlaceholder()
+          ? _value.previousSellingPrice
+          // ignore: cast_nullable_to_non_nullable
+          : previousSellingPrice as String?,
       priceTier: priceTier == const $CopyWithPlaceholder()
           ? _value.priceTier
           // ignore: cast_nullable_to_non_nullable
@@ -172,6 +184,7 @@ CartLine _$CartLineFromJson(Map<String, dynamic> json) => $checkedCreate(
         'variant',
         'quantity',
         'price_per_unit',
+        'previous_selling_price',
         'price_tier',
         'next_tier_price',
         'line_mrp_total',
@@ -191,6 +204,10 @@ CartLine _$CartLineFromJson(Map<String, dynamic> json) => $checkedCreate(
       ),
       quantity: $checkedConvert('quantity', (v) => (v as num).toInt()),
       pricePerUnit: $checkedConvert('price_per_unit', (v) => v as String),
+      previousSellingPrice: $checkedConvert(
+        'previous_selling_price',
+        (v) => v as String?,
+      ),
       priceTier: $checkedConvert(
         'price_tier',
         (v) => v == null ? null : PriceTier.fromJson(v as Map<String, dynamic>),
@@ -209,6 +226,7 @@ CartLine _$CartLineFromJson(Map<String, dynamic> json) => $checkedCreate(
   },
   fieldKeyMap: const {
     'pricePerUnit': 'price_per_unit',
+    'previousSellingPrice': 'previous_selling_price',
     'priceTier': 'price_tier',
     'nextTierPrice': 'next_tier_price',
     'lineMrpTotal': 'line_mrp_total',
@@ -222,6 +240,7 @@ Map<String, dynamic> _$CartLineToJson(CartLine instance) => <String, dynamic>{
   'variant': instance.variant.toJson(),
   'quantity': instance.quantity,
   'price_per_unit': instance.pricePerUnit,
+  'previous_selling_price': instance.previousSellingPrice,
   'price_tier': instance.priceTier?.toJson(),
   'next_tier_price': instance.nextTierPrice,
   'line_mrp_total': instance.lineMrpTotal,

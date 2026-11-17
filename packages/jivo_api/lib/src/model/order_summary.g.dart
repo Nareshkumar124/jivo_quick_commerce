@@ -21,6 +21,8 @@ abstract class _$OrderSummaryCWProxy {
 
   OrderSummary itemCount(int itemCount);
 
+  OrderSummary lineCount(int lineCount);
+
   OrderSummary images(List<ImageSet> images);
 
   OrderSummary grandTotal(String grandTotal);
@@ -49,6 +51,7 @@ abstract class _$OrderSummaryCWProxy {
     PaymentStatusEnum paymentStatus,
     OrderStore store,
     int itemCount,
+    int lineCount,
     List<ImageSet> images,
     String grandTotal,
     DateTime createdAt,
@@ -90,6 +93,9 @@ class _$OrderSummaryCWProxyImpl implements _$OrderSummaryCWProxy {
   OrderSummary itemCount(int itemCount) => this(itemCount: itemCount);
 
   @override
+  OrderSummary lineCount(int lineCount) => this(lineCount: lineCount);
+
+  @override
   OrderSummary images(List<ImageSet> images) => this(images: images);
 
   @override
@@ -127,6 +133,7 @@ class _$OrderSummaryCWProxyImpl implements _$OrderSummaryCWProxy {
     Object? paymentStatus = const $CopyWithPlaceholder(),
     Object? store = const $CopyWithPlaceholder(),
     Object? itemCount = const $CopyWithPlaceholder(),
+    Object? lineCount = const $CopyWithPlaceholder(),
     Object? images = const $CopyWithPlaceholder(),
     Object? grandTotal = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
@@ -164,6 +171,10 @@ class _$OrderSummaryCWProxyImpl implements _$OrderSummaryCWProxy {
           ? _value.itemCount
           // ignore: cast_nullable_to_non_nullable
           : itemCount as int,
+      lineCount: lineCount == const $CopyWithPlaceholder()
+          ? _value.lineCount
+          // ignore: cast_nullable_to_non_nullable
+          : lineCount as int,
       images: images == const $CopyWithPlaceholder()
           ? _value.images
           // ignore: cast_nullable_to_non_nullable
@@ -221,6 +232,7 @@ OrderSummary _$OrderSummaryFromJson(Map<String, dynamic> json) =>
             'payment_status',
             'store',
             'item_count',
+            'line_count',
             'images',
             'grand_total',
             'created_at',
@@ -262,6 +274,7 @@ OrderSummary _$OrderSummaryFromJson(Map<String, dynamic> json) =>
             (v) => OrderStore.fromJson(v as Map<String, dynamic>),
           ),
           itemCount: $checkedConvert('item_count', (v) => (v as num).toInt()),
+          lineCount: $checkedConvert('line_count', (v) => (v as num).toInt()),
           images: $checkedConvert(
             'images',
             (v) => (v as List<dynamic>)
@@ -297,6 +310,7 @@ OrderSummary _$OrderSummaryFromJson(Map<String, dynamic> json) =>
         'paymentMethod': 'payment_method',
         'paymentStatus': 'payment_status',
         'itemCount': 'item_count',
+        'lineCount': 'line_count',
         'grandTotal': 'grand_total',
         'createdAt': 'created_at',
         'placedAt': 'placed_at',
@@ -315,6 +329,7 @@ Map<String, dynamic> _$OrderSummaryToJson(OrderSummary instance) =>
       'payment_status': _$PaymentStatusEnumEnumMap[instance.paymentStatus]!,
       'store': instance.store.toJson(),
       'item_count': instance.itemCount,
+      'line_count': instance.lineCount,
       'images': instance.images.map((e) => e.toJson()).toList(),
       'grand_total': instance.grandTotal,
       'created_at': instance.createdAt.toIso8601String(),
