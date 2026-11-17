@@ -204,6 +204,32 @@ class OfferController extends Notifier<OfferState> {
     }
   }
 
+  /// The rider tapped an offer notification (an FCM `offer.new`, or the
+  /// offer alarm). The server decides: its current offer is shown; if it
+  /// has none (the offer expired, was taken or withdrawn while the
+  /// notification was up), the offer screen says "Offer expired" for
+  /// [offerId]. An open offer, a task, or a failed fetch change nothing.
+  Future<void> openFromNotification(int? offerId) async {
+    if (!ref.read(riderWorkActiveProvider) || _busyWithTask) return;
+    if (state.isOpen && !state.isEnded) return;
+    if (state.isEnded && state.offer?.id != offerId) acknowledge();
+    if (state.isEnded) return; // already says how this offer ended
+    final ReceivedOffer? received;
+    try {
+      received = await _repo.fetchCurrentOffer();
+    } on Object catch (e) {
+      final error = ApiError.from(e);
+      if (ref.mounted) reportAppControlError(ref, error);
+      debugPrint('OfferController.openFromNotification: ${error.code}');
+      return;
+    }
+    if (!ref.mounted || _busyWithTask) return;
+    if (received != null) present(received);
+    if (state.isOpen || offerId == null) return;
+    _ended.add(offerId);
+    state = const OfferState(phase: OfferPhase.expired);
+  }
+
   /// Called every second by the offer screen. Never ends an offer while the
   /// accept is in flight: the server's answer wins.
   void tick() {

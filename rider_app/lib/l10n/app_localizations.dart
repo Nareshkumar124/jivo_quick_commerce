@@ -424,6 +424,48 @@ abstract class AppLocalizations {
   /// **'Rings and opens full screen when a new order is offered to you.'**
   String get offerChannelDescription;
 
+  /// No description provided for @pushChannelOffersName.
+  ///
+  /// In en, this message translates to:
+  /// **'Offer notifications'**
+  String get pushChannelOffersName;
+
+  /// No description provided for @pushChannelOffersDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'New order offers sent while the app is closed.'**
+  String get pushChannelOffersDescription;
+
+  /// No description provided for @pushChannelOrdersName.
+  ///
+  /// In en, this message translates to:
+  /// **'Order updates'**
+  String get pushChannelOrdersName;
+
+  /// No description provided for @pushChannelOrdersDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes to the order you are delivering: packed, amount changed, cancelled.'**
+  String get pushChannelOrdersDescription;
+
+  /// No description provided for @pushChannelGeneralName.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash, payouts and support'**
+  String get pushChannelGeneralName;
+
+  /// No description provided for @pushChannelGeneralDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash in hand, payouts, support replies and other updates.'**
+  String get pushChannelGeneralDescription;
+
+  /// No description provided for @offerAlertBodyFromPush.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Jivo Rider to see the pickup and accept it.'**
+  String get offerAlertBodyFromPush;
+
   /// No description provided for @testOfferTitle.
   ///
   /// In en, this message translates to:

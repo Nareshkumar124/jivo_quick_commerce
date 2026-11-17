@@ -42,14 +42,15 @@ String? routeForRiderLink(String? link) {
 }
 
 /// Opens [route] from a notification (an inbox tap or a tapped push).
-/// The task screen replaces the stack (it is the only place during a task);
-/// anything else is pushed so Back returns to where the rider was.
+/// The task screen and home replace the stack (the task is the only place
+/// during a task; home is the root); anything else is pushed so Back returns
+/// to where the rider was.
 typedef RiderLinkNavigator = void Function(String route);
 
 final riderLinkNavigatorProvider = Provider<RiderLinkNavigator>((ref) {
   return (route) {
     final router = ref.read(routerProvider);
-    if (Routes.isTaskRoute(route)) {
+    if (Routes.isTaskRoute(route) || route == Routes.home) {
       router.go(route);
     } else {
       router.push(route);

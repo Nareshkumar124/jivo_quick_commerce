@@ -15,6 +15,33 @@ val keystoreProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+// Firebase Cloud Messaging (D-19). Each flavor reads its own config from
+// src/<flavor>/google-services.json (dev now: Firebase project jivo-quick,
+// app in.jivo.rider.dev; staging and prod get theirs from their own Firebase
+// projects). The files are private and gitignored; run
+// `tool/setup_firebase.sh --copy [--env dev|staging|prod]` to place them.
+// Every environment uses this same mechanism; only the file differs (same
+// as customer_app).
+//
+// Without any file (CI, a fresh checkout) the google-services plugin is not
+// applied at all. With a file for some flavors only, the others build with a
+// warning. A build without a config has no Firebase resources, so
+// Firebase.initializeApp() fails at run time and the app runs with push off
+// (NoopPushMessaging, see lib/features/notifications/data/push_setup.dart);
+// offers still arrive on the rider socket and by polling.
+val firebaseConfiguredFlavors: List<String> =
+    listOf("dev", "staging", "prod").filter { file("src/$it/google-services.json").isFile }
+if (firebaseConfiguredFlavors.isEmpty()) {
+    logger.lifecycle("Firebase config not found in android/app/src/<flavor>: building with push off.")
+} else {
+    apply(plugin = "com.google.gms.google-services")
+    extensions.configure<com.google.gms.googleservices.GoogleServicesPlugin.GoogleServicesPluginConfig> {
+        missingGoogleServicesStrategy =
+            com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy.WARN
+    }
+    logger.lifecycle("Firebase config found for: ${firebaseConfiguredFlavors.joinToString()}.")
+}
+
 android {
     namespace = "in.jivo.rider"
     // 37, not flutter.compileSdkVersion (36): permission_handler_android 14.x

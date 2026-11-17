@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
+import 'package:rider_app/features/notifications/data/push_guard_store.dart';
 import 'package:rider_app/app/app.dart';
 import 'package:rider_app/app/bootstrap.dart';
 import 'package:rider_app/app/providers.dart';
@@ -198,6 +199,7 @@ class RiderTestHarness {
   final urls = FakeUrlOpener();
   final cleaner = RecordingLocationCleaner();
   final offerAlerts = NoopOfferAlerts();
+  final pushGuard = InMemoryPushGuardStore();
 
   /// 2026-11-02 12:00 IST.
   DateTime now = DateTime.utc(2026, 11, 2, 6, 30);
@@ -252,6 +254,7 @@ class RiderTestHarness {
     otpAutofillProvider.overrideWithValue(const NoOtpAutofill()),
     locationDataCleanerProvider.overrideWithValue(cleaner),
     offerAlertNotificationsProvider.overrideWithValue(offerAlerts),
+    pushGuardStoreProvider.overrideWithValue(pushGuard),
     analyticsProvider.overrideWithValue(const NoopAnalyticsClient()),
     clockProvider.overrideWithValue(() => now),
     fakeRiderOnboardingBackendProvider.overrideWithValue(onboarding),

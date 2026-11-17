@@ -42,6 +42,10 @@ Every development agent reads this before running anything. It records how the s
 - **Customer dev flavor is HTTPS-only for LAN IPs** (T-230, `abd2c6d`): plain HTTP to a LAN IP (e.g. `http://192.168.x.x:8001`) is refused. On the phone use `adb reverse tcp:8001 tcp:<local port>` and `--dart-define=API_BASE_URL=http://localhost:8001`.
 - Don't run `flutter test` or `pub get` while a `flutter build` is running in the same checkout.
 
+### Rider app push (FCM, D-19)
+- Same mechanism and private folder as the customer app: `%USERPROFILE%\.config\jivo-quick-commerce\firebase\<env>\google-services.json` (one file per Firebase project holds both apps; the dev file registers `in.jivo.rider.dev`). In Git Bash, run `rider_app/tool/setup_firebase.sh --copy` (dev flavor from the dev env; `--env staging|prod|all` for the others, `--remove` to undo). It copies the file to `rider_app/android/app/src/<flavor>/google-services.json` (gitignored), refuses a file that doesn't register the flavor's package (`in.jivo.rider.dev` / `.staging` / `in.jivo.rider`) and prints file names only. Never read, print or copy `service-account.json`.
+- Without the file the rider app builds and runs with push off (CI does exactly that); offers still arrive on the rider socket and by polling. See `rider_app/README.md` "Push".
+
 ## Git
 - Agents never commit, push or switch branches. Work only in the worktree path given in the brief.
 - The git stash is shared across worktrees, so never use `git stash`.
