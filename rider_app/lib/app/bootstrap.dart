@@ -9,9 +9,12 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:jivo_core/helpers.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../features/notifications/data/firebase_push_messaging.dart';
+import '../features/notifications/data/push_setup.dart';
+import '../features/notifications/domain/push_messaging.dart';
+import '../features/notifications/presentation/push_providers.dart';
 import '../features/offers/data/offer_alert_notifications.dart';
 import '../features/offers/presentation/offer_alert_providers.dart';
-import '../features/offers/presentation/offer_controller.dart';
 import '../l10n/app_localizations.dart';
 import '../shared/session/store_synced_token_refresher.dart';
 import 'app.dart';
@@ -30,6 +33,13 @@ Future<void> bootstrap(Flavor flavor) async {
 
   // Receives stats from the location service isolate.
   FlutterForegroundTask.initCommunicationPort();
+
+  // FCM when this flavor has its google-services.json, else push off
+  // (D-19); runs alongside the rest of the start-up.
+  final l10n = lookupAppLocalizations(_supportedLocale());
+  final pushReady = initializePush(
+    texts: defaultPushChannelTexts(_supportedLocale()),
+  );
 
   final env = AppEnv.fromEnvironment(flavor);
   final clientInfo = await ClientInfo.fromPlatform(appName: riderAppName);
@@ -50,8 +60,8 @@ Future<void> bootstrap(Flavor flavor) async {
   );
   await session.restore();
   final signals = AppControlSignals();
+  final PushMessaging push = await pushReady;
 
-  final l10n = lookupAppLocalizations(_supportedLocale());
   final offerAlerts = OfferAlertNotifications();
   late final ProviderContainer container;
 
@@ -69,13 +79,32 @@ Future<void> bootstrap(Flavor flavor) async {
           return;
         }
         // A real offer: fetch it; the router opens the offer screen once it
-        // is there (navigating first would race the fetch).
-        unawaited(container.read(offerControllerProvider.notifier).refresh());
+        // is there (navigating first would race the fetch). An offer that
+        // ended meanwhile shows "Offer expired".
+        container
+            .read(pushMessageHandlerProvider)
+            .handle(offerAlertTapMessage(payload));
+      },
+      // A foreground push notification (FCM) was tapped.
+      onOtherSelected: (payload) {
+        if (push is FirebasePushMessaging) push.onLocalNotificationTap(payload);
       },
     );
   } on Object catch (error) {
     debugPrint('bootstrap: offer alert channel setup failed: $error');
   }
+
+  // Started by a tapped foreground push notification: routed once the app
+  // runs (PushMessaging.initialMessage).
+  if (push is FirebasePushMessaging) push.setLocalLaunchPayload(launchPayload);
+  // Started by a real offer alert (its full-screen intent or a tap): the
+  // offer controller fetches the offer when the rider becomes active; this
+  // also shows "Offer expired" if it ended meanwhile.
+  final launchOffer =
+      OfferAlertNotifications.isOfferPayload(launchPayload) &&
+          launchPayload != OfferAlertNotifications.testPayload
+      ? offerAlertTapMessage(launchPayload!)
+      : null;
 
   container = ProviderContainer(
     retry: noAutomaticRetry,
@@ -87,12 +116,17 @@ Future<void> bootstrap(Flavor flavor) async {
         signals: signals,
       ),
       offerAlertNotificationsProvider.overrideWithValue(offerAlerts),
+      pushMessagingProvider.overrideWithValue(push),
       sharedTokenStoreProvider.overrideWithValue(tokenStore),
       if (launchPayload == OfferAlertNotifications.testPayload &&
           env.showDevTools)
         initialLocationProvider.overrideWithValue(Routes.offerPreview),
     ],
   );
+
+  if (launchOffer != null) {
+    container.read(pushMessageHandlerProvider).handle(launchOffer);
+  }
 
   await runWithSentry(
     dsn: env.sentryDsn,

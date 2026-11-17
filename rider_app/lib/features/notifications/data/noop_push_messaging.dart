@@ -1,7 +1,8 @@
 import '../domain/push_messaging.dart';
 
-/// Push is not configured for this build (no Firebase project yet, D-19).
-/// Offers still arrive by polling and, in P6, the rider WebSocket.
+/// Push is not configured for this build: the flavor has no
+/// `google-services.json` (D-19, `tool/setup_firebase.sh`). Offers still
+/// arrive on the rider socket and by polling.
 class NoopPushMessaging implements PushMessaging {
   const NoopPushMessaging();
 
@@ -19,4 +20,7 @@ class NoopPushMessaging implements PushMessaging {
 
   @override
   Future<PushMessage?> initialMessage() async => null;
+
+  @override
+  Future<bool> deleteToken() async => true;
 }

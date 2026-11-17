@@ -6,8 +6,9 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/routes.dart';
+import '../../auth/domain/rider_account.dart';
+import '../../auth/presentation/rider_account_controller.dart';
 import '../../location/domain/backoff.dart';
-import '../../offers/data/offer_alert_notifications.dart';
 import '../../offers/presentation/offer_alert_providers.dart';
 import '../../cash/presentation/cash_providers.dart';
 import '../../offers/presentation/offer_controller.dart';
@@ -16,21 +17,28 @@ import '../../support/presentation/support_providers.dart';
 import '../../task/domain/task_repositories.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
+import '../../offers/data/offer_alert_notifications.dart';
 import '../data/api_device_registry.dart';
 import '../data/noop_push_messaging.dart';
+import '../data/push_guard_store.dart';
 import '../domain/device_registry.dart';
 import '../domain/push_messaging.dart';
 import '../domain/rider_push.dart';
 import 'inbox_providers.dart';
 import 'rider_links.dart';
 
-/// The push channel. TODO(D-19): the Firebase adapter (firebase_messaging,
-/// with its background isolate that turns an `offer.new` data message into
-/// the full-screen offer alert) replaces the no-op once Jivo's FCM projects
-/// exist. Until then offers arrive on the rider socket, with polling as the
-/// fallback. Tests (and a future dev tool) use `FakePushMessaging`.
+/// The push channel: set at start-up from `initializePush()` (Firebase when
+/// the flavor has its `google-services.json`, else the no-op, D-19). Offers
+/// also arrive on the rider socket, with polling as the fallback. Tests use
+/// `FakePushMessaging`.
 final pushMessagingProvider = Provider<PushMessaging>(
   (ref) => const NoopPushMessaging(),
+);
+
+/// The flags shared with the FCM background isolate (signed in, token
+/// delete pending). Tests override it with `InMemoryPushGuardStore`.
+final pushGuardStoreProvider = Provider<PushGuardStore>(
+  (ref) => PrefsPushGuardStore(),
 );
 
 /// `FAKE_API` builds share one fake registry (tests read it).
@@ -72,10 +80,12 @@ final pushRegistrationControllerProvider =
     );
 
 /// Keeps the FCM token registered for the signed-in rider
-/// (`POST /me/devices/`): after login, on app start, and on every token
-/// refresh. A transient failure (no network, 5xx, 429) retries with backoff;
-/// a client error (4xx) is logged and not retried until the next trigger.
-///
+/// (`POST /me/devices/`, `app: rider`): after login, on app start, and on
+/// every token refresh. A transient failure (no network, 5xx, 429) retries
+/// with backoff; a client error (4xx) is logged and not retried until the
+/// next trigger. After any sign-out the local token is deleted
+/// ([PushMessaging.deleteToken]); a logout unregisters it on the server
+/// first ([unregisterForLogout]).
 class PushRegistrationController extends Notifier<PushRegistrationState> {
   Timer? _retry;
   Backoff? _backoff;
@@ -86,14 +96,26 @@ class PushRegistrationController extends Notifier<PushRegistrationState> {
     final session = ref.watch(sessionManagerProvider);
     ref.onDispose(() => _retry?.cancel());
     if (!push.isAvailable) return const PushRegistrationState();
+    final guard = ref.watch(pushGuardStoreProvider);
 
+    var wasSignedIn = session.isSignedIn;
     final status = session.statusStream.listen((status) {
       if (status == SessionStatus.signedIn) {
+        wasSignedIn = true;
+        unawaited(guard.setSignedIn(true));
         unawaited(registerCurrent());
       } else {
         _retry?.cancel();
         _retry = null;
         state = const PushRegistrationState();
+        if (status == SessionStatus.signedOut && wasSignedIn) {
+          wasSignedIn = false;
+          // Every sign-out, including the DL-74 wrong-app one and an
+          // expired session, where the server can't be told: a new token
+          // means pushes for this rider stop reaching this phone. A logout
+          // also unregistered it first (unregisterForLogout).
+          unawaited(_afterSignOut());
+        }
       }
     });
     final refreshes = push.tokenRefreshes.listen(
@@ -103,11 +125,43 @@ class PushRegistrationController extends Notifier<PushRegistrationState> {
       status.cancel();
       refreshes.cancel();
     });
-    if (session.isSignedIn) Future.microtask(registerCurrent);
+    // The background handler rings offers only while this is on.
+    unawaited(guard.setSignedIn(session.isSignedIn));
+    if (session.isSignedIn) {
+      Future.microtask(registerCurrent);
+    } else {
+      // A sign-out that could not delete the token (offline) retries now.
+      Future.microtask(_retryPendingDelete);
+    }
     return const PushRegistrationState();
   }
 
+  Future<void> _afterSignOut() async {
+    final guard = ref.read(pushGuardStoreProvider);
+    final push = ref.read(pushMessagingProvider);
+    // First: the background handler must stop ringing for this phone.
+    await guard.setSignedIn(false);
+    await guard.setTokenDeletePending(true);
+    if (await push.deleteToken()) await guard.setTokenDeletePending(false);
+  }
+
+  /// Deletes the token a sign-out could not delete. Returns when done (or
+  /// still pending).
+  Future<void> _retryPendingDelete() async {
+    if (!ref.mounted) return;
+    final guard = ref.read(pushGuardStoreProvider);
+    if (!await guard.tokenDeletePending()) return;
+    if (!ref.mounted) return;
+    if (await ref.read(pushMessagingProvider).deleteToken()) {
+      await guard.setTokenDeletePending(false);
+    }
+  }
+
   Future<void> registerCurrent() async {
+    // A previous rider's token that could not be deleted is dropped before
+    // this rider registers one.
+    await _retryPendingDelete();
+    if (!ref.mounted) return;
     final String? token;
     try {
       token = await ref.read(pushMessagingProvider).token();
@@ -190,6 +244,11 @@ class PushRegistrationController extends Notifier<PushRegistrationState> {
 final pushMessageHandlerProvider = Provider<PushMessageHandler>((ref) {
   final handler = PushMessageHandler(ref);
   final push = ref.watch(pushMessagingProvider);
+  // A tapped notification that started the app waits for the rider's
+  // account (the screen it opens depends on it).
+  ref.listen(riderAccountControllerProvider, (_, account) {
+    if (account is AccountLoaded) handler._flushPending();
+  });
   final subscription = push.messages.listen(handler.handle);
   ref.onDispose(subscription.cancel);
   unawaited(
@@ -200,10 +259,47 @@ final pushMessageHandlerProvider = Provider<PushMessageHandler>((ref) {
   return handler;
 });
 
+/// The message for a tapped offer alarm (`offer:<id>` payload, in-app or
+/// background): the same as a tapped `offer.new` push.
+PushMessage offerAlertTapMessage(String payload) {
+  final id = int.tryParse(
+    payload.substring(OfferAlertNotifications.payloadPrefix.length),
+  );
+  return PushMessage({
+    RiderPush.typeKey: 'offer.new',
+    if (id != null) 'offer_id': '$id',
+  }, openedApp: true);
+}
+
 class PushMessageHandler {
   PushMessageHandler(this._ref);
 
   final Ref _ref;
+
+  /// A tapped notification that arrived before the account was loaded.
+  PushMessage? _pending;
+
+  void _flushPending() {
+    final pending = _pending;
+    _pending = null;
+    if (pending != null) handle(pending);
+  }
+
+  bool get _accountLoaded =>
+      _ref.read(riderAccountControllerProvider) is AccountLoaded;
+
+  void _open(String route) => _ref.read(riderLinkNavigatorProvider)(route);
+
+  /// A tapped notification: the screen for its `link`, else for its type
+  /// ([fallback]); a link the app doesn't know goes home.
+  void _openTapped(PushMessage message, String? fallback) {
+    final link = message.data['link'];
+    if (link != null && link.isNotEmpty) {
+      _open(routeForRiderLink(link) ?? Routes.home);
+    } else if (fallback != null) {
+      _open(fallback);
+    }
+  }
 
   /// - `offer.new`: fetch the offer from the server; the router then shows
   ///   the full-screen offer (the server's `expires_at` drives the
@@ -215,7 +311,17 @@ class PushMessageHandler {
   ///   the cash ledger.
   /// - `ticket` (every flavor): re-read that ticket and the list; tapped,
   ///   open the ticket.
+  ///
+  /// A tapped notification (`openedApp`) also opens its screen: the offer
+  /// (or "Offer expired" when it ended meanwhile), `jivo://rider/task`,
+  /// `jivo://rider/cash`, the ticket; its `link` when it has one, and home
+  /// for a link or type the app doesn't know. A tap that starts the app is
+  /// held until the account is loaded.
   void handle(PushMessage message) {
+    if (message.openedApp && !_accountLoaded) {
+      if (_ref.read(sessionManagerProvider).isSignedIn) _pending = message;
+      return;
+    }
     final push = RiderPush.parse(message.data);
     if (push case TicketPush(:final ticketId)) {
       _ref
@@ -227,8 +333,19 @@ class PushMessageHandler {
       }
       return;
     }
-    if (!_ref.read(riderWorkActiveProvider)) return;
+    if (!_ref.read(riderWorkActiveProvider)) {
+      // Not an active rider (yet): only the link, if any.
+      if (message.openedApp) _openTapped(message, null);
+      return;
+    }
     switch (push) {
+      case OfferPush(:final offerId) when message.openedApp:
+        // Tapped: open it, or say it expired.
+        unawaited(
+          _ref
+              .read(offerControllerProvider.notifier)
+              .openFromNotification(offerId),
+        );
       case OfferPush():
         // A new offer replaces an ended one still on screen ("expired").
         final offers = _ref.read(offerControllerProvider.notifier);
@@ -254,16 +371,18 @@ class PushMessageHandler {
       case TaskUpdatedPush():
         unawaited(_ref.read(taskFlowControllerProvider.notifier).load());
         _ref.invalidate(inboxUnreadCountProvider);
+        // The guard sends the rider home when there is no task any more.
+        if (message.openedApp) _openTapped(message, Routes.task);
       case CashUpdatedPush():
         _ref
           ..invalidate(todaySummaryProvider)
           ..invalidate(cashLedgerProvider)
           ..invalidate(inboxUnreadCountProvider);
-        if (message.openedApp) {
-          _ref.read(riderLinkNavigatorProvider)(Routes.cash);
-        }
+        if (message.openedApp) _openTapped(message, Routes.cash);
       case TicketPush():
         break; // handled above, in every flavor
+      case UnknownPush() when message.openedApp:
+        _openTapped(message, Routes.home);
       case UnknownPush():
         // Only the type: the payload may carry order details.
         debugPrint(

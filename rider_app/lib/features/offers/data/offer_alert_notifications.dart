@@ -7,8 +7,9 @@ import '../../../shared/platform/device_channel.dart';
 /// max importance, sound on the alarm stream, vibration, and a full-screen
 /// intent so the offer opens over the lock screen.
 ///
-/// Phase 0 spike: only a local test offer is shown, from the dev debug screen.
-/// In P5 the same channel is used for the FCM high-priority data message.
+/// Rung by the in-app offer flow (socket or polling) and, while the app is
+/// not running, by the FCM background handler for a data-only `offer.new`
+/// (`push_background.dart`, D-19). The dev debug screen shows a test offer.
 class OfferAlertNotifications {
   OfferAlertNotifications({
     FlutterLocalNotificationsPlugin? plugin,
@@ -25,7 +26,7 @@ class OfferAlertNotifications {
   static const testNotificationId = 9001;
 
   /// Offers expire after 30 s (04 §2.4). The real offer uses the server's
-  /// `expires_at` instead.
+  /// `expires_at` instead (the background alarm has none: it uses this).
   static const offerTimeout = Duration(seconds: 30);
 
   static const _smallIcon = 'ic_stat_rider';
@@ -37,12 +38,20 @@ class OfferAlertNotifications {
       payload != null && payload.startsWith(payloadPrefix);
 
   /// Creates the channel and registers [onOfferSelected] for taps and
-  /// full-screen launches while the app is running. Returns the offer payload
-  /// if the app process was started by an offer alert, otherwise null.
+  /// full-screen launches while the app is running.
+  ///
+  /// The plugin has one tap callback per process, so this is also where
+  /// taps on the other local notifications arrive: foreground push
+  /// notifications (FCM, D-19) go to [onOtherSelected].
+  ///
+  /// Returns the payload of the notification that started the app process
+  /// (an offer alert's `offer:...`, or a push notification's), otherwise
+  /// null.
   Future<String?> initialize({
     required String channelName,
     required String channelDescription,
     required void Function(String payload) onOfferSelected,
+    void Function(String payload)? onOtherSelected,
   }) async {
     await _plugin.initialize(
       settings: const InitializationSettings(
@@ -50,7 +59,12 @@ class OfferAlertNotifications {
       ),
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
-        if (isOfferPayload(payload)) onOfferSelected(payload!);
+        if (payload == null) return;
+        if (isOfferPayload(payload)) {
+          onOfferSelected(payload);
+        } else {
+          onOtherSelected?.call(payload);
+        }
       },
     );
 
@@ -73,11 +87,7 @@ class OfferAlertNotifications {
 
     final launch = await _plugin.getNotificationAppLaunchDetails();
     final payload = launch?.notificationResponse?.payload;
-    if ((launch?.didNotificationLaunchApp ?? false) &&
-        isOfferPayload(payload)) {
-      return payload;
-    }
-    return null;
+    return (launch?.didNotificationLaunchApp ?? false) ? payload : null;
   }
 
   /// Shows a fake offer through the real channel, to prove the full-screen

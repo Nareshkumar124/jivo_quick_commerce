@@ -196,6 +196,31 @@ class AppLocalizationsEn extends AppLocalizations {
       'Rings and opens full screen when a new order is offered to you.';
 
   @override
+  String get pushChannelOffersName => 'Offer notifications';
+
+  @override
+  String get pushChannelOffersDescription =>
+      'New order offers sent while the app is closed.';
+
+  @override
+  String get pushChannelOrdersName => 'Order updates';
+
+  @override
+  String get pushChannelOrdersDescription =>
+      'Changes to the order you are delivering: packed, amount changed, cancelled.';
+
+  @override
+  String get pushChannelGeneralName => 'Cash, payouts and support';
+
+  @override
+  String get pushChannelGeneralDescription =>
+      'Cash in hand, payouts, support replies and other updates.';
+
+  @override
+  String get offerAlertBodyFromPush =>
+      'Open Jivo Rider to see the pickup and accept it.';
+
+  @override
   String get testOfferTitle => 'New order offer (test)';
 
   @override

@@ -43,6 +43,10 @@ Every development agent reads this before running anything. It records how the s
 - Don't run `flutter test` or `pub get` while a `flutter build` is running in the same checkout.
 - **Firebase push config (D-19).** Private, like the Mappls files: `%USERPROFILE%\.config\jivo-quick-commerce\firebase\<env>\google-services.json` (dev exists; staging/prod later). In Git Bash, run `customer_app/tool/setup_firebase.sh --copy` (dev flavor ← dev env; `--env staging|prod|all` for the others, `--remove` to undo). It copies the file to `customer_app/android/app/src/<flavor>/google-services.json` (gitignored), checks the package name and prints file names only. Never read, print or copy `service-account.json` from that folder. Without the file the app builds and runs with push off (CI does exactly that). See `customer_app/README.md` "Push".
 
+### Rider app push (FCM, D-19)
+- Same mechanism and private folder as the customer app: `%USERPROFILE%\.config\jivo-quick-commerce\firebase\<env>\google-services.json` (one file per Firebase project holds both apps; the dev file registers `in.jivo.rider.dev`). In Git Bash, run `rider_app/tool/setup_firebase.sh --copy` (dev flavor from the dev env; `--env staging|prod|all` for the others, `--remove` to undo). It copies the file to `rider_app/android/app/src/<flavor>/google-services.json` (gitignored), refuses a file that doesn't register the flavor's package (`in.jivo.rider.dev` / `.staging` / `in.jivo.rider`) and prints file names only. Never read, print or copy `service-account.json`.
+- Without the file the rider app builds and runs with push off (CI does exactly that); offers still arrive on the rider socket and by polling. See `rider_app/README.md` "Push".
+
 ## Git
 - Agents never commit, push or switch branches. Work only in the worktree path given in the brief.
 - The git stash is shared across worktrees, so never use `git stash`.

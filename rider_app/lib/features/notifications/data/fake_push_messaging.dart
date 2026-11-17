@@ -2,7 +2,7 @@ import 'dart:async';
 
 import '../domain/push_messaging.dart';
 
-/// FCM stand-in for `FAKE_API` builds and tests (until D-19): a token,
+/// FCM stand-in for tests (and `FAKE_API` dev tools): a token,
 /// token refreshes and messages driven by the caller (dev tools, tests),
 /// so token registration and push routing run end to end without Firebase.
 class FakePushMessaging implements PushMessaging {
@@ -14,6 +14,11 @@ class FakePushMessaging implements PushMessaging {
 
   /// The message that "launched" the app, returned once.
   PushMessage? launch;
+
+  int tokenDeletions = 0;
+
+  /// The next deletes fail (offline) while true.
+  bool failDeletes = false;
 
   void refreshToken(String token) {
     currentToken = token;
@@ -41,5 +46,14 @@ class FakePushMessaging implements PushMessaging {
     final message = launch;
     launch = null;
     return message;
+  }
+
+  /// Like FCM, the next [token] after a delete returns a new token.
+  @override
+  Future<bool> deleteToken() async {
+    if (failDeletes) return false;
+    tokenDeletions++;
+    if (currentToken != null) currentToken = 'fcm-token-new-$tokenDeletions';
+    return true;
   }
 }

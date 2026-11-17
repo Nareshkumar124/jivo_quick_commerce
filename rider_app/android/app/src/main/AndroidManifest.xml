@@ -90,6 +90,20 @@
             android:name="in.jivo.rider.ONLINE_NOTIFICATION_ICON"
             android:resource="@drawable/ic_stat_rider" />
 
+        <!-- FCM notification messages shown by the system while the app is in
+             the background or not running (D-19): small icon, and the
+             channel used when a message names none. The push channels
+             ("offers", "orders", "general") are created at start-up
+             (lib/features/notifications/data/push_channels.dart). They are
+             separate from the location service's "You're online" channel
+             and from the in-app offer alarm channel (offer_alerts_v1). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_rider" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

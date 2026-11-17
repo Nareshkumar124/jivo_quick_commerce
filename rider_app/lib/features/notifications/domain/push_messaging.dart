@@ -15,14 +15,21 @@ class PushMessage {
   String toString() => 'PushMessage(${data['type']}, openedApp: $openedApp)';
 }
 
-/// The push channel (FCM), behind an interface so the app builds and runs
-/// without Firebase.
+/// The push channel (FCM, D-19), behind an interface so the app builds and
+/// runs without Firebase.
 ///
-/// TODO(D-19): the Firebase adapter (firebase_messaging) arrives with the
-/// FCM projects in P6. It also owns the background isolate that turns an
-/// `offer.new` data message into the high-priority offer alert while the app
-/// is not running. Until then [NoopPushMessaging] is used: no token, no
-/// messages, and the app falls back to polling `GET /rider/offers/current/`.
+/// A build with the flavor's `google-services.json` uses
+/// `FirebasePushMessaging` (chosen by `initializePush()` at start-up, see
+/// `data/push_setup.dart`), whose background handler turns a data-only
+/// `offer.new` into the full-screen offer alarm while the app is not
+/// running. A build without it (CI, a fresh checkout, a flavor whose
+/// Firebase project doesn't exist yet) uses `NoopPushMessaging`: no token,
+/// no messages; offers still arrive on the rider socket and by polling
+/// `GET /rider/offers/current/`.
+///
+/// Notification permission (Android 13+ `POST_NOTIFICATIONS`) is never
+/// asked here: the permissions gate asks it, with its explanation, the
+/// first time the rider goes online (04 §2.1).
 abstract interface class PushMessaging {
   /// False when push is not configured for this build.
   bool get isAvailable;
@@ -39,4 +46,11 @@ abstract interface class PushMessaging {
   /// The message whose notification started the app, if any. Returns it
   /// once.
   Future<PushMessage?> initialMessage();
+
+  /// Drops this device's token (after sign-out), so pushes meant for the
+  /// signed-out rider stop arriving even when the server was not told
+  /// (a DL-74 wrong-app sign-out, an expired session). The next [token]
+  /// returns a new token. Never throws: returns false when the token could
+  /// not be deleted (offline), so the caller can retry later.
+  Future<bool> deleteToken();
 }
