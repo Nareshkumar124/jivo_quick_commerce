@@ -6,6 +6,7 @@ import 'package:rider_app/features/auth/presentation/rider_account_controller.da
 import 'package:rider_app/features/notifications/data/api_inbox_repository.dart';
 import 'package:rider_app/features/notifications/domain/inbox.dart';
 import 'package:rider_app/features/notifications/presentation/inbox_providers.dart';
+import 'package:rider_app/features/notifications/presentation/inbox_screen.dart';
 import 'package:rider_app/shared/paging.dart';
 
 import '../../helpers/canned_http.dart';
@@ -205,6 +206,14 @@ void main() {
     });
   });
 
+  test('inbox icons per schema category (RA-23)', () {
+    expect(inboxIconOf('order'), Icons.two_wheeler);
+    expect(inboxIconOf('support'), Icons.forum);
+    expect(inboxIconOf('system'), Icons.badge);
+    expect(inboxIconOf('promo'), Icons.campaign);
+    expect(inboxIconOf('something-new'), Icons.info_outline);
+  });
+
   group('screens', () {
     testWidgets('home bell shows the badge and opens the inbox', (
       tester,
@@ -226,9 +235,25 @@ void main() {
       expect(find.text('Notifications'), findsOneWidget);
       expect(find.byKey(const Key('inbox-3-unread')), findsOneWidget);
 
+      // RA-23: the unread state is spoken, and rider categories have icons.
+      Text title(int id) =>
+          tester.widget<Text>(find.byKey(Key('inbox-$id-title')));
+      expect(title(3).semanticsLabel, 'Unread. Order ready for pickup');
+      expect(title(1).semanticsLabel, isNull, reason: 'already read');
+      Icon icon(int id) =>
+          tester.widget<Icon>(find.byKey(Key('inbox-$id-icon')));
+      expect(icon(3).icon, Icons.two_wheeler);
+      expect(icon(2).icon, Icons.badge);
+
       await tester.tap(find.byKey(const Key('inbox-3')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('inbox-3-unread')), findsNothing);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('inbox-3-title')))
+            .semanticsLabel,
+        isNull,
+      );
 
       await tester.tap(find.byKey(const Key('inbox-mark-all')));
       await tester.pumpAndSettle();

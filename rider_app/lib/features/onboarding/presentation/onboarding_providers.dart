@@ -8,10 +8,12 @@ import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../data/api_rider_onboarding_repository.dart';
 import '../data/fake_rider_onboarding_backend.dart';
+import '../data/file_registration_draft_store.dart';
 import '../data/platform_kyc_images.dart';
 import '../domain/image_compression.dart';
 import '../domain/image_picking.dart';
 import '../domain/kyc_document.dart';
+import '../domain/registration_draft_store.dart';
 import '../domain/rider_onboarding_repository.dart';
 import '../domain/rider_profile.dart';
 
@@ -50,6 +52,11 @@ final imageCodecProvider = Provider<ImageCodec>(
 
 final pendingCaptureStoreProvider = Provider<PendingCaptureStore>(
   (ref) => const FilePendingCaptureStore(),
+);
+
+/// The half-filled registration form (RA-07).
+final registrationDraftStoreProvider = Provider<RegistrationDraftStore>(
+  (ref) => FileRegistrationDraftStore(),
 );
 
 /// On sign-out: forgets a camera capture that Android interrupted and

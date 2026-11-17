@@ -30,6 +30,7 @@ import 'package:rider_app/features/offers/data/offer_alert_notifications.dart';
 import 'package:rider_app/features/offers/presentation/offer_alert_providers.dart';
 import 'package:rider_app/features/onboarding/data/fake_rider_onboarding_backend.dart';
 import 'package:rider_app/features/onboarding/domain/image_picking.dart';
+import 'package:rider_app/features/onboarding/domain/registration_draft_store.dart';
 import 'package:rider_app/features/onboarding/presentation/onboarding_providers.dart';
 import 'package:rider_app/features/notifications/data/api_device_registry.dart';
 import 'package:rider_app/features/notifications/data/fake_inbox_backend.dart';
@@ -207,6 +208,7 @@ class RiderTestHarness {
   final picker = FakeKycImagePicker();
   final codec = FakeImageCodec();
   final pendingCapture = InMemoryPendingCaptureStore();
+  final registrationDraft = InMemoryRegistrationDraftStore();
   late final tasks = FakeTaskBackend(delay: Duration.zero, clock: () => now);
   final locationReader = FakeLocationReader();
   final earnings = FakeEarningsBackend(delay: Duration.zero);
@@ -256,6 +258,7 @@ class RiderTestHarness {
     kycImagePickerProvider.overrideWithValue(picker),
     imageCodecProvider.overrideWithValue(codec),
     pendingCaptureStoreProvider.overrideWithValue(pendingCapture),
+    registrationDraftStoreProvider.overrideWithValue(registrationDraft),
     fakeTaskBackendProvider.overrideWithValue(tasks),
     fakeEarningsBackendProvider.overrideWithValue(earnings),
     fakeCashBackendProvider.overrideWithValue(cash),

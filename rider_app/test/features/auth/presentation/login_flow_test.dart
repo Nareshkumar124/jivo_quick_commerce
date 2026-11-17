@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/features/auth/data/fake_auth_backend.dart';
+import 'package:rider_app/shared/widgets/error_line.dart';
 
 import '../../../helpers/onboarding_fixtures.dart';
 import '../../../helpers/rider_app_harness.dart';
+import '../../../helpers/semantics_helpers.dart';
 
 Finder phoneField() => find.byKey(const Key('login-phone'));
 Finder getOtp() => find.byKey(const Key('login-get-otp'));
@@ -82,8 +84,31 @@ void main() {
       await h.pump(tester);
 
       expect(find.byKey(const Key('login-consent')), findsOneWidget);
-      await tester.tapOnText(find.textRange.ofSubstring('Terms of Use'));
-      await tester.tapOnText(find.textRange.ofSubstring('Privacy Policy'));
+      final consent = find.byKey(const Key('login-consent'));
+      await tester.tapOnText(
+        find.textRange.ofSubstring('Terms of Use', descendentOf: consent),
+      );
+      await tester.tapOnText(
+        find.textRange.ofSubstring('Privacy Policy', descendentOf: consent),
+      );
+
+      expect(h.urls.opened, [
+        Uri.parse('https://jivo.in/terms'),
+        Uri.parse('https://jivo.in/privacy'),
+      ]);
+    });
+
+    testWidgets('RA-03: the policies also open from 48 dp buttons', (
+      tester,
+    ) async {
+      await h.pump(tester);
+
+      final terms = find.byKey(const Key('login-terms-button'));
+      final privacy = find.byKey(const Key('login-privacy-button'));
+      expect(tester.getSize(terms).height, greaterThanOrEqualTo(48));
+      expect(tester.getSize(privacy).height, greaterThanOrEqualTo(48));
+      await tester.tap(terms);
+      await tester.tap(privacy);
 
       expect(h.urls.opened, [
         Uri.parse('https://jivo.in/terms'),
@@ -102,6 +127,20 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Enter the code'), findsNothing);
+      // RA-03: the error has an icon and is read out (live region).
+      final line = find.ancestor(
+        of: find.byKey(const Key('login-error')),
+        matching: find.byType(ErrorLine),
+      );
+      expect(line, findsOneWidget);
+      expect(
+        find.descendant(of: line, matching: find.byIcon(Icons.error)),
+        findsOneWidget,
+      );
+      expect(
+        isInLiveRegion(tester, find.byKey(const Key('login-error'))),
+        isTrue,
+      );
     });
 
     testWidgets('after an expired session, asks to log in again', (
@@ -166,6 +205,11 @@ void main() {
 
       expect(find.text('Wrong code. 4 attempts left.'), findsOneWidget);
       expect(tester.widget<TextField>(codeField()).controller!.text, isEmpty);
+      // RA-03: read out by TalkBack after the field is cleared.
+      expect(
+        isInLiveRegion(tester, find.byKey(const Key('otp-error'))),
+        isTrue,
+      );
       expect(h.backend.calls.last, contains('terms=2026-11-01'));
     });
 

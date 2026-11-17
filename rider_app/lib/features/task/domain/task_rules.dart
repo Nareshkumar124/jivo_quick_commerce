@@ -1,4 +1,4 @@
-import 'package:intl/intl.dart';
+import 'package:jivo_core/jivo_core.dart';
 
 import 'rider_task.dart';
 import 'task_status.dart';
@@ -7,32 +7,17 @@ import 'task_status.dart';
 /// overflow on a malformed server value; longer is "not a money amount".
 final _moneyPattern = RegExp(r'^(-)?(\d{1,15})(?:\.(\d{1,2}))?$');
 
-/// Formats an API money string for display, with the customer app's rule
-/// (03 §4, UX audit RD-02): ₹, `en_IN` grouping, and paise only when they
-/// are not zero. `"249.00"` → `₹249`, `"249.50"` → `₹249.50`,
-/// `"100000.00"` → `₹1,00,000`, `"-20.00"` → `-₹20`.
-///
-/// Parsed as integers, never as a double; display only, nothing is
-/// computed. Returns null for a missing or malformed amount, so callers can
-/// show "can't load the amount" instead of a bare "₹".
-///
-/// TODO(jivo_core): switch to the shared `en_IN` formatter the customer
-/// agent is moving into jivo_core, once it merges. Same behaviour.
-String? tryFormatRupees(String? amount) {
-  if (amount == null) return null;
-  final match = _moneyPattern.firstMatch(amount.trim());
-  if (match == null) return null;
-  final rupees = int.parse(match.group(2)!);
-  final paise = int.parse((match.group(3) ?? '0').padRight(2, '0'));
-  final negative = match.group(1) != null && (rupees != 0 || paise != 0);
-  final grouped = NumberFormat.decimalPattern('en_IN').format(rupees);
-  final fraction = paise == 0 ? '' : '.${paise.toString().padLeft(2, '0')}';
-  return '${negative ? '-' : ''}₹$grouped$fraction';
-}
+/// Shown in place of an amount the server sent malformed (home spec §9).
+const missingAmountText = '–';
 
-/// [tryFormatRupees] for amounts the API always sends (records, payouts).
-/// A malformed value is shown as sent, never with a bare "₹".
-String formatRupees(String amount) => tryFormatRupees(amount) ?? amount.trim();
+/// Formats an API money string for display with jivo_core's shared
+/// `formatRupeeAmount` (03 §4, UX audits RD-02 and RA-20), for amounts the
+/// API always sends (records, payouts, ledger). A malformed value is shown
+/// as "–", never as sent and never as a bare "₹". Where a missing amount
+/// must block an action (the COD step), call `formatRupeeAmount` directly
+/// and handle its null.
+String formatRupees(String amount) =>
+    formatRupeeAmount(amount) ?? missingAmountText;
 
 /// Whether two API money strings are the same amount (`"20"` and
 /// `"20.00"`). A comparison of server values for display, not arithmetic.
@@ -50,7 +35,7 @@ bool isSameAmount(String a, String b) {
 /// The COD amount to collect, formatted, or null when a COD task has no
 /// usable amount: then no cash or UPI action may be offered (RD-02).
 String? codAmountText(RiderTask task) =>
-    task.isCod ? tryFormatRupees(task.codAmountDue) : null;
+    task.isCod ? formatRupeeAmount(task.codAmountDue) : null;
 
 /// The amount offered before the store changed the order, formatted, when
 /// it differs from the amount due now (RD-03); else null.
@@ -59,7 +44,7 @@ String? codAmountWasText(RiderTask task) {
   final now = task.codAmountDue;
   if (!task.isCod || was == null || now == null) return null;
   if (isSameAmount(was, now)) return null;
-  return tryFormatRupees(was);
+  return formatRupeeAmount(was);
 }
 
 // ------------------------------------------------------------------ COD

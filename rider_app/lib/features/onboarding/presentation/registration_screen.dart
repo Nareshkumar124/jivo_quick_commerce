@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../../l10n/app_localizations.dart';
@@ -11,6 +14,7 @@ import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/logout_button.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../domain/onboarding_forms.dart';
+import '../domain/registration_draft_store.dart';
 import '../domain/validators.dart';
 import '../domain/vehicle_type.dart';
 import 'onboarding_controllers.dart';
@@ -41,15 +45,72 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   /// they fix it.
   Map<RegistrationField, FieldError> _errors = const {};
 
+  /// The saved form (RA-07): written shortly after each change, cleared
+  /// once registration succeeds.
+  late final RegistrationDraftStore _draftStore;
+  late final SessionManager _session;
+  Timer? _saveTimer;
+
+  /// Registered, or the session ended: nothing more is saved, so a timer
+  /// or [dispose] can never write a form after sign-out cleared it.
+  bool _closed = false;
+
   @override
   void initState() {
     super.initState();
+    _draftStore = ref.read(registrationDraftStoreProvider);
+    _session = ref.read(sessionManagerProvider);
     final account = ref.read(riderAccountControllerProvider);
     if (account is AccountLoaded) _name.text = account.user.name.trim();
+    for (final field in [_name, _emergencyName, _emergencyPhone]) {
+      field.addListener(_scheduleSave);
+    }
+    _vehicleNumber.addListener(_scheduleSave);
+    unawaited(_restoreDraft());
+  }
+
+  Future<void> _restoreDraft() async {
+    final saved = await _draftStore.read();
+    if (saved == null || saved.isEmpty || !mounted) return;
+    setState(() {
+      if (saved.fullName.trim().isNotEmpty) _name.text = saved.fullName;
+      _emergencyName.text = saved.emergencyName;
+      _emergencyPhone.text = saved.emergencyPhone;
+      _vehicleNumber.text = saved.vehicleNumber;
+      _dob = saved.dateOfBirth;
+      _storeId = saved.storeId;
+      _vehicle = saved.vehicleType;
+    });
+  }
+
+  /// jivo_core drops the tokens before it runs the sign-out hooks (which
+  /// clear the form), so no token means sign-out has started.
+  bool get _canSave =>
+      !_closed && _session.isSignedIn && _session.accessToken != null;
+
+  void _close() {
+    _closed = true;
+    _saveTimer?.cancel();
+    _saveTimer = null;
+  }
+
+  void _scheduleSave() {
+    if (!_canSave) return;
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 400), _saveNow);
+  }
+
+  void _saveNow() {
+    _saveTimer?.cancel();
+    _saveTimer = null;
+    if (!_canSave) return;
+    unawaited(_draftStore.write(_draft));
   }
 
   @override
   void dispose() {
+    // Leaving the form keeps what was typed (until registration succeeds).
+    if (_saveTimer != null) _saveNow();
     _name.dispose();
     _emergencyName.dispose();
     _emergencyPhone.dispose();
@@ -95,6 +156,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     if (picked == null || !mounted) return;
     setState(() => _dob = dateOnly(picked));
     _clear(RegistrationField.dateOfBirth);
+    _scheduleSave();
   }
 
   Future<void> _submit() async {
@@ -107,9 +169,13 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     );
     setState(() => _errors = errors);
     if (errors.isNotEmpty) return;
-    await ref
+    final ok = await ref
         .read(registrationControllerProvider.notifier)
         .submit(draft.toRegistration());
+    if (ok) {
+      _close();
+      await _draftStore.clear();
+    }
   }
 
   String? _error(AppLocalizations l10n, RegistrationField field) {
@@ -123,6 +189,11 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     final theme = Theme.of(context);
     final state = ref.watch(registrationControllerProvider);
     final serverError = state.error;
+    // Sign-out (logout, expired session, DL-74 wrong app): stop saving.
+    // (A reload without sign-out keeps the tokens and keeps saving.)
+    ref.listen(riderAccountControllerProvider, (_, next) {
+      if (next is! AccountLoaded && !_canSave) _close();
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -199,6 +270,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                   onChanged: (id) {
                     setState(() => _storeId = id);
                     _clear(RegistrationField.store);
+                    _scheduleSave();
                   },
                 ),
                 _SectionTitle(l10n.registerSectionVehicle),
@@ -209,6 +281,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                     setState(() => _vehicle = type);
                     _clear(RegistrationField.vehicleType);
                     _clear(RegistrationField.vehicleNumber);
+                    _scheduleSave();
                   },
                 ),
                 if (_vehicle?.isMotorised ?? false) ...[
@@ -419,16 +492,36 @@ class _VehicleChoice extends StatelessWidget {
                   border: Border.all(color: color, width: selected ? 3 : 1),
                   color: selected ? theme.colorScheme.primaryContainer : null,
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Stack(
+                  fit: StackFit.passthrough,
                   children: [
-                    Icon(_icon(type), size: 36, color: color),
-                    const SizedBox(height: 4),
-                    Text(
-                      vehicleName(l10n, type),
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.titleMedium,
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_icon(type), size: 36, color: color),
+                          const SizedBox(height: 4),
+                          Text(
+                            vehicleName(l10n, type),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
                     ),
+                    // RA-07: a check mark, so the choice reads at a glance
+                    // in sun, not only by the border and fill.
+                    if (selected)
+                      PositionedDirectional(
+                        top: 0,
+                        end: 0,
+                        child: Icon(
+                          Icons.check_circle,
+                          key: Key('register-vehicle-${type.wireValue}-check'),
+                          size: 20,
+                          color: color,
+                        ),
+                      ),
                   ],
                 ),
               ),

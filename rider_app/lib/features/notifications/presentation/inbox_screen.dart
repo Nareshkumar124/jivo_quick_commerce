@@ -29,9 +29,13 @@ class InboxScreen extends ConsumerWidget {
         title: Text(l10n.inboxTitle),
         actions: [
           if (anyUnread)
-            TextButton(
+            // An icon (48 dp) rather than words: at 200 % text the words
+            // pushed the app bar past the screen edge.
+            IconButton(
               key: const Key('inbox-mark-all'),
-              style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+              tooltip: l10n.inboxMarkAllRead,
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              icon: const Icon(Icons.done_all),
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
                 if (!await notifier.markAllRead()) {
@@ -40,7 +44,6 @@ class InboxScreen extends ConsumerWidget {
                   );
                 }
               },
-              child: Text(l10n.inboxMarkAllRead),
             ),
         ],
       ),
@@ -49,6 +52,7 @@ class InboxScreen extends ConsumerWidget {
         onRefresh: notifier.refresh,
         onLoadMore: notifier.loadMore,
         emptyText: l10n.inboxEmpty,
+        emptyIcon: Icons.notifications_none,
         itemBuilder: (context, entry) => _InboxTile(
           entry: entry,
           onTap: () {
@@ -63,8 +67,14 @@ class InboxScreen extends ConsumerWidget {
   }
 }
 
+/// The icon of an inbox `category` (`InboxNotificationCategoryEnum`:
+/// order, promo, system, support). UX audit RA-23: rider wording, so an
+/// order update is the rider's task, support is a ticket reply and system
+/// is about the rider's account. Unknown values fall back to `info`.
 IconData inboxIconOf(String category) => switch (category) {
-  'order' => Icons.local_shipping,
+  'order' => Icons.two_wheeler,
+  'support' => Icons.forum,
+  'system' => Icons.badge,
   'promo' => Icons.campaign,
   _ => Icons.info_outline,
 };
@@ -89,7 +99,13 @@ class _InboxTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(inboxIconOf(entry.category), size: 28),
+              ExcludeSemantics(
+                child: Icon(
+                  inboxIconOf(entry.category),
+                  key: Key('inbox-${entry.id}-icon'),
+                  size: 28,
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -97,6 +113,13 @@ class _InboxTile extends StatelessWidget {
                   children: [
                     Text(
                       entry.title,
+                      key: Key('inbox-${entry.id}-title'),
+                      // RA-23: TalkBack hears which entries are unread, not
+                      // only sighted riders (bold title and dot).
+                      semanticsLabel: unread
+                          ? AppLocalizations.of(context)
+                                .inboxUnreadEntry(entry.title)
+                          : null,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: unread ? FontWeight.w800 : FontWeight.w500,
                       ),
@@ -114,11 +137,13 @@ class _InboxTile extends StatelessWidget {
               if (unread)
                 Padding(
                   padding: const EdgeInsets.only(left: 8, top: 6),
-                  child: Icon(
-                    Icons.circle,
-                    key: Key('inbox-${entry.id}-unread'),
-                    size: 12,
-                    color: theme.colorScheme.primary,
+                  child: ExcludeSemantics(
+                    child: Icon(
+                      Icons.circle,
+                      key: Key('inbox-${entry.id}-unread'),
+                      size: 12,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
                 ),
             ],

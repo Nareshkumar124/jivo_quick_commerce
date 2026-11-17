@@ -59,6 +59,60 @@ class RegistrationDraft {
     ),
   };
 
+  /// Whether nothing was typed or chosen yet.
+  bool get isEmpty =>
+      fullName.trim().isEmpty &&
+      dateOfBirth == null &&
+      emergencyName.trim().isEmpty &&
+      emergencyPhone.trim().isEmpty &&
+      storeId == null &&
+      vehicleType == null &&
+      vehicleNumber.trim().isEmpty;
+
+  /// The saved form (UX audit RA-07), so a rider whose app Android stopped
+  /// while they fetched their RC finds what they typed. It holds no
+  /// document numbers.
+  Map<String, Object?> toJson() => {
+    'full_name': fullName,
+    if (dateOfBirth case final dob?)
+      'date_of_birth':
+          '${dob.year.toString().padLeft(4, '0')}-'
+          '${dob.month.toString().padLeft(2, '0')}-'
+          '${dob.day.toString().padLeft(2, '0')}',
+    'emergency_name': emergencyName,
+    'emergency_phone': emergencyPhone,
+    'store_id': ?storeId,
+    'vehicle_type': ?vehicleType?.wireValue,
+    'vehicle_number': vehicleNumber,
+  };
+
+  /// Reads [toJson]'s output; unknown or wrongly typed values are dropped.
+  factory RegistrationDraft.fromJson(Map<String, Object?> json) {
+    String text(String key) => switch (json[key]) {
+      final String value => value,
+      _ => '',
+    };
+    final dob = switch (json['date_of_birth']) {
+      final String value => DateTime.tryParse(value),
+      _ => null,
+    };
+    return RegistrationDraft(
+      fullName: text('full_name'),
+      dateOfBirth: dob == null ? null : dateOnly(dob),
+      emergencyName: text('emergency_name'),
+      emergencyPhone: text('emergency_phone'),
+      storeId: switch (json['store_id']) {
+        final int id => id,
+        _ => null,
+      },
+      vehicleType: switch (json['vehicle_type']) {
+        final String wire => VehicleType.fromWire(wire),
+        _ => null,
+      },
+      vehicleNumber: text('vehicle_number'),
+    );
+  }
+
   /// The request. The vehicle number is dropped for non-motorised vehicles.
   RiderRegistration toRegistration() {
     final vehicle = vehicleType!;

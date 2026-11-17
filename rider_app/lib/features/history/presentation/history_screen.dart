@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/format/ist_format.dart';
 import '../../../shared/widgets/paged_list_view.dart';
@@ -29,6 +30,7 @@ class HistoryScreen extends ConsumerWidget {
         onRefresh: notifier.refresh,
         onLoadMore: notifier.loadMore,
         emptyText: l10n.historyEmpty,
+        emptyIcon: Icons.history,
         itemBuilder: (context, entry) => _HistoryTile(entry: entry),
       ),
     );
@@ -44,6 +46,61 @@ String historyStatusText(AppLocalizations l10n, TaskStatus status) =>
       _ => l10n.historyOther,
     };
 
+/// How a past task ended, as an icon and words in calm colours (UX audit
+/// RA-19): a cancellation (often the store or the customer, before
+/// pickup) is grey, not red like a delivery that did not happen.
+class HistoryStatusLabel extends StatelessWidget {
+  const HistoryStatusLabel({
+    required this.status,
+    this.textKey,
+    this.style,
+    super.key,
+  });
+
+  final TaskStatus status;
+  final Key? textKey;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final colors = RiderColors.of(context);
+    final (icon, color) = switch (status) {
+      TaskStatus.delivered => (Icons.check_circle, colors.onlineBg),
+      TaskStatus.cancelled => (Icons.cancel, colors.textSecondary),
+      TaskStatus.failed ||
+      TaskStatus.returning ||
+      TaskStatus.returned => (Icons.undo, colors.danger),
+      _ => (Icons.info_outline, colors.textSecondary),
+    };
+    final text = historyStatusText(l10n, status);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ExcludeSemantics(
+          child: Icon(
+            icon,
+            key: Key('history-status-icon-${status.name}'),
+            color: color,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            key: textKey,
+            style: (style ?? Theme.of(context).textTheme.labelLarge)?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _HistoryTile extends StatelessWidget {
   const _HistoryTile({required this.entry});
 
@@ -53,7 +110,6 @@ class _HistoryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final delivered = entry.status == TaskStatus.delivered;
     return Card(
       key: Key('history-${entry.taskId}'),
       clipBehavior: Clip.antiAlias,
@@ -74,15 +130,9 @@ class _HistoryTile extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Flexible(
-                    child: Text(
-                      historyStatusText(l10n, entry.status),
-                      key: Key('history-${entry.taskId}-status'),
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: delivered
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.error,
-                      ),
+                    child: HistoryStatusLabel(
+                      status: entry.status,
+                      textKey: Key('history-${entry.taskId}-status'),
                     ),
                   ),
                 ],

@@ -49,10 +49,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         : (account is AccountLoadFailed ? account.error : null);
 
     if (error != null && !launch.loading) {
+      // UX audit RA-02: only a network failure or timeout says "No
+      // internet"; a server error must not send the rider to check data.
+      final offline = isConnectivityError(error);
       return Scaffold(
         body: BlockingMessage(
-          icon: Icons.wifi_off,
-          title: l10n.splashErrorTitle,
+          icon: offline ? Icons.wifi_off : Icons.cloud_off,
+          title: offline ? l10n.splashErrorNoInternet : l10n.splashErrorServer,
           body: apiErrorMessage(JivoCoreLocalizations.of(context), error),
           actions: [
             FilledButton(
@@ -88,3 +91,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     );
   }
 }
+
+/// A failure that never reached the server: no network, or a timeout.
+bool isConnectivityError(ApiError error) =>
+    error.code == ApiErrorCode.network || error.code == ApiErrorCode.timeout;

@@ -136,6 +136,8 @@ class _BankDetailsScreenState extends ConsumerState<BankDetailsScreen> {
                   textCapitalization: TextCapitalization.words,
                   decoration: InputDecoration(
                     labelText: l10n.bankHolderName,
+                    helperText: l10n.bankHolderHelp,
+                    helperMaxLines: 3,
                     errorText: _error(l10n, BankField.holderName),
                   ),
                   onChanged: (_) => _clear(BankField.holderName),

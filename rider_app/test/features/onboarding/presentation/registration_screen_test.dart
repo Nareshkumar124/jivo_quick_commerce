@@ -225,4 +225,70 @@ void main() {
     expect(byKey('register-store'), findsOneWidget);
     expect(h.onboarding.calls, ['fetchStores', 'fetchStores']);
   });
+
+  group('RA-07', () {
+    testWidgets('the selected vehicle tile shows a check mark', (tester) async {
+      await open(tester);
+      expect(byKey('register-vehicle-SCOOTER-check'), findsNothing);
+
+      await chooseVehicle(tester, VehicleType.scooter);
+      expect(byKey('register-vehicle-SCOOTER-check'), findsOneWidget);
+      expect(byKey('register-vehicle-BICYCLE-check'), findsNothing);
+    });
+
+    testWidgets('the form survives the app being stopped, and is cleared '
+        'once registration succeeds', (tester) async {
+      await open(tester);
+      await fillValidForm(tester);
+      await chooseVehicle(tester, VehicleType.bicycle);
+      await tester.pump(const Duration(seconds: 1));
+      expect(h.registrationDraft.draft?.emergencyName, 'Sunita Kumar');
+
+      // Android stopped the app: a fresh widget tree, same phone storage.
+      await tester.pumpWidget(const SizedBox());
+      await h.pump(tester);
+      await show(tester, 'register-emergency-phone');
+      expect(
+        tester
+            .widget<TextField>(byKey('register-emergency-phone'))
+            .controller!
+            .text,
+        '9876500001',
+      );
+      await show(tester, 'register-vehicle-BICYCLE');
+      expect(byKey('register-vehicle-BICYCLE-check'), findsOneWidget);
+
+      await submit(tester);
+      expect(h.onboarding.calls, contains('register'));
+      expect(h.registrationDraft.draft, isNull);
+    });
+
+    testWidgets('signing out inside the 400 ms save window leaves no form '
+        'behind (timer and dispose do not write after the clear)', (
+      tester,
+    ) async {
+      await open(tester);
+      await tester.enterText(byKey('register-emergency-name'), 'Sunita');
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(h.registrationDraft.draft, isNull, reason: 'not saved yet');
+
+      await h.session.signOut(reason: SignOutReason.sessionExpired);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RegistrationScreen), findsNothing);
+      expect(h.registrationDraft.draft, isNull);
+    });
+
+    testWidgets('sign-out deletes the saved form', (tester) async {
+      await open(tester);
+      await tester.enterText(byKey('register-emergency-name'), 'Sunita');
+      await tester.pump(const Duration(seconds: 1));
+      expect(h.registrationDraft.draft, isNotNull);
+
+      await h.session.signOut(reason: SignOutReason.userRequested);
+      await tester.pumpAndSettle();
+      expect(h.registrationDraft.draft, isNull);
+    });
+  });
 }

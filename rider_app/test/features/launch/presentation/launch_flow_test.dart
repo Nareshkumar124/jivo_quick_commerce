@@ -136,7 +136,8 @@ void main() {
     h.config.failWith = const ApiError(code: ApiErrorCode.network);
     await h.pump(tester);
 
-    expect(find.text("Couldn't connect"), findsOneWidget);
+    expect(find.text('No internet'), findsOneWidget);
+    expect(find.byIcon(Icons.wifi_off), findsOneWidget);
     expect(find.text('Log in to Jivo Rider'), findsNothing);
     expect(h.config.fetchCount, 1, reason: 'no automatic retry');
 
@@ -146,6 +147,20 @@ void main() {
 
     expect(h.config.fetchCount, 2);
     expect(find.text('Log in to Jivo Rider'), findsOneWidget);
+  });
+
+  testWidgets('RA-02: a server error on config/app is not "No internet"', (
+    tester,
+  ) async {
+    h.config.failWith = const ApiError(
+      code: ApiErrorCode.unknown,
+      statusCode: 500,
+    );
+    await h.pump(tester);
+
+    expect(find.text("Couldn't load Jivo Rider"), findsOneWidget);
+    expect(find.byIcon(Icons.cloud_off), findsOneWidget);
+    expect(find.text('No internet'), findsNothing);
   });
 
   testWidgets('storeUriOf falls back to the rider app listing', (tester) async {

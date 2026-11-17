@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/features/task/data/fake_task_backend.dart';
 import 'package:rider_app/features/task/domain/rider_task.dart';
 import 'package:rider_app/features/task/domain/task_rules.dart';
@@ -21,15 +22,17 @@ void main() {
     });
 
     test('a malformed amount is never shown with a bare ₹', () {
-      expect(formatRupees('abc'), 'abc');
-      expect(formatRupees(''), '');
-      expect(tryFormatRupees(null), isNull);
-      expect(tryFormatRupees(''), isNull);
-      expect(tryFormatRupees('12.345'), isNull);
+      // RA-20: a malformed amount the API should always send reads "–".
+      expect(formatRupees('abc'), '–');
+      expect(formatRupees(''), '–');
+      expect(formatRupees('1240.5.0'), '–');
+      expect(formatRupeeAmount(null), isNull);
+      expect(formatRupeeAmount(''), isNull);
+      expect(formatRupeeAmount('12.345'), isNull);
       // 20 digits from a broken server value: null, never an overflow.
-      expect(tryFormatRupees('12345678901234567890.00'), isNull);
+      expect(formatRupeeAmount('12345678901234567890.00'), isNull);
       expect(isSameAmount('12345678901234567890', '1'), isFalse);
-      expect(tryFormatRupees('100000000000000.00'), '₹10,00,00,00,00,00,000');
+      expect(formatRupeeAmount('100000000000000.00'), '₹10,00,00,00,00,00,000');
     });
 
     test('isSameAmount compares server strings', () {

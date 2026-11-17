@@ -221,6 +221,16 @@ class TicketsScreen extends ConsumerWidget {
         onRefresh: notifier.refresh,
         onLoadMore: notifier.loadMore,
         emptyText: l10n.ticketsEmpty,
+        emptyIcon: Icons.forum_outlined,
+        emptyAction: FilledButton.icon(
+          key: const Key('tickets-empty-raise'),
+          onPressed: () async {
+            await context.push(Routes.newTicket());
+            await notifier.refresh();
+          },
+          icon: const Icon(Icons.add_comment_outlined),
+          label: Text(l10n.helpRaiseTicket),
+        ),
         itemBuilder: (context, ticket) => _TicketTile(
           ticket: ticket,
           onTap: () async {

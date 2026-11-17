@@ -602,11 +602,17 @@ abstract class AppLocalizations {
   /// **'Getting things ready…'**
   String get splashLoading;
 
-  /// No description provided for @splashErrorTitle.
+  /// Splash error title for a network or timeout failure (UX audit RA-02).
   ///
   /// In en, this message translates to:
-  /// **'Couldn\'t connect'**
-  String get splashErrorTitle;
+  /// **'No internet'**
+  String get splashErrorNoInternet;
+
+  /// Splash error title when the server answered with an error (UX audit RA-02).
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load Jivo Rider'**
+  String get splashErrorServer;
 
   /// No description provided for @updateRequiredTitle.
   ///
@@ -1508,6 +1514,12 @@ abstract class AppLocalizations {
   /// **'Account holder name'**
   String get bankHolderName;
 
+  /// Helper under the account holder name (UX audit RA-09).
+  ///
+  /// In en, this message translates to:
+  /// **'Exactly as in your passbook or bank app.'**
+  String get bankHolderHelp;
+
   /// No description provided for @bankAccountNumber.
   ///
   /// In en, this message translates to:
@@ -2036,6 +2048,24 @@ abstract class AppLocalizations {
   /// **'Waiting for the payment…'**
   String get codUpiWaiting;
 
+  /// Above the UPI QR; the amount is the server's amount due (UX audit RD-10).
+  ///
+  /// In en, this message translates to:
+  /// **'Scan to pay {amount}'**
+  String codUpiScanToPay(String amount);
+
+  /// Under a pending UPI QR; the app polls the server (UX audit RD-10).
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the payment… Checking automatically.'**
+  String get codUpiWaitingAuto;
+
+  /// Primary action after the UPI QR expired (UX audit RD-10).
+  ///
+  /// In en, this message translates to:
+  /// **'Show new QR'**
+  String get codUpiShowNew;
+
   /// No description provided for @codUpiPaid.
   ///
   /// In en, this message translates to:
@@ -2545,6 +2575,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No notifications yet.'**
   String get inboxEmpty;
+
+  /// Screen-reader label of an unread inbox entry's title (UX audit RA-23).
+  ///
+  /// In en, this message translates to:
+  /// **'Unread. {title}'**
+  String inboxUnreadEntry(String title);
 
   /// No description provided for @inboxMarkAllRead.
   ///
@@ -3601,6 +3637,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You have not raised any tickets.'**
   String get ticketsEmpty;
+
+  /// Screen-reader label of the skeleton rows while a list loads (UX audit RA-18).
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get listLoading;
 
   /// No description provided for @newTicketTitle.
   ///

@@ -6,7 +6,6 @@ import '../domain/task_status.dart';
 import 'task_flow_controller.dart';
 import '../../../shared/errors/rider_error_codes.dart';
 import '../../../shared/errors/rider_error_text.dart';
-import '../domain/task_rules.dart';
 
 /// User-facing text for an offer or task error (one place, agent rule 10).
 /// Server messages are never shown; codes and details decide the text.
@@ -20,7 +19,7 @@ String taskErrorText(
   if (error.isWaitNotElapsed) return l10n.failWaitNotElapsed;
   final dueNow = error.codAmountDueNow;
   if (dueNow != null && action == TaskAction.deliver) {
-    final formatted = tryFormatRupees(dueNow);
+    final formatted = formatRupeeAmount(dueNow);
     return formatted == null
         ? l10n.codAmountMismatch
         : l10n.codAmountChangedCollect(formatted);
