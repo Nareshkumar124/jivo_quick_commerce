@@ -164,6 +164,7 @@ def summary_body(order: Order, now: datetime | None = None) -> dict:
         "payment_status": order.payment_status,
         "store": {"id": order.store_id, "name": order.store.name},
         "item_count": units(items),
+        "line_count": len(items),  # API request #57: from the prefetched lines, no query
         "images": [item.image for item in items if item.image][:SUMMARY_IMAGES],
         "grand_total": money_str(order.grand_total),
         "created_at": order.created_at,

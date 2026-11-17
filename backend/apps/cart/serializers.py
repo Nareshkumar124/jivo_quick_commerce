@@ -113,6 +113,16 @@ class CartLineSerializer(serializers.Serializer):
         "The price each unit of this line is billed at (show it, e.g. '₹85/box'): the volume "
         "tier's price when `price_tier` is set, else `variant.selling_price`."
     )
+    previous_selling_price = money_or_null(
+        "Display only, never billed (API request #56): the store's selling price when the "
+        "customer last set this line's quantity, when it differs from today's "
+        "`variant.selling_price` (show 'Price changed from ₹X'). Both are the store's price "
+        "before volume tiers, so a tier reached by the cart's own units is not a price change "
+        "(see `price_tier`). Null when the price is unchanged, or for lines added before this "
+        "field existed. Clears on the next quantity set for the line (`POST /cart/items/` or "
+        "`PATCH /cart/items/{id}/`, the same quantity included, which is how the app "
+        "acknowledges it). Not a checkout blocker: the bill already uses today's price."
+    )
     price_tier = PriceTierSerializer(
         allow_null=True,
         help_text=(

@@ -394,6 +394,7 @@ def summary(order: dict) -> dict:
         "payment_status": order["payment_status"],
         "store": order["store"],
         "item_count": order["item_count"],
+        "line_count": len(order["items"]),
         "images": [line["image"] for line in order["items"][:4] if line["image"]],
         "grand_total": order["bill"]["grand_total"],
         "created_at": order["created_at"],

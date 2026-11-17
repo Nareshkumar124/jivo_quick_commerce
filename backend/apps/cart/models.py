@@ -67,6 +67,17 @@ class CartItem(TimeStampedModel):
         "catalog.ProductVariant", on_delete=models.CASCADE, related_name="cart_items"
     )
     quantity = models.PositiveIntegerField()
+    seen_selling_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=(
+            "The store's selling price (override applied, before volume tiers) when the customer "
+            "last set this line's quantity. Display only (the line's `previous_selling_price`, "
+            "API request #56), never billed. Null on lines added before it existed (no flag)."
+        ),
+    )
 
     class Meta:
         ordering = ["created_at", "id"]

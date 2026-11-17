@@ -83,6 +83,7 @@ CART_EXAMPLES = (
     ("Empty", ex.CART_EMPTY),
     ("Coupon applied, delivery still free", ex.CART_COUPON_KEEPS_FREE_DELIVERY),
     ("Small cart: delivery and small-cart fees", ex.CART_SMALL),
+    ("Price changed since the line was added", ex.CART_PRICE_CHANGED),
     ("Below the minimum order", ex.CART_BELOW_MINIMUM),
     ("Stock changed: lines to fix, COD above limit", ex.CART_STOCK_ISSUES),
     ("Coupon no longer applies", ex.CART_COUPON_NOT_APPLICABLE),

@@ -302,7 +302,17 @@ class OrderSummarySerializer(serializers.Serializer):
     payment_method = serializers.ChoiceField(choices=PaymentMethod.choices)
     payment_status = serializers.ChoiceField(choices=PaymentStatus.choices)
     store = OrderStoreSerializer()
-    item_count = serializers.IntegerField(min_value=1)
+    item_count = serializers.IntegerField(
+        min_value=1, help_text="Units still coming (sum of quantities), as on `Order`."
+    )
+    line_count = serializers.IntegerField(
+        min_value=1,
+        help_text=(
+            "Distinct order lines (API request #57), counted like `Order.items` and `images` "
+            "(lines found unavailable included), for the '+N' thumbnail tile: N = "
+            "`line_count` - `images.length`."
+        ),
+    )
     images = ImageSetSerializer(
         many=True, help_text="Pictures of up to the first 4 lines, for the row thumbnails."
     )

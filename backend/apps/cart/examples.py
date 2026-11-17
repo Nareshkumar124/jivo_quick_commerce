@@ -81,6 +81,7 @@ LINE_CANOLA_1L_X2 = {
     "variant": cat.CANOLA_1L,
     "quantity": 2,
     "price_per_unit": cat.CANOLA_1L["selling_price"],
+    "previous_selling_price": None,
     "price_tier": None,
     "next_tier_price": None,
     "line_mrp_total": "698.00",
@@ -93,6 +94,7 @@ LINE_WHEATGRASS_X1 = {
     "variant": cat.WHEATGRASS_500ML,
     "quantity": 1,
     "price_per_unit": cat.WHEATGRASS_500ML["selling_price"],
+    "previous_selling_price": None,
     "price_tier": None,
     "next_tier_price": None,
     "line_mrp_total": "250.00",
@@ -105,6 +107,7 @@ LINE_ALOE_X1 = {
     "variant": cat.ALOE_1L,
     "quantity": 1,
     "price_per_unit": cat.ALOE_1L["selling_price"],
+    "previous_selling_price": None,
     "price_tier": None,
     "next_tier_price": None,
     "line_mrp_total": "299.00",
@@ -117,6 +120,7 @@ LINE_CHIA_X1 = {
     "variant": CHIA_100G,
     "quantity": 1,
     "price_per_unit": CHIA_100G["selling_price"],
+    "previous_selling_price": None,
     "price_tier": None,
     "next_tier_price": None,
     "line_mrp_total": "150.00",
@@ -129,6 +133,7 @@ LINE_FLAX_X1 = {
     "variant": FLAX_200G,
     "quantity": 1,
     "price_per_unit": FLAX_200G["selling_price"],
+    "previous_selling_price": None,
     "price_tier": None,
     "next_tier_price": None,
     "line_mrp_total": "99.00",
@@ -141,6 +146,7 @@ LINE_CANOLA_5L_X3_LOW = {
     "variant": cat.CANOLA_5L,  # LOW_STOCK, orderable_quantity 2
     "quantity": 3,
     "price_per_unit": cat.CANOLA_5L["selling_price"],
+    "previous_selling_price": None,
     "price_tier": None,
     "next_tier_price": None,
     "line_mrp_total": "4950.00",
@@ -153,6 +159,7 @@ LINE_MUSTARD_X1_OUT = {
     "variant": cat.MUSTARD_1L,  # OUT_OF_STOCK
     "quantity": 1,
     "price_per_unit": cat.MUSTARD_1L["selling_price"],
+    "previous_selling_price": None,
     "price_tier": None,
     "next_tier_price": None,
     "line_mrp_total": "210.00",
@@ -305,6 +312,12 @@ CART_SMALL = {
     },
     "thresholds": thresholds(None, "180.00"),
 }
+# API request #56: chia was ₹129 when the customer added it and is ₹119 now. Display only: the
+# bill is CART_SMALL's (today's price); the flag clears on the line's next quantity set.
+CART_PRICE_CHANGED = {
+    **CART_SMALL,
+    "items": [{**LINE_CHIA_X1, "previous_selling_price": "129.00"}],
+}
 CART_NO_ADDRESS = {
     **CART_SMALL,
     "address": None,
@@ -415,6 +428,7 @@ ALL_CARTS = {
     "CART_READY": CART_READY,
     "CART_COUPON_KEEPS_FREE_DELIVERY": CART_COUPON_KEEPS_FREE_DELIVERY,
     "CART_SMALL": CART_SMALL,
+    "CART_PRICE_CHANGED": CART_PRICE_CHANGED,
     "CART_NO_ADDRESS": CART_NO_ADDRESS,
     "CART_ADDRESS_NOT_SERVICEABLE": CART_ADDRESS_NOT_SERVICEABLE,
     "CART_BELOW_MINIMUM": CART_BELOW_MINIMUM,
