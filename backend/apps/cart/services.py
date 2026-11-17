@@ -302,6 +302,16 @@ class CartLine:
         return self.price if self.price is not None else self.variant.inv_price
 
     @property
+    def previous_selling_price(self) -> Decimal | None:
+        """API request #56 (display only, never billed): the store's selling price when the
+        customer last set this line's quantity, when it differs from today's
+        (`variant.selling_price`, the store's price before volume tiers). Tier moves caused by
+        the cart's own units are not price changes (they show in `price_tier`). Null for lines
+        stored before the snapshot existed."""
+        seen = self.item.seen_selling_price
+        return seen if seen is not None and seen != self.variant.inv_price else None
+
+    @property
     def has_stock_issue(self) -> bool:
         """The store cannot supply the line as it is (out of stock or above what it can)."""
         return self.issue is not None and not self.below_minimum
@@ -335,6 +345,11 @@ class CartLine:
             "variant": self.summary,
             "quantity": self.item.quantity,
             "price_per_unit": money_str(self.unit_price),
+            "previous_selling_price": (
+                money_str(self.previous_selling_price)
+                if self.previous_selling_price is not None
+                else None
+            ),
             "price_tier": (
                 {"min_order_units": self.tier.min_order_units, "price": money_str(self.tier.price)}
                 if self.tier is not None
@@ -802,10 +817,11 @@ def check_minimum(variant_id: int, quantity: int, minimum: int) -> None:
         raise min_qty_error(variant_id, minimum)
 
 
-def check_increase(store_id: int, variant_id: int, quantity: int) -> None:
+def check_increase(store_id: int, variant_id: int, quantity: int) -> ProductVariant:
     """An increase must be within the variant's per-order limits (422 `MAX_QTY_EXCEEDED`, 422
     `MIN_QTY_REQUIRED`) and the store's stock (409 `STOCK_UNAVAILABLE`; a variant the store does
-    not sell has 0, and so does one with fewer free units than its minimum)."""
+    not sell has 0, and so does one with fewer free units than its minimum). Returns the variant
+    with its store price (`inv_price`)."""
     variant = store_variants(store_id, [variant_id], with_images=False).get(variant_id)
     if variant is None or not variant.inv_is_available:
         raise _stock_error(variant_id, quantity, 0)
@@ -825,13 +841,24 @@ def check_increase(store_id: int, variant_id: int, quantity: int) -> None:
     )
     if quantity > stock.orderable_quantity:
         raise _stock_error(variant_id, quantity, stock.orderable_quantity)
+    return variant
+
+
+def store_price(store_id: int, variant_id: int) -> Decimal:
+    """The store's selling price of a variant now (override applied, before volume tiers): the
+    `variant.selling_price` the cart line shows."""
+    return store_variants(store_id, [variant_id], with_images=False)[variant_id].inv_price
 
 
 def set_quantity(cart: Cart, store: StoreArea, variant_id: int, quantity: int) -> None:
     """`POST /cart/items/`: set the line for `variant_id` to `quantity` (0 removes it). An
     increase is checked against the limits and stock; a decrease only against the variant's
     minimum per order, so a customer can always step down a line with a stock issue (or remove
-    it with 0)."""
+    it with 0).
+
+    Every successful set (the same quantity included) records the store's price now as the
+    line's `seen_selling_price`: the customer has seen it, so `previous_selling_price` clears
+    (API request #56). Re-setting the same quantity is how the app acknowledges a change."""
     with transaction.atomic():
         _locked(cart)
         item = cart.items.select_related("variant").filter(variant_id=variant_id).first()
@@ -841,14 +868,18 @@ def set_quantity(cart: Cart, store: StoreArea, variant_id: int, quantity: int) -
                 item.delete()
             return
         if quantity > current:
-            check_increase(store.pk, variant_id, quantity)
-        elif quantity < current:
-            check_minimum(variant_id, quantity, item.variant.min_qty_per_order)
+            price = check_increase(store.pk, variant_id, quantity).inv_price
+        else:
+            if quantity < current:
+                check_minimum(variant_id, quantity, item.variant.min_qty_per_order)
+            price = store_price(store.pk, variant_id)
         if item is None:
-            CartItem.objects.create(cart=cart, variant_id=variant_id, quantity=quantity)
-        elif item.quantity != quantity:
-            item.quantity = quantity
-            item.save(update_fields=["quantity", "updated_at"])
+            CartItem.objects.create(
+                cart=cart, variant_id=variant_id, quantity=quantity, seen_selling_price=price
+            )
+        elif item.quantity != quantity or item.seen_selling_price != price:
+            item.quantity, item.seen_selling_price = quantity, price
+            item.save(update_fields=["quantity", "seen_selling_price", "updated_at"])
 
 
 def own_line(cart: Cart, line_id: int) -> CartItem:

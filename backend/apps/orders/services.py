@@ -1009,12 +1009,20 @@ def reorder(user, store: StoreArea, order_id: int) -> tuple[list[dict], int]:
             if below_minimum:
                 target = current
             added += target > 0
-            if target > current:
+            if target > current:  # target > 0 here, so the variant is sellable at this store
+                # The price the customer sees now (API request #56): no "price changed" flag
+                # against the old order's price.
+                seen = variant.inv_price
                 if line is None:
-                    CartItem.objects.create(cart=cart, variant_id=item.variant_id, quantity=target)
+                    CartItem.objects.create(
+                        cart=cart,
+                        variant_id=item.variant_id,
+                        quantity=target,
+                        seen_selling_price=seen,
+                    )
                 else:
-                    line.quantity = target
-                    line.save(update_fields=["quantity", "updated_at"])
+                    line.quantity, line.seen_selling_price = target, seen
+                    line.save(update_fields=["quantity", "seen_selling_price", "updated_at"])
             if below_minimum or orderable < wanted:
                 if not sellable:
                     reason = ReorderIssueReason.NOT_AVAILABLE

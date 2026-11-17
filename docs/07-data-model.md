@@ -170,7 +170,7 @@ Images (`Category.image`, `ProductImage.image`, `Banner.image`) are public media
 ### 2.5 Cart & promotions (`cart`, `promotions`)
 
 **Cart**: `user` (1:1: one cart per user), `store` (the store of the last cart call, `X-Store-Id`), `coupon` (nullable, SET_NULL), `address` (nullable, SET_NULL; a soft-deleted address counts as none), `tip` (≥ 0), `instructions` (JSON `{chips, note}`). Holds no money: the bill is computed on read.
-**CartItem**: `cart`, `variant`, `quantity`. Unique (`cart`, `variant`).
+**CartItem**: `cart`, `variant`, `quantity`, `seen_selling_price` (nullable Decimal(12,2), added 2026-11-17 for API request #56: the store's selling price, override applied and before volume tiers, when the customer last set the line's quantity; written by `cart.services.set_quantity()` and reorder; display only, never billed; null on older rows = no flag). Unique (`cart`, `variant`).
 
 **Coupon**: `code` (unique, case-insensitive), `title`, `description`, `discount_type` (FLAT/PERCENT), `value`, `max_discount`, `min_order_value`, `starts_at`, `ends_at`, `usage_limit_total`, `usage_limit_per_user`, `first_order_only`, `stores` (M2M), `categories` (M2M, applies to item subtotal in those categories), `is_active`, `is_visible` (listed in the app or hidden code).
 Coupon (built in Phase 3 R2a): `code` stored in capitals, unique on `upper(code)`; `usage_limit_per_user` defaults to 1 (empty = unlimited); `starts_at`/`ends_at` nullable (no bound); check constraints: value > 0, PERCENT ≤ 100, `max_discount` > 0 when set, `ends_at` > `starts_at`. History kept (simple-history).
