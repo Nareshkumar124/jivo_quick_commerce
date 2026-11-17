@@ -18,3 +18,4 @@ Dockerfile.* text eol=lf
 infra/deploy/** text eol=lf
 infra/nginx/** text eol=lf
 infra/docker-compose*.yml text eol=lf
+*.pdf binary
