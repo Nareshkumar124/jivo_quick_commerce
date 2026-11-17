@@ -64,6 +64,27 @@ Staging values (non-secret): `DJANGO_SETTINGS_MODULE=config.settings.staging`,
 `EMAIL_BACKEND=django.core.mail.backends.dummy.EmailBackend` (no SMTP yet), `COD_UPI_QR_ENABLED=false`.
 `STAFF_MFA_ENFORCED` is left at its default (on).
 
+### FCM push key (D-19, docs/deployment.md §11.1)
+
+The Firebase service-account JSON is **not** generated on the server; it comes from the Firebase
+console (project `jivo-quick` for staging) and is copied with `scp` straight to the server, never
+printed, never in an env file, compose file or the repo:
+
+```
+/etc/jqc/secrets/                         root:root 0755 (or 0711)
+  fcm-service-account.json                root:999 0440  (999 = the image's `jivo` group)
+/srv/jqc/compose/.env                     JQC_FCM_KEY_FILE=/etc/jqc/secrets/fcm-service-account.json
+/srv/jqc/env/backend.env                  FCM_CREDENTIALS_FILE=/run/secrets/fcm-service-account.json
+                                          (PUSH_BACKEND left unset: the key file selects FCM)
+```
+
+`compose.prod.yml` mounts `$JQC_FCM_KEY_FILE` read-only at `/run/secrets/fcm-service-account.json`
+in `release`, `web`, `worker` and `beat` (unset: `/dev/null`, push disabled). Verify only with
+`ls -l` and `sha256sum` (compare the hash with the local copy). If a new image ever changes the
+`jivo` gid (`docker run --rm --entrypoint id jqc-backend:<sha>`), the key becomes unreadable and
+the release check fails with `notifications.E002` before anything restarts: `chgrp` the file to
+the new gid. Rotation: docs/deployment.md §11.2 (replace the file in place, roll worker, beat, web).
+
 To read the staff password on the server without printing other values:
 `sudo grep '^SEED_DEMO_STAFF_PASSWORD=' /srv/jqc/env/backend.env` (run it yourself; never paste it).
 
