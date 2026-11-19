@@ -77,8 +77,8 @@ jobs:
             echo "::error::build_number must be a positive integer <= 2100000000 (got '$build_number')."
             exit 1
           fi
-          customer='{"app":"customer_app","prefix":"CUSTOMER","app_id":"in.jivo.quick","mappls":true}'
-          rider='{"app":"rider_app","prefix":"RIDER","app_id":"in.jivo.rider","mappls":false}'
+          customer='{"app":"customer_app","prefix":"CUSTOMER","app_id":"in.jivo.quick","maps":true}'
+          rider='{"app":"rider_app","prefix":"RIDER","app_id":"in.jivo.rider","maps":false}'
           case "$APP" in
             both) matrix="[$customer,$rider]" ;;
             customer_app) matrix="[$customer]" ;;
@@ -110,14 +110,15 @@ jobs:
       UPLOAD_KEY_ALIAS: ${{ secrets[format('{0}_UPLOAD_KEY_ALIAS', matrix.prefix)] }}
       UPLOAD_KEY_PASSWORD: ${{ secrets[format('{0}_UPLOAD_KEY_PASSWORD', matrix.prefix)] }}
       SENTRY_DSN: ${{ secrets[format('{0}_SENTRY_DSN', matrix.prefix)] }}
-      MAPPLS_OLF_BASE64: ${{ matrix.mappls && secrets[format('{0}_MAPPLS_OLF_BASE64', matrix.prefix)] || '' }}
-      MAPPLS_CONF_BASE64: ${{ matrix.mappls && secrets[format('{0}_MAPPLS_CONF_BASE64', matrix.prefix)] || '' }}
+      # Google Maps Android API key (DL-80), customer app only. Its Gradle build reads MAPS_API_KEY
+      # into a manifest placeholder. Restricted in Google Cloud (deployment.md §12.2). Never echoed.
+      MAPS_API_KEY: ${{ matrix.maps && secrets[format('{0}_MAPS_API_KEY', matrix.prefix)] || '' }}
       # Environment variables (not secrets) of `release`.
       API_BASE_URL: ${{ vars.PROD_API_BASE_URL }}
       APP_LINK_HOSTS: ${{ vars.CUSTOMER_APP_LINK_HOSTS }}
       BUILD_NUMBER: ${{ needs.preflight.outputs.build_number }}
       PREFIX: ${{ matrix.prefix }}
-      NEEDS_MAPPLS: ${{ matrix.mappls }}
+      NEEDS_MAPS: ${{ matrix.maps }}
     steps:
       # Before any download, so a missing secret fails in seconds with a list of what to add.
       - name: Release configuration is complete
@@ -126,9 +127,8 @@ jobs:
           for name in UPLOAD_KEYSTORE_BASE64 UPLOAD_KEYSTORE_PASSWORD UPLOAD_KEY_ALIAS UPLOAD_KEY_PASSWORD; do
             [[ -n "${!name}" ]] || missing+=("secret ${PREFIX}_${name}")
           done
-          if [[ "$NEEDS_MAPPLS" == "true" ]]; then
-            [[ -n "$MAPPLS_OLF_BASE64" ]] || missing+=("secret ${PREFIX}_MAPPLS_OLF_BASE64")
-            [[ -n "$MAPPLS_CONF_BASE64" ]] || missing+=("secret ${PREFIX}_MAPPLS_CONF_BASE64")
+          if [[ "$NEEDS_MAPS" == "true" ]]; then
+            [[ -n "$MAPS_API_KEY" ]] || missing+=("secret ${PREFIX}_MAPS_API_KEY")
           fi
           if [[ -z "$API_BASE_URL" ]]; then
             missing+=("variable PROD_API_BASE_URL")
@@ -189,18 +189,6 @@ jobs:
             > "$RUNNER_TEMP/upload-cert.sha256"
           test -s "$RUNNER_TEMP/upload-cert.sha256"
           echo "Upload certificate SHA-256: $(cat "$RUNNER_TEMP/upload-cert.sha256")"
-
-      # Mappls SDK config (secret; bound to the prod package name and the upload/app-signing
-      # certificates in the Mappls console). The mappls_gl Gradle plugin picks it up from android/app.
-      - name: Install the Mappls config
-        if: matrix.mappls
-        env:
-          APP_ID: ${{ matrix.app_id }}
-        run: |
-          umask 077
-          printf '%s' "$MAPPLS_OLF_BASE64" | base64 --decode > "android/app/${APP_ID}.a.olf"
-          printf '%s' "$MAPPLS_CONF_BASE64" | base64 --decode > "android/app/${APP_ID}.a.conf"
-          test -s "android/app/${APP_ID}.a.olf" && test -s "android/app/${APP_ID}.a.conf"
 
       - name: Resolve dependencies (committed lockfile)
         run: flutter pub get --enforce-lockfile
@@ -269,8 +257,5 @@ jobs:
 
       - name: Remove the key material
         if: always()
-        env:
-          APP_ID: ${{ matrix.app_id }}
         run: |
-          rm -f "$RUNNER_TEMP/upload-keystore.jks" "$RUNNER_TEMP/upload-cert.sha256" android/key.properties \
-            "android/app/${APP_ID}.a.olf" "android/app/${APP_ID}.a.conf"
+          rm -f "$RUNNER_TEMP/upload-keystore.jks" "$RUNNER_TEMP/upload-cert.sha256" android/key.properties
