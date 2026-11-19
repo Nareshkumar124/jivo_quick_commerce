@@ -271,14 +271,14 @@ final idempotencyKeyProvider = Provider<String Function()>(
   (ref) => newIdempotencyKey,
 );
 
-/// Whether this build can show a Mappls map (D-03); see README.
+/// Whether this build can show a Google map (DL-80); see README.
 final mapsAvailabilityProvider = Provider<MapsAvailability>(
   (ref) => const PlatformMapsAvailability(),
 );
 
-/// The address under the map pin (Mappls reverse geocoding, D-03).
+/// The address under the map pin (platform geocoder, DL-80).
 final reverseGeocoderProvider = Provider<ReverseGeocoder>(
-  (ref) => const MapplsReverseGeocoder(),
+  (ref) => const PlatformReverseGeocoder(),
 );
 
 final deliveryLocationStoreProvider = Provider<DeliveryLocationStore>(

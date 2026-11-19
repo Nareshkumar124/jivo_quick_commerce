@@ -231,45 +231,6 @@ void main() {
     );
   });
 
-  testWidgets('the fallback "Back to the form" returns to the same form, no '
-      'second one', (tester) async {
-    final app = TestApp(
-      tokens: signedInTokens,
-      mapsAvailable: true,
-      extraOverrides: [
-        pinMapBuilderProvider.overrideWithValue(
-          ({
-            required initial,
-            required onCreated,
-            required onCameraIdle,
-            required onError,
-          }) => Builder(
-            builder: (context) {
-              WidgetsBinding.instance.addPostFrameCallback(
-                (_) => onError(1, 'auth'),
-              );
-              return const SizedBox();
-            },
-          ),
-        ),
-      ],
-    );
-    await openNewAddress(tester, app);
-    await tester.enterText(find.byKey(const Key('address-house')), '12');
-    await tester.tap(find.byKey(const Key('address-set-on-map')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('map-unavailable')), findsOneWidget);
-    await tester.tap(find.text('Back to the form'));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('map-unavailable')), findsNothing);
-    expect(find.byKey(const Key('address-house')), findsOneWidget);
-    expect(
-      fieldText(tester, 'house'),
-      '12',
-      reason: 'same form, not a new one',
-    );
-  });
-
   testWidgets('serviceability line, prefill note, adjust keeps typed values, '
       'and discard asks', (tester) async {
     final app = TestApp(

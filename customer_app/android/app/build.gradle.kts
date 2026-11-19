@@ -39,6 +39,26 @@ if (firebaseConfiguredFlavors.isEmpty()) {
     logger.lifecycle("Firebase config found for: ${firebaseConfiguredFlavors.joinToString()}.")
 }
 
+// Google Maps Android API key (DL-80). Never committed: read at build time
+// from the Gradle property or env var MAPS_API_KEY, else from
+// ~/.config/jivo-quick-commerce/google-maps/android-api-key.txt. Without a
+// key the build still succeeds; the manifest value is empty, MainActivity
+// reports no map, and the app shows its manual-address fallback.
+val mapsApiKey: String = run {
+    val fromProperty = (findProperty("MAPS_API_KEY") as String?)?.trim()
+    val fromEnv = System.getenv("MAPS_API_KEY")?.trim()
+    val keyFile = file(
+        System.getProperty("user.home") +
+            "/.config/jivo-quick-commerce/google-maps/android-api-key.txt",
+    )
+    val fromFile = if (keyFile.isFile) keyFile.readText().trim() else null
+    listOf(fromProperty, fromEnv, fromFile).firstOrNull { !it.isNullOrEmpty() } ?: ""
+}
+logger.lifecycle(
+    if (mapsApiKey.isEmpty()) "Google Maps key not found: building without maps."
+    else "Google Maps key found.",
+)
+
 android {
     namespace = "in.jivo.quick"
     compileSdk = flutter.compileSdkVersion
@@ -68,6 +88,7 @@ android {
         versionName = flutter.versionName
         // Launcher name per flavor, used by AndroidManifest.xml (D-06: "Jivo").
         manifestPlaceholders["appLabel"] = "Jivo"
+        manifestPlaceholders["mapsApiKey"] = mapsApiKey
     }
 
     // One flavor per environment (02 §4). Build with --flavor <name> and the
@@ -136,58 +157,6 @@ configurations.configureEach {
 }
 
 dependencies {
-    // MainActivity's Mappls preflight calls the SDK's own config check
-    // (com.mappls.sdk.core.MapplsInitialiser). The runtime copy comes from
-    // mappls_gl; this must stay the exact version mappls_gl 2.0.7 resolves
-    // (mappls-android-sdk 9.0.4 -> rest-apis 6.0.3 -> mappls-core 1.0.2).
-    compileOnly("com.mappls.sdk:mappls-core:1.0.2")
     // Required by flutter_local_notifications; same version as rider_app.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
-
-// Mappls must never start at app launch (README "Why Mappls starts lazily").
-// mappls_gl's MapplsMapsPlugin calls Mappls.getInstance() in
-// onAttachedToEngine, and the SDK then validates its config on a background
-// thread and throws an uncaught IllegalStateException when the config is
-// missing or not registered for this package/fingerprint, killing the app.
-// The flutter tool writes GeneratedPluginRegistrant.java (gitignored) before
-// Gradle runs, so remove the plugin's registration block from it here.
-// MainActivity registers the plugin later, only after the config passed the
-// SDK's own check. Idempotent; fails the build if the block can't be removed.
-val generatedPluginRegistrant: File =
-    file("src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java")
-val stripMapplsAutoRegistration by tasks.registering {
-    description = "Removes MapplsMapsPlugin from GeneratedPluginRegistrant (lazy Mappls start)."
-    val registrant = generatedPluginRegistrant
-    doLast {
-        if (!registrant.isFile) return@doLast
-        val original = registrant.readText()
-        val block = Regex(
-            """\n[ \t]*try \{\s*flutterEngine\.getPlugins\(\)\.add\(""" +
-                """new com\.mappls\.sdk\.maps\.flutter\.MapplsMapsPlugin\(\)\);""" +
-                """\s*\} catch \(Exception e\) \{[^}]*\}""",
-        )
-        val stripped = original.replace(block, "")
-        if (stripped.contains("MapplsMapsPlugin")) {
-            throw GradleException(
-                "MapplsMapsPlugin is still registered in ${registrant.path}: the " +
-                    "generated registrant's format changed. Update " +
-                    "stripMapplsAutoRegistration in android/app/build.gradle.kts, " +
-                    "or the app crashes at launch without a valid Mappls config.",
-            )
-        }
-        if (stripped != original) {
-            registrant.writeText(stripped)
-            logger.lifecycle("Mappls: removed MapplsMapsPlugin from GeneratedPluginRegistrant.")
-        }
-    }
-}
-stripMapplsAutoRegistration.configure {
-    mustRunAfter(tasks.matching { it.name.startsWith("compileFlutterBuild") })
-}
-tasks.named("preBuild") { dependsOn(stripMapplsAutoRegistration) }
-tasks
-    .matching {
-        it.name.startsWith("compile") &&
-            (it.name.endsWith("JavaWithJavac") || it.name.endsWith("Kotlin"))
-    }.configureEach { dependsOn(stripMapplsAutoRegistration) }

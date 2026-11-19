@@ -1,16 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Whether this build can show a Mappls map (D-03).
+/// Whether this build can show a Google map (DL-80).
 ///
-/// A map is only created when the Mappls SDK config (`<appId>.a.olf` and
-/// `.a.conf`, linked by `tool/setup_mappls.sh`) was built into the app and
-/// passes the SDK's own config check. Android asks `MainActivity`
-/// (`prepare`), which runs that check off the main thread and only then
-/// registers the Mappls plugin: the SDK never starts at app launch, so a
-/// missing or unregistered config can't crash the app (see README). Call
-/// this only when a screen needs a map. iOS reports false until its config
-/// (`.i.olf`/`.i.conf`) is added to the Runner target.
+/// Android asks `MainActivity` (`prepare`), which reports whether the build
+/// injected a Maps API key into the manifest (README "Google Maps key").
+/// Without one no map is ever created and screens show their fallback.
+/// iOS reports false until an iOS key is configured.
 abstract interface class MapsAvailability {
   Future<bool> isAvailable();
 }

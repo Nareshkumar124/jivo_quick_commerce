@@ -132,7 +132,7 @@ void main() {
     expect(container.read(trackProvider(5).notifier).live, isFalse);
   });
 
-  testWidgets('the Mappls map is shown when available, the sketch otherwise', (
+  testWidgets('the Google map is shown when available, the sketch otherwise', (
     tester,
   ) async {
     final repo = FakeTrackRepository(startStep: 2);

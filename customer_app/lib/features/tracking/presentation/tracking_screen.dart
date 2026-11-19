@@ -24,7 +24,7 @@ import 'tracking_map.dart';
 import 'tracking_providers.dart';
 
 /// Live tracking (`03 §2.10`, screen #28): status timeline, ETA
-/// countdown, the Mappls map (or the route sketch without Mappls) with the
+/// countdown, the Google map (or the route sketch without a Maps key) with the
 /// store, the customer and the rider, the rider card with a call button,
 /// and the delivery OTP. Updates arrive over the order socket (`06 §4`),
 /// with `track/` polling while it is down.
@@ -405,8 +405,8 @@ class _EtaCountdownState extends ConsumerState<EtaCountdown> {
   }
 }
 
-/// A store-to-customer line with the rider on it, until the Mappls map
-/// arrives with live tracking (Phase 6).
+/// A store-to-customer line with the rider on it: the map's fallback when
+/// the build has no Maps API key.
 class RouteSketch extends StatelessWidget {
   const RouteSketch({required this.progress, super.key});
 
