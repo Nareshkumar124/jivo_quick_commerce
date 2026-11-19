@@ -1,16 +1,16 @@
 ---
 name: pm-merge-agent-branch
-description: "Commit an agent's finished run in its worktree and merge the module branch (<agent>/phase-N) into develop with --no-ff. Use whenever an agent reports done, the user says merge/commit/integrate a run, or a code review came back Approve; covers ownership check, secret scan, conflicts, migration collisions and post-merge checks."
+description: "Commit an agent's finished run in its worktree and merge the module branch (<agent>/phase-N) into main with --no-ff. Use whenever an agent reports done, the user says merge/commit/integrate a run, or a code review came back Approve; covers ownership check, secret scan, conflicts, migration collisions and post-merge checks."
 ---
 
-# Merge an agent branch into develop
+# Merge an agent branch into main
 
-Agents never commit; the PM does, in the agent's worktree, then merges `--no-ff` into `develop` (`docs/development-phase.md` §9.4). Run from Git Bash. `R=/c/jivo_projects/jivo_quick_commerce`, `W=$R/.worktrees/<name>`, `B=<agent>/phase-N`.
+Agents never commit; the PM does, in the agent's worktree, then merges `--no-ff` into `main` (`docs/development-phase.md` §9.4; all work is on `main` since 2026-11-16, `develop` is stale). Run from Git Bash. `R=/c/jivo_projects/jivo_quick_commerce`, `W=$R/.worktrees/<name>`, `B=<agent>/phase-N`.
 
 ## 1. Ownership check
 ```bash
 git -C $W status --short            # include untracked files
-git -C $W diff --stat develop...HEAD
+git -C $W diff --stat main...HEAD
 ```
 Every changed path must be inside the agent's owned paths (see `.claude/agents/<agent>.md` "What you own"):
 - backend: `backend/**` except `apps/*/admin.py`, `apps/ops_console/`, `templates/`, `static/`, `config/admin_ui.py`, admin tests; plus placeholder lines in `infra/env/backend.env.example`; plus `backend/openapi/schema.yaml`
@@ -46,17 +46,18 @@ EOF
 Types: `feat(backend|admin|customer|rider)`, `test(qa)`, `chore(infra)`/`ci`, `fix(...)`, `docs(pm)`.
 
 ## 4. Optional: refresh the branch first
-If `develop` moved since the branch was cut and the change is risky, `git -C $W merge develop`, then targeted tests in the worktree with its own test DB/Redis (see `new-agent-worktree`), e.g.
+If `main` moved since the branch was cut and the change is risky, `git -C $W merge main`, then targeted tests in the worktree with its own test DB/Redis (see `new-agent-worktree`), e.g.
 ```bash
 cd $W/backend && unset POSTGRES_HOST POSTGRES_PORT POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD
 POSTGRES_TEST_DB=test_jivo_quick_commerce_<wt> TEST_REDIS_DB=<n> uv run pytest -n 4 apps/<app>
 ```
 Flutter: `/c/dev/flutter/bin/flutter analyze && /c/dev/flutter/bin/flutter test` in the app folder.
 
-## 5. Merge into develop (main tree)
+## 5. Merge into main (main tree)
 ```bash
 cd $R && git status --short          # must be clean; never git stash (shared across worktrees)
-git checkout develop && git merge --no-ff $B -m "Merge branch '$B' into develop (<short summary>, T-xxx)"
+git checkout main && git pull --ff-only    # the user's other PC pushes to main
+git merge --no-ff $B -m "Merge branch '$B' into main (<short summary>, T-xxx)"
 ```
 
 ## 6. Conflicts
@@ -67,7 +68,7 @@ git checkout develop && git merge --no-ff $B -m "Merge branch '$B' into develop 
 - After resolving: `python3 infra/scripts/check_env_example.py`.
 - **Migration collisions:** `ls backend/apps/<app>/migrations/` for two files with the same number (e.g. two `cms/0004_*`). Renumber the one **not yet applied** to the shared DB (check `docs/decision-log.md` DL-53/57/58 for what's applied), fix its `dependencies` to point at the other, and confirm with `makemigrations --check`. Never edit an applied migration.
 
-## 7. Post-merge checks (main tree, develop)
+## 7. Post-merge checks (main tree, main)
 ```bash
 cd $R/backend && unset POSTGRES_HOST POSTGRES_PORT POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD
 uv run python manage.py check && uv run python manage.py makemigrations --check --dry-run
@@ -75,7 +76,7 @@ uv run ruff check . && uv run ruff format --check .
 ```
 If the merge brought new migrations, **stop**: they reach the shared DB only via `shared-db-migrate` with user approval. Otherwise restart :8001 and Celery (`local-stack`) and `curl -s http://127.0.0.1:8001/health/ready`.
 
-Then: regenerate `jivo_api` if the schema changed, update `docs/task-tracker.md` (status + merge hash), and tell other active agents' worktrees to `git merge develop` before their next run.
+Then: regenerate `jivo_api` if the schema changed, update `docs/task-tracker.md` (status + merge hash), and tell other active agents' worktrees to `git merge main` before their next run. Pushing is separate: only when the user asks, via `github-publisher`.
 
 ## 8. Drop the merged run's test databases (user decision, 2026-11-05)
 Each run name creates 5 test DBs on the **shared** server: the base DB plus `_gw0`–`_gw3`. Once a run is merged and its agent is done, drop them so they don't pile up:

@@ -13,10 +13,10 @@ Status must be honest (§9.2 rule 7): "built" needs green test output, "done/pas
   ```bash
   R=/c/jivo_projects/jivo_quick_commerce
   git -C $R worktree list
-  for w in $R/.worktrees/*/; do n=$(git -C $w status --short | wc -l); a=$(git -C $w rev-list --count develop..HEAD); echo "$(basename $w) $(git -C $w branch --show-current) dirty=$n unmerged_commits=$a"; done
+  for w in $R/.worktrees/*/; do n=$(git -C $w status --short | wc -l); a=$(git -C $w rev-list --count main..HEAD); echo "$(basename $w) $(git -C $w branch --show-current) dirty=$n unmerged_commits=$a"; done
   ```
   `dirty>0` with no running agent = a finished run waiting for review/merge. `unmerged_commits>0` = committed but not merged.
-- **Recent integration:** `git -C $R log develop --merges --oneline --since='2 days ago' | head -15` and `git -C $R rev-list --count main..develop` (commits on develop not yet released to main).
+- **Recent integration:** `git -C $R log main --merges --oneline --since='2 days ago' | head -15` and, after `git -C $R fetch`, `git -C $R rev-list --count origin/main..main` (local commits not yet pushed) and `git -C $R rev-list --count main..origin/main` (pushed from the other PC, not yet pulled).
 - **Plan state:** `docs/plan/00-roadmap.md` (Build/Gate per phase), `docs/task-tracker.md` (per-phase task statuses: `grep -cE 'Completed|Testing|In Progress|Not Started'` per section), `docs/project-status.md`, open ⚠ rows in `docs/decision-log.md`, open bugs in `qa/bugs/` (status lines), `docs/api-requests.md` open items.
 - **Server:** `curl -s http://127.0.0.1:8001/health/ready` (one line in the report).
 

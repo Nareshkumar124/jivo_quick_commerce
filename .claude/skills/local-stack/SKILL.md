@@ -5,7 +5,7 @@ description: "Start, stop, restart and health-check the local Jivo dev stack on 
 
 # Local stack (no Docker)
 
-Everything runs natively from the **main tree on `develop`** (`/c/jivo_projects/jivo_quick_commerce`). The :8001 server only ever runs merged code. Never use port 6379 or the `redis-chai` / `mongo-chai` containers (another project). 5432 and 8000 are taken.
+Everything runs natively from the **main tree on `main`** (`/c/jivo_projects/jivo_quick_commerce`). The :8001 server only ever runs merged code. Never use port 6379 or the `redis-chai` / `mongo-chai` containers (another project). 5432 and 8000 are taken.
 
 | Service | Port | Start |
 |---|---|---|
@@ -46,7 +46,7 @@ The unset line matters: stale `POSTGRES_*` in the shell would override `backend/
   taskkill //PID <pid> //T //F                  # Git Bash needs // for switches
   ```
   For Celery, `tasklist //V | grep -i celery` or `wmic process where "commandline like '%celery%'" get processid,commandline`. Kill only this project's processes (command line contains `jivo_quick_commerce`).
-- `runserver` autoreloads Python changes, but **restart Django + worker + beat** after: a merge into develop, new migrations applied, `.env` changes, new Celery tasks or beat schedules, installed packages (`uv sync`).
+- `runserver` autoreloads Python changes, but **restart Django + worker + beat** after: a merge into main, new migrations applied, `.env` changes, new Celery tasks or beat schedules, installed packages (`uv sync`).
 - MinIO/Mailpit: `dev-services.ps1 -Action stop` (or `-Service minio`).
 - Redis: TaskStop its task, or `redis-cli -p 6380 shutdown nosave` (6380 only, never 6379).
 

@@ -96,7 +96,7 @@ Rules:
 - **Performance.** Keep concurrency light (≤ 20 concurrent requests, short bursts), because the DB server is shared. Real load testing (Locust, 50 orders/min, 500 sessions, `09 §1`) belongs to Phase 8 on staging. Record that remote-DB network latency inflates local timings.
 - **Ports and Redis.** Never use port 6379, and never touch the `redis-chai` or `mongo-chai` containers. Project ports are listed in `CLAUDE.md`.
 - **Mobile.**
-  - Don't install on the user's phone (`9TY5KF8H49Z5YDON`) unless the main session explicitly allows it.
+  - Don't install on the user's phone unless the main session explicitly allows it.
   - Use the emulator only when the main session says it's free.
   - Flutter commands share one SDK lock with the app agents, so keep them few.
   - You may run the apps' existing test suites to verify claims. You may not edit them.

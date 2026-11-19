@@ -16,7 +16,7 @@ uv run python manage.py showmigrations --plan | grep '\[ \]'
 Approval must name the migrations (e.g. "apply `cms 0005`, `delivery 0001`, `notifications 0001`"), and say separately whether `seed_demo` may run. Past approvals: DL-53, DL-57, DL-58. If an approval has a condition (e.g. "once the P5 final test run is green"), check it.
 
 ## 1. Plan must match exactly
-Run from the **main tree on develop** (merged code only):
+Run from the **main tree on main** (merged code only):
 ```bash
 uv run python manage.py migrate --plan
 ```

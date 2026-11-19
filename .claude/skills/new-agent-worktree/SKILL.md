@@ -1,6 +1,6 @@
 ---
 name: new-agent-worktree
-description: "Create an isolated git worktree and module branch for a development agent (.worktrees/<name> on <agent>/phase-N from develop), set up its env, deps and private test DB/Redis slot, and write the agent's brief. Use whenever starting a new agent run, a new phase for an agent, or a parallel second backend run (backend4, sms, xdist, ...)."
+description: "Create an isolated git worktree and module branch for a development agent (.worktrees/<name> on <agent>/phase-N from main), set up its env, deps and private test DB/Redis slot, and write the agent's brief. Use whenever starting a new agent run, a new phase for an agent, or a parallel second backend run (backend4, sms, xdist, ...)."
 ---
 
 # New agent worktree + brief
@@ -13,12 +13,12 @@ git -C $R branch --list '*/phase-*' '*/p*'
 ```
 - Worktree name: `backend`, `admin`, `customer`, `rider`, `qa`, `devops`; extra parallel runs get a suffix (`backend8`, `support`, `sms`).
 - Branch: `<agent>/phase-N` (or `<agent>/<topic>`, e.g. `backend/p7-support`).
-- An existing worktree whose branch is fully merged can be reused: `git -C $R/.worktrees/<name> status --short` must be empty, then `git -C $R/.worktrees/<name> checkout -b <agent>/phase-N develop`. Never reuse one with uncommitted work.
+- An existing worktree whose branch is fully merged can be reused: `git -C $R/.worktrees/<name> status --short` must be empty, then `git -C $R/.worktrees/<name> checkout -b <agent>/phase-N main`. Never reuse one with uncommitted work.
 
 ## 2. Create it with absolute paths
-Run from the main tree on an up-to-date `develop`; always absolute paths (a relative path once nested a worktree inside another worktree):
+Run from the main tree on an up-to-date `main` (`git -C $R pull --ff-only` first: the user's other PC pushes to it); always absolute paths (a relative path once nested a worktree inside another worktree):
 ```bash
-git -C $R worktree add $R/.worktrees/<name> -b <agent>/phase-N develop
+git -C $R worktree add $R/.worktrees/<name> -b <agent>/phase-N main
 git -C $R worktree list | grep <name>          # must be directly under .worktrees/
 ```
 

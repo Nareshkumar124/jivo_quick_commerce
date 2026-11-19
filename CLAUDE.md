@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state of the repo
 
-**Phase 0 (foundation) and Phase 1 (auth & users) are built and tested** (2026-11-02): OTP login, profile, addresses and staff roles on the backend and both apps, with real-API integration tests passing. The formal phase gate (staging QA, demo, sign-off; `docs/10-testing-strategy.md` §5) is still a human step. Phase 2 is next. The work is run as four parallel development subagents (backend, admin panel, customer app, rider app), an independent QA agent and four support agents (DevOps, code reviewer, catalog data, UI/UX designer), per `docs/development-phase.md`.
+**Phases 0–7 are built and merged; Phase 8 (hardening and launch) is in progress** (as of 2026-11-19). The staging/test server `jqc.jivo.in` is live (plan in `plan.md`, runbook in `docs/deployment.md`). No phase gate is formally signed off yet (`docs/10-testing-strategy.md` §5 is a human step). Remaining launch items wait mostly on Jivo inputs (Razorpay keys, SMS/DLT, Firebase, GST/HSN). Check `docs/project-status.md` and `docs/task-tracker.md` for the live picture, and note `project-status.md` may lag behind `git log`. The work is run as four parallel development subagents (backend, admin panel, customer app, rider app), an independent QA agent and support agents (DevOps, code reviewer, catalog data, UI/UX designer, server deployer, GitHub publisher), per `docs/development-phase.md`.
 
 Repo layout (top-level folders, chosen by the user for readability):
 - `backend/`: the Django project
@@ -18,22 +18,17 @@ Repo layout (top-level folders, chosen by the user for readability):
 **Environment specifics** (they differ from the docs' original plan):
 - **Database.** The DB is a **remote PostgreSQL 16** server. Its credentials are only in `backend/.env`, which is gitignored. Never print that file or copy the password anywhere. The server is shared, so tests may only create or drop databases whose names start with `test_jivo_quick_commerce`. Settings refuse any other `POSTGRES_TEST_DB`. The backend agent uses the default name. The admin agent runs with `POSTGRES_TEST_DB=test_jivo_quick_commerce_admin TEST_REDIS_DB=14`, so parallel test runs don't collide. Never run `DROP DATABASE` or `flush`. The only extension in use is `postgis`, which is already enabled; tests may let GeoDjango create it in their own test DBs.
 - **Current dev machine (since 2026-11-04):** Windows, no Docker, and the remote shared DB is used for both tests and :8001 (DL-49). The temporary local PostGIS container from DL-36 belonged to the previous machine and is no longer used. **`docs/dev-environment.md` is the authority for how to run things here**: native Redis 6380, MinIO and Mailpit via `infra/scripts/windows/dev-services.ps1`, `uv run pytest -n 4`, and Flutter via `C:\dev\flutter\bin\flutter`. Project skills in `.claude/skills/` automate the PM chores.
-- **PostGIS.**
-  - **Server:** PostGIS 3.4.2 was installed on the DB server and enabled in `jivo_quick_commerce` on 2026-11-02 (Phase 2), at the user's request.
-  - **Engine:** settings use the plain `postgresql` engine until the backend agent's Phase 2 R2 switches to `django.contrib.gis.db.backends.postgis`.
-  - **Address storage:** `Address` still stores `lat`/`lng` as decimals until then.
-  - **Host libraries:** GDAL 3.12.2 and GEOS 3.14.1 are installed on the host (2026-11-02), and the backend Docker image has them too.
+- **PostGIS.** PostGIS 3.4.2 is enabled on the DB server, and settings use `django.contrib.gis.db.backends.postgis`. `Address` keeps its `lat`/`lng` decimals (the API shape) and a `location` PointField that always follows them. GDAL and GEOS are installed on the host and in the backend Docker image.
 - **Host ports.** Other projects already use some defaults: **6379 is another project's `redis-chai`; never use it or touch that container**, nor `mongo-chai`. 5432 and 8000 are also taken. This project uses:
   - Redis 6380
   - Django 8001 (Android emulator: `http://10.0.2.2:8001`)
   - MinIO 9000/9001
   - Mailpit 1025/8025
 - **Git.** Hosted at `github.com/Nareshkumar124/jivo_quick_commerce`.
-  - `main` holds only gated work.
-  - **`main`** holds gated releases only.
-  - **`develop`** is the stable integration branch; the :8001 server runs from it.
-  - **Module branches** `<agent>/phase-N` each live in a PM-managed worktree, `.worktrees/<agent>` (gitignored).
-  - The PM reviews each run, commits it and merges it into `develop` with `--no-ff`. A PR `develop` → `main` follows at each phase gate (`docs/development-phase.md` §9.4, DL-24). Agents never commit.
+  - **Since 2026-11-16 all work goes on `main`** (DL-79, user instruction; the user works across two PCs). `develop` is stale and ignored, and the docs, skills and agent files now say so. Older records (phase files, task tracker, decision log) still mention `develop` as history.
+  - Always `git pull` on `main` before starting, because the other PC pushes to it. Decision-log numbers can clash across the PCs, so check the latest DL number on `main` before adding one.
+  - **Module branches** (e.g. `rider/flow-fixes`) are based on `main` and each live in a PM-managed worktree under `.worktrees/` (gitignored).
+  - The PM reviews each run, commits it and merges it into `main` with `--no-ff`. Agents never commit.
   - Commit all four Flutter `pubspec.lock` files, because CI uses `--enforce-lockfile`.
 - **Project management.** The main session is the PM.
   - Status: `docs/plan/00-roadmap.md` and `docs/project-status.md`.
@@ -43,16 +38,16 @@ Repo layout (top-level folders, chosen by the user for readability):
   - Procedures: `docs/integration-checklist.md` and `docs/release-checklist.md`.
   - Agent reports use the §9.3 format.
 - **Maps: Mappls (MapmyIndia), not Google Maps** (DL-29). The SDK config files (`*.a.olf`, `*.a.conf`) are secrets: they live only in `~/.config/jivo-quick-commerce/mappls/`, are gitignored, and must never be committed or printed.
-- **No Android emulator** (user instruction, 2026-11-03: too heavy for this machine). Device and integration tests run on the user's phone over USB (`9TY5KF8H49Z5YDON`, Realme RMX5056) using `adb reverse tcp:8001 tcp:8001` and `--dart-define=API_BASE_URL=http://localhost:8001`. After any integration test, reinstall the normal dev build with `install -r` so the user's app keeps working.
+- **No Android emulator** (user instruction, 2026-11-03: too heavy for this machine). Device and integration tests run on the user's phone over USB (the `phone-build-install` skill; only the PM touches the phone) using `adb reverse tcp:8001 tcp:8001` (and `tcp:9000` for MinIO) and `--dart-define=API_BASE_URL=http://localhost:8001`. Run `adb devices` for the current device id, since the user has changed phones. After any integration test, reinstall the normal dev build with `install -r` so the user's app keeps working. APKs handed to the user go in `apk/`.
 - **Test login:** fixed-OTP test numbers `+919000000001`, `…002` and `…003` all use OTP `123456` and send no SMS (local and test settings only; production refuses them). Seeded staff passwords come only from `SEED_DEMO_STAFF_PASSWORD` in `backend/.env`.
 
-**Known gap:** `docs/README.md` links to `docs/plan/00-roadmap.md` and `docs/plan/phase-0-…` through `phase-8-…`. All three subagents treat `docs/plan/phase-N-*.md` as their main brief. **The `docs/plan/` directory does not exist yet.** Don't invent phase files on your own. Tell the user they're missing and offer to draft them from `docs/README.md` (the phase list and file format) and `docs/10-testing-strategy.md` §5 (gate, test case format, sign-off template).
+The phase briefs are `docs/plan/00-roadmap.md` and `docs/plan/phase-0-…` through `phase-8-…`. The development subagents treat `docs/plan/phase-N-*.md` as their main brief.
 
 ## What is being built
 
 Jivo Quick Commerce is a quick-commerce platform (orders delivered in 10–30 minutes, like Blinkit) that sells only Jivo Wellness products. There are no sellers, commissions or marketplace. The catalog is central, and stock is held per dark store. There are four deliverables:
 
-| Deliverable | Tech | Location (planned) |
+| Deliverable | Tech | Location |
 |---|---|---|
 | Customer app (Android + iOS) | Flutter | `customer_app/` |
 | Rider app (Android only in v1) | Flutter | `rider_app/` |
@@ -68,9 +63,10 @@ Toolchain notes:
 
 Backend (run from `backend/` unless noted):
 ```bash
-docker compose -f infra/docker-compose.yml up -d redis minio mailpit   # from repo root. No postgres service: the DB is remote
+# Local stack on this Windows PC (no Docker): use the `local-stack` skill, or see docs/dev-environment.md
+#   (native Redis 6380 + infra/scripts/windows/dev-services.ps1 for MinIO/Mailpit; the DB is remote)
 uv run python manage.py runserver 0.0.0.0:8001      # dev server (8000 is taken on this host)
-uv run pytest                                        # full suite against the remote Postgres + compose Redis (settings: config.settings.test, --reuse-db)
+uv run pytest -n 4                                   # full suite against the remote Postgres (settings: config.settings.test, --reuse-db); xdist because the remote DB is slow
 uv run pytest apps/accounts/tests/test_models.py::test_name   # single test (or -k <expr>). Tests live in apps/<app>/tests/ and backend/tests/
 uv run ruff check . && uv run ruff format --check .
 uv run python manage.py check
@@ -169,8 +165,11 @@ The agents live in `.claude/agents/`. Their files hold the detailed engineering 
 - **`flutter-rider-dev`:** owns `rider_app/` and builds on `packages/`.
 - **Four support agents** (added 2026-11-02, DL-31):
   - **`devops-engineer`:** owns `infra/`, `.github/workflows/` (all CI/CD), `backend/Dockerfile` and `.dockerignore`, and `docs/deployment.md`. Staging and production need the user's approval (D-05).
-  - **`code-reviewer`** (read-only, Sonnet): reviews every module branch before the PM merges it into `develop`.
+  - **`code-reviewer`** (read-only, Sonnet): reviews every module branch before the PM merges it into `main`.
   - **`catalog-data`** (Sonnet): owns `data/` and turns Jivo's product sheets, SAP CSVs and photos into validated import files. Raw inputs go in gitignored `data/incoming/`.
   - **`ui-designer`:** owns `design/` (design system, tokens, screen specs, HTML prototypes, UX audits). Brand assets go in gitignored `design/incoming/`. Developers implement its specs.
+- **Two release agents:**
+  - **`server-deployer`:** deploys and updates the backend stack on the shared `jqc.jivo.in` server (compose project `jqc`), following `plan.md`. That server also hosts other sites, so it must never touch their nginx config or containers.
+  - **`github-publisher`:** secret-scans the commits that are about to be pushed, then pushes them. It never commits or merges.
 - **Shared code:** changes to `jivo_core` must be **additive only**. Never rename or remove its public APIs. If an app needs an API that's missing, it reports the gap to the backend owner rather than inventing backend behaviour.
 - **Git:** no agent commits or pushes unless explicitly asked. Conventional Commits are planned.

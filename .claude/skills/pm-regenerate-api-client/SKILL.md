@@ -1,13 +1,13 @@
 ---
 name: pm-regenerate-api-client
-description: "Regenerate the Dart API client packages/jivo_api from backend/openapi/schema.yaml, on develop after a backend merge or inside an app worktree to unblock app work early, then pub get, the shared-version check and the customer contract_examples fixtures. Use whenever the API schema changed, an app agent needs new endpoints, or jivo_api/pubspec.lock look stale."
+description: "Regenerate the Dart API client packages/jivo_api from backend/openapi/schema.yaml, on main after a backend merge or inside an app worktree to unblock app work early, then pub get, the shared-version check and the customer contract_examples fixtures. Use whenever the API schema changed, an app agent needs new endpoints, or jivo_api/pubspec.lock look stale."
 ---
 
 # Regenerate `jivo_api`
 
 Generated code is never hand-edited. Needs Java 17 + python3 (the script downloads a pinned openapi-generator jar). Flutter is `/c/dev/flutter/bin/flutter` (the normal path has a space and breaks native-asset hooks). Don't run this while a `flutter build` is running in the same checkout.
 
-## A. On develop (after a backend merge)
+## A. On main (after a backend merge)
 ```bash
 R=/c/jivo_projects/jivo_quick_commerce
 cd $R/backend && unset POSTGRES_HOST POSTGRES_PORT POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD
@@ -15,7 +15,7 @@ uv run python manage.py spectacular --file openapi/schema.yaml    # only if the 
 git -C $R diff --stat -- backend/openapi/schema.yaml
 PATH="/c/dev/flutter/bin:$PATH" bash $R/packages/tool/generate_api.sh
 ```
-Then go to **C**. Commit on develop as `chore(api): regenerate jivo_api for <change>` (packages/jivo_api, any pubspec.lock changes, contract_examples.dart).
+Then go to **C**. Commit on main as `chore(api): regenerate jivo_api for <change>` (packages/jivo_api, any pubspec.lock changes, contract_examples.dart).
 
 ## B. Into an app worktree (backend not merged yet)
 Use when the customer/rider agent needs the new contract before the backend branch merges.
@@ -26,7 +26,7 @@ PATH="/c/dev/flutter/bin:$PATH" bash $W/packages/tool/generate_api.sh
 ```
 - The worktree's script reads the worktree's schema and writes the worktree's `packages/jivo_api`.
 - **Leave `backend/openapi/schema.yaml` out of the app commit**: before committing, `git -C $W checkout -- backend/openapi/schema.yaml`. The backend branch owns it.
-- When the backend later merges, regenerate on develop (A); the app branch's `jivo_api` should then match (no diff, or CRLF only).
+- When the backend later merges, regenerate on main (A); the app branch's `jivo_api` should then match (no diff, or CRLF only).
 
 ## C. After generating (both cases)
 ```bash

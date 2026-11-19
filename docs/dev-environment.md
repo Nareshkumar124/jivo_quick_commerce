@@ -7,7 +7,7 @@ Every development agent reads this before running anything. It records how the s
 - Shells: Git Bash (POSIX) and PowerShell 5.1. Use forward slashes in Bash.
 - **No Docker.** Redis runs natively on `127.0.0.1:6380`. MinIO (the pgsty community build; local dev only) on 9000/9001 and Mailpit on 1025/8025 run natively through `infra/scripts/windows/dev-services.ps1 -Action start|stop|status|init`. Tests must still not need them; test settings use their own storage.
 - **Use `127.0.0.1`, never `localhost`, in Redis URLs** (`REDIS_URL`, `CELERY_BROKER_URL`, `CHANNELS_REDIS_URL`, `REDIS_TEST_URL`). On Windows `localhost` tries IPv6 first and each new connection costs about 2 s (OBS-S3-01). The settings defaults and `infra/env/backend.env.example` use `redis://127.0.0.1:6380/<db>`.
-- Never use port 6379 or the `redis-chai` / `mongo-chai` containers. Don't touch the :8001 dev server; the PM runs it from the main tree on `develop`.
+- Never use port 6379 or the `redis-chai` / `mongo-chai` containers. Don't touch the :8001 dev server; the PM runs it from the main tree on `main`.
 
 ## Backend
 - Always run Python through `uv run`, which uses Python 3.13. Before running anything in Bash:
@@ -44,7 +44,7 @@ Every development agent reads this before running anything. It records how the s
 ## Flutter
 - Run Flutter as **`C:\dev\flutter\bin\flutter`**, a junction to the SDK. The normal path contains a space, which breaks native-asset build hooks (`objective_c`).
 - Flutter 3.47.9 / Dart 3.13.7. Use `flutter pub get --enforce-lockfile`, and keep shared versions identical (`python3 packages/tool/check_shared_versions.py`).
-- **No emulator.** Don't touch the user's USB phone (`9TY5KF8H49Z5YDON`): no `adb install` and no `flutter run`. The PM does device builds and installs.
+- **No emulator.** Don't touch the user's USB phone: no `adb install` and no `flutter run`. The PM does device builds and installs.
 - **Customer dev flavor is HTTPS-only for LAN IPs** (T-230, `abd2c6d`): plain HTTP to a LAN IP (e.g. `http://192.168.x.x:8001`) is refused. On the phone use `adb reverse tcp:8001 tcp:<local port>` and `--dart-define=API_BASE_URL=http://localhost:8001`.
 - Don't run `flutter test` or `pub get` while a `flutter build` is running in the same checkout.
 - **Firebase push config (D-19).** Private, like the Mappls files: `%USERPROFILE%\.config\jivo-quick-commerce\firebase\<env>\google-services.json` (dev exists; staging/prod later). In Git Bash, run `customer_app/tool/setup_firebase.sh --copy` (dev flavor ← dev env; `--env staging|prod|all` for the others, `--remove` to undo). It copies the file to `customer_app/android/app/src/<flavor>/google-services.json` (gitignored), checks the package name and prints file names only. Never read, print or copy `service-account.json` from that folder. Without the file the app builds and runs with push off (CI does exactly that). See `customer_app/README.md` "Push".

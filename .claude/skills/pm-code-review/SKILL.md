@@ -1,6 +1,6 @@
 ---
 name: pm-code-review
-description: "Launch the read-only code-reviewer agent on an agent's work (a commit, an uncommitted worktree or a branch diff vs develop) with a project-specific focus checklist, then triage its verdict. Use before every merge into develop, or when the user asks to review, audit or double-check an agent's run."
+description: "Launch the read-only code-reviewer agent on an agent's work (a commit, an uncommitted worktree or a branch diff vs main) with a project-specific focus checklist, then triage its verdict. Use before every merge into main, or when the user asks to review, audit or double-check an agent's run."
 ---
 
 # Code review before merge
@@ -10,15 +10,15 @@ description: "Launch the read-only code-reviewer agent on an agent's work (a com
 ## 1. Pick the target
 | Situation | What to give it |
 |---|---|
-| Committed branch | `git -C <repo> diff develop...<agent>/phase-N` (worktree path + branch name) |
+| Committed branch | `git -C <repo> diff main...<agent>/phase-N` (worktree path + branch name) |
 | Uncommitted run (before `pm-merge-agent-branch` step 3) | worktree path; it runs `git -C <wt> diff` + `git -C <wt> status --short` and reads untracked files |
 | One commit / range | `git show <sha>` or `<a>..<b>` |
 
-Before launching, get the scale: `git -C <wt> diff --stat develop...HEAD | tail -1`. Over ~3k lines: split by area (e.g. services+migrations, then views+tests) into separate reviews.
+Before launching, get the scale: `git -C <wt> diff --stat main...HEAD | tail -1`. Over ~3k lines: split by area (e.g. services+migrations, then views+tests) into separate reviews.
 
 ## 2. Brief template
 ```
-Review <target> in C:/jivo_projects/jivo_quick_commerce/.worktrees/<name> (branch <agent>/phase-N vs develop).
+Review <target> in C:/jivo_projects/jivo_quick_commerce/.worktrees/<name> (branch <agent>/phase-N vs main).
 Agent: <agent>. Report summary: <3-5 lines from its §9.3 report: tasks, files, tests>.
 Read-only: never edit, never run migrate/seed, never print backend/.env.
 Contract docs: docs/08-order-lifecycle.md, 06, 07, 05 §3, 09; decisions DL-xx relevant here.

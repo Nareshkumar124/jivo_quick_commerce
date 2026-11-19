@@ -10,7 +10,7 @@ This document says **how Phases 0–8 are built by three agents working at the s
 | `admin-panel-dev` (added 2026-11-02) | The admin panel UI inside `backend/`: every `apps/*/admin.py`, `apps/ops_console/`, `templates/`, `static/`, `config/admin_ui.py`, and the admin and ops tests |
 | `qa-engineer` (added 2026-11-02) | `qa/` only: test plan, test cases, reports, bug files and a black-box test suite. It never edits application code. |
 | `devops-engineer` (added 2026-11-02) | `infra/`, `.github/workflows/` (all CI/CD), `backend/Dockerfile` and `.dockerignore`, `docs/deployment.md`. Staging and production changes need the user's approval. |
-| `code-reviewer` (added 2026-11-02, read-only) | Nothing: it reviews each module branch before the PM merges it into `develop` |
+| `code-reviewer` (added 2026-11-02, read-only) | Nothing: it reviews each module branch before the PM merges it into `main` |
 | `catalog-data` (added 2026-11-02) | `data/` (import-ready catalog files, validation reports, image manifests). Raw inputs go in gitignored `data/incoming/`. |
 | `ui-designer` (added 2026-11-02) | `design/` (design system, tokens, screen specs, prototypes, UX audits). Brand assets go in gitignored `design/incoming/`. |
 
@@ -520,33 +520,33 @@ Every agent ends every run with these sections. The PM maps each report into [`t
 
 Plus the actual test output. A task becomes **Completed** only after QA verifies it; an agent's statement is never enough.
 
-### 9.4 Git workflow (DL-24)
+### 9.4 Git workflow (DL-24, changed by DL-79)
+**Since 2026-11-16 all work goes on `main`** (DL-79): the user works across two PCs and wants one branch. `develop` is stale and must not be used. Always `git pull --ff-only` on `main` before starting, since the other PC pushes to it.
 ```
-main      ← gated releases only. A PR from develop at each phase gate (CI green + QA "Ready")
-develop   ← stable integration branch. The PM merges reviewed module branches here. The :8001 dev server runs from it.
-<agent>/phase-N  ← one module branch per agent per phase, each checked out in its own worktree
+main      ← the integration branch. The PM merges reviewed module branches here. The :8001 dev server runs from it.
+<agent>/<topic>  ← one module branch per agent run (e.g. rider/flow-fixes), each checked out in its own worktree
 ```
-- **Worktrees.** The PM creates and manages them under `.worktrees/` (gitignored) with `git worktree add .worktrees/<agent> -b <agent>/phase-N develop`.
+- **Worktrees.** The PM creates and manages them under `.worktrees/` (gitignored) with `git worktree add .worktrees/<agent> -b <agent>/<topic> main`.
   - Agents are `backend`, `admin`, `customer`, `rider` and `qa`.
   - Every brief gives the agent its worktree's absolute path: **all edits and commands happen there**.
   - The backend, admin and QA worktrees symlink `backend/.env` from the main tree (secrets are never copied), then run `uv sync`. The Flutter worktrees run `flutter pub get`.
 - **Agents don't commit.** At each run boundary the PM:
   1. **reviews** the run: its diff touches only the agent's paths, its definition-of-done output is green, and a secret scan of the diff is clean
   2. commits it in the agent's worktree with a meaningful conventional message: `feat(backend): …`, `feat(admin): …`, `feat(customer): …`, `feat(rider): …`, `test(qa): …`, plus the attribution line
-  3. merges it into `develop` with `git merge --no-ff`
+  3. merges it into `main` with `git merge --no-ff`
 - **Shared files.** `backend/config/settings/base.py` and `backend/config/urls.py` are touched by both backend and admin (by agreed one-line edits). Each agent's edits travel on its own branch. If a merge conflicts, the PM resolves it by keeping both sides' lines.
-- **Integration after each merge** (in the main tree on `develop`):
+- **Integration after each merge** (in the main tree on `main`):
   - regenerate `jivo_api`, run the shared-version check and the tests
   - restart :8001
-  - then `git merge develop` into every other active module branch before that agent's next run
+  - then `git merge main` into every other active module branch before that agent's next run
 - **Hand-offs between agents happen only at merges.** For example, the backend's models reach the admin, `jivo_core` reaches the rider, and the schema reaches the apps. Briefs are ordered accordingly.
 - **What stays in the main tree:**
   - the :8001 server, which only ever runs merged code
   - QA's :8004 instance, which tests merged code. Only QA's `qa/` edits go in its worktree.
   - `jivo_api` generation
-- **Push cadence:** `develop` and the module branches stay local, and the phase merges to `main` through a PR when it completes (the user's cadence: push at phase completion).
+- **Push cadence:** module branches stay local. `main` is pushed when the user asks (through `github-publisher`). Phase gates are recorded in the roadmap's sign-off log rather than through a `develop` → `main` PR.
 - **Transition (2026-11-02):**
   - Runs that started before DL-24 work in the main tree.
   - At each one's end, the PM commits its paths straight onto `develop`. The shared config files go in a separate `chore(config)` commit once both backend and admin are idle.
   - The agent's **next** run starts in its worktree.
-- **Cost:** merges at every sync point, slower first Flutter and Gradle builds per worktree, and hand-offs only at merges. **Benefit:** isolated, reviewable module branches, a `develop` branch that always runs, and no half-written code under the user's dev server.
+- **Cost:** merges at every sync point, slower first Flutter and Gradle builds per worktree, and hand-offs only at merges. **Benefit:** isolated, reviewable module branches, a `main` branch that always runs, and no half-written code under the user's dev server.

@@ -31,21 +31,21 @@ The main session (Project Manager) runs this at every sync point and at the end 
 ## D. Review, commit and merge a module branch (`development-phase.md` §9.4)
 - [ ] The run is complete and its definition-of-done output has been seen.
 - [ ] **Review:** run `git -C .worktrees/<agent> status` and the diff. Every change sits inside the agent's owned paths. No working functionality was removed. Tests are green.
-- [ ] **Code review:** run the `code-reviewer` agent on the branch (`git diff develop...<agent>/phase-N`). Merge only on `Approve`, or `Approve with fixes` once the fixes are in. Blockers go back to the owning agent.
+- [ ] **Code review:** run the `code-reviewer` agent on the branch (`git diff main...<agent>/phase-N`). Merge only on `Approve`, or `Approve with fixes` once the fixes are in. Blockers go back to the owning agent.
 - [ ] Secret scan of the diff finds 0 hits (the values from `backend/.env`, key patterns). `backend/.env` and `qa/private/` are not staged.
 - [ ] No Mappls config (`*.a.olf`, `*.a.conf`, `*.i.olf`, `*.i.conf`) and nothing from `data/incoming/` or `design/incoming/` is staged.
 - [ ] Commit in the worktree on `<agent>/phase-N` with a conventional message and the attribution line.
-- [ ] In the main tree on `develop`, run `git merge --no-ff <agent>/phase-N`, resolving any shared-file conflict by keeping both sides.
+- [ ] In the main tree on `main` (after `git pull --ff-only`), run `git merge --no-ff <agent>/phase-N`, resolving any shared-file conflict by keeping both sides.
 - [ ] After the merge:
   - regenerate `jivo_api` if the schema changed
   - run the shared-version check
   - run the affected tests
   - restart :8001
-- [ ] Run `git -C .worktrees/<other> merge develop` for every other active agent before its next run.
+- [ ] Run `git -C .worktrees/<other> merge main` for every other active agent before its next run.
 
 ## E. Phase end
 - [ ] All tasks for the phase in `task-tracker.md` are ✅ or explicitly deferred.
 - [ ] `qa/docs/10-release-readiness-report.md` says **Ready**: no open P0/P1 bugs, all P0/P1 cases passed, and at least 95% of all cases.
-- [ ] Push `develop`, open a PR `develop` → `main`, and get CI green (backend + mobile workflows).
-- [ ] Merge the PR. Update [`plan/00-roadmap.md`](plan/00-roadmap.md) (build ✅) and `CLAUDE.md` (current state).
+- [ ] Push `main` (through `github-publisher`, when the user asks) and get CI green on it (backend + mobile workflows).
+- [ ] Update [`plan/00-roadmap.md`](plan/00-roadmap.md) (build ✅) and `CLAUDE.md` (current state).
 - [ ] Human gate steps (`10 §5`): staging deploy, QA on staging, demo, sign-off recorded in the roadmap's sign-off log.

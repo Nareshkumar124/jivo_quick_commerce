@@ -197,7 +197,7 @@ v=8.30.1; curl -fsSLO "https://github.com/gitleaks/gitleaks/releases/download/v$
 echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks_${v}_linux_x64.tar.gz" | sha256sum -c - \
   && tar -xzf "gitleaks_${v}_linux_x64.tar.gz" gitleaks
 gitleaks git . --redact                      # full history of every branch (what the weekly run does)
-gitleaks git . --redact --log-opts="--full-history --diff-filter=tuxdb develop..HEAD"   # only your branch
+gitleaks git . --redact --log-opts="--full-history --diff-filter=tuxdb main..HEAD"   # only your branch
 gitleaks git . --redact --report-format json --report-path /tmp/gitleaks.json   # findings with fingerprints
 ```
 - Always pass `--redact`.
@@ -254,8 +254,8 @@ For a quick look, use `--format table` instead of the JSON output.
 4. Re-run both local scans. In the same change, look at what the new version adds or deprecates (for example, osv-scanner 2.7.1 renames `ignoreUntil` to `effectiveUntil`).
 
 ## 3. Branches and releases
-- The flow is `main` ← `develop` ← module branches (`development-phase.md` §9.4).
-- A phase merges to `main` through a PR after CI passes and QA says "Ready".
+- The flow is `main` ← module branches (`development-phase.md` §9.4, DL-79). `develop` is stale since 2026-11-16; the workflows below still accept it, but it is no longer used.
+- A phase gate is CI green on `main`, plus QA "Ready" and the sign-off in the roadmap.
 - Release tags and deploy jobs are added when staging exists.
 
 ## 4. Processes (every environment)
