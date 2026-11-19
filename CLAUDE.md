@@ -37,7 +37,7 @@ Repo layout (top-level folders, chosen by the user for readability):
   - Deployment: `docs/deployment.md`.
   - Procedures: `docs/integration-checklist.md` and `docs/release-checklist.md`.
   - Agent reports use the §9.3 format.
-- **Maps: Mappls (MapmyIndia), not Google Maps** (DL-29). The SDK config files (`*.a.olf`, `*.a.conf`) are secrets: they live only in `~/.config/jivo-quick-commerce/mappls/`, are gitignored, and must never be committed or printed.
+- **Maps: Google Maps** (DL-80, 2026-11-19; it replaced Mappls from DL-29). The customer app uses `google_maps_flutter`; reverse geocoding uses the platform geocoder (no key). The Android Maps API key is never committed: it lives in `~/.config/jivo-quick-commerce/google-maps/android-api-key.txt` (or `MAPS_API_KEY`), and without it the app builds and falls back to manual address entry. The old Mappls config in `~/.config/jivo-quick-commerce/mappls/` is unused.
 - **No Android emulator** (user instruction, 2026-11-03: too heavy for this machine). Device and integration tests run on the user's phone over USB (the `phone-build-install` skill; only the PM touches the phone) using `adb reverse tcp:8001 tcp:8001` (and `tcp:9000` for MinIO) and `--dart-define=API_BASE_URL=http://localhost:8001`. Run `adb devices` for the current device id, since the user has changed phones. After any integration test, reinstall the normal dev build with `install -r` so the user's app keeps working. APKs handed to the user go in `apk/`.
 - **Test login:** fixed-OTP test numbers `+919000000001`, `…002` and `…003` all use OTP `123456` and send no SMS (local and test settings only; production refuses them). Seeded staff passwords come only from `SEED_DEMO_STAFF_PASSWORD` in `backend/.env`.
 

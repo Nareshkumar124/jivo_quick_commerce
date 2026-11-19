@@ -544,7 +544,7 @@
   },
   "taskRefresh": "Refresh",
   "taskNavigate": "Navigate",
-  "taskNoMapsApp": "No maps app found. Install Mappls or another maps app.",
+  "taskNoMapsApp": "No maps app found. Install Google Maps or another maps app.",
   "taskCallCustomer": "Call",
   "taskStateChanged": "This order changed. The screen now shows its latest step.",
   "taskLocationUnavailable": "Couldn't get your location. Turn on GPS and try again.",

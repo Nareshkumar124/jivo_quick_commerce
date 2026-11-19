@@ -112,7 +112,7 @@ One Django project serves the REST API, WebSockets, Django Admin and the custom 
 | HTTP | dio, with interceptors for the auth token, refresh, app version and logging | |
 | Models | freezed + json_serializable, **or** a Dart client generated from the OpenAPI schema | Decided in Phase 0 (D-13). Recommended: generate `jivo_api` from OpenAPI. |
 | Secure storage | flutter_secure_storage | JWT tokens |
-| Maps | **Mappls (MapmyIndia) Flutter SDK** (DL-29) | Config files are secrets kept outside the repo; see D-03 and `deployment.md` |
+| Maps | **Google Maps** (`google_maps_flutter`; DL-80 replaces DL-29) | Android API key kept outside the repo and restricted to the app's package name + SHA-1; reverse geocoding uses the phone's platform geocoder (no key). See D-03 |
 | Location | geolocator, plus a foreground service for the rider app | Rider background location |
 | Push | firebase_messaging + flutter_local_notifications | |
 | Payments | razorpay_flutter | Customer app only |

@@ -1763,7 +1763,7 @@ abstract class AppLocalizations {
   /// No description provided for @taskNoMapsApp.
   ///
   /// In en, this message translates to:
-  /// **'No maps app found. Install Mappls or another maps app.'**
+  /// **'No maps app found. Install Google Maps or another maps app.'**
   String get taskNoMapsApp;
 
   /// No description provided for @taskCallCustomer.

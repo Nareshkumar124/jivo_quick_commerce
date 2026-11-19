@@ -983,7 +983,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taskNoMapsApp =>
-      'No maps app found. Install Mappls or another maps app.';
+      'No maps app found. Install Google Maps or another maps app.';
 
   @override
   String get taskCallCustomer => 'Call';
