@@ -111,3 +111,24 @@ Smoke P0–P7 not run as a set this session (stopped for a PC shutdown). Regress
 - **Smoke set: not run** (the machine was critically low on memory; the P3–P7 run before it was stopped by Claude Code's memory guard with no per-test output).
 - **Re-run and passing on main:** all P2 suites (136 passed; the 2 failures are an environment fetch and a PM-default decision), the P2 clock and redis-down cases, P5-TC-50 (b), P5-TC-92 a/b/d.
 - **Regression found:** none. BUG-0025 is a first execution (P5-TC-92c), not a regression.
+
+## DL-80 maps switch (2026-11-19, main `cf070ab`): plan, not run
+DL-80 replaces Mappls with Google Maps in the customer app (pin picker, tracking map, platform reverse geocoder, build-time key with a no-key fallback). In the rider app only the no-maps-app text changes, and the backend is unchanged. Nothing has been executed yet: the cases were written before the build exists, and every device case needs the PM's or the user's phone run.
+
+**New cases (`02` "DL-80 regression"):** P2-TC-63–74, P5-TC-134 and P6-TC-60–66 (20 cases). Run all of them on the first DL-80 build: once with the key and once with a no-key build.
+
+**New 🔥 cases (device smoke, added to the smoke set):** P2-TC-63, 64, 65, 68, 72 and P6-TC-60, 61. The static half of P2-TC-72 (no `AIza` key in the tree or the history) can run without a device on every merge.
+
+**Existing cases to re-run on the DL-80 build:**
+| Case | Why |
+|---|---|
+| P1-TC-89 🔥 | Address list/add/edit/delete; the add and edit flows now go through the new picker and the geocoder prefill |
+| P2-TC-58 🔥, P2-TC-59 🔥 | Location permission, pin picker and the not-serviceable / notify-me path, the core of the swap |
+| P2-TC-60 | The store-closed banner after a picker confirm (same entry path) |
+| P2-TC-57 | Notify-me leads list and map in the console: the leads' `address_text` now comes from the platform geocoder |
+| P3-TC-64 | Cart → checkout → success with an address created through the new picker |
+| P5-TC-124 | Tracking through ASG → OFD → DELIVERED with the socket down (the map widget changed) |
+| P6-TC-17 | Socket drop during tracking → polling and reconnect, now with the Google map on screen |
+| P5-TC-33 (navigation part only) | The rider's "Navigate" still opens the `geo:` intent; text change only |
+
+**Not re-run (unchanged by DL-80):** the backend suites. The server side of tracking (P6-TC-14, 59) and serviceability (P2 BE cases) is untouched, so the normal smoke run covers it.
