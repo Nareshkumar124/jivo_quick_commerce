@@ -95,7 +95,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
   adb reverse tcp:8001 tcp:8001     # re-apply after reconnecting USB
   ```
 - **Test login:** `+919000000001`, `…002` or `…003`, with OTP `123456` (local and test settings only).
-- **Maps (Mappls/MapmyIndia, DL-29):** the Android SDK config files live outside the repo in `~/.config/jivo-quick-commerce/mappls/`, and `customer_app/tool/setup_mappls.sh` copies them in for a build (they're gitignored). Without them, the app falls back to manual address entry. The files are bound to the package name + signing SHA-1 registered in the Mappls console.
+- **Maps (Google Maps, DL-80; replaced Mappls/DL-29):** the customer app's Gradle build reads the Android Maps API key from the Gradle property or env var `MAPS_API_KEY`, else from `~/.config/jivo-quick-commerce/google-maps/android-api-key.txt` (outside the repo), and injects it through a manifest placeholder. Never put the key in a committed file (`gradle.properties`, the manifest, Dart code). Without a key the app still builds and falls back to manual address entry. Reverse geocoding uses the platform geocoder (no key). The key's restrictions are in §12.2 step 5. The old Mappls config in `~/.config/jivo-quick-commerce/mappls/` is unused.
 - **iOS:** builds need a Mac with Xcode. The flavors/schemes aren't set up yet (`customer_app/README.md`).
 
 ### Ports in use on this host
@@ -151,7 +151,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
     - `jqc-twilio-account-sid`: Twilio account SIDs.
     - `jqc-dotenv-secret`: a literal value for one of our secret settings (`POSTGRES_PASSWORD=…`, or `RAZORPAY_KEY_SECRET` passed with a value to `docker run -e`).
     - `jqc-db-url-password`: a password inside a `postgres://` or `redis://` URL.
-    - `jqc-secret-file`: any of the gitignored secret files (`.env*`, Mappls `*.a.olf/conf`, signing keys, `*.local.json`, `qa/private/`, `*/incoming/`), whatever it contains.
+    - `jqc-secret-file`: any of the gitignored secret files (`.env*`, signing keys, `*.local.json`, `qa/private/`, `*/incoming/`, and the legacy Mappls `*.a.olf/conf`), whatever it contains.
+    - A Google Maps API key (`AIza…`) in any committed file is caught by gitleaks' built-in `gcp-api-key` rule (no project allowlist targets it).
 - **What is scanned:**
 
   | Event | Commits | Plus |
@@ -201,7 +202,7 @@ gitleaks git . --redact --log-opts="--full-history --diff-filter=tuxdb main..HEA
 gitleaks git . --redact --report-format json --report-path /tmp/gitleaks.json   # findings with fingerprints
 ```
 - Always pass `--redact`.
-- Don't run `gitleaks dir .` on your working copy. It also reads the gitignored secret files (`backend/.env`, the Mappls config) and reports them. To scan only committed files, run it on an export: `git archive HEAD | tar -x -C /tmp/jqc-tree && (cd /tmp/jqc-tree && gitleaks dir . --redact)`.
+- Don't run `gitleaks dir .` on your working copy. It also reads the gitignored secret files (`backend/.env`, `key.properties`, any local key files) and reports them. To scan only committed files, run it on an export: `git archive HEAD | tar -x -C /tmp/jqc-tree && (cd /tmp/jqc-tree && gitleaks dir . --redact)`.
 
 ### 2.2 Dependency advisories (osv-scanner)
 **What it does.** `dependency-scan.yml` checks the locked versions in these lockfiles against the OSV database (GitHub advisories, PyPA, Pub, …):
@@ -608,10 +609,14 @@ Kept per environment in the secrets manager; never in git or in images:
    | Key alias | `CUSTOMER_UPLOAD_KEY_ALIAS` | `RIDER_UPLOAD_KEY_ALIAS` |
    | Key password | `CUSTOMER_UPLOAD_KEY_PASSWORD` | `RIDER_UPLOAD_KEY_PASSWORD` |
    | Sentry DSN (optional; warning if empty, D-19) | `CUSTOMER_SENTRY_DSN` | `RIDER_SENTRY_DSN` |
-   | Mappls config, `base64 -w0 in.jivo.quick.a.olf` / `.a.conf` (required) | `CUSTOMER_MAPPLS_OLF_BASE64`, `CUSTOMER_MAPPLS_CONF_BASE64` | n/a |
+   | Google Maps Android API key, plain value (required; passed to Gradle as `MAPS_API_KEY`) | `CUSTOMER_MAPS_API_KEY` | n/a |
 
 4. **Environment variables** in `release`: `PROD_API_BASE_URL` (required, an https origin such as `https://api.<domain>`; waits on D-05) and `CUSTOMER_APP_LINK_HOSTS` (optional, comma-separated App Links hosts).
-5. **Mappls console:** register the prod package name with the SHA-256 of the upload certificate (printed by the workflow) and of the Play app-signing certificate (Play Console > App integrity).
+5. **Google Maps API key** (Google Cloud console > APIs & Services > Credentials; DL-80). The key ships inside the APK, so its restrictions are what protect it:
+   - **Application restrictions: Android apps.** Add one entry per package and certificate: `in.jivo.quick` (prod), `in.jivo.quick.staging` and `in.jivo.quick.dev`, each with the SHA-1 of the upload certificate (`keytool -list -v -keystore <file>.jks`; the workflow log prints only the SHA-256) **and** of the Play app-signing certificate (Play Console > App integrity). Dev/staging builds signed with a local debug key need that key's SHA-1 too; prefer a separate dev key rather than adding debug keys to the prod key.
+   - **API restrictions:** Maps SDK for Android only.
+   - Set a daily quota and a billing budget alert in the same project (check Google's current Maps Platform pricing before launch).
+   - Locally, keep the key in `~/.config/jivo-quick-commerce/google-maps/android-api-key.txt` (or export `MAPS_API_KEY`); never in the repo.
 
 With any of the required items missing, the "Release configuration is complete" step fails in seconds and lists each missing secret or variable by name.
 
@@ -654,8 +659,9 @@ android {
 4. **Rollback:** Play cannot take back an installed build. Halt the staged rollout in Play Console, then ship a fix with a higher `build_number`. Server-side, raise `min_supported_version` only once the fixed build is live.
 
 ### 12.5 Rotation
-- **Upload key compromised or lost:** with Play App Signing, request an upload key reset in Play Console, generate a new key (§12.2 step 2), replace the four `*_UPLOAD_*` secrets, and re-register the new certificate SHA-256 in the Mappls console.
-- **Sentry DSN / Mappls config:** replace the secret; the next build picks it up. Older builds keep the old value until users update.
+- **Upload key compromised or lost:** with Play App Signing, request an upload key reset in Play Console, generate a new key (§12.2 step 2), replace the four `*_UPLOAD_*` secrets, and add the new certificate's SHA-1 to the Google Maps key's Android restrictions (§12.2 step 5).
+- **Sentry DSN:** replace the secret; the next build picks it up. Older builds keep the old value until users update.
+- **Google Maps API key leaked or abused:** create a new restricted key (§12.2 step 5), update `CUSTOMER_MAPS_API_KEY` and the local key file, ship a build, then delete the old key once enough users have updated (deleting it earlier breaks the map in older builds; manual address entry still works).
 
 ## 13. P8 drill results 2026-11-16 (staging `jqc.jivo.in`, DL-75)
 
