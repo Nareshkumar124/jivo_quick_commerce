@@ -196,7 +196,7 @@ These are tracked in [`api-requests.md`](api-requests.md): rider requests #2–#
 | H-03 | Make the GitHub repo private | Not Started (recommended) | now |
 | H-04 | Maps provider and config (D-03) | Completed for Android: switched to Mappls; config stored outside the repo (DL-29) | P2 map |
 | H-15 | Register `in.jivo.quick.dev`, `in.jivo.quick.staging` and `in.jivo.quick` with signing SHA-1 `76:E3:69:C1:88:DB:10:1F:AA:5C:88:FC:3B:10:FD:01:D8:FE:0A:1A` (the debug key; the release key comes later) in the Mappls console | Not Started | P2 map |
-| H-16 | Mappls iOS config (`.i.olf`/`.i.conf`) and a Mappls web/REST key for the admin and ops maps | Not Started | iOS build / P5 rider map |
+| H-16 | Google Maps API key from Jivo (DL-80): Google Cloud project with billing, Maps SDK for Android key restricted to the app packages + SHA-1 (steps: `docs/Jivo-QC-google-maps-setup-2026-11-19.pdf`). Save it in `~/.config/jivo-quick-commerce/google-maps/android-api-key.txt`. Replaces the Mappls config items | Not Started | phone map test / launch |
 | H-17 | Rider KYC policy answers (D-14): the 18+ rule; whether an e-bike counts as motorised; full or masked Aadhaar; selfie camera-only; bank details required before review; account-number length; replacing documents in review | Not Started | P5 |
 | H-05 | Real config values: support phone and email, policy URLs, store URLs, terms version | Not Started | staging |
 | H-06 | SMS provider and DLT (D-02) | Not Started | staging/P8 |
