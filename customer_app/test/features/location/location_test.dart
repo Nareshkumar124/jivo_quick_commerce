@@ -9,50 +9,22 @@ import 'package:customer_app/l10n/generated/app_localizations.dart';
 import 'package:customer_app/shared/network/store_header.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mappls_gl/mappls_gl.dart' show MapplsMapController;
+import 'package:google_maps_flutter/google_maps_flutter.dart'
+    show GoogleMapController;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/test_app.dart';
 
 const mumbai = (lat: 19.0760, lng: 72.8777);
 
-/// A stand-in for the Mappls platform view. With [errorCode] it reports a
-/// map error after the first frame, like a failed authentication.
-PinMapBuilder fakeMap({int? errorCode}) =>
+/// A stand-in for the Google Maps platform view.
+PinMapBuilder fakeMap() =>
     ({
       required GeoPoint initial,
-      required void Function(MapplsMapController controller) onCreated,
+      required void Function(GoogleMapController controller) onCreated,
+      required void Function(GeoPoint target) onCameraMove,
       required VoidCallback onCameraIdle,
-      required void Function(int code, String message) onError,
-    }) => _FakeMap(
-      onReady: errorCode == null
-          ? null
-          : () => onError(errorCode, 'Authentication failed'),
-    );
-
-class _FakeMap extends StatefulWidget {
-  const _FakeMap({this.onReady});
-
-  final VoidCallback? onReady;
-
-  @override
-  State<_FakeMap> createState() => _FakeMapState();
-}
-
-class _FakeMapState extends State<_FakeMap> {
-  @override
-  void initState() {
-    super.initState();
-    final onReady = widget.onReady;
-    if (onReady != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => onReady());
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) =>
-      const ColoredBox(key: Key('fake-map'), color: Colors.green);
-}
+    }) => const ColoredBox(key: Key('fake-map'), color: Colors.green);
 
 Future<TestApp> openLocation(WidgetTester tester, {TestApp? app}) async {
   final testApp =
@@ -137,24 +109,6 @@ void main() {
     expect(find.text('Delivery in 14 mins'), findsOneWidget);
   });
 
-  testWidgets('a map that fails to authenticate falls back', (tester) async {
-    final app = TestApp(
-      tokens: signedInTokens,
-      deliveryLocation: null,
-      mapsAvailable: true,
-      extraOverrides: [
-        pinMapBuilderProvider.overrideWithValue(fakeMap(errorCode: 401)),
-      ],
-    );
-    await openLocation(tester, app: app);
-    await tester.tap(find.byKey(const Key('pick-on-map')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('fake-map')), findsNothing);
-    expect(find.byKey(const Key('map-unavailable')), findsOneWidget);
-    expect(find.text('Enter address manually'), findsOneWidget);
-  });
-
   testWidgets('a working map previews the address and confirms the pin', (
     tester,
   ) async {
@@ -179,6 +133,50 @@ void main() {
       find.text('Pinned location · Sector 14, Gurugram, Haryana 122001'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Confirm is disabled while the map moves and saves the pin', (
+    tester,
+  ) async {
+    late void Function(GeoPoint target) move;
+    late VoidCallback idle;
+    final app = TestApp(
+      tokens: signedInTokens,
+      deliveryLocation: null,
+      mapsAvailable: true,
+      extraOverrides: [
+        pinMapBuilderProvider.overrideWithValue(({
+          required initial,
+          required onCreated,
+          required onCameraMove,
+          required onCameraIdle,
+        }) {
+          move = onCameraMove;
+          idle = onCameraIdle;
+          return const ColoredBox(key: Key('fake-map'), color: Colors.green);
+        }),
+      ],
+    );
+    await openLocation(tester, app: app);
+    await tester.tap(find.byKey(const Key('pick-on-map')));
+    await tester.pumpAndSettle();
+    FilledButton confirm() => tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Confirm location'),
+    );
+
+    move(mumbai);
+    await tester.pump();
+    expect(confirm().onPressed, isNull, reason: 'pin not settled yet');
+
+    idle();
+    await tester.pumpAndSettle();
+    expect(confirm().onPressed, isNotNull);
+    expect(app.geocoder.asked.last, mumbai);
+    await tester.tap(find.text('Confirm location'));
+    await tester.pumpAndSettle();
+
+    // The confirmed point is the settled pin, not the previous centre.
+    expect(app.serviceability.checks.last, mumbai);
   });
 
   testWidgets('the fallback offers manual address entry', (tester) async {

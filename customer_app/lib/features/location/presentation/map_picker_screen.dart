@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
-import 'package:mappls_gl/mappls_gl.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../app/redirect.dart';
 import '../../../app/repositories.dart';
@@ -29,40 +29,45 @@ class MapPickerArgs {
 }
 
 /// Builds the map under the pin. A provider, so widget tests can swap the
-/// Mappls platform view for a plain widget.
+/// Google Maps platform view for a plain widget.
 typedef PinMapBuilder = Widget Function({
   required GeoPoint initial,
-  required void Function(MapplsMapController controller) onCreated,
+  required void Function(GoogleMapController controller) onCreated,
+  required void Function(GeoPoint target) onCameraMove,
   required VoidCallback onCameraIdle,
-  required void Function(int code, String message) onError,
 });
 
-final pinMapBuilderProvider = Provider<PinMapBuilder>((ref) => _mapplsMap);
+final pinMapBuilderProvider = Provider<PinMapBuilder>((ref) => _googleMap);
 
-Widget _mapplsMap({
+Widget _googleMap({
   required GeoPoint initial,
-  required void Function(MapplsMapController controller) onCreated,
+  required void Function(GoogleMapController controller) onCreated,
+  required void Function(GeoPoint target) onCameraMove,
   required VoidCallback onCameraIdle,
-  required void Function(int code, String message) onError,
-}) => MapplsMap(
+}) => GoogleMap(
   initialCameraPosition: CameraPosition(
     target: LatLng(initial.lat, initial.lng),
     zoom: 16,
   ),
-  trackCameraPosition: true,
   compassEnabled: false,
+  myLocationButtonEnabled: false,
+  mapToolbarEnabled: false,
+  zoomControlsEnabled: false,
   onMapCreated: onCreated,
+  onCameraMove: (position) => onCameraMove((
+    lat: position.target.latitude,
+    lng: position.target.longitude,
+  )),
   onCameraIdle: onCameraIdle,
-  onMapError: onError,
 );
 
-/// Map pin picker (`03 §3` #12, D-03 Mappls): the pin stays in the centre
+/// Map pin picker (`03 §3` #12, DL-80 Google Maps): the pin stays in the centre
 /// while the map moves under it; the address under the pin is previewed;
 /// "Confirm location" pops a [PickedLocation].
 ///
-/// The map is only created when the Mappls SDK config was built into the
-/// app (see README). Without it, or when the map reports an error (e.g.
-/// authentication), a fallback offers the current location or manual entry.
+/// The map is only created when the build has a Maps API key (see README
+/// "Google Maps key"). Without it, a fallback offers the current location
+/// or manual entry.
 class MapPickerScreen extends ConsumerStatefulWidget {
   const MapPickerScreen({
     this.initial,
@@ -80,8 +85,6 @@ class MapPickerScreen extends ConsumerStatefulWidget {
 }
 
 class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
-  bool _mapFailed = false;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -89,9 +92,8 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.mapPickerTitle)),
       body: switch (available) {
-        AsyncData(value: true) when !_mapFailed => _PinMap(
+        AsyncData(value: true) => _PinMap(
           initial: widget.initial ?? kDefaultMapCenter,
-          onMapError: () => setState(() => _mapFailed = true),
         ),
         AsyncData() || AsyncError() => _MapUnavailable(
           fromAddressForm: widget.fromAddressForm,
@@ -103,18 +105,22 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen> {
 }
 
 class _PinMap extends ConsumerStatefulWidget {
-  const _PinMap({required this.initial, required this.onMapError});
+  const _PinMap({required this.initial});
 
   final GeoPoint initial;
-  final VoidCallback onMapError;
 
   @override
   ConsumerState<_PinMap> createState() => _PinMapState();
 }
 
 class _PinMapState extends ConsumerState<_PinMap> {
-  MapplsMapController? _controller;
+  GoogleMapController? _controller;
   late GeoPoint _center = widget.initial;
+  late GeoPoint _target = widget.initial;
+
+  /// The camera is moving: [_center] is stale until it settles, so Confirm
+  /// is disabled.
+  bool _moving = false;
   String? _address;
   bool _resolving = false;
   int _lookup = 0;
@@ -126,10 +132,14 @@ class _PinMapState extends ConsumerState<_PinMap> {
     _resolve(_center);
   }
 
+  void _onCameraMove(GeoPoint target) {
+    _target = target;
+    if (!_moving) setState(() => _moving = true);
+  }
+
   void _onCameraIdle() {
-    final target = _controller?.cameraPosition?.target;
-    if (target == null) return;
-    final center = (lat: target.latitude, lng: target.longitude);
+    final center = _target;
+    if (_moving) setState(() => _moving = false);
     if (center == _center && _address != null) return;
     setState(() => _center = center);
     _resolve(center);
@@ -183,13 +193,8 @@ class _PinMapState extends ConsumerState<_PinMap> {
               ref.watch(pinMapBuilderProvider)(
                 initial: widget.initial,
                 onCreated: (controller) => _controller = controller,
+                onCameraMove: _onCameraMove,
                 onCameraIdle: _onCameraIdle,
-                onError: (code, message) {
-                  // Usually authentication: the config does not match this
-                  // package name / signing certificate.
-                  debugPrint('Mappls map error $code: $message');
-                  widget.onMapError();
-                },
               ),
               // The pin's tip marks the centre.
               IgnorePointer(
@@ -248,10 +253,12 @@ class _PinMapState extends ConsumerState<_PinMap> {
                 const SizedBox(height: JivoSpacing.md),
                 BusyButton(
                   label: l10n.confirmLocation,
-                  onPressed: () => context.pop<PickedLocation>((
-                    point: _center,
-                    address: address,
-                  )),
+                  onPressed: _moving
+                      ? null
+                      : () => context.pop<PickedLocation>((
+                          point: _center,
+                          address: address,
+                        )),
                 ),
               ],
             ),
@@ -262,8 +269,9 @@ class _PinMapState extends ConsumerState<_PinMap> {
   }
 }
 
-/// No map in this build (or it failed to load): current location or manual
-/// address entry.
+/// No map in this build (no Maps API key): current location or manual
+/// address entry. A key that is present but invalid or wrongly restricted
+/// shows a grey map instead, since the Maps SDK doesn't report it to Dart.
 class _MapUnavailable extends ConsumerStatefulWidget {
   const _MapUnavailable({required this.fromAddressForm});
 

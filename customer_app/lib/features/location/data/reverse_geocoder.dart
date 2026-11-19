@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:mappls_gl/mappls_gl.dart';
+import 'package:geocoding/geocoding.dart' show Geocoding, Placemark;
 
 import '../../addresses/data/device_location.dart';
 
@@ -34,39 +34,73 @@ abstract interface class ReverseGeocoder {
   Future<AddressParts?> partsAt(GeoPoint point);
 }
 
-/// Mappls reverse geocoding (D-03), authenticated by the same SDK config
-/// as the map. Only used while a map is shown, i.e. when the config is
-/// present.
-class MapplsReverseGeocoder implements ReverseGeocoder {
-  const MapplsReverseGeocoder();
+/// Looks up the placemarks at a point. The default is the platform
+/// geocoder; tests pass their own.
+typedef PlacemarkLookup = Future<List<Placemark>> Function(GeoPoint point);
 
-  Future<ReverseGeocodePlace?> _place(GeoPoint point) async {
+Future<List<Placemark>> _platformLookup(GeoPoint point) =>
+    Geocoding().placemarkFromCoordinates(point.lat, point.lng);
+
+/// Reverse geocoding with the platform geocoder (`geocoding` package,
+/// DL-80): no API key, no billing. Results depend on the device's geocoder
+/// service; when it has none or fails, the picker shows the coordinates and
+/// the customer types the address.
+class PlatformReverseGeocoder implements ReverseGeocoder {
+  const PlatformReverseGeocoder({this._lookup = _platformLookup});
+
+  final PlacemarkLookup _lookup;
+
+  Future<Placemark?> _place(GeoPoint point) async {
     try {
-      final response = await MapplsReverseGeocode(
-        location: LatLng(point.lat, point.lng),
-      ).callReverseGeocode();
-      final results = response?.results;
-      return results == null || results.isEmpty ? null : results.first;
+      final results = await _lookup(point);
+      return results.isEmpty ? null : results.first;
     } catch (_) {
       return null;
     }
   }
 
   @override
-  Future<String?> addressAt(GeoPoint point) async =>
-      _clean((await _place(point))?.formattedAddress);
+  Future<String?> addressAt(GeoPoint point) async {
+    final place = await _place(point);
+    return place == null ? null : addressLine(place);
+  }
 
   @override
   Future<AddressParts?> partsAt(GeoPoint point) async {
     final place = await _place(point);
-    if (place == null) return null;
-    return AddressParts(
-      line: _clean(place.formattedAddress),
-      area: _clean(place.subLocality) ?? _clean(place.locality),
-      city: _clean(place.city) ?? _clean(place.district),
-      state: _clean(place.state),
-      pincode: _clean(place.pincode),
-    );
+    return place == null ? null : partsOf(place);
+  }
+
+  /// The parts of [place] for the address form.
+  @visibleForTesting
+  static AddressParts partsOf(Placemark place) => AddressParts(
+    line: addressLine(place),
+    area: _clean(place.subLocality) ?? _clean(place.locality),
+    city: _clean(place.locality) ?? _clean(place.subAdministrativeArea),
+    state: _clean(place.administrativeArea),
+    pincode: _clean(place.postalCode),
+  );
+
+  /// One line from the placemark's parts. Android's `street` is often the
+  /// whole formatted address already, so a part already contained in the
+  /// line is skipped.
+  @visibleForTesting
+  static String? addressLine(Placemark place) {
+    final parts = <String>[];
+    for (final raw in [
+      place.street ?? place.name,
+      place.subLocality,
+      place.locality,
+      place.administrativeArea,
+      place.postalCode,
+    ]) {
+      final part = _clean(raw);
+      if (part == null) continue;
+      final lower = part.toLowerCase();
+      if (parts.any((p) => p.toLowerCase().contains(lower))) continue;
+      parts.add(part);
+    }
+    return parts.isEmpty ? null : parts.join(', ');
   }
 
   static String? _clean(String? value) {
