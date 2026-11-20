@@ -14,7 +14,7 @@
 | App size | Customer APK (per-ABI) < 30 MB; rider < 25 MB |
 | Initial load capacity | 50 orders/min peak and 500 concurrent app sessions without degradation. Tested in Phase 8. |
 
-Techniques: Redis caching of catalog/home per store (invalidated on change), `select_related`/`prefetch_related` everywhere (enforced with tests using `django_assert_max_num_queries`), DB indexes per [07 §3](07-data-model.md#3-key-indexes--constraints), CDN for images, image resizing (thumbnail sizes) at upload.
+Techniques: Redis caching of catalog/home per store (invalidated on change), `select_related`/`prefetch_related` everywhere (enforced with tests using `django_assert_max_num_queries`), DB indexes per [07 §3](07-data-model.md#3-key-indexes--constraints), CDN for images, image resizing (thumbnail sizes) at upload. Static files (admin, Ops Console) get content-hashed names in deployed settings (`ManifestStaticFilesStorage` via `apps.core.staticfiles`, T-817), so nginx can cache `/static/` for days and a deploy still serves the new files; the image build runs `collectstatic` with `DJANGO_STATIC_MANIFEST=true`. Slow Celery jobs (exports, invoice PDFs, purges) run on their own `slow` queue so they never delay dispatch, OTP or push (06 §5).
 
 ## 2. Availability & resilience
 - Target 99.5% monthly uptime for the API in v1.
