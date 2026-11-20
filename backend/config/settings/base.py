@@ -491,6 +491,13 @@ TWILIO_ACCOUNT_SID = env_str("TWILIO_ACCOUNT_SID", default="")
 TWILIO_AUTH_TOKEN = env_str("TWILIO_AUTH_TOKEN", default="")
 TWILIO_FROM_NUMBER = env_str("TWILIO_FROM_NUMBER", default="")
 TWILIO_MESSAGING_SERVICE_SID = env_str("TWILIO_MESSAGING_SERVICE_SID", default="")
+# MSG91 Flow API (T-815; SMS_BACKEND=apps.notifications.sms.Msg91SmsBackend). The auth key only
+# from env. MSG91_FLOW_IDS maps each DLT template id we send (SMS_OTP_DLT_TEMPLATE_ID and the
+# SMS_DLT_TEMPLATE_IDS values) to the MSG91 flow ("template_id") bound to it: "dlt_id:flow_id,..".
+# The sender is SMS_SENDER_ID (sent only when set, for flows whose sender is "FromAPI").
+# System check accounts.E007 requires the key and the OTP flow; W001 lists unmapped events.
+MSG91_AUTH_KEY = env_str("MSG91_AUTH_KEY", default="")
+MSG91_FLOW_IDS: dict[str, str] = env_dict("MSG91_FLOW_IDS", default={})
 # Must match the DLT-registered template text exactly. {app_hash} is the Android SMS Retriever
 # hash of the app that asked (blank if unset).
 SMS_OTP_TEMPLATE = env_str(

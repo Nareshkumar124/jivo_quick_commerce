@@ -36,6 +36,7 @@ def send_otp_sms(otp_request_id: int, code: str) -> str:
             request.phone,
             otp.render_otp_sms(code, request.app),
             settings.SMS_OTP_DLT_TEMPLATE_ID,
+            variables=otp.otp_sms_variables(code, request.app),
         )
     except SmsRejected:
         # The gateway refused this number (e.g. unverified on a Twilio trial account): a retry
@@ -47,7 +48,7 @@ def send_otp_sms(otp_request_id: int, code: str) -> str:
         )
         return "rejected"
     except SmsOutcomeUnknown:
-        # Twilio may have sent it; a retry could send a duplicate OTP (no idempotency key).
+        # The gateway may have sent it; a retry could send a duplicate OTP (no idempotency key).
         logger.warning(
             "OTP SMS outcome unknown, not retried: otp_request=%s phone=%s",
             request.pk,

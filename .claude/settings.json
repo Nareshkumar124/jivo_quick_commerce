@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(adb devices)",
+      "Bash(adb devices -l)",
+      "Bash(curl -s http://127.0.0.1:8001/health/ready)",
+      "Bash(curl -s -m 5 http://127.0.0.1:8001/health/ready)",
+      "Bash(curl -s -m 10 http://127.0.0.1:8001/health/ready)",
+      "Bash(curl -s -m 10 https://jqc.jivo.in/health/ready)",
+      "Bash(flutter analyze)",
+      "Bash(/c/dev/flutter/bin/flutter analyze)",
+      "Bash(redis-cli -p 6380 ping)",
+      "Bash(tasklist)",
+      "Bash(tasklist *)",
+      "PowerShell(Get-CimInstance *)"
+    ]
+  }
+}
