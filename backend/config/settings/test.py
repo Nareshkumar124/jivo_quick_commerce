@@ -102,6 +102,9 @@ SEED_DEMO_ALLOWED = True
 
 SMS_BACKEND = "apps.notifications.sms.LocmemSmsBackend"
 SMS_OTP_DLT_TEMPLATE_ID = "1007000000000000001"
+# Tests never read real gateway keys, whatever backend/.env says (MSG91 tests set fake ones).
+MSG91_AUTH_KEY = ""
+MSG91_FLOW_IDS: dict[str, str] = {}
 # Phase 6: push into a list, DLT ids for every notification event with SMS, fast auth timeout.
 PUSH_BACKEND = "apps.notifications.push.LocmemPushBackend"
 # Tests never read a real Firebase key, whatever backend/.env says (FCM tests use a fake file).

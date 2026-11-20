@@ -111,7 +111,7 @@ def sweep_stuck_sends(now=None) -> int:
         )
     if sms_ids:
         Notification.objects.filter(pk__in=sms_ids, sms_status=DeliveryStatus.SENDING).update(
-            sms_status=DeliveryStatus.FAILED, sms_body="", updated_at=stamp
+            sms_status=DeliveryStatus.FAILED, sms_body="", sms_variables={}, updated_at=stamp
         )
     if push_ids or sms_ids:
         logger.error(
@@ -134,13 +134,20 @@ def render(text: str, context: Mapping[str, Any]) -> str:
     return _SPACES.sub(" ", _PLACEHOLDER.sub(value, text)).strip()
 
 
+def render_variables(text: str, context: Mapping[str, Any]) -> dict[str, str]:
+    """The value of each `{{name}}` in `text`, rendered as `render` would (T-815: a MSG91 flow
+    gets these as its `##name##` variables instead of the rendered text)."""
+    names = dict.fromkeys(_PLACEHOLDER.findall(text))
+    return {name: render(f"{{{{{name}}}}}", context) for name in names}
+
+
 def _template(event: str, channel: str, app: str) -> NotificationTemplate | None:
     return NotificationTemplate.objects.filter(
         event=event, channel=channel, app=app, is_active=True
     ).first()
 
 
-def _texts(spec: EventSpec, context: Mapping[str, Any]) -> dict[str, str]:
+def _texts(spec: EventSpec, context: Mapping[str, Any]) -> dict[str, Any]:
     push_title, push_body, sms_body = spec.title, spec.body, spec.sms
     dlt_id = settings.SMS_DLT_TEMPLATE_IDS.get(spec.event, "")
     if (row := _template(spec.event, Channel.PUSH, spec.app)) is not None:
@@ -154,6 +161,7 @@ def _texts(spec: EventSpec, context: Mapping[str, Any]) -> dict[str, str]:
         "body": body,
         "inbox_body": render(spec.inbox_body, context)[:500] if spec.inbox_body else body,
         "sms_body": render(sms_body, context)[:500] if sms_body else "",
+        "sms_variables": render_variables(sms_body, context) if sms_body else {},
         "dlt_id": dlt_id,
     }
 
@@ -259,6 +267,7 @@ def notify(
                 "push_body": texts["body"] if wants_push else "",
                 "sms_status": DeliveryStatus.PENDING if wants_sms else DeliveryStatus.NONE,
                 "sms_body": texts["sms_body"] if wants_sms else "",
+                "sms_variables": texts["sms_variables"] if wants_sms else {},
                 "sms_dlt_template_id": texts["dlt_id"] if wants_sms else "",
             },
         )
@@ -273,8 +282,9 @@ def notify(
             if wants_sms and notification.sms_status == DeliveryStatus.NONE:
                 notification.sms_status = DeliveryStatus.PENDING
                 notification.sms_body = texts["sms_body"]
+                notification.sms_variables = texts["sms_variables"]
                 notification.sms_dlt_template_id = texts["dlt_id"]
-                changed += ["sms_status", "sms_body", "sms_dlt_template_id"]
+                changed += ["sms_status", "sms_body", "sms_variables", "sms_dlt_template_id"]
             if changed:
                 notification.save(update_fields=[*changed, "updated_at"])
         _queue(notification)
@@ -348,7 +358,7 @@ def _finish(notification_id: int, channel: str, status: str) -> None:
         if status == DeliveryStatus.SENT:
             values["push_sent_at"] = now
     else:
-        values = {"sms_status": status, "sms_body": ""}
+        values = {"sms_status": status, "sms_body": "", "sms_variables": {}}
         if status == DeliveryStatus.SENT:
             values["sms_sent_at"] = now
     Notification.objects.filter(pk=notification_id).update(**values, updated_at=now)
@@ -454,7 +464,12 @@ def deliver_sms(notification_id: int) -> str:
         _finish(notification_id, Channel.SMS, DeliveryStatus.SKIPPED)
         return "no_dlt_template"
     try:
-        send_sms(user.phone, notification.sms_body, notification.sms_dlt_template_id)
+        send_sms(
+            user.phone,
+            notification.sms_body,
+            notification.sms_dlt_template_id,
+            variables=notification.sms_variables or None,  # {} = legacy row: MSG91 refuses
+        )
     except SmsError:
         release_claim(notification_id, Channel.SMS)
         raise

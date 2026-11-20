@@ -158,10 +158,15 @@ def verify_otp(
     return otp
 
 
+def otp_sms_variables(code: str, app: str) -> dict[str, str]:
+    """The OTP template's variables (MSG91 flow `##otp##` / `##app_hash##`, T-815). `app_hash`
+    is the Android SMS Retriever hash of the app that asked (blank if unset)."""
+    return {"otp": code, "app_hash": settings.SMS_RETRIEVER_APP_HASHES.get(app, "")}
+
+
 def render_otp_sms(code: str, app: str) -> str:
     """The DLT-registered OTP template. `{app_hash}` enables Android SMS Retriever autofill."""
-    app_hash = settings.SMS_RETRIEVER_APP_HASHES.get(app, "")
-    return settings.SMS_OTP_TEMPLATE.format(otp=code, app_hash=app_hash).strip()
+    return settings.SMS_OTP_TEMPLATE.format(**otp_sms_variables(code, app)).strip()
 
 
 def purge_old_otp_requests() -> int:
