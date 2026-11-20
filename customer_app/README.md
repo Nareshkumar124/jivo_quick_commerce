@@ -72,16 +72,65 @@ devices without a geocoder service (the picker then shows coordinates).
   package name + SHA-1 signing fingerprint (`in.jivo.quick`,
   `in.jivo.quick.dev`, `in.jivo.quick.staging`; debug, upload and Play app
   signing certificates) and to the Maps SDK for Android API.
-- **No key:** the build still succeeds; `MainActivity` answers the
+- **Android: no key.** The build still succeeds; `MainActivity` answers the
   `in.jivo.quick/maps` channel with false, so no map is ever created and the
   picker shows its current-location / manual-address fallback and tracking
   shows the route sketch.
-- **iOS: deferred.** There is no iOS key or config yet, so
-  `PlatformMapsAvailability` reports iOS as unavailable and iOS always shows
-  the fallback. To enable it later, add the key in `AppDelegate.swift`
-  (`GMSServices.provideAPIKey`) from an untracked file, answer the maps
-  channel there, and drop the Android-only check in
-  `lib/features/location/data/maps_availability.dart`.
+
+#### iOS (T-816)
+
+- **Key.** A separate key restricted in the Google Cloud console to
+  **iOS apps** by bundle id (`in.jivo.quick` today; add `in.jivo.quick.dev`
+  and `in.jivo.quick.staging` once the iOS flavors exist) and to the
+  **Maps SDK for iOS** API. Never reuse the Android key: its restriction does
+  not cover iOS.
+- **Where it lives.** `~/.config/jivo-quick-commerce/google-maps/ios-api-key.txt`
+  (one line) on the Mac that builds iOS, or env `MAPS_API_KEY_IOS` (checked
+  first, e.g. in CI). `GOOGLE_MAPS_CONFIG_DIR` overrides the folder.
+- **Setup** (on the Mac, before building):
+
+  ```sh
+  customer_app/tool/setup_google_maps_ios.sh --write    # writes ios/Flutter/MapsKey.xcconfig
+  customer_app/tool/setup_google_maps_ios.sh --remove   # back to "no maps"
+  ```
+
+  The script validates the key's characters, refuses to write unless the
+  file is gitignored, writes it with mode 600 and never prints the key.
+- **How it flows.** `ios/Flutter/Debug.xcconfig` and `Release.xcconfig`
+  (Profile uses Release) set `MAPS_API_KEY_IOS =` (empty) and then
+  `#include? "MapsKey.xcconfig"`, the gitignored file the script writes.
+  `Info.plist` has `GMSApiKey = $(MAPS_API_KEY_IOS)`. `AppDelegate.swift`
+  reads `GMSApiKey` at launch and, when non-empty, calls
+  `GMSServices.provideAPIKey` before the engine starts; it answers the
+  `in.jivo.quick/maps` channel's `prepare` with whether it did. When the iOS
+  flavors are added, their xcconfigs must include `Debug.xcconfig` /
+  `Release.xcconfig` (or `#include? "MapsKey.xcconfig"` themselves).
+- **No key.** Same as Android: the build succeeds, `prepare` answers false
+  and the screens show their fallback.
+- **CocoaPods.** The project uses Swift Package Manager, but the default iOS
+  implementation (`google_maps_flutter_ios` 2.18.x) is CocoaPods-only, so
+  the first macOS build makes Flutter generate `ios/Podfile` and run
+  `pod install` (CocoaPods must be installed). In the generated Podfile set
+  `platform :ios, '15.0'` (the app's deployment target; GoogleMaps 9.x),
+  then `cd ios && pod install`, and commit `Podfile` and `Podfile.lock`.
+- **Build entry point.** Always build with `flutter build ios` / `flutter run`, or open
+  `ios/Runner.xcworkspace` in Xcode, never `Runner.xcodeproj` directly (otherwise
+  "No such module 'GoogleMaps'", since the pod is only linked through the workspace
+  after `pod install`).
+- **Verify on a Mac:**
+
+  ```sh
+  cd customer_app
+  flutter pub get --enforce-lockfile
+  tool/setup_google_maps_ios.sh --write
+  flutter build ios -t lib/main_dev.dart --no-codesign   # first run generates ios/Podfile
+  # set `platform :ios, '15.0'` in ios/Podfile, then:
+  (cd ios && pod install)
+  flutter build ios -t lib/main_dev.dart --no-codesign   # no --flavor until iOS flavors exist
+  flutter run -t lib/main_dev.dart -d <simulator>        # map shows in the address picker
+  tool/setup_google_maps_ios.sh --remove
+  flutter run -t lib/main_dev.dart -d <simulator>        # manual-address fallback, no crash
+  ```
 
 ## Push: Firebase Cloud Messaging (D-19)
 
@@ -265,6 +314,9 @@ These were set up on Linux, so only the Android flavors exist so far.
   - Add a shared scheme per flavor.
   - Set `PRODUCT_BUNDLE_IDENTIFIER` (`in.jivo.quick.dev`, `.staging`) and the
     display name per configuration through xcconfig files.
+  - Base each flavor xcconfig on `Debug.xcconfig` / `Release.xcconfig` (or
+    add `#include? "MapsKey.xcconfig"`) so it gets the Google Maps key, and
+    add the new bundle ids to the iOS key's restriction.
 - **Plain HTTP for dev.** App Transport Security blocks `http://localhost:8001`.
   Allow local networking for the dev configuration only (for example
   `NSAllowsLocalNetworking` in a dev-only Info.plist), never for prod.

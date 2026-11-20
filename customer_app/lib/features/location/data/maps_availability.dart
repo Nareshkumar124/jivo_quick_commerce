@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 
 /// Whether this build can show a Google map (DL-80).
 ///
-/// Android asks `MainActivity` (`prepare`), which reports whether the build
-/// injected a Maps API key into the manifest (README "Google Maps key").
-/// Without one no map is ever created and screens show their fallback.
-/// iOS reports false until an iOS key is configured.
+/// Android and iOS ask the native side over `in.jivo.quick/maps` (`prepare`):
+/// `MainActivity` reports whether the build injected a Maps API key into the
+/// manifest, and `AppDelegate.swift` whether Info.plist had a `GMSApiKey`
+/// that it handed to `GMSServices.provideAPIKey` (README "Google Maps key").
+/// Without a key, on web and other platforms, and on any channel error, no
+/// map is ever created and screens show their fallback.
 abstract interface class MapsAvailability {
   Future<bool> isAvailable();
 }
@@ -18,8 +20,16 @@ class PlatformMapsAvailability implements MapsAvailability {
 
   @override
   Future<bool> isAvailable() async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-      return false;
+    if (kIsWeb) return false;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+        break;
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        return false;
     }
     try {
       return await _channel.invokeMethod<bool>('prepare') ?? false;
