@@ -57,7 +57,7 @@ def _ok(serializer, description: str, *examples: tuple[str, dict]) -> OpenApiRes
 class ServiceabilityView(APIView):
     authentication_classes: list = []
     permission_classes = [AllowAny]
-    throttle_classes = [ServiceabilityThrottle]  # T-814 (H3): per IP
+    throttle_classes = [ServiceabilityThrottle]  # T-814 (H3); per user with a token (T-817)
 
     @extend_schema(
         operation_id="serviceability_check",

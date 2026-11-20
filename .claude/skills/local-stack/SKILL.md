@@ -13,7 +13,7 @@ Everything runs natively from the **main tree on `main`** (`/c/jivo_projects/jiv
 | MinIO | 9000/9001 | `dev-services.ps1 -Action start` |
 | Mailpit | 1025/8025 | same script |
 | Django (ASGI dev) | 8001 | `uv run python manage.py runserver 127.0.0.1:8001` |
-| Celery worker | – | `uv run celery -A config worker --pool threads -l info` |
+| Celery worker | – | `uv run celery -A config worker --pool threads -Q celery,slow -l info` (both queues, T-817) |
 | Celery beat | – | `uv run celery -A config beat -l info` (DatabaseScheduler from settings) |
 
 ## Status

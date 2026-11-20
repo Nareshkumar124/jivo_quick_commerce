@@ -301,6 +301,12 @@ STORAGES = {
     },
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
+# T-817: content-hashed static names (nginx caches /static/ for 7 days), forced in deployed
+# settings. DJANGO_STATIC_MANIFEST=true selects it under any settings module: the image build
+# runs `collectstatic` with local settings and must write the hashed files and staticfiles.json.
+STATIC_MANIFEST_STORAGE = {"BACKEND": "apps.core.staticfiles.VersionedStaticFilesStorage"}
+if env_bool("DJANGO_STATIC_MANIFEST", default=False):
+    STORAGES["staticfiles"] = STATIC_MANIFEST_STORAGE
 
 # --------------------------------------------------------------------------- redis
 # Port 6380 is this project's Redis (infra/docker-compose.yml). Separate DB numbers per use.
@@ -335,6 +341,37 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = 5 * 60
 CELERY_TASK_SOFT_TIME_LIMIT = 4 * 60
 CELERY_TIMEZONE = "UTC"
+# T-817: two queues. `celery` (the default) carries everything a customer, rider or store is
+# waiting on: dispatch and offers, order events, push/SMS/OTP sends, realtime publishes, payment
+# and refund work, auto-accept, expiry sweeps. `slow` carries bulk and long jobs, so a big report
+# export or a nightly purge never delays an offer or an OTP: report exports and mails, invoice
+# PDFs (WeasyPrint) and the retention/purge sweeps. Deployed: one worker `-Q celery`, a second
+# worker `-Q slow`; one local worker consumes both (`-Q celery,slow`). Beat sends by task name,
+# so periodic jobs follow these routes too. Unlisted tasks go to `celery`.
+CELERY_TASK_DEFAULT_QUEUE = "celery"
+CELERY_SLOW_QUEUE = "slow"
+CELERY_SLOW_TASKS = (
+    # Reports (P7): CSV/XLSX exports, the daily mail, old export files.
+    "reports.generate_export",
+    "reports.daily_reports_email",
+    "reports.daily_report_mail",
+    "reports.purge_old_exports",
+    # Invoice PDF (WeasyPrint render + upload). The invoice link renders on demand if needed.
+    "orders.generate_invoice",
+    # Retention and housekeeping sweeps (nightly / hourly batches).
+    "accounts.anonymise_deleted_accounts",
+    "accounts.purge_old_otp_requests",
+    "accounts.flush_expired_tokens",
+    "accounts.clear_expired_sessions",
+    "delivery.purge_offboarded_kyc",
+    "notifications.purge_old_notifications",
+    "realtime.purge_old_locations",
+    "payments.scrub_payment_payloads",
+    "support.purge_unclaimed_attachments",
+    # Hourly safety net for a lost order.delivered event (`reward_referral` stays urgent).
+    "referrals.reward_pending_referrals",
+)
+CELERY_TASK_ROUTES = {name: {"queue": CELERY_SLOW_QUEUE} for name in CELERY_SLOW_TASKS}
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # Synced into django-celery-beat's tables when beat starts. Times are UTC (21:30 = 03:00 IST).
 CELERY_BEAT_SCHEDULE = {
@@ -931,6 +968,10 @@ REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"].update(
         "invoice": env_str("INVOICE_RATE", default="30/hour"),
         # 2026-11-13: entering a friend's referral code (no guessing codes).
         "referral_apply": env_str("REFERRAL_APPLY_RATE", default="10/hour"),
+        # T-817: per-IP ceiling for signed-in callers on public views (they are otherwise counted
+        # per user). 5x the anonymous baseline: ~300 customers actively browsing behind one
+        # carrier IP at ~5 requests/min each; only many tokens from one IP reach it.
+        "signed_in_ip": env_str("SIGNED_IN_IP_RATE", default="1500/min"),
     }
 )
 # H2 (DL-59): staff lockout per username (whatever the IP: rotating IPs cannot brute-force one

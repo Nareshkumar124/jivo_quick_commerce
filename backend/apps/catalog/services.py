@@ -23,6 +23,7 @@ from django.db.models import (
     F,
     FilteredRelation,
     IntegerField,
+    Max,
     OuterRef,
     Prefetch,
     Q,
@@ -667,6 +668,53 @@ def banners_for_audience(body: dict, user) -> dict:
     return {**body, "banners": banners}
 
 
+# Distinct (variant) rows read from the customer's history before de-duplicating by product: a
+# bound on the work per request (a product has a handful of variants, so 5x the rail is plenty).
+BUY_AGAIN_CANDIDATES = RAIL_SIZE * 5
+
+
 def buy_again(store: DarkStore, user) -> list[dict]:
-    """'Previously bought' rail. Orders arrive in Phase 3/4; until then always empty."""
-    return []
+    """'Previously bought' rail (03 §2.5, 06 §2.4): the signed-in customer's variants from
+    DELIVERED orders (at any store) that `store` sells now, most recently delivered first.
+
+    Same tiles and rules as the collection rails: active variants the store stocks, visible
+    products only, one card per product (default variant = the one bought most recently),
+    out-of-stock last, at most `RAIL_SIZE`. A line the store fully marked unavailable (08 T8a)
+    was never delivered, so it does not count. Anonymous callers get `[]`.
+
+    Per user, so never cached (`apps.catalog.cache`). Scoped by `order__user=user` in the query
+    itself (rule 6). A constant number of queries: the history, then the cards' products and
+    their prefetches."""
+    from apps.orders.choices import OrderStatus
+    from apps.orders.models import OrderItem
+
+    if user is None or not getattr(user, "is_authenticated", False):
+        return []
+    history = (
+        OrderItem.objects.filter(
+            order__user=user,
+            order__status=OrderStatus.DELIVERED,
+            quantity_unavailable__lt=F("quantity"),
+            variant__in=sold_variants(store).values("pk"),
+        )
+        .values("variant_id", "variant__product_id")
+        .annotate(last_delivered=Max("order__delivered_at"), last_order=Max("order_id"))
+        .order_by(F("last_delivered").desc(nulls_last=True), "-last_order", "-variant_id")
+    )[:BUY_AGAIN_CANDIDATES]
+    preferred: dict[int, int] = {}  # product id -> most recently bought variant id
+    for row in history:
+        preferred.setdefault(row["variant__product_id"], row["variant_id"])
+    if not preferred:
+        return []
+    products = {
+        p.pk: p
+        for p in with_card_data(_visible_products().filter(pk__in=preferred), store)
+        if p.store_variants
+    }
+    rail = [
+        product_card(products[pid], variant_id)
+        for pid, variant_id in preferred.items()
+        if pid in products
+    ]
+    rail.sort(key=_card_out_of_stock)  # stable: keeps the recency order
+    return rail[:RAIL_SIZE]

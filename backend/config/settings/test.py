@@ -95,6 +95,8 @@ STORAGES = {
         "BACKEND": "django.core.files.storage.InMemoryStorage",
         "OPTIONS": {"base_url": "https://media.test/"},
     },
+    # Never the manifest storage in tests (no collectstatic run), whatever the environment says.
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
 
 API_DOCS_PUBLIC = True

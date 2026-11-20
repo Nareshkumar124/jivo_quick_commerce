@@ -29,6 +29,9 @@ if NUM_PROXIES < 1:  # T-814 (L1)
     raise ImproperlyConfigured("NUM_PROXIES must be at least 1 behind nginx / a load balancer.")
 REST_FRAMEWORK = {**REST_FRAMEWORK, "NUM_PROXIES": NUM_PROXIES or None}
 
+# T-817: versioned static names; `{% static %}` reads staticfiles.json written at image build.
+STORAGES = {**STORAGES, "staticfiles": STATIC_MANIFEST_STORAGE}
+
 # TLS is terminated by nginx / the load balancer (02 §8).
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", default=True)

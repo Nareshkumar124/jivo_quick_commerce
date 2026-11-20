@@ -34,6 +34,13 @@ def _version(key: str) -> int:
     return int(value)
 
 
+def _versions(*keys: str) -> tuple[int, ...]:
+    """Several version counters in one round trip (`get_many`); a missing one is created at 1
+    as in `_version()`. A cache hit thus costs two Redis reads: the versions, then the entry."""
+    found = cache.get_many(keys)
+    return tuple(int(found[key]) if found.get(key) is not None else _version(key) for key in keys)
+
+
 def _bump(key: str) -> None:
     try:
         cache.add(key, 1, timeout=None)
@@ -97,10 +104,7 @@ def inventory_change_is_published(inventory) -> bool:
 def cached(kind: str, store_id: int, parts: tuple, build: Callable[[], Any]) -> Any:
     """`build()` cached under (kind, store, versions, parts). Falls back to `build()` on errors."""
     try:
-        versions = (
-            _version(GLOBAL_VERSION_KEY),
-            _version(STORE_VERSION_KEY.format(store_id=store_id)),
-        )
+        versions = _versions(GLOBAL_VERSION_KEY, STORE_VERSION_KEY.format(store_id=store_id))
     except Exception:
         logger.warning("catalog cache unavailable; serving from the database", exc_info=True)
         return build()

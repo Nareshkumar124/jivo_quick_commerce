@@ -75,7 +75,7 @@ class TestHome:
         client = make_auth_client(user)
         response = client.get("/api/v1/home/", headers={"X-Store-Id": str(world.store.pk)})
         assert response.status_code == 200
-        assert response.json()["buy_again"] == []  # orders arrive in Phase 3/4
+        assert response.json()["buy_again"] == []  # no delivered orders yet (test_buy_again.py)
 
     def test_store_specific_collection_hidden_elsewhere(self, api_client, world):
         body = api_client.get(
@@ -348,6 +348,22 @@ class TestCaching:
             assert store_client.get("/api/v1/categories/").status_code == 200
         with mock.patch("apps.catalog.cache.cache.set", side_effect=down):
             assert store_client.get("/api/v1/categories/").status_code == 200
+        with mock.patch("apps.catalog.cache.cache.get_many", side_effect=down):
+            assert store_client.get("/api/v1/categories/").status_code == 200
+
+    def test_a_hit_costs_two_redis_reads(self, world):
+        """T-817: the two version counters come in one `get_many`, then the entry."""
+        from apps.catalog import cache as catalog_cache
+        from apps.catalog.cache import cached
+
+        cached("probe", world.store.pk, (), lambda: {"n": 1})  # warm: versions + entry exist
+        real = catalog_cache.cache
+        with (
+            mock.patch.object(real, "get_many", wraps=real.get_many) as get_many,
+            mock.patch.object(real, "get", wraps=real.get) as get,
+        ):
+            assert cached("probe", world.store.pk, (), lambda: {"n": 2}) == {"n": 1}
+        assert (get_many.call_count, get.call_count) == (1, 1)
 
 
 def _bypass_cache(kind, store_id, parts, build):
