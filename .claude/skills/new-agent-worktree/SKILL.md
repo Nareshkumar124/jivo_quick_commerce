@@ -46,6 +46,8 @@ Pick a pair no other running agent uses (`docs/dev-environment.md` table):
 | QA (:8004) | its own settings | 5–7 |
 Names must start with `test_jivo_quick_commerce` (settings refuse others). Two concurrent `-n` runs must never share both values. Avoid 0–2 (dev cache/broker/channels).
 
+**Only one full backend suite at a time.** Two `pytest -n 4` runs against the remote shared Postgres (2026-11-20) caused mass `ConnectionTimeout` errors during test-DB setup and a 90-minute run. Put this in every backend-type brief: iterate with targeted test files; before the single full run, check no other agent's full suite is running (pytest processes on another `test_jivo_quick_commerce_*` DB) and wait if one is; on setup timeouts, report with targeted results instead of re-running. Also check Redis 6380 is up (`local-stack`) before launching a backend run.
+
 ## 5. Brief template (Agent tool, subagent_type = the agent)
 ```
 <Phase N / task title> (T-xxx). Read your agent file, CLAUDE.md, docs/dev-environment.md and <phase docs, DL-xx>.
