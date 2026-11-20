@@ -83,10 +83,7 @@ void main() {
       expect(await failing.addressAt(_point), isNull);
       expect(await failing.partsAt(_point), isNull);
 
-      expect(
-        PlatformReverseGeocoder.addressLine(const Placemark()),
-        isNull,
-      );
+      expect(PlatformReverseGeocoder.addressLine(const Placemark()), isNull);
     });
   });
 
@@ -123,9 +120,61 @@ void main() {
       expect(await const PlatformMapsAvailability().isAvailable(), isFalse);
     });
 
-    test('iOS is unavailable until it has a key', () async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-      expect(await const PlatformMapsAvailability().isAvailable(), isFalse);
-    });
+    for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
+      group(platform.name, () {
+        setUp(() => debugDefaultTargetPlatformOverride = platform);
+
+        test('asks the channel: key provided', () async {
+          final calls = <String>[];
+          messenger.setMockMethodCallHandler(_channel, (call) async {
+            calls.add(call.method);
+            return true;
+          });
+          expect(await const PlatformMapsAvailability().isAvailable(), isTrue);
+          expect(calls, ['prepare']);
+        });
+
+        test('asks the channel: no key', () async {
+          messenger.setMockMethodCallHandler(_channel, (_) async => false);
+          expect(await const PlatformMapsAvailability().isAvailable(), isFalse);
+        });
+
+        test('a null reply is unavailable', () async {
+          messenger.setMockMethodCallHandler(_channel, (_) async => null);
+          expect(await const PlatformMapsAvailability().isAvailable(), isFalse);
+        });
+
+        test('a channel error or missing handler is unavailable', () async {
+          messenger.setMockMethodCallHandler(
+            _channel,
+            (_) async => throw PlatformException(code: 'boom'),
+          );
+          expect(await const PlatformMapsAvailability().isAvailable(), isFalse);
+          messenger.setMockMethodCallHandler(_channel, null);
+          expect(await const PlatformMapsAvailability().isAvailable(), isFalse);
+        });
+      });
+    }
+
+    for (final platform in [
+      TargetPlatform.macOS,
+      TargetPlatform.windows,
+      TargetPlatform.linux,
+      TargetPlatform.fuchsia,
+    ]) {
+      test(
+        '${platform.name} never asks the channel and is unavailable',
+        () async {
+          debugDefaultTargetPlatformOverride = platform;
+          var asked = false;
+          messenger.setMockMethodCallHandler(_channel, (_) async {
+            asked = true;
+            return true;
+          });
+          expect(await const PlatformMapsAvailability().isAvailable(), isFalse);
+          expect(asked, isFalse);
+        },
+      );
+    }
   });
 }

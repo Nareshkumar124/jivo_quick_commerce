@@ -1,1 +1,8 @@
 #include "Generated.xcconfig"
+
+// Google Maps SDK for iOS key (DL-80). Empty by default so the app builds
+// without maps; the gitignored MapsKey.xcconfig (tool/setup_google_maps_ios.sh)
+// overrides it. Info.plist exposes it as GMSApiKey for AppDelegate.swift.
+// The Profile configuration also uses this file.
+MAPS_API_KEY_IOS =
+#include? "MapsKey.xcconfig"
