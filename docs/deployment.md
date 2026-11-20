@@ -33,10 +33,10 @@ uv sync
 uv run python manage.py migrate
 uv run python manage.py seed_demo                  # idempotent demo data; staff password = SEED_DEMO_STAFF_PASSWORD in .env
 uv run python manage.py runserver 127.0.0.1:8001   # API, admin (/admin/), ops (/ops/)
-uv run celery -A config worker -l info             # needed for real (non-test-number) OTP SMS
+uv run celery -A config worker -l info -Q celery,slow   # both queues (T-817); needed for real OTP SMS, exports, invoices
 uv run celery -A config beat -l info               # scheduled jobs (required: expire_unpaid_orders, §4)
 ```
-- **Windows host** (the current dev machine, no Docker; see `dev-environment.md`): run `uv run celery -A config worker -l info --pool threads` and `uv run celery -A config beat -l info` as two separate processes. Windows refuses `-B` (embedded beat).
+- **Windows host** (the current dev machine, no Docker; see `dev-environment.md`): run `uv run celery -A config worker -l info --pool threads -Q celery,slow` and `uv run celery -A config beat -l info` as two separate processes. Windows refuses `-B` (embedded beat).
 - **Alternative:** the compose services `backend`, `worker` and `beat` run the same stack in Docker, using `backend/.env`. Don't run them alongside a host `runserver` on 8001.
 
 ### Windows dev machine: MinIO and Mailpit without Docker
@@ -113,7 +113,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
     - `--with` adds xdist for the run only, so this works whether or not `pytest-xdist` is in `uv.lock` (T-408c).
     - **Worker count:** set by the repository variable `BACKEND_PYTEST_WORKERS` (Settings > Secrets and variables > Actions > Variables). If it's unset, CI uses `auto` (one worker per vCPU, 4 on `ubuntu-24.04`). Set it to `0` to run serially without editing the YAML, e.g. while investigating xdist-only flakes.
   - a schema-drift check
-  - `check --deploy`, pip-audit, and a Docker build
+  - `check --deploy` (after `collectstatic`, because deployed settings use the static manifest and `core.W001` fails the WARNING gate without `staticfiles.json`, T-817), pip-audit, and a Docker build (which itself fails if collectstatic writes no manifest)
   - Caching: `setup-uv` caches uv's downloads, keyed on `backend/uv.lock`.
 - **`mobile.yml`:**
   - the shared-version check
@@ -130,7 +130,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
   - Caching:
     - the Flutter SDK and `~/.pub-cache`, through `subosito/flutter-action`, keyed on every `pubspec.lock`
     - Gradle for the APK builds, through `setup-java` `cache: gradle`, keyed on each app's Gradle files
-- **`infra.yml`** (paths `infra/**`): `bash -n` + shellcheck and a PowerShell parse of `infra/backup/`, the restore scripts' refusal of non-test targets and of names with a trailing newline (bash and PowerShell), `infra/scripts/test_entrypoint.sh` (a failing deploy check blocks start; `JQC_SKIP_STARTUP_CHECK` is refused under staging/production settings), a grep that rejects `JQC_SKIP_STARTUP_CHECK` in any env or compose file, ruff on the infra Python, `check_monitoring.py`, `promtool check rules` and `nginx -t` (pinned images by digest).
+- **`infra.yml`** (paths `infra/**`): `bash -n` + shellcheck and a PowerShell parse of `infra/backup/`, the restore scripts' refusal of non-test targets and of names with a trailing newline (bash and PowerShell), `infra/scripts/test_entrypoint.sh` (a failing deploy check blocks start; `JQC_SKIP_STARTUP_CHECK` is refused under staging/production settings), a grep that rejects `JQC_SKIP_STARTUP_CHECK` in any env or compose file, ruff on the infra Python, `check_monitoring.py`, `promtool check rules` and `nginx -t` (pinned images by digest) of both `infra/nginx/default.conf` and the shared-server site file `infra/deploy/nginx/jqc.jivo.in.conf` (with a throwaway self-signed certificate in place of the Let's Encrypt files).
 - **`deploy-staging.yml`** (manual, protected branches only, environment `staging` with required reviewers, §8.4): builds the production image tagged with the checked-out commit and runs its deploy checks against the real staging env file (§8.1); the deploy step is a placeholder until D-05.
 - **`secret-scan.yml`** (every PR, pushes to `develop`/`main`, weekly, manual): gitleaks looks for committed secrets (§2.1).
 - **`dependency-scan.yml`** (PRs and pushes that change a lockfile, weekly, manual): osv-scanner looks for known vulnerabilities in the locked dependencies of the backend, both apps and the shared packages (§2.2).
@@ -149,7 +149,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File infra\scripts\windows\dev-se
   - Project rules for what the built-in set misses:
     - `jqc-razorpay-key-id`: Razorpay key ids.
     - `jqc-twilio-account-sid`: Twilio account SIDs.
-    - `jqc-dotenv-secret`: a literal value for one of our secret settings (`POSTGRES_PASSWORD=…`, or `RAZORPAY_KEY_SECRET` passed with a value to `docker run -e`).
+    - `jqc-msg91-authkey` (T-819): an MSG91 auth key written next to the `authkey` header or field name (`authkey: …`, `"authkey": "…"`; 20+ letters/digits with some entropy). MSG91 keys have no fixed prefix, so a bare key elsewhere is left to the built-in rules. The MSG91 tests' fake key and flow ids (`65f0aaaa…`, template ids, not secrets) do not match.
+    - `jqc-dotenv-secret`: a literal value for one of our secret settings (`POSTGRES_PASSWORD=…`, `MSG91_AUTH_KEY=…`, or `RAZORPAY_KEY_SECRET` passed with a value to `docker run -e`).
     - `jqc-db-url-password`: a password inside a `postgres://` or `redis://` URL.
     - `jqc-secret-file`: any of the gitignored secret files (`.env*`, signing keys, `*.local.json`, `qa/private/`, `*/incoming/`, and the legacy Mappls `*.a.olf/conf`), whatever it contains.
     - A Google Maps API key (`AIza…`) in any committed file is caught by gitleaks' built-in `gcp-api-key` rule (no project allowlist targets it).
@@ -260,15 +261,23 @@ For a quick look, use `--format table` instead of the JSON output.
 - Release tags and deploy jobs are added when staging exists.
 
 ## 4. Processes (every environment)
-There is one image (`backend/Dockerfile`) and three process types (doc 02). **All three run in every environment:** local compose, staging and production. In the production image every container first runs `manage.py check --deploy --fail-level ERROR` against its real environment (the `jqc-entrypoint`, §8.1). Without beat, unpaid online orders never expire and their reserved stock is never released.
+There is one image (`backend/Dockerfile`) and three process types (doc 02). **All three run in every environment:** local compose, staging and production. Deployed environments run the worker type twice, once per Celery queue (T-817). In the production image every container first runs `manage.py check --deploy --fail-level ERROR` against its real environment (the `jqc-entrypoint`, §8.1). Without beat, unpaid online orders never expire and their reserved stock is never released.
 
 | Process | Command | Replicas | DB connections (T-218) |
 |---|---|---|---|
 | `release` (one-off, once per deploy) | `jqc-release`: `check --deploy --fail-level ERROR`, then `migrate` (§8) | 1 task, before the others roll | as `worker` |
 | `web` (ASGI) | image default: `gunicorn config.asgi:application -k jqc_asgi_worker.JqcUvicornWorker --no-control-socket` (uvicorn with `ws_max_size` and no access log, §9.4; no `gunicornc` control socket, the non-root user has no writable `$HOME`) | 2+ (rolling) | `POSTGRES_POOL=true`, `POSTGRES_CONN_MAX_AGE=0` |
-| `worker` | `celery -A config worker -l INFO` | 1+ | `POSTGRES_POOL=false`, `POSTGRES_CONN_MAX_AGE=60` |
+| `worker` (urgent queue) | `celery -A config worker -l INFO -Q celery -n celery@%h --concurrency 4` | 1+ | `POSTGRES_POOL=false`, `POSTGRES_CONN_MAX_AGE=60` |
+| `worker-slow` (slow queue) | `celery -A config worker -l INFO -Q slow -n slow@%h --concurrency 2 --max-tasks-per-child 50 --time-limit 1800 --soft-time-limit 1500` | 1 (add more only within the DB budget) | same as `worker` |
 | `beat` | `celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler` | **exactly 1** | same as `worker` |
 
+- **Two Celery queues (T-817).** Routes are in settings (`CELERY_SLOW_TASKS` / `CELERY_TASK_ROUTES`; the list is in 06 §5), and beat sends periodic jobs by name, so they follow the same routes.
+  - `celery` (the default) carries everything someone is waiting on: dispatch and rider offers, OTP/SMS/push, realtime publishes, payments and refunds, auto-accept and expiry sweeps. Settings time limits apply (5 min hard, 4 min soft).
+  - `slow` carries report exports and the daily report mails, invoice PDFs (WeasyPrint), the retention and purge sweeps and the hourly referral safety net, so a big export never delays an offer (3 s target, 09 §1).
+  - **Every queue needs a consumer.** A queue nobody consumes just fills up in Redis: deployed, `worker` takes `-Q celery` and `worker-slow` takes `-Q slow` (`infra/deploy/compose.prod.yml`); locally (compose or Windows) one worker takes `-Q celery,slow`. A task added to `CELERY_SLOW_TASKS` needs no infra change.
+  - `worker-slow` limits: concurrency 2 and 1 CPU on the shared host; 30 min hard / 25 min soft time limit for big exports and PDFs, which must stay **below the broker's 1 h visibility timeout** (`CELERY_BROKER_TRANSPORT_OPTIONS`), or a long task with `acks_late` is delivered twice; `--max-tasks-per-child 50` recycles processes to release WeasyPrint/openpyxl memory.
+  - Shutdown: `stop_grace_period` is 60 s (`worker`) and 300 s (`worker-slow`). SIGTERM starts Celery's warm shutdown; a task killed mid-run is redelivered only after the 1 h visibility timeout (`acks_late`).
+  - Names `celery@<host>` and `slow@<host>` let the worker-down alerts tell the two apart (§10.4).
 - **Beat is a singleton.** Two beats would enqueue every periodic task twice, so never scale it above 1. On deploy, stop the old beat before starting the new one. A few seconds without beat does no harm, because the jobs catch up on the next tick.
 - **Scheduler:** beat uses django-celery-beat's `DatabaseScheduler` (`CELERY_BEAT_SCHEDULER` in settings).
   - At start it syncs `CELERY_BEAT_SCHEDULE` into its tables, so run `migrate` before (re)starting beat.
@@ -283,7 +292,7 @@ There is one image (`backend/Dockerfile`) and three process types (doc 02). **Al
   - The worker log shows `orders.expire_unpaid_orders` succeeding every minute.
   - Alert if `last_run_at` is more than 5 minutes old (`09 §5`).
 - **Staff MFA (H2) rollout:** run `migrate` (it creates the django-otp tables `otp_totp_totpdevice`, `otp_static_staticdevice`, `otp_static_statictoken`) **before** starting web processes whose settings enable `STAFF_MFA_ENFORCED`; the middleware queries those tables on every privileged staff request. Set `STAFF_MFA_ENFORCED=false` in the local dev and QA `.env`; leave it on (the default) in staging and production. The recovery-code table holds plain-text codes: include it in the secret-handling rules for backups (09 §3.1).
-- **Connection budget:** the DB server is shared. `web processes x POSTGRES_POOL_MAX_SIZE + worker concurrency + 1 (beat)` must stay under its connection limit.
+- **Connection budget:** the DB server is shared. `web processes x POSTGRES_POOL_MAX_SIZE + worker concurrency + worker-slow concurrency + 1 (beat)` must stay under its connection limit (staging: `worker-slow` adds 2).
 
 ## 5. Razorpay webhook (staging runbook, not done yet)
 This is prepared for when staging exists (D-05) and the Razorpay test keys arrive (D-01). **Don't configure it until the user approves staging.** For production, repeat the steps in **live mode** with a different secret (`release-checklist.md` §7).
@@ -427,8 +436,8 @@ CI runs `check --deploy` with placeholder values, so it cannot catch a real envi
 ### 8.2 Release order (zero downtime)
 1. Build and push the image tagged with the git SHA. Set `SENTRY_RELEASE` to the same SHA.
 2. Run the **release task** once: `jqc-release` (deploy checks, then `migrate --noinput`). Migrations must stay compatible with the running version: expand now, contract in a later release (add nullable columns or columns with defaults, backfill in a task, drop a column only once no running code reads it).
-3. Roll `web`: health check `/health/ready`, at least 2 replicas, 30 s drain (`--graceful-timeout 30`).
-4. Roll `worker`: Celery's warm shutdown finishes running tasks (`CELERY_TASK_TIME_LIMIT` is 5 min).
+3. Publish the new static files to the edge **before** `web` rolls (on the shared server: copy `/app/staticfiles` out of the new image, §8.5), because the new pages name the new hashed files. Then roll `web`: health check `/health/ready`, at least 2 replicas, 30 s drain (`--graceful-timeout 30`).
+4. Roll `worker` and `worker-slow`: Celery's warm shutdown finishes running tasks (`CELERY_TASK_TIME_LIMIT` is 5 min on `worker`; `worker-slow` allows 30 min but is given 300 s to stop, §4).
 5. Stop the old `beat`, then start the new one (never two, §4).
 6. Smoke: `/health/ready`, `/api/v1/config/app/`, a test-number OTP login on staging, and the new release visible in Sentry.
 
@@ -445,25 +454,56 @@ CI runs `check --deploy` with placeholder values, so it cannot catch a real envi
 3. Store `STAGING_BACKEND_ENV` (and later the cloud deploy credentials, preferably OIDC rather than keys) as **environment** secrets of `staging`, never repository secrets, so only an approved run can read them.
 4. Later, `deploy-production.yml` follows the same pattern with a `production` environment, `main` only, and two reviewers.
 
-## 9. Edge proxy hardening (`infra/nginx/default.conf`, P8 OWASP review)
+### 8.5 Rollout: queue split, static manifest and edge changes (T-817 + T-819, `jqc.jivo.in`)
+One-time order for the first deploy that contains both `backend/perf` (T-817) and `devops/perf` (T-819). It needs the user's go-ahead like any server change (plan.md R1-R10); the server-deployer runs it. `<new>` is the merged commit.
+
+**Preconditions (hard; stop and report if one fails):**
+- **RAM headroom.** The JQC app containers' limits become web 1536 MB + worker 1024 MB + **worker-slow 1024 MB (new)** + beat 384 MB, plus postgres 1536, redis 512 and minio 768 (about 6.8 GB of limits in total, 1 GB more than before). `free -m` must show at least the new 1024 MB available, with the other sites' usage left alone (`docker stats --no-stream` for JQC only). If not, ask the PM before starting `worker-slow` (option: run it with `--concurrency 1` and `mem_limit 768m`).
+- **nginx connection budget.** `sudo nginx -T 2>/dev/null | grep -nE '^\s*(worker_processes|worker_connections|worker_rlimit_nofile)'`. Budget = `worker_processes` (CPU count if `auto`, `nproc`) x `worker_connections`, and `worker_rlimit_nofile` (or `ulimit -n` of the nginx workers) must be at least `worker_connections`. Our `/ws/` cap of 200 sockets per IP costs up to 400 connections; with the Debian default 768 per worker on a 1-2 CPU host that is a large share of what every site gets. **Do not reload** the new file if the budget is under about 2 x 400 plus the other sites' current peak (`ss -s`, or the nginx stub_status if the host has one); report it instead, and either lower `limit_conn jqc_ws_conn` in our file or ask the server owner to raise `worker_connections` (a global change, R8: owner's approval). The cap is only raised towards 500 (09 §1) after this check shows the headroom.
+
+1. **Ship and build** as usual (`infra/deploy/README.md` "Update"): `git -c core.autocrlf=false archive`, `docker build -t jqc-backend:<new> .`. The build now runs `collectstatic` with `DJANGO_STATIC_MANIFEST=true` and **fails** if `staticfiles.json` is missing. Check: `docker run --rm --entrypoint sh jqc-backend:<new> -c 'test -s /app/staticfiles/staticfiles.json && ls /app/staticfiles/admin/css/ | grep -E "^base\.[0-9a-f]{12}\.css$"'`.
+2. **Compose file:** install the new `compose.prod.yml`, then `JQC_IMAGE=jqc-backend:<new> docker compose -p jqc -f compose.prod.yml config --quiet` (must print nothing) and `... config --services` (must list `worker` and `worker-slow`).
+3. **Pre-deploy dump**, then `run --rm release` (deploy checks, migrate). T-817 has no migrations.
+4. **Static files, additive:** copy the new image's `/app/staticfiles` into `/srv/jqc/static` **without deleting first** (README step 6), so pages still open on the old version keep finding their old hashed files during the roll. The old `rm -rf /out/*` caused a short window of 404s; with hashed names it is no longer needed.
+5. **App:** `stop beat`, then `JQC_IMAGE=jqc-backend:<new> docker compose -p jqc -f compose.prod.yml up -d web worker worker-slow beat`. `worker` now consumes only `celery`; jobs already queued under `slow` by the new web (none before this deploy) wait for `worker-slow`. Check both workers: `docker compose -p jqc -f compose.prod.yml logs --tail 30 worker worker-slow` shows `celery@… ready` with `.> celery` and `slow@… ready` with `.> slow`; then `docker compose ... exec worker celery -A config inspect active_queues` lists both workers.
+6. **nginx (coexistence checklist, README):** `nginx -T` baseline and `check_sites.sh`; create the media cache directory once, owned by the nginx worker user: `NGINX_USER=$(sudo nginx -T 2>/dev/null | awk '$1=="user"{gsub(";","",$2); print $2; exit}'); sudo install -d -m 700 -o "${NGINX_USER:-www-data}" -g "${NGINX_USER:-www-data}" /srv/jqc/cache/nginx-media` (`/srv/jqc/cache` itself 755); `sudo install -m 644 jqc.jivo.in.conf /etc/nginx/sites-available/jqc.jivo.in.conf`; **`sudo nginx -t`** (on failure restore the previous file and stop); `sudo systemctl reload nginx` (never restart); re-run `check_sites.sh` and diff.
+7. **Verify:**
+   - `curl -sI https://jqc.jivo.in/static/admin/css/base.css` → `Cache-Control: public, max-age=3600`; the hashed name from step 1 → `max-age=31536000, immutable`.
+   - `curl -s -o /dev/null -w '%{size_download}\n' -H 'Accept-Encoding: gzip' -H 'X-Store-Id: <id>' https://jqc.jivo.in/api/v1/categories/` is much smaller than without the header, and the response has `Content-Encoding: gzip`; `curl -sI -H 'Accept-Encoding: gzip' https://jqc.jivo.in/api/v1/auth/otp/verify/` (any non-public path) has **no** `Content-Encoding`.
+   - Two requests to the same `/media/<public image>` show `X-Cache-Status: MISS` then `HIT`; the same URL with any `?x=1` shows `BYPASS`. `X-Cache-Status` exists for this check; it stays for now and can be removed (one `add_header` line in the `/media/` location) once the rollout is verified.
+   - The usual smoke (§8.2 step 6), a report export from `/ops/` (runs on `worker-slow`), and an OTP login (runs on `worker`).
+8. Write `<new>` to `DEPLOYED_SHA`.
+
+**Rollback:**
+- **App:** previous image with the new compose file: `stop beat`, then `JQC_IMAGE=jqc-backend:<previous> docker compose -p jqc -f compose.prod.yml up -d web worker worker-slow beat`. The old code routes everything to `celery`, which `worker` still consumes; `worker-slow` just idles (stop it if you also put back the old compose file, which has no such service). Messages already queued in `slow` stay in Redis until a `-Q slow` worker runs again; they are idempotent exports, invoices and sweeps, and the sweeps run again on their next schedule anyway.
+- **Static files:** nothing to do (additive copy; the old hashed and plain files are still there; the old image's plain names are re-copied by its own step 6 if you run it).
+- **nginx:** reinstall the previous site file (`git -c core.autocrlf=false show <previous>:infra/deploy/nginx/jqc.jivo.in.conf`, or its text in the step 6 `nginx -T` snapshot), `sudo nginx -t`, `sudo systemctl reload nginx`. The cache directory can stay (unused) or be removed with `sudo rm -rf /srv/jqc/cache/nginx-media`.
+
+## 9. Edge proxy hardening (`infra/nginx/default.conf`, `infra/deploy/nginx/jqc.jivo.in.conf`, P8 OWASP review, T-819)
 
 ### 9.1 Rate limits, connection limits and body sizes (H3, edge half)
-These are coarse per-IP limits. The backend keeps its own per-user and per-phone throttles, which return the real error codes (06 §6). The limits are generous because mobile carriers put many users behind one CGNAT address.
+These are coarse per-IP limits. The backend keeps its own per-user and per-phone throttles, which return the real error codes (06 §6). The limits are generous because mobile carriers put many users behind one CGNAT address. T-819 (2026-11-20) sized them for that: the backend now counts signed-in callers per user (T-817, `SIGNED_IN_IP_RATE` 1500/min per IP for tokened callers on public views, plus `API_ANON_RATE` 300/min), so the edge's general zone sits above both (40 r/s = 2400/min) and the backend decides first; images and WebSockets got their own zones so they cannot starve the API or each other. All zone names are `jqc_*` (unique in the shared host's `http {}` context, plan.md R3).
 
 | Location | Limit per IP | Burst | Max body |
 |---|---|---|---|
 | `/api/v1/auth/otp/request/` only (each costs an SMS) | 60 req/min (`jqc_otp`); 429 `OTP_RATE_LIMITED` | 30 | 16 KB |
 | `/api/v1/auth/otp/verify/` | the general API zone (the backend limits attempts per OTP, per phone and per IP) | 40 | 2560 KB |
-| `/api/v1/search/` (search, suggest) | 5 req/s | 20 | 16 KB |
-| `/api/v1/rider/documents/` | 20 req/s | 10 | 1200 KB (1 MB image + multipart overhead; `RIDER_DOCUMENT_MAX_BYTES`) |
+| `/api/v1/search/` (search, suggest) | 10 req/s (`jqc_search`) | 40 | 16 KB |
+| `/api/v1/rider/documents/` | 40 req/s | 10 | 1200 KB (1 MB image + multipart overhead; `RIDER_DOCUMENT_MAX_BYTES`) |
 | `/api/v1/payments/razorpay/webhook/` | none (signed, idempotent, Razorpay retries) | n/a | 256 KB |
-| `/api/v1/support/tickets/<id>/attachments/` (regex location; customer and rider ticket photos) | 20 req/s | 40 | 5300 KB (5 MB photo + multipart overhead; `SUPPORT_ATTACHMENT_MAX_BYTES`) |
-| `/api/` (all other) and `/` | 20 req/s | 40 | 2560 KB (= `DATA_UPLOAD_MAX_MEMORY_SIZE`, 2.5 MB) |
+| `/api/v1/support/tickets/<id>/attachments/` (regex location; customer and rider ticket photos) | 40 req/s | 80 | 5300 KB (5 MB photo + multipart overhead; `SUPPORT_ATTACHMENT_MAX_BYTES`) |
+| `/api/` (all other, including the compressed public-read regex location, §9.6) and `/` | 40 req/s (`jqc_api`) | 80 | 2560 KB (= `DATA_UPLOAD_MAX_MEMORY_SIZE`, 2.5 MB) |
+| `/media/` (shared server only; public catalog images) | 100 req/s (`jqc_media`, its own zone) | 500 | GET/HEAD only |
 | `/admin/`, `/ops/` | 10 req/s | 40 | 6 MB (product images up to 5 MB, 09 §3.6) |
-| `/ws/` | **50 concurrent sockets** (`limit_conn`); upgrades 20 req/s | 20 | 64 KB |
+| `/ws/` | **200 concurrent sockets** (`jqc_ws_conn`); handshakes 50 req/s (`jqc_ws_upgrade`) | 200 | 64 KB |
 | `/health/` | none; not logged | n/a | default |
 
 Over a limit, nginx answers 429 with the JSON error envelope and `Retry-After: 60`; an oversized body gets 413 `PAYLOAD_TOO_LARGE`.
+
+**Why these numbers (T-819):**
+- **WebSockets 200 per IP** (was 50). Customers on the tracking screen and riders (connected all shift) share carrier CGNAT addresses; 50 could lock out a whole carrier IP in one city. The ceiling is the **shared host's connection budget**, not our capacity: each socket costs nginx two connections (client + upstream) out of the host's `worker_processes x worker_connections` (Debian/Ubuntu default 768 per worker), which every other site on the server also needs, so one IP may hold at most about 400 of them. Handshakes get a burst of 200, one IP's full reconnect wave after a deploy (the apps retry with jitter). **Raising it** towards 500 (the 09 §1 launch target of 500 concurrent sessions) is allowed only after the §8.5 connection-budget check shows headroom, or once production has its own server (scaling-strategy A1); change the number in both nginx files and in this table.
+- **Images 100 req/s, burst 500, own zone** (were on the API zone). One screen shows 40-60 tiles; the proxy cache (§9.7) makes them cheap, and the apps' disk cache (T-818) cuts repeats.
+- **API 40 req/s, burst 80** (was 20/40): above the backend's per-IP ceilings, as above. **Search 10 req/s** (was 5): about 30 people typing at once behind one IP. **OTP (60/min) and staff (10 req/s) unchanged**: each OTP request costs an SMS, and staff are few.
 
 **Behind a load balancer, the `set_real_ip_from <lb-subnet>` block (with `real_ip_header X-Forwarded-For` and `real_ip_recursive on`) MUST be set.** Without it every request appears to come from the balancer, all clients share one OTP bucket and one 50-socket bucket, and the first busy minute locks everyone out. Leave it commented only when nginx itself faces the internet. Check after setting it: the nginx access log's `remote_addr` shows client addresses, not the balancer's.
 
@@ -495,6 +535,23 @@ uvicorn's default `ws_max_size` is 16 MiB. The image's worker class sets it to *
 
 nginx keeps `X-Forwarded-For $proxy_add_x_forwarded_for` in every topology, including with `set_real_ip_from`, so these counts hold. After any topology change, send a request with a spoofed `X-Forwarded-For: 1.2.3.4` and confirm the OTP throttle keys on your real IP.
 
+### 9.6 Compression (gzip), BREACH-safe (T-819)
+JSON from the API is 3-5x smaller compressed, which matters on slow 4G. Both nginx files set **`gzip off` for the whole site** and switch it on only where responses hold no secret:
+- a regex location for the public read endpoints: `/api/v1/home/`, `categories/`, `products/` and `products/<id or slug>/`, `collections/<slug>/`, `serviceability/` (not `serviceability/notify-me/`), `config/app/`, `pages/<slug>/`, `faqs/` (same `jqc_api` limits as `/api/`);
+- `/api/v1/search/` (search and suggest);
+- `/static/` (CSS, JS, SVG).
+
+`gzip_types application/json text/css application/javascript text/javascript image/svg+xml`, `gzip_min_length 1024`, `gzip_comp_level 5`, `gzip_vary on`, `gzip_proxied any`. The Flutter apps' HTTP client sends `Accept-Encoding: gzip` and decompresses on its own.
+
+**Why not everything (BREACH).** BREACH recovers a secret from a compressed HTTPS response when the attacker can (a) make the victim's client send many requests carrying the victim's credentials, (b) put chosen text into the same response as the secret, and (c) watch response sizes on the network. So compression stays off wherever a response carries a secret or private data: `/api/v1/auth/` (tokens, OTP flow), `/me`, addresses, cart, orders and invoices, payments, rider endpoints (KYC, bank, cash), support, notifications, referrals, `/admin/` and `/ops/` (HTML with CSRF tokens, staff data, MFA setup), WebSockets. The compressed endpoints are the same for every caller at a store (catalog, search, config), or, for `home`, add only the caller's "Previously bought" product list (not a credential, and nothing in that response echoes request input). The apps also send bearer tokens, not cookies, so a third-party page cannot make them send authenticated requests.
+
+**Host-wide gzip (assumption).** The repo cannot see the shared host's `/etc/nginx/nginx.conf`. Debian/Ubuntu ship `gzip on;` there (HTML only unless `gzip_types` is uncommented). Our explicit server-level `gzip off` makes JQC's behaviour the same whatever the host sets; check with `sudo nginx -T | grep -n gzip` at deploy time. Nothing here changes other sites. Adding a path to the compressed list needs this section's review: no secrets, no private data. Brotli is not used (needs a module the host may not have).
+
+### 9.7 Static and media caching (T-817, T-819)
+- **`/static/`** (served by nginx from `/srv/jqc/static`, the image's `/app/staticfiles`): deployed settings use the manifest storage (T-817), so `{% static %}` names content-hashed files (`base.<12 hex>.css`). A map on the URI gives hashed names `Cache-Control: public, max-age=31536000, immutable`; every other name (the plain copies collectstatic also writes, `staticfiles.json`, admin JS that builds icon paths at run time) gets `public, max-age=3600` and revalidates with ETag/Last-Modified. Never make the plain names immutable: they are overwritten in place on a deploy. The deploy copies static files **additively** (§8.5) so old pages keep their old hashed files during a roll. **Prune** (manual, a quiet window, every few months): hashed files that no current or previous manifest names and that are older than 30 days can go. Files keep their source mtime through `cp -a`, so never prune by age alone. From `/srv/jqc/static`, with the current and previous images' manifests copied out (`docker run --rm --entrypoint cat jqc-backend:<sha> /app/staticfiles/staticfiles.json > /tmp/m-<sha>.json`): list hashed names (`find . -type f -regextype posix-extended -regex '.*\.[0-9a-f]{12}\.[A-Za-z0-9]+' -mtime +30`), drop every path that appears as a value in either manifest (`python3 -c 'import json,sys; [print(v) for f in sys.argv[1:] for v in json.load(open(f))["paths"].values()]' /tmp/m-*.json`), review the remaining list, then delete it. Plain names are never pruned. The image build runs `collectstatic` with `DJANGO_STATIC_MANIFEST=true` and fails without a manifest; `check --deploy` warns (`core.W001`) if a running image has none (the names then fall back to plain, logged).
+- **`/media/`** (shared server; public catalog images from the `jivo-public` bucket): an nginx `proxy_cache` as a stop-gap until a CDN exists (scaling-strategy A6). Zone `jqc_media_cache`, files in `/srv/jqc/cache/nginx-media` (JQC's own tree, owned by the nginx worker user, created once at deploy, §8.5), `max_size=1g`, entries unused for 7 days evicted, key = the path only. Upstream `Cache-Control`/`Expires` win over the defaults (200 for 1 day, 404 for 1 minute); stale entries are served while MinIO is down or being refreshed. **Private objects never pass through it:** the location can only reach `jivo-public` (KYC files, invoices and exports are in the private `jivo-media` bucket and are served by presigned URLs, not by `/media/`), and any request with a query string (a presigned URL's `X-Amz-*` signature) or an `Authorization` header bypasses the cache both ways. Responses with `Set-Cookie` or `Cache-Control: private/no-store` are never stored (nginx defaults, kept). `X-Cache-Status` (HIT/MISS/BYPASS/STALE) is added for checks. Clear it all: `sudo find /srv/jqc/cache/nginx-media -type f -delete` (no reload needed). Image files have random keys and fixed renditions, so a replaced image gets a new name and needs no purge.
+- **Media takedown** (an image that must disappear: wrong product, legal or takedown request): 1) delete the object and its renditions from the `jivo-public` bucket (admin: remove the image; or `mc rm` on each rendition key); 2) remove the cached copies on the server: `sudo grep -rlaF 'KEY: jqc_media/<object key without the bucket>' /srv/jqc/cache/nginx-media | sudo xargs -r rm -f` for each rendition (the cache file header holds the key `jqc_media$uri`, e.g. `jqc_media/catalog/ab12cd.512.webp`), or the clear-all command above; 3) check `curl -sI https://jqc.jivo.in/media/<key>` answers 404 with `X-Cache-Status: MISS`. **Browsers and apps may still show it** from their own caches for up to 30 days (`expires 30d`) and the apps' disk cache; that cannot be recalled, so a takedown that must be immediate also needs the app to stop referencing the URL (it disappears from API responses once the image is removed).
+
 ## 10. Monitoring and alerting (`09 §2`, `§5`; `infra/monitoring/`)
 
 ### 10.1 Sentry (D-19)
@@ -516,10 +573,10 @@ Catalogued in `infra/monitoring/metrics.yml` (name, type, labels, source, status
 - **Structured logs:** `LOGGING` is plain text today. **Backend ask:** a JSON formatter with the request id (`X-Request-ID` from the edge), hashed user id and order id, and phone masking (`09 §3.3`, `§5`).
 
 ### 10.4 Alert rules
-`infra/monitoring/alerts.yml` (Prometheus rule format) has 23 rules:
+`infra/monitoring/alerts.yml` (Prometheus rule format) has 25 rules:
 - **availability:** API not ready, 5xx > 2%, Redis or PostgreSQL down;
 - **latency:** the 09 §1 p95 targets (reads 300 ms, order placement 800 ms, serviceability 150 ms);
-- **jobs:** queue > 200, no workers, repeated task failures, beat stale > 5 min, daily jobs > 26 h, unpaid orders past their window;
+- **jobs:** urgent queue (`celery`) > 200 for 10 min (page) and slow queue > 500 for 30 min (ticket), no `celery@…` worker or no `slow@…` worker (both `ticket` for now: `or vector(0)` also fires while the celery-exporter is down or `celery_worker_up` does not exist yet, which `metrics.yml` marks needs-backend; promote the urgent one to `page` once the metric is confirmed, §10.5), repeated task failures, beat stale > 5 min, daily jobs > 26 h, unpaid orders past their window;
 - **payments:** new FAILED refunds, PENDING > 2 h, webhook 400 bursts, webhook 503 > 15 min;
 - **notifications:** stuck sends, many failures, WebSocket collapse;
 - **business SLA:** store acceptance SLA, orders past ETA, no orders during open hours.
@@ -550,7 +607,11 @@ Record each tuned threshold here with its date and reason (after the pilot week,
 `JqcReadLatencyP95High`, `JqcOrderPlacementLatencyP95High`, `JqcServiceabilityLatencyP95High`. Compare with the deploy timeline. Check slow queries (`pg_stat_statements`), the Redis cache (catalog cache, serviceability snapshot) and lock waits on `inventory_storeinventory` during order bursts.
 
 #### Runbook: Celery
-`JqcCeleryQueueBacklog`, `JqcCeleryWorkersDown`, `JqcCeleryTaskFailures`. Read the worker logs and Sentry. Scale workers within the DB connection budget. One task name failing repeatedly usually means an external provider (SMS, FCM, Razorpay) is down; the tasks retry with back-off.
+`JqcCeleryQueueBacklog`, `JqcCelerySlowQueueBacklog`, `JqcCeleryWorkersDown`, `JqcCelerySlowWorkerDown`, `JqcCeleryTaskFailures`. Two queues (§4): `celery` is consumed by `worker`, `slow` by `worker-slow`; check which one is behind (`docker compose -p jqc -f compose.prod.yml exec worker celery -A config inspect active_queues`, `exec redis redis-cli -n <broker DB from CELERY_BROKER_URL> llen slow`). A growing `slow` with a live `worker-slow` is usually a large export or a WeasyPrint render near its 30 min limit. Read the worker logs and Sentry. Scale workers within the DB connection budget. One task name failing repeatedly usually means an external provider (SMS, FCM, Razorpay) is down; the tasks retry with back-off.
+
+- **Worker-down alerts:** first check the exporter (`up{job="celery-exporter"}`); `or vector(0)` makes them fire when it is down or the metric is missing, not only when the workers are.
+- **`worker-slow` OOM.** A huge export or a heavy invoice PDF can push it past its 1024 MB limit. Spot it: `docker inspect --format '{{.State.OOMKilled}} {{.RestartCount}} {{.State.FinishedAt}}' jqc-worker-slow-1` (true / a rising count), `docker compose -p jqc -f compose.prod.yml ps worker-slow` (recent restart), `dmesg -T | grep -i 'killed process'` (needs sudo), and in the logs `WorkerLostError` / `Process ... exited with signal 9`. With `acks_late` + `reject_on_worker_lost` (settings), the message of the task that was running goes **back to the queue**, so a poison export (one that always runs out of memory) is retried after every restart and blocks one of the two slots each time.
+- **Purge that one message** (only that one; never `celery purge`, which empties the whole queue): find the task id in the worker log line before the kill (`Task reports.generate_export[<id>] received`), then `docker compose -p jqc -f compose.prod.yml exec worker-slow celery -A config control revoke <id>` (the workers drop it when it is delivered again; revokes are kept in memory, so do it while the workers are up, and repeat after a full restart if it is still queued). Then mark the export failed or delete it from the Ops Console so nobody re-requests it, and raise the cause with the backend owner (e.g. row limits or streaming). If the queue must be inspected: `exec redis redis-cli -n <broker DB> lrange slow 0 20` (bodies are base64 JSON; do not paste them anywhere, they may hold ids). A restart counter alert is not configured: the metric catalogue has no container-restart metric yet (cAdvisor or a `docker events` exporter would add it; ticket severity).
 
 #### Runbook: Celery beat
 `JqcBeatNotRunning`, `JqcBeatDailyJobMissed`, `JqcPaymentWindowOverdue`. Exactly one `beat` must run (§4). Check that it is up, that `migrate` ran before it started, and its `last_run_at` in `/admin/` > Periodic Tasks. Overdue unpaid orders hold stock; once beat recovers they expire within a minute.
@@ -574,7 +635,9 @@ Kept per environment in the secrets manager; never in git or in images:
 - CI's `check --deploy` step (`backend.yml`) generates throwaway values for all three on every run, plus a throwaway FCM service-account file (fresh RSA key, project `ci-dummy`, in `$RUNNER_TEMP`, deleted after the step) so `notifications.E002` validates a key and `W001` (push disabled) does not fail the `--fail-level WARNING` gate; the staging preflight (`deploy-staging.yml`) refuses a `STAGING_BACKEND_ENV` that lacks `DJANGO_SECRET_KEY`, `JWT_SIGNING_KEY` or `OTP_HASH_KEY`.
 - **`FIELD_ENCRYPTION_KEYS`:** comma-separated Fernet keys, **newest first**, for rider bank and KYC numbers (09 §3.3). Required in staging and production (`delivery.E001`).
 - **`FCM_CREDENTIALS_FILE`** (D-19): the **path** of the Firebase service-account JSON key, never the JSON itself. On servers it is a read-only mounted secret file, e.g. `/run/secrets/fcm-service-account.json`, mounted into `web`, `worker` and `beat`; one Firebase project per environment (`FCM_PROJECT_ID` optional, defaults to the key's `project_id`). Missing, unreadable or malformed fails startup (`notifications.E002`); unset leaves push disabled and `check --deploy` warns (`notifications.W001`).
-- `POSTGRES_PASSWORD`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN`, `S3_SECRET_ACCESS_KEY` (or an instance role instead), `SENTRY_DSN`, `EMAIL_HOST_PASSWORD`.
+- **`MSG91_AUTH_KEY`** (T-815, D-02; when `SMS_BACKEND=apps.notifications.sms.Msg91SmsBackend`): the MSG91 panel's Authkey. Secret: it sends SMS on Jivo's account. Only in the server env file / secrets manager, never in the repo, an image, a chat or a log (the backend never logs it). gitleaks flags it in env syntax and next to an `authkey` header (§2.1). Check `accounts.E007` refuses MSG91 without the key or the OTP flow, so a missing key stops the deploy (§8.1).
+- **MSG91 non-secret config** (same env file, not secrets): `MSG91_FLOW_IDS` (`<DLT template id>:<MSG91 flow id>,…` for `SMS_OTP_DLT_TEMPLATE_ID` and every `SMS_DLT_TEMPLATE_IDS` value), `SMS_OTP_DLT_TEMPLATE_ID`, `SMS_DLT_TEMPLATE_IDS`, `SMS_SENDER_ID` (only for flows whose sender is "FromAPI"), `SMS_BACKEND`. See `infra/env/backend.env.example`.
+- `POSTGRES_PASSWORD`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `TWILIO_AUTH_TOKEN` (only if Twilio is used instead of MSG91), `S3_SECRET_ACCESS_KEY` (or an instance role instead), `SENTRY_DSN`, `EMAIL_HOST_PASSWORD`.
 - Generate keys with `python3 -c "import secrets; print(secrets.token_urlsafe(64))"` and Fernet keys with `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` (from `backend/`), straight into the secrets manager.
 
 ### 11.2 Rotation runbooks
@@ -583,6 +646,7 @@ Kept per environment in the secrets manager; never in git or in images:
 - **`FIELD_ENCRYPTION_KEYS`:** add the new key **first** and keep the old ones after it; deploy; run `manage.py rotate_field_keys` as a one-off task and confirm it reports no undecryptable values; remove the old key in the next deploy.
 - **`OTP_HASH_KEY`:** set it and roll `web` and `worker`. OTPs in flight (5-minute lifetime) fail and users request a new one, so rotate in a quiet window.
 - **`RAZORPAY_WEBHOOK_SECRET`:** §5.
+- **`MSG91_AUTH_KEY`:** in the MSG91 panel create a new Authkey (keep the old one active); set it in the env file; roll `worker` (it sends the SMS) and `web` (deploy checks); request an OTP for a real test phone and confirm delivery and a quiet `JqcNotificationFailuresHigh`; then delete the old key in the panel. On suspected compromise delete the old key first and accept failed OTP sends until the roll is done (users can retry).
 - **FCM service-account key (`FCM_CREDENTIALS_FILE`):** in the Firebase/Google Cloud console create a **new key** for the same service account; replace the mounted secret file's contents (same path); roll `worker`, `beat` and `web` so every process reads the new file (the backend caches the access token per process); send a test push and confirm `JqcNotificationFailuresHigh` stays quiet; then **delete the old key** in the console. On suspected compromise, delete the old key first and accept failed pushes until the new file is rolled out.
 - **Database password:** set the new password on the role, update the secret, roll `web`, `worker` and `beat` in that order, then confirm no connection still uses the old one. **Least privilege:** staging and production must use a role that owns only the app's database (never a superuser), plus the separate read-only `jqc_metrics` role (§10.4).
 - After any rotation, check Sentry for auth errors, `/health/ready`, and the webhook-events list.

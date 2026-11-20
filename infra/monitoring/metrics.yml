@@ -47,7 +47,7 @@ metrics:
     labels: [queue_name]
     source: celery-exporter
     status: available
-    description: Messages waiting in each broker queue (default queue "celery").
+    description: Messages waiting in each broker queue ("celery" = urgent default, "slow" = exports, invoices, purges; T-817).
   - name: celery_task_failed_total
     type: counter
     labels: [name, hostname, exception]
@@ -61,7 +61,7 @@ metrics:
     labels: [hostname]
     source: celery-exporter
     status: needs-backend
-    description: 1 per live worker (from worker heartbeats; needs task events as above).
+    description: 1 per live worker (from worker heartbeats; needs task events as above). Hostnames are celery@<host> (urgent queue) and slow@<host> (slow queue).
 
   # ---------------------------------------------------------------- business / jobs (sql_exporter)
   - name: jqc_beat_task_last_run_age_seconds

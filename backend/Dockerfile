@@ -50,10 +50,17 @@ COPY pyproject.toml uv.lock .python-version ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev --no-install-project
 COPY . .
 # collectstatic needs importable settings, not a database: placeholder values, build-time only.
+# DJANGO_STATIC_MANIFEST=true (T-817) selects the manifest storage that deployed settings force,
+# so STATIC_ROOT (/app/staticfiles) holds the content-hashed copies and staticfiles.json that
+# {% static %} reads in web, and that each deploy copies to the host nginx (/srv/jqc/static).
+# Post-processing fails the build on a missing referenced file (strict manifest); `test -s`
+# fails it if no manifest was written (check --deploy would only warn, core.W001).
 RUN DJANGO_SETTINGS_MODULE=config.settings.local \
+    DJANGO_STATIC_MANIFEST=true \
     DJANGO_SECRET_KEY=collectstatic-build-only \
     POSTGRES_HOST=unused POSTGRES_DB=unused POSTGRES_USER=unused POSTGRES_PASSWORD=unused \
     python manage.py collectstatic --noinput \
+    && test -s /app/staticfiles/staticfiles.json \
     && python -c "import weasyprint" \
     && useradd --system --uid 10001 --no-create-home jivo
 
@@ -126,7 +133,9 @@ EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/jqc-entrypoint"]
 # Same image, other commands (docs/deployment.md §4):
 #   release: jqc-release                                 (one-off task, once per deploy)
-#   worker:  celery -A config worker -l INFO             (POSTGRES_CONN_MAX_AGE=60)
+#   worker:  celery -A config worker -l INFO -Q celery   (urgent queue; POSTGRES_CONN_MAX_AGE=60)
+#   worker-slow: celery -A config worker -l INFO -Q slow --concurrency 2   (exports, invoice
+#            PDFs, purges; T-817 queue split, docs/deployment.md §4). Locally one worker: -Q celery,slow
 #   beat:    celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
 #            exactly one replica per environment
 # Web: set POSTGRES_POOL=true (T-218). No app-server access log (see jqc_asgi_worker above).

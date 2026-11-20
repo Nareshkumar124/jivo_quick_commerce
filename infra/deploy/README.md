@@ -16,7 +16,10 @@ only repo files the deployment uses. **No secrets live here, ever** (the reposit
   env/                    700  backend.env, postgres.env, minio.env (600, generated on the server)
     keys-backup/          700  FIELD_ENCRYPTION_KEYS copies (600), one file per generation
   src/<sha>/              the backend source of that commit (git archive), the image build context
-  static/                 collectstatic output copied out of the image (nginx /static/)
+  static/                 collectstatic output copied out of the image (nginx /static/; hashed
+                          names + staticfiles.json since T-817; copied additively, never emptied)
+  cache/                  755 superadmin
+    nginx-media/          700 <nginx worker user>  nginx proxy_cache for /media/ (T-819, max 1 GB)
   acme/                   certbot --webroot for jqc.jivo.in only
   logs/                   deploy notes, nginx -T snapshots, other-site status checks
 /etc/nginx/sites-available/jqc.jivo.in.conf  (+ sites-enabled symlink)
@@ -125,17 +128,23 @@ docker compose -p jqc -f compose.prod.yml up -d postgres redis minio
 # 5. release (check --deploy, migrate), then seed (staging)
 docker compose -p jqc -f compose.prod.yml run --rm release
 docker compose -p jqc -f compose.prod.yml run --rm --entrypoint python web manage.py seed_demo
-# 6. static files for nginx
+# 6. static files for nginx: additive (no rm), so pages from the previous release keep their
+#    content-hashed files during a roll (docs/deployment.md §9.7). The image must hold a manifest.
 docker run --rm --user 0 --entrypoint sh -v /srv/jqc/static:/out jqc-backend:$SHA \
-  -c 'rm -rf /out/* && cp -a /app/staticfiles/. /out/ && chmod -R a+rX /out'
-# 7. app
-docker compose -p jqc -f compose.prod.yml up -d web worker beat
+  -c 'test -s /app/staticfiles/staticfiles.json && cp -a /app/staticfiles/. /out/ && chmod -R a+rX /out'
+# 7. app: two Celery workers, one per queue (`worker` -Q celery, `worker-slow` -Q slow)
+docker compose -p jqc -f compose.prod.yml up -d web worker worker-slow beat
 curl -fsS -H 'Host: jqc.jivo.in' http://127.0.0.1:18001/health/ready
 ```
 
 nginx and TLS (coexistence checklist around each reload):
 
 ```bash
+# media cache directory (T-819), once, before the first `nginx -t` with the full file. Owner = the
+# `user` in the host's nginx.conf (www-data on Debian/Ubuntu, nginx on RHEL).
+NGINX_USER=$(sudo nginx -T 2>/dev/null | awk '$1=="user"{gsub(";","",$2); print $2; exit}')
+sudo install -d -m 755 /srv/jqc/cache
+sudo install -d -m 700 -o "${NGINX_USER:-www-data}" -g "${NGINX_USER:-www-data}" /srv/jqc/cache/nginx-media
 # HTTP-only bootstrap: our file without the HTTPS server block
 sed '/^# BEGIN JQC HTTPS/,/^# END JQC HTTPS/d' jqc.jivo.in.conf | sudo tee /etc/nginx/sites-available/jqc.jivo.in.conf >/dev/null
 sudo ln -s /etc/nginx/sites-available/jqc.jivo.in.conf /etc/nginx/sites-enabled/jqc.jivo.in.conf
@@ -153,12 +162,17 @@ sudo nginx -t && sudo systemctl reload nginx
    Windows"), build `jqc-backend:<new>`.
 2. Pre-deploy dump: `docker compose -p jqc -f compose.prod.yml exec -T postgres pg_dump -Fc -U jqc jivo_quick_commerce > /srv/jqc/backups/pre-<new>.dump`.
 3. `JQC_IMAGE=jqc-backend:<new> docker compose ... run --rm release`.
-4. Copy static files (step 6 above).
-5. `docker compose ... stop beat`, then `JQC_IMAGE=jqc-backend:<new> docker compose ... up -d web worker beat`.
+   (First T-817/T-819 rollout: do the RAM and nginx connection-budget preconditions in
+   docs/deployment.md §8.5 first; the nginx reload waits on the budget check.)
+4. Copy static files (step 6 above, additive) **before** web rolls: the new pages name the new hashed files.
+5. `docker compose ... stop beat`, then `JQC_IMAGE=jqc-backend:<new> docker compose ... up -d web worker worker-slow beat`.
 6. Write the sha to `/srv/jqc/compose/DEPLOYED_SHA`.
 
-**App rollback:** `JQC_IMAGE=jqc-backend:<previous> docker compose -p jqc -f compose.prod.yml up -d web worker beat`
-(stop beat first). Migrations are expand-only, so the old code runs on the new schema.
+**App rollback:** `JQC_IMAGE=jqc-backend:<previous> docker compose -p jqc -f compose.prod.yml up -d web worker worker-slow beat`
+(stop beat first). Migrations are expand-only, so the old code runs on the new schema. Rolling back
+to a commit before T-817 (no `slow` queue): `worker-slow` then just idles (the old code routes
+nothing to `slow`); stop it with `docker compose ... stop worker-slow` if you also restore that
+commit's compose file, which has no such service. The first T-817/T-819 rollout and its rollback: docs/deployment.md §8.5.
 
 ## Remove JQC entirely (R10)
 

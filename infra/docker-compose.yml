@@ -101,7 +101,9 @@ services:
 
   worker:
     <<: *backend
-    command: ["celery", "-A", "config", "worker", "--loglevel", "INFO"]
+    # Both queues (T-817): `celery` (urgent) and `slow` (exports, invoices, purges). Without
+    # `-Q celery,slow` the slow jobs are queued and never run. Deployed: one worker per queue.
+    command: ["celery", "-A", "config", "worker", "--loglevel", "INFO", "-Q", "celery,slow"]
     environment:
       <<: *backend-env
       # T-218: long-lived sync threads reuse connections; no pool outside the web process.
