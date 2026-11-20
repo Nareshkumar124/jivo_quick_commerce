@@ -1,7 +1,7 @@
 import re
 
 from django.conf import settings
-from django.core.checks import Error, register
+from django.core.checks import Error, Warning, register
 
 _PHONE = re.compile(r"^\+91[6-9][0-9]{9}$")
 _CODE = re.compile(r"^[0-9]{6}$")
@@ -82,6 +82,53 @@ def check_twilio_settings(app_configs, **kwargs):
             id="accounts.E004",
         )
     ]
+
+
+@register()
+def check_msg91_settings(app_configs, **kwargs):
+    """T-815 (D-02): the MSG91 backend needs its auth key and a flow for the OTP DLT template
+    (an Error, in every environment, so it fails at startup rather than on the first OTP).
+    Notification events whose DLT template has no flow get a Warning: their SMS would fail."""
+    from apps.notifications.sms import MSG91_BACKEND
+
+    if settings.SMS_BACKEND != MSG91_BACKEND:
+        return []
+    flows = getattr(settings, "MSG91_FLOW_IDS", {}) or {}
+    otp_dlt = getattr(settings, "SMS_OTP_DLT_TEMPLATE_ID", "")
+    missing = []
+    if not getattr(settings, "MSG91_AUTH_KEY", ""):
+        missing.append("MSG91_AUTH_KEY")
+    if not otp_dlt:
+        missing.append("SMS_OTP_DLT_TEMPLATE_ID")
+    elif not flows.get(otp_dlt):
+        missing.append("a MSG91_FLOW_IDS entry for SMS_OTP_DLT_TEMPLATE_ID")
+    errors = []
+    if missing:
+        errors.append(
+            Error(
+                f"SMS_BACKEND is Msg91SmsBackend but {', '.join(missing)} is not set.",
+                hint=(
+                    "Set MSG91_AUTH_KEY and MSG91_FLOW_IDS (dlt_template_id:msg91_flow_id,...) "
+                    "in the environment (backend/.env locally)."
+                ),
+                id="accounts.E007",
+            )
+        )
+    unmapped = sorted(
+        event
+        for event, dlt_id in (getattr(settings, "SMS_DLT_TEMPLATE_IDS", {}) or {}).items()
+        if dlt_id and not flows.get(dlt_id)
+    )
+    if unmapped:
+        errors.append(
+            Warning(
+                f"No MSG91 flow for the DLT template of: {', '.join(unmapped)}. "
+                "Their SMS will fail (the push and inbox entry still go out).",
+                hint="Add each DLT id from SMS_DLT_TEMPLATE_IDS to MSG91_FLOW_IDS.",
+                id="accounts.W001",
+            )
+        )
+    return errors
 
 
 @register()

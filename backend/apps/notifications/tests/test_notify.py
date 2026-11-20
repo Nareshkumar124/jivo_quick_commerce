@@ -310,7 +310,7 @@ def test_sms_without_a_dlt_template_is_skipped(order, run_on_commit, settings, c
 
 @pytest.mark.parametrize("error", [sms.SmsRejected, sms.SmsOutcomeUnknown])
 def test_sms_rejected_or_unknown_is_failed_not_retried(order, monkeypatch, error):
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise error("nope")
 
     monkeypatch.setattr(services, "send_sms", fail)
@@ -324,7 +324,7 @@ def test_sms_rejected_or_unknown_is_failed_not_retried(order, monkeypatch, error
 def test_transient_sms_error_releases_the_claim_for_the_retry(order, monkeypatch):
     calls = []
 
-    def flaky(*args):
+    def flaky(*args, **kwargs):
         calls.append(args)
         if len(calls) == 1:
             raise sms.SmsError("timeout before sending")
@@ -639,7 +639,7 @@ def test_two_workers_claiming_one_sms_send_it_once(monkeypatch):
     sent = []
     barrier = threading.Barrier(2)
 
-    def slow_send(*args):
+    def slow_send(*args, **kwargs):
         sent.append(args)
 
     monkeypatch.setattr(services, "send_sms", slow_send)

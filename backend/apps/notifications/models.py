@@ -75,6 +75,9 @@ class Notification(TimeStampedModel):
     )
     sms_body = models.CharField(max_length=500, blank=True)
     sms_dlt_template_id = models.CharField(max_length=32, blank=True)
+    # T-815: the values `sms_body` was rendered from ({name: value}), for gateways that render the
+    # DLT text themselves (MSG91 flows). Can hold a delivery OTP: blanked with `sms_body`.
+    sms_variables = models.JSONField(default=dict, blank=True)
     sms_sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
