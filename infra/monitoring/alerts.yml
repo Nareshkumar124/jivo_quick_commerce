@@ -88,22 +88,51 @@ groups:
   # ------------------------------------------------------------------ background jobs
   - name: jqc-jobs
     rules:
+      # Two queues (T-817): `celery` (urgent) pages; `slow` (exports, invoices, purges) is a ticket.
       - alert: JqcCeleryQueueBacklog
-        expr: sum(celery_queue_length) > 200
+        expr: sum(celery_queue_length{queue_name="celery"}) > 200
         for: 10m
         labels: {severity: page}
         annotations:
-          summary: Celery backlog above 200 messages for 10 minutes.
+          summary: Urgent Celery queue above 200 messages for 10 minutes.
           description: "Push, SMS, refunds and dispatch are delayed. Backlog {{ $value }}."
           runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery
 
-      - alert: JqcCeleryWorkersDown
-        expr: sum(celery_worker_up) < 1
-        for: 3m
-        labels: {severity: page}
+      - alert: JqcCelerySlowQueueBacklog
+        expr: sum(celery_queue_length{queue_name="slow"}) > 500
+        for: 30m
+        labels: {severity: ticket}
         annotations:
-          summary: No Celery worker is alive.
-          description: Nothing consumes the queue; OTP SMS, push and refunds stop.
+          summary: Slow Celery queue above 500 messages for 30 minutes.
+          description: "Report exports, invoice PDFs or purges are late. Backlog {{ $value }}."
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery
+
+      # Workers are named celery@<host> and slow@<host> (-n, infra/deploy/compose.prod.yml).
+      # `or vector(0)`: no series at all (every worker gone) must fire, not evaluate to nothing.
+      # That also fires when the exporter itself is down or celery_worker_up does not exist yet
+      # (metrics.yml: needs-backend, task events off). So both stay severity `ticket` until the
+      # celery-exporter runs with task events on and the metric is confirmed; then promote
+      # JqcCeleryWorkersDown to `page` (record it in docs/deployment.md §10.5).
+      - alert: JqcCeleryWorkersDown
+        expr: (sum(celery_worker_up{hostname=~"celery@.*"}) or vector(0)) < 1
+        for: 3m
+        labels: {severity: ticket}
+        annotations:
+          summary: No Celery worker consumes the urgent queue.
+          description: >-
+            Nothing consumes `celery`; OTP SMS, push, dispatch and refunds stop. Also fires when
+            the exporter is down or the metric is missing: check up{job="celery-exporter"} first.
+          runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery
+
+      - alert: JqcCelerySlowWorkerDown
+        expr: (sum(celery_worker_up{hostname=~"slow@.*"}) or vector(0)) < 1
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: No Celery worker consumes the slow queue.
+          description: >-
+            Report exports, invoice PDFs and retention purges are queued but not run. Also fires
+            when the exporter is down or the metric is missing: check up{job="celery-exporter"}.
           runbook_url: https://github.com/Nareshkumar124/jivo_quick_commerce/blob/main/docs/deployment.md#runbook-celery
 
       - alert: JqcCeleryTaskFailures

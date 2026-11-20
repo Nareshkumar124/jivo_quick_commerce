@@ -10,7 +10,7 @@
 #   cd /srv/jqc/compose
 #   JQC_IMAGE=jqc-backend:<sha> docker compose -p jqc -f compose.prod.yml up -d postgres redis minio
 #   JQC_IMAGE=jqc-backend:<sha> docker compose -p jqc -f compose.prod.yml run --rm release
-#   JQC_IMAGE=jqc-backend:<sha> docker compose -p jqc -f compose.prod.yml up -d web worker beat
+#   JQC_IMAGE=jqc-backend:<sha> docker compose -p jqc -f compose.prod.yml up -d web worker worker-slow beat
 
 name: jqc
 
@@ -141,14 +141,44 @@ services:
     mem_limit: 1536m
     cpus: 2
 
+  # Two Celery queues (T-817, docs/deployment.md §4). Routes live in settings (CELERY_TASK_ROUTES);
+  # a queue nobody consumes just fills up, so both workers must always run.
+  # `worker`: the default queue `celery`, everything someone is waiting on (dispatch and rider
+  # offers, OTP/SMS/push, realtime, payments and refunds, expiry sweeps). Settings time limits
+  # apply (5 min hard / 4 min soft).
+  # No healthcheck on either worker: `celery inspect ping` starts a second Django process inside
+  # the memory limit every interval. Liveness = restart policy + the JqcCeleryWorkersDown alert.
+  # stop_grace_period: SIGTERM starts Celery's warm shutdown (running tasks finish); compose's
+  # default 10 s would SIGKILL them, and an unacked task (acks_late) then waits for the broker's
+  # 1 h visibility timeout before it is redelivered.
   worker:
     <<: *app
-    command: ["celery", "-A", "config", "worker", "-l", "INFO", "--concurrency", "4"]
+    command: ["celery", "-A", "config", "worker", "-l", "INFO", "-Q", "celery",
+              "-n", "celery@%h", "--concurrency", "4"]
     environment:
       POSTGRES_POOL: "false"
       POSTGRES_CONN_MAX_AGE: "60"
+    stop_grace_period: 60s
     mem_limit: 1024m
     cpus: 2
+
+  # `worker-slow`: the `slow` queue only: report exports and mails, invoice PDFs (WeasyPrint),
+  # retention/purge sweeps, the hourly referral safety net. Low concurrency so a burst of exports
+  # cannot take the shared host's CPU; generous limits for big exports and PDFs (30 min hard,
+  # 25 min soft; must stay below the 1 h broker visibility timeout or a long task is delivered
+  # twice). --max-tasks-per-child recycles the process to release WeasyPrint/openpyxl memory.
+  # +2 DB connections (CONN_MAX_AGE=60) in the connection budget (§4).
+  worker-slow:
+    <<: *app
+    command: ["celery", "-A", "config", "worker", "-l", "INFO", "-Q", "slow",
+              "-n", "slow@%h", "--concurrency", "2", "--max-tasks-per-child", "50",
+              "--time-limit", "1800", "--soft-time-limit", "1500"]
+    environment:
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "60"
+    stop_grace_period: 300s
+    mem_limit: 1024m
+    cpus: 1
 
   # Exactly ONE beat (docs/deployment.md §4). Never scale it.
   beat:

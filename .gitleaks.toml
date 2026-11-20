@@ -33,15 +33,31 @@ regex = '''\b(AC[0-9a-f]{32})\b'''
 secretGroup = 1
 tags = ["twilio"]
 
+# MSG91 (T-815, D-02): the auth key travels as the `authkey` header / field. It has no fixed prefix,
+# so the rule needs the word itself right before the value (`authkey: <v>`, `"authkey": "<v>"`,
+# `authkey=<v>`), 20+ letters/digits and some entropy. The env-file form (the MSG91_AUTH_KEY
+# variable with a value) is covered by jqc-dotenv-secret. Not matched: the code's `"authkey": auth_key` (a variable), the
+# tests' `get_header("Authkey")` and fake key `fake-msg91-authkey-not-real`, and the MSG91 flow
+# ids (`65f0aaaa...`, not secrets: template ids) in backend/apps/notifications/tests/test_msg91.py.
+[[rules]]
+id = "jqc-msg91-authkey"
+description = "MSG91 auth key next to the authkey header or field name. It sends SMS on our account."
+regex = '''(?i)\bauthkey["']?\s*[:=]\s*["']?([A-Za-z0-9]{20,64})\b'''
+secretGroup = 1
+entropy = 3.0
+keywords = ["authkey"]
+tags = ["msg91"]
+
 [[rules]]
 id = "jqc-dotenv-secret"
 description = "A literal value for one of our secret settings in env-file, shell, compose or Dockerfile syntax (NAME=value), also mid-line (docker run -e NAME=value, NAME=value cmd)."
-regex = '''(?m)(?:^|[\s;&|(\x60])["']?(?:DJANGO_SECRET_KEY|JWT_SIGNING_KEY|OTP_HASH_KEY|FIELD_ENCRYPTION_KEYS|POSTGRES_PASSWORD|PGPASSWORD|SEED_DEMO_STAFF_PASSWORD|MINIO_ROOT_PASSWORD|EMAIL_HOST_PASSWORD|RAZORPAY_KEY_SECRET|RAZORPAY_WEBHOOK_SECRET|TWILIO_AUTH_TOKEN|S3_SECRET_ACCESS_KEY|AWS_SECRET_ACCESS_KEY)=["']?([^\s"'#]{4,})'''
+regex = '''(?m)(?:^|[\s;&|(\x60])["']?(?:DJANGO_SECRET_KEY|JWT_SIGNING_KEY|OTP_HASH_KEY|FIELD_ENCRYPTION_KEYS|POSTGRES_PASSWORD|PGPASSWORD|SEED_DEMO_STAFF_PASSWORD|MINIO_ROOT_PASSWORD|EMAIL_HOST_PASSWORD|RAZORPAY_KEY_SECRET|RAZORPAY_WEBHOOK_SECRET|TWILIO_AUTH_TOKEN|MSG91_AUTH_KEY|S3_SECRET_ACCESS_KEY|AWS_SECRET_ACCESS_KEY)=["']?([^\s"'#]{4,})'''
 secretGroup = 1
 keywords = [
   "django_secret_key", "jwt_signing_key", "otp_hash_key", "field_encryption_keys",
   "postgres_password", "pgpassword", "seed_demo_staff_password", "minio_root_password",
   "email_host_password", "razorpay_key_secret", "razorpay_webhook_secret", "twilio_auth_token",
+  "msg91_auth_key",
   "s3_secret_access_key", "aws_secret_access_key",
 ]
 tags = ["env"]

@@ -99,7 +99,7 @@ The findings go into a short report before anything is installed.
 
 `infra/deploy/` (owner: DevOps):
 - **`compose.prod.yml`:** compose project `jqc`, network `jqc_net`, volumes prefixed `jqc_`, memory limits and log caps per service.
-  - Services: `postgres` (postgis 16-3.4), `redis`, `minio`, `release`, `web`, `worker`, `beat`.
+  - Services: `postgres` (postgis 16-3.4), `redis`, `minio`, `release`, `web`, `worker` (urgent queue `celery`), `worker-slow` (queue `slow`, T-819), `beat`.
   - **No nginx container.**
   - Only `web` (`127.0.0.1:18001`) and MinIO's public read path (`127.0.0.1:19000`) are published, to localhost only.
 - **`nginx/jqc.jivo.in.conf`:** the single site file for the host nginx. It follows rules R2 and R3, and adapts the hardening already in `infra/nginx/default.conf`:
@@ -134,7 +134,7 @@ The findings go into a short report before anything is installed.
 3. Build the image from the tagged `develop` commit.
 4. `docker compose -p jqc up -d postgres redis minio`, wait until they're healthy, then create the MinIO buckets.
 5. Run the `release` job (`check --deploy` must pass), then `migrate` on the fresh DB, then `seed_demo` (if D2 says so).
-6. `docker compose -p jqc up -d web worker beat`. Check `curl http://127.0.0.1:18001/health/ready`.
+6. `docker compose -p jqc up -d web worker worker-slow beat`. Check `curl http://127.0.0.1:18001/health/ready`.
 7. **nginx, carefully:**
    1. Add `jqc.jivo.in.conf` with an HTTP-only block for the ACME challenge.
    2. `nginx -t`, then `reload`.
@@ -173,7 +173,7 @@ The findings go into a short report before anything is installed.
   1. Build or pull the new tag.
   2. Take an automatic pre-deploy DB dump.
   3. Run `release` (migrate).
-  4. Restart `web` and `worker`. **Beat stays a singleton:** stop the old beat before starting the new one.
+  4. Restart `web`, `worker` and `worker-slow`. **Beat stays a singleton:** stop the old beat before starting the new one.
 - **Rollback the app:** run the previous image tag. Migrations are additive, so the old code works on the new schema.
 - **Remove JQC entirely:**
   1. Remove the symlink, `nginx -t`, reload.

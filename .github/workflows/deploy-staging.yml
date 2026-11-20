@@ -78,5 +78,5 @@ jobs:
     steps:
       - name: Placeholder
         run: |
-          echo "::error::Staging hosting is not decided (D-05). Push the image, run the release task (jqc-release), then roll web, worker and beat (docs/deployment.md §8.2) once it is."
+          echo "::error::Staging hosting is not decided (D-05). Push the image, run the release task (jqc-release), then roll web, worker, worker-slow and beat (docs/deployment.md §8.2) once it is."
           exit 1

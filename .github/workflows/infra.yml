@@ -127,3 +127,22 @@ jobs:
           docker run --rm --add-host backend:127.0.0.1 \
             -v "$PWD/infra/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro" \
             "$NGINX_IMAGE" nginx -t
+
+      # The shared-server site file (infra/deploy/README.md), full file including the HTTPS block.
+      # Its certificate paths get a throwaway self-signed certificate (1 day, generated here, never
+      # uploaded) and stand-ins for certbot's two include files. Catches syntax, duplicate zone
+      # names and unknown directives; the host's own nginx -t at deploy time is still required
+      # (other sites' http-level names, the host's nginx version).
+      - name: nginx -t (jqc.jivo.in site file)
+        run: |
+          le="$RUNNER_TEMP/letsencrypt"
+          mkdir -p "$le/live/jqc.jivo.in"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=jqc.jivo.in" \
+            -keyout "$le/live/jqc.jivo.in/privkey.pem" -out "$le/live/jqc.jivo.in/fullchain.pem" 2>/dev/null
+          printf 'ssl_protocols TLSv1.2 TLSv1.3;\n' > "$le/options-ssl-nginx.conf"
+          openssl dhparam -dsaparam -out "$le/ssl-dhparams.pem" 2048 2>/dev/null
+          trap 'rm -rf "$le"' EXIT
+          docker run --rm \
+            -v "$PWD/infra/deploy/nginx/jqc.jivo.in.conf:/etc/nginx/conf.d/jqc.jivo.in.conf:ro" \
+            -v "$le:/etc/letsencrypt:ro" \
+            "$NGINX_IMAGE" sh -c 'mkdir -p /srv/jqc/cache /srv/jqc/static /srv/jqc/acme && nginx -t'
