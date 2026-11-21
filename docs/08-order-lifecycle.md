@@ -129,7 +129,7 @@ Rules:
 1. The **server** decides payment success: signature verification on `/verify/` plus the webhook. The app's callback is never trusted alone.
 2. Webhook processing is **idempotent** (`PaymentWebhookEvent.event_id` unique) and order-insensitive (a capture can arrive before or after verify).
 3. Before failing an order on timeout, the job **queries Razorpay** for payments on that Razorpay order (handles missed webhooks).
-4. Refunds always go back to the original payment via the Razorpay refund API. Order `payment_status` becomes `REFUND_PENDING`, then `REFUNDED` / `PARTIALLY_REFUNDED` on `refund.processed`.
+4. Refunds always go back to the original payment via the Razorpay refund API. Order `payment_status` becomes `REFUND_PENDING`, then `REFUNDED` / `PARTIALLY_REFUNDED` on `refund.processed`. A refund call the gateway refuses (4xx) is tried again later with backoff (`REFUND_REFUSAL_RETRY_DELAYS_SECONDS`, ~2 h; the refund stays PENDING and each try first looks for a refund already made, so it is never paid twice) unless the refusal is clearly final (amount); only then is it FAILED with the ops alert (doc 06 Phase 3 notes, 2026-11-21).
 
 ## 5. Rider dispatch algorithm (v1)
 

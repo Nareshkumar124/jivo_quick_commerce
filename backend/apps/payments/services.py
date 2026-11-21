@@ -187,7 +187,8 @@ def _refund_by_receipt(entity: dict) -> Refund | None:
     still be in its gateway call (code review R2b-fix Major 1). Matched by the payment and the
     refund `receipt` (= `refund_receipt(idempotency_key)`), never by amount. If nothing matches
     while a refund of that payment is still PENDING without a gateway id and younger than
-    `REFUND_WEBHOOK_RETRY_WINDOW_SECONDS` (so `process_refund` may still record it), the event is
+    `REFUND_WEBHOOK_RETRY_WINDOW_SECONDS` (counted from its `next_attempt_at` when a refusal retry
+    is scheduled; so `process_refund` may still record it), the event is
     answered 503 (`WebhookRetryLater`), not stored, so the gateway's retry finds the id recorded.
     Past that window the event is ignored with a warning, so the 503 is never unbounded."""
     payment_id = entity.get("payment_id")
@@ -210,7 +211,9 @@ def _refund_by_receipt(entity: dict) -> Refund | None:
         r for r in candidates if r.status == RefundStatus.PENDING and not r.gateway_refund_id
     ]
     since = timezone.now() - timedelta(seconds=settings.REFUND_WEBHOOK_RETRY_WINDOW_SECONDS)
-    if any(r.created_at >= since for r in unrecorded):
+    # Counted from the refund's latest scheduled refusal retry, when it has one: the task is
+    # still running until then (and one run's backoff after it).
+    if any(max(r.created_at, r.next_attempt_at or r.created_at) >= since for r in unrecorded):
         raise WebhookRetryLater(f"refund {entity['id']} not recorded yet")
     if unrecorded:
         # Bounded (fix review): past the window `process_refund` is no longer running, so a retry

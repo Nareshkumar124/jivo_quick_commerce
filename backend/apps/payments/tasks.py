@@ -1,9 +1,12 @@
 """Payment Celery tasks. All idempotent and safe to retry."""
 
 import logging
+from datetime import timedelta
 
 from celery import shared_task
+from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from apps.payments.gateways import (
     GatewayRefund,
@@ -41,7 +44,13 @@ def process_refund(refund_id: int) -> str:
     - "Duplicate receipt" / "fully refunded already" 4xx: Razorpay's docs say a repeated refund
       receipt is refused (assumed; confirm in Razorpay test mode), so this is a fallback: the
       refunds are looked up again (`_made_before`).
-    - Other 4xx: not retried; the refund is FAILED and ops are alerted (`payment.refund_failed`).
+    - Other 4xx (refund auto-retry, 2026-11-21): Razorpay has refused valid refunds ("invalid
+      request sent") and accepted them later, so the refund stays PENDING and this task runs
+      again after each of `REFUND_REFUSAL_RETRY_DELAYS_SECONDS` in turn (`Refund.next_attempt_at`
+      and `gateway_refusals`), each run starting with the lookup above. Refused after the last
+      delay, or refused for good (`PaymentGatewayRejected.permanent`: the amount): the refund is
+      FAILED and ops are alerted (`payment.refund_failed`). A run that starts before its
+      `next_attempt_at` (a redelivery, an older scheduled run) does nothing ("scheduled").
     """
     with _exclusive(refund_id) as mine:
         if not mine:  # another worker is sending this refund right now (a redelivery)
@@ -103,11 +112,7 @@ def _process(refund_id: int) -> str:
         except PaymentGatewayRejected as exc:
             result = _made_before(gateway, refund, receipt) if exc.already_done else None
             if result is None:
-                logger.error(
-                    "Refund %s refused by the gateway: %s (%s)", refund.pk, exc, exc.description
-                )
-                record_refund_status(refund, "failed")
-                return "rejected"
+                return _refused(refund, exc)
     record_refund_status(refund, result.status, result.id)
     logger.info("Refund %s for order %s: gateway %s", refund.pk, refund.order_id, result.status)
     return result.status
@@ -128,7 +133,45 @@ def _claim(refund_id: int) -> Refund | str:
             return "skipped"
         if refund.gateway_refund_id:
             return "waiting"
+        if refund.next_attempt_at and refund.next_attempt_at > timezone.now() + EARLY_SLACK:
+            return "scheduled"  # a refusal retry is due later; that run sends it
         return refund
+
+
+# A scheduled refusal retry that starts this much before `next_attempt_at` (clock skew) still runs.
+EARLY_SLACK = timedelta(seconds=30)
+
+
+def _refused(refund: Refund, exc: PaymentGatewayRejected) -> str:
+    """The refund POST was refused (4xx) and no earlier refund was found for it: schedule the next
+    try, or fail the refund (ops alert) when it is a final refusal or the tries are used up."""
+    from apps.orders.models import Order
+
+    delays = settings.REFUND_REFUSAL_RETRY_DELAYS_SECONDS
+    with transaction.atomic():
+        Order.objects.select_for_update().filter(pk=refund.order_id).first()  # order first
+        refund = Refund.objects.select_for_update().get(pk=refund.pk)
+        if refund.status != RefundStatus.PENDING or refund.gateway_refund_id:
+            return "skipped"  # a webhook recorded it meanwhile
+        refund.gateway_refusals += 1
+        final = exc.already_done or exc.permanent or refund.gateway_refusals > len(delays)
+        delay = 0 if final else delays[refund.gateway_refusals - 1]
+        refund.next_attempt_at = None if final else timezone.now() + timedelta(seconds=delay)
+        refund.save(update_fields=["gateway_refusals", "next_attempt_at", "updated_at"])
+        (logger.error if final else logger.warning)(
+            "Refund %s refused by the gateway: %s (%s); refusal %s, %s",
+            refund.pk,
+            exc,
+            exc.description,
+            refund.gateway_refusals,
+            "failing it" if final else f"trying again in {delay} s",
+        )
+        if final:
+            record_refund_status(refund, "failed")
+            return "rejected"
+        refund_id = refund.pk
+        transaction.on_commit(lambda: process_refund.apply_async((refund_id,), countdown=delay))
+    return "retry_scheduled"
 
 
 def _gateway_refunds(gateway, refund: Refund) -> list[GatewayRefund]:
