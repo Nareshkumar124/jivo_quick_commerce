@@ -64,7 +64,9 @@ class GatewayUnavailable(PaymentGatewayError):
 
 
 class PaymentGatewayRejected(PaymentGatewayError):
-    """A 4xx: the gateway refused the request. Retrying the same request cannot help."""
+    """A 4xx: the gateway refused the request. Usually final, but Razorpay has refused valid
+    refunds and accepted them later, so `process_refund` retries refusals that are not
+    `permanent` (2026-11-21)."""
 
     def __init__(self, message: str, *, status: int = 400, description: str = "") -> None:
         super().__init__(message)
@@ -79,6 +81,20 @@ class PaymentGatewayRejected(PaymentGatewayError):
         (confirm in Razorpay test mode)."""
         text = self.description.lower()
         return "duplicate receipt" in text or "refunded already" in text
+
+    @property
+    def permanent(self) -> bool:
+        """A refusal that cannot change on a later try, so the refund fails at once instead of
+        waiting for `process_refund`'s refusal retries (REFUND_REFUSAL_RETRY_DELAYS_SECONDS).
+        Conservative: only amount refusals ("... greater than the amount captured / unrefunded",
+        "Amount must be at least INR 1.00"); anything else, including Razorpay's bare
+        "invalid request sent" seen to pass on a later try (2026-11-21), is retried."""
+        text = self.description.lower()
+        return any(phrase in text for phrase in PERMANENT_REFUSALS)
+
+
+# Lower-case phrases of Razorpay error descriptions that mark a refusal as final (see `permanent`).
+PERMANENT_REFUSALS = ("greater than", "must be at least")
 
 
 @dataclass(frozen=True)

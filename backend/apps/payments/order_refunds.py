@@ -501,6 +501,9 @@ def retry_refund(refund_id: int, *, by) -> Refund:
             and not refund.gateway_refund_id
             and refund.updated_at <= stale
         ):
+            if refund.next_attempt_at:  # ops send it now instead of at the scheduled refusal retry
+                refund.next_attempt_at = None
+                refund.save(update_fields=["next_attempt_at", "updated_at"])
             refund_pk = refund.pk
             transaction.on_commit(lambda: process_refund.delay(refund_pk))
             result = refund
@@ -522,7 +525,9 @@ def sync_refund_status(now=None, limit: int = 200) -> dict:
     """06 §5 `sync_refund_status` (beat, every 30 min): refunds still PENDING.
     - With a gateway id: ask the gateway (outside any row lock) and record what it says.
     - Without one, older than `REFUND_STUCK_MINUTES`: the task never finished; send it again
-      (`process_refund` adopts a refund the gateway already made for the receipt).
+      (`process_refund` adopts a refund the gateway already made for the receipt). A refund
+      waiting for a refusal retry counts from its `next_attempt_at` instead, so it is not sent
+      early, only when that scheduled run is lost.
     Idempotent: `record_refund_status` ignores repeats."""
     from apps.payments.gateways import PaymentGatewayError, get_gateway
     from apps.payments.tasks import process_refund
@@ -542,7 +547,7 @@ def sync_refund_status(now=None, limit: int = 200) -> dict:
     stale = now - timedelta(minutes=settings.REFUND_STUCK_MINUTES)
     for refund in pending:
         if not refund.gateway_refund_id:
-            if refund.updated_at <= stale:
+            if max(refund.updated_at, refund.next_attempt_at or refund.updated_at) <= stale:
                 process_refund.delay(refund.pk)
                 bump("resent")
             else:

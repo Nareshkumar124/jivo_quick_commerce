@@ -733,11 +733,24 @@ RAZORPAY_WEBHOOK_SECRET = env_str("RAZORPAY_WEBHOOK_SECRET", default="")
 # Seconds to wait for a Razorpay API call (create order, list payments, refund).
 RAZORPAY_TIMEOUT_SECONDS = env_float("RAZORPAY_TIMEOUT_SECONDS", default=10.0)
 # A `refund.*` webhook whose refund is not recorded yet answers 503 (so Razorpay retries) only
-# while a PENDING refund of that payment without a gateway id is younger than this. Default 2 h:
-# a little over `payments.process_refund`'s longest life, 5490 s of backoff (30 s doubling to the
-# 1800 s cap, 8 retries) + 9 attempts x 2 calls x RAZORPAY_TIMEOUT_SECONDS (180 s) = ~95 min.
-# Older ones (a Dashboard refund, a task that gave up) are logged and the event is ignored.
+# while a PENDING refund of that payment without a gateway id is younger than this, counted from
+# its latest scheduled attempt (`Refund.next_attempt_at`, else its creation). Default 2 h: a
+# little over one `payments.process_refund` run's longest life, 5490 s of backoff (30 s doubling
+# to the 1800 s cap, 8 retries) + 9 attempts x 2 calls x RAZORPAY_TIMEOUT_SECONDS (180 s) = ~95
+# min. Older ones (a Dashboard refund, a task that gave up) are logged and the event is ignored.
 REFUND_WEBHOOK_RETRY_WINDOW_SECONDS = env_int("REFUND_WEBHOOK_RETRY_WINDOW_SECONDS", default=7200)
+# Refund auto-retry (Razorpay test findings 2026-11-21): Razorpay sometimes refuses a valid refund
+# with HTTP 400 ("invalid request sent") and accepts it later. Such a 4xx keeps the refund PENDING
+# and `process_refund` runs again after each of these delays in turn (seconds, comma-separated;
+# default 2, 5, 15, 30 and 60 min = 6 attempts over ~1 h 52 min). Refused after the last one: the
+# refund is FAILED and ops are alerted. Empty = fail on the first refusal. Unambiguous refusals
+# (amount too large or too small, already refunded) never wait (`PaymentGatewayRejected.permanent`).
+REFUND_REFUSAL_RETRY_DELAYS_SECONDS = [
+    int(value)
+    for value in env_list(
+        "REFUND_REFUSAL_RETRY_DELAYS_SECONDS", default=["120", "300", "900", "1800", "3000"]
+    )
+]
 
 # --------------------------------------------------------------------------- import / export
 # The admin's import is two requests (preview, then confirm), possibly served by different web
