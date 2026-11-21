@@ -103,7 +103,9 @@ def _process(refund_id: int) -> str:
         except PaymentGatewayRejected as exc:
             result = _made_before(gateway, refund, receipt) if exc.already_done else None
             if result is None:
-                logger.error("Refund %s refused by the gateway: %s", refund.pk, exc)
+                logger.error(
+                    "Refund %s refused by the gateway: %s (%s)", refund.pk, exc, exc.description
+                )
                 record_refund_status(refund, "failed")
                 return "rejected"
     record_refund_status(refund, result.status, result.id)
