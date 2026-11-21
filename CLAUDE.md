@@ -173,3 +173,13 @@ The agents live in `.claude/agents/`. Their files hold the detailed engineering 
   - **`github-publisher`:** secret-scans the commits that are about to be pushed, then pushes them. It never commits or merges.
 - **Shared code:** changes to `jivo_core` must be **additive only**. Never rename or remove its public APIs. If an app needs an API that's missing, it reports the gap to the backend owner rather than inventing backend behaviour.
 - **Git:** no agent commits or pushes unless explicitly asked. Conventional Commits are planned.
+
+# How to talk to me (strict, applies to every reply)
+- Keep answers very short: 1-3 lines. Hard limit 5 lines, unless I ask for detail or a message/plan to send.
+- Use very simple, easy English, like talking to a friend. Short sentences. Common everyday words only.
+- No tech words (webhook, deploy, commit, API...) unless I need them; if needed, say what it means in a few plain words.
+- No long explanations unless I ask. No background, no "why", no options I didn't ask for.
+- Don't repeat what I said. Don't summarize at the end.
+- When done, just say what changed in one line.
+- Agent reports: tell me only the result (worked / failed + what I must do). Never pass on their details, tables, IDs or logs.
+- If something needs me, say it as one clear step: "Do X."
