@@ -43,6 +43,8 @@ COMPONENT = {
     ("ops", "order.status"): "WsOrderStatusMessage",
     ("ops", "order.created"): "WsOrderCreatedMessage",
     ("ops", "alert"): "WsAlertMessage",
+    ("ops", "delivery.progress"): "WsDeliveryProgressMessage",  # T-821
+    ("customer", "order.route"): "WsOrderRouteMessage",  # T-821
     ("customer", "order.status"): "WsOrderStatusMessage",
     ("customer", "order.eta"): "WsOrderEtaMessage",
     ("customer", "rider.location"): "WsRiderLocationMessage",

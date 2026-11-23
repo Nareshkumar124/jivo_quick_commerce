@@ -32,12 +32,17 @@ from apps.delivery.choices import (
     OfferRejectReason,
     PaymentType,
     PayoutStatus,
+    RouteLeg,
     ShiftEndedBy,
     ShiftEndReason,
     VehicleType,
 )
 from apps.orders.choices import OrderStatus
-from apps.orders.serializers import OrderAddressSerializer
+from apps.orders.serializers import (
+    OrderAddressSerializer,
+    TrackPointSerializer,
+    TrackRouteSerializer,
+)
 
 IST_DATE = "IST calendar date, YYYY-MM-DD."
 NOTE_MAX_LENGTH = 300
@@ -479,6 +484,16 @@ class LocationBatchSerializer(serializers.Serializer):
             "its response was lost: points already stored are skipped."
         ),
     )
+    task_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "T-821, optional: the task the app thinks is active. Only compared: points are "
+            "always stored for the signed-in rider and linked to the task the server sees as "
+            "active (`active_task_id` in the response); a mismatch means re-read "
+            "`tasks/current/`."
+        ),
+    )
 
     def validate_points(self, value: list) -> list:
         limit = self.context.get("max_batch") or 50
@@ -487,14 +502,42 @@ class LocationBatchSerializer(serializers.Serializer):
         return value
 
 
+class LocationRejectReasonsSerializer(serializers.Serializer):
+    too_old = serializers.IntegerField(help_text="Recorded more than 24 hours ago.")
+    future = serializers.IntegerField(help_text="More than 2 minutes ahead of the server clock.")
+    invalid_point = serializers.IntegerField(help_text="The (0, 0) point (no fix).")
+    implausible_jump = serializers.IntegerField(
+        help_text=(
+            "A GPS jump: faster than RIDER_LOCATION_MAX_SPEED_KMPH (150 km/h) from the previous "
+            "good fix within 10 minutes."
+        )
+    )
+
+
 class LocationBatchResultSerializer(serializers.Serializer):
     accepted = serializers.IntegerField(help_text="Points stored now.")
     duplicates = serializers.IntegerField(help_text="Points already stored (a resent batch).")
     rejected = serializers.IntegerField(
         help_text=(
-            "Points not stored: recorded more than 24 hours ago, or more than 2 minutes in the "
-            "future. Do not resend them."
+            "Points not stored (sum of `rejected_reasons`): too old, in the future, (0, 0) or "
+            "an implausible jump. Do not resend them."
         )
+    )
+    rejected_reasons = LocationRejectReasonsSerializer(help_text="T-821.")
+    out_of_order = serializers.IntegerField(
+        help_text=(
+            "T-821: of `accepted`, points older than the live position (a late buffer): kept "
+            "as history, they do not move the rider on the maps."
+        )
+    )
+    low_accuracy = serializers.IntegerField(
+        help_text=(
+            "T-821: of `accepted`, points less accurate than RIDER_LOCATION_MAX_ACCURACY_M "
+            "(300 m): history only."
+        )
+    )
+    active_task_id = serializers.IntegerField(
+        allow_null=True, help_text="T-821: the task the points were linked to, or null."
     )
     location = RiderLocationSettingsSerializer()
     server_time = serializers.DateTimeField()
@@ -620,6 +663,26 @@ class TaskEarningsSerializer(serializers.Serializer):
     lines = EarningLineSerializer(many=True)
 
 
+class TaskNavigationSerializer(serializers.Serializer):
+    """T-821: where to ride now. Before pickup the store, after pickup the customer."""
+
+    leg = serializers.ChoiceField(choices=RouteLeg.choices)
+    destination = TrackPointSerializer(help_text="The store, or the drop pin after pickup.")
+    route = TrackRouteSerializer(
+        allow_null=True, help_text="Null until the server has a position from this rider."
+    )
+    distance_m = serializers.IntegerField(
+        allow_null=True, help_text="Road metres to the destination; null without a position."
+    )
+    eta_minutes = serializers.IntegerField(
+        allow_null=True, help_text="Minutes to the destination (traffic when available)."
+    )
+    eta_at = serializers.DateTimeField(allow_null=True)
+    position_at = serializers.DateTimeField(
+        allow_null=True, help_text="When the position the route starts from was recorded."
+    )
+
+
 class RiderTaskSerializer(serializers.Serializer):
     """The rider's delivery task with everything the task screens need (api-requests #13)."""
 
@@ -676,6 +739,13 @@ class RiderTaskSerializer(serializers.Serializer):
         help_text=(
             "The pay for this task: base + distance from pickup (DL-61: paid even if the "
             "delivery then fails), plus the tip once DELIVERED. Null before pickup."
+        ),
+    )
+    navigation = TaskNavigationSerializer(
+        allow_null=True,
+        help_text=(
+            "T-821: route, distance and ETA to the store (ASSIGNED, AT_STORE) or to the "
+            "customer (PICKED_UP, AT_CUSTOMER); null in other states."
         ),
     )
 
