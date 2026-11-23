@@ -30517,7 +30517,8 @@ components:
         sent_at: '2026-11-10T09:41:05.120000Z'
     WsOpsRiderLocationMessage:
       type: object
-      description: '`/ws/ops/live/`: the rider map.'
+      description: '`/ws/ops/live/`: the rider map; only to users with the live order
+        board (`orders.view_order` + `orders.cancel_order`), BUG-0026.'
       properties:
         type:
           type: string
@@ -30576,7 +30577,8 @@ components:
     WsDeliveryProgressMessage:
       type: object
       description: '`/ws/ops/live/`: T-821, live dashboard row update (distance, live
-        ETA, delay).'
+        ETA, delay); only to users with the live order board (`orders.view_order`
+        + `orders.cancel_order`).'
       properties:
         type:
           type: string

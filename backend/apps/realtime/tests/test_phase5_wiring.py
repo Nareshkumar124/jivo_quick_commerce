@@ -12,7 +12,7 @@ from apps.delivery import hooks
 from apps.delivery.models import Rider, RiderLocation
 from apps.delivery.tests.factories import RiderFactory, active_rider
 from apps.realtime import consumers, contract, services
-from apps.realtime.groups import rider_group, store_group
+from apps.realtime.groups import live_board_group, rider_group
 from apps.realtime.tests.conftest import (
     expect_close,
     group_send,
@@ -91,7 +91,7 @@ def test_location_hook_reaches_the_home_store_map_and_no_customer_without_a_task
     with django_capture_on_commit_callbacks(execute=True):
         hooks.publish_rider_location(rider.pk, 28.47, 77.04, timezone.now(), heading=12.0)
     [(groups, body)] = recorded
-    assert groups == [store_group(rider.home_store_id)]
+    assert groups == [live_board_group(rider.home_store_id)]  # BUG-0026: live board only
     assert body["data"]["rider_id"] == rider.pk
     assert body["data"]["order_id"] is None  # no active task: no customer socket
 

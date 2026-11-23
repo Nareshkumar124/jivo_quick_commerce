@@ -541,7 +541,8 @@ MESSAGES: list[tuple[str, str, str | None, dict | None, str]] = [
         RIDER_LOCATION,
         "WsOpsRiderLocationData",
         OPS_RIDER_LOCATION_DATA,
-        f"`{OPS_SOCKET}`: the rider map.",
+        f"`{OPS_SOCKET}`: the rider map; only to users with the live order board "
+        "(`orders.view_order` + `orders.cancel_order`), BUG-0026.",
     ),
     (
         "WsOrderRouteMessage",
@@ -555,7 +556,8 @@ MESSAGES: list[tuple[str, str, str | None, dict | None, str]] = [
         DELIVERY_PROGRESS,
         "WsDeliveryProgressData",
         DELIVERY_PROGRESS_DATA,
-        f"`{OPS_SOCKET}`: T-821, live dashboard row update (distance, live ETA, delay).",
+        f"`{OPS_SOCKET}`: T-821, live dashboard row update (distance, live ETA, delay); only "
+        "to users with the live order board (`orders.view_order` + `orders.cancel_order`).",
     ),
     (
         "WsOrderCreatedMessage",

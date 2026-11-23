@@ -20,7 +20,7 @@ from django.db.models import F, Sum
 from django.utils import timezone
 
 from apps.realtime import contract
-from apps.realtime.groups import order_group, rider_group, store_group
+from apps.realtime.groups import live_board_group, order_group, rider_group, store_group
 
 logger = logging.getLogger(__name__)
 
@@ -196,9 +196,10 @@ def publish_rider_location(
     order_id: int | None = None,
     heading: float | None = None,
 ) -> None:
-    """`rider.location` to the ops map of the rider's store (`store_id`, else the rider's home
-    store) and, with `order_id`, to that order's customer. Pass `order_id` only while the rider
-    has an active task for it (ASSIGNED .. AT_CUSTOMER). While the order is OUT_FOR_DELIVERY an
+    """`rider.location` to the ops live map of the rider's store (`store_id`, else the rider's
+    home store; its live-board group only, BUG-0026) and, with `order_id`, to that order's
+    customer. Pass `order_id` only while the rider has an active task for it (ASSIGNED ..
+    AT_CUSTOMER). While the order is OUT_FOR_DELIVERY an
     `order.eta` follows, at most every WS_ETA_MIN_INTERVAL_SECONDS (08 §8)."""
     from apps.realtime.tasks import publish_rider_location_task
 
@@ -237,7 +238,8 @@ def send_rider_location(rider_id, lat, lng, recorded_at, *, store_id, order_id, 
             "heading": heading,
             "recorded_at": recorded_at,
         }
-        send_now([store_group(store_id)], message(contract.RIDER_LOCATION, data))
+        # Live map data: only the sockets that may see the live board (BUG-0026).
+        send_now([live_board_group(store_id)], message(contract.RIDER_LOCATION, data))
         sent.append("ops:" + contract.RIDER_LOCATION)
     if order_id is not None:
         live = _live_delivery(order_id, lat, lng)
@@ -266,7 +268,7 @@ def send_rider_location(rider_id, lat, lng, recorded_at, *, store_id, order_id, 
 
             order = live["order"]
             body = progress_message_data(order, live["task"], (lat, lng))
-            send_now([store_group(order.store_id)], message(contract.DELIVERY_PROGRESS, body))
+            send_now([live_board_group(order.store_id)], message(contract.DELIVERY_PROGRESS, body))
             sent.append("ops:" + contract.DELIVERY_PROGRESS)
     return sent
 
