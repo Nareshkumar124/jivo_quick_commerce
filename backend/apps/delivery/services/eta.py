@@ -11,7 +11,11 @@
   (dispatch not started, searching, offered, unassigned: the same as the serviceability and
   placement ETA); the rider's latest point to the store while ASSIGNED; 0 at the store.
 - Once picked up (order OUT_FOR_DELIVERY): the rider's latest point to the drop, plus the buffer.
-- Distances are straight lines x `ETA_ROAD_FACTOR`, at `ETA_AVG_SPEED_KMPH`. At least 1 minute.
+- Travel times (T-821) come from the road route of `apps.maps` when the leg is known (a task leg
+  from the rider's position, cached and throttled per task; the store -> drop leg, cached per
+  order): Google Routes with traffic when `GOOGLE_MAPS_SERVER_KEY` is set. Without a key, on a
+  provider error, and for objects without a pk, they are straight lines x `ETA_ROAD_FACTOR` at
+  `ETA_AVG_SPEED_KMPH` (the fallback returns exactly that). At least 1 minute.
 - Terminal orders (and orders not yet PLACED) have no live ETA (None).
 
 `Order.eta_at` stays the promise made at placement; the live ETA is only published
@@ -54,6 +58,26 @@ def travel_minutes(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return km / max(settings.ETA_AVG_SPEED_KMPH, 1) * 60  # a 0 setting never divides
 
 
+def _rider_leg_minutes(order, task, point, destination, cached_only=False) -> float:
+    """The rider's current task leg from `point` (road route, cached), else the straight line."""
+    from apps.delivery.services import live_tracking
+
+    tracked = live_tracking.rider_route(task, order, point, cached_only=cached_only)
+    if tracked is not None:
+        return tracked.route.duration_s / 60
+    return travel_minutes(point[0], point[1], destination[0], destination[1])
+
+
+def _store_drop_minutes(order, cached_only=False) -> float:
+    from apps.delivery.services import live_tracking
+
+    route = live_tracking.store_drop_route(order, cached_only=cached_only)
+    if route is not None:
+        return route.duration_s / 60
+    store, drop = order.store.location, order.delivery_location
+    return travel_minutes(store.y, store.x, drop.y, drop.x)
+
+
 def prep_left_minutes(order, now: datetime) -> float:
     if order.status in PREP_DONE_STATUSES:
         return 0.0
@@ -64,7 +88,14 @@ def prep_left_minutes(order, now: datetime) -> float:
     return max(0.0, prep - (now - started).total_seconds() / 60)
 
 
-def compute(order, task=None, rider_point: tuple[float, float] | None = None, now=None):
+def compute(
+    order,
+    task=None,
+    rider_point: tuple[float, float] | None = None,
+    now=None,
+    *,
+    cached_only: bool = False,
+):
     """The live `Eta` of `order` (see the module doc), or None when it has none. `task` is the
     order's delivery task (or None); `rider_point` the rider's latest `(lat, lng)`, if known.
     No queries beyond `order.store` (select it with the order)."""
@@ -78,23 +109,23 @@ def compute(order, task=None, rider_point: tuple[float, float] | None = None, no
         if task_status == TS.AT_CUSTOMER:
             minutes = 0.0
         elif rider_point is not None:
-            minutes = travel_minutes(rider_point[0], rider_point[1], drop.y, drop.x)
+            minutes = _rider_leg_minutes(order, task, rider_point, (drop.y, drop.x), cached_only)
         else:
-            minutes = travel_minutes(store.location.y, store.location.x, drop.y, drop.x)
+            minutes = _store_drop_minutes(order, cached_only)
         total = minutes + settings.ETA_BUFFER_MINUTES
     else:
         if task_status == TS.AT_STORE:
             to_store = 0.0
         elif task_status == TS.ASSIGNED and rider_point is not None:
-            to_store = travel_minutes(
-                rider_point[0], rider_point[1], store.location.y, store.location.x
+            to_store = _rider_leg_minutes(
+                order, task, rider_point, (store.location.y, store.location.x), cached_only
             )
         else:
             to_store = float(settings.ETA_RIDER_WAIT_MINUTES)
         total = (
             prep_left_minutes(order, now)
             + to_store
-            + travel_minutes(store.location.y, store.location.x, drop.y, drop.x)
+            + _store_drop_minutes(order, cached_only)
             + settings.ETA_BUFFER_MINUTES
         )
     minutes = max(1, math.ceil(total))
