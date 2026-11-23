@@ -264,12 +264,17 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Object storage: MinIO locally, S3 in the cloud (django-storages). Private/public bucket split
 # (KYC documents, invoices, product images) is added in Phases 2, 4 and 5.
 S3_ENDPOINT_URL = env_str("S3_ENDPOINT_URL", default="") or None
+# Public host that private-bucket links are signed for (e.g. https://jqc.jivo.in when
+# S3_ENDPOINT_URL is the internal http://minio:9000). Needs the nginx `location /<bucket>/` proxy
+# to MinIO with the original Host header. Empty: links are signed for S3_ENDPOINT_URL.
+S3_PRESIGN_ENDPOINT_URL = env_str("S3_PRESIGN_ENDPOINT_URL", default="") or None
 STORAGES = {
     "default": {
-        "BACKEND": "storages.backends.s3.S3Storage",
+        "BACKEND": "apps.core.storage.PrivateS3Storage",
         "OPTIONS": {
             "bucket_name": env_str("S3_MEDIA_BUCKET", default="jivo-media"),
             "endpoint_url": S3_ENDPOINT_URL,
+            "presign_endpoint_url": S3_PRESIGN_ENDPOINT_URL,
             "access_key": env_str("S3_ACCESS_KEY_ID", default="") or None,
             "secret_key": env_str("S3_SECRET_ACCESS_KEY", default="") or None,
             "region_name": env_str("S3_REGION", default="ap-south-1"),
