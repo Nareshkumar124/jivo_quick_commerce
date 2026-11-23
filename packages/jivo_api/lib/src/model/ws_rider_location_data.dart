@@ -28,6 +28,8 @@ class WsRiderLocationData {
     required this.heading,
 
     required this.recordedAt,
+
+    required this.distanceRemainingM,
   });
 
   @JsonKey(name: r'order_id', required: true, includeIfNull: false)
@@ -47,6 +49,10 @@ class WsRiderLocationData {
   @JsonKey(name: r'recorded_at', required: true, includeIfNull: false)
   final DateTime recordedAt;
 
+  /// T-821: road metres the rider still rides to the customer, or null.
+  @JsonKey(name: r'distance_remaining_m', required: true, includeIfNull: true)
+  final int? distanceRemainingM;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -55,7 +61,8 @@ class WsRiderLocationData {
           other.lat == lat &&
           other.lng == lng &&
           other.heading == heading &&
-          other.recordedAt == recordedAt;
+          other.recordedAt == recordedAt &&
+          other.distanceRemainingM == distanceRemainingM;
 
   @override
   int get hashCode =>
@@ -63,7 +70,8 @@ class WsRiderLocationData {
       lat.hashCode +
       lng.hashCode +
       (heading == null ? 0 : heading.hashCode) +
-      recordedAt.hashCode;
+      recordedAt.hashCode +
+      (distanceRemainingM == null ? 0 : distanceRemainingM.hashCode);
 
   factory WsRiderLocationData.fromJson(Map<String, dynamic> json) =>
       _$WsRiderLocationDataFromJson(json);

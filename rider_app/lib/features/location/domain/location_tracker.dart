@@ -43,6 +43,8 @@ class LocationTracker {
     this._now = _utcNow,
     this._onStats,
     this._onServerStop,
+    this._onTaskMismatch,
+    this._taskId,
     Random? random,
   }) : _random = random ?? Random();
 
@@ -55,7 +57,15 @@ class LocationTracker {
 
   /// Called once when the server stops tracking ([UploadTrackingStopped]).
   final void Function(String code)? _onServerStop;
+
+  /// Called when the server linked the points to another task than
+  /// [taskId] (`active_task_id`, T-821): the app should re-read
+  /// `tasks/current/`. Once per (sent, server) pair, not on every batch.
+  final void Function(int? serverTaskId)? _onTaskMismatch;
   final Random _random;
+
+  int? _taskId;
+  (int?, int?)? _lastMismatch;
 
   TrackingConfig _config;
   TrackingMode _mode;
@@ -79,6 +89,8 @@ class LocationTracker {
 
   int _uploaded = 0;
   int _rejected = 0;
+  int _serverDropped = 0;
+  int _historyOnly = 0;
   LocationPoint? _lastPoint;
   DateTime? _lastUploadAt;
   UploadStatus _lastUploadStatus = UploadStatus.none;
@@ -86,6 +98,9 @@ class LocationTracker {
 
   bool get isRunning => _running;
   TrackingMode get mode => _mode;
+
+  /// The task the app thinks is active, sent with each batch (T-821).
+  int? get taskId => _taskId;
   TrackingConfig get config => _config;
   TrackingIntervals get intervals => _config.intervalsFor(_mode);
 
@@ -102,6 +117,9 @@ class LocationTracker {
     buffered: _buffer.length,
     uploaded: _uploaded,
     rejected: _rejected,
+    serverDropped: _serverDropped,
+    historyOnly: _historyOnly,
+    taskId: _taskId,
     droppedOverflow: _buffer.droppedOverflow,
     lastPoint: _lastPoint,
     lastUploadAt: _lastUploadAt,
@@ -154,8 +172,14 @@ class LocationTracker {
     await _buffer.settle();
   }
 
-  /// Switches between idle and on-task intervals.
-  void setMode(TrackingMode mode) {
+  /// Switches between idle and on-task intervals, and sets the task the
+  /// next batches are sent with (null when idle).
+  void setMode(TrackingMode mode, {int? taskId}) {
+    if (taskId != _taskId) {
+      _taskId = taskId;
+      _lastMismatch = null;
+      _emit();
+    }
     if (mode == _mode) return;
     final before = intervals;
     _mode = mode;
@@ -192,8 +216,9 @@ class LocationTracker {
       if (batch == null) return;
 
       UploadResult result;
+      final sentTaskId = _taskId;
       try {
-        result = await _uploader.upload(batch.points);
+        result = await _uploader.upload(batch.points, taskId: sentTaskId);
       } catch (error) {
         result = UploadRetryLater(error);
       }
@@ -201,12 +226,18 @@ class LocationTracker {
 
       switch (result) {
         case UploadAccepted():
+          // The whole batch is done, including points the server dropped
+          // (too old, a GPS jump): those are never sent again.
           await _buffer.acknowledge(batch);
-          _uploaded += batch.length;
+          final dropped = result.dropped.clamp(0, batch.length);
+          _uploaded += batch.length - dropped;
+          _serverDropped += dropped;
+          _historyOnly += result.outOfOrder + result.lowAccuracy;
           _lastUploadStatus = UploadStatus.accepted;
           _lastError = null;
           _onContact();
           _applyServerSettings(result);
+          _checkTask(result, sentTaskId);
         case UploadRejected(:final code):
           await _buffer.acknowledge(batch);
           _rejected += batch.length;
@@ -226,6 +257,22 @@ class LocationTracker {
       }
       _emit();
     }
+  }
+
+  void _checkTask(UploadAccepted result, int? sent) {
+    if (!result.reportsActiveTask) return;
+    final server = result.activeTaskId;
+    // The task changed on the phone while the batch was in flight.
+    if (sent != _taskId || server == sent) return;
+    final pair = (sent, server);
+    // One reload per mismatch. If the same mismatch persists after it (the
+    // reload kept this task, e.g. `tasks/current/` still returns it), it is
+    // not reported again: re-reading on every batch would loop without
+    // changing anything. A different server task, or a task change on the
+    // phone (setMode clears [_lastMismatch]), is a new mismatch.
+    if (_lastMismatch == pair) return;
+    _lastMismatch = pair;
+    _onTaskMismatch?.call(server);
   }
 
   /// The server returns its current location settings with every answer,
@@ -309,6 +356,7 @@ class LocationTracker {
         _heartbeats++;
         _onContact();
         _applyServerSettings(result);
+        _checkTask(result, _taskId);
       case UploadRejected():
         _heartbeats++;
         _onContact();

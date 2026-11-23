@@ -4015,6 +4015,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Average rating {average} out of 5'**
   String ratingAverageSemantics(String average);
+
+  /// No description provided for @navToStore.
+  ///
+  /// In en, this message translates to:
+  /// **'To the store'**
+  String get navToStore;
+
+  /// No description provided for @navToCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'To the customer'**
+  String get navToCustomer;
+
+  /// No description provided for @navDistanceKm.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km'**
+  String navDistanceKm(String km);
+
+  /// No description provided for @navDistanceM.
+  ///
+  /// In en, this message translates to:
+  /// **'{metres} m'**
+  String navDistanceM(int metres);
+
+  /// No description provided for @navEtaMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String navEtaMinutes(int minutes);
+
+  /// No description provided for @navArriveBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Reach by {time}'**
+  String navArriveBy(String time);
+
+  /// No description provided for @navArrived.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re here'**
+  String get navArrived;
+
+  /// No description provided for @navWaitingForLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your location. Distance and time show soon.'**
+  String get navWaitingForLocation;
+
+  /// No description provided for @navStraightLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Straight-line estimate'**
+  String get navStraightLine;
+
+  /// No description provided for @navLocationOld.
+  ///
+  /// In en, this message translates to:
+  /// **'Location not updated for {minutes} min. Check GPS and network.'**
+  String navLocationOld(int minutes);
+
+  /// No description provided for @navMapSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Map: your route to {place}'**
+  String navMapSemantics(String place);
 }
 
 class _AppLocalizationsDelegate

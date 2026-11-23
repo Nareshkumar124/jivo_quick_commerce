@@ -17,6 +17,9 @@ class TrackerStats {
     required this.uploaded,
     required this.rejected,
     required this.droppedOverflow,
+    this.serverDropped = 0,
+    this.historyOnly = 0,
+    this.taskId,
     this.lastPoint,
     this.lastUploadAt,
     this.lastUploadStatus = UploadStatus.none,
@@ -36,6 +39,9 @@ class TrackerStats {
     uploaded: json['uploaded'] as int,
     rejected: json['rejected'] as int,
     droppedOverflow: json['dropped_overflow'] as int,
+    serverDropped: json['server_dropped'] as int? ?? 0,
+    historyOnly: json['history_only'] as int? ?? 0,
+    taskId: json['task_id'] as int?,
     lastPoint: json['last_point'] == null
         ? null
         : LocationPoint.fromJson(
@@ -69,6 +75,17 @@ class TrackerStats {
   /// Points dropped because the offline buffer was full.
   final int droppedOverflow;
 
+  /// Points the server dropped from accepted batches (`rejected`: too old,
+  /// in the future, (0, 0), a GPS jump). Never resent.
+  final int serverDropped;
+
+  /// Points the server kept as history only (`out_of_order`,
+  /// `low_accuracy`): they do not move the rider on the maps.
+  final int historyOnly;
+
+  /// The task sent with the batches, or null when idle.
+  final int? taskId;
+
   final LocationPoint? lastPoint;
   final DateTime? lastUploadAt;
   final UploadStatus lastUploadStatus;
@@ -92,6 +109,9 @@ class TrackerStats {
     'uploaded': uploaded,
     'rejected': rejected,
     'dropped_overflow': droppedOverflow,
+    'server_dropped': serverDropped,
+    'history_only': historyOnly,
+    'task_id': taskId,
     'last_point': lastPoint?.toJson(),
     'last_upload_at': lastUploadAt?.toUtc().toIso8601String(),
     'last_upload_status': lastUploadStatus.name,

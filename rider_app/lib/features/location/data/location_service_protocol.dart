@@ -13,6 +13,7 @@ class LocationTaskSettings {
   const LocationTaskSettings({
     required this.config,
     required this.mode,
+    this.taskId,
     this.simulateOffline = false,
     this.simulateServerOffline = false,
     this.api = ServiceApiSettings.fake,
@@ -24,6 +25,7 @@ class LocationTaskSettings {
           (json['config'] as Map).cast<String, dynamic>(),
         ),
         mode: TrackingMode.values.byName(json['mode'] as String),
+        taskId: json['task_id'] as int?,
         simulateOffline: json['simulate_offline'] as bool? ?? false,
         simulateServerOffline:
             json['simulate_server_offline'] as bool? ?? false,
@@ -61,6 +63,10 @@ class LocationTaskSettings {
   final TrackingConfig config;
   final TrackingMode mode;
 
+  /// The task the app thinks is active (sent with the batches, T-821), so
+  /// a service restarted by the system keeps sending it.
+  final int? taskId;
+
   /// Dev only: makes the fake uploader fail like a dropped network.
   final bool simulateOffline;
 
@@ -74,11 +80,14 @@ class LocationTaskSettings {
   LocationTaskSettings copyWith({
     TrackingConfig? config,
     TrackingMode? mode,
+    int? taskId,
+    bool clearTaskId = false,
     bool? simulateOffline,
     bool? simulateServerOffline,
   }) => LocationTaskSettings(
     config: config ?? this.config,
     mode: mode ?? this.mode,
+    taskId: clearTaskId ? null : taskId ?? this.taskId,
     simulateOffline: simulateOffline ?? this.simulateOffline,
     simulateServerOffline: simulateServerOffline ?? this.simulateServerOffline,
     api: api,
@@ -87,6 +96,7 @@ class LocationTaskSettings {
   Map<String, dynamic> toJson() => {
     'config': config.toJson(),
     'mode': mode.name,
+    'task_id': taskId,
     'simulate_offline': simulateOffline,
     'simulate_server_offline': simulateServerOffline,
     'api': api.toJson(),
@@ -131,9 +141,10 @@ abstract final class LocationMessages {
   static const _type = 'type';
 
   // UI -> service
-  static Map<String, Object> setMode(TrackingMode mode) => {
+  static Map<String, Object?> setMode(TrackingMode mode, {int? taskId}) => {
     _type: 'set_mode',
     'mode': mode.name,
+    'task_id': taskId,
   };
   static Map<String, Object> simulateOffline(bool value) => {
     _type: 'simulate_offline',
@@ -157,6 +168,16 @@ abstract final class LocationMessages {
   static const destroyed = {_type: 'destroyed'};
 
   static bool isDestroyed(Object data) => typeOf(data) == 'destroyed';
+
+  /// The server linked the points to another task (`active_task_id`,
+  /// T-821): the app re-reads `tasks/current/`.
+  static Map<String, Object?> taskMismatch(int? serverTaskId) => {
+    _type: 'task_mismatch',
+    'task_id': serverTaskId,
+  };
+
+  /// Whether [data] is a `task_mismatch` message.
+  static bool isTaskMismatch(Object data) => typeOf(data) == 'task_mismatch';
 
   static Map<String, Object> serverStop(String code) => {
     _type: 'server_stop',

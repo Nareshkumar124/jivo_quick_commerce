@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../app/brand.dart';
 import '../../../app/providers.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/jivo_wordmark.dart';
 import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import 'blocking_message.dart';
@@ -68,23 +70,33 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       );
     }
 
+    // Brand green with the white wordmark, continuing the native splash.
     final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: kJivoBrandGreen,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.delivery_dining,
-              size: 96,
-              color: theme.colorScheme.primary,
+            const JivoWordmark(
+              key: Key('splash-logo'),
+              height: 80,
+              color: Colors.white,
             ),
             const SizedBox(height: 16),
-            Text(l10n.appTitle, style: theme.textTheme.headlineMedium),
+            Text(
+              l10n.appTitle,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                color: Colors.white,
+              ),
+            ),
             const SizedBox(height: 32),
-            const CircularProgressIndicator(),
+            const CircularProgressIndicator(color: Colors.white),
             const SizedBox(height: 16),
-            Text(l10n.splashLoading),
+            Text(
+              l10n.splashLoading,
+              style: const TextStyle(color: Colors.white),
+            ),
           ],
         ),
       ),

@@ -1408,5 +1408,58 @@
         "type": "String"
       }
     }
+  },
+  "navToStore": "To the store",
+  "navToCustomer": "To the customer",
+  "navDistanceKm": "{km} km",
+  "@navDistanceKm": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "navDistanceM": "{metres} m",
+  "@navDistanceM": {
+    "placeholders": {
+      "metres": {
+        "type": "int"
+      }
+    }
+  },
+  "navEtaMinutes": "{minutes} min",
+  "@navEtaMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "navArriveBy": "Reach by {time}",
+  "@navArriveBy": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "navArrived": "You're here",
+  "navWaitingForLocation": "Waiting for your location. Distance and time show soon.",
+  "navStraightLine": "Straight-line estimate",
+  "navLocationOld": "Location not updated for {minutes} min. Check GPS and network.",
+  "@navLocationOld": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "navMapSemantics": "Map: your route to {place}",
+  "@navMapSemantics": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
   }
 }

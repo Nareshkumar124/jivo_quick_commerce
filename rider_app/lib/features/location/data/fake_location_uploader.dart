@@ -40,7 +40,7 @@ class FakeLocationUploader implements LocationUploader {
   }
 
   @override
-  Future<UploadResult> upload(List<LocationPoint> batch) async {
+  Future<UploadResult> upload(List<LocationPoint> batch, {int? taskId}) async {
     final failure = await _common();
     if (failure != null) return failure;
     sentBatches.add(List.unmodifiable(batch));

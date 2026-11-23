@@ -120,6 +120,26 @@ void main() {
     );
   });
 
+  testWidgets('the preview decodes at display size, not full camera size', (
+    tester,
+  ) async {
+    await openDocuments(tester);
+    await openCapture(tester, KycDocumentType.pan);
+    await takePhoto(tester);
+
+    final image = tester.widget<Image>(byKey('capture-preview'));
+    expect(image.gaplessPlayback, isTrue);
+    expect(image.errorBuilder, isNotNull);
+    final provider = image.image as ResizeImage;
+    expect(provider.imageProvider, isA<MemoryImage>());
+    expect(provider.policy, ResizeImagePolicy.fit);
+    const dpr = 2.625; // the harness device
+    expect(provider.height, (280 * dpr).round());
+    final width = tester.getSize(byKey('capture-preview')).width;
+    expect(provider.width, (width * dpr).round());
+    expect(provider.width, lessThanOrEqualTo(1080));
+  });
+
   testWidgets('Retake drops the photo and goes back to camera / gallery', (
     tester,
   ) async {

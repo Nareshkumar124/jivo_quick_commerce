@@ -67,6 +67,8 @@ abstract class _$RiderTaskCWProxy {
 
   RiderTask earnings(TaskEarnings? earnings);
 
+  RiderTask navigation(TaskNavigation? navigation);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RiderTask(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -104,6 +106,7 @@ abstract class _$RiderTaskCWProxy {
     DeliveryFailReasonEnum? failReason,
     DateTime? returnedAt,
     TaskEarnings? earnings,
+    TaskNavigation? navigation,
   });
 }
 
@@ -219,6 +222,10 @@ class _$RiderTaskCWProxyImpl implements _$RiderTaskCWProxy {
   RiderTask earnings(TaskEarnings? earnings) => this(earnings: earnings);
 
   @override
+  RiderTask navigation(TaskNavigation? navigation) =>
+      this(navigation: navigation);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RiderTask(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -256,6 +263,7 @@ class _$RiderTaskCWProxyImpl implements _$RiderTaskCWProxy {
     Object? failReason = const $CopyWithPlaceholder(),
     Object? returnedAt = const $CopyWithPlaceholder(),
     Object? earnings = const $CopyWithPlaceholder(),
+    Object? navigation = const $CopyWithPlaceholder(),
   }) {
     return RiderTask(
       id: id == const $CopyWithPlaceholder()
@@ -378,6 +386,10 @@ class _$RiderTaskCWProxyImpl implements _$RiderTaskCWProxy {
           ? _value.earnings
           // ignore: cast_nullable_to_non_nullable
           : earnings as TaskEarnings?,
+      navigation: navigation == const $CopyWithPlaceholder()
+          ? _value.navigation
+          // ignore: cast_nullable_to_non_nullable
+          : navigation as TaskNavigation?,
     );
   }
 }
@@ -429,6 +441,7 @@ RiderTask _$RiderTaskFromJson(Map<String, dynamic> json) => $checkedCreate(
         'fail_reason',
         'returned_at',
         'earnings',
+        'navigation',
       ],
     );
     final val = RiderTask(
@@ -547,6 +560,12 @@ RiderTask _$RiderTaskFromJson(Map<String, dynamic> json) => $checkedCreate(
         (v) =>
             v == null ? null : TaskEarnings.fromJson(v as Map<String, dynamic>),
       ),
+      navigation: $checkedConvert(
+        'navigation',
+        (v) => v == null
+            ? null
+            : TaskNavigation.fromJson(v as Map<String, dynamic>),
+      ),
     );
     return val;
   },
@@ -608,6 +627,7 @@ Map<String, dynamic> _$RiderTaskToJson(RiderTask instance) => <String, dynamic>{
   'fail_reason': _$DeliveryFailReasonEnumEnumMap[instance.failReason],
   'returned_at': instance.returnedAt?.toIso8601String(),
   'earnings': instance.earnings?.toJson(),
+  'navigation': instance.navigation?.toJson(),
 };
 
 const _$DeliveryTaskStatusEnumEnumMap = {

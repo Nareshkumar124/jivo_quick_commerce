@@ -65,6 +65,12 @@ dependencies:
   # barcode (bundled model, so the first scan works offline at the store).
   mobile_scanner: ^7.5.0
 
+  # Active delivery map (T-821): rider position, destination and the
+  # server's route polyline. Same version as customer_app (shared-version
+  # check) and the same build-time key mechanism (DL-80): without a key the
+  # task screens show the no-map card.
+  google_maps_flutter: ^2.19.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -77,3 +83,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  assets:
+    - assets/brand/

@@ -277,6 +277,7 @@ const Map<String, Object?> arrivedCustomerExample = {
   "fail_reason": null,
   "returned_at": null,
   "earnings": null,
+  "navigation": navToCustomerArrivedExample,
   "status": "AT_CUSTOMER",
   "order_status": "OUT_FOR_DELIVERY",
   "ready_for_pickup": true,
@@ -352,6 +353,7 @@ const Map<String, Object?> deliveredTaskExample = {
       {"type": "TIP", "amount": "20.00", "note": "Customer tip"},
     ],
   },
+  "navigation": null,
   "status": "DELIVERED",
   "order_status": "DELIVERED",
   "ready_for_pickup": true,
@@ -417,6 +419,7 @@ const Map<String, Object?> currentTaskAtStoreExample = {
     "fail_reason": null,
     "returned_at": null,
     "earnings": null,
+    "navigation": navToStoreArrivedExample,
     "status": "AT_STORE",
     "order_status": "PACKED",
     "ready_for_pickup": true,
@@ -494,4 +497,64 @@ const Map<String, Object?> historyDetailExample = {
       {"type": "TIP", "amount": "20.00", "note": ""},
     ],
   },
+};
+
+// T-821 `navigation` (backend `apps/delivery/examples.py` NAV_TO_STORE /
+// NAV_TO_CUSTOMER).
+const Map<String, Object?> navToStoreExample = {
+  "leg": "TO_STORE",
+  "destination": {"lat": 28.4718, "lng": 77.0436},
+  "route": {
+    "leg": "TO_STORE",
+    "polyline": "kdumDcbguMa@wBeAoD",
+    "distance_m": 820,
+    "duration_s": 190,
+    "provider": "google",
+    "traffic_aware": true,
+    "computed_at": "2026-11-10T09:31:05.000000Z",
+  },
+  "distance_m": 820,
+  "eta_minutes": 4,
+  "eta_at": "2026-11-10T09:35:00.120000Z",
+  "position_at": "2026-11-10T09:31:00.000000Z",
+};
+
+const Map<String, Object?> navToCustomerExample = {
+  "leg": "TO_CUSTOMER",
+  "destination": {"lat": 28.5012, "lng": 77.0688},
+  "route": {
+    "leg": "TO_CUSTOMER",
+    "polyline": "kdumDcbguMa@wBeAoD",
+    "distance_m": 2400,
+    "duration_s": 540,
+    "provider": "haversine",
+    "traffic_aware": false,
+    "computed_at": "2026-11-10T09:31:05.000000Z",
+  },
+  "distance_m": 2400,
+  "eta_minutes": 9,
+  "eta_at": "2026-11-10T09:40:00.120000Z",
+  "position_at": "2026-11-10T09:31:00.000000Z",
+};
+
+/// At the store: ETA 0.
+const Map<String, Object?> navToStoreArrivedExample = {
+  "leg": "TO_STORE",
+  "destination": {"lat": 28.4718, "lng": 77.0436},
+  "route": null,
+  "distance_m": 0,
+  "eta_minutes": 0,
+  "eta_at": "2026-11-10T09:35:00.120000Z",
+  "position_at": "2026-11-10T09:31:00.000000Z",
+};
+
+/// At the customer: ETA 0.
+const Map<String, Object?> navToCustomerArrivedExample = {
+  "leg": "TO_CUSTOMER",
+  "destination": {"lat": 28.5012, "lng": 77.0688},
+  "route": null,
+  "distance_m": 0,
+  "eta_minutes": 0,
+  "eta_at": "2026-11-10T09:40:00.120000Z",
+  "position_at": "2026-11-10T09:31:00.000000Z",
 };

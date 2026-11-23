@@ -6,6 +6,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../shared/errors/rider_error_codes.dart';
 import '../../offers/domain/delivery_offer.dart';
 import '../domain/rider_task.dart';
+import '../domain/task_navigation.dart';
 import '../domain/task_repositories.dart';
 import '../domain/task_rules.dart';
 import '../domain/task_status.dart';
@@ -575,11 +576,70 @@ class FakeTaskBackend
     return _withPickupState(task);
   }
 
-  /// `pickup_code {attempts_remaining, locked}` as the server sends it.
-  RiderTask _withPickupState(RiderTask task) => task.copyWith(
-    pickupAttemptsRemaining: _pickupAttemptsLeft,
-    pickupLocked: _pickupAttemptsLeft <= 0,
-  );
+  /// `pickup_code {attempts_remaining, locked}` as the server sends it,
+  /// and `navigation` for the task's leg.
+  RiderTask _withPickupState(RiderTask task) {
+    final navigation = fakeNavigation(task.status);
+    return task.copyWith(
+      pickupAttemptsRemaining: _pickupAttemptsLeft,
+      pickupLocked: _pickupAttemptsLeft <= 0,
+      navigation: navigation,
+      clearNavigation: navigation == null,
+    );
+  }
+
+  /// Where the fake rider is while riding to the store.
+  static const riderStart = GeoPoint(28.5651, 77.3199);
+
+  /// `navigation` as the server sends it without a Maps key (a straight
+  /// `haversine` line): to the store before pickup, to the customer after,
+  /// null in other states.
+  static TaskNavigation? fakeNavigation(TaskStatus status) {
+    final (leg, from, to, metres, minutes) = switch (status) {
+      TaskStatus.assigned => (
+        NavigationLeg.toStore,
+        riderStart,
+        store.location,
+        1100,
+        4,
+      ),
+      TaskStatus.atStore => (
+        NavigationLeg.toStore,
+        store.location,
+        store.location,
+        0,
+        0,
+      ),
+      TaskStatus.pickedUp => (
+        NavigationLeg.toCustomer,
+        store.location,
+        customerLocation,
+        2400,
+        8,
+      ),
+      TaskStatus.atCustomer => (
+        NavigationLeg.toCustomer,
+        customerLocation,
+        customerLocation,
+        0,
+        0,
+      ),
+      _ => (null, null, null, null, null),
+    };
+    if (leg == null || from == null || to == null) return null;
+    return TaskNavigation(
+      leg: leg,
+      destination: to,
+      route: NavigationRoute(
+        polyline: encodePolyline([from, to]),
+        distanceM: metres!,
+        durationS: minutes! * 60,
+        isRoad: false,
+      ),
+      distanceM: metres,
+      etaMinutes: minutes,
+    );
+  }
 
   static ApiError _riderError(
     RiderErrorCode code,
