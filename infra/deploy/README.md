@@ -63,7 +63,8 @@ rider KYC and bank numbers cannot be read.** Copy that file offsite by hand (D7)
 Staging values (non-secret): `DJANGO_SETTINGS_MODULE=config.settings.staging`,
 `DJANGO_ALLOWED_HOSTS=jqc.jivo.in`, `DJANGO_CSRF_TRUSTED_ORIGINS=https://jqc.jivo.in`,
 `NUM_PROXIES=1`, `OTP_TEST_NUMBERS=+919000000001:123456,+919000000002:123456,+919000000003:123456`
-(D3, staging only), `S3_ENDPOINT_URL=http://minio:9000`, `S3_PUBLIC_MEDIA_DOMAIN=jqc.jivo.in/media`,
+(D3, staging only), `S3_ENDPOINT_URL=http://minio:9000`, `S3_PRESIGN_ENDPOINT_URL=https://jqc.jivo.in`,
+`S3_PUBLIC_MEDIA_DOMAIN=jqc.jivo.in/media`,
 `EMAIL_BACKEND=django.core.mail.backends.dummy.EmailBackend` (no SMTP yet), `COD_UPI_QR_ENABLED=false`.
 `STAFF_MFA_ENFORCED` is left at its default (on).
 
@@ -189,9 +190,13 @@ Never `docker system prune`, never touch other containers, never edit `/etc/dock
 
 ## Known staging limits
 
-- **Private media links** (KYC files, invoices) are presigned against `http://minio:9000`, which is
-  not reachable from outside. Public catalog images work through `/media/`. Fix later with S3 or a
-  public MinIO endpoint for presigning.
+- **Private media links** (KYC files, invoices, support photos, exports) are presigned for
+  `https://jqc.jivo.in/jivo-media/<key>?X-Amz-...` (`S3_PRESIGN_ENDPOINT_URL=https://jqc.jivo.in`).
+  The site file's `location /jivo-media/` passes them unchanged to MinIO (127.0.0.1:19000) with
+  `Host: jqc.jivo.in`, so MinIO checks the signature itself; GET/HEAD only, never cached, bucket
+  root returns 404. Uploads and reads by the backend still go to `http://minio:9000`. No MinIO
+  setting is needed (do not set `MINIO_DOMAIN`). Until a CDN or S3 exists, private files are
+  served by the shared host's nginx.
 - **No SMS gateway** (D-02): only the fixed OTP test numbers can log in.
 - **No Razorpay keys** (D4, COD only): online payment fails; COD works.
 - **No email** (dummy backend), **no Sentry**, **no backups or monitoring yet** (D7/D8, plan.md §8).
