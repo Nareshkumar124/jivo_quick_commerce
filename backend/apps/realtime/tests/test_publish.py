@@ -256,7 +256,14 @@ def test_rider_location_goes_to_the_store_and_the_order(
             41, 28.47, 77.04, timezone.now(), store_id=order.store_id, order_id=order.pk, heading=90
         )
     [mine] = customer.messages()
-    assert set(mine["data"]) == {"order_id", "lat", "lng", "heading", "recorded_at"}  # no rider id
+    assert set(mine["data"]) == {
+        "order_id",
+        "lat",
+        "lng",
+        "heading",
+        "recorded_at",
+        "distance_remaining_m",  # T-821
+    }  # no rider id
     validate(components, "WsRiderLocationMessage", mine)
     [theirs] = ops.messages()
     validate(components, "WsOpsRiderLocationMessage", theirs)

@@ -5,8 +5,15 @@ would (local and staging testing of tracking, auto-offline and later dispatch; 0
 
 The rider must be ACTIVE; `--go-online` starts a shift at the home store first. Points go
 through the same service as `POST /rider/locations/`. Refused where seed_demo is refused.
+
+T-821: pings carry the heading of the route, and the ingest drops GPS jumps faster than
+RIDER_LOCATION_MAX_SPEED_KMPH (150 km/h). Each fix is stamped no earlier than the time a rider
+at `--speed-kmph` (default 30) would need to get there, so a fast replay (`--interval 0`) still
+looks like riding; with `--interval 0` keep the route short (the server refuses fixes more than
+2 minutes ahead of its clock). Start `--from` near the rider's last position.
 """
 
+import math
 import time
 from datetime import timedelta
 
@@ -17,6 +24,17 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.core.exceptions import ApiError
 from apps.delivery.services import shifts
+
+
+def bearing(start: tuple[float, float], end: tuple[float, float]) -> float | None:
+    """Initial bearing from `start` to `end`, degrees from north (0-360); None if equal."""
+    if start == end:
+        return None
+    lat1, lat2 = math.radians(start[0]), math.radians(end[0])
+    dlng = math.radians(end[1] - start[1])
+    x = math.sin(dlng) * math.cos(lat2)
+    y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlng)
+    return round((math.degrees(math.atan2(x, y)) + 360) % 360, 1)
 
 
 def _pair(value: str) -> tuple[float, float]:
@@ -37,6 +55,9 @@ class Command(BaseCommand):
         parser.add_argument("--steps", type=int, default=20)
         parser.add_argument("--interval", type=float, default=5.0, help="Seconds between pings.")
         parser.add_argument("--go-online", action="store_true", help="Start a shift first.")
+        parser.add_argument(
+            "--speed-kmph", type=float, default=30.0, help="Simulated riding speed (T-821)."
+        )
 
     def handle(self, *args, **options) -> None:
         if not settings.SEED_DEMO_ALLOWED:
@@ -60,6 +81,13 @@ class Command(BaseCommand):
                     start = (store.location.y, store.location.x)
             end = _pair(options["to"])
             steps = max(1, options["steps"])
+            heading = bearing(start, end)
+            from apps.stores.services import haversine_km
+
+            started = timezone.now()
+            leg_seconds = (
+                haversine_km(*start, *end) / max(options["speed_kmph"], 1.0) * 3600 / steps
+            )
             for step in range(1, steps + 1):
                 fraction = step / steps
                 point = {
@@ -67,8 +95,11 @@ class Command(BaseCommand):
                     "lng": start[1] + (end[1] - start[1]) * fraction,
                     "accuracy": 8.0,
                     "speed": 5.5,
-                    "heading": None,
-                    "recorded_at": timezone.now() + timedelta(microseconds=step),
+                    "heading": heading,
+                    "recorded_at": max(
+                        timezone.now() + timedelta(microseconds=step),
+                        started + timedelta(seconds=leg_seconds * step),
+                    ),
                     "is_mocked": False,
                 }
                 result = shifts.ingest_locations(user, [point])

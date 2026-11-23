@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     "apps.referrals",  # 2026-11-13: refer a friend (personal reward coupons)
     "apps.reports",  # Phase 7: dashboard metrics, reports, exports (05 §1.1, §4)
     "apps.realtime",  # Phase 6: WebSockets (06 §4)
+    "apps.maps",  # T-821: server-side routes (Google Routes API / straight-line fallback)
     "apps.loadtest",  # P8 T-812: load-test data commands (no models, no API)
     "apps.ops_console",
 ]
@@ -632,6 +633,11 @@ SPECTACULAR_SETTINGS = {
         "ShiftEndReasonEnum": "apps.delivery.choices.ShiftEndReason",
         "ShiftEndedByEnum": "apps.delivery.choices.ShiftEndedBy",
         "DeliveryTaskStatusEnum": "apps.delivery.choices.DeliveryTaskStatus",
+        "TrackingStepEnum": "apps.delivery.choices.TrackingStep",
+        "TrackingOutcomeEnum": "apps.delivery.choices.TrackingOutcome",
+        "RouteLegEnum": "apps.delivery.choices.RouteLeg",
+        "RouteProviderEnum": "apps.delivery.choices.RouteProvider",
+        "LiveRiderStateEnum": "apps.delivery.choices.LiveRiderState",
         "OfferRejectReasonEnum": "apps.delivery.choices.OfferRejectReason",
         "DeliveryFailReasonEnum": "apps.delivery.choices.DeliveryFailReason",
         "RiderPaymentTypeEnum": "apps.delivery.choices.PaymentType",
@@ -709,6 +715,33 @@ ETA_ROAD_FACTOR = env_float("ETA_ROAD_FACTOR", default=1.3)
 ETA_BUFFER_MINUTES = env_int("ETA_BUFFER_MINUTES", default=2)
 # Typical wait for a rider at the store, used by the serviceability ETA (PM default 3 min).
 ETA_RIDER_WAIT_MINUTES = env_int("ETA_RIDER_WAIT_MINUTES", default=3)
+
+# Maps on the server (T-821, apps.maps): road routes for live tracking and the rider's navigation.
+# MAPS_PROVIDER: "auto" (Google when GOOGLE_MAPS_SERVER_KEY is set, else the straight-line
+# fallback), "google" or "haversine" (straight line x ETA_ROAD_FACTOR at ETA_AVG_SPEED_KMPH, no
+# network). Any Google error falls back to the straight line for MAPS_PROVIDER_COOLDOWN_SECONDS.
+MAPS_PROVIDER = env_str("MAPS_PROVIDER", default="auto")
+# Server key (Routes API + Geocoding API), restricted to the server's IPs. Never the app keys.
+GOOGLE_MAPS_SERVER_KEY = env_str("GOOGLE_MAPS_SERVER_KEY", default="")
+MAPS_HTTP_TIMEOUT_SECONDS = env_float("MAPS_HTTP_TIMEOUT_SECONDS", default=3.0)
+# Routes API travelMode: TWO_WHEELER (supported in India) or DRIVE.
+MAPS_TRAVEL_MODE = env_str("MAPS_TRAVEL_MODE", default="TWO_WHEELER")
+MAPS_PROVIDER_COOLDOWN_SECONDS = env_int("MAPS_PROVIDER_COOLDOWN_SECONDS", default=60)
+# A rider's route is recomputed (one Routes API call) only when the rider moved more than
+# MAPS_ROUTE_RECOMPUTE_DISTANCE_M from where it was computed, or it is older than
+# MAPS_ROUTE_MAX_AGE_SECONDS; never more often than MAPS_ROUTE_MIN_INTERVAL_SECONDS. In between,
+# the cached route is scaled to the rider's straight-line progress.
+MAPS_ROUTE_RECOMPUTE_DISTANCE_M = env_int("MAPS_ROUTE_RECOMPUTE_DISTANCE_M", default=150)
+MAPS_ROUTE_MAX_AGE_SECONDS = env_int("MAPS_ROUTE_MAX_AGE_SECONDS", default=120)
+MAPS_ROUTE_MIN_INTERVAL_SECONDS = env_int("MAPS_ROUTE_MIN_INTERVAL_SECONDS", default=20)
+# Fixed legs (store -> drop) are cached this long.
+MAPS_ROUTE_CACHE_SECONDS = env_int("MAPS_ROUTE_CACHE_SECONDS", default=3600)
+# Live tracking (T-821): a rider position older than this is "stale" (marker greyed out).
+TRACKING_STALE_SECONDS = env_int("TRACKING_STALE_SECONDS", default=60)
+# The "Arriving" step: the rider is on the way and within this distance of the drop.
+TRACKING_ARRIVING_RADIUS_M = env_int("TRACKING_ARRIVING_RADIUS_M", default=500)
+# Ops "delayed": the live ETA is later than the promised `eta_at` by more than this.
+TRACKING_DELAY_GRACE_MINUTES = env_int("TRACKING_DELAY_GRACE_MINUTES", default=2)
 # Notify-me leads per user (or IP when anonymous). Fails open when Redis is down.
 REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"] = {
     "notify_me": env_str("NOTIFY_ME_RATE", default="10/hour"),
@@ -840,6 +873,13 @@ RIDER_HEARTBEAT_PRESENCE_MAX_LOCATION_AGE_MINUTES = env_int(
 # RIDER_LOCATION_MAX_FUTURE_SECONDS ahead of the server clock, is not stored.
 RIDER_LOCATION_MAX_AGE_HOURS = env_int("RIDER_LOCATION_MAX_AGE_HOURS", default=24)
 RIDER_LOCATION_MAX_FUTURE_SECONDS = env_int("RIDER_LOCATION_MAX_FUTURE_SECONDS", default=120)
+# T-821 ingest sanity: a point implying more than this speed from the rider's previous accepted
+# point (within RIDER_LOCATION_JUMP_WINDOW_SECONDS) is a GPS jump and is not stored. A point
+# with a worse accuracy than RIDER_LOCATION_MAX_ACCURACY_M is stored (history) but never moves
+# the rider's live position.
+RIDER_LOCATION_MAX_SPEED_KMPH = env_int("RIDER_LOCATION_MAX_SPEED_KMPH", default=150)
+RIDER_LOCATION_JUMP_WINDOW_SECONDS = env_int("RIDER_LOCATION_JUMP_WINDOW_SECONDS", default=600)
+RIDER_LOCATION_MAX_ACCURACY_M = env_int("RIDER_LOCATION_MAX_ACCURACY_M", default=300)
 # 08 §5 / 04 §2.5-2.6 geofences (slice 5.3); a reported accuracy widens them by at most
 # RIDER_GEOFENCE_MAX_ACCURACY_SLACK_M.
 RIDER_STORE_GEOFENCE_M = env_int("RIDER_STORE_GEOFENCE_M", default=200)

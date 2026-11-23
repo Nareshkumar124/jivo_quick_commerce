@@ -240,18 +240,68 @@ def send_rider_location(rider_id, lat, lng, recorded_at, *, store_id, order_id, 
         send_now([store_group(store_id)], message(contract.RIDER_LOCATION, data))
         sent.append("ops:" + contract.RIDER_LOCATION)
     if order_id is not None:
+        live = _live_delivery(order_id, lat, lng)
+        tracked = live["tracked"] if live else None
         data = {
             "order_id": order_id,
             "lat": lat,
             "lng": lng,
             "heading": heading,
             "recorded_at": recorded_at,
+            "distance_remaining_m": live["distance_remaining_m"] if live else None,
         }
         send_now([order_group(order_id)], message(contract.RIDER_LOCATION, data))
         sent.append(contract.RIDER_LOCATION)
+        if tracked is not None and tracked.fresh:
+            from apps.delivery.services.live_tracking import route_body
+
+            route = {"order_id": order_id, **route_body(live["task"], tracked)}
+            route["computed_at"] = iso(route["computed_at"])
+            send_now([order_group(order_id)], message(contract.ORDER_ROUTE, route))
+            sent.append(contract.ORDER_ROUTE)
         if publish_eta_from_location(order_id, lat, lng):
             sent.append(contract.ORDER_ETA)
+        if live and _first_in_window(f"ws:progress:{order_id}"):
+            from apps.delivery.services.live_ops import progress_message_data
+
+            order = live["order"]
+            body = progress_message_data(order, live["task"], (lat, lng))
+            send_now([store_group(order.store_id)], message(contract.DELIVERY_PROGRESS, body))
+            sent.append("ops:" + contract.DELIVERY_PROGRESS)
     return sent
+
+
+def _first_in_window(key: str) -> bool:
+    """At most one per WS_ETA_MIN_INTERVAL_SECONDS per key (fails open without Redis)."""
+    try:
+        return bool(cache.add(key, 1, timeout=settings.WS_ETA_MIN_INTERVAL_SECONDS))
+    except Exception:
+        return True
+
+
+def _live_delivery(order_id: int, lat: float, lng: float) -> dict | None:
+    """T-821: the order, its tracked task and the route from this rider position (cached and
+    throttled in `apps.maps`), or None when the order has no task the customer may track."""
+    from apps.delivery.hooks import CUSTOMER_TRACKING_TASK_STATUSES
+    from apps.delivery.models import DeliveryTask
+    from apps.delivery.services import live_tracking
+
+    task = (
+        DeliveryTask.objects.select_related("order__store")
+        .defer("delivery_otp_encrypted")
+        .filter(order_id=order_id, status__in=sorted(CUSTOMER_TRACKING_TASK_STATUSES))
+        .first()
+    )
+    if task is None:
+        return None
+    order = task.order
+    tracked = live_tracking.rider_route(task, order, (lat, lng))
+    return {
+        "order": order,
+        "task": task,
+        "tracked": tracked,
+        "distance_remaining_m": live_tracking.distance_remaining_m(order, task, tracked),
+    }
 
 
 def eta_minutes_from(lat: float, lng: float, drop_lat: float, drop_lng: float) -> int:

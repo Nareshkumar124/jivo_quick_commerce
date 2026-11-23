@@ -174,3 +174,47 @@ class EarningType(models.TextChoices):
 class PayoutStatus(models.TextChoices):
     PENDING = "PENDING", "Pending"
     PAID = "PAID", "Paid"
+
+
+# --------------------------------------------------------------------------- T-821 live tracking
+
+
+class TrackingStep(models.TextChoices):
+    """The customer's 8 tracking steps (`apps.delivery.services.live_tracking`)."""
+
+    CONFIRMED = "CONFIRMED", "Order confirmed"
+    PREPARING = "PREPARING", "Preparing your order"
+    PACKED = "PACKED", "Packed"
+    RIDER_ASSIGNED = "RIDER_ASSIGNED", "Rider assigned"
+    PICKED_UP = "PICKED_UP", "Picked up"
+    ON_THE_WAY = "ON_THE_WAY", "On the way"
+    ARRIVING = "ARRIVING", "Arriving"
+    DELIVERED = "DELIVERED", "Delivered"
+
+
+class TrackingOutcome(models.TextChoices):
+    DELIVERED = "DELIVERED", "Delivered"
+    CANCELLED = "CANCELLED", "Cancelled"
+    DELIVERY_FAILED = "DELIVERY_FAILED", "Delivery unsuccessful"
+    RETURNED = "RETURNED", "Returned"
+
+
+class RouteLeg(models.TextChoices):
+    TO_STORE = "TO_STORE", "Rider to the store"
+    TO_CUSTOMER = "TO_CUSTOMER", "Rider to the customer"
+
+
+class RouteProvider(models.TextChoices):
+    GOOGLE = "google", "Google (road, traffic)"
+    HAVERSINE = "haversine", "Straight-line estimate"
+
+
+class LiveRiderState(models.TextChoices):
+    """Ops live map marker (T-821)."""
+
+    IDLE = "IDLE", "Online, free"
+    TO_STORE = "TO_STORE", "Going to the store"
+    AT_STORE = "AT_STORE", "At the store"
+    DELIVERING = "DELIVERING", "Delivering"
+    RETURNING = "RETURNING", "Returning items"
+    OFFLINE = "OFFLINE", "Offline on a task"
