@@ -12,6 +12,7 @@ import '../../../../shared/widgets/product_image.dart';
 import '../../../cart/presentation/add_stepper.dart';
 import '../../../cart/presentation/cart_controller.dart';
 import '../../domain/catalog_models.dart';
+import '../../../home/presentation/home_product_card.dart';
 import 'price_tags.dart';
 import 'price_tiers_table.dart';
 
@@ -51,6 +52,10 @@ bool needsMinQtyHint(List<CatalogProduct> items) =>
   return (price: last.price, from: last.from);
 }
 
+/// The older product card, kept for its tests and any screen that still
+/// wants ADD to open "Enter quantity". Lists and rails now use
+/// [HomeProductCard] (home redesign, 2026-11-21).
+///
 /// A product card (`03 §2.5`): image well, discount badge, veg mark, name,
 /// pack size, bold price per carton, the gold bulk-price label, stock label
 /// and the gold ADD button. Out-of-stock cards grey only the image and show
@@ -198,13 +203,17 @@ class ProductTile extends StatelessWidget {
             key: ValueKey('bulk-${product.id}'),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: cc.goldLight,
+              color: cc.softTint,
               borderRadius: BorderRadius.circular(JivoRadii.pill),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.trending_down_rounded, size: 16, color: cc.onGold),
+                Icon(
+                  Icons.trending_down_rounded,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
@@ -212,7 +221,7 @@ class ProductTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelMedium?.copyWith(
-                      color: cc.onGold,
+                      color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
                 ),
@@ -430,37 +439,19 @@ Future<void> showVariantPicker(BuildContext context, CatalogProduct product) =>
       },
     );
 
-/// A horizontal rail of tiles (home collections, similar products).
+/// A horizontal rail of cards (similar products): the home card, with one
+/// tap ADD and − qty + (home redesign, 2026-11-21).
 class ProductRail extends StatelessWidget {
   const ProductRail({required this.items, super.key});
 
   final List<CatalogProduct> items;
 
-  static const tileWidth = 160.0;
-
-  /// Wider tiles at large text, up to 1.5x (CA-14), so names stay readable.
-  static double tileWidthFor(BuildContext context) {
-    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-    return tileWidth * scale.clamp(1.0, 1.5);
-  }
-
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: productTileExtent(context, minQtyHint: needsMinQtyHint(items)),
-    child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: JivoSpacing.gutter),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(width: JivoSpacing.sm),
-      itemBuilder: (_, i) => SizedBox(
-        width: tileWidthFor(context),
-        child: ProductTile(product: items[i]),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) => HomeProductRail(items: items);
 }
 
-/// The tile grid as a sliver (product list, collection, search results).
+/// The card grid as a sliver (product list, collection, search results,
+/// all products, order again): the home card (home redesign, 2026-11-21).
 class SliverProductGrid extends StatelessWidget {
   const SliverProductGrid({required this.items, super.key});
 
@@ -470,14 +461,11 @@ class SliverProductGrid extends StatelessWidget {
   Widget build(BuildContext context) => SliverGrid.builder(
     gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
       maxCrossAxisExtent: productGridMaxExtent(context),
-      mainAxisExtent: productTileExtent(
-        context,
-        minQtyHint: needsMinQtyHint(items),
-      ),
+      mainAxisExtent: homeCardExtent(context, items),
       crossAxisSpacing: JivoSpacing.md,
       mainAxisSpacing: JivoSpacing.md,
     ),
     itemCount: items.length,
-    itemBuilder: (_, i) => ProductTile(product: items[i]),
+    itemBuilder: (_, i) => HomeProductCard(product: items[i]),
   );
 }

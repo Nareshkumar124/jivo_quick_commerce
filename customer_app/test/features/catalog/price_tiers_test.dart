@@ -123,7 +123,10 @@ void main() {
         find.text('Price depends on total cartons in your order (all sizes)'),
         findsOneWidget,
       );
-      expect(find.bySemanticsLabel('5–24 cartons: ₹90 per carton'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('5–24 cartons: ₹90 per carton'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('one-count slab and paise are shown as sent', (tester) async {

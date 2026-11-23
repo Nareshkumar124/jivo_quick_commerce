@@ -65,10 +65,6 @@ class FakeDeviceRepository implements DeviceRepository {
       failNext = null;
       throw failure;
     }
-    calls.add((
-      fcmToken: fcmToken,
-      platform: platform,
-      appVersion: appVersion,
-    ));
+    calls.add((fcmToken: fcmToken, platform: platform, appVersion: appVersion));
   }
 }

@@ -235,17 +235,14 @@ void main() {
             .first,
       );
       await tester.tap(add);
-      // ADD opens "Enter quantity", prefilled with the minimum.
-      final update = find.byKey(const Key('qty-update'));
-      await pumpUntilFound(tester, update);
-      await tester.tap(update);
+      // ADD adds the minimum in one tap (home card, 2026-11-21).
       await pumpUntilFound(tester, find.byKey(const Key('cart-bar')));
       final cart = container.read(cartProvider).snapshot;
       log(
         'cart added "${pick.name}" variant=${variant.id} ${variant.name} '
         'items=${cart.itemCount} qty=${cart.quantityOf(variant.id)}',
       );
-      expect(cart.quantityOf(variant.id), 1);
+      expect(cart.quantityOf(variant.id), variant.minQty);
       expect(find.byKey(ValueKey('qty-${variant.id}')), findsOneWidget);
 
       // Every catalog call carried the serving store; serviceability none.

@@ -30,6 +30,8 @@ void openBannerLink(BuildContext context, WidgetRef ref, BannerLink link) {
 
 /// Admin-managed banners, swiped by hand only (`03 §2.5`): customers read
 /// them, so they never move on their own. A tap opens the banner full screen.
+/// Home redesign: a compact featured strip (about 2.2:1, at most 168 dp
+/// tall); with several banners the next one peeks in to invite a swipe.
 class BannerCarousel extends ConsumerStatefulWidget {
   const BannerCarousel({required this.banners, super.key});
 
@@ -40,13 +42,36 @@ class BannerCarousel extends ConsumerStatefulWidget {
 }
 
 class _BannerCarouselState extends ConsumerState<BannerCarousel> {
-  final _controller = PageController();
+  late PageController _controller = _newController();
   int _page = 0;
+
+  bool get _peek => widget.banners.length > 1;
+
+  PageController _newController() =>
+      PageController(viewportFraction: _peek ? 0.9 : 1);
+
+  @override
+  void didUpdateWidget(BannerCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if ((oldWidget.banners.length > 1) != _peek) {
+      _controller.dispose();
+      _controller = _newController();
+      _page = 0;
+    }
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// The banner's width over 2.2, between 112 and 168 dp.
+  double _heightFor(double screenWidth) {
+    final width = _peek
+        ? screenWidth * 0.9 - 12
+        : screenWidth - 2 * JivoSpacing.gutter;
+    return (width / 2.2).clamp(112.0, 168.0);
   }
 
   @override
@@ -57,7 +82,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
     return Column(
       children: [
         SizedBox(
-          height: 150,
+          height: _heightFor(MediaQuery.sizeOf(context).width),
           child: PageView.builder(
             key: const Key('banner-carousel'),
             controller: _controller,
@@ -66,8 +91,8 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
             itemBuilder: (context, i) {
               final banner = banners[i];
               return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: JivoSpacing.gutter,
+                padding: EdgeInsets.symmetric(
+                  horizontal: _peek ? 6 : JivoSpacing.gutter,
                 ),
                 child: Semantics(
                   button: banner.link is! NoBannerLink,
@@ -112,15 +137,15 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
         if (banners.length > 1)
           ExcludeSemantics(
             child: Padding(
-              padding: const EdgeInsets.only(top: JivoSpacing.sm),
+              padding: const EdgeInsets.only(top: JivoSpacing.sm - 2),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   for (var i = 0; i < banners.length; i++)
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: i == _page ? 16 : 6,
-                      height: 6,
+                      width: i == _page ? 14 : 5,
+                      height: 5,
                       decoration: BoxDecoration(
                         color: i == _page
                             ? theme.colorScheme.primary

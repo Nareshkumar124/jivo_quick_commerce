@@ -99,6 +99,10 @@ flutter:
   # Generates AppLocalizations from lib/l10n (see l10n.yaml).
   generate: true
 
+  # The official Jivo wordmark (tool/generate_brand_assets.py).
+  assets:
+    - assets/brand/
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

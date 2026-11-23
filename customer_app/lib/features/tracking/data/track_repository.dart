@@ -1,9 +1,12 @@
 import 'package:dio/dio.dart';
-import 'package:jivo_api/jivo_api.dart' as api show JivoApi, OrderTrack;
+import 'package:jivo_api/jivo_api.dart'
+    as api
+    show JivoApi, OrderTrack, TrackRoute;
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../orders/domain/order.dart';
 import '../domain/order_track.dart';
+import '../domain/route_geometry.dart';
 
 /// Live tracking data. Phase 5 binds `GET /orders/{id}/track/` (polling);
 /// Phase 6 adds the WebSocket with polling as the fallback.
@@ -48,7 +51,9 @@ OrderTrack orderTrackFromApi(api.OrderTrack t) {
     storeName: t.store.name,
     store: TrackPoint(t.store.lat, t.store.lng),
     destination: TrackPoint(t.destination.lat, t.destination.lng),
-    etaAt: t.etaAt,
+    // The live ETA once the server has one (T-612); the promise otherwise.
+    // Null once the order is finished.
+    etaAt: t.etaAt == null ? null : (t.liveEtaAt ?? t.etaAt),
     rider: rider == null
         ? null
         : TrackRider(
@@ -62,9 +67,43 @@ OrderTrack orderTrackFromApi(api.OrderTrack t) {
                 : null,
             location: lat == null || lng == null ? null : TrackPoint(lat, lng),
             updatedAt: rider.updatedAt,
+            heading: rider.heading,
+            vehicle: RiderVehicle.fromWire(rider.vehicleType?.value),
+            serverStale: rider.isStale,
           ),
     deliveryOtp: otp == null || otp.isEmpty ? null : otp,
     taskStatus: DeliveryTaskStatus.fromWire(t.taskStatus?.value),
+    route: _route(t.route),
+    distanceRemainingM: t.distanceRemainingM,
+    timeline: TrackTimeline(
+      current: t.progress.current?.value,
+      outcome: TrackOutcome.fromWire(t.progress.outcome?.value),
+      steps: [
+        for (final s in t.progress.steps)
+          TrackStepState(
+            key: s.key.value,
+            label: s.label,
+            done: s.done,
+            at: s.at,
+          ),
+      ],
+    ),
+    serverTime: t.serverTime,
+  );
+}
+
+/// The route as sent; dropped when its leg is unknown to this build.
+TrackRoute? _route(api.TrackRoute? r) {
+  if (r == null) return null;
+  final leg = RouteLeg.fromWire(r.leg.value);
+  if (leg == null || r.polyline.isEmpty) return null;
+  return TrackRoute(
+    leg: leg,
+    polyline: r.polyline,
+    distanceM: r.distanceM,
+    durationS: r.durationS,
+    computedAt: r.computedAt,
+    trafficAware: r.trafficAware,
   );
 }
 
@@ -145,6 +184,16 @@ class FakeTrackRepository implements TrackRepository {
       _ => DeliveryTaskStatus.delivered,
     };
     final fraction = out ? riding / ridePings : 0.0;
+    final riderAt = out
+        ? TrackPoint(
+            store.lat + (home.lat - store.lat) * fraction,
+            store.lng + (home.lng - store.lng) * fraction,
+          )
+        : store;
+    final hasRider = step != 0 && !ended;
+    final remaining = out
+        ? (distanceMeters(riderAt, home)).round()
+        : (hasRider ? distanceMeters(store, home).round() : null);
     return OrderTrack(
       orderId: orderId,
       orderNumber: 'JV-261104-${orderId.toString().padLeft(6, '0')}',
@@ -155,21 +204,79 @@ class FakeTrackRepository implements TrackRepository {
       etaAt: ended || status == OrderStatus.deliveryFailed
           ? null
           : now.add(Duration(minutes: out ? (ridePings - riding) * 2 : 14)),
-      rider: step == 0 || ended
+      rider: !hasRider
           ? null
           : TrackRider(
               name: 'Ravi Kumar',
               phone: '+919000000099',
-              location: out
-                  ? TrackPoint(
-                      store.lat + (home.lat - store.lat) * fraction,
-                      store.lng + (home.lng - store.lng) * fraction,
-                    )
-                  : store,
+              location: riderAt,
               updatedAt: now,
+              heading: out ? bearingDegrees(store, home) : null,
+              vehicle: RiderVehicle.scooter,
             ),
       deliveryOtp: out ? '4821' : null,
       taskStatus: task,
+      route: !hasRider
+          ? null
+          : TrackRoute(
+              leg: out ? RouteLeg.toCustomer : RouteLeg.toStore,
+              polyline: encodePolyline(out ? [riderAt, home] : [store, store]),
+              distanceM: remaining ?? 0,
+              durationS: out ? (ridePings - riding) * 120 : 0,
+              computedAt: now,
+            ),
+      distanceRemainingM: remaining,
+      timeline: fakeTimeline(status, task, now),
+      serverTime: now,
     );
   }
+}
+
+/// The 8 steps the way the server reports them (`live_tracking`), for the
+/// fake only: the real app never derives steps.
+TrackTimeline fakeTimeline(
+  OrderStatus status,
+  DeliveryTaskStatus? task,
+  DateTime at,
+) {
+  final reached = switch (status) {
+    OrderStatus.placed => 0,
+    OrderStatus.accepted => 1,
+    OrderStatus.packing => task == DeliveryTaskStatus.assigned ? 3 : 1,
+    OrderStatus.packed => 3,
+    OrderStatus.outForDelivery => task == DeliveryTaskStatus.atCustomer ? 6 : 5,
+    OrderStatus.delivered => 7,
+    OrderStatus.deliveryFailed || OrderStatus.returned => 5,
+    _ => -1,
+  };
+  const labels = [
+    'Order confirmed',
+    'Preparing your order',
+    'Packed',
+    'Rider assigned',
+    'Picked up',
+    'On the way',
+    'Arriving',
+    'Delivered',
+  ];
+  final steps = [
+    for (final (i, step) in TrackStep.values.indexed)
+      TrackStepState(
+        key: step.wireValue,
+        label: labels[i],
+        done: i <= reached,
+        at: i <= reached ? at : null,
+      ),
+  ];
+  return TrackTimeline(
+    steps: steps,
+    current: reached < 0 ? null : TrackStep.values[reached].wireValue,
+    outcome: switch (status) {
+      OrderStatus.delivered => TrackOutcome.delivered,
+      OrderStatus.cancelled => TrackOutcome.cancelled,
+      OrderStatus.deliveryFailed => TrackOutcome.deliveryFailed,
+      OrderStatus.returned => TrackOutcome.returned,
+      _ => null,
+    },
+  );
 }

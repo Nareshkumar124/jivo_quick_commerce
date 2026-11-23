@@ -105,14 +105,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     final bill = snapshot.bill;
     if (snapshot.isEmpty || bill == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.checkoutTitle)),
-        body: EmptyView(
-          message: l10n.cartEmpty,
-          icon: Icons.shopping_bag_outlined,
-          action: FilledButton(
-            onPressed: () => context.go(Routes.home),
-            child: Text(l10n.startShopping),
+      return Theme(
+        data: lightPageTheme(Theme.of(context)),
+        child: Scaffold(
+          appBar: AppBar(title: Text(l10n.checkoutTitle)),
+          body: EmptyView(
+            message: l10n.cartEmpty,
+            icon: Icons.shopping_bag_outlined,
+            action: FilledButton(
+              onPressed: () => context.go(Routes.home),
+              child: Text(l10n.startShopping),
+            ),
           ),
         ),
       );
@@ -148,123 +151,129 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       CheckoutStep.verifying => l10n.checkoutVerifying,
     };
 
-    return PopScope(
-      canPop: !checkout.busy,
-      child: Scaffold(
-        appBar: AppBar(title: Text(l10n.checkoutTitle)),
-        body: ListView(
-          padding: const EdgeInsets.all(JivoSpacing.gutter),
-          children: [
-            const DeliveryAddressCard(),
-            const SizedBox(height: JivoSpacing.lg),
-            // Only while the bill on screen is the changed one: after the
-            // cart changes again the notice is stale (CA-19).
-            if (checkout.priceChange case final change?
-                when isSameAmount(change.after, bill.grandTotal)) ...[
-              PriceChangedNotice(change: change),
+    return Theme(
+      data: lightPageTheme(Theme.of(context)),
+      child: PopScope(
+        canPop: !checkout.busy,
+        child: Scaffold(
+          appBar: AppBar(title: Text(l10n.checkoutTitle)),
+          body: ListView(
+            padding: const EdgeInsets.all(JivoSpacing.gutter),
+            children: [
+              const DeliveryAddressCard(),
               const SizedBox(height: JivoSpacing.lg),
-            ],
-            Semantics(
-              header: true,
-              child: Text(l10n.payWith, style: theme.textTheme.titleMedium),
-            ),
-            const SizedBox(height: JivoSpacing.sm),
-            Card(
-              margin: EdgeInsets.zero,
-              child: RadioGroup<PaymentMethod>(
-                groupValue: method,
-                onChanged: (value) {
-                  if (value != null && !checkout.busy) {
-                    controller.selectMethod(value);
-                  }
-                },
-                child: Column(
-                  children: [
-                    if (snapshot.offers(PaymentMethod.online))
-                      RadioListTile<PaymentMethod>(
-                        key: const Key('pay-online'),
-                        value: PaymentMethod.online,
-                        enabled: !checkout.busy,
-                        secondary: const Icon(Icons.account_balance_outlined),
-                        title: Text(l10n.payOnline),
-                        subtitle: Text(l10n.payOnlineSubtitle),
-                      ),
-                    if (snapshot.offers(PaymentMethod.cod))
-                      RadioListTile<PaymentMethod>(
-                        key: const Key('pay-cod'),
-                        value: PaymentMethod.cod,
-                        enabled: !checkout.busy,
-                        secondary: const Icon(Icons.payments_outlined),
-                        title: Text(l10n.payCod),
-                        subtitle: Text(l10n.payCodSubtitle),
-                      ),
-                    if (!snapshot.offers(PaymentMethod.cod) &&
-                        snapshot.paymentOptions.any(
-                          (o) => o.method == PaymentMethod.cod,
-                        ))
-                      CodUnavailableTile(
-                        message: snapshot.paymentOptions
-                            .firstWhere((o) => o.method == PaymentMethod.cod)
-                            .message,
-                      ),
-                  ],
+              // Only while the bill on screen is the changed one: after the
+              // cart changes again the notice is stale (CA-19).
+              if (checkout.priceChange case final change?
+                  when isSameAmount(change.after, bill.grandTotal)) ...[
+                PriceChangedNotice(change: change),
+                const SizedBox(height: JivoSpacing.lg),
+              ],
+              Semantics(
+                header: true,
+                child: Text(l10n.payWith, style: theme.textTheme.titleMedium),
+              ),
+              const SizedBox(height: JivoSpacing.sm),
+              Card(
+                margin: EdgeInsets.zero,
+                child: RadioGroup<PaymentMethod>(
+                  groupValue: method,
+                  onChanged: (value) {
+                    if (value != null && !checkout.busy) {
+                      controller.selectMethod(value);
+                    }
+                  },
+                  child: Column(
+                    children: [
+                      if (snapshot.offers(PaymentMethod.online))
+                        RadioListTile<PaymentMethod>(
+                          key: const Key('pay-online'),
+                          value: PaymentMethod.online,
+                          enabled: !checkout.busy,
+                          secondary: const Icon(Icons.account_balance_outlined),
+                          title: Text(l10n.payOnline),
+                          subtitle: Text(l10n.payOnlineSubtitle),
+                        ),
+                      if (snapshot.offers(PaymentMethod.cod))
+                        RadioListTile<PaymentMethod>(
+                          key: const Key('pay-cod'),
+                          value: PaymentMethod.cod,
+                          enabled: !checkout.busy,
+                          secondary: const Icon(Icons.payments_outlined),
+                          title: Text(l10n.payCod),
+                          subtitle: Text(l10n.payCodSubtitle),
+                        ),
+                      if (!snapshot.offers(PaymentMethod.cod) &&
+                          snapshot.paymentOptions.any(
+                            (o) => o.method == PaymentMethod.cod,
+                          ))
+                        CodUnavailableTile(
+                          message: snapshot.paymentOptions
+                              .firstWhere((o) => o.method == PaymentMethod.cod)
+                              .message,
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: JivoSpacing.lg),
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(JivoSpacing.lg),
-                child: BillDetails(bill: bill, coupon: snapshot.coupon),
+              const SizedBox(height: JivoSpacing.lg),
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(JivoSpacing.lg),
+                  child: BillDetails(bill: bill, coupon: snapshot.coupon),
+                ),
               ),
+              if (!checkout.busy) const ReferralPromptCard(),
+            ],
+          ),
+          // A white bar under a hairline (home redesign).
+          bottomNavigationBar: Material(
+            color: theme.colorScheme.surfaceContainerLowest,
+            shape: Border(
+              top: BorderSide(color: context.customerColors.hairline),
             ),
-            if (!checkout.busy) const ReferralPromptCard(),
-          ],
-        ),
-        bottomNavigationBar: Material(
-          elevation: 8,
-          color: theme.colorScheme.surface,
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(JivoSpacing.gutter),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (blocker != null && !checkout.busy)
-                    CheckoutBlockerText(blocker),
-                  if (progress != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
-                      child: Semantics(
-                        liveRegion: true,
-                        child: Text(
-                          progress,
-                          key: const Key('checkout-progress'),
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodyMedium,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(JivoSpacing.gutter),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (blocker != null && !checkout.busy)
+                      CheckoutBlockerText(blocker),
+                    if (progress != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            progress,
+                            key: const Key('checkout-progress'),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium,
+                          ),
                         ),
                       ),
+                    BusyButton(
+                      key: const Key('place-order'),
+                      label: method == PaymentMethod.online
+                          ? l10n.payAmount(grandTotal ?? '')
+                          : l10n.placeOrder,
+                      busy: checkout.busy,
+                      onPressed: canPlace
+                          ? () {
+                              controller.selectMethod(method);
+                              controller.placeOrder(
+                                addressId: addressId,
+                                expectedGrandTotal: bill.grandTotal,
+                              );
+                            }
+                          : null,
                     ),
-                  BusyButton(
-                    key: const Key('place-order'),
-                    label: method == PaymentMethod.online
-                        ? l10n.payAmount(grandTotal ?? '')
-                        : l10n.placeOrder,
-                    busy: checkout.busy,
-                    onPressed: canPlace
-                        ? () {
-                            controller.selectMethod(method);
-                            controller.placeOrder(
-                              addressId: addressId,
-                              expectedGrandTotal: bill.grandTotal,
-                            );
-                          }
-                        : null,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

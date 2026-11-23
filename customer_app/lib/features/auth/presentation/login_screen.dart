@@ -10,6 +10,7 @@ import '../../../app/redirect.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/validation/validators.dart';
+import '../../../shared/widgets/jivo_wordmark.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../cms/data/cms_repository.dart';
 import 'auth_flow.dart';
@@ -76,6 +77,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: JivoSpacing.lg),
               ],
+              const SizedBox(height: JivoSpacing.lg),
+              const Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: JivoWordmark(height: 56),
+              ),
               const SizedBox(height: JivoSpacing.xl),
               Semantics(
                 header: true,

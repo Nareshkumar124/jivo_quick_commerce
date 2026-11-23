@@ -69,36 +69,85 @@ class ProductGridSkeleton extends StatelessWidget {
   );
 }
 
-/// The home layout in grey: header, search bar, banner, categories, a rail.
+/// The home layout in grey, shaped like the real sections (home redesign):
+/// the featured banner, the category row and a rail of two product cards.
+/// The header and search field are real and stay above it.
 class HomeSkeleton extends StatelessWidget {
   const HomeSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) => SkeletonSemantics(
     child: ListView(
+      key: const Key('home-skeleton'),
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(JivoSpacing.gutter),
+      padding: const EdgeInsets.symmetric(horizontal: JivoSpacing.gutter),
       children: [
-        const SkeletonBox(height: 140, width: double.infinity),
-        const SizedBox(height: JivoSpacing.xl),
-        const SkeletonBox(height: 18, width: 160),
-        const SizedBox(height: JivoSpacing.md),
-        Row(
-          children: [
-            for (var i = 0; i < 4; i++) ...[
-              if (i > 0) const SizedBox(width: JivoSpacing.md),
-              const Expanded(child: SkeletonBox(height: 72)),
-            ],
-          ],
+        const SkeletonBox(
+          height: 140,
+          width: double.infinity,
+          radius: JivoRadii.lg,
         ),
         const SizedBox(height: JivoSpacing.xl),
-        const SkeletonBox(height: 18, width: 120),
+        const SkeletonBox(height: 16, width: 140),
+        const SizedBox(height: JivoSpacing.md),
+        SizedBox(
+          height: 90,
+          child: ClipRect(
+            child: OverflowBox(
+              alignment: Alignment.centerLeft,
+              maxWidth: double.infinity,
+              child: Row(
+                children: [
+                  for (var i = 0; i < 6; i++) ...[
+                    if (i > 0) const SizedBox(width: JivoSpacing.md),
+                    const Column(
+                      children: [
+                        SkeletonBox(
+                          height: 64,
+                          width: 64,
+                          radius: JivoRadii.lg,
+                        ),
+                        SizedBox(height: JivoSpacing.sm),
+                        SkeletonBox(height: 10, width: 52),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: JivoSpacing.xl),
+        const SkeletonBox(height: 16, width: 120),
         const SizedBox(height: JivoSpacing.md),
         Row(
           children: [
             for (var i = 0; i < 2; i++) ...[
               if (i > 0) const SizedBox(width: JivoSpacing.md),
-              const Expanded(child: SkeletonBox(height: 200)),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonBox(
+                      height: 112,
+                      width: double.infinity,
+                      radius: JivoRadii.md,
+                    ),
+                    SizedBox(height: JivoSpacing.sm),
+                    SkeletonBox(height: 12, width: double.infinity),
+                    SizedBox(height: JivoSpacing.xs),
+                    SkeletonBox(height: 12, width: 64),
+                    SizedBox(height: JivoSpacing.md),
+                    SkeletonBox(height: 18, width: 72),
+                    SizedBox(height: JivoSpacing.md),
+                    SkeletonBox(
+                      height: 48,
+                      width: double.infinity,
+                      radius: JivoRadii.md,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ],
         ),

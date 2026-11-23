@@ -3,8 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// The CMS HTML reader must never let markup run or smuggle links.
 void main() {
-  String plain(String html) =>
-      parseSafeHtml(html).map((b) => b.text).join('|');
+  String plain(String html) => parseSafeHtml(html).map((b) => b.text).join('|');
 
   List<Uri?> links(String html) => [
     for (final block in parseSafeHtml(html))
@@ -177,7 +176,9 @@ void main() {
       expect(blocks.single.spans.single.bold, isTrue);
       final lists = '${'<ul><li>x' * 100}${'</li></ul>' * 100}';
       expect(
-        parseSafeHtml(lists).map((b) => b.depth).reduce((a, b) => a > b ? a : b),
+        parseSafeHtml(lists)
+            .map((b) => b.depth)
+            .reduce((a, b) => a > b ? a : b),
         lessThan(safeHtmlMaxDepth),
       );
     });
@@ -225,10 +226,10 @@ void main() {
     fast('<!-- x10000', '<!--' * 10000);
     fast('nested <b> x10000', '${'<b>' * 10000}x${'</b>' * 10000}');
     fast('<p> x10000', '<p>x' * 10000);
-    fast('& entities x10000', '&aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' * 1000);
     fast(
-      'many same-style spans in one block',
-      '${'x<span>' * 8000}</p>',
+      '& entities x10000',
+      '&aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' * 1000,
     );
+    fast('many same-style spans in one block', '${'x<span>' * 8000}</p>');
   });
 }

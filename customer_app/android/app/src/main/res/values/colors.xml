@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Notification accent (brand green, lib/app/theme.dart). -->
-    <color name="notification_accent">#0B7A47</color>
+    <!-- Notification accent (logo green, lib/app/theme.dart). -->
+    <color name="notification_accent">#2D5528</color>
+    <!-- Green of the official round Jivo logo (adaptive icon background). -->
+    <color name="ic_launcher_background">#2D5528</color>
+    <!-- Launch screen background: the app's warm canvas (theme.dart surface). -->
+    <color name="splash_background">#FFF9F0</color>
 </resources>

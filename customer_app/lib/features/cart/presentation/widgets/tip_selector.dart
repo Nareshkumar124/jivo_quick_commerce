@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../../app/theme.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../shared/formatting/formatters.dart';
 import '../../../../shared/widgets/state_views.dart';
@@ -36,7 +37,11 @@ class TipSelector extends ConsumerWidget {
   Future<void> _custom(BuildContext context, WidgetRef ref) async {
     final rupees = await showDialog<int>(
       context: context,
-      builder: (_) => const _CustomTipDialog(max: maxCustomTip),
+      // Home redesign look: green actions.
+      builder: (context) => Theme(
+        data: lightPageTheme(Theme.of(context)),
+        child: const _CustomTipDialog(max: maxCustomTip),
+      ),
     );
     if (rupees != null && context.mounted) {
       await _set(context, ref, _amount(rupees));

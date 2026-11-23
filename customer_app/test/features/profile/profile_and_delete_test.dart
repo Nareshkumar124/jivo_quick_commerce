@@ -207,7 +207,10 @@ void main() {
     await tester.tap(find.byTooltip('Account'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('account-edit')), findsOneWidget);
-    await tester.scrollUntilVisible(find.byKey(const Key('account-referral')), 100);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('account-referral')),
+      100,
+    );
     await tester.scrollUntilVisible(find.text('Log out'), 100);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

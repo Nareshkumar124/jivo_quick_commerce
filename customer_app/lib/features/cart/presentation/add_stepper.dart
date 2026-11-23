@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:ui' show FlutterView;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/repositories.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../catalog/domain/catalog_models.dart';
@@ -292,7 +295,7 @@ class OutOfStockLabel extends StatelessWidget {
   }
 }
 
-/// The outlined full-width ADD button.
+/// The full-width ADD button: green label on pale mint (home redesign).
 class AddButton extends StatelessWidget {
   const AddButton({
     required this.semanticsLabel,
@@ -314,9 +317,19 @@ class AddButton extends StatelessWidget {
       width: double.infinity,
       child: FilledButton(
         onPressed: onPressed,
+        // Home redesign: green on pale mint with a thin green edge (was
+        // gold), the same everywhere ADD appears.
         style: FilledButton.styleFrom(
+          backgroundColor: context.customerColors.softTint,
+          foregroundColor: theme.colorScheme.primary,
+          disabledBackgroundColor: context.customerColors.softTint,
+          disabledForegroundColor: theme.colorScheme.primary,
+          side: BorderSide(color: theme.colorScheme.primary),
           minimumSize: const Size(64, kJivoMinTouchTarget),
           padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(JivoRadii.md),
+          ),
         ),
         child: busy
             ? Semantics(
@@ -327,7 +340,7 @@ class AddButton extends StatelessWidget {
                   dimension: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: theme.colorScheme.onSecondary,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
               )
@@ -435,5 +448,75 @@ class QuantityBox extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// "Removed {name}" with Undo after a line left the cart (the delete
+/// button, or − at the minimum per order), also read out by screen readers.
+/// Built before the change: the tile that started it may be gone by the
+/// time the server answers, so it keeps the messenger, view and texts.
+class CartRemovedNotice {
+  CartRemovedNotice.of(BuildContext context)
+    : _messenger = ScaffoldMessenger.of(context),
+      _view = View.of(context),
+      _direction = Directionality.of(context),
+      _l10n = AppLocalizations.of(context);
+
+  final ScaffoldMessengerState _messenger;
+  final FlutterView _view;
+  final TextDirection _direction;
+  final AppLocalizations _l10n;
+
+  /// Shows the notice for [name]. [restore] (null: nothing to undo, e.g. out
+  /// of stock) puts the previous quantity back with the same controller
+  /// call as ADD; a refusal is shown through the kept messenger.
+  void show({
+    required String name,
+    required int variantId,
+    Future<void> Function()? restore,
+    Key? undoKey,
+  }) {
+    if (!_messenger.mounted) return;
+    final text = _l10n.removedFromCart(name);
+    _messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(text),
+          action: restore == null
+              ? null
+              : SnackBarAction(
+                  key: undoKey,
+                  label: _l10n.undo,
+                  onPressed: () =>
+                      _undo(restore, name: name, variantId: variantId),
+                ),
+        ),
+      );
+    unawaited(SemanticsService.sendAnnouncement(_view, text, _direction));
+  }
+
+  Future<void> _undo(
+    Future<void> Function() restore, {
+    required String name,
+    required int variantId,
+  }) async {
+    String? problem;
+    try {
+      await restore();
+    } on CartLimitException catch (e) {
+      problem = _l10n.maxQtyReached(e.max);
+    } catch (error) {
+      if (!_messenger.mounted) return;
+      problem = cartErrorText(
+        _messenger.context,
+        error,
+        names: {variantId: name},
+      );
+    }
+    if (problem == null || !_messenger.mounted) return;
+    _messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(problem)));
   }
 }

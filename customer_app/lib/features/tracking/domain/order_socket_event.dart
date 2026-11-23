@@ -2,7 +2,12 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:jivo_api/jivo_api.dart'
-    show WsAuthOkData, WsOrderEtaData, WsOrderStatusData, WsRiderLocationData;
+    show
+        WsAuthOkData,
+        WsOrderEtaData,
+        WsOrderRouteData,
+        WsOrderStatusData,
+        WsRiderLocationData;
 
 import '../../orders/domain/order.dart';
 import 'order_track.dart';
@@ -38,11 +43,23 @@ class RiderLocationEvent extends OrderSocketEvent {
     required this.location,
     required this.recordedAt,
     this.heading,
+    this.distanceRemainingM,
   }) : super(orderId);
 
   final TrackPoint location;
   final DateTime recordedAt;
   final double? heading;
+
+  /// Road metres left to the customer (T-821), or null.
+  final int? distanceRemainingM;
+}
+
+/// `order.route` (T-821): the server recomputed the rider's road route.
+class OrderRouteEvent extends OrderSocketEvent {
+  const OrderRouteEvent({required int orderId, required this.route})
+    : super(orderId);
+
+  final TrackRoute route;
 }
 
 /// `order.eta`: a new server ETA.
@@ -118,13 +135,36 @@ WsFrame parseWsFrame(Object? raw) {
           ),
         );
       case 'rider.location':
-        final d = WsRiderLocationData.fromJson(map);
+        // `distance_remaining_m` is new in T-821: a server without it
+        // still moves the rider.
+        final d = WsRiderLocationData.fromJson({
+          'distance_remaining_m': null,
+          ...map,
+        });
         return WsEvent(
           RiderLocationEvent(
             orderId: d.orderId,
             location: TrackPoint(d.lat, d.lng),
             recordedAt: d.recordedAt,
             heading: d.heading,
+            distanceRemainingM: d.distanceRemainingM,
+          ),
+        );
+      case 'order.route':
+        final d = WsOrderRouteData.fromJson(map);
+        final leg = RouteLeg.fromWire(map['leg'] as String?);
+        if (leg == null) return const WsIgnored('order.route');
+        return WsEvent(
+          OrderRouteEvent(
+            orderId: d.orderId,
+            route: TrackRoute(
+              leg: leg,
+              polyline: d.polyline,
+              distanceM: d.distanceM,
+              durationS: d.durationS,
+              computedAt: d.computedAt,
+              trafficAware: d.trafficAware,
+            ),
           ),
         );
       case 'order.eta':
@@ -153,7 +193,9 @@ WsFrame parseWsFrame(Object? raw) {
 /// Applies a socket event to the last tracking data. Returns null when the
 /// event can't be applied locally and `track/` must be re-read: a new
 /// status (the OTP and the rider card are only on REST, `06 §4.1`), or a
-/// rider location before any rider is known.
+/// rider location before any rider is known. Returns [track] itself when
+/// the event changes nothing or is older than what is shown (out-of-order
+/// fixes and routes are dropped, `06 §4`).
 OrderTrack? applyOrderSocketEvent(OrderTrack track, OrderSocketEvent event) {
   if (event.orderId != track.orderId) return track;
   switch (event) {
@@ -162,16 +204,70 @@ OrderTrack? applyOrderSocketEvent(OrderTrack track, OrderSocketEvent event) {
       return etaAt == null || etaAt == track.etaAt
           ? track
           : track.copyWith(etaAt: etaAt);
-    case RiderLocationEvent(:final location, :final recordedAt):
+    case RiderLocationEvent(
+      :final location,
+      :final recordedAt,
+      :final heading,
+      :final distanceRemainingM,
+    ):
       final rider = track.rider;
       if (rider == null) return null;
       final last = rider.updatedAt;
       // Out-of-order pings: keep the newer fix.
-      if (last != null && recordedAt.isBefore(last)) return track;
+      if (last != null && !recordedAt.isAfter(last)) return track;
       return track.copyWith(
-        rider: rider.copyWith(location: location, updatedAt: recordedAt),
+        rider: rider.copyWith(
+          location: location,
+          updatedAt: recordedAt,
+          heading: heading,
+          serverStale: false,
+        ),
+        distanceRemainingM: distanceRemainingM,
       );
     case OrderEtaEvent(:final etaAt):
-      return track.copyWith(etaAt: etaAt);
+      return etaAt == track.etaAt ? track : track.copyWith(etaAt: etaAt);
+    case OrderRouteEvent(:final route):
+      final shown = track.route;
+      if (!track.status.isActive) return track;
+      if (shown != null && !route.computedAt.isAfter(shown.computedAt)) {
+        return track;
+      }
+      return track.copyWith(route: route);
   }
+}
+
+/// A `track/` read merged over what the screen shows: the fresh read wins,
+/// except that a rider fix or route newer than the one it carries (from the
+/// socket, while the request was in flight) is kept, so the marker never
+/// jumps back.
+OrderTrack mergeTrackRead(OrderTrack? shown, OrderTrack fetched) {
+  if (shown == null || shown.orderId != fetched.orderId) return fetched;
+  var merged = fetched;
+  final oldRider = shown.rider;
+  final newRider = fetched.rider;
+  final oldAt = oldRider?.updatedAt;
+  final newAt = newRider?.updatedAt;
+  if (oldRider != null &&
+      newRider != null &&
+      oldAt != null &&
+      oldRider.location != null &&
+      (newAt == null || oldAt.isAfter(newAt))) {
+    merged = merged.copyWith(
+      rider: newRider.copyWith(
+        location: oldRider.location,
+        updatedAt: oldAt,
+        heading: oldRider.heading,
+        serverStale: oldRider.serverStale,
+      ),
+      distanceRemainingM: shown.distanceRemainingM,
+    );
+  }
+  final oldRoute = shown.route;
+  final newRoute = fetched.route;
+  if (oldRoute != null &&
+      newRoute != null &&
+      oldRoute.computedAt.isAfter(newRoute.computedAt)) {
+    merged = merged.copyWith(route: oldRoute);
+  }
+  return merged;
 }

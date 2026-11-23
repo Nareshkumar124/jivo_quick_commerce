@@ -94,11 +94,17 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[Locale('en')];
 
-  /// App name.
+  /// App name (task switcher title).
+  ///
+  /// In en, this message translates to:
+  /// **'Jivo Quick Commerce'**
+  String get appTitle;
+
+  /// Brand name: what screen readers say for the Jivo logo.
   ///
   /// In en, this message translates to:
   /// **'Jivo'**
-  String get appTitle;
+  String get brandName;
 
   /// Button that repeats a failed request.
   ///
@@ -1257,6 +1263,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search products'**
   String get searchHint;
+
+  /// Home search field placeholder (home redesign): Jivo's main ranges, then 'and more' because the catalog has other products too.
+  ///
+  /// In en, this message translates to:
+  /// **'Search water, oils and more'**
+  String get homeSearchHint;
+
+  /// Home section title: the compact category row (categories from GET /home/).
+  ///
+  /// In en, this message translates to:
+  /// **'Shop by category'**
+  String get homeCategories;
+
+  /// Screen-reader label of the minus button on a home product card stepper.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease {name}'**
+  String decreaseQuantitySemantics(String name);
+
+  /// Screen-reader label of the plus button on a home product card stepper.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase {name}'**
+  String increaseQuantitySemantics(String name);
 
   /// Home section title: every product of the store.
   ///
@@ -4088,6 +4118,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Offers, new products and other messages from Jivo'**
   String get pushChannelGeneralDescription;
+
+  /// Tracking freshness: when data last arrived (relative).
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {ago}'**
+  String trackingUpdatedAgo(String ago);
+
+  /// Tracking freshness, after Live: when the rider's position last changed.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {ago}'**
+  String trackingLiveUpdatedAgo(String ago);
+
+  /// Tracking: seconds ago.
+  ///
+  /// In en, this message translates to:
+  /// **'{n, plural, =1{1 sec ago} other{{n} sec ago}}'**
+  String trackingSecondsAgo(int n);
+
+  /// Tracking: the rider's position is old; never shown as live.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider\'s location last updated {ago}'**
+  String trackingRiderStale(String ago);
+
+  /// Tracking: a rider is assigned but no position yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the rider\'s location'**
+  String get trackingRiderNoFix;
+
+  /// Tracking: refresh failed; relative time.
+  ///
+  /// In en, this message translates to:
+  /// **'Can’t update right now. Last update {ago}. Pull down to try again.'**
+  String trackingStaleAgo(String ago);
+
+  /// Tracking: road distance left (server value), kilometres with one decimal.
+  ///
+  /// In en, this message translates to:
+  /// **'{km} km away'**
+  String trackingDistanceKm(String km);
+
+  /// Tracking: road distance left (server value) under 1 km.
+  ///
+  /// In en, this message translates to:
+  /// **'{m} m away'**
+  String trackingDistanceM(int m);
+
+  /// Rider vehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bicycle'**
+  String get trackingVehicleBicycle;
+
+  /// Rider vehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'E-bike'**
+  String get trackingVehicleEBike;
+
+  /// Rider vehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'Motorbike'**
+  String get trackingVehicleMotorbike;
+
+  /// Rider vehicle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scooter'**
+  String get trackingVehicleScooter;
+
+  /// Tracking: title over the 8-step timeline.
+  ///
+  /// In en, this message translates to:
+  /// **'Order progress'**
+  String get trackingProgressTitle;
+
+  /// Tracking step 1.
+  ///
+  /// In en, this message translates to:
+  /// **'Order confirmed'**
+  String get trackStepConfirmed;
+
+  /// Tracking step 2.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your order'**
+  String get trackStepPreparing;
+
+  /// Tracking step 3.
+  ///
+  /// In en, this message translates to:
+  /// **'Packed'**
+  String get trackStepPacked;
+
+  /// Tracking step 4.
+  ///
+  /// In en, this message translates to:
+  /// **'Rider assigned'**
+  String get trackStepRiderAssigned;
+
+  /// Tracking step 5.
+  ///
+  /// In en, this message translates to:
+  /// **'Picked up'**
+  String get trackStepPickedUp;
+
+  /// Tracking step 6.
+  ///
+  /// In en, this message translates to:
+  /// **'On the way'**
+  String get trackStepOnTheWay;
+
+  /// Tracking step 7.
+  ///
+  /// In en, this message translates to:
+  /// **'Arriving'**
+  String get trackStepArriving;
+
+  /// Tracking step 8.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered'**
+  String get trackStepDelivered;
+
+  /// Screen reader: a finished tracking step.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}, done'**
+  String trackStepDoneSemantics(String step);
+
+  /// Screen reader: the step the order is at.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}, current step'**
+  String trackStepCurrentSemantics(String step);
+
+  /// Screen reader: a step still to come.
+  ///
+  /// In en, this message translates to:
+  /// **'{step}, not yet'**
+  String trackStepPendingSemantics(String step);
+
+  /// Tracking map: button that fits the rider, store and you on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the whole route'**
+  String get trackingRecenter;
+
+  /// Tracking map: chip when the rider's position is old or updates stopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Location not live'**
+  String get trackingMapNotLive;
+
+  /// Tracking sheet: opens support with the order attached.
+  ///
+  /// In en, this message translates to:
+  /// **'Need help with this order?'**
+  String get trackingHelp;
+
+  /// Tracking: rider row subtitle with the vehicle type.
+  ///
+  /// In en, this message translates to:
+  /// **'Your delivery partner · {vehicle}'**
+  String trackingRiderWithVehicle(String vehicle);
 }
 
 class _AppLocalizationsDelegate

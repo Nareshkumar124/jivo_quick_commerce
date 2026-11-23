@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/jivo_wordmark.dart';
 import 'launch_controller.dart';
 
 /// Loads `config/app` (and the user when signed in); the router then moves
@@ -24,16 +25,7 @@ class SplashScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    l10n.appTitle,
-                    style: theme.textTheme.displayMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+                Semantics(header: true, child: const JivoWordmark(height: 88)),
                 const SizedBox(height: JivoSpacing.xxl),
                 if (status.hasError && !status.isLoading) ...[
                   Text(

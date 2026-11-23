@@ -97,6 +97,10 @@ class CartController extends Notifier<CartState> {
   /// already shows that minimum. The server's value always wins.
   final _serverMin = <int, int>{};
 
+  /// The minimum per order the controller applies to [variant]: − below it
+  /// removes the line (the steppers say so, with Undo).
+  int minimumFor(CatalogVariant variant) => _minFor(variant);
+
   /// The minimum per order for [variant]: the cart's copy of it (the
   /// server's latest answer) when it is in the cart; else a minimum the
   /// server reported while [variant] still shows a lower one; else the

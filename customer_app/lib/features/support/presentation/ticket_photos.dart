@@ -117,8 +117,26 @@ class PickedPhotoStrip extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(JivoRadii.sm),
-                    child: Image.memory(
-                      photo.file.bytes,
+                    child: Image(
+                      key: Key('picked-photo-$i'),
+                      // Decode at thumbnail size, not the full photo: a
+                      // full-size camera photo can exceed the GPU texture
+                      // limit on some phones and draw as a black square.
+                      image: ResizeImage(
+                        MemoryImage(photo.file.bytes),
+                        width: _thumbDecodePx(context),
+                        height: _thumbDecodePx(context),
+                        policy: ResizeImagePolicy.fit,
+                      ),
+                      frameBuilder: (context, child, frame, sync) =>
+                          frame == null && !sync
+                          ? ColoredBox(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                              child: const SizedBox.square(dimension: 72),
+                            )
+                          : child,
                       width: 72,
                       height: 72,
                       fit: BoxFit.cover,
@@ -156,6 +174,11 @@ class PickedPhotoStrip extends StatelessWidget {
     );
   }
 }
+
+/// Decode size for a 72 dp picked-photo thumbnail (2x headroom so
+/// `BoxFit.cover` stays sharp on a wide photo).
+int _thumbDecodePx(BuildContext context) =>
+    (72 * MediaQuery.devicePixelRatioOf(context) * 2).round();
 
 /// A message's photos as thumbnails; a tap shows one full screen. The
 /// URLs are signed and short-lived: an expired one shows a placeholder

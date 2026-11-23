@@ -38,11 +38,8 @@ void main() {
           },
         ),
       );
-      await ApiDeviceRepository(http.api()).register(
-        fcmToken: 'tok-1',
-        platform: 'ios',
-        appVersion: '1.0.0+1',
-      );
+      await ApiDeviceRepository(http.api())
+          .register(fcmToken: 'tok-1', platform: 'ios', appVersion: '1.0.0+1');
       expect(http.requests.single.path, '/api/v1/me/devices/');
       expect(http.requests.single.method, 'POST');
       expect(http.body(0), {
@@ -67,11 +64,8 @@ void main() {
         ),
       );
       expect(
-        ApiDeviceRepository(http.api()).register(
-          fcmToken: 't',
-          platform: 'android',
-          appVersion: 'x',
-        ),
+        ApiDeviceRepository(http.api())
+            .register(fcmToken: 't', platform: 'android', appVersion: 'x'),
         throwsA(
           isA<ApiError>().having(
             (e) => e.code,
@@ -133,19 +127,22 @@ void main() {
       expect(messaging.permissionRequests, 0);
     });
 
-    test('signed in at start: registers once; a refresh re-registers', () async {
-      await session.signIn(signedInTokens);
-      registrar.start();
-      await settle();
-      await registrar.sync();
-      expect(devices.calls, hasLength(1), reason: 'same token, same session');
+    test(
+      'signed in at start: registers once; a refresh re-registers',
+      () async {
+        await session.signIn(signedInTokens);
+        registrar.start();
+        await settle();
+        await registrar.sync();
+        expect(devices.calls, hasLength(1), reason: 'same token, same session');
 
-      messaging.rotate('tok-2');
-      await settle();
-      await settle();
-      expect(devices.calls.map((c) => c.fcmToken), ['tok-1', 'tok-2']);
-      expect(registrar.token, 'tok-2');
-    });
+        messaging.rotate('tok-2');
+        await settle();
+        await settle();
+        expect(devices.calls.map((c) => c.fcmToken), ['tok-1', 'tok-2']);
+        expect(registrar.token, 'tok-2');
+      },
+    );
 
     test('a failed call is retried at the next trigger', () async {
       await session.signIn(signedInTokens);
@@ -196,66 +193,70 @@ void main() {
   });
 
   group('NotificationTapRouter', () {
-    test('a tap while signed out is dropped, not opened for the next user',
-        () async {
-      final session = SessionManager(
-        store: InMemoryTokenStore(),
-        refresher: _NoRefresh(),
-      );
-      await session.restore();
-      final launch = LaunchState(onboardingSeen: true)..markReady();
-      final router = _MockRouter();
-      when(() => router.push<Object?>(any())).thenAnswer((_) async => null);
-      final push = FakePushMessaging(token: 't');
-      final tapRouter = NotificationTapRouter(
-        messaging: push,
-        router: router,
-        session: session,
-        launch: launch,
-        trackingAvailable: () => true,
-      )..start();
-      addTearDown(tapRouter.dispose);
-      addTearDown(push.close);
+    test(
+      'a tap while signed out is dropped, not opened for the next user',
+      () async {
+        final session = SessionManager(
+          store: InMemoryTokenStore(),
+          refresher: _NoRefresh(),
+        );
+        await session.restore();
+        final launch = LaunchState(onboardingSeen: true)..markReady();
+        final router = _MockRouter();
+        when(() => router.push<Object?>(any())).thenAnswer((_) async => null);
+        final push = FakePushMessaging(token: 't');
+        final tapRouter = NotificationTapRouter(
+          messaging: push,
+          router: router,
+          session: session,
+          launch: launch,
+          trackingAvailable: () => true,
+        )..start();
+        addTearDown(tapRouter.dispose);
+        addTearDown(push.close);
 
-      tapRouter.handle({'type': 'order', 'order_id': 5});
-      expect(tapRouter.pending, isNull);
+        tapRouter.handle({'type': 'order', 'order_id': 5});
+        expect(tapRouter.pending, isNull);
 
-      await session.signIn(signedInTokens);
-      await Future<void>.delayed(Duration.zero);
-      verifyNever(() => router.push<Object?>(any()));
-      verifyNever(() => router.go(any()));
+        await session.signIn(signedInTokens);
+        await Future<void>.delayed(Duration.zero);
+        verifyNever(() => router.push<Object?>(any()));
+        verifyNever(() => router.go(any()));
 
-      // Signed in now: a tap opens right away.
-      tapRouter.handle({'type': 'order', 'order_id': 5});
-      verify(() => router.push<Object?>('/orders/5/track')).called(1);
-    });
+        // Signed in now: a tap opens right away.
+        tapRouter.handle({'type': 'order', 'order_id': 5});
+        verify(() => router.push<Object?>('/orders/5/track')).called(1);
+      },
+    );
 
-    test('a tap during start-up is held, then opened once in the app',
-        () async {
-      final session = SessionManager(
-        store: InMemoryTokenStore(),
-        refresher: _NoRefresh(),
-      );
-      await session.restore();
-      await session.signIn(signedInTokens);
-      final launch = LaunchState(onboardingSeen: true);
-      final router = _MockRouter();
-      when(() => router.push<Object?>(any())).thenAnswer((_) async => null);
-      final tapRouter = NotificationTapRouter(
-        messaging: const NoopPushMessaging(),
-        router: router,
-        session: session,
-        launch: launch,
-        trackingAvailable: () => false,
-      );
-      tapRouter.handle({'type': 'product', 'slug': 'jivo-ghee'});
-      expect(tapRouter.pending, '/product/jivo-ghee');
-      launch.addListener(tapRouter.flushForTest);
-      launch.markReady();
-      verify(() => router.go('/home')).called(1);
-      verify(() => router.push<Object?>('/product/jivo-ghee')).called(1);
-      expect(tapRouter.pending, isNull);
-    });
+    test(
+      'a tap during start-up is held, then opened once in the app',
+      () async {
+        final session = SessionManager(
+          store: InMemoryTokenStore(),
+          refresher: _NoRefresh(),
+        );
+        await session.restore();
+        await session.signIn(signedInTokens);
+        final launch = LaunchState(onboardingSeen: true);
+        final router = _MockRouter();
+        when(() => router.push<Object?>(any())).thenAnswer((_) async => null);
+        final tapRouter = NotificationTapRouter(
+          messaging: const NoopPushMessaging(),
+          router: router,
+          session: session,
+          launch: launch,
+          trackingAvailable: () => false,
+        );
+        tapRouter.handle({'type': 'product', 'slug': 'jivo-ghee'});
+        expect(tapRouter.pending, '/product/jivo-ghee');
+        launch.addListener(tapRouter.flushForTest);
+        launch.markReady();
+        verify(() => router.go('/home')).called(1);
+        verify(() => router.push<Object?>('/product/jivo-ghee')).called(1);
+        expect(tapRouter.pending, isNull);
+      },
+    );
   });
 
   group('notification taps', () {
@@ -277,9 +278,7 @@ void main() {
           ],
         );
 
-    testWidgets('the app registers the device after start-up', (
-      tester,
-    ) async {
+    testWidgets('the app registers the device after start-up', (tester) async {
       final push = FakePushMessaging(token: 'tok-9');
       final devices = FakeDeviceRepository();
       await app(push, devices).pump(tester);

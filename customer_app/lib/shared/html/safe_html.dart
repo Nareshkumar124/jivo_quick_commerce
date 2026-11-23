@@ -25,7 +25,12 @@ enum HtmlBlockKind { heading1, heading2, heading3, paragraph, listItem, quote }
 
 @immutable
 class HtmlSpan {
-  const HtmlSpan(this.text, {this.bold = false, this.italic = false, this.link});
+  const HtmlSpan(
+    this.text, {
+    this.bold = false,
+    this.italic = false,
+    this.link,
+  });
 
   final String text;
   final bool bold;
@@ -333,8 +338,7 @@ class _Builder {
     _depth = depth;
   }
 
-  static int _open(int depth) =>
-      depth < safeHtmlMaxDepth ? depth + 1 : depth;
+  static int _open(int depth) => depth < safeHtmlMaxDepth ? depth + 1 : depth;
 
   static int _close(int depth) => depth > 0 ? depth - 1 : 0;
 

@@ -24,7 +24,7 @@ Future<void> submit(WidgetTester tester, String query) async {
 }
 
 void main() {
-  testWidgets('the search hint is neutral on home and in the field', (
+  testWidgets("home names Jivo's ranges; the search field stays neutral", (
     tester,
   ) async {
     final app = TestApp(tokens: signedInTokens);
@@ -32,7 +32,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const Key('home-search')),
-        matching: find.text('Search products'),
+        matching: find.text('Search water, oils and more'),
       ),
       findsOneWidget,
     );

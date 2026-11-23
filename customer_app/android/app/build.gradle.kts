@@ -86,8 +86,9 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Launcher name per flavor, used by AndroidManifest.xml (D-06: "Jivo").
-        manifestPlaceholders["appLabel"] = "Jivo"
+        // Launcher name per flavor, used by AndroidManifest.xml (D-06 said "Jivo";
+        // renamed to "Jivo Quick Commerce" by the user, 2026-11-23).
+        manifestPlaceholders["appLabel"] = "Jivo Quick Commerce"
         manifestPlaceholders["mapsApiKey"] = mapsApiKey
     }
 
@@ -100,12 +101,12 @@ android {
         create("dev") {
             dimension = "environment"
             applicationIdSuffix = ".dev"
-            manifestPlaceholders["appLabel"] = "Jivo Dev"
+            manifestPlaceholders["appLabel"] = "Jivo Quick Commerce Dev"
         }
         create("staging") {
             dimension = "environment"
             applicationIdSuffix = ".staging"
-            manifestPlaceholders["appLabel"] = "Jivo Staging"
+            manifestPlaceholders["appLabel"] = "Jivo Quick Commerce Staging"
         }
         create("prod") {
             dimension = "environment"

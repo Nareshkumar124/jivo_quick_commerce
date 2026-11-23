@@ -366,6 +366,17 @@ void main() {
     });
   });
 
+  test('every support upload is sent with the access token', () async {
+    answer = (_) => example('support_tickets_attachments_create/201/Uploaded');
+    final photo = TicketPhotoFile(bytes: pngBytes, filename: 'a.png');
+    await support().uploadNewTicketPhoto(photo);
+    await support().uploadPhoto(12, photo);
+    expect(http.requests, hasLength(2));
+    for (final sent in http.requests) {
+      expect(AuthInterceptor.requiresAuth(sent), isTrue, reason: sent.path);
+    }
+  });
+
   group('photos on create (attachment_keys)', () {
     test('on by itself only when jivo_api has the field', () {
       expect(support().photosOnCreate, jivoApiHasCreateAttachmentKeys);
@@ -384,6 +395,9 @@ void main() {
       final sent = http.requests.single;
       expect(sent.method, 'POST');
       expect(sent.uri.path, '/api/v1/support/attachments/');
+      // Bug fix: the upload must carry the access token (it went out
+      // without one and the screen showed "Please log in to continue.").
+      expect(AuthInterceptor.requiresAuth(sent), isTrue);
       final file = (sent.data as FormData).files.single;
       expect(file.key, 'file');
       expect(file.value.filename, 'photo.png');

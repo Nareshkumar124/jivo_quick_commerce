@@ -110,18 +110,22 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.cartTitle)),
-      body: body,
-      bottomNavigationBar: snapshot.isEmpty || snapshot.bill == null
-          ? null
-          : _CheckoutBar(
-              snapshot: snapshot,
-              busy: cart.busy || _proceeding,
-              updating: cart.busy,
-              proceeding: _proceeding,
-              onProceed: _proceed,
-            ),
+    // Home redesign look: light app bar, white cards, green actions.
+    return Theme(
+      data: lightPageTheme(Theme.of(context)),
+      child: Scaffold(
+        appBar: AppBar(title: Text(l10n.cartTitle)),
+        body: body,
+        bottomNavigationBar: snapshot.isEmpty || snapshot.bill == null
+            ? null
+            : _CheckoutBar(
+                snapshot: snapshot,
+                busy: cart.busy || _proceeding,
+                updating: cart.busy,
+                proceeding: _proceeding,
+                onProceed: _proceed,
+              ),
+      ),
     );
   }
 }
@@ -216,16 +220,18 @@ class _CartContent extends StatelessWidget {
         gap,
         _CouponRow(coupon: snapshot.coupon),
         gap,
-        const TipSelector(),
+        const _Section(child: TipSelector()),
         gap,
-        const InstructionsSelector(),
+        const _Section(child: InstructionsSelector()),
         if (snapshot.priceChangedLines > 0) ...[
           gap,
           CartPricesChangedNotice(count: snapshot.priceChangedLines),
         ],
         if (bill != null) ...[
           gap,
-          BillDetails(bill: bill, coupon: snapshot.coupon),
+          _Section(
+            child: BillDetails(bill: bill, coupon: snapshot.coupon),
+          ),
         ],
         gap,
       ],
@@ -453,9 +459,10 @@ class _CheckoutBar extends ConsumerWidget {
     );
     final stacked = stackCheckoutBar(context);
 
+    // A white bar under a hairline (home redesign), no heavy shadow.
     return Material(
-      elevation: 8,
-      color: theme.colorScheme.surface,
+      color: theme.colorScheme.surfaceContainerLowest,
+      shape: Border(top: BorderSide(color: context.customerColors.hairline)),
       child: SafeArea(
         top: false,
         child: Padding(
@@ -483,6 +490,19 @@ class _CheckoutBar extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// A white card around a cart section (tip, instructions, bill).
+class _Section extends StatelessWidget {
+  const _Section({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: Padding(padding: const EdgeInsets.all(JivoSpacing.lg), child: child),
+  );
 }
 
 class _CartSkeleton extends StatelessWidget {

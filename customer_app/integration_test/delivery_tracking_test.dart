@@ -148,9 +148,7 @@ void main() {
       log('order=$orderId');
 
       // 3. Wait for OUT_FOR_DELIVERY: rider card and delivery OTP.
-      final deadline = DateTime.now().add(
-        const Duration(minutes: waitMinutes),
-      );
+      final deadline = DateTime.now().add(const Duration(minutes: waitMinutes));
       Future<void> waitFor(Finder finder, String what) async {
         while (finder.evaluate().isEmpty) {
           if (DateTime.now().isAfter(deadline)) {

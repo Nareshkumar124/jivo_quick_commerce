@@ -31,13 +31,18 @@ void main() {
 
     expect(find.text('Delivery in 14 mins'), findsOneWidget);
     expect(find.text('Home · Flat 4B, MG Road, New Delhi'), findsOneWidget);
-    // A neutral hint: the catalog is not only oils and ghee.
-    expect(find.text('Search products'), findsOneWidget);
-    expect(find.textContaining('oils, ghee'), findsNothing);
+    // Jivo's main ranges, then "and more": the catalog is not only these.
+    expect(find.text('Search water, oils and more'), findsOneWidget);
+    expect(find.text('Deliver to'), findsOneWidget);
     expect(find.byKey(const Key('banner-carousel')), findsOneWidget);
     expect(find.text('Up to 20% off on olive oils'), findsOneWidget);
     expect(find.text('All products'), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-category-edible-oils')), findsNothing);
+    // The compact category row from the home feed.
+    expect(find.text('Shop by category'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('home-category-edible-oils')),
+      findsOneWidget,
+    );
     expect(find.text('Bestsellers'), findsOneWidget);
     expect(find.text('Offers'), findsOneWidget);
     expect(find.text('New launches'), findsOneWidget);
@@ -58,10 +63,10 @@ void main() {
     final app = TestApp(tokens: signedInTokens);
     await app.pump(tester);
 
+    // ADD adds the minimum (1 here) in one tap; no dialog.
     await tester.tap(find.byKey(const ValueKey('add-1001')).first);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('qty-update'))); // prefilled 1
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('qty-dialog')), findsNothing);
     expect(find.byKey(const Key('cart-bar')), findsOneWidget);
     // The item total is the (fake) server's, not a sum in the app.
     final total = (await app.cart.load()).itemTotal!;

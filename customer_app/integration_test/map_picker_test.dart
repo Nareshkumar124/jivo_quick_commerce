@@ -64,7 +64,11 @@ void main() {
       expect(fallback, findsOneWidget);
       return;
     }
-    expect(map, findsOneWidget, reason: 'a key was built in but no map is shown');
+    expect(
+      map,
+      findsOneWidget,
+      reason: 'a key was built in but no map is shown',
+    );
     final address = tester.widget<Text>(find.byKey(const Key('pin-address')));
     debugPrint('MAPS_CHECK pin_address="${address.data}"');
 
