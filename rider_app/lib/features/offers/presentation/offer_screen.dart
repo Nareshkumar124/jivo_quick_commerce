@@ -8,8 +8,10 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/providers.dart';
 import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/map/rider_map.dart';
 import '../../../shared/widgets/primary_action_bar.dart';
 import '../../launch/presentation/blocking_message.dart';
+import '../../shift/presentation/home_providers.dart';
 import '../../task/domain/rider_task.dart';
 import '../../task/domain/task_rules.dart';
 import '../../task/presentation/task_providers.dart';
@@ -321,6 +323,25 @@ class _OfferScreenState extends ConsumerState<OfferScreen> {
               _OfferRow(
                 icon: Icons.account_balance_wallet,
                 text: l10n.offerPayout(formatRupees(offer.estimatedPayout)),
+              ),
+              // The store pin is the home store (offers come only from it,
+              // `RiderProfile.home_store`). The offer has no store or drop
+              // coordinates, so no drop pin (api-requests gap).
+              RiderMapSection(
+                section: 'offer',
+                title: l10n.mapTitleOffer,
+                spec: (ref) {
+                  final store = ref
+                      .watch(todaySummaryProvider)
+                      .value
+                      ?.homeStoreLocation;
+                  if (store == null) return null;
+                  return RiderMapSpec(
+                    pins: [MapPin(MapPinKind.store, store)],
+                    lineFromRider: true,
+                    followKey: offer.id,
+                  );
+                },
               ),
             ],
           ),

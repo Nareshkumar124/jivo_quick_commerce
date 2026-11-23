@@ -1,24 +1,15 @@
-import 'dart:async';
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/format/ist_format.dart';
-import '../../../shared/platform/device_channel.dart';
+import '../../../shared/map/rider_map.dart';
 import '../domain/rider_task.dart';
 import '../domain/task_navigation.dart';
 
-/// Whether this build can show a Google map: it needs a Maps API key
-/// injected at build time (DL-80, `android/app/build.gradle.kts`). Without
-/// one the task screens show the no-map card. Overridden in tests.
-final mapsAvailableProvider = FutureProvider<bool>(
-  (ref) => const DeviceChannel().hasMapsKey(),
-);
+export '../../../shared/map/rider_map.dart' show mapsAvailableProvider;
 
 /// Builds the map for a task's navigation. A provider, so widget tests swap
 /// the Google Maps platform view for a plain widget.
@@ -256,11 +247,32 @@ String formatDistance(AppLocalizations l10n, int metres) {
   );
 }
 
-/// The Google Maps platform view (DL-80): the rider's own location layer
-/// (blue dot), a marker at the destination and the server's route. The
-/// camera fits the route once, and again when the leg changes; the rider
-/// may pan in between.
-class GoogleTaskMap extends StatefulWidget {
+/// The map spec for a navigation leg: the destination pin, the server's
+/// route (dashed when it is a straight-line estimate), and a dashed line
+/// from the rider while the server has no route yet. The camera fits again
+/// when the leg or the route changes.
+RiderMapSpec navigationMapSpec(TaskNavigation navigation) {
+  final route = navigation.route;
+  return RiderMapSpec(
+    pins: [
+      MapPin(
+        navigation.leg == NavigationLeg.toStore
+            ? MapPinKind.store
+            : MapPinKind.customer,
+        navigation.destination,
+      ),
+    ],
+    route: route?.points ?? const [],
+    roadRoute: route?.isRoad ?? true,
+    lineFromRider: true,
+    followKey: (navigation.leg, route?.polyline),
+  );
+}
+
+/// The navigation card's map (DL-80, T-821): the shared [GoogleRiderMap]
+/// with the rider's blue dot, the destination and the server's route, a
+/// recenter button, and a camera that follows leg and route changes.
+class GoogleTaskMap extends ConsumerWidget {
   const GoogleTaskMap({
     required this.navigation,
     required this.destination,
@@ -271,106 +283,8 @@ class GoogleTaskMap extends StatefulWidget {
   final GeoPoint destination;
 
   @override
-  State<GoogleTaskMap> createState() => _GoogleTaskMapState();
-}
-
-class _GoogleTaskMapState extends State<GoogleTaskMap> {
-  static LatLng _ll(GeoPoint p) => LatLng(p.lat, p.lng);
-
-  GoogleMapController? _controller;
-  List<GeoPoint> _points = const [];
-  String? _polyline;
-
-  List<GeoPoint> get _route {
-    final polyline = widget.navigation.route?.polyline;
-    if (polyline != _polyline) {
-      _polyline = polyline;
-      _points = polyline == null ? const [] : decodePolyline(polyline);
-    }
-    return _points;
-  }
-
-  @override
-  void didUpdateWidget(GoogleTaskMap old) {
-    super.didUpdateWidget(old);
-    final c = _controller;
-    if (c != null && old.navigation.leg != widget.navigation.leg) {
-      unawaited(_fit(c));
-    }
-  }
-
-  Future<void> _fit(GoogleMapController c) async {
-    final points = [..._route, widget.destination];
-    try {
-      if (points.length < 2) {
-        await c.animateCamera(
-          CameraUpdate.newLatLngZoom(_ll(widget.destination), 15),
-        );
-        return;
-      }
-      await c.animateCamera(
-        CameraUpdate.newLatLngBounds(
-          LatLngBounds(
-            southwest: LatLng(
-              points.map((p) => p.lat).reduce(math.min),
-              points.map((p) => p.lng).reduce(math.min),
-            ),
-            northeast: LatLng(
-              points.map((p) => p.lat).reduce(math.max),
-              points.map((p) => p.lng).reduce(math.max),
-            ),
-          ),
-          40,
-        ),
-      );
-    } on Object {
-      // The camera is decoration; distance, ETA and actions still show.
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final route = _route;
-    final toStore = widget.navigation.leg == NavigationLeg.toStore;
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(
-        target: _ll(route.isNotEmpty ? route.first : widget.destination),
-        zoom: 14,
-      ),
-      // The rider's position from the phone (location is already allowed
-      // "all the time" by the permissions gate).
-      myLocationEnabled: true,
-      myLocationButtonEnabled: false,
-      compassEnabled: false,
-      rotateGesturesEnabled: false,
-      tiltGesturesEnabled: false,
-      mapToolbarEnabled: false,
-      zoomControlsEnabled: false,
-      buildingsEnabled: false,
-      trafficEnabled: false,
-      indoorViewEnabled: false,
-      onMapCreated: (c) {
-        _controller = c;
-        unawaited(_fit(c));
-      },
-      polylines: {
-        if (route.length >= 2)
-          Polyline(
-            polylineId: const PolylineId('route'),
-            points: [for (final p in route) _ll(p)],
-            color: const Color(0xFF1565C0),
-            width: 5,
-          ),
-      },
-      markers: {
-        Marker(
-          markerId: const MarkerId('destination'),
-          position: _ll(widget.destination),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            toStore ? BitmapDescriptor.hueAzure : BitmapDescriptor.hueGreen,
-          ),
-        ),
-      },
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fix = ref.watch(riderMapPositionProvider).value ?? MapRiderFix.none;
+    return GoogleRiderMap(spec: navigationMapSpec(navigation).withRider(fix));
   }
 }

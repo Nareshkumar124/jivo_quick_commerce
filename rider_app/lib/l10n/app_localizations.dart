@@ -4081,6 +4081,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Map: your route to {place}'**
   String navMapSemantics(String place);
+
+  /// No description provided for @mapShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show map'**
+  String get mapShow;
+
+  /// No description provided for @mapHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide map'**
+  String get mapHide;
+
+  /// No description provided for @mapRecenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Recenter map'**
+  String get mapRecenter;
+
+  /// No description provided for @mapTitleStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Map: you and {store}'**
+  String mapTitleStore(String store);
+
+  /// No description provided for @mapTitleCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Map: you and the drop location'**
+  String get mapTitleCustomer;
+
+  /// No description provided for @mapTitleHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Map: you and your store'**
+  String get mapTitleHome;
+
+  /// No description provided for @mapTitleOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Map: you and the store'**
+  String get mapTitleOffer;
 }
 
 class _AppLocalizationsDelegate

@@ -10,6 +10,7 @@ import 'package:rider_app/features/task/domain/task_navigation.dart';
 import 'package:rider_app/features/task/domain/task_status.dart';
 import 'package:rider_app/features/task/presentation/navigation_panel.dart';
 import 'package:rider_app/l10n/app_localizations.dart';
+import 'package:rider_app/shared/map/rider_map.dart';
 
 import '../../../helpers/rider_app_harness.dart';
 
@@ -80,6 +81,56 @@ Future<void> _pumpPanel(
 }
 
 void main() {
+  group(
+    'map spec from `navigation` (camera follow, user request 2026-11-23)',
+    () {
+      test('the camera follows a new route and a new leg', () {
+        final a = navigationMapSpec(_nav());
+        final b = navigationMapSpec(_nav(metres: 900));
+        expect(a.followKey, b.followKey, reason: 'same route: no refit');
+        final rerouted = navigationMapSpec(
+          TaskNavigation(
+            leg: NavigationLeg.toStore,
+            destination: const GeoPoint(28.5706, 77.3261),
+            route: NavigationRoute(
+              polyline: encodePolyline(const [
+                GeoPoint(28.5600, 77.3100),
+                GeoPoint(28.5706, 77.3261),
+              ]),
+              distanceM: 2000,
+              durationS: 600,
+              isRoad: true,
+            ),
+          ),
+        );
+        expect(rerouted.followKey, isNot(a.followKey));
+        final toCustomer = navigationMapSpec(
+          _nav(leg: NavigationLeg.toCustomer),
+        );
+        expect(toCustomer.followKey, isNot(a.followKey));
+        expect(toCustomer.pins.single.kind, MapPinKind.customer);
+        expect(a.pins.single.kind, MapPinKind.store);
+        expect(a.route, hasLength(2));
+      });
+
+      test('a straight-line estimate is labelled; no route draws from the '
+          'rider', () {
+        expect(navigationMapSpec(_nav(road: false)).showsStraightLine, isTrue);
+        expect(navigationMapSpec(_nav()).showsStraightLine, isFalse);
+        final noRoute = navigationMapSpec(_nav(withRoute: false));
+        expect(noRoute.showsStraightLine, isFalse, reason: 'no rider yet');
+        expect(
+          noRoute
+              .withRider(
+                const MapRiderFix(permitted: true, at: GeoPoint(28.56, 77.31)),
+              )
+              .showsStraightLine,
+          isTrue,
+        );
+      });
+    },
+  );
+
   group('navigation card from `navigation`', () {
     testWidgets('to the store: leg, ETA, distance and arrival time', (
       tester,

@@ -50,8 +50,10 @@ import 'package:rider_app/features/shift/presentation/shift_controller.dart';
 import 'package:rider_app/features/task/data/fake_task_backend.dart';
 import 'package:rider_app/features/task/presentation/pickup_scan_screen.dart';
 import 'package:rider_app/features/task/presentation/task_providers.dart';
+import 'package:rider_app/shared/map/rider_map.dart';
 
 import 'kyc_image_fakes.dart';
+import 'map_fakes.dart';
 import 'task_fakes.dart';
 
 /// Location service stand-in: "online" is just a flag.
@@ -246,6 +248,13 @@ class RiderTestHarness {
   final legal = FakeLegalBackend();
   List<String> scannerValues = const ['7K2P', 'HELLO-WORLD'];
 
+  /// The phone's position for the maps (never geolocator in tests).
+  final mapLocation = FakeMapLocationSource();
+
+  /// Null: the platform answers (no key in tests). True / false: a build
+  /// with / without a Maps key, maps drawn as plain stub widgets.
+  bool? maps;
+
   /// The test screen in physical pixels (DPR 2.625): 411×914 dp. Screens
   /// whose lists the tests read whole use a taller one, since the rider
   /// theme's larger text (RD-05) makes them longer than one phone screen.
@@ -288,6 +297,8 @@ class RiderTestHarness {
     fakeLegalBackendProvider.overrideWithValue(legal),
     qrScannerBuilderProvider.overrideWith((ref) => fakeScanner(scannerValues)),
     scannerControllerProvider.overrideWith((ref) => null),
+    mapLocationSourceProvider.overrideWithValue(mapLocation),
+    if (maps case final maps?) ...mapOverrides(maps: maps),
     ...extraOverrides,
   ];
 

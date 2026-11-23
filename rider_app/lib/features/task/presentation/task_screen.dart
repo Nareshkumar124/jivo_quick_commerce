@@ -11,6 +11,7 @@ import '../../../app/providers.dart';
 import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/errors/rider_error_codes.dart';
 import '../../../shared/widgets/offline_banner.dart';
 import '../../../shared/widgets/primary_action_bar.dart';
 import '../../../shared/widgets/sensitive_number_field.dart';
@@ -20,11 +21,11 @@ import '../data/fake_task_backend.dart';
 import '../domain/rider_task.dart';
 import '../domain/task_rules.dart';
 import '../domain/task_status.dart';
-import '../../../shared/errors/rider_error_codes.dart';
 import 'at_customer_step.dart';
 import 'cod_amount_changed_notice.dart';
 import 'navigation_panel.dart';
 import 'task_flow_controller.dart';
+import 'task_map_section.dart';
 import 'task_providers.dart';
 import 'task_text.dart';
 
@@ -431,7 +432,14 @@ class _PickupStepState extends ConsumerState<_PickupStep> {
             },
           ),
         ),
-        const SizedBox(height: 24),
+        // Below the code field, small and hideable, so typing the code
+        // stays easy (user request 2026-11-23).
+        TaskMapSection(
+          task: task,
+          target: TaskMapTarget.store,
+          section: 'pickup',
+        ),
+        const SizedBox(height: 16),
         Text(
           l10n.pickupCheckBag(task.items.length),
           style: theme.textTheme.titleMedium,
@@ -722,7 +730,13 @@ class _ReturnStep extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
+        TaskMapSection(
+          task: task,
+          target: TaskMapTarget.store,
+          section: 'return',
+        ),
+        const SizedBox(height: 8),
         _PlaceCard(
           icon: Icons.store,
           title: task.store.name,
