@@ -25,7 +25,7 @@ from apps.delivery.services import cash, dispatch, eta, ops, shifts
 from apps.delivery.tests.test_task_flow import AT_DROP, flow  # noqa: F401
 from apps.orders.choices import OrderStatus
 from apps.realtime import services
-from apps.realtime.groups import order_group, rider_group, store_group
+from apps.realtime.groups import live_board_group, order_group, rider_group, store_group
 from tests.test_schema_examples import to_json_schema
 
 pytestmark = pytest.mark.django_db
@@ -517,7 +517,7 @@ def test_location_fan_out_follows_the_tracking_gate(flow, sent, commit, componen
     customer = order_group(f.order.pk)
     ping()  # online, no task: ops map only
     assert sent.to(customer) == []
-    assert sent.to(store_group(f.rider.home_store_id), "rider.location")
+    assert sent.to(live_board_group(f.rider.home_store_id), "rider.location")
     f.accept()
     f.at_store()
     f.steps.pack(f.order)
@@ -709,6 +709,6 @@ def test_location_fan_out_keeps_the_heading(flow, sent, commit, components):
     assert response.status_code in (200, 201), response.json()
     [customer] = sent.to(order_group(f.order.pk), "rider.location")
     assert customer["data"]["heading"] == 72.5
-    [ops] = sent.to(store_group(f.rider.home_store_id), "rider.location")
+    [ops] = sent.to(live_board_group(f.rider.home_store_id), "rider.location")
     assert ops["data"]["heading"] == 72.5
     sent.validate(components)

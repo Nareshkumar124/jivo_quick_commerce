@@ -19,3 +19,10 @@ def user_group(user_id: int, app: str) -> str:
 def store_group(store_id: int) -> str:
     """The ops sockets permitted for one store."""
     return f"ops.store.{int(store_id)}"
+
+
+def live_board_group(store_id: int) -> str:
+    """The ops sockets of one store whose user may see the live delivery board (05 §3 "Live
+    order board": `apps.delivery.services.live_ops.can_view`). Carries the live map's data,
+    `rider.location` and `delivery.progress` (BUG-0026); everything else goes to `store_group`."""
+    return f"ops.board.store.{int(store_id)}"

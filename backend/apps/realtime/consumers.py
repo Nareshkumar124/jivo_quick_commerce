@@ -2,7 +2,9 @@
 
 - `/ws/v1/orders/{order_id}/` (`OrderConsumer`): the order's owner only.
 - `/ws/v1/rider/` (`RiderConsumer`): an active rider, with a token issued to the rider app.
-- `/ws/ops/live/` (`OpsLiveConsumer`): staff session, `orders.view_order`, permitted stores.
+- `/ws/ops/live/` (`OpsLiveConsumer`): staff session, `orders.view_order`, permitted stores. The
+  live map's data (`rider.location`, `delivery.progress`) goes only to users who may see the live
+  order board (`live_ops.can_view`: + `orders.cancel_order`), via `live_board_group` (BUG-0026).
 
 App sockets are accepted first (so the close code reaches the app), then must authenticate
 within WS_AUTH_TIMEOUT_SECONDS. Nothing is sent to a socket before it is authorised.
@@ -34,7 +36,13 @@ from django.utils import timezone
 
 from apps.realtime import contract, limits
 from apps.realtime.auth import SocketIdentity, authenticate_token, token_from_subprotocols
-from apps.realtime.groups import order_group, rider_group, store_group, user_group
+from apps.realtime.groups import (
+    live_board_group,
+    order_group,
+    rider_group,
+    store_group,
+    user_group,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -385,6 +393,8 @@ class RiderConsumer(JwtSocketConsumer):
 
 # --------------------------------------------------------------------------- ops
 
+# Opens the ops feed (order events, alerts, task and rider status). The name is historical: the
+# live map's data needs the full live-board pair, `live_ops.LIVE_BOARD_PERMISSIONS` (BUG-0026).
 LIVE_BOARD_PERMISSION = "orders.view_order"
 
 
@@ -392,6 +402,9 @@ LIVE_BOARD_PERMISSION = "orders.view_order"
 class OpsAccess:
     store_ids: list[int]
     session_deadline: float  # epoch seconds: the staff session ends then (05 §5)
+    # 05 §3 "Live order board" (`live_ops.can_view`): also gets `rider.location` and
+    # `delivery.progress` for its stores (BUG-0026). Finance and Store Staff do not.
+    live_board: bool = False
 
 
 def staff_session_deadline(session_data: dict, user) -> float | None:
@@ -414,11 +427,14 @@ def ops_store_ids(user_id, session_key: str | None) -> OpsAccess | int:
     refuses them (05 §3, §5):
     - 4401: no session, a deleted or expired one (`expire_date`), a session of another user, the
       8 h absolute or 2 h idle staff limit reached (P8 review M1), not active staff;
-    - 4403: no `orders.view_order`, or no store."""
+    - 4403: no `orders.view_order`, or no store.
+    `live_board` says whether the user also gets the live map's data (05 §3 "Live order board",
+    the same check as the HTTP live map: `apps.delivery.services.live_ops.can_view`)."""
     from django.contrib.auth import SESSION_KEY, get_user_model
     from django.contrib.sessions.backends.base import SessionBase
     from django.utils.module_loading import import_string
 
+    from apps.delivery.services import live_ops
     from apps.stores.services import stores_for
 
     if user_id is None or not session_key:
@@ -439,11 +455,14 @@ def ops_store_ids(user_id, session_key: str | None) -> OpsAccess | int:
     store_ids = sorted(stores_for(user).values_list("pk", flat=True))
     if not store_ids:
         return contract.CLOSE_FORBIDDEN
-    return OpsAccess(store_ids=store_ids, session_deadline=deadline)
+    return OpsAccess(
+        store_ids=store_ids, session_deadline=deadline, live_board=live_ops.can_view(user)
+    )
 
 
 class OpsLiveConsumer(BaseSocketConsumer):
-    """Staff session (AuthMiddlewareStack). Joins one group per permitted store at connect and
+    """Staff session (AuthMiddlewareStack). Joins one group per permitted store at connect (plus
+    that store's live-board group when the user may see the live order board) and
     re-checks access every WS_OPS_RECHECK_SECONDS, and exactly when the staff session reaches
     its absolute or idle limit (requests on the HTTP pages move the idle limit)."""
 
@@ -477,6 +496,9 @@ class OpsLiveConsumer(BaseSocketConsumer):
             return result
         self.session_deadline = result.session_deadline
         wanted = {store_group(pk) for pk in result.store_ids}
+        if result.live_board:
+            # Re-checked like the stores: losing the live board leaves these groups (BUG-0026).
+            wanted |= {live_board_group(pk) for pk in result.store_ids}
         await self.leave(self.joined - wanted)
         await self.join(sorted(wanted))
         await self.renew_slot()

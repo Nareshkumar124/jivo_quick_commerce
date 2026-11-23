@@ -14,7 +14,7 @@ from drf_spectacular.generators import SchemaGenerator
 from apps.orders.choices import OrderStatus
 from apps.orders.tests.factories import OrderFactory
 from apps.realtime import contract, services
-from apps.realtime.groups import order_group, rider_group, store_group
+from apps.realtime.groups import live_board_group, order_group, rider_group, store_group
 from tests.test_schema_examples import to_json_schema
 
 pytestmark = pytest.mark.django_db
@@ -250,7 +250,8 @@ def test_rider_location_goes_to_the_store_and_the_order(
 ):
     order = OrderFactory(status=OrderStatus.ACCEPTED)
     customer = Listener(order_group(order.pk))
-    ops = Listener(store_group(order.store_id))
+    ops = Listener(live_board_group(order.store_id))  # BUG-0026: live board only
+    feed = Listener(store_group(order.store_id))
     with django_capture_on_commit_callbacks(execute=True):
         services.publish_rider_location(
             41, 28.47, 77.04, timezone.now(), store_id=order.store_id, order_id=order.pk, heading=90
@@ -268,6 +269,7 @@ def test_rider_location_goes_to_the_store_and_the_order(
     [theirs] = ops.messages()
     validate(components, "WsOpsRiderLocationMessage", theirs)
     assert theirs["data"]["rider_id"] == 41
+    assert feed.messages() == []  # never on the plain ops feed (Finance, Store Staff)
 
 
 def test_rider_location_without_a_store_or_order_reaches_nobody():

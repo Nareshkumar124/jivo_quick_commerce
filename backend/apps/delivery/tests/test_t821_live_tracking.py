@@ -26,7 +26,7 @@ from apps.delivery.tests.test_task_flow import flow  # noqa: F401
 from apps.orders.choices import OrderStatus
 from apps.orders.models import Order
 from apps.realtime import services
-from apps.realtime.groups import order_group, store_group
+from apps.realtime.groups import live_board_group, order_group
 from apps.stores.services import grant_store_access
 from tests.test_schema_examples import to_json_schema
 
@@ -518,7 +518,7 @@ def test_pings_send_route_and_throttled_progress(flow, sent, components, setting
     validate(components, "WsOrderRouteMessage", route)
     assert route["data"]["leg"] == "TO_STORE"
     groups, progress = by_type["delivery.progress"]
-    assert groups == [store_group(f.order.store_id)]
+    assert groups == [live_board_group(f.order.store_id)]  # BUG-0026: live board only
     validate(components, "WsDeliveryProgressMessage", progress)
     assert "customer" not in str(progress["data"]).lower()
     location = next(b for g, b in sent if b["type"] == "rider.location" and "order" in g[0])
