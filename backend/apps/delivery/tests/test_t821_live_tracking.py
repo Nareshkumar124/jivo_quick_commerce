@@ -209,7 +209,7 @@ def test_track_payload_route_progress_and_scoping(flow, make_auth_client):
     assert body["progress"]["current"] == "RIDER_ASSIGNED"
     assert steps["RIDER_ASSIGNED"]["done"]
     assert not steps["PACKED"]["done"]  # assigned while the store is still packing
-    # IDOR: another customer, and a rider token, get nothing.
+    # IDOR: another customer gets nothing.
     assert make_auth_client(UserFactory()).get(url).status_code == 404
     f.at_store()
     f.steps.pack(f.order)
@@ -225,6 +225,22 @@ def test_track_payload_route_progress_and_scoping(flow, make_auth_client):
     assert done["progress"]["current"] == "DELIVERED"
     assert done["progress"]["outcome"] == "DELIVERED"
     assert all(step["done"] for step in done["progress"]["steps"])
+
+
+def test_track_is_404_for_another_user(flow, make_auth_client):
+    """IDOR (T-821 payload): another customer gets 404 at every stage, never the route,
+    position or progress; an unknown order is 404 too."""
+    f = flow()
+    url = f"/api/v1/orders/{f.order.pk}/track/"
+    stranger = make_auth_client(UserFactory())
+    response = stranger.get(url)
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"
+    f.accept()
+    response = stranger.get(url)
+    assert response.status_code == 404
+    assert "route" not in response.json()
+    assert stranger.get("/api/v1/orders/999999999/track/").status_code == 404
 
 
 def test_track_marks_a_stale_rider(flow, make_auth_client, settings):
@@ -401,16 +417,71 @@ def test_ops_snapshot_scope_and_role_matrix(flow, shop):
     assert snap["deliveries"] == []
     assert f.rider.pk not in [r["rider_id"] for r in snap["riders"]]
     assert live_ops.snapshot(stranger, store_id=own.pk)["stores"] == []
-    # Finance views orders but no customer data.
     User.objects.filter(pk=f.order.user_id).update(name="Asha Verma")
-    finance = staff(roles.FINANCE)
-    assert live_ops.snapshot(finance)["deliveries"][0]["customer_name"] is None
-    assert live_ops.snapshot(staff(roles.OPS))["deliveries"][0]["customer_name"] == "Asha Verma"
-    # No order view: refused.
-    with pytest.raises(PermissionDenied):
-        live_ops.snapshot(staff(roles.CATALOG_MANAGER))
+    for role in (roles.OPS, roles.SUPPORT):
+        [row] = live_ops.snapshot(staff(role))["deliveries"]
+        assert row["customer_name"] == "Asha Verma"
+        assert row["drop"] is not None
+    # 05 §3 "Live order board": Finance, Store Staff and Catalog Manager have no board (review
+    # fix 1): refused, like anyone without the order view.
+    for role, stores in (
+        (roles.FINANCE, ()),
+        (roles.STORE_STAFF, (own,)),
+        (roles.CATALOG_MANAGER, ()),
+    ):
+        with pytest.raises(PermissionDenied):
+            live_ops.snapshot(staff(role, *stores))
     with pytest.raises(PermissionDenied):
         live_ops.snapshot(UserFactory())
+
+
+def test_board_access_without_customer_permissions_hides_the_drop(flow):
+    """The board pair alone (no customer, dispatch or packing permission): no name, no drop
+    point, no area (review fix 1)."""
+    from django.contrib.auth.models import Permission
+
+    f = flow()
+    f.accept()
+    user = staff(roles.CATALOG_MANAGER)  # a global role (every store), no customer permission
+    user.user_permissions.add(
+        *Permission.objects.filter(
+            content_type__app_label="orders", codename__in=["view_order", "cancel_order"]
+        )
+    )
+    user = User.objects.get(pk=user.pk)
+    assert not live_ops.shows_customer_name(user)
+    [row] = live_ops.snapshot(user)["deliveries"]
+    assert (row["customer_name"], row["drop"], row["area"]) == (None, None, None)
+    assert row["order_number"] == f.order.order_number
+
+
+def test_snapshot_query_count_does_not_grow_with_deliveries(flow, admin, monkeypatch):
+    """Review fix 3: a constant number of queries, and no route provider call, for many
+    deliveries."""
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    from apps.maps import services as maps_services
+    from apps.orders.tests.factories import OrderFactory
+
+    f = flow()
+    f.accept()
+    store = f.order.store
+    live_ops.snapshot(admin, store_id=store.pk)  # warm caches (content types, routes)
+    with CaptureQueriesContext(connection) as one:
+        live_ops.snapshot(admin, store_id=store.pk)
+    for _ in range(6):
+        OrderFactory(store=store, status=OrderStatus.PACKING)
+    calls = []
+    real = maps_services.compute_route
+    monkeypatch.setattr(
+        maps_services, "compute_route", lambda *a, **k: calls.append(a) or real(*a, **k)
+    )
+    with CaptureQueriesContext(connection) as many:
+        snap = live_ops.snapshot(admin, store_id=store.pk)
+    assert len(snap["deliveries"]) == 7
+    assert len(many) == len(one)
+    assert calls == []
 
 
 def test_offline_rider_on_a_task_is_flagged(flow, admin):

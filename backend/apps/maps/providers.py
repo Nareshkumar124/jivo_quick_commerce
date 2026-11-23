@@ -5,7 +5,7 @@ touching the tracking code:
   (the same terms as the 08 §8 ETA), with a two-point polyline. Used without a key, in tests and
   while Google is failing.
 - `GoogleMapsProvider`: Routes API `computeRoutes` (road distance, traffic-aware duration,
-  encoded polyline) and the Geocoding API (geocode / reverse geocode).
+  encoded polyline).
 
 Providers raise `MapsProviderError` on any failure; `apps.maps.services` falls back. Nothing
 here logs coordinates, addresses or the key (09 §3: no PII in logs).
@@ -13,7 +13,6 @@ here logs coordinates, addresses or the key (09 §3: no PII in logs).
 
 import json
 import urllib.error
-import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass
 
@@ -26,7 +25,7 @@ from apps.stores.services import haversine_km
 LatLng = tuple[float, float]
 
 ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
-GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+MAX_RESPONSE_BYTES = 1024 * 1024  # a route answer is a few KB
 ROUTES_FIELD_MASK = "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline"
 
 
@@ -73,12 +72,6 @@ class MapsProvider:
     def route(self, origin: LatLng, destination: LatLng) -> Route:
         raise NotImplementedError
 
-    def geocode(self, address: str) -> LatLng | None:
-        return None
-
-    def reverse_geocode(self, lat: float, lng: float) -> str | None:
-        return None
-
 
 class HaversineProvider(MapsProvider):
     name = "haversine"
@@ -111,12 +104,17 @@ class GoogleMapsProvider(MapsProvider):
     def _send(self, request: urllib.request.Request) -> dict:
         try:
             with open_no_redirect(request, timeout=self.timeout) as response:
-                return json.loads(response.read().decode("utf-8"))
+                raw = response.read(MAX_RESPONSE_BYTES + 1)
         except urllib.error.HTTPError as exc:
+            exc.close()
             # The status only: Google's error body may echo the request.
             raise MapsProviderError(f"HTTP {exc.code}") from None
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise MapsProviderError(type(exc).__name__) from None
+        if len(raw) > MAX_RESPONSE_BYTES:
+            raise MapsProviderError("response too large")
+        try:
+            return json.loads(raw.decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             raise MapsProviderError("bad JSON") from None
 
@@ -162,31 +160,3 @@ class GoogleMapsProvider(MapsProvider):
             provider=self.name,
             traffic_aware=True,
         )
-
-    def _geocode_get(self, params: dict) -> dict:
-        query = urllib.parse.urlencode({**params, "key": self._key})
-        request = urllib.request.Request(f"{GEOCODE_URL}?{query}", method="GET")  # noqa: S310
-        data = self._send(request)
-        status = data.get("status") if isinstance(data, dict) else None
-        if status == "ZERO_RESULTS":
-            return {"results": []}
-        if status != "OK":
-            raise MapsProviderError(f"geocode status {status}")
-        return data
-
-    def geocode(self, address: str) -> LatLng | None:
-        results = self._geocode_get({"address": address, "region": "in"})["results"]
-        if not results:
-            return None
-        location = results[0].get("geometry", {}).get("location", {})
-        try:
-            return float(location["lat"]), float(location["lng"])
-        except (KeyError, TypeError, ValueError):
-            raise MapsProviderError("bad geocode result") from None
-
-    def reverse_geocode(self, lat: float, lng: float) -> str | None:
-        results = self._geocode_get({"latlng": f"{lat},{lng}"})["results"]
-        if not results:
-            return None
-        address = results[0].get("formatted_address")
-        return address if isinstance(address, str) else None
