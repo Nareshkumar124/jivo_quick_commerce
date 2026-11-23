@@ -344,7 +344,11 @@ def _static(path: str) -> str:
 
 
 def test_client_never_renders_payloads_as_html():
-    for path in ("ops/js/live_map.js", "ops/js/map_provider_ol.js"):
+    for path in (
+        "ops/js/live_map.js",
+        "ops/js/map_provider_ol.js",
+        "ops/js/map_provider_google.js",
+    ):
         source = _static(path)
         # (htmx's `swap: "innerHTML"` for the server-rendered dispatch panel is fine.)
         assert not re.search(r"\.(inner|outer)HTML\b", source)
@@ -359,6 +363,7 @@ def test_client_never_renders_payloads_as_html():
 
 
 def test_map_provider_setting_falls_back(settings):
+    settings.GOOGLE_MAPS_WEB_KEY = ""
     settings.OPS_MAP_PROVIDER = "nope"
     assert live_map.map_provider()[0] == "openlayers"
     del settings.OPS_MAP_PROVIDER

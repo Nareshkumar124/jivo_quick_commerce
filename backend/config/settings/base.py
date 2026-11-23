@@ -986,7 +986,11 @@ SPECTACULAR_SETTINGS["TAGS"] += [
 ]
 
 # --------------------------------------------------------------------------- admin (unfold)
-from config.admin_ui import UNFOLD  # noqa: E402, F401  (owned by the admin panel track)
+from config.admin_ui import (  # noqa: E402, F401  (owned by the admin panel track)
+    GOOGLE_MAPS_WEB_KEY,
+    OPS_MAP_PROVIDER,
+    UNFOLD,
+)
 
 # --------------------------------------------------------------------------- project flags
 # `manage.py seed_demo` is refused where this is False (production).

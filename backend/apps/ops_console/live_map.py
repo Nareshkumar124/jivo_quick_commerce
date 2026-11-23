@@ -28,9 +28,10 @@ from django.core.exceptions import PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import Http404, JsonResponse
 from django.shortcuts import render
+from django.templatetags.static import static
 from django.urls import reverse
 
-from apps.ops_console import capabilities, order_actions
+from apps.ops_console import capabilities, csp, order_actions
 from apps.ops_console.access import forbidden, ops_view
 from apps.ops_console.forms import CancelOrderForm
 from apps.ops_console.order_views import poll_seconds
@@ -41,15 +42,25 @@ from apps.ops_console.views import ops_context
 from apps.stores.services import stores_for
 
 # Map providers (static/ops/js/map_provider_<name>.js registers `window.OpsMapProviders[name]`).
-# Only OpenLayers + OpenStreetMap tiles today; a Google Maps JS provider can be added later as
-# another entry and chosen with the `OPS_MAP_PROVIDER` setting.
+# `OPS_MAP_PROVIDER` (config/admin_ui.py): "auto" = Google Maps JS when `GOOGLE_MAPS_WEB_KEY` is
+# set, else OpenLayers + OpenStreetMap; or "google" / "openlayers". Google without a key is
+# OpenLayers. The Google provider loads the Maps JS API itself (async, with a callback) and falls
+# back to the OpenLayers assets below in the browser when Google fails (network, bad key,
+# `gm_authFailure`), so those are passed to it as `fallback`.
 MAP_PROVIDERS = {
     "openlayers": {
         "css": ("ops/vendor/ol-7.2.2.css",),
         "js": ("ops/vendor/ol-7.2.2.min.js", "ops/js/map_provider_ol.js"),
     },
+    "google": {
+        "css": (),
+        "js": ("ops/js/map_provider_google.js",),
+    },
 }
 DEFAULT_MAP_PROVIDER = "openlayers"
+AUTO = "auto"
+GOOGLE = "google"
+GOOGLE_MAPS_JS_URL = "https://maps.googleapis.com/maps/api/js"
 # Order states in which the cancel button is offered (08 T12: before pickup). The service
 # re-checks the state, the role ("before pickup" for Store Manager / Support) and the store.
 CANCELLABLE = ("PLACED", "ACCEPTED", "PACKING", "PACKED")
@@ -65,11 +76,36 @@ STATS = (
 )
 
 
+def google_web_key() -> str:
+    return (getattr(settings, "GOOGLE_MAPS_WEB_KEY", "") or "").strip()
+
+
 def map_provider() -> tuple[str, dict]:
-    name = getattr(settings, "OPS_MAP_PROVIDER", DEFAULT_MAP_PROVIDER)
+    name = getattr(settings, "OPS_MAP_PROVIDER", AUTO) or AUTO
+    if name == AUTO:
+        name = GOOGLE if google_web_key() else DEFAULT_MAP_PROVIDER
+    if name == GOOGLE and not google_web_key():
+        name = DEFAULT_MAP_PROVIDER
     if name not in MAP_PROVIDERS:
         name = DEFAULT_MAP_PROVIDER
     return name, MAP_PROVIDERS[name]
+
+
+def google_config(provider: str) -> dict | None:
+    """What map_provider_google.js needs: the browser key (live map page only), the loader URL
+    and the OpenLayers assets for its automatic fallback. None for any other provider."""
+    if provider != GOOGLE:
+        return None
+    fallback = MAP_PROVIDERS[DEFAULT_MAP_PROVIDER]
+    return {
+        "key": google_web_key(),
+        "src": GOOGLE_MAPS_JS_URL,
+        "fallback": {
+            "provider": DEFAULT_MAP_PROVIDER,
+            "css": [static(path) for path in fallback["css"]],
+            "js": [static(path) for path in fallback["js"]],
+        },
+    }
 
 
 def drop_visible(user) -> bool:
@@ -131,6 +167,7 @@ def live_map(request):
         "pollSeconds": poll_seconds(),
         "labels": _labels(),
         "stats": [{"key": key, "label": label} for key, label in STATS],
+        "googleMaps": google_config(provider),
     }
     context = ops_context(
         request,
@@ -144,7 +181,11 @@ def live_map(request):
         cancel_form=CancelOrderForm(reasons=order_actions.cancel_reasons() or ()),
         caps=caps,
     )
-    return render(request, "ops/riders/live_map.html", context)
+    response = render(request, "ops/riders/live_map.html", context)
+    if provider == GOOGLE:
+        # Only this page loads Google Maps JS, so only it widens the panel CSP.
+        csp.set_policy(response, request, extra=csp.GOOGLE_MAPS_SOURCES)
+    return response
 
 
 @ops_view(capability=capabilities.LIVE_BOARD)

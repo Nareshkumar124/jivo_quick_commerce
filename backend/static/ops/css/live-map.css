@@ -102,6 +102,21 @@
 .dark .lm-map__state { background: rgba(17, 24, 39, 0.85); }
 .lm-map__state[hidden] { display: none; }
 .lm-map__state--error { color: var(--lm-danger); }
+/* map_provider_google.js: "Google Maps could not load, showing OpenStreetMap" */
+.lm-map__notice {
+	background: rgba(255, 255, 255, 0.92);
+	border-radius: 6px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+	font-size: 12px;
+	left: 8px;
+	margin: 0;
+	padding: 4px 8px;
+	position: absolute;
+	top: 8px;
+	z-index: 2;
+}
+.dark .lm-map__notice { background: rgba(17, 24, 39, 0.92); }
+.lm-map__notice[hidden] { display: none; }
 .lm-legend {
 	background: rgba(255, 255, 255, 0.92);
 	border-radius: 12px;
