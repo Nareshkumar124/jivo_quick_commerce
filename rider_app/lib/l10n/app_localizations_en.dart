@@ -2424,4 +2424,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String navMapSemantics(String place) {
     return 'Map: your route to $place';
   }
+
+  @override
+  String get mapShow => 'Show map';
+
+  @override
+  String get mapHide => 'Hide map';
+
+  @override
+  String get mapRecenter => 'Recenter map';
+
+  @override
+  String mapTitleStore(String store) {
+    return 'Map: you and $store';
+  }
+
+  @override
+  String get mapTitleCustomer => 'Map: you and the drop location';
+
+  @override
+  String get mapTitleHome => 'Map: you and your store';
+
+  @override
+  String get mapTitleOffer => 'Map: you and the store';
 }

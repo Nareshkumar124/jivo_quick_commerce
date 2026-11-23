@@ -1461,5 +1461,19 @@
         "type": "String"
       }
     }
-  }
+  },
+  "mapShow": "Show map",
+  "mapHide": "Hide map",
+  "mapRecenter": "Recenter map",
+  "mapTitleStore": "Map: you and {store}",
+  "@mapTitleStore": {
+    "placeholders": {
+      "store": {
+        "type": "String"
+      }
+    }
+  },
+  "mapTitleCustomer": "Map: you and the drop location",
+  "mapTitleHome": "Map: you and your store",
+  "mapTitleOffer": "Map: you and the store"
 }

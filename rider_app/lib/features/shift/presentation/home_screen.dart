@@ -19,6 +19,7 @@ import '../../task/data/fake_task_backend.dart';
 import '../../task/presentation/task_flow_controller.dart';
 import '../../task/presentation/task_providers.dart';
 import 'connection_providers.dart';
+import 'home_map.dart';
 import 'home_providers.dart';
 import 'online_toggle.dart';
 import 'shift_controller.dart';
@@ -140,6 +141,7 @@ class HomeScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const ShiftStatusCard(),
+                      const HomeAreaMap(),
                       const GuardCard(),
                       const CashLimitBanner(),
                       const SizedBox(height: 16),

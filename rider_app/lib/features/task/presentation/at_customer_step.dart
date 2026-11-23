@@ -19,6 +19,7 @@ import '../domain/task_rules.dart';
 import '../domain/task_status.dart';
 import 'cod_amount_changed_notice.dart';
 import 'task_flow_controller.dart';
+import 'task_map_section.dart';
 import 'task_providers.dart';
 import 'task_screen.dart';
 
@@ -201,6 +202,12 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
         ),
         // The tries left come only from the server's `attempts_remaining`,
         // in the error line (taskErrorText), never counted on the phone.
+        // The map sits below the code, small and hideable.
+        TaskMapSection(
+          task: task,
+          target: TaskMapTarget.customer,
+          section: 'otp',
+        ),
       ],
       actions: PrimaryActionBar(
         quickRow: [
@@ -252,6 +259,11 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
             ? null
             : () => setState(() => _collecting = false),
         child: Text(l10n.codChangeOtp),
+      ),
+      TaskMapSection(
+        task: task,
+        target: TaskMapTarget.customer,
+        section: 'cod-missing',
       ),
     ],
     actions: PrimaryActionBar(
@@ -462,6 +474,11 @@ class _AtCustomerStepState extends ConsumerState<AtCustomerStep> {
           onPressed: busy ? null : () => setState(() => _collecting = false),
           child: Text(l10n.codChangeOtp),
         ),
+        TaskMapSection(
+          task: task,
+          target: TaskMapTarget.customer,
+          section: 'cod',
+        ),
       ],
       actions: actions,
     );
@@ -500,6 +517,12 @@ class _Locked extends ConsumerWidget {
           key: const Key('otp-locked'),
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 18),
+        ),
+        const SizedBox(height: 8),
+        TaskMapSection(
+          task: task,
+          target: TaskMapTarget.customer,
+          section: 'otp-locked',
         ),
       ],
       // Without a support phone there is no disabled button: only
