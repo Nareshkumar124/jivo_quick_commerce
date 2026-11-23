@@ -38,22 +38,50 @@ HEADER_ENFORCE = "Content-Security-Policy"
 HEADER_REPORT_ONLY = "Content-Security-Policy-Report-Only"
 
 
-def policy(nonce: str) -> str:
-    directives = [
-        "default-src 'self'",
-        f"script-src 'self' 'unsafe-eval' 'nonce-{nonce}'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob: https://tile.openstreetmap.org",
-        "font-src 'self' data:",
-        "connect-src 'self'",
-        "frame-src 'self'",
-        "frame-ancestors 'none'",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-        f"report-uri {REPORT_PATH}",
-    ]
-    return "; ".join(directives)
+# Google Maps JavaScript API (Google's CSP guide for Maps JS, https-only): added **only** to the
+# Ops live delivery map page, and only when it uses the Google provider (live_map.py). Every
+# other panel page keeps the base policy.
+GOOGLE_MAPS_SOURCES = {
+    "script-src": ("https://*.googleapis.com", "https://*.gstatic.com"),
+    "img-src": (
+        "https://*.googleapis.com",
+        "https://*.gstatic.com",
+        "https://*.google.com",
+        "https://*.googleusercontent.com",
+    ),
+    "connect-src": ("https://*.googleapis.com", "https://*.google.com", "https://*.gstatic.com"),
+    "font-src": ("https://fonts.gstatic.com",),
+    "style-src": ("https://fonts.googleapis.com",),
+    "worker-src": ("blob:",),
+}
+
+
+def policy(nonce: str, extra: dict | None = None) -> str:
+    directives = {
+        "default-src": ["'self'"],
+        "script-src": ["'self'", "'unsafe-eval'", f"'nonce-{nonce}'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:", "blob:", "https://tile.openstreetmap.org"],
+        "font-src": ["'self'", "data:"],
+        "connect-src": ["'self'"],
+        "frame-src": ["'self'"],
+        "frame-ancestors": ["'none'"],
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+        "form-action": ["'self'"],
+    }
+    for name, sources in (extra or {}).items():
+        values = directives.setdefault(name, ["'self'"])
+        values.extend(source for source in sources if source not in values)
+    parts = [" ".join([name, *values]) for name, values in directives.items()]
+    parts.append(f"report-uri {REPORT_PATH}")
+    return "; ".join(parts)
+
+
+def set_policy(response, request, extra: dict | None = None) -> None:
+    """Put the panel policy plus `extra` sources on one response (the middleware then leaves it)."""
+    header = HEADER_REPORT_ONLY if report_only() else HEADER_ENFORCE
+    response[header] = policy(getattr(request, "csp_nonce", "") or "", extra=extra)
 
 
 def report_only() -> bool:

@@ -8,6 +8,14 @@ from django.templatetags.static import static
 from django.urls import reverse_lazy
 
 from apps.ops_console.navigation import unfold_sidebar
+from config.env import env_str
+
+# Ops live delivery map (05 §1.4, apps/ops_console/live_map.py). OPS_MAP_PROVIDER: "auto" (Google
+# Maps JS when GOOGLE_MAPS_WEB_KEY is set, else OpenLayers + OpenStreetMap), "google" or
+# "openlayers". GOOGLE_MAPS_WEB_KEY is a *browser* key (Maps JavaScript API only, restricted by
+# HTTP referrer in Google Cloud); it is sent to the live map page only, never the server key.
+OPS_MAP_PROVIDER = env_str("OPS_MAP_PROVIDER", default="auto")
+GOOGLE_MAPS_WEB_KEY = env_str("GOOGLE_MAPS_WEB_KEY", default="")
 
 # Jivo brand (design/incoming/brand-2026-11-23, sizes generated into static/brand/). Callables,
 # so `static()` runs per request (manifest-hashed names in production).
