@@ -180,10 +180,17 @@ void main() {
         phone(tester, scale);
         await startReal(tester);
         expect(find.byType(HomeScreen), findsOneWidget);
-        expect(find.text('All products'), findsOneWidget);
+        // Home redesign: the rails come first, all products last.
         await tester.scrollUntilVisible(
           find.text('Bestsellers'),
           200,
+          scrollable: outerScrollable,
+        );
+        await tester.pumpAndSettle();
+        expectNoLayoutError(tester);
+        await tester.scrollUntilVisible(
+          find.text('All products'),
+          300,
           scrollable: outerScrollable,
         );
         await tester.pumpAndSettle();

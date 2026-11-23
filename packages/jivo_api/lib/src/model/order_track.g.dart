@@ -29,6 +29,12 @@ abstract class _$OrderTrackCWProxy {
 
   OrderTrack taskStatus(DeliveryTaskStatusEnum? taskStatus);
 
+  OrderTrack route(TrackRoute? route);
+
+  OrderTrack distanceRemainingM(int? distanceRemainingM);
+
+  OrderTrack progress(TrackProgress progress);
+
   OrderTrack serverTime(DateTime serverTime);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `OrderTrack(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -49,6 +55,9 @@ abstract class _$OrderTrackCWProxy {
     TrackRider? rider,
     String? deliveryOtp,
     DeliveryTaskStatusEnum? taskStatus,
+    TrackRoute? route,
+    int? distanceRemainingM,
+    TrackProgress progress,
     DateTime serverTime,
   });
 }
@@ -96,6 +105,16 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
       this(taskStatus: taskStatus);
 
   @override
+  OrderTrack route(TrackRoute? route) => this(route: route);
+
+  @override
+  OrderTrack distanceRemainingM(int? distanceRemainingM) =>
+      this(distanceRemainingM: distanceRemainingM);
+
+  @override
+  OrderTrack progress(TrackProgress progress) => this(progress: progress);
+
+  @override
   OrderTrack serverTime(DateTime serverTime) => this(serverTime: serverTime);
 
   @override
@@ -117,6 +136,9 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
     Object? rider = const $CopyWithPlaceholder(),
     Object? deliveryOtp = const $CopyWithPlaceholder(),
     Object? taskStatus = const $CopyWithPlaceholder(),
+    Object? route = const $CopyWithPlaceholder(),
+    Object? distanceRemainingM = const $CopyWithPlaceholder(),
+    Object? progress = const $CopyWithPlaceholder(),
     Object? serverTime = const $CopyWithPlaceholder(),
   }) {
     return OrderTrack(
@@ -164,6 +186,18 @@ class _$OrderTrackCWProxyImpl implements _$OrderTrackCWProxy {
           ? _value.taskStatus
           // ignore: cast_nullable_to_non_nullable
           : taskStatus as DeliveryTaskStatusEnum?,
+      route: route == const $CopyWithPlaceholder()
+          ? _value.route
+          // ignore: cast_nullable_to_non_nullable
+          : route as TrackRoute?,
+      distanceRemainingM: distanceRemainingM == const $CopyWithPlaceholder()
+          ? _value.distanceRemainingM
+          // ignore: cast_nullable_to_non_nullable
+          : distanceRemainingM as int?,
+      progress: progress == const $CopyWithPlaceholder()
+          ? _value.progress
+          // ignore: cast_nullable_to_non_nullable
+          : progress as TrackProgress,
       serverTime: serverTime == const $CopyWithPlaceholder()
           ? _value.serverTime
           // ignore: cast_nullable_to_non_nullable
@@ -200,6 +234,9 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
         'rider',
         'delivery_otp',
         'task_status',
+        'route',
+        'distance_remaining_m',
+        'progress',
         'server_time',
       ],
     );
@@ -248,6 +285,19 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
           unknownValue: DeliveryTaskStatusEnum.unknownDefaultOpenApi,
         ),
       ),
+      route: $checkedConvert(
+        'route',
+        (v) =>
+            v == null ? null : TrackRoute.fromJson(v as Map<String, dynamic>),
+      ),
+      distanceRemainingM: $checkedConvert(
+        'distance_remaining_m',
+        (v) => (v as num?)?.toInt(),
+      ),
+      progress: $checkedConvert(
+        'progress',
+        (v) => TrackProgress.fromJson(v as Map<String, dynamic>),
+      ),
       serverTime: $checkedConvert(
         'server_time',
         (v) => DateTime.parse(v as String),
@@ -263,6 +313,7 @@ OrderTrack _$OrderTrackFromJson(Map<String, dynamic> json) => $checkedCreate(
     'liveEtaMinutes': 'live_eta_minutes',
     'deliveryOtp': 'delivery_otp',
     'taskStatus': 'task_status',
+    'distanceRemainingM': 'distance_remaining_m',
     'serverTime': 'server_time',
   },
 );
@@ -280,6 +331,9 @@ Map<String, dynamic> _$OrderTrackToJson(OrderTrack instance) =>
       'rider': instance.rider?.toJson(),
       'delivery_otp': instance.deliveryOtp,
       'task_status': _$DeliveryTaskStatusEnumEnumMap[instance.taskStatus],
+      'route': instance.route?.toJson(),
+      'distance_remaining_m': instance.distanceRemainingM,
+      'progress': instance.progress.toJson(),
       'server_time': instance.serverTime.toIso8601String(),
     };
 

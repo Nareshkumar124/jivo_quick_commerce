@@ -95,11 +95,15 @@ class RiderCard extends ConsumerWidget {
       contentPadding: EdgeInsets.zero,
       leading: RiderAvatar(photoUrl: rider.photoUrl),
       title: Text(rider.name),
-      subtitle: Text(
-        updatedAt == null
-            ? l10n.trackingRiderLabel
-            : l10n.trackingRiderUpdated(_whenText(l10n, updatedAt)),
-      ),
+      subtitle: Text(switch ((rider.vehicle, updatedAt)) {
+        (final RiderVehicle v, _) => l10n.trackingRiderWithVehicle(
+          vehicleLabel(l10n, v),
+        ),
+        (null, final DateTime at) => l10n.trackingRiderUpdated(
+          _whenText(l10n, at),
+        ),
+        (null, null) => l10n.trackingRiderLabel,
+      }),
       trailing: !canCall || phone == null || phone.isEmpty
           ? null
           : IconButton.filledTonal(
@@ -114,6 +118,15 @@ class RiderCard extends ConsumerWidget {
     );
   }
 }
+
+/// The rider's vehicle in words (T-821).
+String vehicleLabel(AppLocalizations l10n, RiderVehicle vehicle) =>
+    switch (vehicle) {
+      RiderVehicle.bicycle => l10n.trackingVehicleBicycle,
+      RiderVehicle.eBike => l10n.trackingVehicleEBike,
+      RiderVehicle.motorbike => l10n.trackingVehicleMotorbike,
+      RiderVehicle.scooter => l10n.trackingVehicleScooter,
+    };
 
 /// "just now", "5 min ago" or "at 3:45 pm" (IST), from the phone's clock.
 String _whenText(AppLocalizations l10n, DateTime at) {

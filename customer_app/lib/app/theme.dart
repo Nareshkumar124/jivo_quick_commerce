@@ -8,22 +8,35 @@ import 'package:jivo_core/jivo_core.dart';
 class CustomerColors extends ThemeExtension<CustomerColors> {
   const CustomerColors();
 
-  Color get primaryDeep => const Color(0xFF075C36);
+  Color get primaryDeep => const Color(0xFF1F3F1C);
   Color get gold => const Color(0xFFFFC83D);
   Color get onGold => const Color(0xFF3B2600);
   Color get goldLight => const Color(0xFFFFE9A8);
   Color get goldEdge => const Color(0xFF9E6A00);
   Color get imageWell => const Color(0xFFF6EFE3);
-  Color get shadow => const Color(0xFF0B3B22);
+  Color get shadow => const Color(0xFF14290F);
 
   /// `customer.color.warning.tint`: background of non-error attention
   /// notices (price changed, items not supplied), text in onSurface
   /// (15.62:1), icon in `jivoColors.warning`.
   Color get warningTint => const Color(0xFFFFF4D6);
 
+  /// Home redesign (2026-11-21): a pale mint behind the ETA badge, the
+  /// home ADD button and the selected tab. Text on it is
+  /// `onPrimaryContainer` (#0F2A0D, 13.8:1) or logo green #2D5528 (7.7:1).
+  Color get softTint => const Color(0xFFEDF4E9);
+
+  /// Home redesign: the hairline around the home search field and cards
+  /// (decorative only, never carries meaning).
+  Color get hairline => const Color(0xFFEFE8DC);
+
+  /// Home redesign: the shadow on home cards and the search field, kept
+  /// very light (one cheap Material shadow).
+  Color get softShadow => const Color(0x2914290F);
+
   List<Color> get headerGradient => const [
-    Color(0xFF075C36),
-    Color(0xFF0B7A47),
+    Color(0xFF1F3F1C),
+    Color(0xFF2D5528),
   ];
   List<Color> get offerGradient => const [Color(0xFFFFE9A8), Color(0xFFFFC24D)];
 
@@ -45,7 +58,7 @@ extension CustomerColorsContext on BuildContext {
 /// battery) and a white navigation bar with dark icons, so both stay visible
 /// on the ivory/white theme.
 const customerSystemUiStyle = SystemUiOverlayStyle(
-  statusBarColor: Color(0xFF075C36),
+  statusBarColor: Color(0xFF1F3F1C),
   statusBarIconBrightness: Brightness.light,
   statusBarBrightness: Brightness.dark,
   systemNavigationBarColor: Color(0xFFFFFFFF),
@@ -67,9 +80,14 @@ const customerLightScreenStyle = SystemUiOverlayStyle(
   systemNavigationBarDividerColor: Color(0xFFE0E0E0),
 );
 
-ThemeData buildCustomerTheme() {
+/// The customer theme: v2 (green and gold) with the home redesign's light
+/// page look on top for every screen (2026-11-21).
+ThemeData buildCustomerTheme() => lightPageTheme(_buildCustomerThemeV2());
+
+ThemeData _buildCustomerThemeV2() {
   const c = CustomerColors();
-  const green = Color(0xFF0B7A47);
+  // The green of the official round Jivo logo (2026-11-23).
+  const green = Color(0xFF2D5528);
   const ink = Color(0xFF181D17);
   const muted = Color(0xFF424840);
   const outline = Color(0xFF73796F);
@@ -79,8 +97,8 @@ ThemeData buildCustomerTheme() {
   final scheme = ColorScheme.fromSeed(seedColor: green).copyWith(
     primary: green,
     onPrimary: white,
-    primaryContainer: const Color(0xFFD6F3E1),
-    onPrimaryContainer: const Color(0xFF00391F),
+    primaryContainer: const Color(0xFFDCEBD6),
+    onPrimaryContainer: const Color(0xFF0F2A0D),
     secondary: c.gold,
     onSecondary: c.onGold,
     secondaryContainer: c.goldLight,
@@ -207,13 +225,16 @@ ThemeData buildCustomerTheme() {
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
       ),
     ),
+    // Home redesign (2026-11-21): a flat white bar under a hairline, line
+    // icons, green for the selected tab on a pale-mint pill, neutral grey
+    // for the others.
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: white,
-      elevation: 3,
-      shadowColor: c.shadow,
+      elevation: 0,
+      shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
-      height: 68,
-      indicatorColor: c.goldLight,
+      height: 64,
+      indicatorColor: c.softTint,
       indicatorShape: const StadiumBorder(),
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       iconTheme: WidgetStateProperty.resolveWith(
@@ -281,5 +302,74 @@ ThemeData buildCustomerTheme() {
       ),
     ),
     dividerTheme: const DividerThemeData(color: edge, thickness: 1),
+  );
+}
+
+/// The home redesign's look for one screen (2026-11-21), applied screen by
+/// screen with `Theme(data: lightPageTheme(Theme.of(context)), ...)`: a
+/// light app bar on the warm canvas, white cards on a hairline with a soft
+/// shadow, green main buttons and pale-mint selected chips. Styles only.
+ThemeData lightPageTheme(ThemeData base) {
+  final c = base.extension<CustomerColors>() ?? const CustomerColors();
+  final s = base.colorScheme;
+  final ink = IconThemeData(color: s.onSurface, size: 24);
+  final green = FilledButton.styleFrom(
+    backgroundColor: s.primary,
+    foregroundColor: s.onPrimary,
+    disabledBackgroundColor: s.surfaceContainerHighest,
+    disabledForegroundColor: s.onSurfaceVariant,
+    minimumSize: const Size(64, 52),
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(JivoRadii.md),
+    ),
+    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+  );
+  return base.copyWith(
+    // Pale gold surfaces (session-expired card, delivery stage card) turn
+    // pale mint; gold "secondary" accents turn green.
+    colorScheme: s.copyWith(
+      secondary: s.primary,
+      onSecondary: s.onPrimary,
+      secondaryContainer: c.softTint,
+      onSecondaryContainer: s.onPrimaryContainer,
+    ),
+    appBarTheme: base.appBarTheme.copyWith(
+      backgroundColor: s.surface,
+      foregroundColor: s.onSurface,
+      systemOverlayStyle: customerLightScreenStyle,
+      titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(
+        color: s.onSurface,
+      ),
+      iconTheme: ink,
+      actionsIconTheme: ink,
+    ),
+    cardTheme: base.cardTheme.copyWith(
+      elevation: 1,
+      shadowColor: c.softShadow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(JivoRadii.lg),
+        side: BorderSide(color: c.hairline),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(style: green),
+    elevatedButtonTheme: ElevatedButtonThemeData(style: green),
+    chipTheme: base.chipTheme.copyWith(
+      backgroundColor: s.surfaceContainerLowest,
+      selectedColor: c.softTint,
+      side: WidgetStateBorderSide.resolveWith(
+        (states) => BorderSide(
+          color: states.contains(WidgetState.selected)
+              ? s.primary
+              : s.outlineVariant,
+        ),
+      ),
+      secondaryLabelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: s.onPrimaryContainer,
+      ),
+      checkmarkColor: s.primary,
+    ),
   );
 }

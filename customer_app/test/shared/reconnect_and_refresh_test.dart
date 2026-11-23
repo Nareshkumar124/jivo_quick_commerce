@@ -6,6 +6,7 @@ import 'package:customer_app/features/home/presentation/home_screen.dart';
 import 'package:customer_app/shared/connectivity/connectivity.dart';
 import 'package:customer_app/shared/network/network_health_interceptor.dart';
 import 'package:dio/dio.dart';
+import 'package:customer_app/features/home/presentation/home_product_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,7 +82,7 @@ void main() {
       GoRouter.of(tester.element(find.byType(HomeScreen)))
           .push(Routes.category('edible-oils'));
       await tester.pumpAndSettle();
-      final tiles = find.byType(Card);
+      final tiles = find.byType(HomeProductCard);
       final before = tester.widgetList(tiles).length;
       expect(before, greaterThan(0));
 

@@ -179,9 +179,7 @@ final logoutProvider = Provider<Future<void> Function()>((ref) {
         await repository.logout(sent, fcmToken: fcmToken).timeout(timeout);
         final rotated = session.refreshToken;
         if (rotated != null && rotated != sent) {
-          await repository
-              .logout(rotated, fcmToken: fcmToken)
-              .timeout(timeout);
+          await repository.logout(rotated, fcmToken: fcmToken).timeout(timeout);
         }
       } catch (_) {
         // Best effort: the user is signed out locally regardless.

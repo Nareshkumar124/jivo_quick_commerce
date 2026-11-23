@@ -30,17 +30,15 @@ void main() {
     expect(add, findsWidgets);
     await tester.tap(add.first);
     await tester.pumpAndSettle();
-    // ADD opens the quantity dialog (one pack size) or the variant picker.
-    final opened =
-        find.byKey(const Key('qty-dialog')).evaluate().isNotEmpty ||
-        find.byKey(const Key('variant-picker')).evaluate().isNotEmpty;
-    expect(opened, isTrue);
-    if (find.byKey(const Key('variant-picker')).evaluate().isNotEmpty) {
+    // ADD adds the minimum in one tap (one pack size) or opens the variant
+    // picker (several).
+    final picker = find.byKey(const Key('variant-picker'));
+    if (picker.evaluate().isNotEmpty) {
       await tester.tapAt(const Offset(10, 10));
       await tester.pumpAndSettle();
     } else {
-      await tester.tap(find.byKey(const Key('qty-update')));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('qty-dialog')), findsNothing);
+      expect(find.byKey(const Key('cart-bar')), findsOneWidget);
     }
 
     router.pop();

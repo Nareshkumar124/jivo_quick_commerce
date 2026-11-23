@@ -5,6 +5,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/launch_state.dart';
 import '../../../app/providers.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/widgets/jivo_wordmark.dart';
 
 /// Three brand slides on first launch, skippable (`03 §2.1`).
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -48,11 +49,20 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: _finish,
-                child: Text(l10n.onboardingSkip),
+            Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: JivoSpacing.xl,
+                top: JivoSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  const JivoWordmark(height: 36),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _finish,
+                    child: Text(l10n.onboardingSkip),
+                  ),
+                ],
               ),
             ),
             Expanded(

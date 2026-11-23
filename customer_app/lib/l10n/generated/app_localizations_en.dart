@@ -10,7 +10,10 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Jivo';
+  String get appTitle => 'Jivo Quick Commerce';
+
+  @override
+  String get brandName => 'Jivo';
 
   @override
   String get retry => 'Retry';
@@ -697,6 +700,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchHint => 'Search products';
+
+  @override
+  String get homeSearchHint => 'Search water, oils and more';
+
+  @override
+  String get homeCategories => 'Shop by category';
+
+  @override
+  String decreaseQuantitySemantics(String name) {
+    return 'Decrease $name';
+  }
+
+  @override
+  String increaseQuantitySemantics(String name) {
+    return 'Increase $name';
+  }
 
   @override
   String get allProducts => 'All products';
@@ -2518,4 +2537,116 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get pushChannelGeneralDescription =>
       'Offers, new products and other messages from Jivo';
+
+  @override
+  String trackingUpdatedAgo(String ago) {
+    return 'Updated $ago';
+  }
+
+  @override
+  String trackingLiveUpdatedAgo(String ago) {
+    return 'Updated $ago';
+  }
+
+  @override
+  String trackingSecondsAgo(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sec ago',
+      one: '1 sec ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String trackingRiderStale(String ago) {
+    return 'Rider\'s location last updated $ago';
+  }
+
+  @override
+  String get trackingRiderNoFix => 'Waiting for the rider\'s location';
+
+  @override
+  String trackingStaleAgo(String ago) {
+    return 'Can’t update right now. Last update $ago. Pull down to try again.';
+  }
+
+  @override
+  String trackingDistanceKm(String km) {
+    return '$km km away';
+  }
+
+  @override
+  String trackingDistanceM(int m) {
+    return '$m m away';
+  }
+
+  @override
+  String get trackingVehicleBicycle => 'Bicycle';
+
+  @override
+  String get trackingVehicleEBike => 'E-bike';
+
+  @override
+  String get trackingVehicleMotorbike => 'Motorbike';
+
+  @override
+  String get trackingVehicleScooter => 'Scooter';
+
+  @override
+  String get trackingProgressTitle => 'Order progress';
+
+  @override
+  String get trackStepConfirmed => 'Order confirmed';
+
+  @override
+  String get trackStepPreparing => 'Preparing your order';
+
+  @override
+  String get trackStepPacked => 'Packed';
+
+  @override
+  String get trackStepRiderAssigned => 'Rider assigned';
+
+  @override
+  String get trackStepPickedUp => 'Picked up';
+
+  @override
+  String get trackStepOnTheWay => 'On the way';
+
+  @override
+  String get trackStepArriving => 'Arriving';
+
+  @override
+  String get trackStepDelivered => 'Delivered';
+
+  @override
+  String trackStepDoneSemantics(String step) {
+    return '$step, done';
+  }
+
+  @override
+  String trackStepCurrentSemantics(String step) {
+    return '$step, current step';
+  }
+
+  @override
+  String trackStepPendingSemantics(String step) {
+    return '$step, not yet';
+  }
+
+  @override
+  String get trackingRecenter => 'Show the whole route';
+
+  @override
+  String get trackingMapNotLive => 'Location not live';
+
+  @override
+  String get trackingHelp => 'Need help with this order?';
+
+  @override
+  String trackingRiderWithVehicle(String vehicle) {
+    return 'Your delivery partner · $vehicle';
+  }
 }

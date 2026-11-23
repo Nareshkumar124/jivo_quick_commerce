@@ -232,26 +232,25 @@ class _ProfileHeader extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final colors = context.customerColors;
     final text = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+    // Home redesign: a white card (was the green gradient band).
     return Container(
       padding: const EdgeInsets.all(JivoSpacing.lg),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: colors.headerGradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: scheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(JivoRadii.lg),
+        border: Border.all(color: colors.hairline),
       ),
       child: Row(
         children: [
           ExcludeSemantics(
             child: CircleAvatar(
               radius: 30,
-              backgroundColor: colors.gold,
+              backgroundColor: colors.softTint,
               child: Text(
                 _initials(name),
                 style: text.titleLarge?.copyWith(
-                  color: colors.onGold,
+                  color: scheme.onPrimaryContainer,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -267,13 +266,14 @@ class _ProfileHeader extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: text.titleMedium?.copyWith(
-                    color: Colors.white,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
                   _maskPhone(phone),
-                  style: text.bodyMedium?.copyWith(color: Colors.white70),
+                  style: text.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: JivoSpacing.sm),
                 ActionChip(
@@ -281,11 +281,11 @@ class _ProfileHeader extends StatelessWidget {
                   avatar: Icon(
                     Icons.edit_outlined,
                     size: 16,
-                    color: colors.onGold,
+                    color: scheme.primary,
                   ),
                   label: Text(l10n.edit),
-                  labelStyle: TextStyle(color: colors.onGold),
-                  backgroundColor: colors.goldLight,
+                  labelStyle: TextStyle(color: scheme.onPrimaryContainer),
+                  backgroundColor: colors.softTint,
                   side: BorderSide.none,
                   materialTapTargetSize: MaterialTapTargetSize.padded,
                   onPressed: () => context.push(Routes.editProfile),
@@ -315,7 +315,7 @@ class _QuickTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.customerColors;
     return Material(
-      color: colors.goldLight.withValues(alpha: 0.55),
+      color: colors.softTint,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -326,7 +326,7 @@ class _QuickTile extends StatelessWidget {
             padding: const EdgeInsets.all(JivoSpacing.md),
             child: Row(
               children: [
-                Icon(icon, color: colors.primaryDeep),
+                Icon(icon, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: JivoSpacing.sm),
                 Expanded(
                   child: Text(
@@ -343,7 +343,7 @@ class _QuickTile extends StatelessWidget {
   }
 }
 
-/// Gold strip that opens Refer & earn. The amount comes from the referral
+/// Mint strip that opens Refer & earn. The amount comes from the referral
 /// data; without it the text is generic.
 class _ReferralStrip extends ConsumerWidget {
   const _ReferralStrip();
@@ -355,10 +355,18 @@ class _ReferralStrip extends ConsumerWidget {
     final info = ref.watch(currentReferralProvider).value;
     final reward = info == null ? null : formatRupeesOrNull(info.rewardAmount);
     final active = info != null && info.isEnabled && reward != null;
+    final green = Theme.of(context).colorScheme.primary;
+    final ink = Theme.of(context).colorScheme.onPrimaryContainer;
     return Material(
       key: const Key('account-referral'),
-      color: colors.gold,
-      borderRadius: BorderRadius.circular(16),
+      // Home redesign: pale mint with a green edge (was gold).
+      color: colors.softTint,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
+        ),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => context.push(Routes.referral),
@@ -368,7 +376,7 @@ class _ReferralStrip extends ConsumerWidget {
             padding: const EdgeInsets.all(JivoSpacing.md),
             child: Row(
               children: [
-                Icon(Icons.card_giftcard, color: colors.onGold),
+                Icon(Icons.card_giftcard, color: green),
                 const SizedBox(width: JivoSpacing.md),
                 Expanded(
                   child: Column(
@@ -378,21 +386,19 @@ class _ReferralStrip extends ConsumerWidget {
                         active
                             ? l10n.referralHeadline(reward)
                             : l10n.referralStripGeneric,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: colors.onGold,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: Theme.of(context).textTheme.titleSmall
+                            ?.copyWith(color: ink, fontWeight: FontWeight.w700),
                       ),
                       if (active && info.canApplyCode)
                         Text(
                           l10n.referralEntryHaveCode,
                           key: const Key('referral-have-code'),
-                          style: TextStyle(color: colors.onGold),
+                          style: TextStyle(color: ink),
                         ),
                     ],
                   ),
                 ),
-                Icon(Icons.chevron_right, color: colors.onGold),
+                Icon(Icons.chevron_right, color: green),
               ],
             ),
           ),
@@ -448,7 +454,7 @@ class _Row extends StatelessWidget {
   Widget build(BuildContext context) {
     final tint = danger
         ? Theme.of(context).colorScheme.error
-        : context.customerColors.primaryDeep;
+        : Theme.of(context).colorScheme.primary;
     return ListTile(
       minTileHeight: 56,
       leading: CircleAvatar(

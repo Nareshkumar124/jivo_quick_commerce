@@ -43,7 +43,7 @@ class CartBar extends ConsumerWidget {
     );
     final pill = DecoratedBox(
       decoration: BoxDecoration(
-        color: cc.gold,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(JivoRadii.pill),
       ),
       child: Padding(
@@ -55,13 +55,17 @@ class CartBar extends ConsumerWidget {
               child: Text(
                 l10n.viewCart,
                 style: TextStyle(
-                  color: cc.onGold,
+                  color: Theme.of(context).colorScheme.primary,
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-            Icon(Icons.chevron_right_rounded, size: 20, color: cc.onGold),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ],
         ),
       ),
@@ -78,9 +82,11 @@ class CartBar extends ConsumerWidget {
         ),
         child: Material(
           key: const Key('cart-bar'),
-          color: cc.primaryDeep,
-          elevation: 3,
-          shadowColor: cc.shadow,
+          // Home redesign: Jivo green with a white pill (was deep green and
+          // gold).
+          color: Theme.of(context).colorScheme.primary,
+          elevation: 2,
+          shadowColor: cc.softShadow,
           borderRadius: BorderRadius.circular(JivoRadii.md),
           child: InkWell(
             borderRadius: BorderRadius.circular(JivoRadii.md),

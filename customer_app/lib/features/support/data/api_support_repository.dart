@@ -74,19 +74,12 @@ class ApiSupportRepository implements SupportRepository {
       // The generated request would drop the keys and lose the photos.
       throw StateError('attachment_keys on create needs a newer jivo_api');
     }
-    var request = api.TicketCreateRequest(
+    final request = api.TicketCreateRequest(
       category: categoryToApi(category),
       message: message.trim(),
       orderId: orderId,
+      attachmentKeys: photoKeys.isEmpty ? null : photoKeys,
     );
-    if (photoKeys.isNotEmpty) {
-      // TODO(api): pass `attachmentKeys: photoKeys` to the constructor once
-      // jivo_api is regenerated with the field (then drop this round trip).
-      request = api.TicketCreateRequest.fromJson({
-        ...request.toJson(),
-        'attachment_keys': photoKeys,
-      });
-    }
     final created = (await _api.getSupportApi().supportTicketsCreate(
       ticketCreateRequest: request,
     )).data!;
@@ -114,24 +107,22 @@ class ApiSupportRepository implements SupportRepository {
   Future<TicketPhoto> uploadPhoto(int ticketId, TicketPhotoFile photo) =>
       _upload(
         photo,
-        (file) async => (await _api
-            .getSupportApi()
-            .supportTicketsAttachmentsCreate(id: ticketId, file: file)).data!,
+        (file) async =>
+            (await _api.getSupportApi().supportTicketsAttachmentsCreate(
+              id: ticketId,
+              file: file,
+            )).data!,
       );
 
   @override
-  Future<TicketPhoto> uploadNewTicketPhoto(TicketPhotoFile photo) =>
-      _upload(photo, (file) async {
-        // TODO(api): use the generated `supportAttachmentsCreate(file:)`
-        // once jivo_api is regenerated (backend P8 follow-up adds
-        // `POST /api/v1/support/attachments/`, 201 `TicketAttachment`).
-        final response = await _api.dio.post<Map<String, dynamic>>(
-          newTicketAttachmentsPath,
-          data: FormData.fromMap({'file': file}),
-          options: Options(contentType: 'multipart/form-data'),
-        );
-        return api.TicketAttachment.fromJson(response.data!);
-      });
+  Future<TicketPhoto> uploadNewTicketPhoto(TicketPhotoFile photo) => _upload(
+    photo,
+    // The generated call marks the request as bearer-secured, so the
+    // AuthInterceptor adds the token (a hand-written `dio.post` went
+    // out without it and got 401 "Please log in to continue.").
+    (file) async =>
+        (await _api.getSupportApi().supportAttachmentsCreate(file: file)).data!,
+  );
 
   Future<TicketPhoto> _upload(
     TicketPhotoFile photo,
@@ -158,9 +149,6 @@ class ApiSupportRepository implements SupportRepository {
     }
   }
 }
-
-/// `support_attachments_create`: a photo for a ticket not created yet.
-const newTicketAttachmentsPath = '/api/v1/support/attachments/';
 
 /// Whether the generated `TicketCreateRequest` carries `attachment_keys`,
 /// i.e. `jivo_api` was regenerated after the backend added photos on

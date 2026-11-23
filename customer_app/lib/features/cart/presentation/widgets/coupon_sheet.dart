@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../../app/repositories.dart';
+import '../../../../app/theme.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../shared/formatting/formatters.dart';
 import '../../../../shared/widgets/state_views.dart';
@@ -24,7 +25,11 @@ Future<void> showCouponSheet(BuildContext context) =>
       isScrollControlled: true,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (_) => const CouponSheet(),
+      // Home redesign look: white cards, green actions.
+      builder: (context) => Theme(
+        data: lightPageTheme(Theme.of(context)),
+        child: const CouponSheet(),
+      ),
     );
 
 /// The eligible and ineligible coupons, plus manual code entry. Applying

@@ -1,6 +1,6 @@
 import 'package:customer_app/app/redirect.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
-import 'package:customer_app/features/catalog/presentation/widgets/product_tile.dart';
+import 'package:customer_app/features/home/presentation/home_product_card.dart';
 import 'package:customer_app/features/home/presentation/banner_carousel.dart';
 import 'package:customer_app/features/home/presentation/banner_viewer.dart';
 import 'package:customer_app/features/home/presentation/home_screen.dart';
@@ -13,11 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../../helpers/test_app.dart';
 
 const _banners = [
-  HomeBanner(
-    id: 1,
-    title: 'Rate list',
-    link: CollectionBannerLink('offers'),
-  ),
+  HomeBanner(id: 1, title: 'Rate list', link: CollectionBannerLink('offers')),
   HomeBanner(id: 2, title: 'No link banner'),
 ];
 
@@ -57,7 +53,12 @@ void main() {
     await tester.pump(const Duration(seconds: 30));
     await tester.pumpAndSettle();
     expect(_pageView(tester).controller!.page, 0);
-    expect(find.text('No link banner'), findsNothing);
+    // The next banner only peeks in at the right edge (home redesign).
+    final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(
+      tester.getTopLeft(find.text('No link banner')).dx,
+      greaterThan(width * 0.85),
+    );
   });
 
   testWidgets('a swipe changes the page', (tester) async {
@@ -119,9 +120,7 @@ void main() {
       matching: find.byKey(const ValueKey('add-1001')),
     );
     expect(add, findsOneWidget);
-    await tester.tap(add);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('qty-update')));
+    await tester.tap(add); // home ADD adds the minimum in one tap
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('cart-bar')), findsOneWidget);
   });
@@ -138,11 +137,14 @@ void main() {
       final app = TestApp(tokens: signedInTokens);
       await app.pump(tester);
       for (var i = 0; i < 12; i++) {
-        await tester.drag(find.byType(CustomScrollView).first, const Offset(0, -500));
+        await tester.drag(
+          find.byType(CustomScrollView).first,
+          const Offset(0, -500),
+        );
         await tester.pump();
       }
       expect(tester.takeException(), isNull);
-      expect(find.byType(ProductTile), findsWidgets);
+      expect(find.byType(HomeProductCard), findsWidgets);
     });
   }
 }

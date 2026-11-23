@@ -1,14 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/launch_state.dart';
 import '../../../app/providers.dart';
-import '../../../app/theme.dart';
 import '../../../app/redirect.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/skeletons.dart';
@@ -17,18 +15,21 @@ import '../../auth/presentation/auth_flow.dart';
 import '../../catalog/domain/catalog_models.dart';
 import '../../catalog/presentation/catalog_controllers.dart';
 import '../../catalog/presentation/widgets/paged_product_grid.dart';
-import '../../catalog/presentation/widgets/product_tile.dart';
-import '../../location/domain/delivery_location.dart';
+import '../../catalog/presentation/widgets/product_tile.dart'
+    show productGridMaxExtent;
 import '../../location/presentation/delivery_controller.dart';
 import '../../location/presentation/location_options.dart';
 import '../../location/presentation/store_closed_banner.dart';
 import '../../orders/presentation/active_order_card.dart';
 import '../../orders/presentation/pending_payment.dart';
 import 'banner_carousel.dart';
+import 'home_header.dart';
+import 'home_product_card.dart';
 
-/// Home (`03 §2.5`): ETA and address header, search bar, banners, category
-/// grid, collection rails and "Previously bought". Pull to refresh reloads
-/// home and re-checks serviceability.
+/// Home (`03 §2.5`, redesign 2026-11-21): a compact delivery header,
+/// search, the featured banners, a category row, collection rails,
+/// "Previously bought" and all products. Pull to refresh reloads home and
+/// re-checks serviceability.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -84,21 +85,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : ref.watch(homeFeedProvider).value?.store ?? delivery.store;
     return Scaffold(
       key: const Key('home-screen'),
-      // No top SafeArea: the green header paints behind the status bar and
-      // adds the top inset itself.
+      // No top SafeArea: the header paints behind the status bar and adds
+      // the top inset itself.
       body: SafeArea(
         top: false,
         child: RefreshIndicator(
           onRefresh: _refresh,
           child: CustomScrollView(
             slivers: [
+              SliverToBoxAdapter(child: HomeHeader(delivery: delivery)),
               SliverToBoxAdapter(
-                child: _HomeHeader(
-                  delivery: delivery,
-                  searchHint: l10n.searchHint,
-                ),
+                child: HomeSearchBar(hint: l10n.homeSearchHint),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: JivoSpacing.md)),
               const SliverToBoxAdapter(child: _UpdatePrompt()),
               const SliverToBoxAdapter(child: PendingPaymentBanner()),
               const SliverToBoxAdapter(child: ActiveOrderCard()),
@@ -189,32 +187,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   List<Widget> _sections(BuildContext context, HomeFeed feed) {
     final l10n = AppLocalizations.of(context);
+    // Rails come before all products: that grid pages without end, so
+    // anything under it would be out of reach.
     return [
       if (feed.banners.isNotEmpty)
         SliverToBoxAdapter(child: BannerCarousel(banners: feed.banners)),
-      SliverToBoxAdapter(child: _SectionHeader(title: l10n.allProducts)),
-      const _AllProducts(),
+      if (feed.categories.isNotEmpty) ...[
+        SliverToBoxAdapter(
+          child: HomeSectionHeader(title: l10n.homeCategories),
+        ),
+        SliverToBoxAdapter(child: HomeCategoryRow(categories: feed.categories)),
+      ],
       for (final collection in feed.collections)
         if (collection.items.isNotEmpty) ...[
           SliverToBoxAdapter(
-            child: _SectionHeader(
+            child: HomeSectionHeader(
               title: collection.name,
               onSeeAll: collection.hasMore
                   ? () => context.push(Routes.collection(collection.slug))
                   : null,
             ),
           ),
-          SliverToBoxAdapter(child: ProductRail(items: collection.items)),
+          SliverToBoxAdapter(child: HomeProductRail(items: collection.items)),
         ],
       if (feed.buyAgain.isNotEmpty) ...[
         SliverToBoxAdapter(
-          child: _SectionHeader(
+          child: HomeSectionHeader(
             title: l10n.previouslyBought,
             onSeeAll: () => context.go(Routes.orderAgain),
           ),
         ),
-        SliverToBoxAdapter(child: ProductRail(items: feed.buyAgain)),
+        SliverToBoxAdapter(child: HomeProductRail(items: feed.buyAgain)),
       ],
+      SliverToBoxAdapter(
+        child: HomeSectionHeader(
+          title: l10n.allProducts,
+          onSeeAll: () => context.push(Routes.allProducts),
+        ),
+      ),
+      const _AllProducts(),
       const SliverToBoxAdapter(child: SizedBox(height: JivoSpacing.xl)),
     ];
   }
@@ -253,15 +264,12 @@ class _AllProducts extends ConsumerWidget {
               key: const Key('all-products-grid'),
               gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                 maxCrossAxisExtent: productGridMaxExtent(context),
-                mainAxisExtent: productTileExtent(
-                  context,
-                  minQtyHint: needsMinQtyHint(shown.items),
-                ),
+                mainAxisExtent: homeCardExtent(context, shown.items),
                 crossAxisSpacing: JivoSpacing.md,
                 mainAxisSpacing: JivoSpacing.md,
               ),
               itemCount: shown.items.length,
-              itemBuilder: (_, i) => ProductTile(product: shown.items[i]),
+              itemBuilder: (_, i) => HomeProductCard(product: shown.items[i]),
             ),
           ),
           SliverToBoxAdapter(
@@ -282,244 +290,9 @@ class _AllProducts extends ConsumerWidget {
       );
     }
     return const SliverToBoxAdapter(
-      child: SizedBox(height: 280, child: ProductGridSkeleton()),
+      child: SizedBox(height: 300, child: ProductGridSkeleton(count: 2)),
     );
   }
-}
-
-/// The deep-green header band: ETA, address, account button and the search
-/// bar. It grows with the text and extends under the status bar.
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.delivery, required this.searchHint});
-
-  final DeliveryState delivery;
-  final String searchHint;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final cc = context.customerColors;
-    final location = delivery.location;
-    final serviceability = delivery.serviceability;
-    final eta = serviceability?.etaMinutes;
-    final headline = switch ((location, serviceability)) {
-      (null, _) => l10n.selectLocation,
-      (_, null) => l10n.checkingDelivery,
-      (_, Serviceability(serviceable: false)) => l10n.notDeliveringHere,
-      _ when eta != null => l10n.deliveryIn(eta),
-      (_, Serviceability(storeClosed: true)) => l10n.storeClosedHeadline,
-      _ => l10n.appTitle,
-    };
-    final address = location == null
-        ? null
-        : [location.title, ?location.subtitle].join(' · ');
-    final showsEta = location != null && serviceability != null && eta != null;
-
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
-        statusBarColor: Colors.transparent,
-      ),
-      child: DecoratedBox(
-        key: const Key('home-header'),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: cc.headerGradient,
-          ),
-          borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(JivoRadii.xl),
-          ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            JivoSpacing.gutter,
-            MediaQuery.paddingOf(context).top + 8,
-            JivoSpacing.gutter,
-            JivoSpacing.gutter,
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Semantics(
-                      button: true,
-                      hint: l10n.changeLocationSemantics,
-                      child: InkWell(
-                        key: const Key('home-address'),
-                        borderRadius: BorderRadius.circular(JivoRadii.sm),
-                        splashColor: Colors.white24,
-                        onTap: () => location == null
-                            ? context.push(Routes.location)
-                            : showAddressSwitcher(context),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minHeight: kJivoMinTouchTarget,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ExcludeSemantics(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(
-                                        top: 4,
-                                        right: 6,
-                                      ),
-                                      child: Icon(
-                                        showsEta
-                                            ? Icons.bolt_rounded
-                                            : Icons.location_on_rounded,
-                                        size: 22,
-                                        color: cc.gold,
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      headline,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.headlineSmall
-                                          ?.copyWith(color: Colors.white),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (address != null)
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        address,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.keyboard_arrow_down_rounded,
-                                      size: 20,
-                                      color: Colors.white,
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: l10n.accountTitle,
-                    iconSize: 28,
-                    color: Colors.white,
-                    icon: const Icon(Icons.account_circle_rounded),
-                    onPressed: () => context.go(Routes.account),
-                  ),
-                ],
-              ),
-              const SizedBox(height: JivoSpacing.lg),
-              _SearchBar(hint: searchHint),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Looks like a search field; opens the search screen.
-class _SearchBar extends StatelessWidget {
-  const _SearchBar({required this.hint});
-
-  final String hint;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Semantics(
-      button: true,
-      child: Material(
-        color: Colors.white,
-        elevation: 3,
-        shadowColor: context.customerColors.shadow,
-        borderRadius: BorderRadius.circular(JivoRadii.lg),
-        child: InkWell(
-          key: const Key('home-search'),
-          borderRadius: BorderRadius.circular(JivoRadii.lg),
-          onTap: () => context.push(Routes.search),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 52),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: JivoSpacing.md,
-                vertical: JivoSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.search_rounded,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: JivoSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      hint,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.onSeeAll});
-
-  final String title;
-  final VoidCallback? onSeeAll;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(
-      JivoSpacing.gutter,
-      JivoSpacing.lg,
-      JivoSpacing.xs,
-      JivoSpacing.xs,
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: Semantics(
-            header: true,
-            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-          ),
-        ),
-        if (onSeeAll != null)
-          TextButton(
-            onPressed: onSeeAll,
-            child: Text(AppLocalizations.of(context).seeAll),
-          ),
-      ],
-    ),
-  );
 }
 
 /// The dismissible "newer version" prompt (Phase 1, `03 §2.1`).

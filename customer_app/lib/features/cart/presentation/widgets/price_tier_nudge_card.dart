@@ -3,10 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../../app/theme.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 
-/// The volume-price "piggy" nudge at the top of the cart. A warm amber card
-/// (the app is green, so it stands out) that slides in once, then the icon
+/// The volume-price "piggy" nudge at the top of the cart. A pale-mint card
+/// with a green edge (home redesign) that slides in once, then the icon
 /// pulses once. Text comes from the server's numbers via [headline] and
 /// [detail]; [semanticsLabel] is the full sentence for TalkBack.
 class PriceTierNudgeCard extends StatefulWidget {
@@ -36,9 +37,6 @@ class _PriceTierNudgeCardState extends State<PriceTierNudgeCard>
   );
   bool _started = false;
 
-  static const _ink = Color(0xFF3B2600);
-  static const _gradient = [Color(0xFFFFE9A8), Color(0xFFFFC24D)];
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -61,6 +59,9 @@ class _PriceTierNudgeCardState extends State<PriceTierNudgeCard>
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    // Home redesign: pale mint with green text (was the gold gradient).
+    final ink = scheme.onPrimaryContainer;
     final enter = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0, 0.4, curve: Curves.easeOutBack),
@@ -93,19 +94,11 @@ class _PriceTierNudgeCardState extends State<PriceTierNudgeCard>
               child: Container(
                 padding: const EdgeInsets.all(JivoSpacing.md),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: _gradient,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                  color: context.customerColors.softTint,
+                  borderRadius: BorderRadius.circular(JivoRadii.lg),
+                  border: Border.all(
+                    color: scheme.primary.withValues(alpha: 0.35),
                   ),
-                  borderRadius: BorderRadius.circular(JivoRadii.md),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.amber.withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,10 +119,10 @@ class _PriceTierNudgeCardState extends State<PriceTierNudgeCard>
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                Icons.savings_rounded,
-                                color: _ink,
-                                size: 28,
+                              child: Icon(
+                                Icons.savings_outlined,
+                                color: scheme.primary,
+                                size: 26,
                               ),
                             ),
                           ),
@@ -143,8 +136,8 @@ class _PriceTierNudgeCardState extends State<PriceTierNudgeCard>
                                 Text(
                                   widget.headline,
                                   key: const Key('price-tier-headline'),
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    color: _ink,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: ink,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
@@ -152,7 +145,7 @@ class _PriceTierNudgeCardState extends State<PriceTierNudgeCard>
                                   widget.detail,
                                   key: const Key('price-tier-detail'),
                                   style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: _ink,
+                                    color: scheme.onSurface,
                                   ),
                                 ),
                               ],
@@ -167,7 +160,7 @@ class _PriceTierNudgeCardState extends State<PriceTierNudgeCard>
                         child: TextButton(
                           key: const Key('price-tier-add-more'),
                           style: TextButton.styleFrom(
-                            foregroundColor: _ink,
+                            foregroundColor: scheme.primary,
                             minimumSize: const Size(
                               kJivoMinTouchTarget,
                               kJivoMinTouchTarget,

@@ -145,14 +145,15 @@ void main() {
           FakeMapsAvailability(available: maps),
         ),
         trackMapBuilderProvider.overrideWithValue(
-          (track) => Text('map ${track.rider?.name}'),
+          (orderId, _) => Text('map $orderId'),
         ),
+        supportAvailableProvider.overrideWithValue(true),
       ],
     );
     await tester.pumpWidget(app(maps: true));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('tracking-map')), findsOneWidget);
-    expect(find.text('map Ravi Kumar'), findsOneWidget);
+    expect(find.text('map 3'), findsOneWidget);
     expect(find.byKey(const Key('route-sketch')), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
@@ -172,6 +173,7 @@ void main() {
             FakeTrackRepository(startStep: 1),
           ),
           trackPollIntervalProvider.overrideWithValue(Duration.zero),
+          supportAvailableProvider.overrideWithValue(true),
         ],
       ),
     );

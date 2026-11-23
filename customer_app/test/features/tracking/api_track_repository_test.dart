@@ -35,7 +35,8 @@ void main() {
     expect(track.storeName, 'Jivo Sector 14');
     expect(track.store.lat, 28.4718);
     expect(track.destination.lng, 77.0688);
-    expect(track.etaAt, DateTime.utc(2026, 11, 10, 9, 58));
+    // The live ETA (`live_eta_at`) over the placement promise.
+    expect(track.etaAt, DateTime.utc(2026, 11, 10, 10));
     expect(track.rider, isNull);
     expect(track.deliveryOtp, isNull);
   });
@@ -50,19 +51,36 @@ void main() {
     expect(track.deliveryOtp, isNull);
   });
 
-  test('out for delivery: rider with signed https photo, location, OTP',
-      () async {
-    final (_, result) = await fetch('200/OutForDelivery(OTPShown)');
-    final track = result as OrderTrack;
-    expect(track.status, OrderStatus.outForDelivery);
-    expect(track.deliveryOtp, '4821');
-    expect(track.rider!.name, 'Ravi K.');
-    expect(track.rider!.phone, '+919811122233');
-    expect(Uri.parse(track.rider!.photoUrl!).scheme, 'https');
-    expect(track.rider!.location!.lat, 28.489);
-    expect(track.rider!.updatedAt, DateTime.utc(2026, 11, 10, 9, 44, 55));
-    expect(track.progress, greaterThan(0));
-  });
+  test(
+    'out for delivery: rider with signed https photo, location, OTP',
+    () async {
+      final (_, result) = await fetch('200/OutForDelivery(OTPShown)');
+      final track = result as OrderTrack;
+      expect(track.status, OrderStatus.outForDelivery);
+      expect(track.deliveryOtp, '4821');
+      expect(track.rider!.name, 'Ravi K.');
+      expect(track.rider!.phone, '+919811122233');
+      expect(Uri.parse(track.rider!.photoUrl!).scheme, 'https');
+      expect(track.rider!.location!.lat, 28.489);
+      expect(track.rider!.updatedAt, DateTime.utc(2026, 11, 10, 9, 44, 55));
+      expect(track.progress, greaterThan(0));
+      // T-821 fields.
+      expect(track.etaAt, DateTime.utc(2026, 11, 10, 9, 52)); // live ETA
+      expect(track.rider!.vehicle, RiderVehicle.scooter);
+      expect(track.rider!.heading, 41.0);
+      expect(track.rider!.serverStale, isFalse);
+      expect(track.route!.leg, RouteLeg.toCustomer);
+      expect(track.route!.distanceM, 1840);
+      expect(track.route!.trafficAware, isTrue);
+      expect(track.distanceRemainingM, 1840);
+      expect(track.serverTime, DateTime.utc(2026, 11, 10, 9, 45));
+      final timeline = track.timeline!;
+      expect(timeline.current, 'ON_THE_WAY');
+      expect(timeline.outcome, isNull);
+      expect(timeline.steps.map((s) => s.step), TrackStep.values);
+      expect(timeline.steps.where((s) => s.done), hasLength(6));
+    },
+  );
 
   test('delivered: no OTP; polling stops (status not active)', () async {
     final (_, result) = await fetch('200/Delivered');
@@ -102,8 +120,7 @@ void main() {
     expect(track.rider!.location, isNull);
   });
 
-  test('providers: tracking is on wherever orders are (dev), on the API',
-      () {
+  test('providers: tracking is on wherever orders are (dev), on the API', () {
     ProviderContainer make({required bool cart}) => ProviderContainer(
       overrides: [
         appEnvProvider.overrideWithValue(testEnv),

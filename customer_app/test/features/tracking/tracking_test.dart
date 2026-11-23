@@ -107,6 +107,7 @@ void main() {
           ),
           trackPollIntervalProvider.overrideWithValue(Duration.zero),
           urlOpenerProvider.overrideWithValue(urls),
+          supportAvailableProvider.overrideWithValue(true),
         ],
       ),
     );
@@ -128,6 +129,7 @@ void main() {
           trackRepositoryProvider.overrideWithValue(
             const UnavailableTrackRepository(),
           ),
+          supportAvailableProvider.overrideWithValue(true),
         ],
       ),
     );

@@ -225,6 +225,7 @@ void main() {
         trackRepositoryProvider.overrideWithValue(track),
         orderHistoryRepositoryProvider.overrideWithValue(backend),
         trackPollIntervalProvider.overrideWithValue(Duration.zero),
+        supportAvailableProvider.overrideWithValue(true),
       ],
     );
 

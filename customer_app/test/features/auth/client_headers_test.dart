@@ -17,11 +17,8 @@ void main() {
   test('OTP verify sends X-App-Name: customer', () async {
     final http = FakeHttp((_) => (500, null));
     await expectLater(
-      ApiAuthRepository(http.api()).verifyOtp(
-        phone: '+919000000001',
-        otp: '123456',
-        termsVersion: '1',
-      ),
+      ApiAuthRepository(http.api())
+          .verifyOtp(phone: '+919000000001', otp: '123456', termsVersion: '1'),
       throwsA(isA<ApiError>()),
     );
     expect(http.requests.single.path, contains('/auth/otp/verify/'));

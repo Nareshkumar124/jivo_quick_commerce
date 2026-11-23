@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/redirect.dart';
+import '../../../app/theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
@@ -119,24 +120,27 @@ class _PaymentFailedScreenState extends ConsumerState<PaymentFailedScreen> {
       );
     }
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && !state.busy) context.go(Routes.home);
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: Text(l10n.paymentFailedTitle),
-          actions: [
-            IconButton(
-              tooltip: l10n.close,
-              onPressed: state.busy ? null : () => context.go(Routes.home),
-              icon: const Icon(Icons.close),
-            ),
-          ],
+    return Theme(
+      data: lightPageTheme(Theme.of(context)),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && !state.busy) context.go(Routes.home);
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: Text(l10n.paymentFailedTitle),
+            actions: [
+              IconButton(
+                tooltip: l10n.close,
+                onPressed: state.busy ? null : () => context.go(Routes.home),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          body: body,
         ),
-        body: body,
       ),
     );
   }

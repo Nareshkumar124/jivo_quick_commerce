@@ -28,20 +28,25 @@ void main() {
         uploadTicketPhotos(photos, (f) => repo.uploadPhoto(1, f)),
         throwsA(isA<ApiError>()),
       );
-      final keys = await uploadTicketPhotos(photos, (f) => repo.uploadPhoto(1, f));
+      final keys = await uploadTicketPhotos(
+        photos,
+        (f) => repo.uploadPhoto(1, f),
+      );
       expect(keys, hasLength(2));
       expect(repo.uploads, hasLength(2));
       // Already uploaded: nothing goes up again.
-      expect(await uploadTicketPhotos(photos, (f) => repo.uploadPhoto(1, f)), keys);
+      expect(
+        await uploadTicketPhotos(photos, (f) => repo.uploadPhoto(1, f)),
+        keys,
+      );
       expect(repo.uploads, hasLength(2));
     });
 
     test('more than three photos are refused', () {
       expect(
-        uploadTicketPhotos(
-          [for (var i = 0; i < 4; i++) PendingTicketPhoto(pngPhoto())],
-          (f) => FakeSupportRepository().uploadPhoto(1, f),
-        ),
+        uploadTicketPhotos([
+          for (var i = 0; i < 4; i++) PendingTicketPhoto(pngPhoto()),
+        ], (f) => FakeSupportRepository().uploadPhoto(1, f)),
         throwsA(isA<TicketPhotoException>()),
       );
     });
@@ -141,6 +146,23 @@ void main() {
       final thread = await support.ticket(1);
       expect(thread.messages.last.body, 'Photos of the issue');
       expect(thread.messages.last.photos, hasLength(1));
+    });
+
+    testWidgets('a picked photo thumbnail is decoded at thumbnail size', (
+      tester,
+    ) async {
+      picker.queue.add(pngPhoto());
+      await openTicket1(tester);
+      await addReplyPhoto(tester);
+      final thumb = tester.widget<Image>(
+        find.byKey(const Key('picked-photo-0')),
+      );
+      final image = thumb.image;
+      expect(image, isA<ResizeImage>());
+      final resize = image as ResizeImage;
+      expect(resize.imageProvider, isA<MemoryImage>());
+      expect(resize.width, lessThanOrEqualTo(72 * 3 * 2));
+      expect(resize.policy, ResizeImagePolicy.fit);
     });
 
     testWidgets('at most three photos per message; one can be removed', (

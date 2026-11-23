@@ -88,6 +88,7 @@ void main() {
   List<Override> screenOverrides(FakeTrackRepository repo) => [
     trackRepositoryProvider.overrideWithValue(repo),
     trackPollIntervalProvider.overrideWithValue(Duration.zero),
+    supportAvailableProvider.overrideWithValue(true),
   ];
 
   testWidgets('the OTP card is above the route sketch while out for delivery', (

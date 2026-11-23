@@ -16,6 +16,11 @@ final trackPollIntervalProvider = Provider<Duration>(
   (ref) => const Duration(seconds: 10),
 );
 
+/// The phone's clock (tests override it). Rider-fix staleness uses it with
+/// the offset to the server's clock (`server_time`), so a wrong phone clock
+/// never makes an old fix look live.
+final trackClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
 /// How current the tracking data is (`tracking-layout` §3): app state only.
 enum TrackFreshMode { live, polling, stale }
 
@@ -33,7 +38,8 @@ class TrackFreshness {
 const trackLiveDebounce = Duration(seconds: 5);
 
 /// One order's live tracking: `GET /orders/{id}/track/`, then the order
-/// socket's `order.status`, `rider.location` and `order.eta` messages.
+/// socket's `order.status`, `rider.location`, `order.eta` and (T-821)
+/// `order.route` messages. Older fixes and routes are dropped.
 /// While the socket is down it polls every [trackPollIntervalProvider]
 /// until the order is finished; when the socket is (back) up it re-reads
 /// `track/` once and stops polling. A failed refresh keeps the last data.
@@ -47,6 +53,8 @@ class TrackController extends AsyncNotifier<OrderTrack> {
   bool _showLive = false;
   bool _stale = false;
   DateTime? _lastUpdatedAt;
+  Duration _clockOffset = Duration.zero;
+  late DateTime Function() _clock;
 
   /// The freshness line's state.
   final ValueNotifier<TrackFreshness> freshness = ValueNotifier(
@@ -55,7 +63,7 @@ class TrackController extends AsyncNotifier<OrderTrack> {
 
   void _publish({bool received = false}) {
     if (received) {
-      _lastUpdatedAt = DateTime.now();
+      _lastUpdatedAt = _clock();
       _stale = false;
     }
     final mode = _stale
@@ -64,11 +72,23 @@ class TrackController extends AsyncNotifier<OrderTrack> {
     freshness.value = TrackFreshness(mode, _lastUpdatedAt);
   }
 
+  /// The server's clock now (the phone's clock plus the offset seen on the
+  /// last `track/` read), for the rider fix's age.
+  DateTime serverNow() => _clock().toUtc().add(_clockOffset);
+
+  void _learnClock(OrderTrack track) {
+    final server = track.serverTime;
+    if (server != null) {
+      _clockOffset = server.toUtc().difference(_clock().toUtc());
+    }
+  }
+
   /// Whether updates arrive over the socket right now (no polling).
   bool get live => _socket?.live.value ?? false;
 
   @override
   Future<OrderTrack> build() async {
+    _clock = ref.watch(trackClockProvider);
     ref.onDispose(() {
       _timer?.cancel();
       _debounce?.cancel();
@@ -85,6 +105,7 @@ class TrackController extends AsyncNotifier<OrderTrack> {
       });
     }
     final track = await ref.read(trackRepositoryProvider).fetch(orderId);
+    _learnClock(track);
     _showLive = live;
     _schedule(track);
     _publish(received: true);
@@ -137,8 +158,12 @@ class TrackController extends AsyncNotifier<OrderTrack> {
   /// Fetches now (the timer, a socket event, or pull to refresh).
   Future<void> poll() async {
     try {
-      final track = await ref.read(trackRepositoryProvider).fetch(orderId);
+      final fetched = await ref.read(trackRepositoryProvider).fetch(orderId);
       if (!ref.mounted) return;
+      _learnClock(fetched);
+      // A fix or route the socket brought while the read was in flight is
+      // newer than the read's: keep it (no marker jumping back).
+      final track = mergeTrackRead(state.value, fetched);
       state = AsyncData(track);
       _publish(received: true);
       _schedule(track);

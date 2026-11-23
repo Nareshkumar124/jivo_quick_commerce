@@ -7,6 +7,7 @@ import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../shared/formatting/formatters.dart';
 import '../../../../shared/widgets/product_image.dart';
 import '../../../catalog/presentation/widgets/price_tags.dart';
+import '../../../home/presentation/home_product_card.dart' show QuantityStepper;
 import '../../domain/cart.dart';
 import '../add_stepper.dart';
 import '../cart_controller.dart';
@@ -48,52 +49,42 @@ class CartLineTile extends ConsumerWidget {
         line.variant.hasMinQty &&
         line.issue?.code != CartIssueCode.minQtyRequired;
 
-    Future<void> remove() async {
-      // The tile goes away with the line: keep the messenger (and its
-      // context) for the Undo snackbar.
-      final messenger = ScaffoldMessenger.of(context);
+    /// Removes the line (the delete button, or − at the minimum per
+    /// order: the same server change) and offers Undo.
+    Future<void> remove({bool viaMinus = false}) async {
+      // The tile goes away with the line: build the notice first.
+      final notice = CartRemovedNotice.of(context);
       var removed = false;
       await run(() async {
-        await cart.removeLine(line);
+        if (viaMinus) {
+          await cart.setLineQuantity(line, line.quantity - 1);
+        } else {
+          await cart.removeLine(line);
+        }
         removed = true;
       });
-      if (!removed || !messenger.mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              l10n.removedFromCart('${line.productName} ${line.variantName}'),
-            ),
-            // An out-of-stock line can't come back; nothing to undo.
-            action: outOfStock
-                ? null
-                : SnackBarAction(
-                    key: ValueKey('cart-line-undo-$id'),
-                    label: l10n.undo,
-                    // The same server call as ADD: the server still checks
-                    // stock and price. The tile is gone, so a refusal is
-                    // shown through the kept messenger, with the line named
-                    // ("Only 1 of <name> can be ordered now").
-                    onPressed: () => _undo(
-                      messenger,
-                      () => cart.setVariantQuantity(
-                        line.variant,
-                        line.quantity,
-                        productName: line.productName,
-                      ),
-                      name: '${line.productName} ${line.variantName}',
-                      variantId: line.variantId,
-                    ),
-                  ),
-          ),
-        );
+      if (!removed) return;
+      notice.show(
+        name: '${line.productName} ${line.variantName}',
+        variantId: line.variantId,
+        undoKey: ValueKey('cart-line-undo-$id'),
+        // An out-of-stock line can't come back; nothing to undo. Undo is
+        // the same server call as ADD: the server still checks stock and
+        // price.
+        restore: outOfStock
+            ? null
+            : () => cart.setVariantQuantity(
+                line.variant,
+                line.quantity,
+                productName: line.productName,
+              ),
+      );
     }
 
     final image = ClipRRect(
-      borderRadius: BorderRadius.circular(JivoRadii.sm),
+      borderRadius: BorderRadius.circular(JivoRadii.md),
       child: SizedBox.square(
-        dimension: 56,
+        dimension: 60,
         child: ColoredBox(
           color: context.customerColors.imageWell,
           child: ProductImage(url: line.imageUrl, onWell: true),
@@ -146,14 +137,31 @@ class CartLineTile extends ConsumerWidget {
     final stepper = outOfStock
         ? null
         : SizedBox(
-            width: 112,
+            width: 132,
             child: DelayedPending(
               pending: pending,
-              builder: (context, slow) => QuantityBox(
+              // − qty + (home redesign): the same setLineQuantity call as
+              // the typed quantity, one step at a time.
+              builder: (context, slow) => QuantityStepper(
                 id: 'line-$id',
+                name: line.productName,
                 quantity: line.quantity,
                 busy: slow,
-                onTap: pending
+                // − at the minimum per order removes the line: say so,
+                // with Undo.
+                onMinus: pending
+                    ? null
+                    : line.quantity - 1 < line.minQty
+                    ? () => remove(viaMinus: true)
+                    : () => run(
+                        () => cart.setLineQuantity(line, line.quantity - 1),
+                      ),
+                onPlus: pending
+                    ? null
+                    : () => run(
+                        () => cart.setLineQuantity(line, line.quantity + 1),
+                      ),
+                onType: pending
                     ? null
                     : () async {
                         final typed = await showQuantityDialog(
@@ -176,7 +184,7 @@ class CartLineTile extends ConsumerWidget {
     final removeButton = IconButton(
       key: ValueKey('cart-line-remove-$id'),
       tooltip: l10n.removeItem(line.productName),
-      onPressed: pending ? null : remove,
+      onPressed: pending ? null : () => remove(),
       icon: const Icon(Icons.delete_outline),
     );
 
@@ -255,30 +263,6 @@ class CartLineTile extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// Runs an Undo [change]; a refusal goes to [messenger] (the line's tile is
-/// already gone).
-Future<void> _undo(
-  ScaffoldMessengerState messenger,
-  Future<void> Function() change, {
-  required String name,
-  required int variantId,
-}) async {
-  String? problem;
-  try {
-    await change();
-  } on CartLimitException catch (e) {
-    if (!messenger.mounted) return;
-    problem = AppLocalizations.of(messenger.context).maxQtyReached(e.max);
-  } catch (error) {
-    if (!messenger.mounted) return;
-    problem = cartErrorText(messenger.context, error, names: {variantId: name});
-  }
-  if (problem == null || !messenger.mounted) return;
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(problem)));
 }
 
 /// "Price changed: was ₹129, now ₹119" under a line whose store price
