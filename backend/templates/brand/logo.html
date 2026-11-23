@@ -1,0 +1,3 @@
+{% load static %}{# Jivo wordmark: green on light, white on dark (the admin's `.dark` class). Params: height (px, default 32), alt. #}
+<img src="{% static 'brand/logo.png' %}" alt="{{ alt|default:'Jivo' }}" width="{% widthratio height|default:32 80 181 %}" height="{{ height|default:32 }}" class="block dark:hidden" style="height: {{ height|default:32 }}px; width: auto;" data-testid="brand-logo">
+<img src="{% static 'brand/logo-white.png' %}" alt="{{ alt|default:'Jivo' }}" width="{% widthratio height|default:32 80 181 %}" height="{{ height|default:32 }}" class="hidden dark:block" style="height: {{ height|default:32 }}px; width: auto;">

@@ -1,9 +1,9 @@
 {# Ops sidebar: the module registry (apps/ops_console/navigation.py) filtered by permission. #}
 <div class="flex flex-col h-full">
     <div class="border-b border-base-200 flex items-center gap-3 h-16 px-6 dark:border-base-800">
-        <span class="material-symbols-outlined text-primary-600 dark:text-primary-500">{{ site_symbol|default:"local_shipping" }}</span>
+        <a href="{% url 'ops:dashboard' %}" class="shrink-0" aria-label="Ops Console home">{% include "brand/logo.html" with height=32 alt=site_header|default:"Jivo Quick Commerce" %}</a>
         <div class="flex flex-col min-w-0">
-            <span class="font-semibold text-font-important-light truncate dark:text-font-important-dark">{{ site_header|default:"Jivo Quick Commerce" }}</span>
+            <span class="font-semibold text-font-important-light truncate dark:text-font-important-dark">Quick Commerce</span>
             <span class="text-xs text-font-subtle-light dark:text-font-subtle-dark">Ops Console</span>
         </div>
         <button type="button" class="ops-icon-button ops-hide-desktop ml-auto" x-on:click="sidebarOpen = false" aria-label="Close navigation">

@@ -4,6 +4,7 @@ from apps.ops_console import (
     csp,
     delivery_ops_views,
     dispatch_views,
+    live_map,
     mfa,
     order_views,
     report_views,
@@ -56,6 +57,14 @@ urlpatterns = [
     path("orders/live/", order_views.live_board, name="live-board"),
     path("orders/live/columns/", order_views.live_board_columns, name="live-board-columns"),
     path("orders/<int:order_id>/cancel/", order_views.board_cancel, name="board-cancel"),
+    # Live delivery monitoring (05 §1.4 rider map, T-821)
+    path("riders/map/", live_map.live_map, name="live-map"),
+    path("riders/map/data/", live_map.live_map_data, name="live-map-data"),
+    path(
+        "riders/map/orders/<int:order_id>/route/",
+        live_map.live_map_route,
+        name="live-map-route",
+    ),
     # Dispatch (05 §1.4, slice 5.3)
     path("dispatch/", dispatch_views.dispatch_board, name="dispatch"),
     path("dispatch/board/", dispatch_views.dispatch_board_partial, name="dispatch-board"),

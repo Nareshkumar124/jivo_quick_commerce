@@ -196,6 +196,13 @@ MODULES: tuple[NavSection, ...] = (
         "Riders",
         (
             NavItem(
+                "Live deliveries",
+                "map",
+                "ops:live-map",
+                surface=OPS,
+                capability="live_board",
+            ),
+            NavItem(
                 "Dispatch",
                 "route",
                 "ops:dispatch",

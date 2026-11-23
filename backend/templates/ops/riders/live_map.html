@@ -1,0 +1,107 @@
+{% extends "ops/base.html" %}
+{% load static %}
+
+{% block extrahead %}
+    {% for href in map_assets.css %}<link href="{% static href %}" rel="stylesheet">{% endfor %}
+    <link href="{% static 'ops/css/live-map.css' %}" rel="stylesheet">
+{% endblock %}
+
+{% block page_scripts %}
+    <script src="{% static 'ops/js/orders.js' %}" defer></script>
+    {% for src in map_assets.js %}<script src="{% static src %}" defer></script>{% endfor %}
+    <script src="{% static 'ops/js/live_map.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+{# Live delivery monitoring (05 §1.4, T-821; apps/ops_console/live_map.py). The page holds no delivery data: ops/js/live_map.js loads the snapshot (JSON), follows the ops socket and polls as the fallback. Every value from the data is written with textContent, never as HTML. #}
+{{ live_map_config|json_script:"live-map-config" }}
+<div class="lm" id="live-map" data-map-provider="{{ map_provider }}" data-testid="live-map">
+
+    <div class="lm-toolbar">
+        <form class="lm-toolbar__filters" method="get" action="{% url 'ops:live-map' %}" data-testid="live-map-filters">
+            <label class="sr-only" for="lm-store">Store</label>
+            <select id="lm-store" name="store" class="lm-select">
+                <option value="">All my stores</option>
+                {% for store in stores %}<option value="{{ store.pk }}"{% if store.pk == store_id %} selected{% endif %}>{{ store.code }} {{ store.name }}</option>{% endfor %}
+            </select>
+            <noscript><button type="submit" class="ops-button ops-button--secondary">Apply</button></noscript>
+        </form>
+        <div class="lm-toolbar__meta">
+            <span class="lm-pill" id="lm-updated" role="status" aria-live="polite" data-testid="live-map-updated">Loading…</span>
+            <button type="button" class="ops-icon-button" id="lm-refresh" aria-label="Refresh now" title="Refresh now">
+                <span class="material-symbols-outlined">refresh</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="lm-banner lm-banner--offline" id="lm-offline" hidden data-testid="live-map-offline">
+        <span class="material-symbols-outlined" aria-hidden="true">wifi_off</span>
+        <span>You are offline. The map shows the last data received and refreshes when the connection is back.</span>
+    </div>
+    <div class="lm-banner lm-banner--error" id="lm-error" hidden role="alert" data-testid="live-map-error">
+        <span class="material-symbols-outlined" aria-hidden="true">error</span>
+        <span id="lm-error-text">Could not load live deliveries.</span>
+        <button type="button" class="ops-link-button" id="lm-retry">Try again</button>
+    </div>
+
+    <section class="lm-stats" aria-label="Live numbers" data-testid="live-map-stats">
+        {% for key, label in stats %}
+            <div class="lm-stat{% if key == 'delayed' %} lm-stat--delayed{% endif %}" data-stat="{{ key }}">
+                <span class="lm-stat__value" data-stat-value>–</span>
+                <span class="lm-stat__label">{{ label }}</span>
+            </div>
+        {% endfor %}
+    </section>
+
+    <div class="lm-split">
+        <section class="lm-card lm-map-card" aria-label="Map">
+            <div class="lm-map" id="lm-map" role="application" aria-label="Map of stores, riders and drop points"></div>
+            <div class="lm-map__state" id="lm-map-state" data-testid="live-map-map-state">
+                <span class="ops-spinner" aria-hidden="true"></span><span>Loading map…</span>
+            </div>
+            <ul class="lm-legend" aria-label="Legend">
+                <li><span class="lm-dot lm-dot--DELIVERING"></span>Delivering</li>
+                <li><span class="lm-dot lm-dot--TO_STORE"></span>To store</li>
+                <li><span class="lm-dot lm-dot--AT_STORE"></span>At store</li>
+                <li><span class="lm-dot lm-dot--RETURNING"></span>Returning</li>
+                <li><span class="lm-dot lm-dot--IDLE"></span>Idle</li>
+                <li><span class="lm-dot lm-dot--STALE"></span>No recent update / offline</li>
+                <li><span class="lm-dot lm-dot--drop"></span>Drop point</li>
+                <li><span class="lm-dot lm-dot--store"></span>Store</li>
+            </ul>
+        </section>
+
+        <section class="lm-card lm-list-card" aria-labelledby="lm-list-title">
+            <div class="lm-list__head">
+                <h2 id="lm-list-title" class="lm-title">Active deliveries <span class="lm-count" id="lm-count"></span></h2>
+                <label class="sr-only" for="lm-search">Search</label>
+                <input id="lm-search" type="search" class="lm-input" placeholder="Search order, rider, customer or area" autocomplete="off">
+                <div class="lm-chips" role="group" aria-label="Filter">
+                    <button type="button" class="lm-chip lm-chip--on" data-filter="all" aria-pressed="true">All</button>
+                    <button type="button" class="lm-chip" data-filter="delayed" aria-pressed="false">Delayed</button>
+                    <button type="button" class="lm-chip" data-filter="waiting" aria-pressed="false">Awaiting rider</button>
+                    <button type="button" class="lm-chip" data-filter="road" aria-pressed="false">On the road</button>
+                </div>
+            </div>
+            <div class="lm-list" id="lm-list" aria-live="polite" data-testid="live-map-list">
+                <div class="lm-state"><span class="ops-spinner" aria-hidden="true"></span><span>Loading deliveries…</span></div>
+            </div>
+            <p class="lm-note" id="lm-truncated" hidden>Showing the first 200 active orders. Pick a store to narrow the list.</p>
+        </section>
+    </div>
+
+    <div class="lm-drawer-backdrop" id="lm-backdrop" hidden></div>
+    <aside class="lm-drawer" id="lm-drawer" aria-labelledby="lm-drawer-title" aria-hidden="true" tabindex="-1" data-testid="live-map-drawer">
+        <div class="lm-drawer__head">
+            <h2 class="lm-title" id="lm-drawer-title">Delivery</h2>
+            <button type="button" class="ops-icon-button" id="lm-drawer-close" aria-label="Close details">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <div class="lm-drawer__body" id="lm-drawer-body"></div>
+        <div class="lm-drawer__dispatch" id="lm-dispatch" data-testid="live-map-dispatch"></div>
+    </aside>
+</div>
+
+{% if caps.cancel_order %}{% include "ops/components/cancel_dialog.html" %}{% endif %}
+{% endblock %}

@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="NONE,NOARCHIVE">
+    {% include "brand/favicons.html" %}
     <title>{{ title }} | Jivo staff</title>
     <link href="{% static 'unfold/fonts/inter/styles.css' %}" rel="stylesheet">
     <link href="{% static 'unfold/css/styles.css' %}" rel="stylesheet">
@@ -13,6 +14,7 @@
 {# Staff two-step sign-in pages (apps/ops_console/mfa.py). Standalone: the panel itself stays closed until the code is verified. Never cached (the setup page holds the secret key). #}
 <body class="antialiased bg-base-50 font-sans text-font-default-light text-sm">
     <main class="max-w-lg mx-auto px-4 py-12">
+        <div class="flex justify-center mb-6">{% include "brand/logo.html" with height=40 %}</div>
         <section class="bg-white border border-base-200 p-6 rounded-default shadow-xs">
             <h1 class="font-semibold mb-4 text-lg text-font-important-light">{{ title }}</h1>
             {% block content %}{% endblock %}
