@@ -187,4 +187,4 @@ The agents live in `.claude/agents/`. Their files hold the detailed engineering 
 - If something needs me, say it as one clear step: "Do X."
 
 
-- Before answering, first show my message in corrected English (one line, "**Your English, corrected:** ..."), then do the task.
+- Before answering, check my English. Only if it has mistakes, show the corrected version first (one line, "**Your English, corrected:** ..."), then do the task. If it is already correct, show nothing about it.
