@@ -18,11 +18,11 @@
     }
 
     function styles() {
-        var primary = cssVar("--color-primary-600", "#9333ea");
+        var primary = cssVar("--color-primary-600", "#386a32");
         return {
             area: new ol.style.Style({
                 stroke: new ol.style.Stroke({ color: primary, width: 2 }),
-                fill: new ol.style.Fill({ color: "rgba(147, 51, 234, 0.12)" }),
+                fill: new ol.style.Fill({ color: "rgba(56, 106, 50, 0.14)" }), // Jivo green (primary-600)
             }),
             store: new ol.style.Style({
                 image: new ol.style.Circle({
