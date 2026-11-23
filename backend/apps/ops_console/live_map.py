@@ -72,6 +72,12 @@ def map_provider() -> tuple[str, dict]:
     return name, MAP_PROVIDERS[name]
 
 
+def drop_visible(user) -> bool:
+    """The snapshot's own rule for `drop` / `area` (and the customer name): a route ends at the
+    drop point, so the route endpoint answers only where the snapshot shows it."""
+    return _snapshot_module().shows_customer_name(user)
+
+
 def _snapshot_module():
     from apps.delivery.services import live_ops
 
@@ -167,7 +173,7 @@ def live_map_route(request, order_id: int):
     if order is None:
         raise Http404("No such order.")
     route = None
-    if live_ops.shows_customer_name(request.user):
+    if drop_visible(request.user):
         task = (
             DeliveryTask.objects.filter(order=order)
             .defer(*live_ops.TASK_SECRETS)

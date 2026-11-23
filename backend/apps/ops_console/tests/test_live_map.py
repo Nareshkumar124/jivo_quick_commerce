@@ -185,6 +185,50 @@ def test_customer_name_only_where_the_service_gives_it(client, world):
     assert route.json()["route"] is None
 
 
+def _finance_with_cancel():
+    user = staff_in_role(roles.FINANCE)
+    user.user_permissions.add(
+        Permission.objects.get(content_type__app_label="orders", codename="cancel_order")
+    )
+    return user
+
+
+@pytest.mark.parametrize("principal", [*sorted(LIVE_BOARD_ROLES), "finance+cancel"])
+def test_route_is_null_whenever_the_snapshot_omits_the_drop(client, world, principal):
+    """Same rule on both endpoints (`live_ops.shows_customer_name`): no drop point (and no area
+    or name) in the snapshot -> no route; a drop point -> the route ends there."""
+    if principal == "finance+cancel":
+        client.force_login(_finance_with_cancel())
+    else:
+        login_with_stores(client, principal, world["own"])
+    [row] = [
+        d
+        for d in client.get(reverse(DATA)).json()["deliveries"]
+        if d["order_id"] == world["assigned"].order_id
+    ]
+    route = client.get(reverse("ops:live-map-route", args=[world["assigned"].order_id]))
+    assert route.status_code == 200
+    if row["drop"] is None:
+        assert route.json()["route"] is None
+        assert row["area"] is None
+        assert row["customer_name"] is None
+    else:
+        assert route.json()["route"] is not None
+    assert (row["drop"] is None) == (not live_map.drop_visible(route.wsgi_request.user))
+
+
+def test_live_board_capability_matches_the_backend_gate():
+    """The page's capability is exactly the snapshot's permission set (Support included,
+    Finance / Store Staff / Catalog Manager not)."""
+    from apps.ops_console import capabilities
+
+    assert capabilities.DEDICATED[capabilities.LIVE_BOARD] == (live_ops.LIVE_BOARD_PERMISSIONS,)
+    for role in roles.ROLE_PERMISSIONS:
+        user = staff_in_role(role)
+        assert capabilities.allowed(user, capabilities.LIVE_BOARD) == live_ops.can_view(user), role
+        assert live_ops.can_view(user) == (role in LIVE_BOARD_ROLES), role
+
+
 # --------------------------------------------------------------------------- store scoping
 
 
