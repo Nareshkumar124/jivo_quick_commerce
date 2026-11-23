@@ -2,12 +2,14 @@
 snapshot of every active delivery in the staff user's stores, and the per-delivery progress
 that `/ws/ops/live/` pushes as `delivery.progress`.
 
-Access (05 §3): `orders.view_order` (the "Live order board" row: Super Admin, Ops, Store
-Manager own stores, Support view) and the stores of `stores_for(user)` (Store Manager / Store
-Staff: their `StaffStoreAccess` stores only). Everything is filtered by those stores first, so
-another store's order or rider is simply absent. The customer's name is included only for
-users who handle orders or customers (`accounts.view_customer`, `delivery.dispatch_order` or
-`orders.process_order`; 05 §3 "Customers (PII)": store roles see a name), else null. No phone,
+Access (05 §3 "Live order board" row: Super Admin, Ops, Store Manager own stores, Support
+view; Store Staff and Finance none): `orders.view_order` and `orders.cancel_order`, the same
+pair as the panel's live board capability (`ops_console.capabilities.LIVE_BOARD`), and the
+stores of `stores_for(user)` (Store Manager: their `StaffStoreAccess` stores only). Everything
+is filtered by those stores first, so another store's order or rider is simply absent. The
+customer's name, the drop point and the area are included only for users who handle orders or
+customers (`accounts.view_customer`, `delivery.dispatch_order` or `orders.process_order`; 05 §3
+"Customers (PII)": store roles see a name), else null. No phone,
 no street address, no OTP or pickup code.
 
 Nothing here writes: assign / reassign / cancel stay in `apps.delivery.services.dispatch`,
@@ -44,7 +46,7 @@ from apps.orders.choices import OrderStatus
 from apps.orders.models import Order
 from apps.stores.services import stores_for
 
-VIEW_PERMISSION = "orders.view_order"
+LIVE_BOARD_PERMISSIONS = ("orders.view_order", "orders.cancel_order")
 CUSTOMER_NAME_PERMISSIONS = (
     "accounts.view_customer",
     "delivery.dispatch_order",
@@ -76,7 +78,7 @@ def can_view(user) -> bool:
         and user.is_authenticated
         and user.is_active
         and user.is_staff
-        and user.has_perm(VIEW_PERMISSION)
+        and user.has_perms(LIVE_BOARD_PERMISSIONS)
     )
 
 
@@ -99,14 +101,20 @@ def is_delayed(order, live, now: datetime) -> bool:
     return live is not None and live.eta_at > order.eta_at + grace
 
 
-def delivery_progress(order, task, point, now=None) -> dict:
+def delivery_progress(order, task, point, now=None, *, cached_only: bool = False) -> dict:
     """Route, distance left, live ETA and the delay flag of one delivery (no customer data)."""
     now = now or timezone.now()
-    tracked = live_tracking.rider_route(task, order, point, now) if task is not None else None
-    live = eta_service.compute(order, task, point, now=now)
+    tracked = (
+        live_tracking.rider_route(task, order, point, now, cached_only=cached_only)
+        if task is not None
+        else None
+    )
+    live = eta_service.compute(order, task, point, now=now, cached_only=cached_only)
     return {
         "tracked": tracked,
-        "distance_remaining_m": live_tracking.distance_remaining_m(order, task, tracked, now),
+        "distance_remaining_m": live_tracking.distance_remaining_m(
+            order, task, tracked, now, cached_only=cached_only
+        ),
         "live_eta_at": live.eta_at if live else None,
         "live_eta_minutes": live.minutes if live else None,
         "is_delayed": is_delayed(order, live, now),
@@ -189,7 +197,8 @@ def snapshot(user, store_id: int | None = None, now=None) -> dict:
         if rider is not None and rider.pk not in positions and rider.pk not in rows_by_rider:
             location = latest_location(rider)
             point = (location["lat"], location["lng"]) if location else None
-        progress = delivery_progress(order, task, point, now)
+        # Read-only on routes: a snapshot of many deliveries never calls the provider.
+        progress = delivery_progress(order, task, point, now, cached_only=True)
         rider_row = rows_by_rider.get(rider.pk) if rider is not None else None
         snapshot_area = order.address_snapshot or {}
         deliveries.append(
@@ -198,8 +207,12 @@ def snapshot(user, store_id: int | None = None, now=None) -> dict:
                 "order_number": order.order_number,
                 "store_id": order.store_id,
                 "customer_name": ((order.user.name or "").strip() or None) if names else None,
-                "area": snapshot_area.get("area") or None,
-                "drop": {"lat": order.delivery_location.y, "lng": order.delivery_location.x},
+                "area": (snapshot_area.get("area") or None) if names else None,
+                "drop": (
+                    {"lat": order.delivery_location.y, "lng": order.delivery_location.x}
+                    if names
+                    else None
+                ),
                 "order_status": order.status,
                 "task_id": task.pk if task is not None else None,
                 "task_status": task.status if task is not None else None,

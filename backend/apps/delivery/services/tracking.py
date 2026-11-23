@@ -63,7 +63,12 @@ def _task(order: Order):
     """The order's delivery task in any state (one per order), with its rider, or None."""
     from apps.delivery.models import DeliveryTask
 
-    return DeliveryTask.objects.select_related("rider__user").filter(order=order).first()
+    return (
+        DeliveryTask.objects.select_related("rider__user")
+        .filter(order=order)
+        .order_by("-pk")
+        .first()
+    )
 
 
 def track_body(order: Order, now=None) -> dict:

@@ -12,8 +12,9 @@
   `fresh` says whether it was just computed.
 - `fixed_route(key, origin, destination)`: a leg that does not move (store -> drop), cached for
   `MAPS_ROUTE_CACHE_SECONDS`.
-- `geocode(address)` / `reverse_geocode(lat, lng)`: optional helpers, None when unknown or on
-  any error (the apps use the platform geocoder, DL-80).
+- Fallback routes computed while a remote provider is configured are cached only for the
+  cooldown; a per-key lock stops concurrent callers from all calling the provider at once (they
+  get the cached route or the straight line). `cached_only=True` never calls the provider.
 
 Redis is a cache here: when it is down the route is computed without it. Logs carry the key and
 the reason only, never coordinates or addresses.
@@ -126,12 +127,48 @@ def _entry(origin: LatLng, destination: LatLng, route: Route, now: datetime) -> 
     }
 
 
-def tracked_route(key: str, origin: LatLng, destination: LatLng, now=None) -> TrackedRoute:
+def _store(cache_key: str, origin, destination, route: Route, now, provider) -> None:
+    """Cache a computed route. A straight-line fallback computed while a remote provider is
+    configured is kept only for MAPS_PROVIDER_COOLDOWN_SECONDS, so the road route replaces it
+    as soon as the provider answers again."""
+    timeout = (
+        settings.MAPS_ROUTE_CACHE_SECONDS
+        if route.provider == provider.name
+        else settings.MAPS_PROVIDER_COOLDOWN_SECONDS
+    )
+    _cache_set(cache_key, _entry(origin, destination, route, now), timeout)
+
+
+def _lock(cache_key: str, provider) -> bool:
+    """One provider call per route key at a time (stampede guard). True: go ahead. Only a
+    remote provider is guarded; without Redis the call goes ahead (fail open)."""
+    if not provider.remote:
+        return True
+    try:
+        return bool(
+            cache.add(f"{cache_key}:lock", 1, timeout=int(settings.MAPS_HTTP_TIMEOUT_SECONDS) + 2)
+        )
+    except Exception:
+        return True
+
+
+def _unlock(cache_key: str) -> None:
+    try:
+        cache.delete(f"{cache_key}:lock")
+    except Exception:
+        logger.warning("maps: cache delete failed for %s", cache_key)
+
+
+def tracked_route(
+    key: str, origin: LatLng, destination: LatLng, now=None, *, cached_only: bool = False
+) -> TrackedRoute:
     """The route from a moving `origin` (see the module doc). `key` names the leg, e.g.
-    `task:42:TO_CUSTOMER`."""
+    `task:42:TO_CUSTOMER`. `cached_only`: never call the provider (bulk readers such as the ops
+    snapshot): the cached route scaled, else the straight line (not cached)."""
     now = now or timezone.now()
     cache_key = ROUTE_KEY.format(key=key)
     entry = _cache_get(cache_key)
+    usable = None  # the cached route, scaled, when it can stand in for a new one
     if isinstance(entry, dict):
         try:
             cached_origin = tuple(entry["origin"])
@@ -141,6 +178,11 @@ def tracked_route(key: str, origin: LatLng, destination: LatLng, now=None) -> Tr
         except (KeyError, TypeError, ValueError):
             same_destination = False
         if same_destination and age >= 0:
+            scaled = TrackedRoute(
+                route=_scaled(cached, cached_origin, origin, destination),
+                computed_at=datetime.fromtimestamp(float(entry["computed_at"]), tz=UTC),
+                fresh=False,
+            )
             moved = _meters(cached_origin, origin)
             small_move = moved <= settings.MAPS_ROUTE_RECOMPUTE_DISTANCE_M
             # A route computed at its destination cannot be scaled: a real move recomputes it
@@ -149,21 +191,28 @@ def tracked_route(key: str, origin: LatLng, destination: LatLng, now=None) -> Tr
             if (age < settings.MAPS_ROUTE_MIN_INTERVAL_SECONDS and (scalable or small_move)) or (
                 small_move and age < settings.MAPS_ROUTE_MAX_AGE_SECONDS
             ):
-                computed_at = datetime.fromtimestamp(float(entry["computed_at"]), tz=UTC)
-                return TrackedRoute(
-                    route=_scaled(cached, cached_origin, origin, destination),
-                    computed_at=computed_at,
-                    fresh=False,
-                )
-    route = compute_route(origin, destination)
-    _cache_set(
-        cache_key, _entry(origin, destination, route, now), settings.MAPS_ROUTE_CACHE_SECONDS
-    )
+                return scaled
+            if scalable or small_move:
+                usable = scaled
+    provider = get_provider()
+    if cached_only or not _lock(cache_key, provider):
+        if usable is not None:
+            return usable
+        return TrackedRoute(route=straight_route(origin, destination), computed_at=now, fresh=False)
+    try:
+        route = compute_route(origin, destination, provider)
+        _store(cache_key, origin, destination, route, now, provider)
+    finally:
+        if provider.remote:
+            _unlock(cache_key)
     return TrackedRoute(route=route, computed_at=now, fresh=True)
 
 
-def fixed_route(key: str, origin: LatLng, destination: LatLng, now=None) -> Route:
-    """A leg whose ends do not move (store -> drop), cached for MAPS_ROUTE_CACHE_SECONDS."""
+def fixed_route(
+    key: str, origin: LatLng, destination: LatLng, now=None, *, cached_only: bool = False
+) -> Route:
+    """A leg whose ends do not move (store -> drop), cached for MAPS_ROUTE_CACHE_SECONDS.
+    `cached_only`: the cached route, else the straight line (no provider call, not cached)."""
     now = now or timezone.now()
     cache_key = ROUTE_KEY.format(key=key)
     entry = _cache_get(cache_key)
@@ -176,10 +225,15 @@ def fixed_route(key: str, origin: LatLng, destination: LatLng, now=None) -> Rout
                 return Route.from_dict(entry["route"])
         except (KeyError, TypeError, ValueError):
             pass
-    route = compute_route(origin, destination)
-    _cache_set(
-        cache_key, _entry(origin, destination, route, now), settings.MAPS_ROUTE_CACHE_SECONDS
-    )
+    provider = get_provider()
+    if cached_only or not _lock(cache_key, provider):
+        return straight_route(origin, destination)
+    try:
+        route = compute_route(origin, destination, provider)
+        _store(cache_key, origin, destination, route, now, provider)
+    finally:
+        if provider.remote:
+            _unlock(cache_key)
     return route
 
 
@@ -191,28 +245,6 @@ def forget(key: str) -> None:
         logger.warning("maps: cache delete failed for %s", key)
 
 
-def geocode(address: str) -> LatLng | None:
-    provider = get_provider()
-    if not address or not provider.remote or _cooling_down(provider):
-        return None
-    try:
-        return provider.geocode(address)
-    except Exception as exc:
-        logger.warning("maps: %s geocode failed (%s)", provider.name, type(exc).__name__)
-        return None
-
-
-def reverse_geocode(lat: float, lng: float) -> str | None:
-    provider = get_provider()
-    if not provider.remote or _cooling_down(provider):
-        return None
-    try:
-        return provider.reverse_geocode(lat, lng)
-    except Exception as exc:
-        logger.warning("maps: %s reverse geocode failed (%s)", provider.name, type(exc).__name__)
-        return None
-
-
 __all__ = [
     "MapsProviderError",
     "Route",
@@ -220,8 +252,6 @@ __all__ = [
     "compute_route",
     "fixed_route",
     "forget",
-    "geocode",
     "get_provider",
-    "reverse_geocode",
     "tracked_route",
 ]

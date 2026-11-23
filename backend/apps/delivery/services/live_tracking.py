@@ -123,31 +123,39 @@ def leg_destination(order, leg: str) -> tuple[float, float]:
     return store_point(order) if leg == LEG_TO_STORE else drop_point(order)
 
 
-def rider_route(task, order, point: tuple[float, float] | None, now=None):
+def rider_route(
+    task, order, point: tuple[float, float] | None, now=None, *, cached_only: bool = False
+):
     """The `TrackedRoute` from the rider's `point` along the task's current leg, or None (no
     leg, no position, or a task without a pk)."""
     leg = leg_of(task)
     if leg is None or point is None or getattr(task, "pk", None) is None:
         return None
-    return maps.tracked_route(f"task:{task.pk}:{leg}", point, leg_destination(order, leg), now)
+    return maps.tracked_route(
+        f"task:{task.pk}:{leg}", point, leg_destination(order, leg), now, cached_only=cached_only
+    )
 
 
-def store_drop_route(order, now=None):
+def store_drop_route(order, now=None, *, cached_only: bool = False):
     """The store -> drop `Route` (fixed, cached), or None for an order without a pk."""
     if getattr(order, "pk", None) is None:
         return None
     key = f"order:{order.pk}:store-drop"
-    return maps.fixed_route(key, store_point(order), drop_point(order), now)
+    return maps.fixed_route(
+        key, store_point(order), drop_point(order), now, cached_only=cached_only
+    )
 
 
-def distance_remaining_m(order, task, tracked, now=None) -> int | None:
+def distance_remaining_m(
+    order, task, tracked, now=None, *, cached_only: bool = False
+) -> int | None:
     """Metres the rider still has to ride to the customer: the current leg's route, plus the
     store -> drop leg while heading to the store. None without a route (no rider position)."""
     if tracked is None:
         return None
     distance = tracked.route.distance_m
     if leg_of(task) == LEG_TO_STORE:
-        fixed = store_drop_route(order, now)
+        fixed = store_drop_route(order, now, cached_only=cached_only)
         distance += fixed.distance_m if fixed is not None else 0
     return distance
 

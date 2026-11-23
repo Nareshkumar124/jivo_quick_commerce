@@ -91,8 +91,6 @@ def test_haversine_route_equals_the_08_eta_terms():
     assert route.duration_s / 60 == pytest.approx(travel_minutes(*STORE, *DROP))
     assert route.distance_m == pytest.approx(2600, rel=0.05)  # ~2 km x 1.3
     assert polyline.decode(route.polyline) == [STORE, DROP]
-    assert HaversineProvider().geocode("x") is None
-    assert HaversineProvider().reverse_geocode(1, 2) is None
 
 
 def test_get_provider_selection(settings):
@@ -142,6 +140,7 @@ def test_google_route_same_point_and_missing_polyline(google, http):
 @pytest.mark.parametrize(
     "answer",
     [
+        b"x" * (providers.MAX_RESPONSE_BYTES + 1),
         urllib.error.HTTPError(providers.ROUTES_URL, 403, "Forbidden", {}, None),
         urllib.error.URLError("down"),
         TimeoutError(),
@@ -157,35 +156,6 @@ def test_google_route_errors_raise(google, http, answer):
     http(answer)
     with pytest.raises(MapsProviderError):
         GoogleMapsProvider("k").route(STORE, DROP)
-
-
-def test_google_geocode_and_reverse(google, http):
-    fake = http(
-        {"status": "OK", "results": [{"geometry": {"location": {"lat": 28.5, "lng": 77.1}}}]},
-        {"status": "OK", "results": [{"formatted_address": "Sector 14, Gurugram"}]},
-        {"status": "ZERO_RESULTS", "results": []},
-    )
-    assert services.geocode("Sector 14 Gurugram") == (28.5, 77.1)
-    assert services.reverse_geocode(28.5, 77.1) == "Sector 14, Gurugram"
-    assert services.reverse_geocode(0.1, 0.1) is None
-    assert "key=test-key-not-real" in fake.requests[0][0].full_url
-    assert "latlng=28.5%2C77.1" in fake.requests[1][0].full_url
-
-
-def test_geocode_failures_return_none(google, http):
-    http({"status": "REQUEST_DENIED"})
-    assert services.geocode("x") is None
-    http({"status": "OK", "results": [{"geometry": {}}]})
-    assert services.geocode("x") is None
-    http({"status": "ZERO_RESULTS"})
-    assert services.geocode("x") is None
-    assert services.geocode("") is None
-
-
-def test_geocode_needs_a_remote_provider(settings):
-    settings.GOOGLE_MAPS_SERVER_KEY = ""
-    assert services.geocode("Sector 14") is None
-    assert services.reverse_geocode(28.5, 77.1) is None
 
 
 # --------------------------------------------------------------------------- fallback
@@ -204,7 +174,6 @@ def test_provider_error_falls_back_and_cools_down(google, http, settings, caplog
     text = caplog.text
     assert "28.45" not in text
     assert "test-key-not-real" not in text
-    assert services.reverse_geocode(1.0, 1.0) is None  # also skipped while cooling down
     cache.clear()
     http(google_route())
     assert services.compute_route(STORE, DROP).provider == "google"
@@ -304,6 +273,77 @@ def test_fixed_route_is_cached(google, http):
     assert len(fake.requests) == 1
     services.fixed_route("order:1:store-drop", STORE, (28.47, 77.06))  # the drop moved
     assert len(fake.requests) == 2
+
+
+def test_a_fallback_is_cached_only_for_the_cooldown(google, http, settings, monkeypatch):
+    """Review fix 2: a straight line computed because Google failed must not stay cached for
+    MAPS_ROUTE_CACHE_SECONDS; a road route does."""
+    settings.MAPS_PROVIDER_COOLDOWN_SECONDS = 60
+    settings.MAPS_ROUTE_CACHE_SECONDS = 3600
+    writes = []
+    real = services._cache_set
+
+    def record(key, value, timeout):
+        if key.startswith("maps:route:"):
+            writes.append((key, value["route"]["provider"], timeout))
+        real(key, value, timeout)
+
+    monkeypatch.setattr(services, "_cache_set", record)
+    http(urllib.error.HTTPError(providers.ROUTES_URL, 500, "boom", {}, None))
+    services.fixed_route("order:9:store-drop", STORE, DROP)
+    services.tracked_route("task:9:TO_CUSTOMER", STORE, DROP)
+    assert writes == [
+        ("maps:route:order:9:store-drop", "haversine", 60),
+        ("maps:route:task:9:TO_CUSTOMER", "haversine", 60),
+    ]
+    cache.clear()
+    writes.clear()
+    http(google_route())
+    services.fixed_route("order:9:store-drop", STORE, DROP)
+    assert writes == [("maps:route:order:9:store-drop", "google", 3600)]
+
+
+def test_cached_only_never_calls_the_provider(google, http):
+    """Review fix 3: bulk readers read the cache or get the straight line."""
+    fake = http(google_route())
+    assert services.fixed_route("f", STORE, DROP, cached_only=True).provider == "haversine"
+    tracked = services.tracked_route("t", STORE, DROP, cached_only=True)
+    assert (tracked.fresh, tracked.route.provider) == (False, "haversine")
+    assert fake.requests == []
+    # Nothing was cached by those reads; a normal call computes and caches the road route.
+    assert services.fixed_route("f", STORE, DROP).provider == "google"
+    assert services.fixed_route("f", STORE, DROP, cached_only=True).provider == "google"
+    t0 = timezone.now()
+    services.tracked_route("t", STORE, DROP, t0)
+    stale = services.tracked_route("t", STORE, DROP, t0 + timedelta(seconds=600), cached_only=True)
+    assert (stale.fresh, stale.route.provider) == (False, "google")
+    assert len(fake.requests) == 2
+
+
+def test_a_held_lock_avoids_a_stampede(google, http):
+    """Review fix 3: while another caller computes a key, the others do not call Google."""
+    fake = http(google_route())
+    cache.add("maps:route:f:lock", 1, 30)
+    assert services.fixed_route("f", STORE, DROP).provider == "haversine"
+    t0 = timezone.now()
+    cache.delete("maps:route:t:lock")
+    services.tracked_route("t", STORE, DROP, t0)  # cached road route
+    assert len(fake.requests) == 1
+    cache.add("maps:route:t:lock", 1, 30)
+    later = services.tracked_route("t", (28.4545, 77.05), DROP, t0 + timedelta(seconds=600))
+    assert (later.fresh, later.route.provider) == (False, "google")  # the old one, scaled
+    cache.add("maps:route:u:lock", 1, 30)
+    assert services.tracked_route("u", STORE, DROP, t0).route.provider == "haversine"
+    assert len(fake.requests) == 1
+    # The lock is released after a computation.
+    cache.delete("maps:route:f:lock")
+    services.fixed_route("f", STORE, DROP)
+    assert cache.get("maps:route:f:lock") is None
+
+
+def test_the_haversine_provider_takes_no_lock(settings):
+    cache.add("maps:route:h:lock", 1, 30)
+    assert services.tracked_route("h", STORE, DROP).fresh
 
 
 # --------------------------------------------------------------------------- checks
