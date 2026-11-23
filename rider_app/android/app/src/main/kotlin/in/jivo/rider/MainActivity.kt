@@ -58,6 +58,9 @@ class MainActivity : FlutterActivity() {
                         ),
                     )
                     "canUseFullScreenIntent" -> result.success(canUseFullScreenIntent())
+                    // T-821: a Google map is only created when the build
+                    // injected a Maps API key (build.gradle.kts).
+                    "hasMapsKey" -> result.success(hasMapsKey())
                     "openFullScreenIntentSettings" -> result.success(openFullScreenIntentSettings())
                     "locationOps" -> result.success(
                         mapOf(
@@ -109,6 +112,18 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         stopOfferRinging()
         super.onDestroy()
+    }
+
+    /** Whether the build has a Google Maps API key in the manifest. */
+    private fun hasMapsKey(): Boolean = try {
+        @Suppress("DEPRECATION")
+        val info = packageManager.getApplicationInfo(
+            packageName,
+            android.content.pm.PackageManager.GET_META_DATA,
+        )
+        !info.metaData?.getString("com.google.android.geo.API_KEY").isNullOrBlank()
+    } catch (e: Exception) {
+        false
     }
 
     /**

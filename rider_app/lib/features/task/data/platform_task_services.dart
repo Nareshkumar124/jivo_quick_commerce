@@ -8,24 +8,45 @@ import '../../offers/domain/delivery_offer.dart';
 import '../domain/rider_task.dart';
 import '../domain/task_repositories.dart';
 
-/// Navigation through a generic `geo:` intent, so the Mappls app (DL-29) or
-/// any installed maps app handles it. No embedded navigation in v1.
+/// Turn-by-turn in the Google Maps app (DL-80, T-821), with fallbacks. No
+/// embedded navigation in v1 and no Maps key needed: these are intents.
 ///
-/// Option for later: try the Mappls app's own navigation deep link first
-/// (format to confirm with MapmyIndia), then fall back to `geo:`.
+/// 1. `google.navigation:q=lat,lng&mode=l`: Google Maps starts two-wheeler
+///    navigation to the destination at once.
+/// 2. `geo:0,0?q=lat,lng(label)`: any installed maps app, with a pin.
+/// 3. The https Google Maps directions link (browser), last.
 class GeoIntentNavigationLauncher implements NavigationLauncher {
   const GeoIntentNavigationLauncher(this._opener);
 
   final UrlOpener _opener;
+
+  /// Google Maps navigation, two-wheeler mode (`mode=l`).
+  static Uri googleNavigationUri(GeoPoint to) =>
+      Uri.parse('google.navigation:q=${to.lat},${to.lng}&mode=l');
 
   /// `geo:0,0?q=lat,lng(label)`: a pin at the destination; the maps app
   /// offers directions from there.
   static Uri geoUri(GeoPoint to, String label) =>
       Uri.parse('geo:0,0?q=${to.lat},${to.lng}(${Uri.encodeComponent(label)})');
 
+  /// Directions in the browser when no maps app is installed.
+  static Uri webDirectionsUri(GeoPoint to) => Uri.https(
+    'www.google.com',
+    '/maps/dir/',
+    {'api': '1', 'destination': '${to.lat},${to.lng}'},
+  );
+
   @override
-  Future<bool> navigateTo(GeoPoint destination, {required String label}) =>
-      _opener.open(geoUri(destination, label));
+  Future<bool> navigateTo(GeoPoint destination, {required String label}) async {
+    for (final uri in [
+      googleNavigationUri(destination),
+      geoUri(destination, label),
+      webDirectionsUri(destination),
+    ]) {
+      if (await _opener.open(uri)) return true;
+    }
+    return false;
+  }
 }
 
 /// One fresh, accurate fix from the UI isolate (the tracking service runs in

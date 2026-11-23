@@ -6,6 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:jivo_api/src/model/delivery_otp_state.dart';
 import 'package:jivo_api/src/model/task_geofence.dart';
+import 'package:jivo_api/src/model/task_navigation.dart';
 import 'package:jivo_api/src/model/delivery_task_status_enum.dart';
 import 'package:jivo_api/src/model/order_status_enum.dart';
 import 'package:jivo_api/src/model/rider_payment_type_enum.dart';
@@ -91,6 +92,8 @@ class RiderTask {
     required this.returnedAt,
 
     required this.earnings,
+
+    required this.navigation,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -215,6 +218,10 @@ class RiderTask {
   @JsonKey(name: r'earnings', required: true, includeIfNull: true)
   final TaskEarnings? earnings;
 
+  /// T-821: route, distance and ETA to the store (ASSIGNED, AT_STORE) or to the customer (PICKED_UP, AT_CUSTOMER); null in other states.
+  @JsonKey(name: r'navigation', required: true, includeIfNull: true)
+  final TaskNavigation? navigation;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -248,7 +255,8 @@ class RiderTask {
           other.failedAt == failedAt &&
           other.failReason == failReason &&
           other.returnedAt == returnedAt &&
-          other.earnings == earnings;
+          other.earnings == earnings &&
+          other.navigation == navigation;
 
   @override
   int get hashCode =>
@@ -281,7 +289,8 @@ class RiderTask {
       (failedAt == null ? 0 : failedAt.hashCode) +
       (failReason == null ? 0 : failReason.hashCode) +
       (returnedAt == null ? 0 : returnedAt.hashCode) +
-      (earnings == null ? 0 : earnings.hashCode);
+      (earnings == null ? 0 : earnings.hashCode) +
+      (navigation == null ? 0 : navigation.hashCode);
 
   factory RiderTask.fromJson(Map<String, dynamic> json) =>
       _$RiderTaskFromJson(json);

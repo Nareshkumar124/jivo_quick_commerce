@@ -5,6 +5,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../offers/domain/delivery_offer.dart';
 import '../domain/rider_task.dart';
 import '../domain/task_repositories.dart';
+import '../domain/task_navigation.dart';
 import '../domain/task_rules.dart';
 import '../domain/task_status.dart';
 
@@ -311,4 +312,32 @@ RiderTask riderTaskOf(api.RiderTask task) => RiderTask(
   },
   pickupAttemptsRemaining: task.pickupCode.attemptsRemaining,
   pickupLocked: task.pickupCode.locked,
+  navigation: switch (task.navigation) {
+    final nav? => navigationOf(nav),
+    null => null,
+  },
 );
+
+/// `navigation` (T-821). Null for a leg this build does not know.
+TaskNavigation? navigationOf(api.TaskNavigation nav) {
+  final leg = NavigationLeg.fromWire(nav.leg.value);
+  if (leg == null) return null;
+  final route = nav.route;
+  return TaskNavigation(
+    leg: leg,
+    destination: GeoPoint(nav.destination.lat, nav.destination.lng),
+    route: route == null
+        ? null
+        : NavigationRoute(
+            polyline: route.polyline,
+            distanceM: route.distanceM,
+            durationS: route.durationS,
+            isRoad: route.provider == api.RouteProviderEnum.google,
+            computedAt: route.computedAt,
+          ),
+    distanceM: nav.distanceM,
+    etaMinutes: nav.etaMinutes,
+    etaAt: nav.etaAt,
+    positionAt: nav.positionAt,
+  );
+}

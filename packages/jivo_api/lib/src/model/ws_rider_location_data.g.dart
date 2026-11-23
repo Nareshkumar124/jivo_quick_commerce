@@ -17,6 +17,8 @@ abstract class _$WsRiderLocationDataCWProxy {
 
   WsRiderLocationData recordedAt(DateTime recordedAt);
 
+  WsRiderLocationData distanceRemainingM(int? distanceRemainingM);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `WsRiderLocationData(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -29,6 +31,7 @@ abstract class _$WsRiderLocationDataCWProxy {
     double lng,
     double? heading,
     DateTime recordedAt,
+    int? distanceRemainingM,
   });
 }
 
@@ -55,6 +58,10 @@ class _$WsRiderLocationDataCWProxyImpl implements _$WsRiderLocationDataCWProxy {
       this(recordedAt: recordedAt);
 
   @override
+  WsRiderLocationData distanceRemainingM(int? distanceRemainingM) =>
+      this(distanceRemainingM: distanceRemainingM);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `WsRiderLocationData(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -67,6 +74,7 @@ class _$WsRiderLocationDataCWProxyImpl implements _$WsRiderLocationDataCWProxy {
     Object? lng = const $CopyWithPlaceholder(),
     Object? heading = const $CopyWithPlaceholder(),
     Object? recordedAt = const $CopyWithPlaceholder(),
+    Object? distanceRemainingM = const $CopyWithPlaceholder(),
   }) {
     return WsRiderLocationData(
       orderId: orderId == const $CopyWithPlaceholder()
@@ -89,6 +97,10 @@ class _$WsRiderLocationDataCWProxyImpl implements _$WsRiderLocationDataCWProxy {
           ? _value.recordedAt
           // ignore: cast_nullable_to_non_nullable
           : recordedAt as DateTime,
+      distanceRemainingM: distanceRemainingM == const $CopyWithPlaceholder()
+          ? _value.distanceRemainingM
+          // ignore: cast_nullable_to_non_nullable
+          : distanceRemainingM as int?,
     );
   }
 }
@@ -105,29 +117,43 @@ extension $WsRiderLocationDataCopyWith on WsRiderLocationData {
 // **************************************************************************
 
 WsRiderLocationData _$WsRiderLocationDataFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('WsRiderLocationData', json, ($checkedConvert) {
-      $checkKeys(
-        json,
-        requiredKeys: const [
-          'order_id',
-          'lat',
-          'lng',
-          'heading',
-          'recorded_at',
-        ],
-      );
-      final val = WsRiderLocationData(
-        orderId: $checkedConvert('order_id', (v) => (v as num).toInt()),
-        lat: $checkedConvert('lat', (v) => (v as num).toDouble()),
-        lng: $checkedConvert('lng', (v) => (v as num).toDouble()),
-        heading: $checkedConvert('heading', (v) => (v as num?)?.toDouble()),
-        recordedAt: $checkedConvert(
-          'recorded_at',
-          (v) => DateTime.parse(v as String),
-        ),
-      );
-      return val;
-    }, fieldKeyMap: const {'orderId': 'order_id', 'recordedAt': 'recorded_at'});
+    $checkedCreate(
+      'WsRiderLocationData',
+      json,
+      ($checkedConvert) {
+        $checkKeys(
+          json,
+          requiredKeys: const [
+            'order_id',
+            'lat',
+            'lng',
+            'heading',
+            'recorded_at',
+            'distance_remaining_m',
+          ],
+        );
+        final val = WsRiderLocationData(
+          orderId: $checkedConvert('order_id', (v) => (v as num).toInt()),
+          lat: $checkedConvert('lat', (v) => (v as num).toDouble()),
+          lng: $checkedConvert('lng', (v) => (v as num).toDouble()),
+          heading: $checkedConvert('heading', (v) => (v as num?)?.toDouble()),
+          recordedAt: $checkedConvert(
+            'recorded_at',
+            (v) => DateTime.parse(v as String),
+          ),
+          distanceRemainingM: $checkedConvert(
+            'distance_remaining_m',
+            (v) => (v as num?)?.toInt(),
+          ),
+        );
+        return val;
+      },
+      fieldKeyMap: const {
+        'orderId': 'order_id',
+        'recordedAt': 'recorded_at',
+        'distanceRemainingM': 'distance_remaining_m',
+      },
+    );
 
 Map<String, dynamic> _$WsRiderLocationDataToJson(
   WsRiderLocationData instance,
@@ -137,4 +163,5 @@ Map<String, dynamic> _$WsRiderLocationDataToJson(
   'lng': instance.lng,
   'heading': instance.heading,
   'recorded_at': instance.recordedAt.toIso8601String(),
+  'distance_remaining_m': instance.distanceRemainingM,
 };

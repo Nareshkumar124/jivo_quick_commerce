@@ -1,3 +1,4 @@
+import 'task_navigation.dart';
 import 'task_status.dart';
 
 /// Prepaid or cash on delivery (`RiderPaymentTypeEnum`).
@@ -178,6 +179,7 @@ class RiderTask {
     this.codQr,
     this.pickupAttemptsRemaining,
     this.pickupLocked = false,
+    this.navigation,
   });
 
   final int id;
@@ -235,6 +237,10 @@ class RiderTask {
   /// order over (or ops unlock it). Restored after a restart.
   final bool pickupLocked;
 
+  /// `navigation` (T-821): the leg, destination, route polyline, distance
+  /// and ETA. Null outside ASSIGNED .. AT_CUSTOMER, or from an older server.
+  final TaskNavigation? navigation;
+
   bool get isCod => paymentType == PaymentType.cod;
 
   RiderTask copyWith({
@@ -250,6 +256,8 @@ class RiderTask {
     String? codAmountChangedFrom,
     int? pickupAttemptsRemaining,
     bool? pickupLocked,
+    TaskNavigation? navigation,
+    bool clearNavigation = false,
   }) => RiderTask(
     id: id,
     status: status ?? this.status,
@@ -275,6 +283,7 @@ class RiderTask {
     pickupAttemptsRemaining:
         pickupAttemptsRemaining ?? this.pickupAttemptsRemaining,
     pickupLocked: pickupLocked ?? this.pickupLocked,
+    navigation: clearNavigation ? null : navigation ?? this.navigation,
   );
 
   @override

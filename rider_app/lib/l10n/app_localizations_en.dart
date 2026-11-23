@@ -2378,4 +2378,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String ratingAverageSemantics(String average) {
     return 'Average rating $average out of 5';
   }
+
+  @override
+  String get navToStore => 'To the store';
+
+  @override
+  String get navToCustomer => 'To the customer';
+
+  @override
+  String navDistanceKm(String km) {
+    return '$km km';
+  }
+
+  @override
+  String navDistanceM(int metres) {
+    return '$metres m';
+  }
+
+  @override
+  String navEtaMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String navArriveBy(String time) {
+    return 'Reach by $time';
+  }
+
+  @override
+  String get navArrived => 'You\'re here';
+
+  @override
+  String get navWaitingForLocation =>
+      'Waiting for your location. Distance and time show soon.';
+
+  @override
+  String get navStraightLine => 'Straight-line estimate';
+
+  @override
+  String navLocationOld(int minutes) {
+    return 'Location not updated for $minutes min. Check GPS and network.';
+  }
+
+  @override
+  String navMapSemantics(String place) {
+    return 'Map: your route to $place';
+  }
 }

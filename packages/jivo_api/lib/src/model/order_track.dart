@@ -7,8 +7,10 @@
 import 'package:jivo_api/src/model/delivery_task_status_enum.dart';
 import 'package:jivo_api/src/model/order_status_enum.dart';
 import 'package:jivo_api/src/model/track_point.dart';
+import 'package:jivo_api/src/model/track_route.dart';
 import 'package:jivo_api/src/model/track_rider.dart';
 import 'package:jivo_api/src/model/track_store.dart';
+import 'package:jivo_api/src/model/track_progress.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -45,6 +47,12 @@ class OrderTrack {
     required this.deliveryOtp,
 
     required this.taskStatus,
+
+    required this.route,
+
+    required this.distanceRemainingM,
+
+    required this.progress,
 
     required this.serverTime,
   });
@@ -100,6 +108,17 @@ class OrderTrack {
   )
   final DeliveryTaskStatusEnum? taskStatus;
 
+  /// T-821: null without an assigned rider position, or once the order ended.
+  @JsonKey(name: r'route', required: true, includeIfNull: true)
+  final TrackRoute? route;
+
+  /// T-821: road metres the rider still rides to you (to the store and on to you before pickup); null without a rider position.
+  @JsonKey(name: r'distance_remaining_m', required: true, includeIfNull: true)
+  final int? distanceRemainingM;
+
+  @JsonKey(name: r'progress', required: true, includeIfNull: false)
+  final TrackProgress progress;
+
   @JsonKey(name: r'server_time', required: true, includeIfNull: false)
   final DateTime serverTime;
 
@@ -118,6 +137,9 @@ class OrderTrack {
           other.rider == rider &&
           other.deliveryOtp == deliveryOtp &&
           other.taskStatus == taskStatus &&
+          other.route == route &&
+          other.distanceRemainingM == distanceRemainingM &&
+          other.progress == progress &&
           other.serverTime == serverTime;
 
   @override
@@ -133,6 +155,9 @@ class OrderTrack {
       (rider == null ? 0 : rider.hashCode) +
       (deliveryOtp == null ? 0 : deliveryOtp.hashCode) +
       (taskStatus == null ? 0 : taskStatus.hashCode) +
+      (route == null ? 0 : route.hashCode) +
+      (distanceRemainingM == null ? 0 : distanceRemainingM.hashCode) +
+      progress.hashCode +
       serverTime.hashCode;
 
   factory OrderTrack.fromJson(Map<String, dynamic> json) =>

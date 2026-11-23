@@ -34,6 +34,10 @@ void main() {
         'accepted': 1,
         'duplicates': 0,
         'rejected': 0,
+        'rejected_reasons': noRejectReasons,
+        'out_of_order': 0,
+        'low_accuracy': 0,
+        'active_task_id': null,
         'location': locationSettingsJson,
         'server_time': '2026-11-04T10:00:06Z',
       });
@@ -129,4 +133,139 @@ void main() {
       expect(await uploader.heartbeat(), isA<UploadTrackingStopped>());
     },
   );
+
+  group('T-821 live tracking', () {
+    Map<String, Object?> result({
+      int accepted = 1,
+      int rejected = 0,
+      int outOfOrder = 0,
+      int lowAccuracy = 0,
+      int? activeTaskId,
+    }) => {
+      'accepted': accepted,
+      'duplicates': 0,
+      'rejected': rejected,
+      'rejected_reasons': {...noRejectReasons, 'implausible_jump': rejected},
+      'out_of_order': outOfOrder,
+      'low_accuracy': lowAccuracy,
+      'active_task_id': activeTaskId,
+      'location': locationSettingsJson,
+      'server_time': '2026-11-04T10:00:06Z',
+    };
+
+    test('a ping carries heading, speed, accuracy, recorded_at and the '
+        'task id', () async {
+      http.answers[_locations] = Canned(201, result(activeTaskId: 7001));
+      final point = LocationPoint(
+        lat: 28.5706,
+        lng: 77.3261,
+        accuracy: 8.5,
+        speed: 6.1,
+        heading: 271.5,
+        recordedAt: DateTime.utc(2026, 11, 4, 10, 0, 5),
+      );
+
+      final answer = await uploader.upload([point], taskId: 7001);
+
+      final body = http.jsonBody(_locations);
+      expect(body['task_id'], 7001);
+      final sent = (body['points'] as List).single as Map<String, dynamic>;
+      expect(sent['lat'], 28.5706);
+      expect(sent['lng'], 77.3261);
+      expect(sent['accuracy'], 8.5);
+      expect(sent['speed'], 6.1);
+      expect(sent['heading'], 271.5);
+      expect(sent['recorded_at'], '2026-11-04T10:00:05.000Z');
+      final accepted = answer as UploadAccepted;
+      expect(accepted.reportsActiveTask, isTrue);
+      expect(accepted.activeTaskId, 7001);
+    });
+
+    test('idle: no task id is sent', () async {
+      http.answers[_locations] = Canned(201, result());
+      await uploader.upload([_point]);
+      expect(http.jsonBody(_locations)['task_id'], isNull);
+    });
+
+    test('values the contract refuses are sent as unknown, so one bad fix '
+        'does not drop the batch', () {
+      final sent = ApiLocationUploader.point(
+        LocationPoint(
+          lat: 28.5,
+          lng: 77.2,
+          accuracy: -1,
+          speed: -1,
+          heading: 360,
+          recordedAt: DateTime.utc(2026, 11, 4),
+        ),
+      );
+      expect(sent.accuracy, ApiLocationUploader.unknownAccuracyMeters);
+      expect(sent.speed, isNull);
+      expect(sent.heading, 0);
+      final noHeading = ApiLocationUploader.point(
+        LocationPoint(
+          lat: 28.5,
+          lng: 77.2,
+          heading: -1,
+          recordedAt: DateTime.utc(2026, 11, 4),
+        ),
+      );
+      expect(noHeading.heading, isNull);
+    });
+
+    test('an unknown or invalid accuracy is never sent as precise', () {
+      for (final accuracy in [null, -1.0, double.nan, double.infinity]) {
+        final sent = ApiLocationUploader.point(
+          LocationPoint(
+            lat: 28.5,
+            lng: 77.2,
+            accuracy: accuracy,
+            recordedAt: DateTime.utc(2026, 11, 4),
+          ),
+        );
+        expect(sent.accuracy, 9999, reason: 'accuracy $accuracy');
+        expect(sent.accuracy, greaterThan(300));
+      }
+      final zero = ApiLocationUploader.point(
+        LocationPoint(
+          lat: 28.5,
+          lng: 77.2,
+          accuracy: 0,
+          recordedAt: DateTime.utc(2026, 11, 4),
+        ),
+      );
+      expect(zero.accuracy, 0);
+    });
+
+    test('dropped, out-of-order and low-accuracy counts come back', () async {
+      http.answers[_locations] = Canned(
+        201,
+        result(accepted: 3, rejected: 2, outOfOrder: 1, lowAccuracy: 1),
+      );
+      final answer = await uploader.upload([
+        _point,
+        _point,
+        _point,
+        _point,
+        _point,
+      ]) as UploadAccepted;
+      expect(answer.dropped, 2);
+      expect(answer.outOfOrder, 1);
+      expect(answer.lowAccuracy, 1);
+    });
+
+    test('the heartbeat reports the server task too', () async {
+      http.answers[_heartbeat] = const Canned(200, {
+        'is_online': true,
+        'pending_offer_id': null,
+        'active_task_id': 7001,
+        'shift': null,
+        'location': locationSettingsJson,
+        'server_time': '2026-11-04T10:00:06Z',
+      });
+      final beat = await uploader.heartbeat() as UploadAccepted;
+      expect(beat.reportsActiveTask, isTrue);
+      expect(beat.activeTaskId, 7001);
+    });
+  });
 }

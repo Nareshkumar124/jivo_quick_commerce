@@ -42,7 +42,7 @@ void main() {
       : tester.widget<Text>(byKey('task-error')).data;
 
   group('go to the store', () {
-    testWidgets('restored on start; navigate opens a geo: intent', (
+    testWidgets('restored on start; navigate opens Google Maps navigation', (
       tester,
     ) async {
       await resume(tester, TaskStatus.assigned);
@@ -52,8 +52,9 @@ void main() {
       expect(find.text('Store is packing: wait here'), findsOneWidget);
 
       await tap(tester, 'navigate-store');
-      expect(h.urls.opened.single.scheme, 'geo');
+      expect(h.urls.opened.single.scheme, 'google.navigation');
       expect(h.urls.opened.single.toString(), contains('28.5706,77.3261'));
+      expect(h.urls.opened.single.toString(), contains('mode=l'));
     });
 
     testWidgets('outside the geofence: the distance from the server, then '

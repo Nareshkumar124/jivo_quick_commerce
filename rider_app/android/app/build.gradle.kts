@@ -42,6 +42,27 @@ if (firebaseConfiguredFlavors.isEmpty()) {
     logger.lifecycle("Firebase config found for: ${firebaseConfiguredFlavors.joinToString()}.")
 }
 
+// Google Maps Android API key (DL-80, T-821), the same mechanism as
+// customer_app. Never committed: read at build time from the Gradle property
+// or env var MAPS_API_KEY, else from
+// ~/.config/jivo-quick-commerce/google-maps/android-api-key.txt. Without a
+// key the build still succeeds; the manifest value is empty, MainActivity
+// reports no map (`hasMapsKey`), and the task screens show the no-map card.
+val mapsApiKey: String = run {
+    val fromProperty = (findProperty("MAPS_API_KEY") as String?)?.trim()
+    val fromEnv = System.getenv("MAPS_API_KEY")?.trim()
+    val keyFile = file(
+        System.getProperty("user.home") +
+            "/.config/jivo-quick-commerce/google-maps/android-api-key.txt",
+    )
+    val fromFile = if (keyFile.isFile) keyFile.readText().trim() else null
+    listOf(fromProperty, fromEnv, fromFile).firstOrNull { !it.isNullOrEmpty() } ?: ""
+}
+logger.lifecycle(
+    if (mapsApiKey.isEmpty()) "Google Maps key not found: building without maps."
+    else "Google Maps key found.",
+)
+
 android {
     namespace = "in.jivo.rider"
     // 37, not flutter.compileSdkVersion (36): permission_handler_android 14.x
@@ -65,6 +86,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["appLabel"] = "Jivo Rider"
+        manifestPlaceholders["mapsApiKey"] = mapsApiKey
     }
 
     // Build with: flutter build apk --flavor <dev|staging|prod> -t lib/main_<flavor>.dart

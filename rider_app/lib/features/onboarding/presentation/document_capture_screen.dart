@@ -184,17 +184,7 @@ class _DocumentCaptureScreenState extends ConsumerState<DocumentCaptureScreen> {
                   borderRadius: BorderRadius.circular(12),
                   child: ColoredBox(
                     color: theme.colorScheme.surfaceContainerHighest,
-                    child: Image.memory(
-                      state.image!.bytes,
-                      key: const Key('capture-preview'),
-                      height: 280,
-                      fit: BoxFit.contain,
-                      gaplessPlayback: true,
-                      errorBuilder: (_, _, _) => const SizedBox(
-                        height: 280,
-                        child: Icon(Icons.image_not_supported, size: 64),
-                      ),
-                    ),
+                    child: CapturePreview(bytes: state.image!.bytes),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -336,6 +326,66 @@ class _ChooseSource extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// Height of the KYC photo preview, in logical pixels.
+const double kCapturePreviewHeight = 280;
+
+/// The picked KYC photo, decoded at display size.
+///
+/// A full-size camera photo decoded with a plain `Image.memory` can show as a
+/// black box on budget phones (too big a texture / memory spike), so the
+/// image is decoded no larger than the preview box in physical pixels
+/// (aspect ratio kept). A light placeholder shows while it decodes. Only the
+/// preview is downscaled; the upload keeps the processed bytes.
+class CapturePreview extends StatelessWidget {
+  const CapturePreview({required this.bytes, super.key});
+
+  final Uint8List bytes;
+
+  /// The decode box for a preview [maxWidth] logical pixels wide.
+  static ResizeImage imageFor(
+    Uint8List bytes, {
+    required double maxWidth,
+    required double devicePixelRatio,
+  }) => ResizeImage(
+    MemoryImage(bytes),
+    width: (maxWidth * devicePixelRatio).round(),
+    height: (kCapturePreviewHeight * devicePixelRatio).round(),
+    policy: ResizeImagePolicy.fit,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final placeholder = ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: const SizedBox(
+        height: kCapturePreviewHeight,
+        width: double.infinity,
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        return Image(
+          key: const Key('capture-preview'),
+          image: imageFor(bytes, maxWidth: maxWidth, devicePixelRatio: dpr),
+          height: kCapturePreviewHeight,
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          frameBuilder: (_, child, frame, wasSynchronouslyLoaded) =>
+              wasSynchronouslyLoaded || frame != null ? child : placeholder,
+          errorBuilder: (_, _, _) => const SizedBox(
+            height: kCapturePreviewHeight,
+            child: Icon(Icons.image_not_supported, size: 64),
+          ),
+        );
+      },
     );
   }
 }

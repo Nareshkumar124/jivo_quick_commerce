@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- PLACEHOLDER launcher icon colour until Jivo supplies the logo (H-19, D-06).
-     #1B5E20 = rider.color.online.bg in design/tokens/rider.tokens.json
-     (= JivoBrandColors.success), the rider app's brand green. -->
+<!-- Jivo brand green, sampled from the official logo (2026-11-23). Same
+     value as kJivoBrandGreen in lib/app/brand.dart and GREEN in
+     tool/gen_brand_assets.py. Also the splash background. -->
 <resources>
-    <color name="ic_launcher_background">#1B5E20</color>
+    <color name="ic_launcher_background">#2D5528</color>
 </resources>

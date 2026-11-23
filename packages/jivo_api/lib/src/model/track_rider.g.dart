@@ -13,11 +13,17 @@ abstract class _$TrackRiderCWProxy {
 
   TrackRider photo(String? photo);
 
+  TrackRider vehicleType(VehicleTypeEnum? vehicleType);
+
   TrackRider lat(double? lat);
 
   TrackRider lng(double? lng);
 
+  TrackRider heading(double? heading);
+
   TrackRider updatedAt(DateTime? updatedAt);
+
+  TrackRider isStale(bool isStale);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TrackRider(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -29,9 +35,12 @@ abstract class _$TrackRiderCWProxy {
     String name,
     String? phone,
     String? photo,
+    VehicleTypeEnum? vehicleType,
     double? lat,
     double? lng,
+    double? heading,
     DateTime? updatedAt,
+    bool isStale,
   });
 }
 
@@ -51,13 +60,23 @@ class _$TrackRiderCWProxyImpl implements _$TrackRiderCWProxy {
   TrackRider photo(String? photo) => this(photo: photo);
 
   @override
+  TrackRider vehicleType(VehicleTypeEnum? vehicleType) =>
+      this(vehicleType: vehicleType);
+
+  @override
   TrackRider lat(double? lat) => this(lat: lat);
 
   @override
   TrackRider lng(double? lng) => this(lng: lng);
 
   @override
+  TrackRider heading(double? heading) => this(heading: heading);
+
+  @override
   TrackRider updatedAt(DateTime? updatedAt) => this(updatedAt: updatedAt);
+
+  @override
+  TrackRider isStale(bool isStale) => this(isStale: isStale);
 
   @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `TrackRider(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -70,9 +89,12 @@ class _$TrackRiderCWProxyImpl implements _$TrackRiderCWProxy {
     Object? name = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
     Object? photo = const $CopyWithPlaceholder(),
+    Object? vehicleType = const $CopyWithPlaceholder(),
     Object? lat = const $CopyWithPlaceholder(),
     Object? lng = const $CopyWithPlaceholder(),
+    Object? heading = const $CopyWithPlaceholder(),
     Object? updatedAt = const $CopyWithPlaceholder(),
+    Object? isStale = const $CopyWithPlaceholder(),
   }) {
     return TrackRider(
       name: name == const $CopyWithPlaceholder()
@@ -87,6 +109,10 @@ class _$TrackRiderCWProxyImpl implements _$TrackRiderCWProxy {
           ? _value.photo
           // ignore: cast_nullable_to_non_nullable
           : photo as String?,
+      vehicleType: vehicleType == const $CopyWithPlaceholder()
+          ? _value.vehicleType
+          // ignore: cast_nullable_to_non_nullable
+          : vehicleType as VehicleTypeEnum?,
       lat: lat == const $CopyWithPlaceholder()
           ? _value.lat
           // ignore: cast_nullable_to_non_nullable
@@ -95,10 +121,18 @@ class _$TrackRiderCWProxyImpl implements _$TrackRiderCWProxy {
           ? _value.lng
           // ignore: cast_nullable_to_non_nullable
           : lng as double?,
+      heading: heading == const $CopyWithPlaceholder()
+          ? _value.heading
+          // ignore: cast_nullable_to_non_nullable
+          : heading as double?,
       updatedAt: updatedAt == const $CopyWithPlaceholder()
           ? _value.updatedAt
           // ignore: cast_nullable_to_non_nullable
           : updatedAt as DateTime?,
+      isStale: isStale == const $CopyWithPlaceholder()
+          ? _value.isStale
+          // ignore: cast_nullable_to_non_nullable
+          : isStale as bool,
     );
   }
 }
@@ -113,39 +147,71 @@ extension $TrackRiderCopyWith on TrackRider {
 // JsonSerializableGenerator
 // **************************************************************************
 
-TrackRider _$TrackRiderFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('TrackRider', json, ($checkedConvert) {
-      $checkKeys(
-        json,
-        requiredKeys: const [
-          'name',
-          'phone',
-          'photo',
-          'lat',
-          'lng',
-          'updated_at',
-        ],
-      );
-      final val = TrackRider(
-        name: $checkedConvert('name', (v) => v as String),
-        phone: $checkedConvert('phone', (v) => v as String?),
-        photo: $checkedConvert('photo', (v) => v as String?),
-        lat: $checkedConvert('lat', (v) => (v as num?)?.toDouble()),
-        lng: $checkedConvert('lng', (v) => (v as num?)?.toDouble()),
-        updatedAt: $checkedConvert(
-          'updated_at',
-          (v) => v == null ? null : DateTime.parse(v as String),
+TrackRider _$TrackRiderFromJson(Map<String, dynamic> json) => $checkedCreate(
+  'TrackRider',
+  json,
+  ($checkedConvert) {
+    $checkKeys(
+      json,
+      requiredKeys: const [
+        'name',
+        'phone',
+        'photo',
+        'vehicle_type',
+        'lat',
+        'lng',
+        'heading',
+        'updated_at',
+        'is_stale',
+      ],
+    );
+    final val = TrackRider(
+      name: $checkedConvert('name', (v) => v as String),
+      phone: $checkedConvert('phone', (v) => v as String?),
+      photo: $checkedConvert('photo', (v) => v as String?),
+      vehicleType: $checkedConvert(
+        'vehicle_type',
+        (v) => $enumDecodeNullable(
+          _$VehicleTypeEnumEnumMap,
+          v,
+          unknownValue: VehicleTypeEnum.unknownDefaultOpenApi,
         ),
-      );
-      return val;
-    }, fieldKeyMap: const {'updatedAt': 'updated_at'});
+      ),
+      lat: $checkedConvert('lat', (v) => (v as num?)?.toDouble()),
+      lng: $checkedConvert('lng', (v) => (v as num?)?.toDouble()),
+      heading: $checkedConvert('heading', (v) => (v as num?)?.toDouble()),
+      updatedAt: $checkedConvert(
+        'updated_at',
+        (v) => v == null ? null : DateTime.parse(v as String),
+      ),
+      isStale: $checkedConvert('is_stale', (v) => v as bool),
+    );
+    return val;
+  },
+  fieldKeyMap: const {
+    'vehicleType': 'vehicle_type',
+    'updatedAt': 'updated_at',
+    'isStale': 'is_stale',
+  },
+);
 
 Map<String, dynamic> _$TrackRiderToJson(TrackRider instance) =>
     <String, dynamic>{
       'name': instance.name,
       'phone': instance.phone,
       'photo': instance.photo,
+      'vehicle_type': _$VehicleTypeEnumEnumMap[instance.vehicleType],
       'lat': instance.lat,
       'lng': instance.lng,
+      'heading': instance.heading,
       'updated_at': instance.updatedAt?.toIso8601String(),
+      'is_stale': instance.isStale,
     };
+
+const _$VehicleTypeEnumEnumMap = {
+  VehicleTypeEnum.BICYCLE: 'BICYCLE',
+  VehicleTypeEnum.E_BIKE: 'E_BIKE',
+  VehicleTypeEnum.MOTORBIKE: 'MOTORBIKE',
+  VehicleTypeEnum.SCOOTER: 'SCOOTER',
+  VehicleTypeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
+};

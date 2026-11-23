@@ -56,6 +56,7 @@ import 'package:jivo_api/src/model/inbox_notification.dart';
 import 'package:jivo_api/src/model/location_batch_request.dart';
 import 'package:jivo_api/src/model/location_batch_result.dart';
 import 'package:jivo_api/src/model/location_point_request.dart';
+import 'package:jivo_api/src/model/location_reject_reasons.dart';
 import 'package:jivo_api/src/model/logout_request.dart';
 import 'package:jivo_api/src/model/me.dart';
 import 'package:jivo_api/src/model/next_price_tier.dart';
@@ -145,6 +146,7 @@ import 'package:jivo_api/src/model/task_geofence.dart';
 import 'package:jivo_api/src/model/task_history_detail.dart';
 import 'package:jivo_api/src/model/task_history_item.dart';
 import 'package:jivo_api/src/model/task_item.dart';
+import 'package:jivo_api/src/model/task_navigation.dart';
 import 'package:jivo_api/src/model/task_store.dart';
 import 'package:jivo_api/src/model/ticket.dart';
 import 'package:jivo_api/src/model/ticket_attachment.dart';
@@ -155,7 +157,10 @@ import 'package:jivo_api/src/model/ticket_summary.dart';
 import 'package:jivo_api/src/model/token_pair.dart';
 import 'package:jivo_api/src/model/token_refresh_request.dart';
 import 'package:jivo_api/src/model/track_point.dart';
+import 'package:jivo_api/src/model/track_progress.dart';
+import 'package:jivo_api/src/model/track_progress_step.dart';
 import 'package:jivo_api/src/model/track_rider.dart';
+import 'package:jivo_api/src/model/track_route.dart';
 import 'package:jivo_api/src/model/track_store.dart';
 import 'package:jivo_api/src/model/unit_price.dart';
 import 'package:jivo_api/src/model/unread_count.dart';
@@ -169,6 +174,8 @@ import 'package:jivo_api/src/model/ws_auth_ok_message.dart';
 import 'package:jivo_api/src/model/ws_auth_request.dart';
 import 'package:jivo_api/src/model/ws_cash_updated_data.dart';
 import 'package:jivo_api/src/model/ws_cash_updated_message.dart';
+import 'package:jivo_api/src/model/ws_delivery_progress_data.dart';
+import 'package:jivo_api/src/model/ws_delivery_progress_message.dart';
 import 'package:jivo_api/src/model/ws_error_data.dart';
 import 'package:jivo_api/src/model/ws_error_message.dart';
 import 'package:jivo_api/src/model/ws_notification_new_data.dart';
@@ -186,6 +193,8 @@ import 'package:jivo_api/src/model/ws_order_created_data.dart';
 import 'package:jivo_api/src/model/ws_order_created_message.dart';
 import 'package:jivo_api/src/model/ws_order_eta_data.dart';
 import 'package:jivo_api/src/model/ws_order_eta_message.dart';
+import 'package:jivo_api/src/model/ws_order_route_data.dart';
+import 'package:jivo_api/src/model/ws_order_route_message.dart';
 import 'package:jivo_api/src/model/ws_order_status_data.dart';
 import 'package:jivo_api/src/model/ws_order_status_message.dart';
 import 'package:jivo_api/src/model/ws_ping_request.dart';
@@ -382,6 +391,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'LocationPointRequest':
       return LocationPointRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LocationRejectReasons':
+      return LocationRejectReasons.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'LogoutRequest':
       return LogoutRequest.fromJson(value as Map<String, dynamic>)
@@ -602,6 +614,8 @@ ReturnType deserialize<ReturnType, BaseType>(
       return RiderTask.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'RiderToday':
       return RiderToday.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'RouteLegEnum':
+    case 'RouteProviderEnum':
     case 'SearchSuggestion':
       return SearchSuggestion.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -639,6 +653,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'TaskItem':
       return TaskItem.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'TaskNavigation':
+      return TaskNavigation.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'TaskStore':
       return TaskStore.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'Ticket':
@@ -667,10 +684,20 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'TrackPoint':
       return TrackPoint.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'TrackProgress':
+      return TrackProgress.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'TrackProgressStep':
+      return TrackProgressStep.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'TrackRider':
       return TrackRider.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'TrackRoute':
+      return TrackRoute.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'TrackStore':
       return TrackStore.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'TrackingOutcomeEnum':
+    case 'TrackingStepEnum':
     case 'UnitPrice':
       return UnitPrice.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'UnreadCount':
@@ -703,6 +730,12 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'WsCashUpdatedMessage':
       return WsCashUpdatedMessage.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'WsDeliveryProgressData':
+      return WsDeliveryProgressData.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'WsDeliveryProgressMessage':
+      return WsDeliveryProgressMessage.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'WsErrorData':
       return WsErrorData.fromJson(value as Map<String, dynamic>) as ReturnType;
@@ -752,6 +785,12 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'WsOrderEtaMessage':
       return WsOrderEtaMessage.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'WsOrderRouteData':
+      return WsOrderRouteData.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'WsOrderRouteMessage':
+      return WsOrderRouteMessage.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'WsOrderStatusData':
       return WsOrderStatusData.fromJson(value as Map<String, dynamic>)

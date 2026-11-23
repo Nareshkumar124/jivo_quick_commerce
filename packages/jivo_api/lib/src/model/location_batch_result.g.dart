@@ -13,6 +13,14 @@ abstract class _$LocationBatchResultCWProxy {
 
   LocationBatchResult rejected(int rejected);
 
+  LocationBatchResult rejectedReasons(LocationRejectReasons rejectedReasons);
+
+  LocationBatchResult outOfOrder(int outOfOrder);
+
+  LocationBatchResult lowAccuracy(int lowAccuracy);
+
+  LocationBatchResult activeTaskId(int? activeTaskId);
+
   LocationBatchResult location(RiderLocationSettings location);
 
   LocationBatchResult serverTime(DateTime serverTime);
@@ -27,6 +35,10 @@ abstract class _$LocationBatchResultCWProxy {
     int accepted,
     int duplicates,
     int rejected,
+    LocationRejectReasons rejectedReasons,
+    int outOfOrder,
+    int lowAccuracy,
+    int? activeTaskId,
     RiderLocationSettings location,
     DateTime serverTime,
   });
@@ -49,6 +61,22 @@ class _$LocationBatchResultCWProxyImpl implements _$LocationBatchResultCWProxy {
   LocationBatchResult rejected(int rejected) => this(rejected: rejected);
 
   @override
+  LocationBatchResult rejectedReasons(LocationRejectReasons rejectedReasons) =>
+      this(rejectedReasons: rejectedReasons);
+
+  @override
+  LocationBatchResult outOfOrder(int outOfOrder) =>
+      this(outOfOrder: outOfOrder);
+
+  @override
+  LocationBatchResult lowAccuracy(int lowAccuracy) =>
+      this(lowAccuracy: lowAccuracy);
+
+  @override
+  LocationBatchResult activeTaskId(int? activeTaskId) =>
+      this(activeTaskId: activeTaskId);
+
+  @override
   LocationBatchResult location(RiderLocationSettings location) =>
       this(location: location);
 
@@ -67,6 +95,10 @@ class _$LocationBatchResultCWProxyImpl implements _$LocationBatchResultCWProxy {
     Object? accepted = const $CopyWithPlaceholder(),
     Object? duplicates = const $CopyWithPlaceholder(),
     Object? rejected = const $CopyWithPlaceholder(),
+    Object? rejectedReasons = const $CopyWithPlaceholder(),
+    Object? outOfOrder = const $CopyWithPlaceholder(),
+    Object? lowAccuracy = const $CopyWithPlaceholder(),
+    Object? activeTaskId = const $CopyWithPlaceholder(),
     Object? location = const $CopyWithPlaceholder(),
     Object? serverTime = const $CopyWithPlaceholder(),
   }) {
@@ -83,6 +115,22 @@ class _$LocationBatchResultCWProxyImpl implements _$LocationBatchResultCWProxy {
           ? _value.rejected
           // ignore: cast_nullable_to_non_nullable
           : rejected as int,
+      rejectedReasons: rejectedReasons == const $CopyWithPlaceholder()
+          ? _value.rejectedReasons
+          // ignore: cast_nullable_to_non_nullable
+          : rejectedReasons as LocationRejectReasons,
+      outOfOrder: outOfOrder == const $CopyWithPlaceholder()
+          ? _value.outOfOrder
+          // ignore: cast_nullable_to_non_nullable
+          : outOfOrder as int,
+      lowAccuracy: lowAccuracy == const $CopyWithPlaceholder()
+          ? _value.lowAccuracy
+          // ignore: cast_nullable_to_non_nullable
+          : lowAccuracy as int,
+      activeTaskId: activeTaskId == const $CopyWithPlaceholder()
+          ? _value.activeTaskId
+          // ignore: cast_nullable_to_non_nullable
+          : activeTaskId as int?,
       location: location == const $CopyWithPlaceholder()
           ? _value.location
           // ignore: cast_nullable_to_non_nullable
@@ -106,33 +154,59 @@ extension $LocationBatchResultCopyWith on LocationBatchResult {
 // JsonSerializableGenerator
 // **************************************************************************
 
-LocationBatchResult _$LocationBatchResultFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('LocationBatchResult', json, ($checkedConvert) {
-      $checkKeys(
-        json,
-        requiredKeys: const [
-          'accepted',
-          'duplicates',
-          'rejected',
-          'location',
-          'server_time',
-        ],
-      );
-      final val = LocationBatchResult(
-        accepted: $checkedConvert('accepted', (v) => (v as num).toInt()),
-        duplicates: $checkedConvert('duplicates', (v) => (v as num).toInt()),
-        rejected: $checkedConvert('rejected', (v) => (v as num).toInt()),
-        location: $checkedConvert(
-          'location',
-          (v) => RiderLocationSettings.fromJson(v as Map<String, dynamic>),
-        ),
-        serverTime: $checkedConvert(
-          'server_time',
-          (v) => DateTime.parse(v as String),
-        ),
-      );
-      return val;
-    }, fieldKeyMap: const {'serverTime': 'server_time'});
+LocationBatchResult _$LocationBatchResultFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate(
+  'LocationBatchResult',
+  json,
+  ($checkedConvert) {
+    $checkKeys(
+      json,
+      requiredKeys: const [
+        'accepted',
+        'duplicates',
+        'rejected',
+        'rejected_reasons',
+        'out_of_order',
+        'low_accuracy',
+        'active_task_id',
+        'location',
+        'server_time',
+      ],
+    );
+    final val = LocationBatchResult(
+      accepted: $checkedConvert('accepted', (v) => (v as num).toInt()),
+      duplicates: $checkedConvert('duplicates', (v) => (v as num).toInt()),
+      rejected: $checkedConvert('rejected', (v) => (v as num).toInt()),
+      rejectedReasons: $checkedConvert(
+        'rejected_reasons',
+        (v) => LocationRejectReasons.fromJson(v as Map<String, dynamic>),
+      ),
+      outOfOrder: $checkedConvert('out_of_order', (v) => (v as num).toInt()),
+      lowAccuracy: $checkedConvert('low_accuracy', (v) => (v as num).toInt()),
+      activeTaskId: $checkedConvert(
+        'active_task_id',
+        (v) => (v as num?)?.toInt(),
+      ),
+      location: $checkedConvert(
+        'location',
+        (v) => RiderLocationSettings.fromJson(v as Map<String, dynamic>),
+      ),
+      serverTime: $checkedConvert(
+        'server_time',
+        (v) => DateTime.parse(v as String),
+      ),
+    );
+    return val;
+  },
+  fieldKeyMap: const {
+    'rejectedReasons': 'rejected_reasons',
+    'outOfOrder': 'out_of_order',
+    'lowAccuracy': 'low_accuracy',
+    'activeTaskId': 'active_task_id',
+    'serverTime': 'server_time',
+  },
+);
 
 Map<String, dynamic> _$LocationBatchResultToJson(
   LocationBatchResult instance,
@@ -140,6 +214,10 @@ Map<String, dynamic> _$LocationBatchResultToJson(
   'accepted': instance.accepted,
   'duplicates': instance.duplicates,
   'rejected': instance.rejected,
+  'rejected_reasons': instance.rejectedReasons.toJson(),
+  'out_of_order': instance.outOfOrder,
+  'low_accuracy': instance.lowAccuracy,
+  'active_task_id': instance.activeTaskId,
   'location': instance.location.toJson(),
   'server_time': instance.serverTime.toIso8601String(),
 };

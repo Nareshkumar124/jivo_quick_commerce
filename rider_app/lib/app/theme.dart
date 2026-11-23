@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import 'brand.dart';
+
 /// Rider sizes from `design/tokens/rider.tokens.json` (`rider.size.*`, dp).
 /// Minimum height of rider primary actions (agent rule 9: at least 56 dp).
 const double kRiderPrimaryActionHeight = 56;
@@ -17,7 +19,9 @@ const double kRiderListRowMin = 64;
 /// Rider high-contrast (sunlight) colours, built from
 /// `design/tokens/rider.tokens.json` (UX audit RD-05). Every text pair is
 /// 7:1 or more except [danger], which is always paired with an icon and
-/// words. Brand hues are placeholders: TODO(D-06).
+/// words. Online/success green ([onlineBg]) and COD amber keep their
+/// meaning; the brand colour is the logo green ([kJivoBrandGreen]), used as
+/// the theme's primary in [buildRiderTheme].
 ///
 /// Read with `RiderColors.of(context)`.
 @immutable
@@ -132,7 +136,11 @@ BoxDecoration riderCodDecoration(BuildContext context) =>
 /// (RD-05), plus the [RiderColors] extension.
 ThemeData buildRiderTheme() {
   const rider = RiderColors.light;
-  final base = JivoTheme.light();
+  // The logo green as primary (user decision 2026-11-23). Seeding keeps the
+  // generated secondary/tertiary/surface tones in the same family; the
+  // primary pairs are set exactly. Contrast: white on #2D5528 is 8.6:1,
+  // #0F2A0D on #D3E8CD is 11.9:1, #2D5528 on white is 8.6:1 (all AA and AAA).
+  final base = JivoTheme.build(Brightness.light, seed: kJivoBrandGreen);
   const minimumSize = WidgetStatePropertyAll(
     Size(64, kRiderPrimaryActionHeight),
   );
@@ -143,6 +151,12 @@ ThemeData buildRiderTheme() {
       .copyWith(minimumSize: minimumSize, textStyle: textStyle);
 
   final scheme = base.colorScheme.copyWith(
+    primary: kJivoBrandGreen,
+    onPrimary: Colors.white,
+    primaryContainer: const Color(0xFFD3E8CD),
+    onPrimaryContainer: const Color(0xFF0F2A0D),
+    inversePrimary: const Color(0xFF9CD38F),
+    surfaceTint: kJivoBrandGreen,
     onSurface: rider.textPrimary,
     onSurfaceVariant: rider.textSecondary,
     outline: rider.textSecondary,

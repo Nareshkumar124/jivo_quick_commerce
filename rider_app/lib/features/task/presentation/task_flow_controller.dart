@@ -176,8 +176,20 @@ class TaskFlowController extends Notifier<TaskFlowState> {
       onHide: _stopPolling,
       onPause: _stopPolling,
     );
+    // The location service says the server links the rider's points to
+    // another task (T-821 `active_task_id`): read the task again.
+    StreamSubscription<void>? mismatches;
+    try {
+      mismatches = ref
+          .read(locationServiceClientProvider)
+          .taskMismatches
+          .listen((_) => unawaited(load()));
+    } on Object catch (error) {
+      debugPrint('TaskFlowController: taskMismatches ${error.runtimeType}');
+    }
     ref.onDispose(() {
       lifecycle.dispose();
+      unawaited(mismatches?.cancel());
       _pollTimer?.cancel();
       _pollTimer = null;
     });
@@ -650,14 +662,18 @@ class TaskFlowController extends Notifier<TaskFlowState> {
     return false;
   }
 
-  /// GPS every 5–10 s while on a task, every 30 s otherwise (04 §3).
+  /// GPS every 5–10 s while on a task, every 30 s otherwise (04 §3); the
+  /// batches carry the task id while on it (T-821).
   void _setTask(RiderTask? task) {
     final onTask = task?.status.blocksGoingOffline ?? false;
     ref.read(taskBlocksGoingOfflineProvider.notifier).set(onTask);
     try {
       ref
           .read(locationServiceClientProvider)
-          .setMode(onTask ? TrackingMode.onTask : TrackingMode.idle);
+          .setMode(
+            onTask ? TrackingMode.onTask : TrackingMode.idle,
+            taskId: onTask ? task?.id : null,
+          );
     } on Object catch (error) {
       debugPrint('TaskFlowController: setMode ${error.runtimeType}');
     }

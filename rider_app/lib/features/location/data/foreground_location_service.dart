@@ -28,6 +28,7 @@ class ForegroundLocationService implements LocationServiceClient {
   final _taskData = StreamController<Object>.broadcast();
   final _stats = StreamController<TrackerStats>.broadcast();
   final _serverStops = StreamController<String>.broadcast();
+  final _taskMismatches = StreamController<void>.broadcast();
   bool _listening = false;
 
   void _listen() {
@@ -49,6 +50,12 @@ class ForegroundLocationService implements LocationServiceClient {
   }
 
   @override
+  Stream<void> get taskMismatches {
+    _listen();
+    return _taskMismatches.stream;
+  }
+
+  @override
   Future<String?> takeServerStop() => LocationTaskSettings.takeServerStop();
 
   void _onTaskData(Object data) {
@@ -56,6 +63,10 @@ class ForegroundLocationService implements LocationServiceClient {
     final stats = LocationMessages.parseStats(data);
     if (stats != null) {
       _stats.add(stats);
+      return;
+    }
+    if (LocationMessages.isTaskMismatch(data)) {
+      _taskMismatches.add(null);
       return;
     }
     final stop = LocationMessages.parseServerStop(data);
@@ -141,8 +152,10 @@ class ForegroundLocationService implements LocationServiceClient {
   }
 
   @override
-  void setMode(TrackingMode mode) =>
-      FlutterForegroundTask.sendDataToTask(LocationMessages.setMode(mode));
+  void setMode(TrackingMode mode, {int? taskId}) =>
+      FlutterForegroundTask.sendDataToTask(
+        LocationMessages.setMode(mode, taskId: taskId),
+      );
 
   @override
   void setSimulateOffline(bool value) => FlutterForegroundTask.sendDataToTask(
