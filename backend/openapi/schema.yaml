@@ -13479,6 +13479,44 @@ paths:
                     rider: null
                     delivery_otp: null
                     task_status: SEARCHING
+                    route: null
+                    distance_remaining_m: null
+                    progress:
+                      current: PREPARING
+                      outcome: null
+                      steps:
+                      - key: CONFIRMED
+                        label: Order confirmed
+                        done: true
+                        at: '2026-11-10T09:40:31Z'
+                      - key: PREPARING
+                        label: Preparing your order
+                        done: true
+                        at: '2026-11-10T09:41:04Z'
+                      - key: PACKED
+                        label: Packed
+                        done: false
+                        at: null
+                      - key: RIDER_ASSIGNED
+                        label: Rider assigned
+                        done: false
+                        at: null
+                      - key: PICKED_UP
+                        label: Picked up
+                        done: false
+                        at: null
+                      - key: ON_THE_WAY
+                        label: On the way
+                        done: false
+                        at: null
+                      - key: ARRIVING
+                        label: Arriving
+                        done: false
+                        at: null
+                      - key: DELIVERED
+                        label: Delivered
+                        done: false
+                        at: null
                   summary: Accepted, no rider yet
                 RiderHeadingToTheStore:
                   value:
@@ -13501,11 +13539,59 @@ paths:
                       name: Ravi K.
                       phone: null
                       photo: https://jivo-media.s3.ap-south-1.amazonaws.com/kyc/42/photo-5f1c2a9be03d47a1.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=3b1f0c
+                      vehicle_type: SCOOTER
                       lat: 28.4702
                       lng: 77.0411
+                      heading: 41.0
                       updated_at: '2026-11-10T09:44:55Z'
+                      is_stale: false
                     delivery_otp: null
                     task_status: ASSIGNED
+                    route:
+                      leg: TO_STORE
+                      polyline: kdumDcbguMa@wBeAoD
+                      distance_m: 420
+                      duration_s: 95
+                      provider: google
+                      traffic_aware: true
+                      computed_at: '2026-11-10T09:44:56Z'
+                    distance_remaining_m: 4620
+                    progress:
+                      current: RIDER_ASSIGNED
+                      outcome: null
+                      steps:
+                      - key: CONFIRMED
+                        label: Order confirmed
+                        done: true
+                        at: '2026-11-10T09:40:31Z'
+                      - key: PREPARING
+                        label: Preparing your order
+                        done: true
+                        at: '2026-11-10T09:41:04Z'
+                      - key: PACKED
+                        label: Packed
+                        done: false
+                        at: null
+                      - key: RIDER_ASSIGNED
+                        label: Rider assigned
+                        done: true
+                        at: '2026-11-10T09:42:20Z'
+                      - key: PICKED_UP
+                        label: Picked up
+                        done: false
+                        at: null
+                      - key: ON_THE_WAY
+                        label: On the way
+                        done: false
+                        at: null
+                      - key: ARRIVING
+                        label: Arriving
+                        done: false
+                        at: null
+                      - key: DELIVERED
+                        label: Delivered
+                        done: false
+                        at: null
                   summary: Rider heading to the store
                 OutForDelivery(OTPShown):
                   value:
@@ -13528,11 +13614,59 @@ paths:
                       name: Ravi K.
                       phone: '+919811122233'
                       photo: https://jivo-media.s3.ap-south-1.amazonaws.com/kyc/42/photo-5f1c2a9be03d47a1.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=3b1f0c
+                      vehicle_type: SCOOTER
                       lat: 28.489
                       lng: 77.057
+                      heading: 41.0
                       updated_at: '2026-11-10T09:44:55Z'
+                      is_stale: false
                     delivery_otp: '4821'
                     task_status: PICKED_UP
+                    route:
+                      leg: TO_CUSTOMER
+                      polyline: kdumDcbguMa@wBeAoD
+                      distance_m: 1840
+                      duration_s: 412
+                      provider: google
+                      traffic_aware: true
+                      computed_at: '2026-11-10T09:44:56Z'
+                    distance_remaining_m: 1840
+                    progress:
+                      current: ON_THE_WAY
+                      outcome: null
+                      steps:
+                      - key: CONFIRMED
+                        label: Order confirmed
+                        done: true
+                        at: '2026-11-10T09:40:31Z'
+                      - key: PREPARING
+                        label: Preparing your order
+                        done: true
+                        at: '2026-11-10T09:41:04Z'
+                      - key: PACKED
+                        label: Packed
+                        done: true
+                        at: '2026-11-10T09:46:10Z'
+                      - key: RIDER_ASSIGNED
+                        label: Rider assigned
+                        done: true
+                        at: '2026-11-10T09:42:20Z'
+                      - key: PICKED_UP
+                        label: Picked up
+                        done: true
+                        at: '2026-11-10T09:47:02Z'
+                      - key: ON_THE_WAY
+                        label: On the way
+                        done: true
+                        at: null
+                      - key: ARRIVING
+                        label: Arriving
+                        done: false
+                        at: null
+                      - key: DELIVERED
+                        label: Delivered
+                        done: false
+                        at: null
                   summary: Out for delivery (OTP shown)
                 Delivered:
                   value:
@@ -13554,6 +13688,44 @@ paths:
                     rider: null
                     delivery_otp: null
                     task_status: DELIVERED
+                    route: null
+                    distance_remaining_m: null
+                    progress:
+                      current: DELIVERED
+                      outcome: DELIVERED
+                      steps:
+                      - key: CONFIRMED
+                        label: Order confirmed
+                        done: true
+                        at: '2026-11-10T09:40:31Z'
+                      - key: PREPARING
+                        label: Preparing your order
+                        done: true
+                        at: '2026-11-10T09:41:04Z'
+                      - key: PACKED
+                        label: Packed
+                        done: true
+                        at: '2026-11-10T09:46:10Z'
+                      - key: RIDER_ASSIGNED
+                        label: Rider assigned
+                        done: true
+                        at: '2026-11-10T09:42:20Z'
+                      - key: PICKED_UP
+                        label: Picked up
+                        done: true
+                        at: '2026-11-10T09:47:02Z'
+                      - key: ON_THE_WAY
+                        label: On the way
+                        done: true
+                        at: null
+                      - key: ARRIVING
+                        label: Arriving
+                        done: true
+                        at: null
+                      - key: DELIVERED
+                        label: Delivered
+                        done: true
+                        at: '2026-11-10T09:55:40Z'
           description: Tracking.
         '401':
           content:
@@ -16134,6 +16306,14 @@ paths:
                     accepted: 2
                     duplicates: 0
                     rejected: 0
+                    rejected_reasons:
+                      too_old: 0
+                      future: 0
+                      invalid_point: 0
+                      implausible_jump: 0
+                    out_of_order: 0
+                    low_accuracy: 0
+                    active_task_id: null
                     location:
                       active_interval_seconds: 10
                       idle_interval_seconds: 30
@@ -16146,6 +16326,14 @@ paths:
                     accepted: 0
                     duplicates: 2
                     rejected: 0
+                    rejected_reasons:
+                      too_old: 0
+                      future: 0
+                      invalid_point: 0
+                      implausible_jump: 0
+                    out_of_order: 0
+                    low_accuracy: 0
+                    active_task_id: null
                     location:
                       active_interval_seconds: 10
                       idle_interval_seconds: 30
@@ -17192,6 +17380,23 @@ paths:
                     fail_reason: null
                     returned_at: null
                     earnings: null
+                    navigation:
+                      leg: TO_STORE
+                      destination:
+                        lat: 28.4718
+                        lng: 77.0436
+                      route:
+                        leg: TO_STORE
+                        polyline: kdumDcbguMa@wBeAoD
+                        distance_m: 820
+                        duration_s: 190
+                        provider: google
+                        traffic_aware: true
+                        computed_at: '2026-11-10T09:31:05.000000Z'
+                      distance_m: 820
+                      eta_minutes: 4
+                      eta_at: '2026-11-10T09:35:00.120000Z'
+                      position_at: '2026-11-10T09:31:00.000000Z'
                     status: ASSIGNED
                     order_status: PACKING
                     ready_for_pickup: false
@@ -19013,6 +19218,23 @@ paths:
                     fail_reason: null
                     returned_at: null
                     earnings: null
+                    navigation:
+                      leg: TO_CUSTOMER
+                      destination:
+                        lat: 28.5012
+                        lng: 77.0688
+                      route:
+                        leg: TO_CUSTOMER
+                        polyline: kdumDcbguMa@wBeAoD
+                        distance_m: 2400
+                        duration_s: 540
+                        provider: google
+                        traffic_aware: true
+                        computed_at: '2026-11-10T09:31:05.000000Z'
+                      distance_m: 2400
+                      eta_minutes: 0
+                      eta_at: '2026-11-10T09:35:00.120000Z'
+                      position_at: '2026-11-10T09:31:00.000000Z'
                     status: AT_CUSTOMER
                     order_status: OUT_FOR_DELIVERY
                     ready_for_pickup: true
@@ -19287,6 +19509,23 @@ paths:
                     fail_reason: null
                     returned_at: null
                     earnings: null
+                    navigation:
+                      leg: TO_STORE
+                      destination:
+                        lat: 28.4718
+                        lng: 77.0436
+                      route:
+                        leg: TO_STORE
+                        polyline: kdumDcbguMa@wBeAoD
+                        distance_m: 820
+                        duration_s: 190
+                        provider: google
+                        traffic_aware: true
+                        computed_at: '2026-11-10T09:31:05.000000Z'
+                      distance_m: 820
+                      eta_minutes: 0
+                      eta_at: '2026-11-10T09:35:00.120000Z'
+                      position_at: '2026-11-10T09:31:00.000000Z'
                     status: AT_STORE
                     order_status: PACKED
                     ready_for_pickup: true
@@ -19794,6 +20033,7 @@ paths:
                       - type: TIP
                         amount: '20.00'
                         note: Customer tip
+                    navigation: null
                     status: DELIVERED
                     order_status: DELIVERED
                     ready_for_pickup: true
@@ -20100,6 +20340,7 @@ paths:
                     fail_reason: CUSTOMER_NOT_REACHABLE
                     returned_at: null
                     earnings: null
+                    navigation: null
                     status: RETURNING
                     order_status: DELIVERY_FAILED
                     ready_for_pickup: true
@@ -20381,6 +20622,23 @@ paths:
                     fail_reason: null
                     returned_at: null
                     earnings: null
+                    navigation:
+                      leg: TO_CUSTOMER
+                      destination:
+                        lat: 28.5012
+                        lng: 77.0688
+                      route:
+                        leg: TO_CUSTOMER
+                        polyline: kdumDcbguMa@wBeAoD
+                        distance_m: 2400
+                        duration_s: 540
+                        provider: google
+                        traffic_aware: true
+                        computed_at: '2026-11-10T09:31:05.000000Z'
+                      distance_m: 2400
+                      eta_minutes: 9
+                      eta_at: '2026-11-10T09:35:00.120000Z'
+                      position_at: '2026-11-10T09:31:00.000000Z'
                     status: PICKED_UP
                     order_status: OUT_FOR_DELIVERY
                     ready_for_pickup: true
@@ -20681,6 +20939,23 @@ paths:
                       fail_reason: null
                       returned_at: null
                       earnings: null
+                      navigation:
+                        leg: TO_STORE
+                        destination:
+                          lat: 28.4718
+                          lng: 77.0436
+                        route:
+                          leg: TO_STORE
+                          polyline: kdumDcbguMa@wBeAoD
+                          distance_m: 820
+                          duration_s: 190
+                          provider: google
+                          traffic_aware: true
+                          computed_at: '2026-11-10T09:31:05.000000Z'
+                        distance_m: 820
+                        eta_minutes: 0
+                        eta_at: '2026-11-10T09:35:00.120000Z'
+                        position_at: '2026-11-10T09:31:00.000000Z'
                       status: AT_STORE
                       order_status: PACKED
                       ready_for_pickup: true
@@ -25235,6 +25510,13 @@ components:
             $ref: '#/components/schemas/LocationPointRequest'
           description: '1 to `max_batch` points (default 50), any order. Send a batch
             again unchanged if its response was lost: points already stored are skipped.'
+        task_id:
+          type: integer
+          nullable: true
+          description: 'T-821, optional: the task the app thinks is active. Only compared:
+            points are always stored for the signed-in rider and linked to the task
+            the server sees as active (`active_task_id` in the response); a mismatch
+            means re-read `tasks/current/`.'
       required:
       - points
     LocationBatchResult:
@@ -25248,8 +25530,24 @@ components:
           description: Points already stored (a resent batch).
         rejected:
           type: integer
-          description: 'Points not stored: recorded more than 24 hours ago, or more
-            than 2 minutes in the future. Do not resend them.'
+          description: 'Points not stored (sum of `rejected_reasons`): too old, in
+            the future, (0, 0) or an implausible jump. Do not resend them.'
+        rejected_reasons:
+          allOf:
+          - $ref: '#/components/schemas/LocationRejectReasons'
+          description: T-821.
+        out_of_order:
+          type: integer
+          description: 'T-821: of `accepted`, points older than the live position
+            (a late buffer): kept as history, they do not move the rider on the maps.'
+        low_accuracy:
+          type: integer
+          description: 'T-821: of `accepted`, points less accurate than RIDER_LOCATION_MAX_ACCURACY_M
+            (300 m): history only.'
+        active_task_id:
+          type: integer
+          nullable: true
+          description: 'T-821: the task the points were linked to, or null.'
         location:
           $ref: '#/components/schemas/RiderLocationSettings'
         server_time:
@@ -25257,9 +25555,13 @@ components:
           format: date-time
       required:
       - accepted
+      - active_task_id
       - duplicates
       - location
+      - low_accuracy
+      - out_of_order
       - rejected
+      - rejected_reasons
       - server_time
     LocationPointRequest:
       type: object
@@ -25309,6 +25611,27 @@ components:
       - lat
       - lng
       - recorded_at
+    LocationRejectReasons:
+      type: object
+      properties:
+        too_old:
+          type: integer
+          description: Recorded more than 24 hours ago.
+        future:
+          type: integer
+          description: More than 2 minutes ahead of the server clock.
+        invalid_point:
+          type: integer
+          description: The (0, 0) point (no fix).
+        implausible_jump:
+          type: integer
+          description: 'A GPS jump: faster than RIDER_LOCATION_MAX_SPEED_KMPH (150
+            km/h) from the previous good fix within 10 minutes.'
+      required:
+      - future
+      - implausible_jump
+      - invalid_point
+      - too_old
     LogoutRequest:
       type: object
       properties:
@@ -26227,18 +26550,34 @@ components:
             * `RETURNED` - Items returned to the store
             * `UNASSIGNED` - No rider found: ops to assign
             * `CANCELLED` - Cancelled
+        route:
+          allOf:
+          - $ref: '#/components/schemas/TrackRoute'
+          nullable: true
+          description: 'T-821: null without an assigned rider position, or once the
+            order ended.'
+        distance_remaining_m:
+          type: integer
+          nullable: true
+          description: 'T-821: road metres the rider still rides to you (to the store
+            and on to you before pickup); null without a rider position.'
+        progress:
+          $ref: '#/components/schemas/TrackProgress'
         server_time:
           type: string
           format: date-time
       required:
       - delivery_otp
       - destination
+      - distance_remaining_m
       - eta_at
       - live_eta_at
       - live_eta_minutes
       - order_id
       - order_number
+      - progress
       - rider
+      - route
       - server_time
       - status
       - store
@@ -28118,6 +28457,12 @@ components:
           description: 'The pay for this task: base + distance from pickup (DL-61:
             paid even if the delivery then fails), plus the tip once DELIVERED. Null
             before pickup.'
+        navigation:
+          allOf:
+          - $ref: '#/components/schemas/TaskNavigation'
+          nullable: true
+          description: 'T-821: route, distance and ETA to the store (ASSIGNED, AT_STORE)
+            or to the customer (PICKED_UP, AT_CUSTOMER); null in other states.'
       required:
       - arrived_customer_at
       - arrived_store_at
@@ -28138,6 +28483,7 @@ components:
       - instructions
       - item_count
       - items
+      - navigation
       - not_reachable_after
       - order_id
       - order_number
@@ -28179,6 +28525,22 @@ components:
       - earnings
       - online_seconds
       - orders_delivered
+    RouteLegEnum:
+      enum:
+      - TO_STORE
+      - TO_CUSTOMER
+      type: string
+      description: |-
+        * `TO_STORE` - Rider to the store
+        * `TO_CUSTOMER` - Rider to the customer
+    RouteProviderEnum:
+      enum:
+      - google
+      - haversine
+      type: string
+      description: |-
+        * `google` - Google (road, traffic)
+        * `haversine` - Straight-line estimate
     SearchSuggestion:
       type: object
       properties:
@@ -28613,6 +28975,47 @@ components:
       - name
       - quantity
       - variant
+    TaskNavigation:
+      type: object
+      description: 'T-821: where to ride now. Before pickup the store, after pickup
+        the customer.'
+      properties:
+        leg:
+          $ref: '#/components/schemas/RouteLegEnum'
+        destination:
+          allOf:
+          - $ref: '#/components/schemas/TrackPoint'
+          description: The store, or the drop pin after pickup.
+        route:
+          allOf:
+          - $ref: '#/components/schemas/TrackRoute'
+          nullable: true
+          description: Null until the server has a position from this rider.
+        distance_m:
+          type: integer
+          nullable: true
+          description: Road metres to the destination; null without a position.
+        eta_minutes:
+          type: integer
+          nullable: true
+          description: Minutes to the destination (traffic when available).
+        eta_at:
+          type: string
+          format: date-time
+          nullable: true
+        position_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the position the route starts from was recorded.
+      required:
+      - destination
+      - distance_m
+      - eta_at
+      - eta_minutes
+      - leg
+      - position_at
+      - route
     TaskStore:
       type: object
       properties:
@@ -28973,6 +29376,67 @@ components:
       required:
       - lat
       - lng
+    TrackProgress:
+      type: object
+      description: |-
+        T-821: the 8 tracking steps from real order/task states (rules in
+        `apps.delivery.services.live_tracking`).
+      properties:
+        current:
+          allOf:
+          - $ref: '#/components/schemas/TrackingStepEnum'
+          nullable: true
+          description: |-
+            The last step reached.
+
+            * `CONFIRMED` - Order confirmed
+            * `PREPARING` - Preparing your order
+            * `PACKED` - Packed
+            * `RIDER_ASSIGNED` - Rider assigned
+            * `PICKED_UP` - Picked up
+            * `ON_THE_WAY` - On the way
+            * `ARRIVING` - Arriving
+            * `DELIVERED` - Delivered
+        outcome:
+          allOf:
+          - $ref: '#/components/schemas/TrackingOutcomeEnum'
+          nullable: true
+          description: |-
+            Null while the order is active.
+
+            * `DELIVERED` - Delivered
+            * `CANCELLED` - Cancelled
+            * `DELIVERY_FAILED` - Delivery unsuccessful
+            * `RETURNED` - Returned
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrackProgressStep'
+          description: Always the 8 steps, in order.
+      required:
+      - current
+      - outcome
+      - steps
+    TrackProgressStep:
+      type: object
+      properties:
+        key:
+          $ref: '#/components/schemas/TrackingStepEnum'
+        label:
+          type: string
+          description: Default English text; the app may use its own.
+        done:
+          type: boolean
+        at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When it happened; null for derived steps or not yet.
+      required:
+      - at
+      - done
+      - key
+      - label
     TrackRider:
       type: object
       description: The assigned rider, shown from assignment until the order ends
@@ -28992,6 +29456,17 @@ components:
           nullable: true
           description: Signed https link to the rider's photo, valid about an hour
             (re-read `track/` for a fresh one); null without a photo.
+        vehicle_type:
+          allOf:
+          - $ref: '#/components/schemas/VehicleTypeEnum'
+          nullable: true
+          description: |-
+            T-821: bike, scooter, ... (the vehicle number is never shown).
+
+            * `BICYCLE` - Bicycle
+            * `E_BIKE` - E-bike
+            * `MOTORBIKE` - Motorbike
+            * `SCOOTER` - Scooter
         lat:
           type: number
           format: double
@@ -29001,18 +29476,73 @@ components:
           type: number
           format: double
           nullable: true
+        heading:
+          type: number
+          format: double
+          nullable: true
+          description: 'T-821: degrees from north (rotate the marker); null when unknown.'
         updated_at:
           type: string
           format: date-time
           nullable: true
           description: When that position was recorded.
+        is_stale:
+          type: boolean
+          description: 'T-821: true when there is no position or it is older than
+            TRACKING_STALE_SECONDS (60 s): grey the marker out and show "Last updated
+            ... ago".'
       required:
+      - heading
+      - is_stale
       - lat
       - lng
       - name
       - phone
       - photo
       - updated_at
+      - vehicle_type
+    TrackRoute:
+      type: object
+      description: |-
+        T-821: the road route of the rider's current leg, computed on the server (Google Routes
+        with traffic when configured, else a straight line). Cached: re-computed only when the rider
+        moved about 150 m or every 2 minutes.
+      properties:
+        leg:
+          allOf:
+          - $ref: '#/components/schemas/RouteLegEnum'
+          description: |-
+            TO_STORE before pickup, TO_CUSTOMER after.
+
+            * `TO_STORE` - Rider to the store
+            * `TO_CUSTOMER` - Rider to the customer
+        polyline:
+          type: string
+          description: Google encoded polyline (precision 5) from where the route
+            was computed to the leg's end. Draw it from the rider marker; a 2-point
+            line with provider haversine.
+        distance_m:
+          type: integer
+          description: Road metres left on this leg.
+        duration_s:
+          type: integer
+          description: Seconds left on this leg.
+        provider:
+          $ref: '#/components/schemas/RouteProviderEnum'
+        traffic_aware:
+          type: boolean
+        computed_at:
+          type: string
+          format: date-time
+          description: When the route was computed.
+      required:
+      - computed_at
+      - distance_m
+      - duration_s
+      - leg
+      - polyline
+      - provider
+      - traffic_aware
     TrackStore:
       type: object
       properties:
@@ -29031,6 +29561,38 @@ components:
       - lat
       - lng
       - name
+    TrackingOutcomeEnum:
+      enum:
+      - DELIVERED
+      - CANCELLED
+      - DELIVERY_FAILED
+      - RETURNED
+      type: string
+      description: |-
+        * `DELIVERED` - Delivered
+        * `CANCELLED` - Cancelled
+        * `DELIVERY_FAILED` - Delivery unsuccessful
+        * `RETURNED` - Returned
+    TrackingStepEnum:
+      enum:
+      - CONFIRMED
+      - PREPARING
+      - PACKED
+      - RIDER_ASSIGNED
+      - PICKED_UP
+      - ON_THE_WAY
+      - ARRIVING
+      - DELIVERED
+      type: string
+      description: |-
+        * `CONFIRMED` - Order confirmed
+        * `PREPARING` - Preparing your order
+        * `PACKED` - Packed
+        * `RIDER_ASSIGNED` - Rider assigned
+        * `PICKED_UP` - Picked up
+        * `ON_THE_WAY` - On the way
+        * `ARRIVING` - Arriving
+        * `DELIVERED` - Delivered
     UnitPrice:
       type: object
       description: Unit sale price for comparison (Legal Metrology), e.g. ₹27.90 per
@@ -29353,12 +29915,122 @@ components:
           type: string
           format: date-time
           description: When the phone recorded the fix (UTC).
+        distance_remaining_m:
+          type: integer
+          nullable: true
+          description: 'T-821: road metres the rider still rides to the customer,
+            or null.'
       required:
       - order_id
       - lat
       - lng
       - heading
       - recorded_at
+      - distance_remaining_m
+    WsOrderRouteData:
+      type: object
+      description: 'T-821: a newly computed road route for the rider''s current leg
+        (sent when the server recomputes it: the rider moved about 150 m, or every
+        2 minutes). Same shape as `route` in `GET /orders/{id}/track/`.'
+      properties:
+        order_id:
+          type: integer
+        leg:
+          type: string
+          enum:
+          - TO_STORE
+          - TO_CUSTOMER
+        polyline:
+          type: string
+          description: Google encoded polyline (precision 5).
+        distance_m:
+          type: integer
+        duration_s:
+          type: integer
+        provider:
+          type: string
+          enum:
+          - google
+          - haversine
+        traffic_aware:
+          type: boolean
+        computed_at:
+          type: string
+          format: date-time
+      required:
+      - order_id
+      - leg
+      - polyline
+      - distance_m
+      - duration_s
+      - provider
+      - traffic_aware
+      - computed_at
+    WsDeliveryProgressData:
+      type: object
+      description: 'T-821: a delivery''s live progress for the ops dashboard (at most
+        every WS_ETA_MIN_INTERVAL_SECONDS per order, from rider pings). No customer
+        data.'
+      properties:
+        order_id:
+          type: integer
+        order_number:
+          type: string
+        store_id:
+          type: integer
+        task_id:
+          type: integer
+          nullable: true
+        rider_id:
+          type: integer
+          nullable: true
+        order_status:
+          $ref: '#/components/schemas/OrderStatusEnum'
+        task_status:
+          type: string
+          enum:
+          - SEARCHING
+          - OFFERED
+          - ASSIGNED
+          - AT_STORE
+          - PICKED_UP
+          - AT_CUSTOMER
+          - DELIVERED
+          - FAILED
+          - RETURNING
+          - RETURNED
+          - UNASSIGNED
+          - CANCELLED
+          - null
+          nullable: true
+        distance_remaining_m:
+          type: integer
+          nullable: true
+        live_eta_at:
+          type: string
+          format: date-time
+          nullable: true
+        live_eta_minutes:
+          type: integer
+          nullable: true
+        is_delayed:
+          type: boolean
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - order_id
+      - order_number
+      - store_id
+      - task_id
+      - rider_id
+      - order_status
+      - task_status
+      - distance_remaining_m
+      - live_eta_at
+      - live_eta_minutes
+      - is_delayed
+      - updated_at
     WsOpsRiderLocationData:
       type: object
       description: A rider's newest position (ops socket, rider map).
@@ -29841,6 +30513,7 @@ components:
           lng: 77.0489
           heading: 72.5
           recorded_at: '2026-11-10T09:47:12Z'
+          distance_remaining_m: 1840
         sent_at: '2026-11-10T09:41:05.120000Z'
     WsOpsRiderLocationMessage:
       type: object
@@ -29869,6 +30542,70 @@ components:
           lng: 77.0489
           heading: 72.5
           recorded_at: '2026-11-10T09:47:12Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsOrderRouteMessage:
+      type: object
+      description: '`/ws/v1/orders/{order_id}/`: T-821, the rider''s road route was
+        recomputed.'
+      properties:
+        type:
+          type: string
+          description: Always "order.route".
+        data:
+          $ref: '#/components/schemas/WsOrderRouteData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: order.route
+        data:
+          order_id: 1203
+          leg: TO_CUSTOMER
+          polyline: _p~iF~ps|U_ulLnnqC_mqNvxq`@
+          distance_m: 1840
+          duration_s: 412
+          provider: google
+          traffic_aware: true
+          computed_at: '2026-11-10T09:47:13Z'
+        sent_at: '2026-11-10T09:41:05.120000Z'
+    WsDeliveryProgressMessage:
+      type: object
+      description: '`/ws/ops/live/`: T-821, live dashboard row update (distance, live
+        ETA, delay).'
+      properties:
+        type:
+          type: string
+          description: Always "delivery.progress".
+        data:
+          $ref: '#/components/schemas/WsDeliveryProgressData'
+        sent_at:
+          type: string
+          format: date-time
+          description: When the server sent it (UTC).
+      required:
+      - type
+      - data
+      - sent_at
+      example:
+        type: delivery.progress
+        data:
+          order_id: 1203
+          order_number: JV-261110-001203
+          store_id: 1
+          task_id: 7001
+          rider_id: 41
+          order_status: OUT_FOR_DELIVERY
+          task_status: PICKED_UP
+          distance_remaining_m: 1840
+          live_eta_at: '2026-11-10T09:56:00Z'
+          live_eta_minutes: 9
+          is_delayed: false
+          updated_at: '2026-11-10T09:47:13Z'
         sent_at: '2026-11-10T09:41:05.120000Z'
     WsOrderCreatedMessage:
       type: object

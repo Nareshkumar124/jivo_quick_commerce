@@ -23,6 +23,7 @@ import '../domain/task_status.dart';
 import '../../../shared/errors/rider_error_codes.dart';
 import 'at_customer_step.dart';
 import 'cod_amount_changed_notice.dart';
+import 'navigation_panel.dart';
 import 'task_flow_controller.dart';
 import 'task_providers.dart';
 import 'task_text.dart';
@@ -225,6 +226,7 @@ class _GoToStoreStep extends ConsumerWidget {
       task: task,
       title: l10n.taskGoToStoreTitle,
       content: [
+        NavigationPanel(task: task),
         _PlaceCard(
           icon: Icons.store,
           title: task.store.name,
@@ -581,6 +583,7 @@ class _GoToCustomerStep extends ConsumerWidget {
       task: task,
       title: l10n.taskGoToCustomerTitle,
       content: [
+        NavigationPanel(task: task),
         if (customer != null)
           _PlaceCard(
             icon: Icons.person_pin_circle,

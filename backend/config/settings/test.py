@@ -109,6 +109,9 @@ MSG91_AUTH_KEY = ""
 MSG91_FLOW_IDS: dict[str, str] = {}
 # Phase 6: push into a list, DLT ids for every notification event with SMS, fast auth timeout.
 PUSH_BACKEND = "apps.notifications.push.LocmemPushBackend"
+# T-821: tests never call Google; routes use the straight-line provider (provider tests mock HTTP).
+MAPS_PROVIDER = "haversine"
+GOOGLE_MAPS_SERVER_KEY = ""
 # Tests never read a real Firebase key, whatever backend/.env says (FCM tests use a fake file).
 FCM_CREDENTIALS_FILE = ""
 FCM_PROJECT_ID = ""

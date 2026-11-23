@@ -294,6 +294,39 @@ def task_body(task) -> dict:
         "fail_reason": task.fail_reason or None,
         "returned_at": task.returned_at,
         "earnings": _earnings(task),
+        "navigation": navigation_body(task),
+    }
+
+
+def navigation_body(task, now=None) -> dict | None:
+    """T-821: the rider's current leg (to the store, then to the customer) with the road route
+    from the rider's latest position, the distance and the ETA; None outside those legs."""
+    import math
+
+    from apps.delivery.services import live_tracking
+    from apps.delivery.services.shifts import latest_location
+
+    leg = live_tracking.leg_of(task)
+    if leg is None or task.rider_id is None:
+        return None
+    now = now or timezone.now()
+    order = task.order
+    destination = live_tracking.leg_destination(order, leg)
+    location = latest_location(task.rider)
+    point = (location["lat"], location["lng"]) if location else None
+    tracked = live_tracking.rider_route(task, order, point, now)
+    at_destination = task.status in ("AT_STORE", "AT_CUSTOMER")
+    minutes = None
+    if tracked is not None:
+        minutes = 0 if at_destination else max(1, math.ceil(tracked.route.duration_s / 60))
+    return {
+        "leg": leg,
+        "destination": {"lat": destination[0], "lng": destination[1]},
+        "route": live_tracking.route_body(task, tracked),
+        "distance_m": tracked.route.distance_m if tracked is not None else None,
+        "eta_minutes": minutes,
+        "eta_at": now + timedelta(minutes=minutes) if minutes is not None else None,
+        "position_at": location["recorded_at"] if location else None,
     }
 
 

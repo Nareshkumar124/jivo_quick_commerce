@@ -16,7 +16,14 @@ from apps.cart.serializers import (
     DeliveryInstructionsSerializer,
 )
 from apps.catalog.serializers import ImageSetSerializer, money
-from apps.delivery.choices import DeliveryTaskStatus
+from apps.delivery.choices import (
+    DeliveryTaskStatus,
+    RouteLeg,
+    RouteProvider,
+    TrackingOutcome,
+    TrackingStep,
+    VehicleType,
+)
 from apps.orders.choices import (
     ActorType,
     CancelReason,
@@ -499,11 +506,72 @@ class TrackRiderSerializer(serializers.Serializer):
             "for a fresh one); null without a photo."
         ),
     )
+    vehicle_type = serializers.ChoiceField(
+        choices=VehicleType.choices,
+        allow_null=True,
+        help_text="T-821: bike, scooter, ... (the vehicle number is never shown).",
+    )
     lat = serializers.FloatField(allow_null=True, help_text="Last known position; null if none.")
     lng = serializers.FloatField(allow_null=True)
+    heading = serializers.FloatField(
+        allow_null=True,
+        help_text="T-821: degrees from north (rotate the marker); null when unknown.",
+    )
     updated_at = serializers.DateTimeField(
         allow_null=True, help_text="When that position was recorded."
     )
+    is_stale = serializers.BooleanField(
+        help_text=(
+            "T-821: true when there is no position or it is older than TRACKING_STALE_SECONDS "
+            '(60 s): grey the marker out and show "Last updated ... ago".'
+        )
+    )
+
+
+class TrackRouteSerializer(serializers.Serializer):
+    """T-821: the road route of the rider's current leg, computed on the server (Google Routes
+    with traffic when configured, else a straight line). Cached: re-computed only when the rider
+    moved about 150 m or every 2 minutes."""
+
+    leg = serializers.ChoiceField(
+        choices=RouteLeg.choices,
+        help_text="TO_STORE before pickup, TO_CUSTOMER after.",
+    )
+    polyline = serializers.CharField(
+        help_text=(
+            "Google encoded polyline (precision 5) from where the route was computed to the "
+            "leg's end. Draw it from the rider marker; a 2-point line with provider haversine."
+        )
+    )
+    distance_m = serializers.IntegerField(help_text="Road metres left on this leg.")
+    duration_s = serializers.IntegerField(help_text="Seconds left on this leg.")
+    provider = serializers.ChoiceField(choices=RouteProvider.choices)
+    traffic_aware = serializers.BooleanField()
+    computed_at = serializers.DateTimeField(help_text="When the route was computed.")
+
+
+class TrackProgressStepSerializer(serializers.Serializer):
+    key = serializers.ChoiceField(choices=TrackingStep.choices)
+    label = serializers.CharField(help_text="Default English text; the app may use its own.")
+    done = serializers.BooleanField()
+    at = serializers.DateTimeField(
+        allow_null=True, help_text="When it happened; null for derived steps or not yet."
+    )
+
+
+class TrackProgressSerializer(serializers.Serializer):
+    """T-821: the 8 tracking steps from real order/task states (rules in
+    `apps.delivery.services.live_tracking`)."""
+
+    current = serializers.ChoiceField(
+        choices=TrackingStep.choices, allow_null=True, help_text="The last step reached."
+    )
+    outcome = serializers.ChoiceField(
+        choices=TrackingOutcome.choices,
+        allow_null=True,
+        help_text="Null while the order is active.",
+    )
+    steps = TrackProgressStepSerializer(many=True, help_text="Always the 8 steps, in order.")
 
 
 class OrderTrackSerializer(serializers.Serializer):
@@ -549,4 +617,16 @@ class OrderTrackSerializer(serializers.Serializer):
             "(before dispatch starts)."
         ),
     )
+    route = TrackRouteSerializer(
+        allow_null=True,
+        help_text="T-821: null without an assigned rider position, or once the order ended.",
+    )
+    distance_remaining_m = serializers.IntegerField(
+        allow_null=True,
+        help_text=(
+            "T-821: road metres the rider still rides to you (to the store and on to you before "
+            "pickup); null without a rider position."
+        ),
+    )
+    progress = TrackProgressSerializer()
     server_time = serializers.DateTimeField()

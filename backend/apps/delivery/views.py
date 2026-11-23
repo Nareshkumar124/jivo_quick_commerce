@@ -526,7 +526,9 @@ class LocationsView(APIView):
             data=request.data, context={"max_batch": settings_body["max_batch"]}
         )
         data.is_valid(raise_exception=True)
-        result = shifts.ingest_locations(request.user, data.validated_data["points"])
+        result = shifts.ingest_locations(
+            request.user, data.validated_data["points"], task_id=data.validated_data.get("task_id")
+        )
         return Response({**result, "location": settings_body, "server_time": timezone.now()})
 
 

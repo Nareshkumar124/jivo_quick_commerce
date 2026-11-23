@@ -60,6 +60,8 @@ TASK_UPDATED = "task.updated"
 CASH_UPDATED = "cash.updated"
 NOTIFICATION_NEW = "notification.new"
 TASK_STATUS = "task.status"
+ORDER_ROUTE = "order.route"  # T-821
+DELIVERY_PROGRESS = "delivery.progress"  # T-821
 ALERT = "alert"
 # Control messages
 AUTH = "auth"  # client -> server
@@ -174,6 +176,31 @@ RIDER_LOCATION_DATA = {
     "lng": 77.0489,
     "heading": 72.5,
     "recorded_at": "2026-11-10T09:47:12Z",
+    "distance_remaining_m": 1840,
+}
+ORDER_ROUTE_DATA = {
+    "order_id": 1203,
+    "leg": "TO_CUSTOMER",
+    "polyline": "_p~iF~ps|U_ulLnnqC_mqNvxq`@",
+    "distance_m": 1840,
+    "duration_s": 412,
+    "provider": "google",
+    "traffic_aware": True,
+    "computed_at": "2026-11-10T09:47:13Z",
+}
+DELIVERY_PROGRESS_DATA = {
+    "order_id": 1203,
+    "order_number": "JV-261110-001203",
+    "store_id": 1,
+    "task_id": 7001,
+    "rider_id": 41,
+    "order_status": "OUT_FOR_DELIVERY",
+    "task_status": "PICKED_UP",
+    "distance_remaining_m": 1840,
+    "live_eta_at": "2026-11-10T09:56:00Z",
+    "live_eta_minutes": 9,
+    "is_delayed": False,
+    "updated_at": "2026-11-10T09:47:13Z",
 }
 OPS_RIDER_LOCATION_DATA = {
     "rider_id": 41,
@@ -302,6 +329,39 @@ DATA_COMPONENTS: dict[str, dict] = {
         lng=NUM,
         heading={**NUM_NULL, "description": "Degrees from north, or null."},
         recorded_at={**DT, "description": "When the phone recorded the fix (UTC)."},
+        distance_remaining_m={
+            **INT_NULL,
+            "description": "T-821: road metres the rider still rides to the customer, or null.",
+        },
+    ),
+    "WsOrderRouteData": _object(
+        "T-821: a newly computed road route for the rider's current leg (sent when the server "
+        "recomputes it: the rider moved about 150 m, or every 2 minutes). Same shape as "
+        "`route` in `GET /orders/{id}/track/`.",
+        order_id=INT,
+        leg=_enum("TO_STORE", "TO_CUSTOMER"),
+        polyline={**STR, "description": "Google encoded polyline (precision 5)."},
+        distance_m=INT,
+        duration_s=INT,
+        provider=_enum("google", "haversine"),
+        traffic_aware=BOOL,
+        computed_at=DT,
+    ),
+    "WsDeliveryProgressData": _object(
+        "T-821: a delivery's live progress for the ops dashboard (at most every "
+        "WS_ETA_MIN_INTERVAL_SECONDS per order, from rider pings). No customer data.",
+        order_id=INT,
+        order_number=STR,
+        store_id=INT,
+        task_id=INT_NULL,
+        rider_id=INT_NULL,
+        order_status=_ref("OrderStatusEnum"),
+        task_status=_enum(*TASK_STATUSES, nullable=True),
+        distance_remaining_m=INT_NULL,
+        live_eta_at=DT_NULL,
+        live_eta_minutes=INT_NULL,
+        is_delayed=BOOL,
+        updated_at=DT,
     ),
     "WsOpsRiderLocationData": _object(
         "A rider's newest position (ops socket, rider map).",
@@ -482,6 +542,20 @@ MESSAGES: list[tuple[str, str, str | None, dict | None, str]] = [
         "WsOpsRiderLocationData",
         OPS_RIDER_LOCATION_DATA,
         f"`{OPS_SOCKET}`: the rider map.",
+    ),
+    (
+        "WsOrderRouteMessage",
+        ORDER_ROUTE,
+        "WsOrderRouteData",
+        ORDER_ROUTE_DATA,
+        f"`{ORDER_SOCKET}`: T-821, the rider's road route was recomputed.",
+    ),
+    (
+        "WsDeliveryProgressMessage",
+        DELIVERY_PROGRESS,
+        "WsDeliveryProgressData",
+        DELIVERY_PROGRESS_DATA,
+        f"`{OPS_SOCKET}`: T-821, live dashboard row update (distance, live ETA, delay).",
     ),
     (
         "WsOrderCreatedMessage",

@@ -268,6 +268,10 @@ LOCATIONS_RESULT = {
     "accepted": 2,
     "duplicates": 0,
     "rejected": 0,
+    "rejected_reasons": {"too_old": 0, "future": 0, "invalid_point": 0, "implausible_jump": 0},
+    "out_of_order": 0,
+    "low_accuracy": 0,
+    "active_task_id": None,
     "location": LOCATION_SETTINGS,
     "server_time": SERVER_TIME,
 }
@@ -368,12 +372,39 @@ _TASK_BASE = {
     "fail_reason": None,
     "returned_at": None,
     "earnings": None,
+    "navigation": None,
+}
+NAV_TO_STORE = {
+    "leg": "TO_STORE",
+    "destination": {"lat": 28.4718, "lng": 77.0436},
+    "route": {
+        "leg": "TO_STORE",
+        "polyline": "kdumDcbguMa@wBeAoD",
+        "distance_m": 820,
+        "duration_s": 190,
+        "provider": "google",
+        "traffic_aware": True,
+        "computed_at": "2026-11-10T09:31:05.000000Z",
+    },
+    "distance_m": 820,
+    "eta_minutes": 4,
+    "eta_at": "2026-11-10T09:35:00.120000Z",
+    "position_at": "2026-11-10T09:31:00.000000Z",
+}
+NAV_TO_CUSTOMER = {
+    **NAV_TO_STORE,
+    "leg": "TO_CUSTOMER",
+    "destination": {"lat": 28.5012, "lng": 77.0688},
+    "route": {**NAV_TO_STORE["route"], "leg": "TO_CUSTOMER", "distance_m": 2400, "duration_s": 540},
+    "distance_m": 2400,
+    "eta_minutes": 9,
 }
 TASK_ASSIGNED = {
     **_TASK_BASE,
     "status": "ASSIGNED",
     "order_status": "PACKING",
     "ready_for_pickup": False,
+    "navigation": NAV_TO_STORE,
 }
 TASK_AT_STORE_READY = {
     **TASK_ASSIGNED,
@@ -381,18 +412,21 @@ TASK_AT_STORE_READY = {
     "order_status": "PACKED",
     "ready_for_pickup": True,
     "arrived_store_at": "2026-11-10T09:36:40.000000Z",
+    "navigation": {**NAV_TO_STORE, "eta_minutes": 0},
 }
 TASK_PICKED_UP = {
     **TASK_AT_STORE_READY,
     "status": "PICKED_UP",
     "order_status": "OUT_FOR_DELIVERY",
     "picked_up_at": "2026-11-10T09:38:05.000000Z",
+    "navigation": NAV_TO_CUSTOMER,
 }
 TASK_AT_CUSTOMER = {
     **TASK_PICKED_UP,
     "status": "AT_CUSTOMER",
     "arrived_customer_at": "2026-11-10T09:49:30.000000Z",
     "not_reachable_after": "2026-11-10T09:59:30.000000Z",
+    "navigation": {**NAV_TO_CUSTOMER, "eta_minutes": 0},
 }
 COD_QR = {
     "qr_id": "qr_Nq7aB2cD3eF4gH",
@@ -412,6 +446,7 @@ TASK_DELIVERED = {
     "status": "DELIVERED",
     "order_status": "DELIVERED",
     "delivered_at": "2026-11-10T09:51:02.000000Z",
+    "navigation": None,
     "earnings": {
         "total": "62.00",
         "lines": [
@@ -427,6 +462,7 @@ TASK_RETURNING = {
     "order_status": "DELIVERY_FAILED",
     "failed_at": "2026-11-10T10:00:15.000000Z",
     "fail_reason": "CUSTOMER_NOT_REACHABLE",
+    "navigation": None,
 }
 TASK_PREPAID_ASSIGNED = {**TASK_ASSIGNED, "payment_type": "PREPAID", "cod_amount_due": None}
 TASK_COD_REDUCED = {

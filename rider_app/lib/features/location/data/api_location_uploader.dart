@@ -32,14 +32,22 @@ class ApiLocationUploader implements LocationUploader {
   static const riderOffline = 'RIDER_OFFLINE';
 
   @override
-  Future<UploadResult> upload(List<LocationPoint> batch) async {
+  Future<UploadResult> upload(List<LocationPoint> batch, {int? taskId}) async {
     try {
       final result = (await _api.getRiderApi().riderLocationsCreate(
         locationBatchRequest: LocationBatchRequest(
-          points: [for (final p in batch) _point(p)],
+          points: [for (final p in batch) point(p)],
+          taskId: taskId,
         ),
       )).data!;
-      return _accepted(result.location);
+      return _accepted(
+        result.location,
+        dropped: result.rejected,
+        outOfOrder: result.outOfOrder,
+        lowAccuracy: result.lowAccuracy,
+        activeTaskId: result.activeTaskId,
+        reportsActiveTask: true,
+      );
     } on DioException catch (e) {
       return mapUploadError(ApiError.fromDioException(e));
     } on Object catch (e) {
@@ -52,7 +60,11 @@ class ApiLocationUploader implements LocationUploader {
     try {
       final beat = (await _api.getRiderApi().riderHeartbeat()).data!;
       if (!beat.isOnline) return const UploadTrackingStopped(riderOffline);
-      return _accepted(beat.location);
+      return _accepted(
+        beat.location,
+        activeTaskId: beat.activeTaskId,
+        reportsActiveTask: true,
+      );
     } on DioException catch (e) {
       return mapUploadError(ApiError.fromDioException(e));
     } on Object catch (e) {
@@ -60,18 +72,47 @@ class ApiLocationUploader implements LocationUploader {
     }
   }
 
-  static LocationPointRequest _point(LocationPoint p) => LocationPointRequest(
-    lat: p.lat,
-    lng: p.lng,
-    // Required by the contract; geolocator always reports it on Android.
-    accuracy: p.accuracy ?? 0,
-    speed: p.speed,
-    heading: p.heading,
-    recordedAt: p.recordedAt,
-    isMocked: p.isMocked,
-  );
+  /// Accuracy sent when the device reported none or an invalid one. Far
+  /// above the server's low-accuracy limit (300 m), so such a fix is kept as
+  /// history only and never used as the rider's live position.
+  static const double unknownAccuracyMeters = 9999;
 
-  static UploadAccepted _accepted(RiderLocationSettings s) {
+  /// One fix as sent: position, accuracy, speed, heading and the device
+  /// time it was taken (`recorded_at`, UTC).
+  ///
+  /// Values the contract would refuse are sent as "unknown" instead: an
+  /// out-of-range speed, heading or accuracy is a 400 for the whole batch
+  /// (T-821), which would drop every good fix with it.
+  static LocationPointRequest point(LocationPoint p) {
+    final speed = p.speed;
+    final heading = p.heading;
+    final accuracy = p.accuracy;
+    return LocationPointRequest(
+      lat: p.lat,
+      lng: p.lng,
+      // Required by the contract. An unknown or invalid accuracy must never
+      // look precise (0 would be trusted as a live fix), so it is sent as
+      // [unknownAccuracyMeters]: the server keeps it as history only.
+      accuracy: accuracy == null || !accuracy.isFinite || accuracy < 0
+          ? unknownAccuracyMeters
+          : accuracy,
+      speed: speed == null || !speed.isFinite || speed < 0 ? null : speed,
+      heading: heading == null || !heading.isFinite || heading < 0
+          ? null
+          : (heading >= 360 ? heading % 360 : heading),
+      recordedAt: p.recordedAt,
+      isMocked: p.isMocked,
+    );
+  }
+
+  static UploadAccepted _accepted(
+    RiderLocationSettings s, {
+    int dropped = 0,
+    int outOfOrder = 0,
+    int lowAccuracy = 0,
+    int? activeTaskId,
+    bool reportsActiveTask = false,
+  }) {
     TrackingIntervals? pair(int sample, int upload) => sample > 0 && upload > 0
         ? TrackingIntervals(
             sample: Duration(seconds: sample),
@@ -82,6 +123,11 @@ class ApiLocationUploader implements LocationUploader {
       idleIntervals: pair(s.idleSampleSeconds, s.idleIntervalSeconds),
       onTaskIntervals: pair(s.activeSampleSeconds, s.activeIntervalSeconds),
       maxBatch: s.maxBatch > 0 ? s.maxBatch : null,
+      dropped: dropped,
+      outOfOrder: outOfOrder,
+      lowAccuracy: lowAccuracy,
+      activeTaskId: activeTaskId,
+      reportsActiveTask: reportsActiveTask,
     );
   }
 }

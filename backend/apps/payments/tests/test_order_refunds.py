@@ -468,11 +468,12 @@ class TestLateCaptureSettles:
         assert (order.payment_status, order.amount_refunded) == ("REFUNDED", D("558.00"))
 
     def test_rejected_late_refund_waits_for_the_ops_retry(
-        self, checkout, shop, superuser, monkeypatch
+        self, checkout, shop, superuser, monkeypatch, settings
     ):
-        """Code review: the gateway refuses a late-capture refund for good (a 4xx; the task does
-        not retry). The order stays REFUND_PENDING until ops retry it (a new refund keyed
-        `capture:<payment id>:retry-1`, T-401c), then settles REFUNDED."""
+        """Code review: the gateway refuses a late-capture refund for good (a 4xx; here with no
+        refusal retries configured, so the task fails it at once). The order stays
+        REFUND_PENDING until ops retry it (a new refund keyed `capture:<payment id>:retry-1`,
+        T-401c), then settles REFUNDED."""
         from apps.orders import services
         from apps.payments.gateways import PaymentGatewayRejected
         from apps.payments.tasks import process_refund
@@ -485,6 +486,7 @@ class TestLateCaptureSettles:
             amount_paise=55800,
         )
         late = Refund.objects.get(order_id=order_id)
+        settings.REFUND_REFUSAL_RETRY_DELAYS_SECONDS = []
 
         def refused(self, **kwargs):
             raise PaymentGatewayRejected("HTTP 400", description="The payment is not refundable")

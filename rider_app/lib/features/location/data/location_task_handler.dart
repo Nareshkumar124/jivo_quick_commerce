@@ -65,6 +65,10 @@ class LocationTaskHandler extends TaskHandler {
       uploader: uploader,
       config: _settings.config,
       mode: _settings.mode,
+      taskId: _settings.taskId,
+      onTaskMismatch: (id) => FlutterForegroundTask.sendDataToMain(
+        LocationMessages.taskMismatch(id),
+      ),
       onStats: (stats) =>
           FlutterForegroundTask.sendDataToMain(LocationMessages.stats(stats)),
       onServerStop: (code) => unawaited(_onServerStop(code)),
@@ -110,8 +114,15 @@ class LocationTaskHandler extends TaskHandler {
     switch (LocationMessages.typeOf(data)) {
       case 'set_mode':
         final mode = TrackingMode.values.byName(data['mode'] as String);
-        tracker.setMode(mode);
-        _saveSettings(_settings.copyWith(mode: mode));
+        final taskId = data['task_id'] as int?;
+        tracker.setMode(mode, taskId: taskId);
+        _saveSettings(
+          _settings.copyWith(
+            mode: mode,
+            taskId: taskId,
+            clearTaskId: taskId == null,
+          ),
+        );
       case 'simulate_offline':
         final value = data['value'] as bool;
         _fake?.simulateOffline = value;

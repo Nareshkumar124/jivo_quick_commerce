@@ -53,14 +53,18 @@ class ScriptedUploader implements LocationUploader {
 
   List<LocationPoint> get allSent => [for (final b in batches) ...b];
 
+  /// The `task_id` sent with each recorded batch.
+  final taskIds = <int?>[];
+
   @override
-  Future<UploadResult> upload(List<LocationPoint> batch) async {
+  Future<UploadResult> upload(List<LocationPoint> batch, {int? taskId}) async {
     if (throwNext != null) {
       final error = throwNext!;
       throwNext = null;
       throw error;
     }
     batches.add(batch);
+    taskIds.add(taskId);
     return script.isEmpty ? const UploadAccepted() : script.removeAt(0);
   }
 

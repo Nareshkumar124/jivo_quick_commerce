@@ -91,8 +91,19 @@ class FakeLocationServiceClient implements LocationServiceClient {
     running = false;
   }
 
+  /// The last `setMode` (mode, task id) the app sent.
+  (TrackingMode, int?)? lastMode;
+
   @override
-  void setMode(TrackingMode mode) {}
+  void setMode(TrackingMode mode, {int? taskId}) => lastMode = (mode, taskId);
+
+  final _taskMismatches = StreamController<void>.broadcast();
+
+  @override
+  Stream<void> get taskMismatches => _taskMismatches.stream;
+
+  /// The service reports that the server sees another active task.
+  void taskMismatch() => _taskMismatches.add(null);
 
   @override
   void setSimulateOffline(bool value) {}

@@ -129,7 +129,7 @@ Rules:
 1. The **server** decides payment success: signature verification on `/verify/` plus the webhook. The app's callback is never trusted alone.
 2. Webhook processing is **idempotent** (`PaymentWebhookEvent.event_id` unique) and order-insensitive (a capture can arrive before or after verify).
 3. Before failing an order on timeout, the job **queries Razorpay** for payments on that Razorpay order (handles missed webhooks).
-4. Refunds always go back to the original payment via the Razorpay refund API. Order `payment_status` becomes `REFUND_PENDING`, then `REFUNDED` / `PARTIALLY_REFUNDED` on `refund.processed`.
+4. Refunds always go back to the original payment via the Razorpay refund API. Order `payment_status` becomes `REFUND_PENDING`, then `REFUNDED` / `PARTIALLY_REFUNDED` on `refund.processed`. A refund call the gateway refuses (4xx) is tried again later with backoff (`REFUND_REFUSAL_RETRY_DELAYS_SECONDS`, ~2 h; the refund stays PENDING and each try first looks for a refund already made, so it is never paid twice) unless the refusal is clearly final (amount); only then is it FAILED with the ops alert (doc 06 Phase 3 notes, 2026-11-21).
 
 ## 5. Rider dispatch algorithm (v1)
 
@@ -213,6 +213,7 @@ eta_minutes = store.avg_prep_minutes
 - The serviceability ETA uses the same formula with the typical rider wait.
 - Recomputed on status changes and on each rider location update while out for delivery. Displayed as a range if confidence is low (v2).
 - Terms (T-612, `apps.delivery.services.eta`): prep left = `avg_prep_minutes` minus the time since acceptance (or placement), 0 once PACKED; rider-to-store = the typical rider wait (`ETA_RIDER_WAIT_MINUTES`) while no rider is assigned, the rider's latest point to the store while ASSIGNED, 0 at the store; once picked up, rider's latest point to the drop + buffer (buffer only at the door). The live ETA is published (`order.eta`) and returned by `track/` (`live_eta_*`); `Order.eta_at` keeps the promise made at placement.
+- Road routes (T-821, `apps.maps`): when `GOOGLE_MAPS_SERVER_KEY` is set, the rider legs (rider -> store while ASSIGNED, rider -> drop once picked up) and the store -> drop leg use the Google Routes API duration (two-wheeler, traffic-aware) instead of straight line x road factor. Routes are cached: a rider leg is recomputed only after the rider moved `MAPS_ROUTE_RECOMPUTE_DISTANCE_M` (150 m) or every `MAPS_ROUTE_MAX_AGE_SECONDS` (120 s), never more often than `MAPS_ROUTE_MIN_INTERVAL_SECONDS` (20 s), and scaled by the straight-line progress in between; the store -> drop leg is cached per order. Without a key, on any provider error (then skipped for `MAPS_PROVIDER_COOLDOWN_SECONDS`) and in tests, the straight-line formula above applies unchanged. The placement promise (`eta_at`) and the serviceability ETA keep the straight-line formula. No state, money or stock rule changes.
 
 ## 9. Notifications per transition
 

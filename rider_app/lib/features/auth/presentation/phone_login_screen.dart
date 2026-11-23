@@ -11,6 +11,7 @@ import '../../../app/providers.dart';
 import '../../../app/routes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/error_line.dart';
+import '../../../shared/widgets/jivo_wordmark.dart';
 import '../../launch/presentation/launch_controller.dart';
 
 import 'package:jivo_core/helpers.dart';
@@ -112,10 +113,11 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                     children: [
                       if (constraints.maxHeight >= _compactHeight) ...[
                         const SizedBox(height: 8),
-                        Icon(
-                          Icons.delivery_dining,
-                          size: 64,
-                          color: theme.colorScheme.primary,
+                        const Center(
+                          child: JivoWordmark(
+                            key: Key('login-logo'),
+                            height: 64,
+                          ),
                         ),
                         const SizedBox(height: 16),
                       ],

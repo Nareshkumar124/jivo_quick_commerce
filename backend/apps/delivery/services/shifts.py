@@ -9,7 +9,9 @@
   returned (idempotent).
 - Going offline (`end_shift`): refused during an active task (409 `ACTIVE_TASK`).
 - Location (`ingest_locations`): de-duplicated on (rider, recorded_at); points older than
-  `RIDER_LOCATION_MAX_AGE_HOURS` or too far in the future are counted as `rejected`. The latest
+  `RIDER_LOCATION_MAX_AGE_HOURS` or too far in the future, the (0, 0) point and implausible GPS
+  jumps are counted as `rejected`; out-of-order and low-accuracy fixes are history only (T-821,
+  see the function). The latest
   point is mirrored on the rider row (for dispatch, PostGIS) and in Redis (for the live map and
   tracking; best effort). An offline rider gets 409 `RIDER_OFFLINE` (api-requests #4).
 - Auto-offline (`auto_offline_stale`, beat `rider_heartbeat_check` every 2 minutes): riders
@@ -75,7 +77,9 @@ def last_shift(rider: Rider) -> RiderShift | None:
     return RiderShift.objects.filter(rider=rider).order_by("-started_at", "-id").first()
 
 
-def _remember_location(rider_id: int, lat: float, lng: float, recorded_at, accuracy) -> None:
+def _remember_location(
+    rider_id: int, lat: float, lng: float, recorded_at, accuracy, *, heading=None, speed=None
+) -> None:
     try:
         cache.set(
             location_cache_key(rider_id),
@@ -83,6 +87,8 @@ def _remember_location(rider_id: int, lat: float, lng: float, recorded_at, accur
                 "lat": lat,
                 "lng": lng,
                 "accuracy": accuracy,
+                "heading": heading,
+                "speed": speed,
                 "recorded_at": recorded_at.isoformat(),
             },
             LOCATION_CACHE_SECONDS,
@@ -92,19 +98,27 @@ def _remember_location(rider_id: int, lat: float, lng: float, recorded_at, accur
 
 
 def latest_location(rider: Rider) -> dict | None:
-    """`{lat, lng, accuracy, recorded_at}` of the rider's last point: Redis, else the row."""
+    """`{lat, lng, accuracy, heading, speed, recorded_at}` of the rider's last point: Redis,
+    else the row (no accuracy, heading or speed there)."""
     try:
         cached = cache.get(location_cache_key(rider.pk))
     except Exception:
         cached = None
     if cached:
-        return {**cached, "recorded_at": datetime.fromisoformat(cached["recorded_at"])}
+        return {
+            "heading": None,
+            "speed": None,
+            **cached,
+            "recorded_at": datetime.fromisoformat(cached["recorded_at"]),
+        }
     if rider.current_location is None or rider.last_location_at is None:
         return None
     return {
         "lat": rider.current_location.y,
         "lng": rider.current_location.x,
         "accuracy": None,
+        "heading": None,
+        "speed": None,
         "recorded_at": rider.last_location_at,
     }
 
@@ -241,8 +255,51 @@ def force_offline(rider_id: int, *, by, ip: str | None = None) -> Rider:
 # --------------------------------------------------------------------------- location
 
 
-def ingest_locations(user, points: list[dict], now=None) -> dict:
-    """`POST /rider/locations/`. Returns `{accepted, duplicates, rejected}`."""
+REJECT_REASONS = ("too_old", "future", "invalid_point", "implausible_jump")
+# A move this short is never a "jump", whatever the time between the fixes (GPS jitter).
+JUMP_MIN_DISTANCE_M = 100
+
+
+def _jump_check(anchor: tuple | None, point: dict) -> bool:
+    """True when `point` is plausible after `anchor` = `(lat, lng, recorded_at)` (the rider's
+    previous accepted good fix): within RIDER_LOCATION_JUMP_WINDOW_SECONDS of it, the implied
+    speed must not exceed RIDER_LOCATION_MAX_SPEED_KMPH. Outside the window (a long gap) any
+    move is accepted, so one bad anchor can never block a rider for long."""
+    if anchor is None:
+        return True
+    lat, lng, at = anchor
+    seconds = abs((point["recorded_at"] - at).total_seconds())
+    if seconds > settings.RIDER_LOCATION_JUMP_WINDOW_SECONDS:
+        return True
+    metres = haversine_km(lat, lng, point["lat"], point["lng"]) * 1000
+    if metres <= JUMP_MIN_DISTANCE_M + (point.get("accuracy") or 0):
+        return True
+    kmph = metres / max(seconds, 1.0) * 3.6
+    return kmph <= settings.RIDER_LOCATION_MAX_SPEED_KMPH
+
+
+def _good_fix(point: dict) -> bool:
+    accuracy = point.get("accuracy")
+    return accuracy is None or accuracy <= settings.RIDER_LOCATION_MAX_ACCURACY_M
+
+
+def ingest_locations(user, points: list[dict], now=None, task_id: int | None = None) -> dict:
+    """`POST /rider/locations/`. Store-or-drop rules (T-821, 06 §3):
+
+    - **Dropped** (`rejected`, by reason in `rejected_reasons`): recorded more than
+      RIDER_LOCATION_MAX_AGE_HOURS ago (`too_old`) or more than
+      RIDER_LOCATION_MAX_FUTURE_SECONDS ahead (`future`); the (0, 0) point (`invalid_point`);
+      a GPS jump faster than RIDER_LOCATION_MAX_SPEED_KMPH from the previous good fix
+      (`implausible_jump`). Out-of-range lat/lng/heading/accuracy are a 400 for the batch.
+    - **Stored as history only** (counted in `accepted`, never move the live position):
+      fixes older than the rider's live position (`out_of_order`: an offline buffer sent
+      late) and fixes less accurate than RIDER_LOCATION_MAX_ACCURACY_M (`low_accuracy`).
+    - The newest remaining fix moves the rider's live position (row, Redis, sockets).
+    - Points are always the caller's own: the task is the rider's active task, derived on the
+      server. `task_id` (optional) is only compared: the response's `active_task_id` tells the
+      app which task the server sees.
+    Returns `{accepted, duplicates, rejected, rejected_reasons, out_of_order, low_accuracy,
+    active_task_id}`."""
     now = now or timezone.now()
     rider = require_rider(user, active=True)
     # Unlocked read on purpose: ingestion is frequent and must not queue behind shift changes.
@@ -252,13 +309,17 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
         raise ApiError(ErrorCode.RIDER_OFFLINE, MSG_OFFLINE)
     oldest = now - timedelta(hours=settings.RIDER_LOCATION_MAX_AGE_HOURS)
     newest_allowed = now + timedelta(seconds=settings.RIDER_LOCATION_MAX_FUTURE_SECONDS)
+    reasons = dict.fromkeys(REJECT_REASONS, 0)
     valid: dict = {}
-    rejected = 0
     duplicates = 0
     for point in points:
         recorded_at = point["recorded_at"]
-        if recorded_at < oldest or recorded_at > newest_allowed:
-            rejected += 1
+        if recorded_at < oldest:
+            reasons["too_old"] += 1
+        elif recorded_at > newest_allowed:
+            reasons["future"] += 1
+        elif point["lat"] == 0 and point["lng"] == 0:
+            reasons["invalid_point"] += 1
         elif recorded_at in valid:
             duplicates += 1
         else:
@@ -270,13 +331,29 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
             )
         )
         duplicates += len(known)
-        fresh = [p for t, p in sorted(valid.items()) if t not in known]
+        candidates = [p for t, p in sorted(valid.items()) if t not in known]
     else:
-        fresh = []
+        candidates = []
+    live_at = rider.last_location_at
+    anchor = (
+        (rider.current_location.y, rider.current_location.x, live_at)
+        if rider.current_location is not None and live_at is not None
+        else None
+    )
+    fresh = []
+    for point in candidates:
+        if not _jump_check(anchor, point):
+            reasons["implausible_jump"] += 1
+            continue
+        fresh.append(point)
+        if _good_fix(point) and (anchor is None or point["recorded_at"] >= anchor[2]):
+            anchor = (point["lat"], point["lng"], point["recorded_at"])
     shift = open_shift(rider)
     from apps.delivery.services.tasks import active_task
 
     task = active_task(rider)
+    if task_id is not None and (task is None or task.pk != task_id):
+        logger.info("Rider %s sent points for task %s; active task is another", rider.pk, task_id)
     RiderLocation.objects.bulk_create(
         [
             RiderLocation(
@@ -294,10 +371,15 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
         ],
         ignore_conflicts=True,  # a concurrent resend of the same batch
     )
-    if fresh:
-        # Presence (auto-offline) uses the server's receipt time, never the device clock.
+    out_of_order = sum(1 for p in fresh if live_at is not None and p["recorded_at"] <= live_at)
+    low_accuracy = sum(1 for p in fresh if not _good_fix(p))
+    if fresh or reasons["implausible_jump"]:
+        # Presence (auto-offline) uses the server's receipt time, never the device clock. A
+        # dropped jump still proves the app is alive.
         Rider.objects.filter(pk=rider.pk).update(last_location_received_at=now)
-        latest = fresh[-1]
+    usable = [p for p in fresh if _good_fix(p)]
+    if usable:
+        latest = usable[-1]
         # The device clock may run ahead (points up to 2 min in the future are accepted):
         # never record a position time later than the server's now.
         latest_at = min(latest["recorded_at"], now)
@@ -326,10 +408,20 @@ def ingest_locations(user, points: list[dict], now=None) -> dict:
                 latest["lng"],
                 latest_at,
                 latest["accuracy"],
+                heading=latest.get("heading"),
+                speed=latest.get("speed"),
             )
-        if any(p.get("is_mocked") for p in fresh):
-            _mocked_location_alert(rider.pk, task.pk if task else None)
-    return {"accepted": len(fresh), "duplicates": duplicates, "rejected": rejected}
+    if any(p.get("is_mocked") for p in fresh):
+        _mocked_location_alert(rider.pk, task.pk if task else None)
+    return {
+        "accepted": len(fresh),
+        "duplicates": duplicates,
+        "rejected": sum(reasons.values()),
+        "rejected_reasons": reasons,
+        "out_of_order": out_of_order,
+        "low_accuracy": low_accuracy,
+        "active_task_id": task.pk if task else None,
+    }
 
 
 MOCKED_ALERT_SECONDS = 30 * 60

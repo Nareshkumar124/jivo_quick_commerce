@@ -449,6 +449,47 @@ STORE_CLOSED_DETAILS = {"store_id": 1, "opens_at": "2026-11-03T01:30:00Z"}
 
 # --------------------------------------------------------------------------- tracking (Phase 5)
 
+_STEP_AT = {
+    "CONFIRMED": "2026-11-10T09:40:31Z",
+    "PREPARING": "2026-11-10T09:41:04Z",
+    "PACKED": "2026-11-10T09:46:10Z",
+    "RIDER_ASSIGNED": "2026-11-10T09:42:20Z",
+    "PICKED_UP": "2026-11-10T09:47:02Z",
+    "ON_THE_WAY": None,
+    "ARRIVING": None,
+    "DELIVERED": "2026-11-10T09:55:40Z",
+}
+_STEP_LABELS = {
+    "CONFIRMED": "Order confirmed",
+    "PREPARING": "Preparing your order",
+    "PACKED": "Packed",
+    "RIDER_ASSIGNED": "Rider assigned",
+    "PICKED_UP": "Picked up",
+    "ON_THE_WAY": "On the way",
+    "ARRIVING": "Arriving",
+    "DELIVERED": "Delivered",
+}
+
+
+def _progress(*reached: str, outcome=None) -> dict:
+    """The `progress` of a track example: `reached` steps done (the last one is `current`)."""
+    keys = list(_STEP_LABELS)
+    last = max(keys.index(step) for step in reached)
+    return {
+        "current": keys[last],
+        "outcome": outcome,
+        "steps": [
+            {
+                "key": key,
+                "label": _STEP_LABELS[key],
+                "done": key in reached,
+                "at": _STEP_AT[key] if key in reached else None,
+            }
+            for index, key in enumerate(keys)
+        ],
+    }
+
+
 _TRACK = {
     "order_id": 1203,
     "order_number": "JV-261110-001203",
@@ -469,18 +510,35 @@ TRACK_PACKING = {
             "https://jivo-media.s3.ap-south-1.amazonaws.com/kyc/42/photo-5f1c2a9be03d47a1.jpg"
             "?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Signature=3b1f0c"
         ),
+        "vehicle_type": "SCOOTER",
         "lat": 28.4702,
         "lng": 77.0411,
+        "heading": 41.0,
         "updated_at": "2026-11-10T09:44:55Z",
+        "is_stale": False,
     },
     "delivery_otp": None,
     "task_status": "ASSIGNED",
+    "route": {
+        "leg": "TO_STORE",
+        "polyline": "kdumDcbguMa@wBeAoD",
+        "distance_m": 420,
+        "duration_s": 95,
+        "provider": "google",
+        "traffic_aware": True,
+        "computed_at": "2026-11-10T09:44:56Z",
+    },
+    "distance_remaining_m": 4620,
+    "progress": _progress("CONFIRMED", "PREPARING", "RIDER_ASSIGNED"),
 }
 TRACK_NO_RIDER = {
     **TRACK_PACKING,
     "status": "ACCEPTED",
     "rider": None,
     "task_status": "SEARCHING",
+    "route": None,
+    "distance_remaining_m": None,
+    "progress": _progress("CONFIRMED", "PREPARING"),
     "live_eta_at": "2026-11-10T10:00:00Z",
     "live_eta_minutes": 15,
 }
@@ -495,6 +553,16 @@ TRACK_OUT_FOR_DELIVERY = {
     },
     "delivery_otp": "4821",
     "task_status": "PICKED_UP",
+    "route": {
+        **TRACK_PACKING["route"],
+        "leg": "TO_CUSTOMER",
+        "distance_m": 1840,
+        "duration_s": 412,
+    },
+    "distance_remaining_m": 1840,
+    "progress": _progress(
+        "CONFIRMED", "PREPARING", "PACKED", "RIDER_ASSIGNED", "PICKED_UP", "ON_THE_WAY"
+    ),
     "live_eta_at": "2026-11-10T09:52:00Z",
     "live_eta_minutes": 7,
 }
@@ -506,4 +574,17 @@ TRACK_DELIVERED = {
     "live_eta_minutes": None,
     "rider": None,
     "task_status": "DELIVERED",
+    "route": None,
+    "distance_remaining_m": None,
+    "progress": _progress(
+        "CONFIRMED",
+        "PREPARING",
+        "PACKED",
+        "RIDER_ASSIGNED",
+        "PICKED_UP",
+        "ON_THE_WAY",
+        "ARRIVING",
+        "DELIVERED",
+        outcome="DELIVERED",
+    ),
 }

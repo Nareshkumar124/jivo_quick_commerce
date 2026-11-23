@@ -73,6 +73,14 @@ JivoApi cannedApi(CannedAdapter adapter) {
   return JivoApi(dio: dio, interceptors: const []);
 }
 
+/// `rejected_reasons` with nothing dropped (T-821).
+const noRejectReasons = {
+  'too_old': 0,
+  'future': 0,
+  'invalid_point': 0,
+  'implausible_jump': 0,
+};
+
 const locationSettingsJson = {
   'active_interval_seconds': 10,
   'idle_interval_seconds': 30,

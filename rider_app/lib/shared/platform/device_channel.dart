@@ -48,6 +48,17 @@ class DeviceChannel {
     }
   }
 
+  /// Whether this build has a Google Maps API key (T-821, DL-80). A map is
+  /// only created when it does; false when the check fails.
+  Future<bool> hasMapsKey() async {
+    try {
+      return await _channel.invokeMethod<bool>('hasMapsKey') ?? false;
+    } on Object catch (error) {
+      debugPrint('DeviceChannel.hasMapsKey: $error');
+      return false;
+    }
+  }
+
   /// The location app-op modes (`coarse`, `fine`): "allowed",
   /// "foreground", "ignored", "errored" or "default". Null when they can't
   /// be read (the runtime permission then decides alone).

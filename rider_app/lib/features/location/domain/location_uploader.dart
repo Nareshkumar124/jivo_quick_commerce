@@ -12,11 +12,33 @@ final class UploadAccepted extends UploadResult {
     this.idleIntervals,
     this.onTaskIntervals,
     this.maxBatch,
+    this.dropped = 0,
+    this.outOfOrder = 0,
+    this.lowAccuracy = 0,
+    this.activeTaskId,
+    this.reportsActiveTask = false,
   });
 
   final TrackingIntervals? idleIntervals;
   final TrackingIntervals? onTaskIntervals;
   final int? maxBatch;
+
+  /// Points the server dropped for good (`rejected`: too old, in the
+  /// future, (0, 0), an implausible jump; T-821). The batch is still done:
+  /// they are never sent again.
+  final int dropped;
+
+  /// Points stored as history only because they are older than the live
+  /// position (`out_of_order`, a late buffer).
+  final int outOfOrder;
+
+  /// Points stored as history only because they are too inaccurate.
+  final int lowAccuracy;
+
+  /// `active_task_id`: the task the server linked the points to. Only
+  /// meaningful when [reportsActiveTask] (a heartbeat has no such field).
+  final int? activeTaskId;
+  final bool reportsActiveTask;
 }
 
 /// Temporary failure (no network, timeout, 5xx, 429). Keep the points and
@@ -59,7 +81,10 @@ final class UploadTrackingStopped extends UploadResult {
 abstract interface class LocationUploader {
   /// Must not throw. Map every failure to [UploadRetryLater],
   /// [UploadRejected] or [UploadTrackingStopped].
-  Future<UploadResult> upload(List<LocationPoint> batch);
+  ///
+  /// [taskId] is the task the app thinks is active (T-821, optional): the
+  /// server only compares it and answers with `active_task_id`.
+  Future<UploadResult> upload(List<LocationPoint> batch, {int? taskId});
 
   /// Tells the server the rider is still online when no point was uploaded
   /// for [TrackingConfig.heartbeat] (rider standing still indoors with no

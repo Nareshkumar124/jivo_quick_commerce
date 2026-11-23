@@ -613,6 +613,28 @@ class TestRefundWebhook:
         refund_row.refresh_from_db()
         assert (refund_row.status, refund_row.gateway_refund_id) == ("PENDING", "")
 
+    def test_the_window_counts_from_a_scheduled_refusal_retry(
+        self, api_client, refund_row, settings
+    ):
+        """Refund auto-retry (2026-11-21): a refund created long ago but waiting for a refusal
+        retry is still in `process_refund`'s hands, so the event is retried (503)."""
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        settings.REFUND_WEBHOOK_RETRY_WINDOW_SECONDS = 7200
+        now = timezone.now()
+        Refund.objects.filter(pk=refund_row.pk).update(
+            created_at=now - timedelta(seconds=9000), next_attempt_at=now - timedelta(minutes=5)
+        )
+        response = self.post(api_client, "evt_rf_8", refund_id="rfnd_Dashboard0004", receipt="")
+        assert response.status_code == 503
+        Refund.objects.filter(pk=refund_row.pk).update(
+            next_attempt_at=now - timedelta(seconds=7201)
+        )
+        response = self.post(api_client, "evt_rf_9", refund_id="rfnd_Dashboard0004", receipt="")
+        assert (response.status_code, response.json()) == (200, {"status": "ignored"})
+
     def test_an_event_for_another_payment_never_gets_a_503(self, api_client, refund_row):
         """A refund of payment A pending inside the window says nothing about payment B."""
         Payment.objects.create(

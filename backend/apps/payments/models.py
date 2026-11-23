@@ -108,6 +108,15 @@ class Refund(TimeStampedModel):
     idempotency_key = models.CharField(
         max_length=64, unique=True, help_text='Makes the refund task safe to retry ("t3a:...").'
     )
+    # Refund auto-retry (2026-11-21): a 4xx refusal of the refund POST that may be transient keeps
+    # the refund PENDING and `process_refund` tries again at `next_attempt_at`
+    # (REFUND_REFUSAL_RETRY_DELAYS_SECONDS). `db_default` so code without the column still inserts.
+    gateway_refusals = models.PositiveSmallIntegerField(
+        default=0, db_default=0, help_text="4xx refusals of the refund call so far."
+    )
+    next_attempt_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the refund call is tried again after a refusal."
+    )
 
     class Meta:
         constraints = [

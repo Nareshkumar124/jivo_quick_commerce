@@ -43,7 +43,13 @@ abstract interface class LocationServiceClient {
   /// Stops the service and with it all location updates.
   Future<void> stop();
 
-  void setMode(TrackingMode mode);
+  /// Idle or on-task intervals, and the task sent with the batches (T-821;
+  /// null when idle).
+  void setMode(TrackingMode mode, {int? taskId});
+
+  /// The server linked the points to another task than the one sent
+  /// (`active_task_id`, T-821): re-read `tasks/current/`.
+  Stream<void> get taskMismatches;
 
   /// Dev only: make the fake uploader fail like a dropped network.
   void setSimulateOffline(bool value);
