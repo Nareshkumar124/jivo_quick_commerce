@@ -37,11 +37,11 @@ void main() {
     expect(find.byKey(const Key('banner-carousel')), findsOneWidget);
     expect(find.text('Up to 20% off on olive oils'), findsOneWidget);
     expect(find.text('All products'), findsOneWidget);
-    // The compact category row from the home feed.
-    expect(find.text('Shop by category'), findsOneWidget);
+    // The "Shop by category" row is hidden (user, 2026-11-25).
+    expect(find.text('Shop by category'), findsNothing);
     expect(
       find.byKey(const ValueKey('home-category-edible-oils')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(find.text('Bestsellers'), findsOneWidget);
     expect(find.text('Offers'), findsOneWidget);

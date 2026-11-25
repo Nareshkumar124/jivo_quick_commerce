@@ -192,12 +192,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return [
       if (feed.banners.isNotEmpty)
         SliverToBoxAdapter(child: BannerCarousel(banners: feed.banners)),
-      if (feed.categories.isNotEmpty) ...[
-        SliverToBoxAdapter(
-          child: HomeSectionHeader(title: l10n.homeCategories),
-        ),
-        SliverToBoxAdapter(child: HomeCategoryRow(categories: feed.categories)),
-      ],
+      // No "Shop by category" row: the user hid it (2026-11-25). The
+      // Categories tab stays. To bring it back, show
+      // HomeSectionHeader(title: l10n.homeCategories) and
+      // HomeCategoryRow(categories: feed.categories) here.
       for (final collection in feed.collections)
         if (collection.items.isNotEmpty) ...[
           SliverToBoxAdapter(
