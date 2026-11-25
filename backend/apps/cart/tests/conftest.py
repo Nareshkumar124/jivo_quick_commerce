@@ -106,3 +106,45 @@ def shop(db) -> Shop:
 @pytest.fixture
 def address(user):
     return make_address(user)
+
+
+# ------------------------------------------------------------------- free cartons (ADR 0002)
+
+
+@dataclass
+class Water:
+    """Jivo Water by the carton at the shop's store: flat rates (MRP = selling price), the
+    5-carton minimum and the volume offer 1 free for every 10 paid (ADR 0002)."""
+
+    pricing: object
+    one_litre: object  # ₹110, 100 in stock
+    quarter: object  # 250 ml, ₹110, 100 in stock (ties with 1 L on price)
+    half: object  # 500 ml, ₹140, 100 in stock
+
+
+@pytest.fixture
+def water(shop) -> Water:
+    from apps.stores.models import PricingConfig
+
+    category = CategoryFactory(name="Water", slug="water")
+    product = ProductFactory(name="Jivo Water", category=category)
+    sizes = []
+    for name, price, order in (
+        ("1 L x 12", "110.00", 1),
+        ("250 ml x 24", "110.00", 2),
+        ("500 ml x 24", "140.00", 3),
+    ):
+        variant = VariantFactory(
+            product=product,
+            name=name,
+            mrp=Decimal(price),
+            selling_price=Decimal(price),
+            max_qty_per_order=100,
+            sort_order=order,
+        )
+        stock(shop.store_model, variant, 100)
+        sizes.append(variant)
+    pricing = PricingConfig.objects.create(
+        store=shop.store_model, min_order_units=5, order_unit_label="cartons", free_unit_every=10
+    )
+    return Water(pricing, *sizes)

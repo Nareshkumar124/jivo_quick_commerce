@@ -12,6 +12,12 @@ Checks, in this order (the first failure is the answer):
    (MIN_ORDER_VALUE, with the amount still needed);
 7. a category coupon with no qualifying item -> `COUPON_NOT_ELIGIBLE` (NO_ELIGIBLE_ITEMS).
 
+Free-carton rewards (ADR 0002, `DiscountType.FREE_UNIT`) give no money off (discount 0); the
+cart adds a free carton of the size the customer picked. Between steps 5 and 6 they need the
+store's minimum paid cartons (at least 1; free cartons never count) -> `COUPON_NOT_ELIGIBLE`
+(MIN_ORDER_UNITS). The size itself is checked by the cart (FREE_VARIANT_UNAVAILABLE,
+`free_variant_check`), which knows the store's stock.
+
 Discount (PM decision, Phase 3): FLAT = the value; PERCENT = value % of the eligible subtotal,
 rounded half-up to the paisa; capped by `max_discount` and by the eligible subtotal (all items,
 or only the coupon's categories), so never above the item total.
@@ -39,7 +45,7 @@ from django.utils import timezone
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
 from apps.core.money import rupees
-from apps.promotions.choices import CouponIneligibleReason, DiscountType
+from apps.promotions.choices import CouponIneligibleReason, CouponSource, DiscountType
 from apps.promotions.models import COUNTED_STATUSES, Coupon, CouponRedemption, RedemptionStatus
 
 CENT = Decimal("0.01")
@@ -52,6 +58,7 @@ MSG_USED_BY_YOU = "You have already used this coupon."
 MSG_USED_UP = "This coupon has been fully redeemed."
 MSG_FIRST_ORDER = "This coupon is only for your first order."
 MSG_NO_ITEMS = "No items in your cart qualify for this coupon."
+MSG_FREE_VARIANT = "This size is not available for your free carton here. Choose another size."
 
 
 class CouponLine(Protocol):
@@ -95,7 +102,10 @@ def eligible_subtotal(coupon: Coupon, lines: Sequence[CouponLine]) -> Decimal:
 
 
 def coupon_discount(coupon: Coupon, lines: Sequence[CouponLine]) -> Decimal:
-    """The discount `coupon` gives these lines (eligibility is checked separately)."""
+    """The discount `coupon` gives these lines (eligibility is checked separately). A
+    free-carton reward (FREE_UNIT) gives no money off: its carton is a free line (ADR 0002)."""
+    if coupon.discount_type == DiscountType.FREE_UNIT:
+        return ZERO
     eligible = eligible_subtotal(coupon, lines)
     value = Decimal(coupon.value)
     if coupon.discount_type == DiscountType.PERCENT:
@@ -151,10 +161,20 @@ class CouponCheck:
     scope: str | None = None
     amount_to_unlock: Decimal | None = None
     discount: Decimal = ZERO
+    # ADR 0002 (FREE_UNIT): MIN_ORDER_UNITS and FREE_VARIANT_UNAVAILABLE details
+    min_units: int | None = None
+    paid_units: int | None = None
+    free_variant_id: int | None = None
 
     @property
     def ok(self) -> bool:
         return self.error is None
+
+    @property
+    def units_to_unlock(self) -> int | None:
+        if self.min_units is None or self.paid_units is None:
+            return None
+        return self.min_units - self.paid_units
 
     def details(self) -> dict:
         details: dict = {"code": self.coupon.code}
@@ -163,6 +183,12 @@ class CouponCheck:
         if self.reason == CouponIneligibleReason.MIN_ORDER_VALUE:
             details["min_order_value"] = _money(self.coupon.min_order_value)
             details["amount_to_unlock"] = _money(self.amount_to_unlock)
+        if self.reason == CouponIneligibleReason.MIN_ORDER_UNITS:
+            details["min_order_units"] = self.min_units
+            details["paid_units"] = self.paid_units
+            details["units_to_unlock"] = self.units_to_unlock
+        if self.reason == CouponIneligibleReason.FREE_VARIANT_UNAVAILABLE:
+            details["free_variant_id"] = self.free_variant_id
         if self.scope is not None:
             details["scope"] = self.scope
         return details
@@ -193,6 +219,35 @@ def offered_at(coupon: Coupon, store_id: int) -> bool:
     return not store_ids or store_id in store_ids
 
 
+def is_free_unit(coupon: Coupon | None) -> bool:
+    """A free-carton reward (ADR 0002)."""
+    return coupon is not None and coupon.discount_type == DiscountType.FREE_UNIT
+
+
+def free_variant_check(coupon: Coupon, free_variant_id: int | None) -> CouponCheck:
+    """ADR 0002: the size picked for a free-carton reward cannot be given at this store."""
+    return CouponCheck(
+        coupon,
+        ErrorCode.COUPON_NOT_ELIGIBLE,
+        MSG_FREE_VARIANT,
+        CouponIneligibleReason.FREE_VARIANT_UNAVAILABLE,
+        free_variant_id=free_variant_id,
+    )
+
+
+def min_units_check(coupon: Coupon, *, paid: int, required: int, label: str) -> CouponCheck:
+    """ADR 0002 §9: a free-carton reward needs the order's minimum paid cartons."""
+    missing = required - paid
+    return CouponCheck(
+        coupon,
+        ErrorCode.COUPON_NOT_ELIGIBLE,
+        f"Add {missing} more {label} to use this reward (minimum {required} paid {label}).",
+        CouponIneligibleReason.MIN_ORDER_UNITS,
+        min_units=required,
+        paid_units=paid,
+    )
+
+
 def check_coupon(
     coupon: Coupon,
     *,
@@ -203,9 +258,14 @@ def check_coupon(
     now: datetime | None = None,
     usage: Usage | None = None,
     placed_before: bool | None = None,
+    paid_units: int | None = None,
+    min_units: int = 0,
+    unit_label: str = "items",
 ) -> CouponCheck:
     """Apply the rules (module docstring) to the cart's lines. `usage`/`placed_before` may be
-    passed in when checking many coupons at once."""
+    passed in when checking many coupons at once. `paid_units`, `min_units` (the store's
+    minimum units per order) and `unit_label` are for free-carton rewards (ADR 0002); without
+    `paid_units` that rule is not checked."""
     now = now or timezone.now()
     if not is_for(coupon, user) or not is_live(coupon, now):
         return CouponCheck(coupon, ErrorCode.COUPON_INVALID, MSG_INVALID)
@@ -233,6 +293,10 @@ def check_coupon(
                 MSG_FIRST_ORDER,
                 CouponIneligibleReason.FIRST_ORDER_ONLY,
             )
+    if is_free_unit(coupon) and paid_units is not None:
+        required = max(min_units, 1)
+        if paid_units < required:
+            return min_units_check(coupon, paid=paid_units, required=required, label=unit_label)
     if item_total < coupon.min_order_value:
         missing = coupon.min_order_value - item_total
         return CouponCheck(
@@ -278,9 +342,14 @@ def coupon_offers(
     item_total: Decimal,
     applied: Coupon | None,
     now: datetime | None = None,
+    paid_units: int | None = None,
+    min_units: int = 0,
+    unit_label: str = "items",
+    free_variant_id: int | None = None,
 ) -> list[dict]:
     """The 'Apply coupon' sheet (`CouponOffer` dicts): eligible first by savings, then the
-    rest by code. Coupons this customer (or everyone) has used up are left out."""
+    rest by code. Coupons this customer (or everyone) has used up are left out. A free-carton
+    reward on the cart shows its size (`free_variant_id`)."""
     now = now or timezone.now()
     coupons = list(listed_coupons(store_id, now, user))
     usages = usage_for(coupons, user)
@@ -296,10 +365,18 @@ def coupon_offers(
             now=now,
             usage=usages.get(coupon.pk, Usage()),
             placed_before=placed_before,
+            paid_units=paid_units,
+            min_units=min_units,
+            unit_label=unit_label,
         )
         if check.error == ErrorCode.COUPON_USAGE_EXCEEDED:
             continue
-        offers.append(offer_body(check, applied=applied is not None and applied.pk == coupon.pk))
+        is_applied = applied is not None and applied.pk == coupon.pk
+        offers.append(
+            offer_body(
+                check, applied=is_applied, free_variant_id=free_variant_id if is_applied else None
+            )
+        )
     eligible = sorted(
         (offer for offer in offers if offer["is_eligible"]),
         key=lambda offer: (-Decimal(offer["savings"]), offer["code"]),
@@ -307,7 +384,7 @@ def coupon_offers(
     return eligible + [offer for offer in offers if not offer["is_eligible"]]
 
 
-def offer_body(check: CouponCheck, *, applied: bool) -> dict:
+def offer_body(check: CouponCheck, *, applied: bool, free_variant_id: int | None = None) -> dict:
     coupon = check.coupon
     message = None
     if not check.ok:
@@ -334,6 +411,8 @@ def offer_body(check: CouponCheck, *, applied: bool) -> dict:
             _money(check.amount_to_unlock) if check.amount_to_unlock is not None else None
         ),
         "is_personal": coupon.owner_id is not None,
+        "source": coupon.source,
+        "free_variant_id": free_variant_id if is_free_unit(coupon) else None,
     }
 
 
@@ -388,6 +467,18 @@ def _move(order, from_status: RedemptionStatus, to_status: RedemptionStatus) -> 
     )
 
 
+def forget_use(order) -> bool:
+    """ADR 0002 (placement): the order cannot give the reward's carton after all, so it does
+    not use the coupon. Removes the HELD/APPLIED redemption made earlier in the same placement
+    transaction (the coupon row is still locked): it never counted, and the reward stays
+    AVAILABLE. Only for that case; a placed order's use ends through `release_coupon` /
+    `reverse_coupon`."""
+    if not connection.in_atomic_block:
+        raise RuntimeError("Only inside the order-placement transaction.")
+    deleted, _ = CouponRedemption.objects.filter(order=order, status__in=COUNTED_STATUSES).delete()
+    return bool(deleted)
+
+
 def confirm_coupon(order) -> bool:
     """08 T3: payment captured, the held coupon is used."""
     return _move(order, RedemptionStatus.HELD, RedemptionStatus.APPLIED)
@@ -428,18 +519,23 @@ def create_personal_coupon(
     description: str = "",
     prefix: str = "REF",
     now: datetime | None = None,
+    discount_type: str = DiscountType.FLAT,
+    source: str = CouponSource.NONE,
 ) -> Coupon:
-    """A FLAT `amount` coupon only `owner` can see and use, once, until `now + valid_days`
-    (added 2026-11-13 for referral rewards). Its code is generated (`prefix` + 8 characters); a
-    clash with an existing code (any case) is retried with a new code. Runs in the caller's
-    transaction (a savepoint per attempt)."""
+    """A coupon only `owner` can see and use, once, until `now + valid_days` (added 2026-11-13
+    for referral rewards): FLAT `amount` off, or (ADR 0002) a FREE_UNIT reward (`amount` 1 =
+    one carton) with its `source`. Its code is generated (`prefix` + 8 characters); a clash
+    with an existing code (any case) is retried with a new code. Any other refusal of the
+    database (e.g. a second WELCOME reward) is raised. Runs in the caller's transaction (a
+    savepoint per attempt)."""
     now = now or timezone.now()
     for _attempt in range(PERSONAL_CODE_ATTEMPTS):
         coupon = Coupon(
             code=personal_code(prefix),
             title=title[:80],
             description=description[:200],
-            discount_type=DiscountType.FLAT,
+            discount_type=discount_type,
+            source=source,
             value=amount,
             min_order_value=min_order_value,
             starts_at=None,

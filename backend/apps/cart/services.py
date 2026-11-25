@@ -8,12 +8,18 @@ The cart follows the store in `X-Store-Id`: lines keep their quantities and take
 prices and stock on every read. It never reserves stock (08 §6.1). A line above what the store
 can supply is flagged (`issue`) and blocks checkout; the server never changes the cart silently.
 
+Free cartons (ADR 0002) are computed here too, next to `load_lines()`, and passed into
+`compute_bill()`: the store's volume offer (1 free carton for every `free_unit_every` paid ones,
+the cheapest size in the cart) and a free-carton reward applied as the cart's coupon. They cost
+₹0: never part of `item_total`, the fees, the coupon minimum or the COD limit; their MRP value is
+`free_items_value` (part of `total_savings`). Free cartons never count as paid units.
+
 Every cart and coupon operation goes through this module. Callers pass the store as resolved from
 `X-Store-Id` (`apps.stores.services.StoreArea`: id, name, hours and service area, no query).
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
@@ -41,9 +47,10 @@ from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
 from apps.core.money import ZERO, money_str, round_money, rupees
 from apps.inventory.services import availability
-from apps.orders.choices import PaymentMethod
+from apps.orders.choices import FreeSource, PaymentMethod
 from apps.promotions import services as promotions
 from apps.promotions.choices import CouponIneligibleReason
+from apps.promotions.rewards import REWARD_UNITS
 from apps.stores.models import PricingConfig
 from apps.stores.services import StoreArea, status_message, store_status
 
@@ -76,6 +83,7 @@ class PricingRules:
     cod_max_order_value: Decimal
     min_order_units: int = 0  # 0 = no minimum
     order_unit_label: str = "items"
+    free_unit_every: int = 0  # ADR 0002 volume offer: 1 free per this many paid; 0 = off
 
     @classmethod
     def from_config(cls, config: PricingConfig) -> "PricingRules":
@@ -90,6 +98,7 @@ class PricingRules:
             cod_max_order_value=config.cod_max_order_value,
             min_order_units=config.min_order_units,
             order_unit_label=config.order_unit_label,
+            free_unit_every=config.free_unit_every,
         )
 
 
@@ -132,6 +141,7 @@ class Bill:
     tip: Decimal = ZERO
     grand_total: Decimal = ZERO
     total_savings: Decimal = ZERO
+    free_items_value: Decimal = ZERO  # ADR 0002: MRP x quantity of the free cartons
 
     FIELDS = (
         "mrp_total",
@@ -144,6 +154,7 @@ class Bill:
         "tip",
         "grand_total",
         "total_savings",
+        "free_items_value",
     )
 
     def as_dict(self) -> dict:
@@ -166,6 +177,11 @@ def clamp_tip(tip) -> Decimal:
     return min(max(round_money(tip), ZERO), round_money(settings.CART_MAX_TIP))
 
 
+def free_items_value(free_lines: Sequence[BillLine]) -> Decimal:
+    """ADR 0002: what the free cartons are worth, MRP x quantity (they are billed at ₹0)."""
+    return round_money(sum((line.line_mrp_total for line in free_lines), ZERO))
+
+
 def compute_bill(
     lines: Sequence[BillLine],
     rules: PricingRules,
@@ -174,6 +190,7 @@ def compute_bill(
     tip: Decimal = ZERO,
     fixed_coupon_discount: Decimal | None = None,
     fee_caps: Bill | None = None,
+    free_lines: Sequence[BillLine] = (),
 ) -> Bill:
     """08 §6.2. `coupon` is a coupon already found applicable (promotions.check_coupon), or
     None. Fee thresholds compare against `item_total`, before the coupon (D-09). An empty cart's
@@ -202,6 +219,7 @@ def compute_bill(
     tip = clamp_tip(tip)
     product_discount = mrp_total - items_total
     grand_total = items_total - coupon_discount + delivery_fee + small_cart_fee + handling_fee + tip
+    free_value = free_items_value(free_lines)
     return Bill(
         mrp_total=mrp_total,
         item_total=items_total,
@@ -212,7 +230,8 @@ def compute_bill(
         handling_fee=round_money(handling_fee),
         tip=tip,
         grand_total=round_money(grand_total),
-        total_savings=round_money(product_discount + coupon_discount),
+        total_savings=round_money(product_discount + coupon_discount + free_value),
+        free_items_value=free_value,
     )
 
 
@@ -474,6 +493,138 @@ def next_tier(lines: Sequence[CartLine], units: int) -> tuple[int, dict[int, Dec
     return None
 
 
+# ------------------------------------------------------------------- free cartons (ADR 0002)
+
+MSG_FREE_NO_STOCK = "Your free carton is out of stock right now, so it is not added."
+MSG_FREE_VARIANT_REQUIRED = "Choose a size for your free carton."
+MSG_FREE_VARIANT_UNAVAILABLE = (
+    "This size is not available for your free carton here. Choose another size."
+)
+
+
+@dataclass(slots=True)
+class FreeLine:
+    """Free cartons of one size (₹0): the volume offer or a reward."""
+
+    variant: ProductVariant  # from `store_variants()` (store price and stock annotations)
+    summary: dict  # `variant_summary()`
+    quantity: int
+    source: str  # FreeSource
+
+    @property
+    def bill_line(self) -> BillLine:
+        return BillLine(
+            variant_id=self.variant.pk,
+            category_id=self.variant.product.category_id,
+            mrp=self.variant.mrp,
+            selling_price=ZERO,
+            quantity=self.quantity,
+        )
+
+    def as_dict(self) -> dict:
+        product = self.variant.product
+        return {
+            "product": {
+                "id": product.pk,
+                "slug": product.slug,
+                "name": product.name,
+                "brand": product.brand,
+                "is_veg": product.is_veg,
+            },
+            "variant": self.summary,
+            "quantity": self.quantity,
+            "mrp": money_str(self.variant.mrp),
+            "value": money_str(self.bill_line.line_mrp_total),
+            "source": self.source,
+        }
+
+
+def counted_units(line: CartLine) -> int:
+    """Paid units a line counts for the minimum and the volume offer: min(quantity, orderable),
+    so units the store cannot supply do not count."""
+    return min(line.item.quantity, line.summary["orderable_quantity"])
+
+
+def paid_units(lines: Sequence[CartLine]) -> int:
+    """Paid units of the cart (free cartons never count, ADR 0002 §2)."""
+    return sum(counted_units(line) for line in lines)
+
+
+def stock_units(variant: ProductVariant) -> int:
+    """Units the store can give now for this variant (on hand - reserved), ignoring the
+    per-order limits: free cartons are not limited by them. 0 when not sold here."""
+    if not variant.inv_is_available:
+        return 0
+    return max(variant.inv_on_hand - variant.inv_reserved, 0)
+
+
+def _paid_of(lines: Sequence[CartLine], variant_id: int) -> int:
+    return sum(counted_units(line) for line in lines if line.variant.pk == variant_id)
+
+
+def reward_size_ok(variant: ProductVariant | None, lines: Sequence[CartLine]) -> bool:
+    """A reward's size can be given (ADR 0002 §9): sold at the store, of the same product
+    category as at least one paid line of the cart (a water reward goes on a water order; PM,
+    2026-11-25), and with the stock for the cart's paid units of that size plus the free
+    carton."""
+    if variant is None or not variant.inv_is_available:
+        return False
+    paid_categories = {
+        line.variant.product.category_id for line in lines if counted_units(line) > 0
+    }
+    if variant.product.category_id not in paid_categories:
+        return False
+    return _paid_of(lines, variant.pk) + REWARD_UNITS <= stock_units(variant)
+
+
+def volume_offer(
+    lines: Sequence[CartLine],
+    rules: PricingRules,
+    *,
+    extra: dict[int, int] | None = None,
+    available: dict[int, int] | None = None,
+) -> tuple[FreeLine | None, dict | None]:
+    """ADR 0002 §3: `paid // every` free cartons of the cheapest size in the cart (lowest unit
+    price among the paid lines; a tie goes to the size with more paid units, then the lowest
+    variant id). That size must have the stock for its paid units, any other free carton of it
+    (`extra`, e.g. a reward) and these free ones; else the next-cheapest size that can. When
+    none can, no free carton and a `notice`. Returns (the free line or None, the API
+    `free_offer` or None when the store has no offer). `available` (variant id -> units) is
+    the stock read under the placement's row locks; by default, the stock the cart read."""
+    every = rules.free_unit_every
+    if not every:
+        return None, None
+    extra = extra or {}
+    paid = paid_units(lines)
+    free = paid // every
+    chosen, notice = None, None
+    if free:
+        candidates = sorted(
+            (line for line in lines if counted_units(line) > 0),
+            key=lambda line: (line.unit_price, -counted_units(line), line.variant.pk),
+        )
+        for line in candidates:
+            variant = line.variant
+            need = _paid_of(lines, variant.pk) + extra.get(variant.pk, 0) + free
+            stock = available.get(variant.pk, 0) if available is not None else stock_units(variant)
+            if need <= stock:
+                chosen = FreeLine(variant, line.summary, free, FreeSource.VOLUME_OFFER)
+                break
+        if chosen is None:
+            notice = MSG_FREE_NO_STOCK
+    to_next = every - paid % every
+    more = " more" if free else ""
+    offer = {
+        "every": every,
+        "paid_units": paid,
+        "free_units": free,
+        "units_to_next_free": to_next,
+        "message": f"Add {to_next} more {rules.order_unit_label} to get 1{more} free",
+        "notice": notice,
+    }
+    return chosen, offer
+
+
 # --------------------------------------------------------------------------- the cart
 
 
@@ -529,6 +680,9 @@ class CartState:
     rules: PricingRules
     coupon_check: "promotions.CouponCheck | None"
     bill: Bill
+    # ADR 0002: free cartons (volume offer first, then the reward) and the volume offer body
+    free_lines: list[FreeLine] = field(default_factory=list)
+    free_offer: dict | None = None
 
     @property
     def bill_lines(self) -> list[BillLine]:
@@ -542,10 +696,8 @@ class CartState:
     def order_units(self) -> int:
         """Units for the store's minimum units per order: what would be ordered once the lines'
         stock fixes are made, min(quantity, orderable_quantity) per line (an out-of-stock line
-        counts 0). Any mix of items counts together."""
-        return sum(
-            min(line.item.quantity, line.summary["orderable_quantity"]) for line in self.lines
-        )
+        counts 0). Any mix of items counts together. Free cartons never count (ADR 0002)."""
+        return paid_units(self.lines)
 
     @property
     def units_to_min_order(self) -> int | None:
@@ -561,25 +713,79 @@ def min_units_message(rules: PricingRules, missing: int) -> str:
     )
 
 
+def check_cart_coupon(
+    coupon, lines: Sequence[CartLine], rules: PricingRules, *, user, store_id: int, now=None
+):
+    """`promotions.check_coupon` with the cart's paid units (ADR 0002 rewards)."""
+    bill_lines = [line.bill_line for line in lines]
+    return promotions.check_coupon(
+        coupon,
+        user=user,
+        store_id=store_id,
+        lines=bill_lines,
+        item_total=item_total(bill_lines),
+        now=now,
+        paid_units=paid_units(lines),
+        min_units=rules.min_order_units,
+        unit_label=rules.order_unit_label,
+    )
+
+
+def reward_variant(
+    store_id: int, variant_id: int | None, lines: Sequence[CartLine]
+) -> ProductVariant | None:
+    """The size picked for a free-carton reward, with its store price and stock: the cart
+    line's variant when the cart has it, else one more read."""
+    if variant_id is None:
+        return None
+    for line in lines:
+        if line.variant.pk == variant_id:
+            return line.variant
+    return store_variants(store_id, [variant_id]).get(variant_id)
+
+
+def free_cartons(
+    lines: Sequence[CartLine],
+    rules: PricingRules,
+    *,
+    reward: ProductVariant | None = None,
+) -> tuple[list[FreeLine], dict | None]:
+    """ADR 0002: the cart's free lines (the volume offer, then the reward's carton when
+    `reward` is the size of an applicable reward) and the API `free_offer`."""
+    extra = {reward.pk: REWARD_UNITS} if reward is not None else {}
+    volume, offer = volume_offer(lines, rules, extra=extra)
+    free = [volume] if volume is not None else []
+    if reward is not None:
+        summary = variant_summary(reward, reward.product)
+        free.append(FreeLine(reward, summary, REWARD_UNITS, FreeSource.REWARD))
+    return free, offer
+
+
 def evaluate(cart: Cart, store: StoreArea, user, *, now: datetime | None = None) -> CartState:
     lines = load_lines(cart, store.pk)
     rules = pricing_rules(store.pk)
     bill_lines = [line.bill_line for line in lines]
-    items_total = item_total(bill_lines)
-    check = None
+    check, reward = None, None
     if cart.coupon is not None:
         prefetch_related_objects([cart.coupon], "stores", "categories__children")
-        check = promotions.check_coupon(
-            cart.coupon,
-            user=user,
-            store_id=store.pk,
-            lines=bill_lines,
-            item_total=items_total,
-            now=now,
-        )
+        check = check_cart_coupon(cart.coupon, lines, rules, user=user, store_id=store.pk, now=now)
+        if check.ok and promotions.is_free_unit(cart.coupon):
+            reward = reward_variant(store.pk, cart.free_variant_id, lines)
+            if not reward_size_ok(reward, lines):
+                check, reward = (
+                    promotions.free_variant_check(cart.coupon, cart.free_variant_id),
+                    None,
+                )
     coupon = cart.coupon if check is not None and check.ok else None
-    bill = compute_bill(bill_lines, rules, coupon=coupon, tip=cart.tip)
-    return CartState(lines, rules, check, bill)
+    free_lines, offer = free_cartons(lines, rules, reward=reward)
+    bill = compute_bill(
+        bill_lines,
+        rules,
+        coupon=coupon,
+        tip=cart.tip,
+        free_lines=[line.bill_line for line in free_lines],
+    )
+    return CartState(lines, rules, check, bill, free_lines, offer)
 
 
 def _thresholds(state: CartState) -> dict:
@@ -649,13 +855,17 @@ def _payment_methods(state: CartState, user) -> list[dict]:
     ]
 
 
-def _coupon_body(state: CartState) -> dict | None:
+def _coupon_body(state: CartState, cart: Cart) -> dict | None:
     check = state.coupon_check
     if check is None:
         return None
+    coupon = check.coupon
     return {
-        "code": check.coupon.code,
-        "title": check.coupon.title,
+        "code": coupon.code,
+        "title": coupon.title,
+        "discount_type": coupon.discount_type,
+        "source": coupon.source,
+        "free_variant_id": cart.free_variant_id if promotions.is_free_unit(coupon) else None,
         "discount": money_str(state.bill.coupon_discount),
         "is_applicable": check.ok,
         "message": check.message,
@@ -671,6 +881,8 @@ def _coupon_blocker(check) -> dict:
             f"Add items worth {rupees(check.amount_to_unlock)} more to use {check.coupon.code}, "
             "or remove the coupon."
         )
+    elif check.reason == CouponIneligibleReason.FREE_VARIANT_UNAVAILABLE:
+        message = f"{check.message} Or remove the reward to continue."
     else:
         message = f"{check.message} Remove it to continue."
     return {"code": check.error.value, "message": message}
@@ -710,8 +922,15 @@ def blockers(state: CartState, *, status, store: StoreArea, address: Address | N
                 "message": min_units_message(state.rules, state.units_to_min_order),
             }
         )
-    if state.coupon_check is not None and not state.coupon_check.ok:
-        found.append(_coupon_blocker(state.coupon_check))
+    check = state.coupon_check
+    # A reward below the minimum paid cartons is covered by MIN_UNITS_NOT_MET (ADR 0002): it
+    # stays on the cart and applies once the minimum is reached.
+    if (
+        check is not None
+        and not check.ok
+        and check.reason != CouponIneligibleReason.MIN_ORDER_UNITS
+    ):
+        found.append(_coupon_blocker(check))
     if address is None:
         found.append(
             {
@@ -749,7 +968,7 @@ def cart_body(
         "store": status.as_dict(),
         "items": [line.as_dict() for line in state.lines],
         "item_count": sum(line.item.quantity for line in state.lines),
-        "coupon": _coupon_body(state),
+        "coupon": _coupon_body(state, cart),
         "tip": money_str(cart.tip),
         "instructions": {
             "chips": list(instructions.get("chips", [])),
@@ -757,6 +976,8 @@ def cart_body(
         },
         "address": AddressSerializer(address).data if address is not None else None,
         "bill": state.bill.as_dict(),
+        "free_lines": [line.as_dict() for line in state.free_lines],
+        "free_offer": state.free_offer,
         "thresholds": _thresholds(state),
         "payment_methods": _payment_methods(state, user),
         "checkout": {"can_place_order": not found, "blockers": found},
@@ -765,6 +986,7 @@ def cart_body(
 
 def coupon_list_body(cart: Cart, store: StoreArea, user, *, now: datetime | None = None) -> dict:
     lines = load_lines(cart, store.pk)
+    rules = pricing_rules(store.pk)
     bill_lines = [line.bill_line for line in lines]
     offers = promotions.coupon_offers(
         user=user,
@@ -773,6 +995,10 @@ def coupon_list_body(cart: Cart, store: StoreArea, user, *, now: datetime | None
         item_total=item_total(bill_lines),
         applied=cart.coupon,
         now=now,
+        paid_units=paid_units(lines),
+        min_units=rules.min_order_units,
+        unit_label=rules.order_unit_label,
+        free_variant_id=cart.free_variant_id,
     )
     return {"results": offers}
 
@@ -904,8 +1130,9 @@ def clear_cart(cart: Cart) -> None:
         _locked(cart)
         cart.items.all().delete()
         cart.coupon = None
+        cart.free_variant = None
         cart.tip = ZERO
-        cart.save(update_fields=["coupon", "tip", "updated_at"])
+        cart.save(update_fields=["coupon", "free_variant", "tip", "updated_at"])
 
 
 def update_cart(cart: Cart, store: StoreArea, user, data: dict) -> None:
@@ -935,9 +1162,25 @@ def update_cart(cart: Cart, store: StoreArea, user, data: dict) -> None:
         cart.save(update_fields=[*fields, "updated_at"])
 
 
-def apply_coupon(cart: Cart, store: StoreArea, user, code: str, *, now=None) -> None:
+def apply_coupon(
+    cart: Cart,
+    store: StoreArea,
+    user,
+    code: str,
+    *,
+    free_variant_id: int | None = None,
+    now=None,
+) -> None:
     """`POST /cart/coupon/`: apply `code` (replacing any coupon) if the cart qualifies now;
-    otherwise 422 with the reason and nothing changes."""
+    otherwise 422 with the reason and nothing changes.
+
+    A free-carton reward (ADR 0002, FREE_UNIT) also needs `free_variant_id`, the size the
+    customer picked (400 when missing, checked after the coupon's own rules so another
+    customer's code still looks unknown): it must be sold at this store, be of the same
+    product category as a paid line of the cart, and have the stock for the cart's paid units
+    of that size plus the free carton (422 `COUPON_NOT_ELIGIBLE`, FREE_VARIANT_UNAVAILABLE).
+    The reward needs the store's minimum paid cartons (422 MIN_ORDER_UNITS). It takes the
+    cart's single coupon slot."""
     coupon = promotions.find_coupon(code)
     if coupon is None:
         raise ApiError(
@@ -945,22 +1188,23 @@ def apply_coupon(cart: Cart, store: StoreArea, user, code: str, *, now=None) -> 
             promotions.MSG_INVALID,
             details={"code": promotions.normalise_code(code)},
         )
-    bill_lines = [line.bill_line for line in load_lines(cart, store.pk)]
-    check = promotions.check_coupon(
-        coupon,
-        user=user,
-        store_id=store.pk,
-        lines=bill_lines,
-        item_total=item_total(bill_lines),
-        now=now,
-    )
+    lines = load_lines(cart, store.pk)
+    rules = pricing_rules(store.pk)
+    check = check_cart_coupon(coupon, lines, rules, user=user, store_id=store.pk, now=now)
     if not check.ok:
         raise check.as_error()
-    cart.coupon = coupon
-    cart.save(update_fields=["coupon", "updated_at"])
+    size = None
+    if promotions.is_free_unit(coupon):
+        if free_variant_id is None:
+            raise ValidationError({"free_variant_id": [MSG_FREE_VARIANT_REQUIRED]})
+        if not reward_size_ok(reward_variant(store.pk, free_variant_id, lines), lines):
+            raise promotions.free_variant_check(coupon, free_variant_id).as_error()
+        size = free_variant_id
+    cart.coupon, cart.free_variant_id = coupon, size
+    cart.save(update_fields=["coupon", "free_variant", "updated_at"])
 
 
 def remove_coupon(cart: Cart) -> None:
-    if cart.coupon_id is not None:
-        cart.coupon = None
-        cart.save(update_fields=["coupon", "updated_at"])
+    if cart.coupon_id is not None or cart.free_variant_id is not None:
+        cart.coupon, cart.free_variant = None, None
+        cart.save(update_fields=["coupon", "free_variant", "updated_at"])

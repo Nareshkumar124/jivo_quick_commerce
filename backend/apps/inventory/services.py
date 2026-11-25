@@ -319,6 +319,23 @@ class ReservationLine:
     min_qty_per_order: int = 1
 
 
+def lock_available(store_id: int, variant_ids: Iterable[int]) -> dict[int, int]:
+    """ADR 0002 (placement): lock the `StoreInventory` rows of `variant_ids` in variant-id order
+    (the reservation lock order) and return the units free to reserve per variant (on hand -
+    reserved; 0 when not available). The rows stay locked until the placement commits, so
+    `reserve()` then sees the same stock. Inside the placement transaction only."""
+    from django.db import connection
+
+    if not connection.in_atomic_block:
+        raise RuntimeError("Stock is locked only inside the order-placement transaction.")
+    rows = (
+        StoreInventory.objects.select_for_update()
+        .filter(store_id=store_id, variant_id__in=sorted(set(variant_ids)))
+        .order_by("variant_id")
+    )
+    return {row.variant_id: max(row.available, 0) if row.is_available else 0 for row in rows}
+
+
 def reserve(order, store_id: int, lines: Iterable[ReservationLine], *, expires_at=None) -> None:
     """08 §6.1 (T1/T2): hold stock for an order's lines. Locks the `StoreInventory` rows in
     variant-id order (one order for every path, so two placements never deadlock), re-checks

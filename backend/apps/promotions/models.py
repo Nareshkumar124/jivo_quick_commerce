@@ -4,6 +4,12 @@ A coupon with an `owner` is personal (07 §2.5, added 2026-11-13): only that cus
 the coupon sheet and can apply or use it (`apps.promotions.services.is_for`). Referral rewards
 are personal coupons.
 
+Free-carton rewards (ADR 0002) are personal coupons too: `discount_type` FREE_UNIT (value 1 =
+one carton, no money off) with a `source` (WELCOME, REFERRAL_REFERRER, REFERRAL_REFERRED). A
+customer has at most one WELCOME reward (database rule). Their status (AVAILABLE, CLAIMED, USED,
+EXPIRED) is derived from the coupon's redemptions and their orders
+(`apps.promotions.rewards`).
+
 A coupon's use is a `CouponRedemption` row per order, whose status follows the order (08 T1-T5):
 - HELD: the order awaits online payment; it already counts against the usage limits.
 - APPLIED: the order is placed (COD at once, online when the payment is captured).
@@ -23,7 +29,7 @@ from django.db.models.functions import Upper
 from simple_history.models import HistoricalRecords
 
 from apps.core.models import TimeStampedModel
-from apps.promotions.choices import DiscountType
+from apps.promotions.choices import CouponSource, DiscountType
 
 COUPON_CODE_MAX_LENGTH = 30
 MONEY = {"max_digits": 12, "decimal_places": 2}
@@ -42,7 +48,10 @@ class Coupon(TimeStampedModel):
     value = models.DecimalField(
         **MONEY,
         validators=[MinValueValidator(Decimal("0.01"))],
-        help_text="FLAT: rupees off. PERCENT: percent off (at most 100).",
+        help_text=(
+            "FLAT: rupees off. PERCENT: percent off (at most 100). FREE_UNIT: free cartons "
+            "(always 1)."
+        ),
     )
     max_discount = models.DecimalField(
         **MONEY,
@@ -96,6 +105,15 @@ class Coupon(TimeStampedModel):
             "reward). Empty = a public coupon."
         ),
     )
+    # ADR 0002: why the coupon exists (rewards). `db_default` so the previous release (during a
+    # deploy) can still insert coupons.
+    source = models.CharField(
+        max_length=20,
+        choices=CouponSource.choices,
+        default=CouponSource.NONE,
+        db_default=CouponSource.NONE,
+        help_text="Welcome and referral rewards are made by the system; staff coupons are NONE.",
+    )
     history = HistoricalRecords()
 
     class Meta:
@@ -120,8 +138,29 @@ class Coupon(TimeStampedModel):
                 | Q(ends_at__gt=F("starts_at")),
                 name="coupon_ends_after_start",
             ),
+            # ADR 0002: a free-carton coupon gives exactly one carton.
+            models.CheckConstraint(
+                condition=~Q(discount_type=DiscountType.FREE_UNIT) | Q(value=1),
+                name="coupon_free_unit_is_one",
+            ),
+            # ADR 0002 (code review): a free-carton coupon is always a personal reward, never a
+            # public coupon or a staff one.
+            models.CheckConstraint(
+                condition=~Q(discount_type=DiscountType.FREE_UNIT)
+                | (Q(owner__isnull=False) & ~Q(source=CouponSource.NONE)),
+                name="coupon_free_unit_is_a_reward",
+            ),
+            # ADR 0002 §7/§13: one welcome reward per customer, ever.
+            models.UniqueConstraint(
+                fields=["owner"],
+                condition=Q(source=CouponSource.WELCOME),
+                name="coupon_one_welcome_reward_per_owner",
+            ),
         ]
-        indexes = [models.Index(fields=["is_active", "is_visible"], name="coupon_listing_idx")]
+        indexes = [
+            models.Index(fields=["is_active", "is_visible"], name="coupon_listing_idx"),
+            models.Index(fields=["owner", "discount_type"], name="coupon_owner_type_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.code
@@ -135,6 +174,17 @@ class Coupon(TimeStampedModel):
         self.code = (self.code or "").strip().upper()
         if self.discount_type == DiscountType.PERCENT and self.value and self.value > 100:
             raise ValidationError({"value": "A percent coupon is at most 100."})
+        if self.discount_type == DiscountType.FREE_UNIT:
+            errors = {}
+            if self.value != 1:
+                errors["value"] = "A free-carton coupon gives exactly 1 carton."
+            if self.owner_id is None or self.source == CouponSource.NONE:
+                errors["discount_type"] = (
+                    "Free-carton coupons are rewards made by the system (welcome and referral) "
+                    "for one customer. Choose flat or percent off."
+                )
+            if errors:
+                raise ValidationError(errors)
         if self.starts_at and self.ends_at and self.ends_at <= self.starts_at:
             raise ValidationError({"ends_at": "Must be after the start."})
 

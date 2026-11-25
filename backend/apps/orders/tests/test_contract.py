@@ -352,7 +352,9 @@ class TestPhase4OrderExamples:
             + bill["tip"]
         )
         assert bill["product_discount"] == bill["mrp_total"] - bill["item_total"]
-        assert bill["total_savings"] == bill["product_discount"] + bill["coupon_discount"]
+        assert bill["total_savings"] == (
+            bill["product_discount"] + bill["coupon_discount"] + bill["free_items_value"]
+        )
 
     def test_states(self, order):
         statuses = [step["status"] for step in order["timeline"]]
@@ -389,3 +391,25 @@ class TestPhase4Access:
 
     def test_unknown_order(self, auth_client):
         assert auth_client.get("/api/v1/orders/999999/invoice/").status_code == 404
+
+
+def test_free_cartons_example_adr_0002():
+    """ADR-0002: the delivered order with free cartons, placed from CART_FREE_CARTONS. Paid lines
+    make the bill; free lines are ₹0 and their MRP value is `free_items_value`."""
+    order = ex.ORDER_FREE_CARTONS_DELIVERED
+    assert order["bill"] == cart_ex.CART_FREE_CARTONS["bill"]
+    paid = [line for line in order["items"] if not line["is_free"]]
+    free = [line for line in order["items"] if line["is_free"]]
+    assert all(line["free_source"] is None for line in paid)
+    assert sum(Decimal(line["line_total"]) for line in paid) == Decimal(order["bill"]["item_total"])
+    assert sum(Decimal(line["line_mrp_total"]) for line in paid) == Decimal(
+        order["bill"]["mrp_total"]
+    )
+    assert all(line["selling_price"] == line["line_total"] == "0.00" for line in free)
+    assert sum(Decimal(line["line_mrp_total"]) for line in free) == Decimal(
+        order["bill"]["free_items_value"]
+    )
+    assert [(line["variant_id"], line["free_source"]) for line in free] == [
+        (line["variant"]["id"], line["source"]) for line in cart_ex.CART_FREE_CARTONS["free_lines"]
+    ]
+    assert order["item_count"] == sum(line["quantity"] for line in paid)  # free not counted

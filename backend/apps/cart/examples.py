@@ -216,10 +216,14 @@ EMPTY_BILL = {
     "tip": ZERO,
     "grand_total": ZERO,
     "total_savings": ZERO,
+    "free_items_value": ZERO,
 }
 JIVO50 = {
     "code": "JIVO50",
     "title": "Flat ₹50 off",
+    "discount_type": "FLAT",
+    "source": "NONE",
+    "free_variant_id": None,
     "discount": "50.00",
     "is_applicable": True,
     "message": None,
@@ -237,6 +241,8 @@ CART_EMPTY = {
     "instructions": NO_INSTRUCTIONS,
     "address": None,
     "bill": EMPTY_BILL,
+    "free_lines": [],
+    "free_offer": None,
     "thresholds": thresholds("99.00", "299.00"),
     "payment_methods": PAYMENT_METHODS,
     "checkout": blocked("CART_EMPTY", "Add items to your cart."),
@@ -262,7 +268,10 @@ CART_READY = {
         "tip": "20.00",
         "grand_total": "753.00",
         "total_savings": "215.00",
+        "free_items_value": ZERO,
     },
+    "free_lines": [],
+    "free_offer": None,
     "thresholds": thresholds(),
     "payment_methods": PAYMENT_METHODS,
     "checkout": READY,
@@ -287,6 +296,7 @@ CART_COUPON_KEEPS_FREE_DELIVERY = {
         "tip": ZERO,
         "grand_total": "249.00",
         "total_savings": "50.00",
+        "free_items_value": ZERO,
     },
 }
 
@@ -309,6 +319,7 @@ CART_SMALL = {
         "tip": ZERO,
         "grand_total": "159.00",
         "total_savings": "31.00",
+        "free_items_value": ZERO,
     },
     "thresholds": thresholds(None, "180.00"),
 }
@@ -347,6 +358,7 @@ CART_BELOW_MINIMUM = {
         "tip": ZERO,
         "grand_total": "119.00",
         "total_savings": "20.00",
+        "free_items_value": ZERO,
     },
     "thresholds": thresholds("20.00", "220.00"),
     "checkout": blocked(
@@ -374,6 +386,7 @@ CART_STOCK_ISSUES = {
         "tip": ZERO,
         "grand_total": "4086.00",
         "total_savings": "1074.00",
+        "free_items_value": ZERO,
     },
     "payment_methods": [ONLINE_OK, COD_ABOVE_LIMIT],
     "checkout": blocked(
@@ -409,6 +422,7 @@ CART_COUPON_NOT_APPLICABLE = {
         "tip": ZERO,
         "grand_total": "250.00",
         "total_savings": "25.00",
+        "free_items_value": ZERO,
     },
     "thresholds": thresholds(None, "74.00"),
     "checkout": blocked(
@@ -420,6 +434,172 @@ CART_STORE_CLOSED = {
     **CART_READY,
     "store": STORE_CLOSED_FOR_NIGHT,
     "checkout": blocked("STORE_CLOSED", "The store is closed now. It opens at 7:00 AM."),
+}
+
+# ------------------------------------------------------------------- free cartons (ADR 0002)
+# Jivo Water by the carton: flat rates (MRP = selling price), minimum 5 paid cartons, volume
+# offer 1 free for every 10 paid. 1 L x8 (₹880) + 500 ml x4 (₹560) = 12 paid cartons, ₹1,440.
+# Volume offer: 12 // 10 = 1 free carton of the cheapest size (1 L, ₹110). The welcome reward
+# is applied with the 500 ml size picked: 1 more free carton (MRP ₹140). Free cartons cost ₹0:
+# `free_items_value` ₹250 is only in `total_savings`.
+
+WATER_IMAGE = cat.image("5d2f8a/jivo-water", "Jivo Water carton")
+WATER_PRODUCT = {
+    "id": 401,
+    "slug": "jivo-water",
+    "name": "Jivo Water",
+    "brand": "Jivo",
+    "is_veg": True,
+}
+
+
+def water_variant(variant_id: int, name: str, price: str, per: str, unit: str) -> dict:
+    return {
+        "id": variant_id,
+        "name": name,
+        "mrp": price,
+        "selling_price": price,
+        "discount_amount": "0.00",
+        "discount_percent": 0,
+        "unit_price": {"amount": unit, "per": per},
+        "stock_status": "IN_STOCK",
+        "orderable_quantity": 50,
+        "units_left": None,
+        "max_qty_per_order": 50,
+        "min_qty_per_order": 1,
+        "price_tiers": [],
+        "image": WATER_IMAGE,
+    }
+
+
+WATER_1L = water_variant(4001, "1 L x 12 (carton)", "110.00", "1 L", "9.17")
+WATER_500ML = water_variant(4002, "500 ml x 24 (carton)", "140.00", "1 L", "11.67")
+LINE_WATER_1L_X8 = {
+    "id": 511,
+    "product": WATER_PRODUCT,
+    "variant": WATER_1L,
+    "quantity": 8,
+    "price_per_unit": "110.00",
+    "previous_selling_price": None,
+    "price_tier": None,
+    "next_tier_price": None,
+    "line_mrp_total": "880.00",
+    "line_total": "880.00",
+    "issue": None,
+}
+LINE_WATER_500ML_X4 = {
+    "id": 512,
+    "product": WATER_PRODUCT,
+    "variant": WATER_500ML,
+    "quantity": 4,
+    "price_per_unit": "140.00",
+    "previous_selling_price": None,
+    "price_tier": None,
+    "next_tier_price": None,
+    "line_mrp_total": "560.00",
+    "line_total": "560.00",
+    "issue": None,
+}
+FREE_WATER_1L_VOLUME = {
+    "product": WATER_PRODUCT,
+    "variant": WATER_1L,
+    "quantity": 1,
+    "mrp": "110.00",
+    "value": "110.00",
+    "source": "VOLUME_OFFER",
+}
+FREE_WATER_500ML_REWARD = {
+    "product": WATER_PRODUCT,
+    "variant": WATER_500ML,
+    "quantity": 1,
+    "mrp": "140.00",
+    "value": "140.00",
+    "source": "REWARD",
+}
+WELCOME_REWARD_APPLIED = {
+    "code": "WEL7K2M9QPX",
+    "title": "1 free carton: welcome reward",
+    "discount_type": "FREE_UNIT",
+    "source": "WELCOME",
+    "free_variant_id": 4002,
+    "discount": ZERO,
+    "is_applicable": True,
+    "message": None,
+    "amount_to_unlock": None,
+}
+FREE_OFFER_12 = {
+    "every": 10,
+    "paid_units": 12,
+    "free_units": 1,
+    "units_to_next_free": 8,
+    "message": "Add 8 more cartons to get 1 more free",
+    "notice": None,
+}
+CART_FREE_CARTONS = {
+    **CART_READY,
+    "items": [LINE_WATER_1L_X8, LINE_WATER_500ML_X4],
+    "item_count": 12,
+    "coupon": WELCOME_REWARD_APPLIED,
+    "tip": ZERO,
+    "instructions": NO_INSTRUCTIONS,
+    "bill": {
+        "mrp_total": "1440.00",
+        "item_total": "1440.00",
+        "product_discount": ZERO,
+        "coupon_discount": ZERO,
+        "delivery_fee": ZERO,
+        "small_cart_fee": ZERO,
+        "handling_fee": ZERO,
+        "tip": ZERO,
+        "grand_total": "1440.00",
+        "total_savings": "250.00",
+        "free_items_value": "250.00",
+    },
+    "free_lines": [FREE_WATER_1L_VOLUME, FREE_WATER_500ML_REWARD],
+    "free_offer": FREE_OFFER_12,
+    "thresholds": {
+        **thresholds(),
+        "min_order_units": 5,
+        "order_unit_label": "cartons",
+    },
+}
+# 10 cartons of 1 L earn 1 free 1 L carton, but the store has only the 10 paid ones: no free
+# carton is given and the cart says so (a notice, not a blocker).
+CART_FREE_CARTON_NO_STOCK = {
+    **CART_FREE_CARTONS,
+    "items": [
+        {
+            **LINE_WATER_1L_X8,
+            "variant": {
+                **WATER_1L,
+                "orderable_quantity": 10,
+                "stock_status": "LOW_STOCK",
+                "units_left": 10,
+            },
+            "quantity": 10,
+            "line_mrp_total": "1100.00",
+            "line_total": "1100.00",
+        }
+    ],
+    "item_count": 10,
+    "coupon": None,
+    "bill": {
+        **CART_FREE_CARTONS["bill"],
+        "mrp_total": "1100.00",
+        "item_total": "1100.00",
+        "grand_total": "1100.00",
+        "total_savings": ZERO,
+        "free_items_value": ZERO,
+    },
+    "free_lines": [],
+    "free_offer": {
+        "every": 10,
+        "paid_units": 10,
+        "free_units": 1,
+        "units_to_next_free": 10,
+        "message": "Add 10 more cartons to get 1 more free",
+        "notice": "Your free carton is out of stock right now, so it is not added.",
+    },
 }
 
 # The carts whose bills tests recompute from 08 §6.2.
@@ -435,6 +615,8 @@ ALL_CARTS = {
     "CART_STOCK_ISSUES": CART_STOCK_ISSUES,
     "CART_COUPON_NOT_APPLICABLE": CART_COUPON_NOT_APPLICABLE,
     "CART_STORE_CLOSED": CART_STORE_CLOSED,
+    "CART_FREE_CARTONS": CART_FREE_CARTONS,
+    "CART_FREE_CARTON_NO_STOCK": CART_FREE_CARTON_NO_STOCK,
 }
 
 # --------------------------------------------------------------------------- requests
@@ -445,6 +627,7 @@ ITEM_UPDATE_REQUEST = {"quantity": 2}
 CART_UPDATE_REQUEST = {"tip": "20.00", "instructions": INSTRUCTIONS, "address_id": 12}
 CART_UPDATE_TIP_REQUEST = {"tip": "30.00"}
 COUPON_APPLY_REQUEST = {"code": "jivo50"}
+COUPON_APPLY_REWARD_REQUEST = {"code": "WEL7K2M9QPX", "free_variant_id": 4002}
 
 # --------------------------------------------------------------------------- error details
 

@@ -15,6 +15,10 @@ refund services, never through this form.
   note, timeline note) is hidden from them too. `str(user)` (the phone) is never rendered.
 - Money is shown exactly as stored at placement (`compute_bill()` snapshot, 08 §6.2); nothing is
   added up here.
+- Free cartons (ADR 0002): free lines carry a "Free: volume offer" / "Free: reward" badge and
+  their stored ₹0 price. They are not part of the stored item total; the bill adds one row, the
+  free cartons' MRP value from the backend (`orders.presenters.free_items_value`), shown only
+  when the order has free cartons.
 - Payments and refunds appear on the order only for roles that may view them
   (`payments.view_payment` / `payments.view_refund`). Gateway payloads are never shown.
 - Phase 4 follow-up (QA BUG-0010): "Issue refund" (a detail action, `/<id>/refund/`) for
@@ -54,6 +58,7 @@ from apps.ops_console.pii import address_lines, can_view_full_phone, customer_la
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin
 from apps.orders.choices import ActorType
 from apps.orders.models import Order, OrderItem, OrderStatusHistory
+from apps.orders.presenters import free_items_value
 from apps.payments.models import Payment, Refund
 
 # 08 §6.2, in the order the customer's bill shows them.
@@ -69,6 +74,8 @@ BILL_ROWS = (
     ("grand_total", "Grand total (amount payable)"),
     ("amount_refunded", "Amount refunded so far"),
 )
+
+FREE_VALUE_LABEL = "Free cartons (MRP value, not charged)"
 
 FULL_SEARCH = ("user__phone", "address_snapshot__receiver_phone")
 BASIC_SEARCH = ("order_number", "coupon_code")
@@ -266,6 +273,7 @@ class OrderItemInline(ReadOnlyInline):
     fields = (
         "product_name",
         "variant_name",
+        "free_badge",
         "sku",
         "hsn_code",
         "gst_rate",
@@ -276,7 +284,14 @@ class OrderItemInline(ReadOnlyInline):
         "line_total_inr",
     )
     readonly_fields = fields
-    verbose_name_plural = "Items (names and prices as ordered)"
+    verbose_name_plural = "Items (names and prices as ordered; free cartons at ₹0)"
+
+    @display(description="Free", label=status.label_tones(status.FREE_SOURCE))
+    def free_badge(self, obj) -> str:
+        """ADR 0002: a free carton, by source. Paid lines show "-"."""
+        if not obj.is_free:
+            return "-"
+        return status.badge_for(status.FREE_SOURCE, obj.free_source).label
 
     @display(description="MRP")
     def mrp_inr(self, obj) -> str:
@@ -684,6 +699,11 @@ class OrderAdmin(StoreScopedAdminMixin, ImportExportPermissionsMixin, ExportMixi
             if name == "coupon_discount" and obj.coupon_code:
                 label = f"{label} ({obj.coupon_code})"
             rows.append((label, inr(getattr(obj, name))))
+        # ADR 0002: the free cartons' MRP value (the backend's helper; not charged, so it is
+        # outside the grand total). Only for orders with free cartons.
+        items = list(obj.items.all()) if obj.pk else []
+        if any(item.is_free for item in items):
+            rows.insert(2, (FREE_VALUE_LABEL, inr(free_items_value(items))))
         return format_html(
             '<table class="text-sm" data-testid="order-bill"><tbody>{}</tbody></table>',
             format_html_join(

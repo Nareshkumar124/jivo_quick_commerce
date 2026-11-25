@@ -1,6 +1,7 @@
 """The referral reward (06 §2.1 "Referral", §5 `reward_referral`; added 2026-11-13): both
-customers get a personal ₹90 coupon when the referred customer's first order is DELIVERED,
-exactly once, after commit through the order domain event."""
+customers get a reward when the referred customer's first order is DELIVERED, exactly once,
+after commit through the order domain event. ADR-0002 (2026-11-25): the reward is one free
+carton each (a personal FREE_UNIT coupon), no longer ₹90 off."""
 
 from datetime import timedelta
 from decimal import Decimal
@@ -17,7 +18,7 @@ from apps.orders import events
 from apps.orders import tasks as order_tasks
 from apps.orders.choices import OrderStatus
 from apps.orders.tests.factories import OrderFactory
-from apps.promotions.choices import DiscountType
+from apps.promotions.choices import CouponSource, DiscountType
 from apps.promotions.models import Coupon
 from apps.referrals import services, tasks
 from apps.referrals.choices import ReferralStatus
@@ -56,21 +57,32 @@ def run(order) -> str:
 class TestReward:
     @freeze_time(NOW)
     def test_first_delivered_order_rewards_both_customers(self, referral, user, friend):
-        """Both get a FLAT ₹90 personal coupon, one use, valid 30 days, no minimum."""
+        """ADR-0002 §8: both get exactly one free-carton reward (FREE_UNIT, value 1), one use,
+        valid 30 days, with their source."""
         order = delivered(user)
         assert run(order) == "rewarded"
         referral.refresh_from_db()
         assert referral.status == ReferralStatus.REWARDED
         assert referral.reward_order == order
-        assert referral.reward_amount == Decimal("90.00")
+        assert referral.reward_amount is None
         assert referral.rewarded_at == NOW
-        for owner, coupon in (
-            (friend, referral.referrer_coupon),
-            (user, referral.referred_coupon),
+        for owner, coupon, source, title in (
+            (
+                friend,
+                referral.referrer_coupon,
+                CouponSource.REFERRAL_REFERRER,
+                "1 free carton: you invited a friend",
+            ),
+            (
+                user,
+                referral.referred_coupon,
+                CouponSource.REFERRAL_REFERRED,
+                "1 free carton: you joined with a friend's code",
+            ),
         ):
             assert coupon.owner == owner
-            assert coupon.discount_type == DiscountType.FLAT
-            assert coupon.value == Decimal("90.00")
+            assert (coupon.discount_type, coupon.source) == (DiscountType.FREE_UNIT, source)
+            assert coupon.value == Decimal("1.00")
             assert coupon.min_order_value == Decimal("0.00")
             assert (coupon.usage_limit_total, coupon.usage_limit_per_user) == (1, 1)
             assert coupon.ends_at == NOW + timedelta(days=30)
@@ -80,17 +92,20 @@ class TestReward:
             assert not coupon.first_order_only
             assert coupon.code.startswith("REF")
             assert len(coupon.code) == 11
-            assert coupon.title == "₹90 off: referral reward"
+            assert coupon.title == title
         assert referral.referrer_coupon.code != referral.referred_coupon.code
         assert personal_coupons().count() == 2
+        for owner in (user, friend):  # exactly one reward each
+            assert personal_coupons().filter(owner=owner).count() == 1
 
     def test_both_customers_are_notified_once(self, referral, user, friend):
-        """Inbox + push `referral.reward_earned` ("You earned ₹90 off"), no SMS."""
+        """Inbox + push `referral.reward_earned` ("You earned 1 free carton"), no SMS."""
         run(delivered(user))
         sent = Notification.objects.filter(event=services.REWARD_EVENT).order_by("user_id")
         assert {note.user_id for note in sent} == {user.pk, friend.pk}
         for note in sent:
-            assert note.title == "You earned ₹90 off"
+            assert note.title == "You earned 1 free carton"
+            assert "Your 1 free carton is in Rewards: pick a size and use it by" in note.body
             assert note.sms_status == DeliveryStatus.NONE
             assert note.data["link"] == "jivo://account/referral"
             assert note.in_inbox
@@ -161,7 +176,9 @@ class TestReward:
         assert not personal_coupons().exists()
 
     @freeze_time(NOW)
-    def test_settings_are_read_when_the_reward_is_given(self, referral, user):
+    def test_validity_is_read_when_the_reward_is_given(self, referral, user):
+        """ADR-0002: the validity comes from the settings; the old ₹ amount and minimum are
+        not used by free-carton rewards."""
         ReferralSettings.objects.update_or_create(
             pk=1,
             defaults={
@@ -172,12 +189,11 @@ class TestReward:
         )
         run(delivered(user))
         referral.refresh_from_db()
-        assert referral.reward_amount == Decimal("120.00")
+        assert referral.reward_amount is None
         for coupon in (referral.referrer_coupon, referral.referred_coupon):
-            assert coupon.value == Decimal("120.00")
-            assert coupon.min_order_value == Decimal("199.00")
+            assert (coupon.discount_type, coupon.value) == (DiscountType.FREE_UNIT, Decimal(1))
+            assert coupon.min_order_value == Decimal("0.00")
             assert coupon.ends_at == NOW + timedelta(days=7)
-            assert coupon.title == "₹120 off: referral reward"
 
     def test_a_failing_notification_never_undoes_the_reward(self, referral, user, monkeypatch):
         def boom(*args, **kwargs):

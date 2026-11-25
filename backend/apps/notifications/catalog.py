@@ -223,11 +223,12 @@ SPECS["support.ticket_replied_rider"] = EventSpec(
 )
 
 # Referral reward (added 2026-11-13; apps.referrals sends it to both customers once the referred
-# customer's first order is delivered). Push + inbox, no SMS.
+# customer's first order is delivered). Push + inbox, no SMS. Since ADR 0002 (2026-11-25) the
+# reward is one free carton ({{reward}} = "1 free carton").
 SPECS["referral.reward_earned"] = EventSpec(
     "referral.reward_earned",
-    "You earned {{amount}} off",
-    "{{reason}} Your {{amount}} coupon is in Apply coupon at checkout. Use it by {{expires_on}}.",
+    "You earned {{reward}}",
+    "{{reason}} Your {{reward}} is in Rewards: pick a size and use it by {{expires_on}}.",
     category=NotificationCategory.PROMO,
     link="jivo://account/referral",
     data_type="referral",

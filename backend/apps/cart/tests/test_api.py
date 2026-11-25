@@ -139,6 +139,7 @@ class TestReadingTheCart:
             "tip": "20.00",
             "grand_total": "697.00",
             "total_savings": "171.00",
+            "free_items_value": "0.00",
         }
         assert body["checkout"] == {"can_place_order": True, "blockers": []}
         assert body["address"]["id"] == address.pk
@@ -439,6 +440,9 @@ class TestCoupons:
         assert body["coupon"] == {
             "code": "JIVO50",
             "title": "Flat ₹50 off",
+            "discount_type": "FLAT",
+            "source": "NONE",
+            "free_variant_id": None,
             "discount": "50.00",
             "is_applicable": True,
             "message": None,
@@ -517,6 +521,9 @@ class TestCoupons:
         assert body["coupon"] == {
             "code": "JIVO50",
             "title": "Flat ₹50 off",
+            "discount_type": "FLAT",
+            "source": "NONE",
+            "free_variant_id": None,
             "discount": "0.00",
             "is_applicable": False,
             "message": "Add items worth ₹20 more to use this coupon.",

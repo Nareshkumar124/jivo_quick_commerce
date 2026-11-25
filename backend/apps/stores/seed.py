@@ -1,5 +1,6 @@
 """seed_demo step (idempotent): the demo dark store GGN-01 in Gurugram with a real service area,
-opening hours 07:00-23:00 IST every day, the D-09 pricing config (Phase 3) and store access for
+opening hours 07:00-23:00 IST every day, the D-09 pricing config (Phase 3) with the volume offer
+on (ADR 0002: 1 free carton for every 10 paid; switched on when it is off) and store access for
 the seeded Store Manager and Store Staff."""
 
 from datetime import time
@@ -28,6 +29,7 @@ SERVICE_AREA = MultiPolygon(
     srid=4326,
 )
 SCOPED_STAFF = ("store.manager@jivo.test", "store.staff@jivo.test")
+DEMO_FREE_UNIT_EVERY = 10  # ADR 0002 volume offer on the demo store
 
 
 def seed_stores(stdout, options) -> None:
@@ -54,7 +56,13 @@ def seed_stores(stdout, options) -> None:
             store=store, weekday=weekday, defaults={"opens_at": time(7), "closes_at": time(23)}
         )
     # New rows get the D-09 model defaults; values edited in the admin survive re-seeding.
-    PricingConfig.objects.get_or_create(store=store)
+    pricing, _ = PricingConfig.objects.get_or_create(
+        store=store, defaults={"free_unit_every": DEMO_FREE_UNIT_EVERY}
+    )
+    if not pricing.free_unit_every:
+        # ADR 0002: the demo store shows the volume offer (1 free carton for every 10 paid).
+        pricing.free_unit_every = DEMO_FREE_UNIT_EVERY
+        pricing.save(update_fields=["free_unit_every", "updated_at"])
     for email in SCOPED_STAFF:
         user = User.objects.filter(email=email).first()
         if user is not None:

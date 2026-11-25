@@ -15,7 +15,7 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.utils import datetime_from_epoch
 
-from apps.accounts.choices import OtpPurpose
+from apps.accounts.choices import AppName, OtpPurpose
 from apps.accounts.models import Address, Device, OTPRequest, User
 from apps.accounts.services.otp import verify_otp
 from apps.core import audit
@@ -75,6 +75,13 @@ def login_with_otp(
             user.terms_accepted_at = now
         user.last_login = now
         user.save()
+        if is_new_user and app == AppName.CUSTOMER:
+            # ADR 0002 §7: a new customer account gets its one welcome reward (free carton) in
+            # the transaction that creates it. Accounts created before (or by the rider app)
+            # get none; the database keeps at most one per customer.
+            from apps.promotions.rewards import grant_welcome_reward
+
+            grant_welcome_reward(user, now=now)
     access, refresh = issue_tokens(user, app)
     return LoginResult(user, access, refresh, is_new_user, deletion_cancelled)
 

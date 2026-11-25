@@ -175,6 +175,10 @@ def recompute(cart: dict) -> dict:
     small_cart_fee = SMALL_CART_FEE if item_total < SMALL_CART_BELOW else Decimal(0)
     tip = Decimal(cart["tip"])
     grand_total = item_total - coupon_discount + delivery_fee + small_cart_fee + HANDLING_FEE + tip
+    # ADR 0002: free cartons are ₹0, only their MRP value counts as a saving.
+    free_value = sum(
+        (Decimal(line["mrp"]) * line["quantity"] for line in cart["free_lines"]), Decimal(0)
+    )
     return {
         "mrp_total": money(mrp_total),
         "item_total": money(item_total),
@@ -185,7 +189,8 @@ def recompute(cart: dict) -> dict:
         "handling_fee": money(HANDLING_FEE),
         "tip": money(tip),
         "grand_total": money(grand_total),
-        "total_savings": money(mrp_total - item_total + coupon_discount),
+        "total_savings": money(mrp_total - item_total + coupon_discount + free_value),
+        "free_items_value": money(free_value),
     }
 
 
@@ -211,6 +216,18 @@ class TestCartExamples:
                 )
                 assert line["issue"]["code"] == expected
         assert cart["item_count"] == sum(line["quantity"] for line in cart["items"])
+        for free in cart["free_lines"]:  # ADR 0002
+            assert free["mrp"] == free["variant"]["mrp"]
+            assert free["value"] == money(Decimal(free["mrp"]) * free["quantity"])
+        offer = cart["free_offer"]
+        if offer is not None:
+            paid = sum(
+                min(line["quantity"], line["variant"]["orderable_quantity"])
+                for line in cart["items"]
+            )
+            assert offer["paid_units"] == paid
+            assert offer["free_units"] == paid // offer["every"]
+            assert offer["units_to_next_free"] == offer["every"] - paid % offer["every"]
 
     def test_thresholds(self, name):
         cart = ex.ALL_CARTS[name]
@@ -280,6 +297,8 @@ class TestCouponExamples:
 
     def discount(self, offer: dict, eligible: Decimal) -> str:
         value = Decimal(offer["value"])
+        if offer["discount_type"] == "FREE_UNIT":  # ADR 0002: a free carton, no money off
+            return money(0)
         if offer["discount_type"] == "FLAT":
             amount = value
         else:

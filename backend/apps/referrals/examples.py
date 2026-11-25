@@ -1,10 +1,16 @@
-"""Example payloads for the referral contract (06 §2.1 "Referral"). Default settings: ₹90 off,
-30 days, no minimum."""
+"""Example payloads for the referral contract (06 §2.1 "Referral"). Since ADR 0002 the reward is
+one free carton for each of the two customers, valid 30 days (default settings). `reward_amount`
+is the old ₹ setting, kept for older apps and not given any more."""
+
+SHARE = "Use my code {code} on the Jivo app and we both get 1 free carton."
 
 NEW_CUSTOMER = {
     "code": "K7M2PQ",
-    "share_message": "Use my code K7M2PQ on the Jivo app and we both get ₹90 off.",
+    "share_message": SHARE.format(code="K7M2PQ"),
     "is_enabled": True,
+    "reward_type": "FREE_UNIT",
+    "reward_quantity": 1,
+    "reward_label": "1 free carton",
     "reward_amount": "90.00",
     "reward_validity_days": 30,
     "reward_min_order_value": "0.00",
@@ -25,7 +31,7 @@ JOINED_PENDING = {
 REFERRER_WITH_FRIENDS = {
     **NEW_CUSTOMER,
     "code": "XR4TNW",
-    "share_message": "Use my code XR4TNW on the Jivo app and we both get ₹90 off.",
+    "share_message": SHARE.format(code="XR4TNW"),
     "can_apply_code": False,
     "referred_by": {
         "code_masked": "AB**7P",

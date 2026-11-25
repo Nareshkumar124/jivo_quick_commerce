@@ -35,6 +35,8 @@ SEED_STEPS: list[str] = [
     "apps.support.seed.seed_canned_replies",
     # 2026-11-13: referral settings row and the test customer's referral code
     "apps.referrals.seed.seed_referrals",
+    # 2026-11-25 (ADR 0002): the test customer's welcome reward (volume offer: stores step)
+    "apps.promotions.seed.seed_rewards",
 ]
 
 

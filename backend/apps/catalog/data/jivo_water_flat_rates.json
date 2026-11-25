@@ -1,0 +1,8 @@
+{
+  "note": "Jivo Water flat rates per carton, GST inclusive (user, 2026-11-25, ADR 0002). Every order pays these rates; the volume slabs of ADR 0001 are removed. MRP = selling price = the rate (no '% off' shown).",
+  "variants": [
+    {"sku": "JVW-WTR-1L-12", "rate": "110.00"},
+    {"sku": "JVW-WTR-250ML-24", "rate": "110.00"},
+    {"sku": "JVW-WTR-500ML-24", "rate": "140.00"}
+  ]
+}

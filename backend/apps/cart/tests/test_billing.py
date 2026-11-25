@@ -177,3 +177,31 @@ class TestPriceChanged:
             "expected_grand_total": "299.99",
             "grand_total": "300.00",
         }
+
+
+class TestFreeCartons:
+    """ADR-0002 §4: free cartons are passed to `compute_bill()` separately and only add their
+    MRP value (`free_items_value`) to `total_savings`."""
+
+    def test_free_lines_change_nothing_but_the_savings(self):
+        paid = [line("110.00", 4)]  # ₹440: free delivery, no small-cart fee
+        free = [line("0.00", 2, mrp="110.00", variant=2), line("0.00", 1, mrp="140.00", variant=3)]
+        without = compute_bill(paid, D09, tip=Decimal("10"))
+        with_free = compute_bill(paid, D09, tip=Decimal("10"), free_lines=free)
+        for field in ("mrp_total", "item_total", "product_discount", "delivery_fee",
+                      "small_cart_fee", "handling_fee", "tip", "grand_total"):  # fmt: skip
+            assert getattr(with_free, field) == getattr(without, field), field
+        assert with_free.free_items_value == Decimal("360.00")
+        assert with_free.total_savings == without.total_savings + Decimal("360.00")
+        assert as_strings(with_free)["free_items_value"] == "360.00"
+
+    def test_free_lines_never_lower_the_fees(self):
+        """₹119 paid + ₹500 of free cartons: still below every threshold."""
+        bill = compute_bill(
+            [line("119.00")], D09, free_lines=[line("0.00", 5, mrp="100.00", variant=2)]
+        )
+        assert (bill.delivery_fee, bill.small_cart_fee) == (Decimal("25.00"), Decimal("15.00"))
+        assert bill.grand_total == Decimal("159.00")
+
+    def test_no_paid_lines_is_the_empty_bill(self):
+        assert compute_bill([], D09, free_lines=[line("0.00", 1, mrp="110.00")]) == EMPTY_BILL

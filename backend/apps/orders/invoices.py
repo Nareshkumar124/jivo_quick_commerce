@@ -70,8 +70,15 @@ def financial_year(at) -> str:
     return f"{start % 100:02d}-{(start + 1) % 100:02d}"
 
 
+FREE_SUFFIX = " (free)"
+
+
 def tax_lines(order: Order) -> list[TaxLine]:
-    items = [i for i in order.items.all() if i.quantity > i.quantity_unavailable]
+    """The paid lines (with their coupon share), then the free cartons at ₹0 (ADR 0002: shown
+    at ₹0 and marked "(free)"; their GST treatment is an open item for Jivo's accountant), then
+    the fees."""
+    coming = [i for i in order.items.all() if i.quantity > i.quantity_unavailable]
+    items = [i for i in coming if not i.is_free]
     values = [i.selling_price * (i.quantity - i.quantity_unavailable) for i in items]
     total = sum(values, ZERO)
     discount, left = order.coupon_discount, order.coupon_discount
@@ -86,6 +93,17 @@ def tax_lines(order: Order) -> list[TaxLine]:
                 code=item.hsn_code or settings.INVOICE_PLACEHOLDER_HSN,
                 quantity=item.quantity - item.quantity_unavailable,
                 gross=value - share,
+                rate=item.gst_rate or ZERO,
+                placeholder=not item.hsn_code,
+            )
+        )
+    for item in (i for i in coming if i.is_free):
+        lines.append(
+            TaxLine(
+                description=f"{item.product_name} {item.variant_name}{FREE_SUFFIX}",
+                code=item.hsn_code or settings.INVOICE_PLACEHOLDER_HSN,
+                quantity=item.quantity - item.quantity_unavailable,
+                gross=ZERO,
                 rate=item.gst_rate or ZERO,
                 placeholder=not item.hsn_code,
             )

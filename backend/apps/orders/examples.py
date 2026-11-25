@@ -5,6 +5,8 @@ Both example orders are placed from `cart.examples.CART_READY` (₹753.00 to pay
 (12:00 IST) on 3 Nov 2026. The online payment window is 15 minutes.
 """
 
+from decimal import Decimal
+
 from apps.accounts.examples import ADDRESS, ME
 from apps.cart import examples as cart
 from apps.catalog import examples as cat
@@ -43,6 +45,8 @@ ORDER_LINES = [
         "quantity_unavailable": 0,
         "line_mrp_total": "698.00",
         "line_total": "558.00",
+        "is_free": False,
+        "free_source": None,
     },
     {
         "id": 9002,
@@ -57,6 +61,8 @@ ORDER_LINES = [
         "quantity_unavailable": 0,
         "line_mrp_total": "250.00",
         "line_total": "225.00",
+        "is_free": False,
+        "free_source": None,
     },
 ]
 
@@ -183,6 +189,7 @@ ORDER_ITEM_UNAVAILABLE = {
         "tip": "20.00",
         "grand_total": "474.00",
         "total_savings": "145.00",
+        "free_items_value": "0.00",
     },
     "can_cancel": False,
     "timeline": [
@@ -261,6 +268,46 @@ ORDER_DELIVERED = {
         step("OUT_FOR_DELIVERY", "On the way", "2026-11-03T06:35:30Z"),
         step("DELIVERED", "Delivered", "2026-11-03T06:43:10Z"),
     ],
+}
+
+
+# ADR 0002: delivered COD order placed from `cart.examples.CART_FREE_CARTONS`: 12 paid water
+# cartons plus 2 free ones (₹0): 1 L from the volume offer and 500 ml from the welcome reward.
+def _water_line(line_id: int, variant: dict, quantity: int, *, free_source=None) -> dict:
+    price = "0.00" if free_source else variant["selling_price"]
+    total = str(Decimal(price) * quantity)
+    return {
+        "id": line_id,
+        "variant_id": variant["id"],
+        "product_id": cart.WATER_PRODUCT["id"],
+        "product_name": cart.WATER_PRODUCT["name"],
+        "variant_name": variant["name"],
+        "image": cart.WATER_IMAGE,
+        "mrp": variant["mrp"],
+        "selling_price": price,
+        "quantity": quantity,
+        "quantity_unavailable": 0,
+        "line_mrp_total": str(Decimal(variant["mrp"]) * quantity),
+        "line_total": total,
+        "is_free": free_source is not None,
+        "free_source": free_source,
+    }
+
+
+ORDER_FREE_CARTONS_DELIVERED = {
+    **ORDER_DELIVERED,
+    "id": 4321,
+    "order_number": "JV-261103-004321",
+    "items": [
+        _water_line(9101, cart.WATER_1L, 8),
+        _water_line(9102, cart.WATER_500ML, 4),
+        _water_line(9103, cart.WATER_1L, 1, free_source="VOLUME_OFFER"),
+        _water_line(9104, cart.WATER_500ML, 1, free_source="REWARD"),
+    ],
+    "item_count": 12,  # paid units only (ADR 0002)
+    "bill": cart.CART_FREE_CARTONS["bill"],
+    "coupon_code": "WEL7K2M9QPX",
+    "instructions": cart.NO_INSTRUCTIONS,
 }
 PHASE4_ORDERS = (
     ORDER_ACCEPTED,

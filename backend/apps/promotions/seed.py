@@ -71,3 +71,20 @@ def seed_coupons(stdout, options) -> None:
         if slugs:
             coupon.categories.set(Category.objects.filter(slug__in=slugs))
     stdout.write(f"  coupons: {', '.join(spec['code'] for spec in DEMO_COUPONS)}")
+
+
+def seed_rewards(stdout, options) -> None:
+    """ADR 0002: the test customer's welcome reward (one free carton), so the Rewards screen and
+    the reward flow can be tried locally. Demo data only: real accounts get theirs when the OTP
+    login creates them. Idempotent (one welcome reward per customer)."""
+    from apps.accounts.models import User
+    from apps.accounts.seed import TEST_CUSTOMER_PHONE
+    from apps.promotions.rewards import grant_welcome_reward
+
+    customer = User.objects.filter(phone=TEST_CUSTOMER_PHONE).first()
+    if customer is None:
+        return
+    created = grant_welcome_reward(customer)
+    stdout.write(
+        f"  welcome reward for {TEST_CUSTOMER_PHONE}: {'created' if created else 'already there'}"
+    )

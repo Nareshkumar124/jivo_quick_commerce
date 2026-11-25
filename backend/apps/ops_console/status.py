@@ -35,6 +35,7 @@ COD = "cod"  # User.cod_blocked
 TICKET = "ticket"  # SupportTicket.status (P7)
 TICKET_PRIORITY = "ticket_priority"  # SupportTicket.priority (P7)
 TICKET_SLA = "ticket_sla"  # support.services.with_sla (P7)
+FREE_SOURCE = "free_source"  # OrderItem.free_source (ADR 0002 free cartons)
 
 BADGES: dict[str, dict[str, Badge]] = {
     CUSTOMER: {
@@ -102,6 +103,12 @@ BADGES: dict[str, dict[str, Badge]] = {
         "APPLIED": Badge("Applied", SUCCESS),
         "RELEASED": Badge("Released", NEUTRAL),
         "REVERSED": Badge("Reversed", NEUTRAL),
+    },
+    # ADR 0002: a free carton (₹0) on an order line, by why it is free. The offer's N is a
+    # per-store setting, so the label does not name it.
+    FREE_SOURCE: {
+        "VOLUME_OFFER": Badge("Free: volume offer", SUCCESS),
+        "REWARD": Badge("Free: reward", SUCCESS),
     },
     COUPON: {
         "live": Badge("Live", SUCCESS),

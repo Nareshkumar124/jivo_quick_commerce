@@ -65,7 +65,8 @@ def detail(rider, task_id: int) -> dict:
     items = [
         {
             "name": item.product_name,
-            "variant": item.variant_name,
+            # ADR 0002: a free carton is handed over too, marked in the text (no new field)
+            "variant": f"{item.variant_name} (free)" if item.is_free else item.variant_name,
             "quantity": item.quantity - item.quantity_unavailable,
         }
         for item in order.items.all()

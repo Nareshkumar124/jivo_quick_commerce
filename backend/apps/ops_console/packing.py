@@ -15,6 +15,10 @@ the buttons go through `order_actions`.
 - The packing screen never shows the customer's phone or address: the slip carries the order
   number, the 4-character pickup code, a QR code of that code and the item count (05 §1.3
   "Print").
+- Free cartons (ADR 0002): free lines are packed like paid ones (they are in the pick list,
+  need a tick, and count in the item count, which says how many are free). They carry a FREE
+  badge with their source and ₹0. "Can't supply" on a free line never cancels the order: the
+  backend counts paid units only (`store_ops.mark_item_unavailable`), so `would_empty` does too.
 """
 
 from dataclasses import dataclass, field
@@ -25,7 +29,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from apps.inventory.models import StoreInventory
-from apps.ops_console import sla
+from apps.ops_console import sla, status
 from apps.ops_console.board import CANCELLABLE_STATUSES, units_subquery
 from apps.ops_console.params import text_param_or_404
 from apps.ops_console.scoping import visible_stores
@@ -75,9 +79,16 @@ def lines_queryset(store):
             "sku",
             "quantity",
             "quantity_unavailable",
+            "is_free",
+            "free_source",
         )
         .order_by("rack", "product_name", "id")
     )
+
+
+def free_units(lines) -> int:
+    """Free cartons still to pack (ADR 0002), from the prepared lines (units, not money)."""
+    return sum(line.to_pack for line in lines if line.is_free)
 
 
 @dataclass
@@ -92,8 +103,13 @@ class Ticket:
 
     @property
     def pick_ids(self) -> list[str]:
-        """Lines with units left to pick (fully unavailable lines need no tick)."""
+        """Lines with units left to pick (fully unavailable lines need no tick). Free cartons
+        are picked and ticked too."""
         return [str(line.pk) for line in self.lines if line.to_pack > 0]
+
+    @property
+    def free_units(self) -> int:
+        return free_units(self.lines)
 
     @property
     def cod(self) -> bool:
@@ -144,13 +160,22 @@ class Console:
 def prepare_lines(lines: list[OrderItem]) -> list[OrderItem]:
     """Display fields per line (units only, design/screens/ops/cant-supply-dialog.md §5):
     `to_pack` (units still to pack), `not_in_order` (nothing left to pack) and
-    `would_empty` (every other line is fully unavailable, so removing all of this line's units
-    cancels the order). Lines with nothing to pack go last."""
+    `would_empty` (every other paid line is fully unavailable, so removing all of this line's
+    units cancels the order; free cartons never keep an order alone and a free line never
+    cancels it, as in `store_ops.mark_item_unavailable`), and `key` (the SKU, plus the free
+    source on a free line: a variant can have a paid line and free lines). Lines with nothing
+    to pack go last."""
     for line in lines:
         line.to_pack = line.quantity - line.quantity_unavailable
         line.not_in_order = line.to_pack <= 0
+        line.key = f"{line.sku}-free-{line.free_source.lower()}" if line.is_free else line.sku
+        line.free_label = (
+            status.badge_for(status.FREE_SOURCE, line.free_source).label if line.is_free else ""
+        )
     for line in lines:
-        line.would_empty = all(other.not_in_order for other in lines if other.pk != line.pk)
+        line.would_empty = not line.is_free and all(
+            other.not_in_order for other in lines if other.pk != line.pk and not other.is_free
+        )
     return sorted(lines, key=lambda line: line.not_in_order)
 
 
@@ -216,6 +241,7 @@ def slip(store, order_id: int) -> Order | None:
     if order is not None:
         order.lines = prepare_lines(order.lines)
         order.lines_not_in_order = sum(line.not_in_order for line in order.lines)
+        order.free_units = free_units(order.lines)
     return order
 
 

@@ -1,5 +1,5 @@
 {% load ops %}
-{# Failed deliveries waiting to be received back. Context: store, rows (dispatch.ReturnRow), can_receive. The form posts to store_ops.receive_return through order_actions. #}
+{# Failed deliveries waiting to be received back. Context: store, rows (dispatch.ReturnRow), can_receive. The form posts to store_ops.receive_return through order_actions. Free cartons (ADR 0002) come back too and carry their FREE badge. #}
 <div id="returns-list" class="ops-touch" hx-get="{% url 'ops:store-returns-list' store.code %}" hx-swap="outerHTML"
      hx-trigger="ops:refresh from:body" data-testid="returns-list">
     {# No timed poll: it would wipe damaged counts being entered. Refreshes after a receive, or on demand. #}
@@ -21,7 +21,7 @@
                     <div class="ops-return-lines">
                         {% for line in row.lines %}
                             <label class="flex gap-2 items-center justify-between">
-                                <span>{{ line.item.product_name }} {{ line.item.variant_name }} <span class="ops-text-secondary">&times; {{ line.units }} sent</span></span>
+                                <span>{{ line.item.product_name }} {{ line.item.variant_name }}{% if line.item.is_free %} {% status_badge "free_source" line.item.free_source "md" %}{% endif %} <span class="ops-text-secondary">&times; {{ line.units }} sent</span></span>
                                 <span class="flex gap-2 items-center">Damaged
                                     <input type="number" name="damaged_{{ line.item.pk }}" value="0" min="0" max="{{ line.units }}" inputmode="numeric"
                                            class="border border-base-200 px-2 py-1 rounded-default w-20 dark:bg-base-900 dark:border-base-700" data-testid="damaged-{{ line.item.pk }}">

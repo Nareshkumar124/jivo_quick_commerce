@@ -16,7 +16,8 @@ from apps.cart.choices import (
     PaymentUnavailableReason,
 )
 from apps.catalog.serializers import PriceTierSerializer, VariantSummarySerializer, money
-from apps.orders.choices import PaymentMethod
+from apps.orders.choices import FreeSource, PaymentMethod
+from apps.promotions.choices import CouponSource, DiscountType
 from apps.stores.serializers import StoreStatusSerializer
 
 # Request sanity bound; the real limits are the variant's min/max per order.
@@ -57,7 +58,13 @@ class BillSerializer(serializers.Serializer):
     tip = money('Rider tip chosen by the customer ("0.00" when none). Goes fully to the rider.')
     grand_total = money("**To pay.** Not rounded to the rupee in v1.")
     total_savings = money(
-        "`product_discount` + `coupon_discount`: the highlighted 'You save' amount."
+        "`product_discount` + `coupon_discount` + `free_items_value`: the highlighted 'You "
+        "save' amount."
+    )
+    free_items_value = money(
+        "ADR 0002: the MRP value of the free cartons (MRP x free quantity; the volume offer and "
+        "a free-carton reward). They cost ₹0: not part of `item_total`, the fees, the coupon "
+        'minimum, the COD limit or `grand_total`. "0.00" when there are none.'
     )
 
 
@@ -152,6 +159,24 @@ class CartLineSerializer(serializers.Serializer):
 class AppliedCouponSerializer(serializers.Serializer):
     code = serializers.CharField()
     title = serializers.CharField(help_text='e.g. "Flat ₹50 off".')
+    discount_type = serializers.ChoiceField(
+        choices=DiscountType.choices,
+        help_text=(
+            "FREE_UNIT: a free-carton reward (ADR 0002). It gives no money off (`discount` is "
+            '"0.00"); its carton is in `free_lines` with `source` REWARD.'
+        ),
+    )
+    source = serializers.ChoiceField(
+        choices=CouponSource.choices,
+        help_text="Why the coupon exists: WELCOME / REFERRAL_* rewards, NONE for staff coupons.",
+    )
+    free_variant_id = serializers.IntegerField(
+        allow_null=True,
+        help_text=(
+            "FREE_UNIT only: the size picked for the free carton (`VariantSummary.id`, sent as "
+            "`free_variant_id` when applying). Null for other coupons."
+        ),
+    )
     discount = money('The discount it gives this cart now ("0.00" when it does not apply).')
     is_applicable = serializers.BooleanField(
         help_text=(
@@ -168,6 +193,58 @@ class AppliedCouponSerializer(serializers.Serializer):
         "When it does not apply because the item total is below its minimum: the item value "
         "still needed (for the app's own 'Add items worth ₹X more'). Null otherwise. Added in "
         "Phase 3 R2b, like `CouponOffer.amount_to_unlock`."
+    )
+
+
+class FreeLineSerializer(serializers.Serializer):
+    """ADR 0002: a free carton on the cart (₹0). Computed by the server on every cart read:
+    never add, remove or price these in the app."""
+
+    product = CartProductSerializer()
+    variant = VariantSummarySerializer(
+        help_text="The free carton's size (same shape as the catalog)."
+    )
+    quantity = serializers.IntegerField(min_value=1, help_text="Free cartons of this size.")
+    mrp = money("Unit MRP of the free carton.")
+    value = money("`mrp` x `quantity`: what the customer saves (part of `bill.free_items_value`).")
+    source = serializers.ChoiceField(
+        choices=FreeSource.choices,
+        help_text=(
+            "VOLUME_OFFER: 1 free for every `free_offer.every` paid cartons (the cheapest size "
+            "in the cart). REWARD: the free-carton reward applied as the cart's coupon."
+        ),
+    )
+
+
+class FreeOfferSerializer(serializers.Serializer):
+    """ADR 0002 §3: the store's volume offer, "1 free carton for every `every` paid cartons".
+    Paid cartons are counted like `thresholds.min_order_units` (each line counts
+    min(`quantity`, `orderable_quantity`)); free cartons never count."""
+
+    every = serializers.IntegerField(
+        min_value=1, help_text="Paid cartons per free carton (e.g. 10)."
+    )
+    paid_units = serializers.IntegerField(min_value=0, help_text="Paid cartons counted now.")
+    free_units = serializers.IntegerField(
+        min_value=0,
+        help_text=(
+            "Free cartons earned: `paid_units` // `every`. The ones the store can supply are in "
+            "`free_lines` (VOLUME_OFFER); see `notice` when they cannot be supplied."
+        ),
+    )
+    units_to_next_free = serializers.IntegerField(
+        min_value=1, help_text="Paid cartons still to add for one more free carton."
+    )
+    message = serializers.CharField(
+        help_text='Ready-made nudge, e.g. "Add 8 more cartons to get 1 more free".'
+    )
+    notice = serializers.CharField(
+        allow_null=True,
+        help_text=(
+            "Set when a free carton was earned but no size in the cart has the stock for it (no "
+            "free carton is given). Show it as a notice; it does not block checkout. Null "
+            "otherwise."
+        ),
     )
 
 
@@ -278,6 +355,16 @@ class CartSerializer(serializers.Serializer):
         ),
     )
     bill = BillSerializer()
+    free_lines = FreeLineSerializer(
+        many=True,
+        help_text=(
+            "ADR 0002: free cartons (₹0), volume offer first, then the reward. [] when none. "
+            "Placing the order adds them as order lines with `is_free: true`."
+        ),
+    )
+    free_offer = FreeOfferSerializer(
+        allow_null=True, help_text="The store's volume offer; null when the store has none."
+    )
     thresholds = CartThresholdsSerializer()
     payment_methods = PaymentOptionSerializer(
         many=True, help_text="ONLINE then COD, each with its availability for this cart."
@@ -364,4 +451,15 @@ class CouponApplySerializer(serializers.Serializer):
         max_length=30,
         trim_whitespace=True,
         help_text="Coupon code as typed; case-insensitive.",
+    )
+    free_variant_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=1,
+        help_text=(
+            "ADR 0002: required for a free-carton reward (`discount_type` FREE_UNIT): the size "
+            "the customer picked (`VariantSummary.id`). It must be sold at the store in "
+            "`X-Store-Id`, be of the same product category as a paid line in the cart (a water "
+            "reward goes on a water order) and have the stock. Ignored for other coupons."
+        ),
     )

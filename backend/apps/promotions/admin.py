@@ -16,6 +16,11 @@ Support and Finance view; DL-45, DL-46).
   roles that may see customers in full) and is read-only afterwards, so a coupon customers or
   orders already use never changes hands. The owner is shown per the PII policy, never as
   `str(user)` (the phone).
+- Free-carton rewards (ADR 0002: `discount_type` FREE_UNIT, with a `source`: welcome or
+  referral) are made by the system only, so FREE_UNIT is not offered on the form. On a reward's
+  page the type, value, cap and minimum are replaced by "1 free carton" and the reward's status,
+  and its usage limits (one use) are read-only, also against a crafted POST (the fields are not
+  in the form). The list shows and filters the type and the source.
 """
 
 from urllib.parse import urlencode
@@ -39,7 +44,8 @@ from apps.ops_console.money import RupeeInput, inr
 from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.pii import can_view_full_phone, customer_label
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin
-from apps.promotions.choices import DiscountType
+from apps.promotions import rewards
+from apps.promotions.choices import DiscountType, RewardStatus
 from apps.promotions.models import COUNTED_STATUSES, Coupon, CouponRedemption
 from apps.promotions.services import (
     MSG_CODE_LOCKED,
@@ -59,6 +65,22 @@ MSG_NO_CAP_ON_FLAT = "A flat coupon has no cap: its value is the discount. Leave
 MSG_CODE_SPACES = "Use letters and numbers without spaces, e.g. JIVO50."
 MSG_OWNER_NOT_CUSTOMER = "Enter the id of an active customer account (not a staff account)."
 PUBLIC_COUPON = "Public (everyone)"
+
+# ADR 0002: a free-carton reward's page shows these instead of the money fields.
+REWARD_FIELDSET = (
+    "Reward",
+    {
+        "fields": ("reward_kind", "reward_status"),
+        "description": (
+            "A free-carton reward gives no money off: the customer picks the size when using "
+            "it, and the order still needs the store's minimum paid cartons. One use; its type "
+            "and limits are fixed. Switch it off or change its end date if needed."
+        ),
+    },
+)
+# Fixed on a reward (one use, ADR 0002 §13): read-only on its page.
+REWARD_FIXED_FIELDS = ("usage_limit_total", "usage_limit_per_user", "first_order_only")
+STORE_MINIMUM = "Store minimum (cartons)"
 
 
 def owner_choices():
@@ -138,6 +160,16 @@ class CouponAdminForm(forms.ModelForm):
     # Set by CouponAdmin when `save_coupon` refused the save (a raced code, a limit below the
     # counted uses...): shown as errors of this form, nothing saved.
     save_refusal: ValidationError | None = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        kind = self.fields.get("discount_type")
+        if kind is not None:
+            # ADR 0002: free-carton rewards are made by the system (welcome, referral), never
+            # here; a reward's own page has no type field (CouponAdmin.get_fieldsets).
+            kind.choices = [
+                choice for choice in kind.choices if choice[0] != DiscountType.FREE_UNIT
+            ]
 
     def code_taken(self, code: str) -> bool:
         taken = Coupon.objects.filter(code__iexact=code)
@@ -230,6 +262,7 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
         "uses",
         "per_user",
         "audience",
+        "source_label",
         "owner_label",
         "state_badge",
     )
@@ -238,6 +271,7 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
         CouponStateFilter,
         CouponKindFilter,
         "discount_type",
+        "source",
         "first_order_only",
         "is_visible",
         "is_active",
@@ -248,7 +282,16 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
     list_per_page = 50
     filter_horizontal = ("stores", "categories")
     raw_id_fields = ("owner",)  # widget: CustomerRawIdWidget (formfield_for_foreignkey)
-    readonly_fields = ("state_badge", "usage_summary", "owner_label", "created_at", "updated_at")
+    readonly_fields = (
+        "state_badge",
+        "usage_summary",
+        "owner_label",
+        "source_label",
+        "reward_kind",
+        "reward_status",
+        "created_at",
+        "updated_at",
+    )
     fieldsets = (
         (
             "Coupon",
@@ -288,7 +331,18 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
             },
         ),
         ("Where it applies", {"fields": ("stores", "categories")}),
-        ("Status", {"fields": ("state_badge", "usage_summary", "created_at", "updated_at")}),
+        (
+            "Status",
+            {
+                "fields": (
+                    "state_badge",
+                    "usage_summary",
+                    "source_label",
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
     )
 
     def get_queryset(self, request):
@@ -306,6 +360,14 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
     def get_fieldsets(self, request, obj=None):
         if obj is None:
             return self.fieldsets[:-1]  # nothing to report on a new coupon
+        fieldsets = self.fieldsets
+        if rewards.is_reward(obj):
+            # ADR 0002: no money fields on a free-carton reward (so a crafted POST cannot change
+            # its type, value, cap or minimum either: the form has no such fields).
+            fieldsets = tuple(
+                REWARD_FIELDSET if title == "Discount" else (title, options)
+                for title, options in fieldsets
+            )
         # An existing coupon never changes hands: its owner is shown, not a field (so a crafted
         # POST cannot set it either: the form has no `owner` field).
         return tuple(
@@ -318,7 +380,7 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
                     ),
                 },
             )
-            for title, options in self.fieldsets
+            for title, options in fieldsets
         )
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -339,6 +401,8 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
         fields = list(super().get_readonly_fields(request, obj))
         if is_used(obj):
             fields.append("code")  # customers and orders refer to it (T-406c)
+        if rewards.is_reward(obj):
+            fields.extend(REWARD_FIXED_FIELDS)  # one use (ADR 0002 §13)
         return fields
 
     def get_form(self, request, obj=None, change=False, **kwargs):
@@ -381,6 +445,8 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
 
     @display(description="Discount", ordering="value")
     def discount(self, obj) -> str:
+        if rewards.is_reward(obj):
+            return rewards.REWARD_LABEL  # no money off (ADR 0002)
         if obj.discount_type == DiscountType.PERCENT:
             text = f"{obj.value.normalize():f}% off"
             if obj.max_discount is not None:
@@ -393,6 +459,8 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
 
     @display(description="Min. item total", ordering="min_order_value")
     def minimum(self, obj) -> str:
+        if rewards.is_reward(obj) and not obj.min_order_value:
+            return STORE_MINIMUM  # a reward needs the store's minimum paid cartons
         return inr(obj.min_order_value)
 
     @display(description="Valid (IST)")
@@ -430,6 +498,28 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
             return PUBLIC_COUPON
         # Masked unless this viewer sees customers in full (history pages: always masked).
         return customer_label(obj.owner, full=getattr(obj, "full_pii", False))
+
+    @display(description="Source", ordering="source")
+    def source_label(self, obj) -> str:
+        if obj is None or obj.pk is None:
+            return "-"
+        return obj.get_source_display()
+
+    @display(description="Reward")
+    def reward_kind(self, obj) -> str:
+        return f"{rewards.REWARD_LABEL} (₹0; the customer picks the size)"
+
+    @display(description="Reward status")
+    def reward_status(self, obj) -> str:
+        """ADR 0002 §10, derived by the backend (`rewards.reward_state`), never stored."""
+        if obj is None or obj.pk is None or not rewards.is_reward(obj):
+            return "-"
+        state = rewards.reward_state(obj)
+        label = RewardStatus(state.status).label
+        if state.order is not None:
+            # Plain text: not every coupon role may open orders.
+            return f"{label} (order {state.order.order_number})"
+        return label
 
     @display(description="State", label=status.label_tones(status.COUPON))
     def state_badge(self, obj) -> str:
@@ -556,6 +646,8 @@ class CouponRedemptionAdmin(StoreScopedAdminMixin, ModelAdmin):
 
     @display(description="Discount", ordering="discount_amount")
     def discount(self, obj) -> str:
+        if rewards.is_reward(obj.coupon):
+            return rewards.REWARD_LABEL  # a free line at ₹0 on the order (ADR 0002)
         return inr(obj.discount_amount)
 
     @display(description="Status", label=status.label_tones(status.REDEMPTION))
