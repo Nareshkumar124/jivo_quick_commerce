@@ -259,6 +259,10 @@
   "statusUnknownTitle": "Account status unavailable",
   "statusUnknownBody": "This version of the app can't show your account status. Update the app or contact support.",
   "callSupport": "Call support",
+  "emailSupport": "Email us",
+  "@emailSupport": {
+    "description": "Button that opens the email app to write to Jivo customer care. The address is shown under it."
+  },
   "onboardingStepOf": "Step {step} of {total}",
   "@onboardingStepOf": {
     "description": "Progress through registration, documents and bank details.",

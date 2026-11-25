@@ -7,6 +7,7 @@ import 'package:rider_app/features/onboarding/data/fake_rider_onboarding_backend
 import '../../../helpers/onboarding_fixtures.dart';
 import '../../../helpers/records_helpers.dart';
 import '../../../helpers/rider_app_harness.dart';
+import '../../../helpers/support_config.dart';
 
 void main() {
   late RiderTestHarness h;
@@ -150,7 +151,33 @@ void main() {
     );
     await tester.tap(byKey('profile-call-support'));
     await tester.pumpAndSettle();
-    expect(h.urls.opened.single, Uri(scheme: 'tel', path: '+911800123456'));
+    expect(h.urls.opened.single, Uri(scheme: 'tel', path: '+919910557187'));
+  });
+
+  testWidgets('email support opens mailto with the address from the config', (
+    tester,
+  ) async {
+    await openFromHome(tester, h, 'home-profile');
+    final email = byKey('profile-email-support');
+    await scrollTo(tester, email, listKey: const Key('profile-list'));
+    expect(
+      find.descendant(of: email, matching: find.text('info@jivo.in')),
+      findsOneWidget,
+    );
+    await tester.tap(email);
+    await tester.pumpAndSettle();
+    expect(h.urls.opened.single, Uri.parse('mailto:info@jivo.in'));
+  });
+
+  testWidgets('no email in the config: only Call support', (tester) async {
+    h.config = SupportConfigRepository(email: '');
+    await openFromHome(tester, h, 'home-profile');
+    await scrollTo(
+      tester,
+      byKey('profile-call-support'),
+      listKey: const Key('profile-list'),
+    );
+    expect(byKey('profile-email-support'), findsNothing);
   });
 
   testWidgets('log out from the profile: offline with no task signs out', (

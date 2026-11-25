@@ -504,6 +504,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get callSupport => 'Call support';
 
   @override
+  String get emailSupport => 'Email us';
+
+  @override
   String onboardingStepOf(int step, int total) {
     return 'Step $step of $total';
   }

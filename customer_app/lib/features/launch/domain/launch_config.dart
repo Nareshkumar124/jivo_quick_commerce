@@ -14,6 +14,7 @@ class LaunchConfig {
     this.otpLength = 6,
     this.resendAfterSeconds = 30,
     this.supportPhone,
+    this.supportEmail,
   });
 
   final String? minSupportedVersion;
@@ -30,6 +31,9 @@ class LaunchConfig {
 
   /// `support.phone`: "Contact support" calls it (`03 §2.10`).
   final String? supportPhone;
+
+  /// `support.email`: Help's "Email us" row opens it (`03 §2.11`).
+  final String? supportEmail;
 }
 
 @immutable

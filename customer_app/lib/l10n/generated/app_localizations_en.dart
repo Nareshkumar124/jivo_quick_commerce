@@ -702,7 +702,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchHint => 'Search products';
 
   @override
-  String get homeSearchHint => 'Search water, oils and more';
+  String get homeSearchHint => 'Search water';
 
   @override
   String get homeCategories => 'Shop by category';
@@ -2214,6 +2214,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get callSupport => 'Call support';
+
+  @override
+  String get emailSupport => 'Email us';
 
   @override
   String get helpComingSoon => 'Support is coming soon to the app.';

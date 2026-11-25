@@ -38,6 +38,9 @@ class ApiConfigRepository implements ConfigRepository {
         supportPhone: config.support.phone.trim().isEmpty
             ? null
             : config.support.phone.trim(),
+        supportEmail: config.support.email.trim().isEmpty
+            ? null
+            : config.support.email.trim(),
       );
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -64,7 +67,8 @@ class FakeConfigRepository implements ConfigRepository {
     ),
     minSupportedVersion: '1.0.0',
     latestVersion: '1.0.0',
-    supportPhone: '+911800000000',
+    supportPhone: '+919910557187',
+    supportEmail: 'info@jivo.in',
   );
 
   @override
