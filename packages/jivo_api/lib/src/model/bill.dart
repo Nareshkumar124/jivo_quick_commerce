@@ -38,6 +38,8 @@ class Bill {
     required this.grandTotal,
 
     required this.totalSavings,
+
+    required this.freeItemsValue,
   });
 
   /// Sum of MRP x quantity. The struck-out 'Item total (MRP)'.
@@ -76,9 +78,13 @@ class Bill {
   @JsonKey(name: r'grand_total', required: true, includeIfNull: false)
   final String grandTotal;
 
-  /// `product_discount` + `coupon_discount`: the highlighted 'You save' amount.
+  /// `product_discount` + `coupon_discount` + `free_items_value`: the highlighted 'You save' amount.
   @JsonKey(name: r'total_savings', required: true, includeIfNull: false)
   final String totalSavings;
+
+  /// ADR 0002: the MRP value of the free cartons (MRP x free quantity; the volume offer and a free-carton reward). They cost ₹0: not part of `item_total`, the fees, the coupon minimum, the COD limit or `grand_total`. \"0.00\" when there are none.
+  @JsonKey(name: r'free_items_value', required: true, includeIfNull: false)
+  final String freeItemsValue;
 
   @override
   bool operator ==(Object other) =>
@@ -93,7 +99,8 @@ class Bill {
           other.handlingFee == handlingFee &&
           other.tip == tip &&
           other.grandTotal == grandTotal &&
-          other.totalSavings == totalSavings;
+          other.totalSavings == totalSavings &&
+          other.freeItemsValue == freeItemsValue;
 
   @override
   int get hashCode =>
@@ -106,7 +113,8 @@ class Bill {
       handlingFee.hashCode +
       tip.hashCode +
       grandTotal.hashCode +
-      totalSavings.hashCode;
+      totalSavings.hashCode +
+      freeItemsValue.hashCode;
 
   factory Bill.fromJson(Map<String, dynamic> json) => _$BillFromJson(json);
 

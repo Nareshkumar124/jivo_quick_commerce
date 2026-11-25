@@ -45,6 +45,8 @@ import 'package:jivo_api/src/model/earnings_order.dart';
 import 'package:jivo_api/src/model/error_body.dart';
 import 'package:jivo_api/src/model/error_envelope.dart';
 import 'package:jivo_api/src/model/faq.dart';
+import 'package:jivo_api/src/model/free_line.dart';
+import 'package:jivo_api/src/model/free_offer.dart';
 import 'package:jivo_api/src/model/health_checks.dart';
 import 'package:jivo_api/src/model/health_live.dart';
 import 'package:jivo_api/src/model/health_ready.dart';
@@ -117,6 +119,9 @@ import 'package:jivo_api/src/model/referral_apply_request.dart';
 import 'package:jivo_api/src/model/referred_by.dart';
 import 'package:jivo_api/src/model/reorder_issue.dart';
 import 'package:jivo_api/src/model/reorder_result.dart';
+import 'package:jivo_api/src/model/reward.dart';
+import 'package:jivo_api/src/model/reward_history_entry.dart';
+import 'package:jivo_api/src/model/rewards.dart';
 import 'package:jivo_api/src/model/rider_bank_account.dart';
 import 'package:jivo_api/src/model/rider_bank_account_update_request.dart';
 import 'package:jivo_api/src/model/rider_cash.dart';
@@ -314,6 +319,7 @@ ReturnType deserialize<ReturnType, BaseType>(
       return CouponList.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'CouponOffer':
       return CouponOffer.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'CouponSourceEnum':
     case 'CurrentOffer':
       return CurrentOffer.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'CurrentTask':
@@ -363,6 +369,11 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'Faq':
       return Faq.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'FreeLine':
+      return FreeLine.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'FreeOffer':
+      return FreeOffer.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'FreeSourceEnum':
     case 'HealthCheckStatusEnum':
     case 'HealthChecks':
       return HealthChecks.fromJson(value as Map<String, dynamic>) as ReturnType;
@@ -568,6 +579,15 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'ReorderResult':
       return ReorderResult.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'Reward':
+      return Reward.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'RewardHistoryEntry':
+      return RewardHistoryEntry.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RewardHistoryKindEnum':
+    case 'RewardStatusEnum':
+    case 'Rewards':
+      return Rewards.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'RiderBankAccount':
       return RiderBankAccount.fromJson(value as Map<String, dynamic>)
           as ReturnType;

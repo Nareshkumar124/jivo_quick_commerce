@@ -23,6 +23,10 @@ abstract class _$CartCWProxy {
 
   Cart bill(Bill bill);
 
+  Cart freeLines(List<FreeLine> freeLines);
+
+  Cart freeOffer(FreeOffer? freeOffer);
+
   Cart thresholds(CartThresholds thresholds);
 
   Cart paymentMethods(List<PaymentOption> paymentMethods);
@@ -44,6 +48,8 @@ abstract class _$CartCWProxy {
     DeliveryInstructions instructions,
     Address? address,
     Bill bill,
+    List<FreeLine> freeLines,
+    FreeOffer? freeOffer,
     CartThresholds thresholds,
     List<PaymentOption> paymentMethods,
     CheckoutStatus checkout,
@@ -82,6 +88,12 @@ class _$CartCWProxyImpl implements _$CartCWProxy {
   Cart bill(Bill bill) => this(bill: bill);
 
   @override
+  Cart freeLines(List<FreeLine> freeLines) => this(freeLines: freeLines);
+
+  @override
+  Cart freeOffer(FreeOffer? freeOffer) => this(freeOffer: freeOffer);
+
+  @override
   Cart thresholds(CartThresholds thresholds) => this(thresholds: thresholds);
 
   @override
@@ -107,6 +119,8 @@ class _$CartCWProxyImpl implements _$CartCWProxy {
     Object? instructions = const $CopyWithPlaceholder(),
     Object? address = const $CopyWithPlaceholder(),
     Object? bill = const $CopyWithPlaceholder(),
+    Object? freeLines = const $CopyWithPlaceholder(),
+    Object? freeOffer = const $CopyWithPlaceholder(),
     Object? thresholds = const $CopyWithPlaceholder(),
     Object? paymentMethods = const $CopyWithPlaceholder(),
     Object? checkout = const $CopyWithPlaceholder(),
@@ -144,6 +158,14 @@ class _$CartCWProxyImpl implements _$CartCWProxy {
           ? _value.bill
           // ignore: cast_nullable_to_non_nullable
           : bill as Bill,
+      freeLines: freeLines == const $CopyWithPlaceholder()
+          ? _value.freeLines
+          // ignore: cast_nullable_to_non_nullable
+          : freeLines as List<FreeLine>,
+      freeOffer: freeOffer == const $CopyWithPlaceholder()
+          ? _value.freeOffer
+          // ignore: cast_nullable_to_non_nullable
+          : freeOffer as FreeOffer?,
       thresholds: thresholds == const $CopyWithPlaceholder()
           ? _value.thresholds
           // ignore: cast_nullable_to_non_nullable
@@ -185,6 +207,8 @@ Cart _$CartFromJson(Map<String, dynamic> json) => $checkedCreate(
         'instructions',
         'address',
         'bill',
+        'free_lines',
+        'free_offer',
         'thresholds',
         'payment_methods',
         'checkout',
@@ -221,6 +245,16 @@ Cart _$CartFromJson(Map<String, dynamic> json) => $checkedCreate(
         'bill',
         (v) => Bill.fromJson(v as Map<String, dynamic>),
       ),
+      freeLines: $checkedConvert(
+        'free_lines',
+        (v) => (v as List<dynamic>)
+            .map((e) => FreeLine.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      ),
+      freeOffer: $checkedConvert(
+        'free_offer',
+        (v) => v == null ? null : FreeOffer.fromJson(v as Map<String, dynamic>),
+      ),
       thresholds: $checkedConvert(
         'thresholds',
         (v) => CartThresholds.fromJson(v as Map<String, dynamic>),
@@ -240,6 +274,8 @@ Cart _$CartFromJson(Map<String, dynamic> json) => $checkedCreate(
   },
   fieldKeyMap: const {
     'itemCount': 'item_count',
+    'freeLines': 'free_lines',
+    'freeOffer': 'free_offer',
     'paymentMethods': 'payment_methods',
   },
 );
@@ -253,6 +289,8 @@ Map<String, dynamic> _$CartToJson(Cart instance) => <String, dynamic>{
   'instructions': instance.instructions.toJson(),
   'address': instance.address?.toJson(),
   'bill': instance.bill.toJson(),
+  'free_lines': instance.freeLines.map((e) => e.toJson()).toList(),
+  'free_offer': instance.freeOffer?.toJson(),
   'thresholds': instance.thresholds.toJson(),
   'payment_methods': instance.paymentMethods.map((e) => e.toJson()).toList(),
   'checkout': instance.checkout.toJson(),

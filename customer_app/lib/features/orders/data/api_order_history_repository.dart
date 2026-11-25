@@ -5,6 +5,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../addresses/domain/saved_address.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../cart/data/api_cart_repository.dart' show billFromApi, cartFromApi;
+import '../../cart/domain/cart.dart' show FreeLine, FreeLineSource;
 import '../domain/order.dart';
 import '../domain/order_history.dart';
 import 'api_order_repository.dart' show paymentMethodFromApi;
@@ -121,7 +122,9 @@ OrderListItem orderListItemFromApi(api.OrderSummary s) => OrderListItem(
   canRetryPayment: s.canRetryPayment,
 );
 
-/// `Order` as the detail screen's order.
+/// `Order` as the detail screen's order. Free cartons (`is_free` lines,
+/// ADR 0002) go to [OrderDetail.freeLines] and never into the paid
+/// [OrderDetail.lines].
 OrderDetail orderDetailFromApi(api.Order o) => OrderDetail(
   id: o.id,
   number: o.orderNumber,
@@ -129,21 +132,38 @@ OrderDetail orderDetailFromApi(api.Order o) => OrderDetail(
   paymentMethod: paymentMethodFromApi(o.paymentMethod),
   paymentStatus: PaymentStatus.fromWire(o.paymentStatus.value),
   storeName: o.store.name,
+  freeLines: [
+    for (final line in o.items)
+      if (line.isFree)
+        FreeLine(
+          variantId: line.variantId,
+          productId: line.productId,
+          productName: line.productName,
+          variantName: line.variantName,
+          imageUrl: line.image?.thumbnail,
+          quantity: line.quantity,
+          mrp: line.mrp,
+          value: line.lineMrpTotal,
+          source: FreeLineSource.fromWire(line.freeSource?.value),
+          quantityUnavailable: line.quantityUnavailable,
+        ),
+  ],
   lines: [
     for (final line in o.items)
-      OrderLineItem(
-        variantId: line.variantId,
-        productId: line.productId,
-        productName: line.productName,
-        variantName: line.variantName,
-        imageUrl: line.image?.thumbnail,
-        mrp: line.mrp,
-        sellingPrice: line.sellingPrice,
-        quantity: line.quantity,
-        lineMrpTotal: line.lineMrpTotal,
-        lineTotal: line.lineTotal,
-        quantityUnavailable: line.quantityUnavailable,
-      ),
+      if (!line.isFree)
+        OrderLineItem(
+          variantId: line.variantId,
+          productId: line.productId,
+          productName: line.productName,
+          variantName: line.variantName,
+          imageUrl: line.image?.thumbnail,
+          mrp: line.mrp,
+          sellingPrice: line.sellingPrice,
+          quantity: line.quantity,
+          lineMrpTotal: line.lineMrpTotal,
+          lineTotal: line.lineTotal,
+          quantityUnavailable: line.quantityUnavailable,
+        ),
   ],
   itemCount: o.itemCount,
   bill: billFromApi(o.bill),

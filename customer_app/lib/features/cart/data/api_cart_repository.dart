@@ -56,11 +56,17 @@ class ApiCartRepository implements CartRepository {
     return [for (final offer in list.results) _offer(offer)];
   });
 
+  /// A free-carton reward sends the picked size as `free_variant_id`
+  /// (ADR 0002); the server answers 400 without it, or 422
+  /// `COUPON_NOT_ELIGIBLE` (`MIN_ORDER_UNITS`, `FREE_VARIANT_UNAVAILABLE`).
   @override
-  Future<CartSnapshot> applyCoupon(String code) => _call(
+  Future<CartSnapshot> applyCoupon(String code, {int? freeVariantId}) => _call(
     () => _cart.cartCouponApply(
       xStoreId: _store,
-      couponApplyRequest: api.CouponApplyRequest(code: code.trim()),
+      couponApplyRequest: api.CouponApplyRequest(
+        code: code.trim(),
+        freeVariantId: freeVariantId,
+      ),
     ),
   );
 
@@ -89,7 +95,8 @@ class ApiCartRepository implements CartRepository {
   }
 }
 
-/// `Cart` as the app's [CartSnapshot]: the server's values, unchanged.
+/// `Cart` as the app's [CartSnapshot]: the server's values, unchanged,
+/// including the free cartons (`free_lines`, `free_offer`, ADR 0002).
 CartSnapshot cartFromApi(api.Cart c) => CartSnapshot.fromLines(
   lines: [for (final line in c.items) _line(line)],
   itemCount: c.itemCount,
@@ -102,6 +109,21 @@ CartSnapshot cartFromApi(api.Cart c) => CartSnapshot.fromLines(
       discount: coupon.discount,
       isApplicable: coupon.isApplicable,
       message: coupon.message,
+      discountType: CouponDiscountType.fromWire(coupon.discountType.value),
+      source: RewardSource.fromWire(coupon.source_.value),
+      freeVariantId: coupon.freeVariantId,
+    ),
+  },
+  freeLines: [for (final line in c.freeLines) _freeLine(line)],
+  freeOffer: switch (c.freeOffer) {
+    null => null,
+    final offer => FreeOffer(
+      every: offer.every,
+      paidUnits: offer.paidUnits,
+      freeUnits: offer.freeUnits,
+      unitsToNextFree: offer.unitsToNextFree,
+      message: offer.message,
+      notice: offer.notice,
     ),
   },
   tip: c.tip,
@@ -171,7 +193,25 @@ CartBill billFromApi(api.Bill b) => CartBill(
   tip: b.tip,
   grandTotal: b.grandTotal,
   totalSavings: b.totalSavings,
+  freeItemsValue: b.freeItemsValue,
 );
+
+/// A cart `FreeLine` (ADR 0002): always ₹0; `mrp` and `value` as sent.
+FreeLine _freeLine(api.FreeLine l) {
+  final variant = variantFromApi(l.variant);
+  return FreeLine(
+    variantId: variant.id,
+    productId: l.product.id,
+    productSlug: l.product.slug,
+    productName: l.product.name,
+    variantName: variant.name,
+    imageUrl: variant.imageUrl,
+    quantity: l.quantity,
+    mrp: l.mrp,
+    value: l.value,
+    source: FreeLineSource.fromWire(l.source_.value),
+  );
+}
 
 CartLine _line(api.CartLine l) => CartLine(
   id: l.id,
@@ -259,6 +299,9 @@ CouponOffer _offer(api.CouponOffer o) => CouponOffer(
   endsAt: o.endsAt,
   isPersonal: o.isPersonal,
   minOrderValue: o.minOrderValue,
+  discountType: CouponDiscountType.fromWire(o.discountType.value),
+  source: RewardSource.fromWire(o.source_.value),
+  freeVariantId: o.freeVariantId,
 );
 
 InstructionTag? _chipFromApi(

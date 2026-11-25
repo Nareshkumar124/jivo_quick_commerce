@@ -36,6 +36,7 @@ import '../features/profile/data/profile_repository.dart';
 import '../features/rating/data/api_rating_repository.dart';
 import '../features/rating/data/rating_repository.dart';
 import '../features/referral/data/referral_repository.dart';
+import '../features/rewards/data/rewards_repository.dart';
 import '../features/support/data/api_support_repository.dart';
 import '../features/support/data/support_repository.dart';
 import '../features/support/data/ticket_photo_picker.dart';
@@ -77,6 +78,14 @@ final referralRepositoryProvider = Provider<ReferralRepository>(
   (ref) => _fake(ref)
       ? FakeReferralRepository()
       : ApiReferralRepository(ref.watch(jivoApiProvider)),
+);
+
+/// Rewards (`GET /account/rewards/`, ADR 0002): the API, the demo fake with
+/// `FAKE_API`.
+final rewardsRepositoryProvider = Provider<RewardsRepository>(
+  (ref) => _fake(ref)
+      ? FakeRewardsRepository.demo()
+      : ApiRewardsRepository(ref.watch(jivoApiProvider)),
 );
 
 final addressRepositoryProvider = Provider<AddressRepository>(
@@ -123,7 +132,16 @@ final cartAvailableProvider = Provider<bool>(
 /// repositories, so placing an order clears the cart. Never built for
 /// staging or prod.
 final fakeCommerceBackendProvider = Provider<FakeCommerceBackend>(
-  (ref) => FakeCommerceBackend()..seedDemoOrders(),
+  (ref) =>
+      FakeCommerceBackend(
+          // The demo rules, plus "buy 10 get 1 free" (ADR 0002).
+          rules: const FakeBillRules(freeUnitEvery: 10),
+          variantLookup: fakeCatalogVariant,
+        )
+        ..rewardCoupons.add(
+          const FakeCoupon.freeCarton(code: FakeRewardsRepository.welcomeCode),
+        )
+        ..seedDemoOrders(),
 );
 
 /// The server cart (`06 §2.5`): the API in the dev flavor, the fake with

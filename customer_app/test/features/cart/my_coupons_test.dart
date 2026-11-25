@@ -70,7 +70,8 @@ void main() {
       ],
     );
 
-    expect(find.text('My coupons'), findsWidgets);
+    // Account > Rewards (was My coupons, ADR 0002): same route.
+    expect(find.text('Rewards'), findsWidgets);
     expect(
       find.byKey(const ValueKey('coupon-for-you-FRIEND100')),
       findsOneWidget,
@@ -102,7 +103,7 @@ void main() {
 
   testWidgets('empty state', (tester) async {
     await openCoupons(tester);
-    expect(find.text('No coupons right now'), findsOneWidget);
+    expect(find.text('No rewards or coupons right now'), findsOneWidget);
   });
 
   testWidgets('error shows retry, retry loads the list', (tester) async {

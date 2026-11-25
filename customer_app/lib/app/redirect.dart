@@ -28,7 +28,8 @@ abstract final class Routes {
   /// Refer & earn: the customer's code, and entering a friend's.
   static const referral = '/account/referral';
 
-  /// My coupons: the coupons available to this customer.
+  /// Rewards (was "My coupons", ADR 0002): free-carton rewards, coupons and
+  /// the rewards history. The path is kept so old links still work.
   static const myCoupons = '/account/coupons';
 
   /// Under Home, on the root navigator: `go` keeps Home behind them.

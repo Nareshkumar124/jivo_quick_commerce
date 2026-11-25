@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/model/coupon_discount_type_enum.dart';
 import 'package:jivo_api/src/model/referred_by.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -25,6 +26,12 @@ class Referral {
     required this.shareMessage,
 
     required this.isEnabled,
+
+    required this.rewardType,
+
+    required this.rewardQuantity,
+
+    required this.rewardLabel,
 
     required this.rewardAmount,
 
@@ -53,15 +60,33 @@ class Referral {
   @JsonKey(name: r'is_enabled', required: true, includeIfNull: false)
   final bool isEnabled;
 
-  /// Rupees off for each of the two customers, e.g. \"90.00\".
+  /// ADR 0002: FREE_UNIT = each of the two customers gets one free carton (show `reward_label`, never a ₹ amount). The only value sent today.  * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - One free carton (reward)
+  @JsonKey(
+    name: r'reward_type',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: CouponDiscountTypeEnum.unknownDefaultOpenApi,
+  )
+  final CouponDiscountTypeEnum rewardType;
+
+  /// Free cartons each customer gets (1).
+  // minimum: 1
+  @JsonKey(name: r'reward_quantity', required: true, includeIfNull: false)
+  final int rewardQuantity;
+
+  /// Ready-made text, e.g. \"1 free carton\".
+  @JsonKey(name: r'reward_label', required: true, includeIfNull: false)
+  final String rewardLabel;
+
+  /// Deprecated (ADR 0002): the old ₹ reward setting, not given any more. Use `reward_type` / `reward_label`.
   @JsonKey(name: r'reward_amount', required: true, includeIfNull: false)
   final String rewardAmount;
 
-  /// Days the reward coupon stays valid after it is given.
+  /// Days the reward stays valid after it is given.
   @JsonKey(name: r'reward_validity_days', required: true, includeIfNull: false)
   final int rewardValidityDays;
 
-  /// Minimum item total to use the reward coupon (\"0.00\" = none).
+  /// Deprecated (ADR 0002): free-carton rewards need the store's minimum paid cartons instead. Always \"0.00\".
   @JsonKey(
     name: r'reward_min_order_value',
     required: true,
@@ -92,6 +117,9 @@ class Referral {
           other.code == code &&
           other.shareMessage == shareMessage &&
           other.isEnabled == isEnabled &&
+          other.rewardType == rewardType &&
+          other.rewardQuantity == rewardQuantity &&
+          other.rewardLabel == rewardLabel &&
           other.rewardAmount == rewardAmount &&
           other.rewardValidityDays == rewardValidityDays &&
           other.rewardMinOrderValue == rewardMinOrderValue &&
@@ -105,6 +133,9 @@ class Referral {
       code.hashCode +
       shareMessage.hashCode +
       isEnabled.hashCode +
+      rewardType.hashCode +
+      rewardQuantity.hashCode +
+      rewardLabel.hashCode +
       rewardAmount.hashCode +
       rewardValidityDays.hashCode +
       rewardMinOrderValue.hashCode +

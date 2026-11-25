@@ -37,6 +37,10 @@ abstract class _$CouponOfferCWProxy {
 
   CouponOffer isPersonal(bool isPersonal);
 
+  CouponOffer source_(CouponSourceEnum source_);
+
+  CouponOffer freeVariantId(int? freeVariantId);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CouponOffer(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -59,6 +63,8 @@ abstract class _$CouponOfferCWProxy {
     String? message,
     String? amountToUnlock,
     bool isPersonal,
+    CouponSourceEnum source_,
+    int? freeVariantId,
   });
 }
 
@@ -119,6 +125,13 @@ class _$CouponOfferCWProxyImpl implements _$CouponOfferCWProxy {
   CouponOffer isPersonal(bool isPersonal) => this(isPersonal: isPersonal);
 
   @override
+  CouponOffer source_(CouponSourceEnum source_) => this(source_: source_);
+
+  @override
+  CouponOffer freeVariantId(int? freeVariantId) =>
+      this(freeVariantId: freeVariantId);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CouponOffer(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -141,6 +154,8 @@ class _$CouponOfferCWProxyImpl implements _$CouponOfferCWProxy {
     Object? message = const $CopyWithPlaceholder(),
     Object? amountToUnlock = const $CopyWithPlaceholder(),
     Object? isPersonal = const $CopyWithPlaceholder(),
+    Object? source_ = const $CopyWithPlaceholder(),
+    Object? freeVariantId = const $CopyWithPlaceholder(),
   }) {
     return CouponOffer(
       code: code == const $CopyWithPlaceholder()
@@ -203,6 +218,14 @@ class _$CouponOfferCWProxyImpl implements _$CouponOfferCWProxy {
           ? _value.isPersonal
           // ignore: cast_nullable_to_non_nullable
           : isPersonal as bool,
+      source_: source_ == const $CopyWithPlaceholder()
+          ? _value.source_
+          // ignore: cast_nullable_to_non_nullable
+          : source_ as CouponSourceEnum,
+      freeVariantId: freeVariantId == const $CopyWithPlaceholder()
+          ? _value.freeVariantId
+          // ignore: cast_nullable_to_non_nullable
+          : freeVariantId as int?,
     );
   }
 }
@@ -239,6 +262,8 @@ CouponOffer _$CouponOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
         'message',
         'amount_to_unlock',
         'is_personal',
+        'source',
+        'free_variant_id',
       ],
     );
     final val = CouponOffer(
@@ -274,6 +299,18 @@ CouponOffer _$CouponOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
       message: $checkedConvert('message', (v) => v as String?),
       amountToUnlock: $checkedConvert('amount_to_unlock', (v) => v as String?),
       isPersonal: $checkedConvert('is_personal', (v) => v as bool),
+      source_: $checkedConvert(
+        'source',
+        (v) => $enumDecode(
+          _$CouponSourceEnumEnumMap,
+          v,
+          unknownValue: CouponSourceEnum.unknownDefaultOpenApi,
+        ),
+      ),
+      freeVariantId: $checkedConvert(
+        'free_variant_id',
+        (v) => (v as num?)?.toInt(),
+      ),
     );
     return val;
   },
@@ -287,6 +324,8 @@ CouponOffer _$CouponOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
     'ineligibleReason': 'ineligible_reason',
     'amountToUnlock': 'amount_to_unlock',
     'isPersonal': 'is_personal',
+    'source_': 'source',
+    'freeVariantId': 'free_variant_id',
   },
 );
 
@@ -308,11 +347,14 @@ Map<String, dynamic> _$CouponOfferToJson(CouponOffer instance) =>
       'message': instance.message,
       'amount_to_unlock': instance.amountToUnlock,
       'is_personal': instance.isPersonal,
+      'source': _$CouponSourceEnumEnumMap[instance.source_]!,
+      'free_variant_id': instance.freeVariantId,
     };
 
 const _$CouponDiscountTypeEnumEnumMap = {
   CouponDiscountTypeEnum.FLAT: 'FLAT',
   CouponDiscountTypeEnum.PERCENT: 'PERCENT',
+  CouponDiscountTypeEnum.FREE_UNIT: 'FREE_UNIT',
   CouponDiscountTypeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
@@ -321,5 +363,16 @@ const _$CouponIneligibleReasonEnumEnumMap = {
   CouponIneligibleReasonEnum.FIRST_ORDER_ONLY: 'FIRST_ORDER_ONLY',
   CouponIneligibleReasonEnum.NO_ELIGIBLE_ITEMS: 'NO_ELIGIBLE_ITEMS',
   CouponIneligibleReasonEnum.STORE: 'STORE',
+  CouponIneligibleReasonEnum.MIN_ORDER_UNITS: 'MIN_ORDER_UNITS',
+  CouponIneligibleReasonEnum.FREE_VARIANT_UNAVAILABLE:
+      'FREE_VARIANT_UNAVAILABLE',
   CouponIneligibleReasonEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$CouponSourceEnumEnumMap = {
+  CouponSourceEnum.NONE: 'NONE',
+  CouponSourceEnum.WELCOME: 'WELCOME',
+  CouponSourceEnum.REFERRAL_REFERRER: 'REFERRAL_REFERRER',
+  CouponSourceEnum.REFERRAL_REFERRED: 'REFERRAL_REFERRED',
+  CouponSourceEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

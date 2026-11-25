@@ -9,6 +9,8 @@ import '../../domain/cart.dart';
 /// `compute_bill` (`08 §6.2`), shown as sent. Nothing here adds, subtracts
 /// or compares amounts; zero rows are hidden (except delivery, which shows
 /// FREE) and the savings banner appears only when the server sends it.
+/// Free cartons (`free_items_value`, ADR 0002) show as their struck-out
+/// value and FREE: they are not part of the amount to pay.
 class BillDetails extends StatelessWidget {
   const BillDetails({required this.bill, this.coupon, super.key});
 
@@ -44,6 +46,17 @@ class BillDetails extends StatelessWidget {
             label: l10n.billProductDiscount,
             value: minus(bill.productDiscount),
             valueColor: success,
+          ),
+        if (!isZeroAmount(bill.freeItemsValue))
+          _BillRow(
+            rowKey: 'free-items',
+            label: l10n.billFreeCartons,
+            struck: displayRupees(bill.freeItemsValue),
+            value: l10n.billFree,
+            valueColor: success,
+            semanticsLabel: l10n.billFreeCartonsSemantics(
+              displayRupees(bill.freeItemsValue),
+            ),
           ),
         if (!isZeroAmount(bill.couponDiscount))
           _BillRow(
@@ -103,6 +116,8 @@ class _BillRow extends StatelessWidget {
     required this.value,
     this.valueColor,
     this.emphasised = false,
+    this.struck,
+    this.semanticsLabel,
   });
 
   final String rowKey;
@@ -111,29 +126,55 @@ class _BillRow extends StatelessWidget {
   final Color? valueColor;
   final bool emphasised;
 
+  /// A struck-out amount before [value] (the free cartons' worth).
+  final String? struck;
+
+  /// Replaces the row's merged label for screen readers.
+  final String? semanticsLabel;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final style = emphasised
         ? theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)
         : theme.textTheme.bodyMedium;
-    return MergeSemantics(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: JivoSpacing.xs),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: Text(label, style: style)),
-            const SizedBox(width: JivoSpacing.md),
+    final struck = this.struck;
+    final row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: JivoSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text(label, style: style)),
+          const SizedBox(width: JivoSpacing.md),
+          if (struck != null) ...[
             Text(
-              value,
-              key: ValueKey('bill-$rowKey'),
-              style: style?.copyWith(color: valueColor),
+              struck,
+              key: ValueKey('bill-$rowKey-struck'),
+              style: style?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                decoration: TextDecoration.lineThrough,
+              ),
             ),
+            const SizedBox(width: JivoSpacing.xs),
           ],
-        ),
+          Text(
+            value,
+            key: ValueKey('bill-$rowKey'),
+            style: style?.copyWith(color: valueColor),
+          ),
+        ],
       ),
     );
+    final spoken = semanticsLabel;
+    if (spoken != null) {
+      return Semantics(
+        container: true,
+        label: spoken,
+        excludeSemantics: true,
+        child: row,
+      );
+    }
+    return MergeSemantics(child: row);
   }
 }
 

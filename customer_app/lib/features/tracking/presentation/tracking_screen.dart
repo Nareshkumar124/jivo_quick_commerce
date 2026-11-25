@@ -263,7 +263,12 @@ List<Widget> trackSheetChildren(
         runSpacing: JivoSpacing.xs,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          EtaCountdown(etaAt: eta, status: status, orderId: track.orderId),
+          EtaCountdown(
+            etaAt: eta,
+            status: status,
+            orderId: track.orderId,
+            now: ref.read(trackClockProvider),
+          ),
           TrackDistanceLeft(orderId: track.orderId),
         ],
       ),

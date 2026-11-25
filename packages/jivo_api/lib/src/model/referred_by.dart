@@ -31,7 +31,7 @@ class ReferredBy {
   @JsonKey(name: r'code_masked', required: true, includeIfNull: false)
   final String codeMasked;
 
-  /// PENDING: both get the reward when the caller's first order is delivered. REWARDED: the reward coupon is in the caller's coupon list. VOID: no reward (the program was off at that delivery).  * `PENDING` - Waiting for the first delivered order * `REWARDED` - Rewarded (both coupons given) * `VOID` - No reward (program off at the first delivery)
+  /// PENDING: both get the reward when the caller's first order is delivered. REWARDED: the reward is in the caller's Rewards (`GET /account/rewards/`). VOID: no reward (the program was off at that delivery).  * `PENDING` - Waiting for the first delivered order * `REWARDED` - Rewarded (both coupons given) * `VOID` - No reward (program off at the first delivery)
   @JsonKey(
     name: r'status',
     required: true,

@@ -4,6 +4,8 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/model/coupon_discount_type_enum.dart';
+import 'package:jivo_api/src/model/coupon_source_enum.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -23,6 +25,12 @@ class AppliedCoupon {
 
     required this.title,
 
+    required this.discountType,
+
+    required this.source_,
+
+    required this.freeVariantId,
+
     required this.discount,
 
     required this.isApplicable,
@@ -38,6 +46,28 @@ class AppliedCoupon {
   /// e.g. \"Flat ₹50 off\".
   @JsonKey(name: r'title', required: true, includeIfNull: false)
   final String title;
+
+  /// FREE_UNIT: a free-carton reward (ADR 0002). It gives no money off (`discount` is \"0.00\"); its carton is in `free_lines` with `source` REWARD.  * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - One free carton (reward)
+  @JsonKey(
+    name: r'discount_type',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: CouponDiscountTypeEnum.unknownDefaultOpenApi,
+  )
+  final CouponDiscountTypeEnum discountType;
+
+  /// Why the coupon exists: WELCOME / REFERRAL_* rewards, NONE for staff coupons.  * `NONE` - Made by staff * `WELCOME` - Welcome reward (new account) * `REFERRAL_REFERRER` - Referral reward (you invited a friend) * `REFERRAL_REFERRED` - Referral reward (you joined with a friend's code)
+  @JsonKey(
+    name: r'source',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: CouponSourceEnum.unknownDefaultOpenApi,
+  )
+  final CouponSourceEnum source_;
+
+  /// FREE_UNIT only: the size picked for the free carton (`VariantSummary.id`, sent as `free_variant_id` when applying). Null for other coupons.
+  @JsonKey(name: r'free_variant_id', required: true, includeIfNull: true)
+  final int? freeVariantId;
 
   /// The discount it gives this cart now (\"0.00\" when it does not apply).
   @JsonKey(name: r'discount', required: true, includeIfNull: false)
@@ -61,6 +91,9 @@ class AppliedCoupon {
       other is AppliedCoupon &&
           other.code == code &&
           other.title == title &&
+          other.discountType == discountType &&
+          other.source_ == source_ &&
+          other.freeVariantId == freeVariantId &&
           other.discount == discount &&
           other.isApplicable == isApplicable &&
           other.message == message &&
@@ -70,6 +103,9 @@ class AppliedCoupon {
   int get hashCode =>
       code.hashCode +
       title.hashCode +
+      discountType.hashCode +
+      source_.hashCode +
+      (freeVariantId == null ? 0 : freeVariantId.hashCode) +
       discount.hashCode +
       isApplicable.hashCode +
       (message == null ? 0 : message.hashCode) +

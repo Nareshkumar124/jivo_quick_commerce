@@ -61,7 +61,7 @@ class ReferralPromptCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: JivoSpacing.xs),
                       Text(
-                        l10n.referralPromptBody(referralRewardText(info)),
+                        referralPromptText(l10n, info),
                         style: theme.textTheme.bodySmall,
                       ),
                       TextButton(

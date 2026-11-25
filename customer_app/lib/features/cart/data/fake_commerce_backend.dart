@@ -28,6 +28,7 @@ class FakeBillRules {
     this.maxTip = 50000,
     this.paymentWindow = const Duration(minutes: 15),
     this.eta = const Duration(minutes: 15),
+    this.freeUnitEvery = 0,
   });
 
   static const demo = FakeBillRules();
@@ -50,6 +51,10 @@ class FakeBillRules {
 
   /// `CART_MAX_TIP`.
   final int maxTip;
+
+  /// `PricingConfig.free_unit_every` (ADR 0002): 1 free carton for every
+  /// this many paid ones; 0 = no volume offer (the default).
+  final int freeUnitEvery;
   final Duration paymentWindow;
   final Duration eta;
 }
@@ -66,7 +71,23 @@ class FakeCoupon {
     this.maxDiscount,
     this.firstOrderOnly = false,
     this.expired = false,
+    this.freeUnit = false,
+    this.source = RewardSource.none,
   });
+
+  /// A personal free-carton reward (`FREE_UNIT`, ADR 0002).
+  const FakeCoupon.freeCarton({
+    required this.code,
+    this.title = '1 free carton',
+    this.description = 'Pick any water size',
+    this.source = RewardSource.welcome,
+  }) : minItemTotal = 0,
+       flatOff = null,
+       percentOff = null,
+       maxDiscount = null,
+       firstOrderOnly = false,
+       expired = false,
+       freeUnit = true;
 
   final String code;
   final String title;
@@ -81,6 +102,12 @@ class FakeCoupon {
 
   /// Not listed; applying it is `COUPON_EXPIRED`.
   final bool expired;
+
+  /// One free carton of a size the customer picks (`free_variant_id`).
+  final bool freeUnit;
+
+  /// Why it was given (rewards only).
+  final RewardSource source;
 }
 
 /// The key id the server's local fake gateway sends (`06 §2.6`).
@@ -108,11 +135,22 @@ class FakeCommerceBackend
     this.rules = FakeBillRules.demo,
     this.latency = const Duration(milliseconds: 250),
     this.signer = fakePaymentSignature,
+    this.variantLookup,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now;
 
   final FakeBillRules rules;
   final Duration latency;
+
+  /// Finds a variant sold at the store that isn't in the cart (the size
+  /// picked for a free-carton reward). Without it only cart variants can
+  /// be picked.
+  final ({String productName, CatalogVariant variant})? Function(int id)?
+  variantLookup;
+
+  /// This customer's personal rewards (free cartons), listed and applied
+  /// like coupons (ADR 0002). Used ones are in [usedCoupons].
+  final rewardCoupons = <FakeCoupon>[];
 
   /// Checks the verify call's signature (the fake gateway's scheme).
   final FakePaymentSigner signer;
@@ -153,6 +191,9 @@ class FakeCommerceBackend
   final _lines = <int, _FakeLine>{};
   int _nextLineId = 1;
   String? _couponCode;
+
+  /// The size picked for the applied free-carton reward.
+  CartLinePreview? _rewardSize;
   int _tip = 0;
   DeliveryInstructions _instructions = DeliveryInstructions.none;
   int? _savedAddressId;
@@ -312,6 +353,7 @@ class FakeCommerceBackend
     // Lines, coupon and tip go; the address and instructions stay.
     _lines.clear();
     _couponCode = null;
+    _rewardSize = null;
     _tip = 0;
     return _snapshot();
   }
@@ -340,16 +382,50 @@ class FakeCommerceBackend
         ),
       );
     }
+    for (final reward in rewardCoupons) {
+      if (usedCoupons.contains(reward.code)) continue;
+      final applied = _couponCode == reward.code;
+      offers.add(
+        CouponOffer(
+          code: reward.code,
+          title: reward.title,
+          description: reward.description,
+          isEligible: true,
+          isApplied: applied,
+          isPersonal: true,
+          discountType: CouponDiscountType.freeUnit,
+          source: reward.source,
+          freeVariantId: applied ? _rewardSize?.variant.id : null,
+        ),
+      );
+    }
     // Eligible first.
     offers.sort((a, b) => (a.isEligible ? 0 : 1) - (b.isEligible ? 0 : 1));
     return offers;
   }
 
+  FakeCoupon? _coupon(String code) =>
+      demoCoupons.where((c) => c.code == code).firstOrNull ??
+      rewardCoupons.where((c) => c.code == code).firstOrNull;
+
+  /// The size picked for a reward: a cart line's variant, or one the store
+  /// sells ([variantLookup]); null when the store doesn't sell it.
+  CartLinePreview? _sizeFor(int variantId) {
+    final line = _lines[variantId];
+    if (line != null) return line.preview;
+    final found = variantLookup?.call(variantId);
+    if (found == null) return null;
+    return CartLinePreview(
+      productName: found.productName,
+      variant: found.variant,
+    );
+  }
+
   @override
-  Future<CartSnapshot> applyCoupon(String code) async {
+  Future<CartSnapshot> applyCoupon(String code, {int? freeVariantId}) async {
     await _respond();
     final normalised = code.trim().toUpperCase();
-    final coupon = demoCoupons.where((c) => c.code == normalised).firstOrNull;
+    final coupon = _coupon(normalised);
     if (coupon == null) _fail(ApiErrorCode.couponInvalid, status: 422);
     if (coupon.expired) _fail(ApiErrorCode.couponExpired, status: 422);
     if (usedCoupons.contains(coupon.code)) {
@@ -359,10 +435,30 @@ class FakeCommerceBackend
         details: {'scope': 'per_user'},
       );
     }
+    if (coupon.freeUnit) {
+      // ADR 0002: the size is required and must be sold at this store.
+      final size = freeVariantId == null ? null : _sizeFor(freeVariantId);
+      if (size == null) {
+        _fail(
+          ApiErrorCode.validationError,
+          details: {
+            'free_variant_id': [
+              freeVariantId == null
+                  ? 'This field is required.'
+                  : 'Not sold at this store.',
+            ],
+          },
+        );
+      }
+      _couponCode = coupon.code;
+      _rewardSize = size;
+      return _snapshot();
+    }
     final result = _evaluate(coupon, _itemTotal());
     switch (result.reason) {
       case null:
         _couponCode = coupon.code;
+        _rewardSize = null;
         return _snapshot();
       case CouponIneligibility.minOrderValue:
         _fail(
@@ -389,6 +485,7 @@ class FakeCommerceBackend
   Future<CartSnapshot> removeCoupon() async {
     await _respond();
     _couponCode = null;
+    _rewardSize = null;
     return _snapshot();
   }
 
@@ -553,6 +650,7 @@ class FakeCommerceBackend
       grandTotal: bill.grandTotal,
       status: cod ? OrderStatus.placed : OrderStatus.paymentPending,
       couponCode: _couponCode,
+      freeLines: cart.freeLines,
       lines: [
         for (final line in cart.lines)
           _FakeOrderLine(
@@ -995,6 +1093,7 @@ class FakeCommerceBackend
       ],
       itemCount: _units(order),
       bill: order.bill,
+      freeLines: order.freeLines,
       couponCode: order.couponCode,
       address: const OrderAddressSnapshot(
         label: AddressLabel.home,
@@ -1103,6 +1202,7 @@ class FakeCommerceBackend
     order.etaAt = _clock().toUtc().add(rules.eta);
     _lines.clear();
     _couponCode = null;
+    _rewardSize = null;
     _tip = 0;
     _hasOrdered = true;
   }
@@ -1222,6 +1322,8 @@ class FakeCommerceBackend
       for (final line in _lines.values)
         if (line.preview.variant.hasPriceTiers) line.preview.variant,
     ], tierUnits);
+    // The paid lines that count for the free-carton offer (ADR 0002).
+    final paid = <_PaidLine>[];
     for (final line in _lines.values) {
       final variant = line.preview.variant;
       final orderable = _orderable(variant);
@@ -1249,6 +1351,17 @@ class FakeCommerceBackend
       mrpTotal += mrp * line.quantity;
       itemTotal += price * line.quantity;
       units += line.quantity;
+      if (orderable > 0) {
+        paid.add(
+          _PaidLine(
+            line.preview,
+            quantity: line.quantity,
+            units: math.min(line.quantity, orderable),
+            price: price,
+            orderable: orderable,
+          ),
+        );
+      }
       lines.add(
         CartLine(
           id: line.id,
@@ -1275,8 +1388,17 @@ class FakeCommerceBackend
     AppliedCoupon? coupon;
     var couponDiscount = 0;
     final code = _couponCode;
-    if (code != null) {
-      final rule = demoCoupons.firstWhere((c) => c.code == code);
+    final rule = code == null ? null : _coupon(code);
+    if (code != null && rule != null && rule.freeUnit) {
+      coupon = AppliedCoupon(
+        code: code,
+        title: rule.title,
+        discount: _amount(0),
+        discountType: CouponDiscountType.freeUnit,
+        source: rule.source,
+        freeVariantId: _rewardSize?.variant.id,
+      );
+    } else if (code != null && rule != null) {
       final result = _evaluate(rule, itemTotal);
       couponDiscount = result.discount;
       coupon = AppliedCoupon(
@@ -1288,6 +1410,12 @@ class FakeCommerceBackend
             ? null
             : 'Add items worth ${_rupees(result.toUnlock!)} more',
       );
+    }
+
+    final (:freeLines, :freeOffer) = _freeCartons(paid, rule);
+    var freeItemsValue = 0;
+    for (final line in freeLines) {
+      freeItemsValue += _paise(line.value);
     }
 
     final deliveryFee = empty || itemTotal >= rules.freeDeliveryThreshold
@@ -1377,8 +1505,13 @@ class FakeCommerceBackend
         handlingFee: _amount(handlingFee),
         tip: _amount(tip),
         grandTotal: _amount(grandTotal),
-        totalSavings: _amount(productDiscount + couponDiscount),
+        totalSavings: _amount(
+          productDiscount + couponDiscount + freeItemsValue,
+        ),
+        freeItemsValue: _amount(freeItemsValue),
       ),
+      freeLines: freeLines,
+      freeOffer: freeOffer,
       coupon: coupon,
       tip: _amount(_tip),
       instructions: _instructions,
@@ -1418,6 +1551,82 @@ class FakeCommerceBackend
         blockers: blockers,
       ),
       storeOpen: storeOpen,
+    );
+  }
+
+  /// ADR 0002, as the server does it: 1 free carton per
+  /// [FakeBillRules.freeUnitEvery] paid ones, of the cheapest size in the
+  /// order (ties: more paid units, then the lower variant id) that can
+  /// supply paid + free; none can → no free carton and a notice. Plus one
+  /// carton of the size picked for an applied free-carton [reward].
+  ({List<FreeLine> freeLines, FreeOffer? freeOffer}) _freeCartons(
+    List<_PaidLine> paid,
+    FakeCoupon? reward,
+  ) {
+    final lines = <FreeLine>[];
+    FreeOffer? offer;
+    final every = rules.freeUnitEvery;
+    if (every > 0) {
+      final paidUnits = paid.fold(0, (n, line) => n + line.units);
+      final earned = paidUnits ~/ every;
+      String? notice;
+      var given = 0;
+      if (earned > 0) {
+        final cheapest = [...paid]
+          ..sort((a, b) {
+            final byPrice = a.price.compareTo(b.price);
+            if (byPrice != 0) return byPrice;
+            final byUnits = b.units.compareTo(a.units);
+            if (byUnits != 0) return byUnits;
+            return a.preview.variant.id.compareTo(b.preview.variant.id);
+          });
+        final pick = cheapest
+            .where((line) => line.orderable >= line.quantity + earned)
+            .firstOrNull;
+        if (pick == null) {
+          notice = "We couldn't add your free carton: not enough stock.";
+        } else {
+          given = earned;
+          lines.add(
+            _freeLine(pick.preview, earned, FreeLineSource.volumeOffer),
+          );
+        }
+      }
+      final toNext = every - paidUnits % every;
+      final label = rules.orderUnitLabel;
+      offer = FreeOffer(
+        every: every,
+        paidUnits: paidUnits,
+        freeUnits: given,
+        unitsToNextFree: toNext,
+        message: earned == 0
+            ? 'Add $toNext more $label to get 1 free'
+            : 'Add $toNext more $label to get 1 more free',
+        notice: notice,
+      );
+    }
+    final size = _rewardSize;
+    if (reward != null && reward.freeUnit && size != null) {
+      lines.add(_freeLine(size, 1, FreeLineSource.reward));
+    }
+    return (freeLines: lines, freeOffer: offer);
+  }
+
+  static FreeLine _freeLine(
+    CartLinePreview preview,
+    int quantity,
+    FreeLineSource source,
+  ) {
+    final variant = preview.variant;
+    return FreeLine(
+      variantId: variant.id,
+      productName: preview.productName,
+      variantName: variant.name,
+      imageUrl: variant.imageUrl,
+      quantity: quantity,
+      mrp: variant.mrp,
+      value: _amount(_paise(variant.mrp) * quantity),
+      source: source,
     );
   }
 
@@ -1498,6 +1707,7 @@ class _FakeOrder {
     required this.addressId,
     required this.createdAt,
     this.couponCode,
+    this.freeLines = const [],
   });
 
   final int id;
@@ -1505,6 +1715,9 @@ class _FakeOrder {
   final PaymentMethod method;
   final String grandTotal;
   final String? couponCode;
+
+  /// The free cartons fixed at placement (ADR 0002 rule 6).
+  final List<FreeLine> freeLines;
   final List<_FakeOrderLine> lines;
   final CartBill bill;
   final int addressId;
@@ -1526,6 +1739,27 @@ class _FakeOrder {
   DateTime? etaAt;
   RazorpayCheckout? razorpay;
   CancelReason? cancelReason;
+}
+
+/// A paid cart line as the free-carton offer sees it.
+class _PaidLine {
+  _PaidLine(
+    this.preview, {
+    required this.quantity,
+    required this.units,
+    required this.price,
+    required this.orderable,
+  });
+
+  final CartLinePreview preview;
+  final int quantity;
+
+  /// min(quantity, orderable): what counts towards the offer.
+  final int units;
+
+  /// The billed unit price in paise.
+  final int price;
+  final int orderable;
 }
 
 class _FakeOrderLine {

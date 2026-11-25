@@ -15,9 +15,69 @@ import '../../../shared/widgets/state_views.dart';
 import '../domain/referral.dart';
 import 'referral_controller.dart';
 
-/// The server's reward amount for display, e.g. `₹90`.
-String referralRewardText(ReferralInfo info) =>
-    formatRupeesOrNull(info.rewardAmount) ?? info.rewardAmount;
+/// The reward as words: "1 free carton" for a free-carton reward (ADR
+/// 0002), else the server's amount as rupees ("₹90"). Null when a ₹ amount
+/// can't be shown. All referral copy below goes through it, so a free
+/// carton is never shown as a ₹ amount.
+String? referralRewardLabel(AppLocalizations l10n, ReferralInfo info) =>
+    info.isFreeCarton
+    ? l10n.freeCartonCount(info.rewardQuantity)
+    : formatRupeesOrNull(info.rewardAmount);
+
+String _reward(AppLocalizations l10n, ReferralInfo info) =>
+    referralRewardLabel(l10n, info) ?? info.rewardAmount;
+
+/// "You and your friend each get 1 free carton" or "you both get ₹90
+/// off" (the headline and the Account strip).
+String referralHeadlineText(AppLocalizations l10n, ReferralInfo info) =>
+    info.isFreeCarton
+    ? l10n.referralHeadlineReward(_reward(l10n, info))
+    : l10n.referralHeadline(_reward(l10n, info));
+
+/// The Account row: "Refer & earn 1 free carton" / "Refer & earn ₹90";
+/// null when there is no reward to name.
+String? referralAccountTitle(AppLocalizations l10n, ReferralInfo info) {
+  final reward = referralRewardLabel(l10n, info);
+  if (reward == null) return null;
+  return info.isFreeCarton
+      ? l10n.referAndEarnReward(reward)
+      : l10n.referAndEarn(reward);
+}
+
+/// Rule 3: what both get after the first delivery, and how long it lasts.
+String referralStep3Text(AppLocalizations l10n, ReferralInfo info) =>
+    info.isFreeCarton
+    ? l10n.referralStep3Reward(_reward(l10n, info), info.rewardValidityDays)
+    : l10n.referralStep3(_reward(l10n, info), info.rewardValidityDays);
+
+/// The confirmation after entering a friend's code.
+String referralAppliedText(AppLocalizations l10n, ReferralInfo info) =>
+    info.isFreeCarton
+    ? l10n.referralAppliedReward(_reward(l10n, info))
+    : l10n.referralApplied(_reward(l10n, info));
+
+/// The checkout card's body.
+String referralPromptText(AppLocalizations l10n, ReferralInfo info) =>
+    info.isFreeCarton
+    ? l10n.referralPromptBodyReward(_reward(l10n, info))
+    : l10n.referralPromptBody(_reward(l10n, info));
+
+/// The "You joined with code" card's status line; null for a status this
+/// build does not know.
+String? referralStatusText(
+  AppLocalizations l10n,
+  ReferralInfo info,
+  ReferralStatus status,
+) => switch (status) {
+  ReferralStatus.pending when info.isFreeCarton =>
+    l10n.referralStatusPendingReward(_reward(l10n, info)),
+  ReferralStatus.pending => l10n.referralStatusPending(_reward(l10n, info)),
+  ReferralStatus.rewarded when info.isFreeCarton =>
+    l10n.referralStatusRewardedReward,
+  ReferralStatus.rewarded => l10n.referralStatusRewarded(_reward(l10n, info)),
+  ReferralStatus.noReward => l10n.referralStatusNoReward,
+  ReferralStatus.unknown => null,
+};
 
 /// Account row that opens the referral screen. Names the reward once it is
 /// known, and invites a new customer to enter a friend's code.
@@ -28,12 +88,12 @@ class ReferralAccountTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final info = ref.watch(currentReferralProvider).value;
-    final reward = info == null ? null : formatRupeesOrNull(info.rewardAmount);
-    final active = info != null && info.isEnabled && reward != null;
+    final title = info == null ? null : referralAccountTitle(l10n, info);
+    final active = info != null && info.isEnabled && title != null;
     return ListTile(
       key: const Key('account-referral'),
       leading: const Icon(Icons.card_giftcard_outlined),
-      title: Text(active ? l10n.referAndEarn(reward) : l10n.referAFriend),
+      title: Text(active ? title : l10n.referAFriend),
       subtitle: active && info.canApplyCode
           ? Text(
               l10n.referralEntryHaveCode,
@@ -100,9 +160,7 @@ class _ReferralScreenState extends ConsumerState<ReferralScreen> {
     if (!applied || !mounted) return;
     _code.clear();
     final info = ref.read(currentReferralProvider).value;
-    if (info != null) {
-      showMessage(context, l10n.referralApplied(referralRewardText(info)));
-    }
+    if (info != null) showMessage(context, referralAppliedText(l10n, info));
   }
 
   Future<void> _copyCode(ReferralInfo info) async {
@@ -183,7 +241,6 @@ class _ReferralBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final reward = referralRewardText(info);
     final referredBy = info.referredBy;
     final minOrder = isZeroAmount(info.rewardMinOrderValue)
         ? null
@@ -193,7 +250,7 @@ class _ReferralBody extends ConsumerWidget {
       padding: const EdgeInsets.all(JivoSpacing.gutter),
       children: [
         if (info.isEnabled) ...[
-          _Hero(text: l10n.referralHeadline(reward)),
+          _Hero(text: referralHeadlineText(l10n, info)),
           const SizedBox(height: JivoSpacing.lg),
           _CodeBox(code: info.code, onCopy: onCopy),
           const SizedBox(height: JivoSpacing.md),
@@ -221,7 +278,7 @@ class _ReferralBody extends ConsumerWidget {
         ],
         if (referredBy != null) ...[
           const SizedBox(height: JivoSpacing.xl),
-          _JoinedWithCard(referredBy: referredBy, reward: reward),
+          _JoinedWithCard(referredBy: referredBy, info: info),
         ],
         const SizedBox(height: JivoSpacing.xl),
         Semantics(
@@ -237,7 +294,7 @@ class _ReferralBody extends ConsumerWidget {
         _Step(
           number: 3,
           text: [
-            l10n.referralStep3(reward, info.rewardValidityDays),
+            referralStep3Text(l10n, info),
             if (minOrder != null) l10n.referralMinOrder(minOrder),
           ].join(' '),
         ),
@@ -465,20 +522,15 @@ class _ApplyCodeBox extends ConsumerWidget {
 }
 
 class _JoinedWithCard extends StatelessWidget {
-  const _JoinedWithCard({required this.referredBy, required this.reward});
+  const _JoinedWithCard({required this.referredBy, required this.info});
 
   final ReferredBy referredBy;
-  final String reward;
+  final ReferralInfo info;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final status = switch (referredBy.status) {
-      ReferralStatus.pending => l10n.referralStatusPending(reward),
-      ReferralStatus.rewarded => l10n.referralStatusRewarded(reward),
-      ReferralStatus.noReward => l10n.referralStatusNoReward,
-      ReferralStatus.unknown => null,
-    };
+    final status = referralStatusText(l10n, info, referredBy.status);
     return _Notice(
       key: const Key('referral-joined'),
       icon: referredBy.status == ReferralStatus.rewarded

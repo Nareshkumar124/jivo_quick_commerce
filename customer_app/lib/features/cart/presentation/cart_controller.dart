@@ -309,9 +309,12 @@ class CartController extends Notifier<CartState> {
     _apply(ticket, snapshot);
   }
 
-  /// Throws the server's `COUPON_*` error for the coupon sheet to show.
-  Future<void> applyCoupon(String code) =>
-      _update((repository) => repository.applyCoupon(code));
+  /// Throws the server's `COUPON_*` error for the coupon sheet to show. A
+  /// free-carton reward passes the size the customer picked as
+  /// [freeVariantId] (ADR 0002); the server adds the free line.
+  Future<void> applyCoupon(String code, {int? freeVariantId}) => _update(
+    (repository) => repository.applyCoupon(code, freeVariantId: freeVariantId),
+  );
 
   Future<void> removeCoupon() =>
       _update((repository) => repository.removeCoupon());

@@ -29,8 +29,10 @@ abstract interface class CartRepository {
   /// cart.
   Future<List<CouponOffer>> coupons();
 
-  /// `POST /cart/coupon/ {code}`.
-  Future<CartSnapshot> applyCoupon(String code);
+  /// `POST /cart/coupon/ {code, free_variant_id}`. A free-carton reward
+  /// (`FREE_UNIT`, ADR 0002) needs [freeVariantId]: the size the customer
+  /// picked, sold at the cart's store. It takes the cart's coupon slot.
+  Future<CartSnapshot> applyCoupon(String code, {int? freeVariantId});
 
   /// `DELETE /cart/coupon/`.
   Future<CartSnapshot> removeCoupon();
@@ -64,7 +66,8 @@ class UnavailableCartRepository implements CartRepository {
   Future<List<CouponOffer>> coupons() => _unavailable();
 
   @override
-  Future<CartSnapshot> applyCoupon(String code) => _unavailable();
+  Future<CartSnapshot> applyCoupon(String code, {int? freeVariantId}) =>
+      _unavailable();
 
   @override
   Future<CartSnapshot> removeCoupon() => _unavailable();

@@ -11,6 +11,7 @@ import '../../../shared/widgets/state_views.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_texts.dart';
 import '../../cart/presentation/widgets/bill_details.dart';
+import '../../cart/presentation/widgets/free_line_tile.dart';
 import '../../cart/presentation/widgets/checkout_blocker.dart';
 import '../../cart/presentation/widgets/delivery_address_card.dart';
 import '../../location/presentation/delivery_controller.dart';
@@ -216,6 +217,35 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                 ),
               ),
+              // The free cartons at ₹0 (ADR 0002), above the bill.
+              if (snapshot.freeLines.isNotEmpty) ...[
+                const SizedBox(height: JivoSpacing.lg),
+                Card(
+                  key: const Key('checkout-free-lines'),
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(JivoSpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Semantics(
+                          header: true,
+                          child: Text(
+                            l10n.checkoutFreeCartonsTitle,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ),
+                        const SizedBox(height: JivoSpacing.sm),
+                        for (final line in snapshot.freeLines)
+                          FreeLineRow(
+                            line: line,
+                            every: snapshot.freeOffer?.every,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: JivoSpacing.lg),
               Card(
                 margin: EdgeInsets.zero,

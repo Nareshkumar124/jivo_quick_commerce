@@ -6,6 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:jivo_api/src/model/coupon_discount_type_enum.dart';
 import 'package:jivo_api/src/model/coupon_ineligible_reason_enum.dart';
+import 'package:jivo_api/src/model/coupon_source_enum.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -50,6 +51,10 @@ class CouponOffer {
     required this.amountToUnlock,
 
     required this.isPersonal,
+
+    required this.source_,
+
+    required this.freeVariantId,
   });
 
   /// Upper case. Apply with `POST /cart/coupon/`.
@@ -64,6 +69,7 @@ class CouponOffer {
   @JsonKey(name: r'description', required: true, includeIfNull: false)
   final String description;
 
+  /// FREE_UNIT (ADR 0002): a free-carton reward. Applying it needs `free_variant_id` (the size the customer picks); it gives no money off (`savings` \"0.00\").  * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - One free carton (reward)
   @JsonKey(
     name: r'discount_type',
     required: true,
@@ -72,7 +78,7 @@ class CouponOffer {
   )
   final CouponDiscountTypeEnum discountType;
 
-  /// FLAT: rupees off (\"50.00\"). PERCENT: percent off (\"10.00\" = 10%).
+  /// FLAT: rupees off (\"50.00\"). PERCENT: percent off (\"10.00\" = 10%). FREE_UNIT: free cartons (\"1.00\").
   @JsonKey(name: r'value', required: true, includeIfNull: false)
   final String value;
 
@@ -120,6 +126,19 @@ class CouponOffer {
   @JsonKey(name: r'is_personal', required: true, includeIfNull: false)
   final bool isPersonal;
 
+  /// ADR 0002: WELCOME / REFERRAL_* for rewards, NONE for staff coupons.  * `NONE` - Made by staff * `WELCOME` - Welcome reward (new account) * `REFERRAL_REFERRER` - Referral reward (you invited a friend) * `REFERRAL_REFERRED` - Referral reward (you joined with a friend's code)
+  @JsonKey(
+    name: r'source',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: CouponSourceEnum.unknownDefaultOpenApi,
+  )
+  final CouponSourceEnum source_;
+
+  /// FREE_UNIT and applied to the cart: the size picked for the free carton. Null otherwise.
+  @JsonKey(name: r'free_variant_id', required: true, includeIfNull: true)
+  final int? freeVariantId;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -138,7 +157,9 @@ class CouponOffer {
           other.ineligibleReason == ineligibleReason &&
           other.message == message &&
           other.amountToUnlock == amountToUnlock &&
-          other.isPersonal == isPersonal;
+          other.isPersonal == isPersonal &&
+          other.source_ == source_ &&
+          other.freeVariantId == freeVariantId;
 
   @override
   int get hashCode =>
@@ -156,7 +177,9 @@ class CouponOffer {
       (ineligibleReason == null ? 0 : ineligibleReason.hashCode) +
       (message == null ? 0 : message.hashCode) +
       (amountToUnlock == null ? 0 : amountToUnlock.hashCode) +
-      isPersonal.hashCode;
+      isPersonal.hashCode +
+      source_.hashCode +
+      (freeVariantId == null ? 0 : freeVariantId.hashCode);
 
   factory CouponOffer.fromJson(Map<String, dynamic> json) =>
       _$CouponOfferFromJson(json);

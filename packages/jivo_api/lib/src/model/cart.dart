@@ -5,8 +5,10 @@
 
 // ignore_for_file: unused_element
 import 'package:jivo_api/src/model/applied_coupon.dart';
+import 'package:jivo_api/src/model/free_line.dart';
 import 'package:jivo_api/src/model/checkout_status.dart';
 import 'package:jivo_api/src/model/store_status.dart';
+import 'package:jivo_api/src/model/free_offer.dart';
 import 'package:jivo_api/src/model/delivery_instructions.dart';
 import 'package:jivo_api/src/model/cart_line.dart';
 import 'package:jivo_api/src/model/cart_thresholds.dart';
@@ -43,6 +45,10 @@ class Cart {
     required this.address,
 
     required this.bill,
+
+    required this.freeLines,
+
+    required this.freeOffer,
 
     required this.thresholds,
 
@@ -82,6 +88,14 @@ class Cart {
   @JsonKey(name: r'bill', required: true, includeIfNull: false)
   final Bill bill;
 
+  /// ADR 0002: free cartons (₹0), volume offer first, then the reward. [] when none. Placing the order adds them as order lines with `is_free: true`.
+  @JsonKey(name: r'free_lines', required: true, includeIfNull: false)
+  final List<FreeLine> freeLines;
+
+  /// The store's volume offer; null when the store has none.
+  @JsonKey(name: r'free_offer', required: true, includeIfNull: true)
+  final FreeOffer? freeOffer;
+
   @JsonKey(name: r'thresholds', required: true, includeIfNull: false)
   final CartThresholds thresholds;
 
@@ -104,6 +118,8 @@ class Cart {
           other.instructions == instructions &&
           other.address == address &&
           other.bill == bill &&
+          other.freeLines == freeLines &&
+          other.freeOffer == freeOffer &&
           other.thresholds == thresholds &&
           other.paymentMethods == paymentMethods &&
           other.checkout == checkout;
@@ -118,6 +134,8 @@ class Cart {
       instructions.hashCode +
       (address == null ? 0 : address.hashCode) +
       bill.hashCode +
+      freeLines.hashCode +
+      (freeOffer == null ? 0 : freeOffer.hashCode) +
       thresholds.hashCode +
       paymentMethods.hashCode +
       checkout.hashCode;

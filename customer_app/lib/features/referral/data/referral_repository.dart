@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:jivo_api/jivo_api.dart'
     as api
     show
+        CouponDiscountTypeEnum,
         JivoApi,
         Referral,
         ReferralApplyRequest,
@@ -48,12 +49,20 @@ class ApiReferralRepository implements ReferralRepository {
   );
 }
 
-/// Maps the generated `Referral` to the app model.
+/// Maps the generated `Referral` to the app model. `reward_type`
+/// `FREE_UNIT` (ADR 0002) is a free-carton reward of `reward_quantity`
+/// cartons; the app words it itself (l10n) rather than showing the
+/// server's English `reward_label`, and never shows the deprecated
+/// `reward_amount` for it.
 ReferralInfo referralFromApi(api.Referral r) => ReferralInfo(
   code: r.code,
   shareMessage: r.shareMessage,
   isEnabled: r.isEnabled,
   rewardAmount: r.rewardAmount,
+  rewardType: r.rewardType == api.CouponDiscountTypeEnum.FREE_UNIT
+      ? ReferralRewardType.freeCarton
+      : ReferralRewardType.amount,
+  rewardQuantity: r.rewardQuantity,
   rewardValidityDays: r.rewardValidityDays,
   rewardMinOrderValue: r.rewardMinOrderValue,
   canApplyCode: r.canApplyCode,
@@ -82,8 +91,8 @@ Future<T> _guard<T>(Future<T> Function() call) async {
   }
 }
 
-/// TODO(api): a backend stand-in for `--dart-define=FAKE_API=true` and
-/// tests. Follows the server's checks in the server's order: program off,
+/// A backend stand-in for `--dart-define=FAKE_API=true` and tests.
+/// Follows the server's checks in the server's order: program off,
 /// code already entered, order already placed, unknown code, own code.
 class FakeReferralRepository implements ReferralRepository {
   FakeReferralRepository({
@@ -94,10 +103,14 @@ class FakeReferralRepository implements ReferralRepository {
     this.friendsJoined = 2,
     this.friendsRewarded = 1,
     this.friendCodes = const {'AB3K7P', 'JIVO90'},
+    this.rewardType = ReferralRewardType.amount,
   });
 
   final String code;
   bool isEnabled;
+
+  /// ₹90 off (the old reward) or a free carton (ADR 0002).
+  ReferralRewardType rewardType;
 
   /// An order was already placed: codes can no longer be entered.
   bool hasOrders;
@@ -119,11 +132,16 @@ class FakeReferralRepository implements ReferralRepository {
 
   ReferralInfo get info => ReferralInfo(
     code: code,
-    shareMessage:
-        'Use my code $code on the Jivo app and we both get ₹90 off. '
-        'https://jivo.in/app',
+    shareMessage: rewardType == ReferralRewardType.freeCarton
+        ? 'Use my code $code on the Jivo app and we each get 1 free carton. '
+              'https://jivo.in/app'
+        : 'Use my code $code on the Jivo app and we both get ₹90 off. '
+              'https://jivo.in/app',
     isEnabled: isEnabled,
-    rewardAmount: '90.00',
+    rewardType: rewardType,
+    rewardAmount: rewardType == ReferralRewardType.freeCarton
+        ? '0.00'
+        : '90.00',
     rewardValidityDays: 30,
     rewardMinOrderValue: '0.00',
     canApplyCode: isEnabled && referredBy == null && !hasOrders,

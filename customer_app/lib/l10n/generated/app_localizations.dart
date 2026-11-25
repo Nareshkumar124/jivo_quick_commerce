@@ -2236,11 +2236,11 @@ abstract class AppLocalizations {
   /// **'Add more'**
   String get priceTierAddMore;
 
-  /// Account row and screen title for the coupon list.
+  /// Account tile and screen title for the Rewards screen (was My coupons, ADR 0002): free-carton rewards and coupons.
   ///
   /// In en, this message translates to:
-  /// **'My coupons'**
-  String get myCoupons;
+  /// **'Rewards'**
+  String get rewardsTitle;
 
   /// Label on a coupon made only for this customer.
   ///
@@ -2278,11 +2278,11 @@ abstract class AppLocalizations {
   /// **'Choose location'**
   String get couponsChooseLocation;
 
-  /// My coupons empty state.
+  /// Rewards screen, Available tab: nothing to show.
   ///
   /// In en, this message translates to:
-  /// **'No coupons right now'**
-  String get myCouponsEmpty;
+  /// **'No rewards or coupons right now'**
+  String get rewardsEmpty;
 
   /// Cart nudge when one line gets cheaper at the next volume tier. count = next_price_tier.units_to_next_tier, label = order_unit_label (e.g. boxes), price = that line's next_tier_price, variant = its pack size (e.g. 1 L).
   ///
@@ -4292,6 +4292,329 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Your delivery partner · {vehicle}'**
   String trackingRiderWithVehicle(String vehicle);
+
+  /// Rewards screen tab: rewards and coupons that can be used or are on an order.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get rewardsTabAvailable;
+
+  /// Rewards screen tab: earned, claimed, used, expired and volume-offer free cartons.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get rewardsTabHistory;
+
+  /// Rewards screen, Available tab: heading above the free-carton rewards.
+  ///
+  /// In en, this message translates to:
+  /// **'Free cartons'**
+  String get rewardsSectionFreeCartons;
+
+  /// Rewards screen, Available tab: heading above the coupons.
+  ///
+  /// In en, this message translates to:
+  /// **'Coupons'**
+  String get rewardsSectionCoupons;
+
+  /// Rewards screen, History tab: empty state.
+  ///
+  /// In en, this message translates to:
+  /// **'No rewards history yet'**
+  String get rewardsHistoryEmpty;
+
+  /// A number of free cartons (ADR 0002), e.g. on a reward card or in referral copy.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 free carton} other{{count} free cartons}}'**
+  String freeCartonCount(int count);
+
+  /// Where a free-carton reward came from: the gift for a new account.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome gift'**
+  String get rewardSourceWelcome;
+
+  /// Where a free-carton reward came from: a referral (either side).
+  ///
+  /// In en, this message translates to:
+  /// **'Referral reward'**
+  String get rewardSourceReferral;
+
+  /// Reward status chip: can be used now.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get rewardStatusAvailable;
+
+  /// Reward status chip: on an order that is placed but not delivered yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Claimed'**
+  String get rewardStatusClaimed;
+
+  /// Claimed reward: the order it is on. number = order_number, e.g. JV-261125-000123.
+  ///
+  /// In en, this message translates to:
+  /// **'On your order {number}'**
+  String rewardOnOrder(String number);
+
+  /// Reward card button: pick a size and add the free carton to the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'Use'**
+  String get rewardUse;
+
+  /// Screen reader label of the Use button on a free-carton reward.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your free carton'**
+  String get rewardUseSemantics;
+
+  /// Reward card: this reward is applied to the current cart.
+  ///
+  /// In en, this message translates to:
+  /// **'In your cart'**
+  String get rewardInCart;
+
+  /// Reward card button when the reward is already on the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'View cart'**
+  String get rewardViewCart;
+
+  /// Rewards history: a reward was given.
+  ///
+  /// In en, this message translates to:
+  /// **'Earned'**
+  String get rewardHistoryEarned;
+
+  /// Rewards history: a reward was put on an order.
+  ///
+  /// In en, this message translates to:
+  /// **'Claimed'**
+  String get rewardHistoryClaimed;
+
+  /// Rewards history: the order with the reward was delivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Used'**
+  String get rewardHistoryUsed;
+
+  /// Rewards history: a reward ran out unused.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get rewardHistoryExpired;
+
+  /// Rewards history: free cartons from the buy-N-get-1-free offer on a delivered order.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume offer'**
+  String get rewardHistoryVolumeFree;
+
+  /// Rewards history row: the order number.
+  ///
+  /// In en, this message translates to:
+  /// **'Order {number}'**
+  String rewardHistoryOrder(String number);
+
+  /// Size picker sheet title (Rewards > Use, or Apply on a free-carton reward).
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a size for your free carton'**
+  String get freeSizeTitle;
+
+  /// Size picker: the free carton does not count toward the store's minimum. minimum = min_order_units, label = order_unit_label.
+  ///
+  /// In en, this message translates to:
+  /// **'{minimum, plural, =1{Your order still needs at least 1 paid carton.} other{Your order still needs at least {minimum} paid {label}.}}'**
+  String freeSizeMinNote(int minimum, String label);
+
+  /// Size picker row: the server's MRP of one carton.
+  ///
+  /// In en, this message translates to:
+  /// **'Worth {amount}'**
+  String freeSizeWorth(String amount);
+
+  /// Size picker button: applies the reward with the chosen size.
+  ///
+  /// In en, this message translates to:
+  /// **'Add free carton'**
+  String get freeSizeConfirm;
+
+  /// Size picker: the store sells no water size in stock.
+  ///
+  /// In en, this message translates to:
+  /// **'No sizes are available at this store right now.'**
+  String get freeSizeEmpty;
+
+  /// Size picker: no store selected yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your delivery location to pick a size'**
+  String get freeSizeNeedsLocation;
+
+  /// Size picker: one reward or one coupon per order.
+  ///
+  /// In en, this message translates to:
+  /// **'This replaces coupon {code} on your cart.'**
+  String freeSizeReplacesCoupon(String code);
+
+  /// Reward apply refused: COUPON_NOT_ELIGIBLE reason MIN_ORDER_UNITS. count = details.units_to_unlock, minimum = details.min_order_units, label = order_unit_label.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more to use this reward (minimum {minimum} paid {label})} other{Add {count} more {label} to use this reward (minimum {minimum} paid {label})}}'**
+  String rewardNeedsUnits(int count, int minimum, String label);
+
+  /// Reward apply refused: COUPON_NOT_ELIGIBLE reason FREE_VARIANT_UNAVAILABLE.
+  ///
+  /// In en, this message translates to:
+  /// **'This size is not available for your free carton here. Choose another size.'**
+  String get rewardSizeUnavailable;
+
+  /// Size picker button after MIN_ORDER_UNITS: closes the sheet and opens all products.
+  ///
+  /// In en, this message translates to:
+  /// **'Add cartons'**
+  String get rewardAddCartons;
+
+  /// Snackbar after a free-carton reward is applied.
+  ///
+  /// In en, this message translates to:
+  /// **'Free carton added to your cart'**
+  String get freeCartonAdded;
+
+  /// Tag on a free carton line (cart, checkout, order).
+  ///
+  /// In en, this message translates to:
+  /// **'FREE'**
+  String get freeTag;
+
+  /// Free line source: the volume offer. every = free_offer.every (e.g. 10).
+  ///
+  /// In en, this message translates to:
+  /// **'Buy {every} get 1 free'**
+  String freeSourceVolume(int every);
+
+  /// Free line source: the volume offer when its number is not known (orders).
+  ///
+  /// In en, this message translates to:
+  /// **'Free with your order'**
+  String get freeSourceVolumeGeneric;
+
+  /// Free line source: a free-carton reward.
+  ///
+  /// In en, this message translates to:
+  /// **'Reward'**
+  String get freeSourceReward;
+
+  /// Free line: how many free cartons.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty {count}'**
+  String freeLineQuantity(int count);
+
+  /// Screen reader label of a free line. amount = the server's value (MRP x quantity).
+  ///
+  /// In en, this message translates to:
+  /// **'{name} {variant}, {count} free, worth {amount}'**
+  String freeLineSemantics(
+    String name,
+    String variant,
+    int count,
+    String amount,
+  );
+
+  /// Order free line: free cartons the store could not supply (dropped, nothing to refund).
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 free carton could not be supplied} other{{count} free cartons could not be supplied}}'**
+  String freeLineUnavailable(int count);
+
+  /// Cart nudge when the server sends no message text. count = free_offer.units_to_next_free, label = order_unit_label.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Add 1 more to get 1 more free} other{Add {count} more {label} to get 1 more free}}'**
+  String freeOfferNudge(int count, String label);
+
+  /// Bill row: the value of the free cartons (free_items_value), shown struck out and FREE.
+  ///
+  /// In en, this message translates to:
+  /// **'Free cartons'**
+  String get billFreeCartons;
+
+  /// Screen reader label of the free cartons bill row.
+  ///
+  /// In en, this message translates to:
+  /// **'Free cartons worth {amount}, free'**
+  String billFreeCartonsSemantics(String amount);
+
+  /// Cart coupon row when a free-carton reward is on the cart.
+  ///
+  /// In en, this message translates to:
+  /// **'Free carton reward applied'**
+  String get couponFreeCartonApplied;
+
+  /// Cart coupon row subtitle for a free-carton reward.
+  ///
+  /// In en, this message translates to:
+  /// **'Your free carton is in the items above'**
+  String get couponFreeCartonInOrder;
+
+  /// Coupon sheet: what a free-carton reward gives.
+  ///
+  /// In en, this message translates to:
+  /// **'Get 1 free carton. Pick a size when you apply it.'**
+  String get couponFreeCartonOffer;
+
+  /// Checkout: heading above the free lines.
+  ///
+  /// In en, this message translates to:
+  /// **'Free cartons'**
+  String get checkoutFreeCartonsTitle;
+
+  /// Account row with a non-rupee reward. reward = e.g. 1 free carton.
+  ///
+  /// In en, this message translates to:
+  /// **'Refer & earn {reward}'**
+  String referAndEarnReward(String reward);
+
+  /// Referral headline for a free-carton reward. reward = e.g. 1 free carton.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite a friend. You and your friend each get {reward}'**
+  String referralHeadlineReward(String reward);
+
+  /// Referral rule 3 for a free-carton reward. reward = e.g. 1 free carton, days = reward_validity_days.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{When their first order is delivered, you and your friend each get {reward}. Use it within 1 day.} other{When their first order is delivered, you and your friend each get {reward}. Use it within {days} days.}}'**
+  String referralStep3Reward(String reward, int days);
+
+  /// After entering a friend's code, free-carton reward.
+  ///
+  /// In en, this message translates to:
+  /// **'Code applied. You and your friend will each get {reward} after your first delivery.'**
+  String referralAppliedReward(String reward);
+
+  /// Joined-with card, PENDING, free-carton reward.
+  ///
+  /// In en, this message translates to:
+  /// **'You and your friend will each get {reward} after your first delivery.'**
+  String referralStatusPendingReward(String reward);
+
+  /// Joined-with card, REWARDED, free-carton reward.
+  ///
+  /// In en, this message translates to:
+  /// **'Your free carton is in Rewards. Tap Use there to add it to your cart.'**
+  String get referralStatusRewardedReward;
+
+  /// Checkout card body, free-carton reward.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter it before you place this order. You and your friend each get {reward} after it is delivered.'**
+  String referralPromptBodyReward(String reward);
 }
 
 class _AppLocalizationsDelegate

@@ -42,6 +42,16 @@ class ReferredBy {
   int get hashCode => Object.hash(codeMasked, status, appliedAt);
 }
 
+/// What each of the two customers gets (ADR 0002 replaced ₹90 with a free
+/// carton; the server says which with a reward-type flag).
+enum ReferralRewardType {
+  /// Rupees off ([ReferralInfo.rewardAmount]): the old ₹90 reward.
+  amount,
+
+  /// A free-carton reward ([ReferralInfo.rewardQuantity] cartons).
+  freeCarton,
+}
+
 /// The customer's referral screen (`GET /account/referral/`).
 ///
 /// Money stays the server's decimal strings (`"90.00"`): display only.
@@ -58,6 +68,8 @@ class ReferralInfo {
     required this.friendsJoined,
     required this.friendsRewarded,
     this.referredBy,
+    this.rewardType = ReferralRewardType.amount,
+    this.rewardQuantity = 1,
   });
 
   /// The customer's own code (upper case). Never changes.
@@ -69,8 +81,17 @@ class ReferralInfo {
   /// False: the program is paused (no sharing, no entering codes).
   final bool isEnabled;
 
-  /// Rupees off for each of the two customers, e.g. `"90.00"`.
+  /// Rupees off for each of the two customers, e.g. `"90.00"`. Only for
+  /// [ReferralRewardType.amount]; never shown for a free carton.
   final String rewardAmount;
+
+  /// Rupees off, or free cartons (ADR 0002).
+  final ReferralRewardType rewardType;
+
+  /// Free cartons each customer gets (1) for [ReferralRewardType.freeCarton].
+  final int rewardQuantity;
+
+  bool get isFreeCarton => rewardType == ReferralRewardType.freeCarton;
 
   /// Days the reward coupon stays valid after it is given.
   final int rewardValidityDays;
@@ -103,7 +124,9 @@ class ReferralInfo {
       other.canApplyCode == canApplyCode &&
       other.referredBy == referredBy &&
       other.friendsJoined == friendsJoined &&
-      other.friendsRewarded == friendsRewarded;
+      other.friendsRewarded == friendsRewarded &&
+      other.rewardType == rewardType &&
+      other.rewardQuantity == rewardQuantity;
 
   @override
   int get hashCode => Object.hash(
@@ -117,5 +140,7 @@ class ReferralInfo {
     referredBy,
     friendsJoined,
     friendsRewarded,
+    rewardType,
+    rewardQuantity,
   );
 }

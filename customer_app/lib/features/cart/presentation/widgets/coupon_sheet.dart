@@ -7,6 +7,7 @@ import '../../../../app/theme.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../shared/formatting/formatters.dart';
 import '../../../../shared/widgets/state_views.dart';
+import '../../../rewards/presentation/free_size_sheet.dart';
 import '../../domain/cart.dart';
 import '../cart_controller.dart';
 import '../cart_texts.dart';
@@ -52,6 +53,21 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
     super.dispose();
   }
 
+  /// A free-carton reward (ADR 0002) needs a size: the size sheet applies
+  /// it, then this sheet closes with a confirmation.
+  Future<void> _applyFreeCarton(String code) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    setState(() => _error = null);
+    final applied = await showFreeSizeSheet(context, code: code);
+    if (!applied || !mounted) return;
+    navigator.pop();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(l10n.freeCartonAdded)));
+  }
+
   Future<void> _apply(String code) async {
     final l10n = AppLocalizations.of(context);
     final trimmed = code.trim();
@@ -64,6 +80,26 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
       _applying = trimmed;
       _error = null;
     });
+    // A typed reward code is a free carton too: pick its size first. Wait
+    // for the coupon list if it is still loading; if it failed, the
+    // server's answer below still tells.
+    var listed = const <CouponOffer>[];
+    try {
+      listed = await ref.read(cartCouponsProvider.future);
+    } catch (_) {
+      // Decided by the apply answer instead.
+    }
+    if (!mounted) return;
+    final reward = listed
+        .where(
+          (o) =>
+              o.isFreeCarton && o.code.toUpperCase() == trimmed.toUpperCase(),
+        )
+        .firstOrNull;
+    if (reward != null) {
+      setState(() => _applying = null);
+      return _applyFreeCarton(reward.code);
+    }
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     try {
@@ -87,11 +123,18 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _applying = null;
-        _error = _describe(error);
-      });
+      setState(() => _applying = null);
+      // A reward code sent without a size: the server asks for one (400
+      // with `free_variant_id`, ADR 0002). Pick it instead of an error.
+      if (_needsSize(error)) return _applyFreeCarton(trimmed);
+      setState(() => _error = _describe(error));
     }
+  }
+
+  static bool _needsSize(Object error) {
+    final apiError = ApiError.from(error);
+    return apiError.code == ApiErrorCode.validationError &&
+        apiError.details.containsKey('free_variant_id');
   }
 
   /// The server's coupon error, with its details (e.g. how much to add).
@@ -186,7 +229,11 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
                     return _CouponCard(
                       offer: offer,
                       applying: _applying == offer.code,
-                      onApply: busy ? null : () => _apply(offer.code),
+                      onApply: busy
+                          ? null
+                          : offer.isFreeCarton
+                          ? () => _applyFreeCarton(offer.code)
+                          : () => _apply(offer.code),
                     );
                   },
                 ),
@@ -260,7 +307,15 @@ class _CouponCard extends StatelessWidget {
                           color: muted,
                         ),
                       ),
-                    if (eligible && savings != null)
+                    if (offer.isFreeCarton)
+                      Text(
+                        l10n.couponFreeCartonOffer,
+                        key: ValueKey('coupon-free-carton-${offer.code}'),
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: context.jivoColors.success,
+                        ),
+                      )
+                    else if (eligible && savings != null)
                       Text(
                         l10n.couponSavesOnCart(displayRupees(savings)),
                         style: theme.textTheme.labelLarge?.copyWith(
