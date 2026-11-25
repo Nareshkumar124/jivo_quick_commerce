@@ -252,7 +252,10 @@ class TestSettingsPermissions:
     def test_change_form_has_short_help_texts(self, client, config):
         client.force_login(staff_with(VIEW_SETTINGS, CHANGE_SETTINGS))
         html = client.get(change_url()).content.decode()
-        assert "off each for the referrer and the friend after the friend" in html
+        assert "Not used for new rewards: the referral reward is now 1 free carton each." in html
+        assert "Reward amount (old ₹ rewards only)" in html
+        assert "Minimum item total (old ₹ rewards only)" in html
+        assert "1 free carton" in html  # the reward now (ADR 0002)
 
     @pytest.mark.parametrize(
         ("field", "value"),
@@ -329,7 +332,7 @@ class TestReferralList:
         assert done.referrer_coupon.code in html
         assert done.referred_coupon.code in html
         assert done.reward_order.order_number in html
-        assert "₹90.00" in html
+        assert "1 free carton" in html  # ADR 0002: free-carton rewards have no ₹ amount
         assert pending.code in html
         assert REFERRER_MASKED in html
         assert FRIEND_MASKED in html
@@ -456,3 +459,64 @@ class TestReferralCodeList:
         with CaptureQueriesContext(connection) as many:
             assert client.get(reverse(CODES)).status_code == 200
         assert len(many) == len(few)
+
+
+# --------------------------------------------------------------------------- ADR 0002
+
+
+class TestFreeCartonRewards:
+    """ADR 0002: the reward is 1 free carton each; the ₹ settings are for old rewards only."""
+
+    def test_new_reward_says_one_free_carton(self, client):
+        from apps.promotions.choices import DiscountType
+
+        done = rewarded_referral()
+        assert done.reward_amount is None
+        assert done.referrer_coupon.discount_type == DiscountType.FREE_UNIT
+        client.force_login(staff_with(VIEW_REFERRAL))
+        response = client.get(reverse("admin:referrals_referral_change", args=[done.pk]))
+        html = response.content.decode()
+        assert response.status_code == 200
+        assert "1 free carton" in html
+        assert "Older referrals got a ₹ off coupon." in html
+
+    def test_old_rupee_reward_keeps_its_amount(self, client, pending):
+        from apps.promotions import services as promotions
+
+        coupons = [
+            promotions.create_personal_coupon(
+                user,
+                amount=Decimal("90.00"),
+                valid_days=30,
+                min_order_value=Decimal("0.00"),
+                title="₹90 off: referral reward",
+                now=timezone.now(),
+            )
+            for user in (pending.referrer, pending.referred)
+        ]
+        order = OrderFactory(
+            user=pending.referred, status=OrderStatus.DELIVERED, delivered_at=timezone.now()
+        )
+        Referral.objects.filter(pk=pending.pk).update(
+            status=ReferralStatus.REWARDED,
+            reward_order=order,
+            reward_amount=Decimal("90.00"),
+            referrer_coupon=coupons[0],
+            referred_coupon=coupons[1],
+            rewarded_at=timezone.now(),
+        )
+        client.force_login(staff_with(VIEW_REFERRAL))
+        response = client.get(reverse(REFERRALS))
+        assert response.status_code == 200
+        model_admin = response.context["cl"].model_admin
+        (row,) = response.context["cl"].result_list
+        assert model_admin.reward(row) == "₹90.00"
+
+    def test_view_only_settings_label_the_old_rupee_values(self, client, config):
+        client.force_login(staff_with(VIEW_SETTINGS))
+        html = client.get(change_url()).content.decode()
+        assert "Reward amount (old ₹ rewards only)" in html
+        assert "Minimum item total (old ₹ rewards only)" in html
+        assert "Old ₹ rewards" in html
+        assert "1 free carton" in html
+        assert "₹90.00" in html

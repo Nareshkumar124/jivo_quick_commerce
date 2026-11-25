@@ -329,6 +329,7 @@ class OrderDetailView(APIView):
                     ("Cancelled by the customer, refunded", ex.ORDER_CANCELLED_REFUNDED),
                     ("Cancelled by the store (COD)", ex.ORDER_CANCELLED_BY_STORE),
                     ("Delivered, invoice available", ex.ORDER_DELIVERED),
+                    ("Delivered with free cartons", ex.ORDER_FREE_CARTONS_DELIVERED),
                 ),
                 401: UNAUTHORIZED,
                 404: ORDER_NOT_FOUND,

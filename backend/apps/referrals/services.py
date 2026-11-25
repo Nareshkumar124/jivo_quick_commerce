@@ -5,10 +5,12 @@
   (`apply_code`); not their own, and never again or after their first order.
 - When the referred customer's first order is DELIVERED, the order domain event queues
   `referrals.reward_referral` after commit, which calls `reward_for_order`: both customers get a
-  personal FLAT coupon (`apps.promotions.services.create_personal_coupon`) and the referral
-  becomes REWARDED. The referral row is locked and only a PENDING one is rewarded, so the reward
-  is given exactly once per referred customer, whatever the retries or later orders. If the
-  program is off at that moment the referral becomes VOID (no reward later).
+  free-carton reward (ADR 0002, 2026-11-25: a personal FREE_UNIT coupon from
+  `apps.promotions.rewards.create_reward`, sources REFERRAL_REFERRER / REFERRAL_REFERRED; it
+  replaced the ₹ FLAT coupon) and the referral becomes REWARDED. The referral row is locked and
+  only a PENDING one is rewarded, so the reward is given exactly once per referred customer,
+  whatever the retries or later orders. If the program is off at that moment the referral
+  becomes VOID (no reward later).
 
 `apply_code` checks, first failure wins: program off (`REFERRAL_NOT_ELIGIBLE` PROGRAM_OFF), a
 code already entered (`REFERRAL_ALREADY_APPLIED`), an order already placed
@@ -27,8 +29,10 @@ from django.utils import timezone
 
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
-from apps.core.money import money_str, rupees
+from apps.core.money import money_str
+from apps.promotions import rewards
 from apps.promotions import services as promotions
+from apps.promotions.choices import CouponSource, DiscountType
 from apps.referrals.choices import ReferralIneligibleReason, ReferralStatus
 from apps.referrals.models import CODE_MAX_LENGTH, Referral, ReferralCode, ReferralSettings
 
@@ -113,13 +117,15 @@ def summary(user) -> dict:
     return {
         "code": own.code,
         "share_message": (
-            f"Use my code {own.code} on the Jivo app and we both get "
-            f"{rupees(config.reward_amount)} off."
+            f"Use my code {own.code} on the Jivo app and we both get {rewards.REWARD_LABEL}."
         ),
         "is_enabled": config.is_enabled,
-        "reward_amount": money_str(config.reward_amount),
+        "reward_type": DiscountType.FREE_UNIT,
+        "reward_quantity": rewards.REWARD_UNITS,
+        "reward_label": rewards.REWARD_LABEL,
+        "reward_amount": money_str(config.reward_amount),  # deprecated (ADR 0002)
         "reward_validity_days": config.reward_validity_days,
-        "reward_min_order_value": money_str(config.reward_min_order_value),
+        "reward_min_order_value": money_str(0),  # deprecated (ADR 0002): not used
         "can_apply_code": can_apply,
         "referred_by": (
             None
@@ -185,7 +191,6 @@ def _notify(referral: Referral) -> None:
     customer). Best effort: a failure is logged and never undoes the reward."""
     from apps import notifications
 
-    amount = rupees(referral.reward_amount)
     for user, coupon, reason in (
         (referral.referrer, referral.referrer_coupon, "Your friend's first order was delivered."),
         (referral.referred, referral.referred_coupon, "Thanks for joining with a friend's code."),
@@ -196,7 +201,7 @@ def _notify(referral: Referral) -> None:
                     user,
                     REWARD_EVENT,
                     {
-                        "amount": amount,
+                        "reward": rewards.REWARD_LABEL,
                         "reason": reason,
                         "expires_on": _expires_on(coupon),
                         "ref": referral.pk,
@@ -238,27 +243,15 @@ def reward_for_order(order_id: int, *, now=None) -> str:
             referral.save(update_fields=["status", "reward_order", "note", "updated_at"])
             logger.info("Referral %s void (program off), order %s", referral.pk, order_id)
             return "void"
-        amount = config.reward_amount
-        title = f"{rupees(amount)} off: referral reward"
-        terms = {
-            "amount": amount,
-            "valid_days": config.reward_validity_days,
-            "min_order_value": config.reward_min_order_value,
-            "title": title,
-            "now": now,
-        }
-        referral.referrer_coupon = promotions.create_personal_coupon(
-            referral.referrer,
-            description="Your reward for inviting a friend. One use, only for you.",
-            **terms,
+        # ADR 0002: one free carton each (no ₹ amount any more).
+        referral.referrer_coupon = rewards.create_reward(
+            referral.referrer, source=CouponSource.REFERRAL_REFERRER, now=now
         )
-        referral.referred_coupon = promotions.create_personal_coupon(
-            referral.referred,
-            description="Your reward for joining with a friend's code. One use, only for you.",
-            **terms,
+        referral.referred_coupon = rewards.create_reward(
+            referral.referred, source=CouponSource.REFERRAL_REFERRED, now=now
         )
         referral.status = ReferralStatus.REWARDED
-        referral.reward_amount = amount
+        referral.reward_amount = None
         referral.rewarded_at = now
         referral.save()
         _notify(referral)

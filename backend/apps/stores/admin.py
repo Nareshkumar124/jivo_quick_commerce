@@ -13,6 +13,8 @@
   one row per store, read by `cart.services.compute_bill()` on every bill (no cache). Edits are
   kept in the row's history (django-simple-history, with the staff user); history is view-only.
   A store without a row is billed with the model defaults (D-09, DL-43), shown above the list.
+  ADR 0002: `free_unit_every` (the volume offer, 1 free carton per N paid; 0 = off) is edited
+  in its own fieldset; viewers see it in words.
 """
 
 from django.contrib import admin, messages
@@ -291,11 +293,32 @@ PRICING_FIELDSETS = (
             ),
         },
     ),
+    (
+        "Free cartons (volume offer)",
+        {
+            "fields": ("free_unit_every",),
+            "description": (
+                "The free carton is the cheapest size in the order, at ₹0. Free cartons are not "
+                "part of the item total and never count toward the minimum units."
+            ),
+        },
+    ),
     ("Delivery fee", {"fields": ("delivery_fee", "free_delivery_threshold")}),
     ("Small-cart fee", {"fields": ("small_cart_fee", "small_cart_threshold")}),
     ("Handling fee", {"fields": ("handling_fee",)}),
     ("Cash on delivery", {"fields": ("cod_enabled", "cod_max_order_value")}),
 )
+
+# ADR 0002: the volume offer (the model's verbose name is "free unit every").
+FREE_OFFER_LABEL = "Free carton every (paid cartons)"
+FREE_OFFER_HELP = "1 free carton per N paid cartons; 0 = off."
+
+
+def free_offer_text(every: int, unit_label: str = "cartons") -> str:
+    """`free_unit_every` in words, for viewers and the list (display only)."""
+    if not every:
+        return "Off"
+    return f"1 free per {every} paid {unit_label or 'cartons'}"
 
 
 def _rupee_field(name: str):
@@ -316,6 +339,9 @@ def pricing_defaults() -> list[tuple[str, str]]:
         for name in options["fields"]:
             field = PricingConfig._meta.get_field(name)
             default = field.get_default()
+            if name == "free_unit_every":
+                rows.append((FREE_OFFER_LABEL, free_offer_text(default)))
+                continue
             value = inr(default) if name in PRICING_MONEY_FIELDS else ("On" if default else "Off")
             rows.append((field.verbose_name.capitalize(), value))
     return rows
@@ -330,6 +356,7 @@ class PricingConfigAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmin
         "small_cart",
         "handling",
         "cod",
+        "free_offer",
         "updated_at",
     )
     list_display_links = ("store_label",)
@@ -350,24 +377,32 @@ class PricingConfigAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmin
         record = (("Record", {"fields": ("created_at", "updated_at")}),)
         fieldsets = PRICING_FIELDSETS
         if obj is not None and not self.has_change_permission(request, obj):
-            # View-only roles (Finance): the amounts in rupees instead of bare numbers.
+            # View-only roles (Finance): the amounts in rupees instead of bare numbers, and the
+            # volume offer in words.
+            shown = {name: f"{name}_inr" for name in PRICING_MONEY_FIELDS}
+            shown["free_unit_every"] = "free_offer"
             fieldsets = tuple(
                 (
                     title,
                     {
                         **options,
-                        "fields": tuple(
-                            f"{name}_inr" if name in PRICING_MONEY_FIELDS else name
-                            for name in options["fields"]
-                        ),
+                        "fields": tuple(shown.get(name, name) for name in options["fields"]),
                     },
                 )
                 for title, options in fieldsets
             )
         return store + fieldsets + (record if obj is not None else ())
 
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == "free_unit_every" and formfield is not None:
+            formfield.label = FREE_OFFER_LABEL
+            formfield.help_text = FREE_OFFER_HELP
+        return formfield
+
     def get_readonly_fields(self, request, obj=None):
         fields = (*super().get_readonly_fields(request, obj),)
+        fields += ("free_offer",)
         fields += tuple(f"{name}_inr" for name in PRICING_MONEY_FIELDS)
         if obj is not None:
             fields += ("store",)  # one row per store; never moved to another store
@@ -422,6 +457,10 @@ class PricingConfigAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmin
     @display(description="Cash on delivery")
     def cod(self, obj) -> str:
         return f"Up to {inr(obj.cod_max_order_value)}" if obj.cod_enabled else "Off"
+
+    @display(description=FREE_OFFER_LABEL, ordering="free_unit_every")
+    def free_offer(self, obj) -> str:
+        return free_offer_text(obj.free_unit_every, obj.order_unit_label)
 
 
 for _name in PRICING_MONEY_FIELDS:

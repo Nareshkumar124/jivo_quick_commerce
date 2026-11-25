@@ -266,6 +266,11 @@
 .ops-pickrow--gone { color: var(--ops-color-text-secondary); background: var(--ops-color-surface-muted); }
 .ops-pickrow--gone .ops-product { text-decoration: line-through; }
 .ops-gone { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+/* ADR 0002: a free carton (₹0) is packed like any line; the badge and a green edge make it stand out. */
+.ops-pickrow--free td:first-child { box-shadow: inset 4px 0 0 var(--color-green-500, #22c55e); }
+.ops-free { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+.ops-free__price { font-weight: 700; }
+.ops-free-count { font-weight: 600; }
 @media (max-width: 899.98px) {
 	.ops-picklist tr.ops-pickrow { display: grid; grid-template-columns: 40px 1fr auto; }
 	.ops-pickrow__action { grid-column: 1 / -1; text-align: left; }

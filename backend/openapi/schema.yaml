@@ -13,7 +13,7 @@ paths:
       description: |-
         The caller's own referral code (created on the first call, never changed), a ready-made share message, the reward terms (current admin settings), whether the caller joined with a friend's code, and how many friends joined with theirs.
 
-        When a referred customer's first order is delivered, **both** customers get a personal coupon (FLAT `reward_amount` off, valid `reward_validity_days` days, one use, only for them). It appears in `GET /cart/coupons/` with `is_personal: true`.
+        When a referred customer's first order is delivered, **both** customers get a free-carton reward (ADR 0002: `reward_type` FREE_UNIT, `reward_label` "1 free carton", valid `reward_validity_days` days, one use, only for them). It appears in `GET /account/rewards/` and in `GET /cart/coupons/` (`discount_type` FREE_UNIT, `is_personal: true`). Rewards given before 2026-11-25 were ₹ coupons.
       summary: My referral code and status
       tags:
       - account
@@ -30,8 +30,11 @@ paths:
                   value:
                     code: K7M2PQ
                     share_message: Use my code K7M2PQ on the Jivo app and we both
-                      get ₹90 off.
+                      get 1 free carton.
                     is_enabled: true
+                    reward_type: FREE_UNIT
+                    reward_quantity: 1
+                    reward_label: 1 free carton
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -44,8 +47,11 @@ paths:
                   value:
                     code: K7M2PQ
                     share_message: Use my code K7M2PQ on the Jivo app and we both
-                      get ₹90 off.
+                      get 1 free carton.
                     is_enabled: true
+                    reward_type: FREE_UNIT
+                    reward_quantity: 1
+                    reward_label: 1 free carton
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -61,8 +67,11 @@ paths:
                   value:
                     code: XR4TNW
                     share_message: Use my code XR4TNW on the Jivo app and we both
-                      get ₹90 off.
+                      get 1 free carton.
                     is_enabled: true
+                    reward_type: FREE_UNIT
+                    reward_quantity: 1
+                    reward_label: 1 free carton
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -78,8 +87,11 @@ paths:
                   value:
                     code: K7M2PQ
                     share_message: Use my code K7M2PQ on the Jivo app and we both
-                      get ₹90 off.
+                      get 1 free carton.
                     is_enabled: false
+                    reward_type: FREE_UNIT
+                    reward_quantity: 1
+                    reward_label: 1 free carton
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -229,8 +241,11 @@ paths:
                   value:
                     code: K7M2PQ
                     share_message: Use my code K7M2PQ on the Jivo app and we both
-                      get ₹90 off.
+                      get 1 free carton.
                     is_enabled: true
+                    reward_type: FREE_UNIT
+                    reward_quantity: 1
+                    reward_label: 1 free carton
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -364,6 +379,174 @@ paths:
             the caller''s own code. `REFERRAL_ALREADY_APPLIED`: a code was entered
             before. `REFERRAL_NOT_ELIGIBLE`: `details.reason` is `HAS_ORDERS` (an
             order was already placed) or `PROGRAM_OFF` (the program is paused).'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/account/rewards/:
+    get:
+      operationId: account_rewards_retrieve
+      description: 'ADR 0002: the caller''s free-carton rewards (welcome and referral)
+        and their history. A reward is a personal coupon with `discount_type` FREE_UNIT:
+        tap **Use**, let the customer pick a size, then `POST /cart/coupon/` with
+        `code` and `free_variant_id`. One reward or one coupon per order; the order
+        still needs the store''s minimum paid cartons. USED and EXPIRED rewards are
+        only in `history`.'
+      summary: My free-carton rewards
+      tags:
+      - account
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rewards'
+              examples:
+                Rewards:
+                  value:
+                    available:
+                    - code: WEL7K2M9QPX
+                      title: '1 free carton: welcome reward'
+                      source: WELCOME
+                      status: AVAILABLE
+                      expires_at: '2026-12-25T09:30:00Z'
+                      order_number: null
+                    - code: REF4Q8N2KXW
+                      title: '1 free carton: you invited a friend'
+                      source: REFERRAL_REFERRER
+                      status: CLAIMED
+                      expires_at: '2026-12-20T11:00:00Z'
+                      order_number: JV-261124-000318
+                    history:
+                    - at: '2026-11-24T08:15:00Z'
+                      kind: CLAIMED
+                      title: 'Referral reward: you invited a friend'
+                      quantity: 1
+                      order_number: JV-261124-000318
+                    - at: '2026-11-22T12:40:00Z'
+                      kind: VOLUME_FREE
+                      title: 2 free cartons with your order
+                      quantity: 2
+                      order_number: JV-261122-000287
+                    - at: '2026-11-20T11:00:00Z'
+                      kind: EARNED
+                      title: 'Referral reward: you invited a friend'
+                      quantity: 1
+                      order_number: null
+                    - at: '2026-11-18T09:30:00Z'
+                      kind: EARNED
+                      title: Welcome reward
+                      quantity: 1
+                      order_number: null
+                NoRewards:
+                  value:
+                    available: []
+                    history: []
+                  summary: No rewards
+          description: The caller's rewards.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                WRONGAPPTOKEN:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This is for the Jivo customer app. Sign in to the customer
+                        app to use it.
+                      details:
+                        reason: WRONG_APP_TOKEN
+                        required_app: customer
+                        token_app: rider
+                  summary: A token issued to the rider app
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: customer
+                        token_app: rider
+                  summary: X-App-Name names a different app than the token
+          description: 'Only customer-app tokens may call this: a token issued to
+            the rider app gets `details.reason` = `WRONG_APP_TOKEN`. `X-App-Name`
+            names a different app than the access token''s `app` claim: `details.reason`
+            = `APP_HEADER_MISMATCH`.'
         '429':
           content:
             application/json:
@@ -2070,6 +2253,9 @@ paths:
                     coupon:
                       code: JIVO50
                       title: Flat ₹50 off
+                      discount_type: FLAT
+                      source: NONE
+                      free_variant_id: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -2110,6 +2296,9 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -2159,6 +2348,9 @@ paths:
                       tip: '0.00'
                       grand_total: '0.00'
                       total_savings: '0.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: '99.00'
@@ -2231,6 +2423,9 @@ paths:
                     coupon:
                       code: JIVO50
                       title: Flat ₹50 off
+                      discount_type: FLAT
+                      source: NONE
+                      free_variant_id: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -2269,6 +2464,9 @@ paths:
                       tip: '0.00'
                       grand_total: '249.00'
                       total_savings: '50.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -2372,6 +2570,9 @@ paths:
                       tip: '0.00'
                       grand_total: '159.00'
                       total_savings: '31.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -2475,6 +2676,9 @@ paths:
                       tip: '0.00'
                       grand_total: '159.00'
                       total_savings: '31.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -2578,6 +2782,9 @@ paths:
                       tip: '0.00'
                       grand_total: '119.00'
                       total_savings: '20.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: '20.00'
@@ -2724,6 +2931,9 @@ paths:
                       tip: '0.00'
                       grand_total: '4086.00'
                       total_savings: '1074.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -2798,6 +3008,9 @@ paths:
                     coupon:
                       code: JIVO50
                       title: Flat ₹50 off
+                      discount_type: FLAT
+                      source: NONE
+                      free_variant_id: null
                       discount: '0.00'
                       is_applicable: false
                       message: Add items worth ₹74 more to use this coupon.
@@ -2836,6 +3049,9 @@ paths:
                       tip: '0.00'
                       grand_total: '250.00'
                       total_savings: '25.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -2924,6 +3140,9 @@ paths:
                       tip: '0.00'
                       grand_total: '159.00'
                       total_savings: '31.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -3029,6 +3248,9 @@ paths:
                       tip: '0.00'
                       grand_total: '159.00'
                       total_savings: '31.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -3139,6 +3361,9 @@ paths:
                     coupon:
                       code: JIVO50
                       title: Flat ₹50 off
+                      discount_type: FLAT
+                      source: NONE
+                      free_variant_id: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -3179,6 +3404,9 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -3204,6 +3432,338 @@ paths:
                       - code: STORE_CLOSED
                         message: The store is closed now. It opens at 7:00 AM.
                   summary: Store closed
+                FreeCartons:VolumeOfferAndAReward:
+                  value:
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: true
+                      opens_at: null
+                    items:
+                    - id: 511
+                      product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 8
+                      price_per_unit: '110.00'
+                      previous_selling_price: null
+                      price_tier: null
+                      next_tier_price: null
+                      line_mrp_total: '880.00'
+                      line_total: '880.00'
+                      issue: null
+                    - id: 512
+                      product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4002
+                        name: 500 ml x 24 (carton)
+                        mrp: '140.00'
+                        selling_price: '140.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '11.67'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 4
+                      price_per_unit: '140.00'
+                      previous_selling_price: null
+                      price_tier: null
+                      next_tier_price: null
+                      line_mrp_total: '560.00'
+                      line_total: '560.00'
+                      issue: null
+                    item_count: 12
+                    coupon:
+                      code: WEL7K2M9QPX
+                      title: '1 free carton: welcome reward'
+                      discount_type: FREE_UNIT
+                      source: WELCOME
+                      free_variant_id: 4002
+                      discount: '0.00'
+                      is_applicable: true
+                      message: null
+                      amount_to_unlock: null
+                    tip: '0.00'
+                    instructions:
+                      chips: []
+                      note: ''
+                    address:
+                      id: 12
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                      is_default: true
+                      is_serviceable: true
+                      created_at: '2026-10-20T06:35:00Z'
+                      updated_at: '2026-10-20T06:35:00Z'
+                    bill:
+                      mrp_total: '1440.00'
+                      item_total: '1440.00'
+                      product_discount: '0.00'
+                      coupon_discount: '0.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '0.00'
+                      grand_total: '1440.00'
+                      total_savings: '250.00'
+                      free_items_value: '250.00'
+                    free_lines:
+                    - product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 1
+                      mrp: '110.00'
+                      value: '110.00'
+                      source: VOLUME_OFFER
+                    - product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4002
+                        name: 500 ml x 24 (carton)
+                        mrp: '140.00'
+                        selling_price: '140.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '11.67'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 1
+                      mrp: '140.00'
+                      value: '140.00'
+                      source: REWARD
+                    free_offer:
+                      every: 10
+                      paid_units: 12
+                      free_units: 1
+                      units_to_next_free: 8
+                      message: Add 8 more cartons to get 1 more free
+                      notice: null
+                    thresholds:
+                      min_order_value: '99.00'
+                      amount_to_min_order: null
+                      free_delivery_threshold: '299.00'
+                      amount_to_free_delivery: null
+                      min_order_units: 5
+                      units_to_min_order: null
+                      order_unit_label: cartons
+                      tier_units: 0
+                      next_price_tier: null
+                    payment_methods:
+                    - method: ONLINE
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    - method: COD
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    checkout:
+                      can_place_order: true
+                      blockers: []
+                  summary: 'Free cartons: volume offer and a reward'
+                FreeCartonEarnedButOutOfStock:
+                  value:
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: true
+                      opens_at: null
+                    items:
+                    - id: 511
+                      product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: LOW_STOCK
+                        orderable_quantity: 10
+                        units_left: 10
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 10
+                      price_per_unit: '110.00'
+                      previous_selling_price: null
+                      price_tier: null
+                      next_tier_price: null
+                      line_mrp_total: '1100.00'
+                      line_total: '1100.00'
+                      issue: null
+                    item_count: 10
+                    coupon: null
+                    tip: '0.00'
+                    instructions:
+                      chips: []
+                      note: ''
+                    address:
+                      id: 12
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                      is_default: true
+                      is_serviceable: true
+                      created_at: '2026-10-20T06:35:00Z'
+                      updated_at: '2026-10-20T06:35:00Z'
+                    bill:
+                      mrp_total: '1100.00'
+                      item_total: '1100.00'
+                      product_discount: '0.00'
+                      coupon_discount: '0.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '0.00'
+                      grand_total: '1100.00'
+                      total_savings: '0.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer:
+                      every: 10
+                      paid_units: 10
+                      free_units: 1
+                      units_to_next_free: 10
+                      message: Add 10 more cartons to get 1 more free
+                      notice: Your free carton is out of stock right now, so it is
+                        not added.
+                    thresholds:
+                      min_order_value: '99.00'
+                      amount_to_min_order: null
+                      free_delivery_threshold: '299.00'
+                      amount_to_free_delivery: null
+                      min_order_units: 5
+                      units_to_min_order: null
+                      order_unit_label: cartons
+                      tier_units: 0
+                      next_price_tier: null
+                    payment_methods:
+                    - method: ONLINE
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    - method: COD
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    checkout:
+                      can_place_order: true
+                      blockers: []
+                  summary: Free carton earned but out of stock
           description: The cart.
         '401':
           content:
@@ -3498,6 +4058,9 @@ paths:
                     coupon:
                       code: JIVO50
                       title: Flat ₹50 off
+                      discount_type: FLAT
+                      source: NONE
+                      free_variant_id: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -3538,6 +4101,9 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -3806,6 +4372,9 @@ paths:
                       tip: '0.00'
                       grand_total: '0.00'
                       total_savings: '0.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: '99.00'
@@ -3980,10 +4549,10 @@ paths:
   /api/v1/cart/coupon/:
     post:
       operationId: cart_coupon_apply
-      description: 'Applies `code` (case-insensitive) and replaces any coupon already
-        applied. The discount is on the item total (or on the qualifying items for
-        a category coupon), capped by `max_discount` and by the item total. Applying
-        does not use the coupon up: an order does (held while its payment is pending).'
+      description: |-
+        Applies `code` (case-insensitive) and replaces any coupon already applied. The discount is on the item total (or on the qualifying items for a category coupon), capped by `max_discount` and by the item total. Applying does not use the coupon up: an order does (held while its payment is pending).
+
+        **Free-carton rewards** (ADR 0002, `discount_type` FREE_UNIT): send `free_variant_id`, the size the customer picked; it must be sold at this store, be of the same product category as a paid line in the cart, and have the stock. The cart then has a free REWARD line in `free_lines` and no money off. A reward takes the order's single coupon slot and still needs the store's minimum paid cartons (`thresholds.min_order_units`; free cartons never count).
       summary: Apply a coupon
       parameters:
       - in: header
@@ -4007,6 +4576,11 @@ paths:
               Apply:
                 value:
                   code: jivo50
+              ApplyAFree-cartonReward:
+                value:
+                  code: WEL7K2M9QPX
+                  free_variant_id: 4002
+                summary: Apply a free-carton reward
         required: true
       security:
       - jwtAuth: []
@@ -4101,6 +4675,9 @@ paths:
                     coupon:
                       code: JIVO50
                       title: Flat ₹50 off
+                      discount_type: FLAT
+                      source: NONE
+                      free_variant_id: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -4141,6 +4718,9 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -4163,6 +4743,225 @@ paths:
                     checkout:
                       can_place_order: true
                       blockers: []
+                Free-cartonRewardApplied:
+                  value:
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: true
+                      opens_at: null
+                    items:
+                    - id: 511
+                      product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 8
+                      price_per_unit: '110.00'
+                      previous_selling_price: null
+                      price_tier: null
+                      next_tier_price: null
+                      line_mrp_total: '880.00'
+                      line_total: '880.00'
+                      issue: null
+                    - id: 512
+                      product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4002
+                        name: 500 ml x 24 (carton)
+                        mrp: '140.00'
+                        selling_price: '140.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '11.67'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 4
+                      price_per_unit: '140.00'
+                      previous_selling_price: null
+                      price_tier: null
+                      next_tier_price: null
+                      line_mrp_total: '560.00'
+                      line_total: '560.00'
+                      issue: null
+                    item_count: 12
+                    coupon:
+                      code: WEL7K2M9QPX
+                      title: '1 free carton: welcome reward'
+                      discount_type: FREE_UNIT
+                      source: WELCOME
+                      free_variant_id: 4002
+                      discount: '0.00'
+                      is_applicable: true
+                      message: null
+                      amount_to_unlock: null
+                    tip: '0.00'
+                    instructions:
+                      chips: []
+                      note: ''
+                    address:
+                      id: 12
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                      is_default: true
+                      is_serviceable: true
+                      created_at: '2026-10-20T06:35:00Z'
+                      updated_at: '2026-10-20T06:35:00Z'
+                    bill:
+                      mrp_total: '1440.00'
+                      item_total: '1440.00'
+                      product_discount: '0.00'
+                      coupon_discount: '0.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '0.00'
+                      grand_total: '1440.00'
+                      total_savings: '250.00'
+                      free_items_value: '250.00'
+                    free_lines:
+                    - product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 1
+                      mrp: '110.00'
+                      value: '110.00'
+                      source: VOLUME_OFFER
+                    - product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4002
+                        name: 500 ml x 24 (carton)
+                        mrp: '140.00'
+                        selling_price: '140.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '11.67'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 1
+                      mrp: '140.00'
+                      value: '140.00'
+                      source: REWARD
+                    free_offer:
+                      every: 10
+                      paid_units: 12
+                      free_units: 1
+                      units_to_next_free: 8
+                      message: Add 8 more cartons to get 1 more free
+                      notice: null
+                    thresholds:
+                      min_order_value: '99.00'
+                      amount_to_min_order: null
+                      free_delivery_threshold: '299.00'
+                      amount_to_free_delivery: null
+                      min_order_units: 5
+                      units_to_min_order: null
+                      order_unit_label: cartons
+                      tier_units: 0
+                      next_price_tier: null
+                    payment_methods:
+                    - method: ONLINE
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    - method: COD
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    checkout:
+                      can_place_order: true
+                      blockers: []
+                  summary: Free-carton reward applied
           description: The cart with the coupon.
         '401':
           content:
@@ -4270,11 +5069,40 @@ paths:
                         code: JIVO50
                         scope: per_user
                   summary: COUPON_USAGE_EXCEEDED
+                COUPONNOTELIGIBLEMINUNITS:
+                  value:
+                    error:
+                      code: COUPON_NOT_ELIGIBLE
+                      message: Add 3 more cartons to use this reward (minimum 5 paid
+                        cartons).
+                      details:
+                        code: WEL7K2M9QPX
+                        reason: MIN_ORDER_UNITS
+                        min_order_units: 5
+                        paid_units: 2
+                        units_to_unlock: 3
+                  summary: COUPON_NOT_ELIGIBLE_MIN_UNITS
+                COUPONNOTELIGIBLEFREEVARIANT:
+                  value:
+                    error:
+                      code: COUPON_NOT_ELIGIBLE
+                      message: This size is not available for your free carton here.
+                        Choose another size.
+                      details:
+                        code: WEL7K2M9QPX
+                        reason: FREE_VARIANT_UNAVAILABLE
+                        free_variant_id: 4003
+                  summary: COUPON_NOT_ELIGIBLE_FREE_VARIANT
           description: 'The coupon cannot be applied; nothing changed. `COUPON_INVALID`:
             unknown, inactive or not started. `COUPON_EXPIRED`. `COUPON_NOT_ELIGIBLE`:
             `details.reason` is `MIN_ORDER_VALUE` (with `min_order_value` and `amount_to_unlock`),
-            `FIRST_ORDER_ONLY`, `NO_ELIGIBLE_ITEMS` or `STORE`. `COUPON_USAGE_EXCEEDED`:
-            `details.scope` is `per_user` or `total`.'
+            `FIRST_ORDER_ONLY`, `NO_ELIGIBLE_ITEMS` or `STORE`; for a free-carton
+            reward also `MIN_ORDER_UNITS` (with `min_order_units`, `paid_units` and
+            `units_to_unlock`: free cartons never count) or `FREE_VARIANT_UNAVAILABLE`
+            (the size is not sold at this store, is not of the category of a paid
+            line, or has no stock for it; with `free_variant_id`). `COUPON_USAGE_EXCEEDED`:
+            `details.scope` is `per_user` or `total` (a reward already on another
+            order).'
         '400':
           content:
             application/json:
@@ -4308,6 +5136,15 @@ paths:
                         code:
                         - This field may not be blank.
                   summary: Blank code
+                RewardWithoutASize:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        free_variant_id:
+                        - Choose a size for your free carton.
+                  summary: Reward without a size
           description: 'Invalid request: the `X-Store-Id` header is missing or malformed,
             or a query parameter is invalid.'
         '404':
@@ -4482,6 +5319,9 @@ paths:
                       tip: '0.00'
                       grand_total: '159.00'
                       total_savings: '31.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -4699,6 +5539,8 @@ paths:
                       message: null
                       amount_to_unlock: null
                       is_personal: true
+                      source: REFERRAL_REFERRER
+                      free_variant_id: null
                     - code: OILS15
                       title: 15% off cooking oils
                       description: On edible oils, up to ₹150.
@@ -4714,6 +5556,8 @@ paths:
                       message: null
                       amount_to_unlock: null
                       is_personal: false
+                      source: NONE
+                      free_variant_id: null
                     - code: JIVO10
                       title: 10% off
                       description: On orders of ₹499 or more, up to ₹100.
@@ -4729,6 +5573,8 @@ paths:
                       message: null
                       amount_to_unlock: null
                       is_personal: false
+                      source: NONE
+                      free_variant_id: null
                     - code: JIVO50
                       title: Flat ₹50 off
                       description: On orders of ₹299 or more.
@@ -4744,6 +5590,26 @@ paths:
                       message: null
                       amount_to_unlock: null
                       is_personal: false
+                      source: NONE
+                      free_variant_id: null
+                    - code: WEL7K2M9QPX
+                      title: '1 free carton: welcome reward'
+                      description: Welcome to Jivo. One free carton of the size you
+                        choose, only for you.
+                      discount_type: FREE_UNIT
+                      value: '1.00'
+                      max_discount: null
+                      min_order_value: '0.00'
+                      ends_at: '2026-12-25T09:30:00Z'
+                      is_applied: false
+                      is_eligible: true
+                      savings: '0.00'
+                      ineligible_reason: null
+                      message: null
+                      amount_to_unlock: null
+                      is_personal: true
+                      source: WELCOME
+                      free_variant_id: null
                     - code: BIGSAVE200
                       title: Flat ₹200 off
                       description: On orders of ₹1,499 or more.
@@ -4759,6 +5625,8 @@ paths:
                       message: Add items worth ₹716 more to unlock.
                       amount_to_unlock: '716.00'
                       is_personal: false
+                      source: NONE
+                      free_variant_id: null
                     - code: WELCOME100
                       title: ₹100 off your first order
                       description: On your first order of ₹399 or more.
@@ -4774,6 +5642,8 @@ paths:
                       message: Only for your first order.
                       amount_to_unlock: null
                       is_personal: false
+                      source: NONE
+                      free_variant_id: null
                 NoneAvailable:
                   value:
                     results: []
@@ -5056,6 +5926,9 @@ paths:
                     coupon:
                       code: JIVO50
                       title: Flat ₹50 off
+                      discount_type: FLAT
+                      source: NONE
+                      free_variant_id: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -5096,6 +5969,9 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -5454,6 +6330,9 @@ paths:
                     coupon:
                       code: JIVO50
                       title: Flat ₹50 off
+                      discount_type: FLAT
+                      source: NONE
+                      free_variant_id: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -5494,6 +6373,9 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -5842,6 +6724,9 @@ paths:
                       tip: '0.00'
                       grand_total: '159.00'
                       total_savings: '31.00'
+                      free_items_value: '0.00'
+                    free_lines: []
+                    free_offer: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -9706,6 +10591,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
+                        is_free: false
+                        free_source: null
                       - id: 9002
                         variant_id: 2001
                         product_id: 201
@@ -9722,6 +10609,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
+                        is_free: false
+                        free_source: null
                       item_count: 3
                       bill:
                         mrp_total: '948.00'
@@ -9734,6 +10623,7 @@ paths:
                         tip: '20.00'
                         grand_total: '753.00'
                         total_savings: '215.00'
+                        free_items_value: '0.00'
                       coupon_code: JIVO50
                       address:
                         label: home
@@ -9812,6 +10702,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
+                        is_free: false
+                        free_source: null
                       - id: 9002
                         variant_id: 2001
                         product_id: 201
@@ -9828,6 +10720,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
+                        is_free: false
+                        free_source: null
                       item_count: 3
                       bill:
                         mrp_total: '948.00'
@@ -9840,6 +10734,7 @@ paths:
                         tip: '20.00'
                         grand_total: '753.00'
                         total_savings: '215.00'
+                        free_items_value: '0.00'
                       coupon_code: JIVO50
                       address:
                         label: home
@@ -9918,6 +10813,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
+                        is_free: false
+                        free_source: null
                       - id: 9002
                         variant_id: 2001
                         product_id: 201
@@ -9934,6 +10831,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
+                        is_free: false
+                        free_source: null
                       item_count: 3
                       bill:
                         mrp_total: '948.00'
@@ -9946,6 +10845,7 @@ paths:
                         tip: '20.00'
                         grand_total: '753.00'
                         total_savings: '215.00'
+                        free_items_value: '0.00'
                       coupon_code: JIVO50
                       address:
                         label: home
@@ -10019,6 +10919,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
+                        is_free: false
+                        free_source: null
                       - id: 9002
                         variant_id: 2001
                         product_id: 201
@@ -10035,6 +10937,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
+                        is_free: false
+                        free_source: null
                       item_count: 3
                       bill:
                         mrp_total: '948.00'
@@ -10047,6 +10951,7 @@ paths:
                         tip: '20.00'
                         grand_total: '753.00'
                         total_savings: '215.00'
+                        free_items_value: '0.00'
                       coupon_code: JIVO50
                       address:
                         label: home
@@ -10125,6 +11030,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
+                        is_free: false
+                        free_source: null
                       - id: 9002
                         variant_id: 2001
                         product_id: 201
@@ -10141,6 +11048,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
+                        is_free: false
+                        free_source: null
                       item_count: 3
                       bill:
                         mrp_total: '948.00'
@@ -10153,6 +11062,7 @@ paths:
                         tip: '20.00'
                         grand_total: '753.00'
                         total_savings: '215.00'
+                        free_items_value: '0.00'
                       coupon_code: JIVO50
                       address:
                         label: home
@@ -10602,6 +11512,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -10618,6 +11530,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -10630,6 +11544,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -10694,6 +11609,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -10710,6 +11627,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -10722,6 +11641,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -10789,6 +11709,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -10805,6 +11727,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -10817,6 +11741,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -10881,6 +11806,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -10897,6 +11824,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -10909,6 +11838,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -10980,6 +11910,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -10996,6 +11928,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -11008,6 +11942,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -11078,6 +12013,8 @@ paths:
                       quantity_unavailable: 1
                       line_mrp_total: '349.00'
                       line_total: '279.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -11094,6 +12031,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 2
                     bill:
                       mrp_total: '599.00'
@@ -11106,6 +12045,7 @@ paths:
                       tip: '20.00'
                       grand_total: '474.00'
                       total_savings: '145.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -11185,6 +12125,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -11201,6 +12143,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -11213,6 +12157,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -11296,6 +12241,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -11312,6 +12259,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -11324,6 +12273,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -11395,6 +12345,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -11411,6 +12363,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -11423,6 +12377,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -11475,6 +12430,152 @@ paths:
                       title: Delivered
                       at: '2026-11-03T06:43:10Z'
                   summary: Delivered, invoice available
+                DeliveredWithFreeCartons:
+                  value:
+                    id: 4321
+                    order_number: JV-261103-004321
+                    status: DELIVERED
+                    payment_method: COD
+                    payment_status: COD_COLLECTED
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                    items:
+                    - id: 9101
+                      variant_id: 4001
+                      product_id: 401
+                      product_name: Jivo Water
+                      variant_name: 1 L x 12 (carton)
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                        medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                        large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                        alt_text: Jivo Water carton
+                      mrp: '110.00'
+                      selling_price: '110.00'
+                      quantity: 8
+                      quantity_unavailable: 0
+                      line_mrp_total: '880.00'
+                      line_total: '880.00'
+                      is_free: false
+                      free_source: null
+                    - id: 9102
+                      variant_id: 4002
+                      product_id: 401
+                      product_name: Jivo Water
+                      variant_name: 500 ml x 24 (carton)
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                        medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                        large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                        alt_text: Jivo Water carton
+                      mrp: '140.00'
+                      selling_price: '140.00'
+                      quantity: 4
+                      quantity_unavailable: 0
+                      line_mrp_total: '560.00'
+                      line_total: '560.00'
+                      is_free: false
+                      free_source: null
+                    - id: 9103
+                      variant_id: 4001
+                      product_id: 401
+                      product_name: Jivo Water
+                      variant_name: 1 L x 12 (carton)
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                        medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                        large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                        alt_text: Jivo Water carton
+                      mrp: '110.00'
+                      selling_price: '0.00'
+                      quantity: 1
+                      quantity_unavailable: 0
+                      line_mrp_total: '110.00'
+                      line_total: '0.00'
+                      is_free: true
+                      free_source: VOLUME_OFFER
+                    - id: 9104
+                      variant_id: 4002
+                      product_id: 401
+                      product_name: Jivo Water
+                      variant_name: 500 ml x 24 (carton)
+                      image:
+                        thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                        medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                        large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                        alt_text: Jivo Water carton
+                      mrp: '140.00'
+                      selling_price: '0.00'
+                      quantity: 1
+                      quantity_unavailable: 0
+                      line_mrp_total: '140.00'
+                      line_total: '0.00'
+                      is_free: true
+                      free_source: REWARD
+                    item_count: 12
+                    bill:
+                      mrp_total: '1440.00'
+                      item_total: '1440.00'
+                      product_discount: '0.00'
+                      coupon_discount: '0.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '0.00'
+                      grand_total: '1440.00'
+                      total_savings: '250.00'
+                      free_items_value: '250.00'
+                    coupon_code: WEL7K2M9QPX
+                    address:
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                    instructions:
+                      chips: []
+                      note: ''
+                    created_at: '2026-11-03T06:30:00Z'
+                    cancellation: null
+                    amount_refunded: '0.00'
+                    refunds: []
+                    can_download_invoice: true
+                    can_rate: true
+                    rating: null
+                    placed_at: '2026-11-03T06:30:00Z'
+                    payment_expires_at: null
+                    eta_at: '2026-11-03T06:44:00Z'
+                    can_cancel: false
+                    can_retry_payment: false
+                    timeline:
+                    - status: PLACED
+                      title: Order placed
+                      at: '2026-11-03T06:30:00Z'
+                    - status: ACCEPTED
+                      title: Order confirmed
+                      at: '2026-11-03T06:30:20Z'
+                    - status: PACKING
+                      title: Packing your order
+                      at: '2026-11-03T06:31:00Z'
+                    - status: PACKED
+                      title: Packed, rider on the way to store
+                      at: '2026-11-03T06:34:00Z'
+                    - status: OUT_FOR_DELIVERY
+                      title: On the way
+                      at: '2026-11-03T06:35:30Z'
+                    - status: DELIVERED
+                      title: Delivered
+                      at: '2026-11-03T06:43:10Z'
+                  summary: Delivered with free cartons
           description: The order.
         '401':
           content:
@@ -11671,6 +12772,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -11687,6 +12790,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -11699,6 +12804,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -11770,6 +12876,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -11786,6 +12894,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -11798,6 +12908,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -12731,6 +13842,9 @@ paths:
                       coupon:
                         code: JIVO50
                         title: Flat ₹50 off
+                        discount_type: FLAT
+                        source: NONE
+                        free_variant_id: null
                         discount: '50.00'
                         is_applicable: true
                         message: null
@@ -12771,6 +13885,9 @@ paths:
                         tip: '20.00'
                         grand_total: '753.00'
                         total_savings: '215.00'
+                        free_items_value: '0.00'
+                      free_lines: []
+                      free_offer: null
                       thresholds:
                         min_order_value: '99.00'
                         amount_to_min_order: null
@@ -12881,6 +13998,9 @@ paths:
                       coupon:
                         code: JIVO50
                         title: Flat ₹50 off
+                        discount_type: FLAT
+                        source: NONE
+                        free_variant_id: null
                         discount: '50.00'
                         is_applicable: true
                         message: null
@@ -12921,6 +14041,9 @@ paths:
                         tip: '20.00'
                         grand_total: '753.00'
                         total_savings: '215.00'
+                        free_items_value: '0.00'
+                      free_lines: []
+                      free_offer: null
                       thresholds:
                         min_order_value: '99.00'
                         amount_to_min_order: null
@@ -13175,6 +14298,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '698.00'
                         line_total: '558.00'
+                        is_free: false
+                        free_source: null
                       - id: 9002
                         variant_id: 2001
                         product_id: 201
@@ -13191,6 +14316,8 @@ paths:
                         quantity_unavailable: 0
                         line_mrp_total: '250.00'
                         line_total: '225.00'
+                        is_free: false
+                        free_source: null
                       item_count: 3
                       bill:
                         mrp_total: '948.00'
@@ -13203,6 +14330,7 @@ paths:
                         tip: '20.00'
                         grand_total: '753.00'
                         total_savings: '215.00'
+                        free_items_value: '0.00'
                       coupon_code: JIVO50
                       address:
                         label: home
@@ -14007,6 +15135,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '698.00'
                       line_total: '558.00'
+                      is_free: false
+                      free_source: null
                     - id: 9002
                       variant_id: 2001
                       product_id: 201
@@ -14023,6 +15153,8 @@ paths:
                       quantity_unavailable: 0
                       line_mrp_total: '250.00'
                       line_total: '225.00'
+                      is_free: false
+                      free_source: null
                     item_count: 3
                     bill:
                       mrp_total: '948.00'
@@ -14035,6 +15167,7 @@ paths:
                       tip: '20.00'
                       grand_total: '753.00'
                       total_savings: '215.00'
+                      free_items_value: '0.00'
                     coupon_code: JIVO50
                     address:
                       label: home
@@ -23788,6 +24921,30 @@ components:
         title:
           type: string
           description: e.g. "Flat ₹50 off".
+        discount_type:
+          allOf:
+          - $ref: '#/components/schemas/CouponDiscountTypeEnum'
+          description: |-
+            FREE_UNIT: a free-carton reward (ADR 0002). It gives no money off (`discount` is "0.00"); its carton is in `free_lines` with `source` REWARD.
+
+            * `FLAT` - Flat amount off
+            * `PERCENT` - Percent off
+            * `FREE_UNIT` - One free carton (reward)
+        source:
+          allOf:
+          - $ref: '#/components/schemas/CouponSourceEnum'
+          description: |-
+            Why the coupon exists: WELCOME / REFERRAL_* rewards, NONE for staff coupons.
+
+            * `NONE` - Made by staff
+            * `WELCOME` - Welcome reward (new account)
+            * `REFERRAL_REFERRER` - Referral reward (you invited a friend)
+            * `REFERRAL_REFERRED` - Referral reward (you joined with a friend's code)
+        free_variant_id:
+          type: integer
+          nullable: true
+          description: 'FREE_UNIT only: the size picked for the free carton (`VariantSummary.id`,
+            sent as `free_variant_id` when applying). Null for other coupons.'
         discount:
           type: string
           format: decimal
@@ -23816,8 +24973,11 @@ components:
       - amount_to_unlock
       - code
       - discount
+      - discount_type
+      - free_variant_id
       - is_applicable
       - message
+      - source
       - title
     ArrivedCustomerRequest:
       type: object
@@ -23967,11 +25127,20 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
-          description: '`product_discount` + `coupon_discount`: the highlighted ''You
-            save'' amount.'
+          description: '`product_discount` + `coupon_discount` + `free_items_value`:
+            the highlighted ''You save'' amount.'
+        free_items_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: 'ADR 0002: the MRP value of the free cartons (MRP x free quantity;
+            the volume offer and a free-carton reward). They cost ₹0: not part of
+            `item_total`, the fees, the coupon minimum, the COD limit or `grand_total`.
+            "0.00" when there are none.'
       required:
       - coupon_discount
       - delivery_fee
+      - free_items_value
       - grand_total
       - handling_fee
       - item_total
@@ -24050,6 +25219,18 @@ components:
             when sent, else the one saved with `PATCH /cart/`. Null when none is selected.'
         bill:
           $ref: '#/components/schemas/Bill'
+        free_lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/FreeLine'
+          description: 'ADR 0002: free cartons (₹0), volume offer first, then the
+            reward. [] when none. Placing the order adds them as order lines with
+            `is_free: true`.'
+        free_offer:
+          allOf:
+          - $ref: '#/components/schemas/FreeOffer'
+          nullable: true
+          description: The store's volume offer; null when the store has none.
         thresholds:
           $ref: '#/components/schemas/CartThresholds'
         payment_methods:
@@ -24064,6 +25245,8 @@ components:
       - bill
       - checkout
       - coupon
+      - free_lines
+      - free_offer
       - instructions
       - item_count
       - items
@@ -24573,28 +25756,43 @@ components:
           minLength: 1
           description: Coupon code as typed; case-insensitive.
           maxLength: 30
+        free_variant_id:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'ADR 0002: required for a free-carton reward (`discount_type`
+            FREE_UNIT): the size the customer picked (`VariantSummary.id`). It must
+            be sold at the store in `X-Store-Id`, be of the same product category
+            as a paid line in the cart (a water reward goes on a water order) and
+            have the stock. Ignored for other coupons.'
       required:
       - code
     CouponDiscountTypeEnum:
       enum:
       - FLAT
       - PERCENT
+      - FREE_UNIT
       type: string
       description: |-
         * `FLAT` - Flat amount off
         * `PERCENT` - Percent off
+        * `FREE_UNIT` - One free carton (reward)
     CouponIneligibleReasonEnum:
       enum:
       - MIN_ORDER_VALUE
       - FIRST_ORDER_ONLY
       - NO_ELIGIBLE_ITEMS
       - STORE
+      - MIN_ORDER_UNITS
+      - FREE_VARIANT_UNAVAILABLE
       type: string
       description: |-
         * `MIN_ORDER_VALUE` - The item total is below the coupon's minimum.
         * `FIRST_ORDER_ONLY` - Only for your first order.
         * `NO_ELIGIBLE_ITEMS` - No items in the cart qualify for this coupon.
         * `STORE` - Not valid at this store.
+        * `MIN_ORDER_UNITS` - A free-carton reward needs the order's minimum paid cartons.
+        * `FREE_VARIANT_UNAVAILABLE` - The size chosen for the free carton is not available here (not sold at this store, not of the category of a paid line, or out of stock).
     CouponList:
       type: object
       properties:
@@ -24622,13 +25820,20 @@ components:
           type: string
           description: Terms in one line, e.g. "On orders above ₹299".
         discount_type:
-          $ref: '#/components/schemas/CouponDiscountTypeEnum'
+          allOf:
+          - $ref: '#/components/schemas/CouponDiscountTypeEnum'
+          description: |-
+            FREE_UNIT (ADR 0002): a free-carton reward. Applying it needs `free_variant_id` (the size the customer picks); it gives no money off (`savings` "0.00").
+
+            * `FLAT` - Flat amount off
+            * `PERCENT` - Percent off
+            * `FREE_UNIT` - One free carton (reward)
         value:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
           description: 'FLAT: rupees off ("50.00"). PERCENT: percent off ("10.00"
-            = 10%).'
+            = 10%). FREE_UNIT: free cartons ("1.00").'
         max_discount:
           type: string
           format: decimal
@@ -24677,12 +25882,28 @@ components:
           type: boolean
           description: 'True for the customer''s own personal coupon (e.g. a referral
             reward): show a ''For you'' label and its expiry (`ends_at`). Added 2026-11-13.'
+        source:
+          allOf:
+          - $ref: '#/components/schemas/CouponSourceEnum'
+          description: |-
+            ADR 0002: WELCOME / REFERRAL_* for rewards, NONE for staff coupons.
+
+            * `NONE` - Made by staff
+            * `WELCOME` - Welcome reward (new account)
+            * `REFERRAL_REFERRER` - Referral reward (you invited a friend)
+            * `REFERRAL_REFERRED` - Referral reward (you joined with a friend's code)
+        free_variant_id:
+          type: integer
+          nullable: true
+          description: 'FREE_UNIT and applied to the cart: the size picked for the
+            free carton. Null otherwise.'
       required:
       - amount_to_unlock
       - code
       - description
       - discount_type
       - ends_at
+      - free_variant_id
       - ineligible_reason
       - is_applied
       - is_eligible
@@ -24691,8 +25912,21 @@ components:
       - message
       - min_order_value
       - savings
+      - source
       - title
       - value
+    CouponSourceEnum:
+      enum:
+      - NONE
+      - WELCOME
+      - REFERRAL_REFERRER
+      - REFERRAL_REFERRED
+      type: string
+      description: |-
+        * `NONE` - Made by staff
+        * `WELCOME` - Welcome reward (new account)
+        * `REFERRAL_REFERRER` - Referral reward (you invited a friend)
+        * `REFERRAL_REFERRED` - Referral reward (you joined with a friend's code)
     CurrentOffer:
       type: object
       properties:
@@ -25287,6 +26521,96 @@ components:
       - category
       - id
       - question
+    FreeLine:
+      type: object
+      description: |-
+        ADR 0002: a free carton on the cart (₹0). Computed by the server on every cart read:
+        never add, remove or price these in the app.
+      properties:
+        product:
+          $ref: '#/components/schemas/CartProduct'
+        variant:
+          allOf:
+          - $ref: '#/components/schemas/VariantSummary'
+          description: The free carton's size (same shape as the catalog).
+        quantity:
+          type: integer
+          minimum: 1
+          description: Free cartons of this size.
+        mrp:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Unit MRP of the free carton.
+        value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: '`mrp` x `quantity`: what the customer saves (part of `bill.free_items_value`).'
+        source:
+          allOf:
+          - $ref: '#/components/schemas/FreeSourceEnum'
+          description: |-
+            VOLUME_OFFER: 1 free for every `free_offer.every` paid cartons (the cheapest size in the cart). REWARD: the free-carton reward applied as the cart's coupon.
+
+            * `VOLUME_OFFER` - Volume offer
+            * `REWARD` - Reward
+      required:
+      - mrp
+      - product
+      - quantity
+      - source
+      - value
+      - variant
+    FreeOffer:
+      type: object
+      description: |-
+        ADR 0002 §3: the store's volume offer, "1 free carton for every `every` paid cartons".
+        Paid cartons are counted like `thresholds.min_order_units` (each line counts
+        min(`quantity`, `orderable_quantity`)); free cartons never count.
+      properties:
+        every:
+          type: integer
+          minimum: 1
+          description: Paid cartons per free carton (e.g. 10).
+        paid_units:
+          type: integer
+          minimum: 0
+          description: Paid cartons counted now.
+        free_units:
+          type: integer
+          minimum: 0
+          description: 'Free cartons earned: `paid_units` // `every`. The ones the
+            store can supply are in `free_lines` (VOLUME_OFFER); see `notice` when
+            they cannot be supplied.'
+        units_to_next_free:
+          type: integer
+          minimum: 1
+          description: Paid cartons still to add for one more free carton.
+        message:
+          type: string
+          description: Ready-made nudge, e.g. "Add 8 more cartons to get 1 more free".
+        notice:
+          type: string
+          nullable: true
+          description: Set when a free carton was earned but no size in the cart has
+            the stock for it (no free carton is given). Show it as a notice; it does
+            not block checkout. Null otherwise.
+      required:
+      - every
+      - free_units
+      - message
+      - notice
+      - paid_units
+      - units_to_next_free
+    FreeSourceEnum:
+      enum:
+      - VOLUME_OFFER
+      - REWARD
+      type: string
+      description: |-
+        * `VOLUME_OFFER` - Volume offer
+        * `REWARD` - Reward
     HealthCheckStatusEnum:
       enum:
       - ok
@@ -25881,7 +27205,8 @@ components:
         item_count:
           type: integer
           minimum: 1
-          description: Units (sum of quantities).
+          description: Paid units (sum of quantities); free cartons (`is_free` lines,
+            ADR 0002) are not counted, as in the cart's `item_count`.
         bill:
           $ref: '#/components/schemas/Bill'
         coupon_code:
@@ -26218,9 +27543,26 @@ components:
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
           description: '`selling_price` x the units coming (`quantity` - `quantity_unavailable`).'
+        is_free:
+          type: boolean
+          description: 'ADR 0002: a free carton (`selling_price` and `line_total`
+            "0.00"): show it as "FREE". Not part of `bill.item_total`; its value is
+            in `bill.free_items_value`. A free line the store could not supply is
+            dropped (`quantity_unavailable`), with nothing to refund.'
+        free_source:
+          allOf:
+          - $ref: '#/components/schemas/FreeSourceEnum'
+          nullable: true
+          description: |-
+            Why it is free: VOLUME_OFFER or REWARD. Null for a paid line.
+
+            * `VOLUME_OFFER` - Volume offer
+            * `REWARD` - Reward
       required:
+      - free_source
       - id
       - image
+      - is_free
       - line_mrp_total
       - line_total
       - mrp
@@ -26419,7 +27761,8 @@ components:
         item_count:
           type: integer
           minimum: 1
-          description: Units still coming (sum of quantities), as on `Order`.
+          description: Paid units still coming (sum of quantities; free cartons not
+            counted), as on `Order`.
         line_count:
           type: integer
           minimum: 1
@@ -27576,19 +28919,37 @@ components:
           type: boolean
           description: 'False: the program is paused (hide sharing; codes cannot be
             entered).'
+        reward_type:
+          allOf:
+          - $ref: '#/components/schemas/CouponDiscountTypeEnum'
+          description: |-
+            ADR 0002: FREE_UNIT = each of the two customers gets one free carton (show `reward_label`, never a ₹ amount). The only value sent today.
+
+            * `FLAT` - Flat amount off
+            * `PERCENT` - Percent off
+            * `FREE_UNIT` - One free carton (reward)
+        reward_quantity:
+          type: integer
+          minimum: 1
+          description: Free cartons each customer gets (1).
+        reward_label:
+          type: string
+          description: Ready-made text, e.g. "1 free carton".
         reward_amount:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
-          description: Rupees off for each of the two customers, e.g. "90.00".
+          description: 'Deprecated (ADR 0002): the old ₹ reward setting, not given
+            any more. Use `reward_type` / `reward_label`.'
         reward_validity_days:
           type: integer
-          description: Days the reward coupon stays valid after it is given.
+          description: Days the reward stays valid after it is given.
         reward_min_order_value:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
-          description: Minimum item total to use the reward coupon ("0.00" = none).
+          description: 'Deprecated (ADR 0002): free-carton rewards need the store''s
+            minimum paid cartons instead. Always "0.00".'
         can_apply_code:
           type: boolean
           description: 'Show the ''Have a referral code?'' box only when true: the
@@ -27614,7 +28975,10 @@ components:
       - is_enabled
       - referred_by
       - reward_amount
+      - reward_label
       - reward_min_order_value
+      - reward_quantity
+      - reward_type
       - reward_validity_days
       - share_message
     ReferralApplyRequest:
@@ -27648,7 +29012,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ReferralStatusEnum'
           description: |-
-            PENDING: both get the reward when the caller's first order is delivered. REWARDED: the reward coupon is in the caller's coupon list. VOID: no reward (the program was off at that delivery).
+            PENDING: both get the reward when the caller's first order is delivered. REWARDED: the reward is in the caller's Rewards (`GET /account/rewards/`). VOID: no reward (the program was off at that delivery).
 
             * `PENDING` - Waiting for the first delivered order
             * `REWARDED` - Rewarded (both coupons given)
@@ -27721,6 +29085,136 @@ components:
       - added_count
       - cart
       - unavailable
+    Reward:
+      type: object
+      description: A free-carton reward the caller can use, or has put on an order
+        not delivered yet.
+      properties:
+        code:
+          type: string
+          description: Apply it with `POST /cart/coupon/` {`code`, `free_variant_id`}
+            (the customer picks the size).
+        title:
+          type: string
+          description: 'e.g. "1 free carton: welcome reward".'
+        source:
+          allOf:
+          - $ref: '#/components/schemas/CouponSourceEnum'
+          description: |-
+            WELCOME, REFERRAL_REFERRER or REFERRAL_REFERRED.
+
+            * `NONE` - Made by staff
+            * `WELCOME` - Welcome reward (new account)
+            * `REFERRAL_REFERRER` - Referral reward (you invited a friend)
+            * `REFERRAL_REFERRED` - Referral reward (you joined with a friend's code)
+        status:
+          allOf:
+          - $ref: '#/components/schemas/RewardStatusEnum'
+          description: |-
+            AVAILABLE: show **Use**. CLAIMED: on order `order_number`, not delivered yet (it comes back to AVAILABLE if that order is cancelled or its payment fails, unless it has expired by then).
+
+            * `AVAILABLE` - Can be used
+            * `CLAIMED` - On an order that is not delivered yet
+            * `USED` - Used on a delivered order
+            * `EXPIRED` - Expired without being used
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: UTC (show the date in IST); null = no expiry.
+        order_number:
+          type: string
+          nullable: true
+          description: 'CLAIMED: the order it is on. Null when AVAILABLE.'
+      required:
+      - code
+      - expires_at
+      - order_number
+      - source
+      - status
+      - title
+    RewardHistoryEntry:
+      type: object
+      description: One line of the Rewards history, newest first.
+      properties:
+        at:
+          type: string
+          format: date-time
+          description: When it happened (UTC).
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/RewardHistoryKindEnum'
+          description: |-
+            EARNED: a reward was given. CLAIMED: put on an order. USED: that order was delivered. EXPIRED: it ran out unused. VOLUME_FREE: free cartons of the volume offer with a delivered order.
+
+            * `EARNED` - Reward earned
+            * `CLAIMED` - Reward put on an order
+            * `USED` - Reward used (order delivered)
+            * `EXPIRED` - Reward expired
+            * `VOLUME_FREE` - Free cartons with a delivered order (volume offer)
+        title:
+          type: string
+          description: Display text, e.g. "Welcome reward".
+        quantity:
+          type: integer
+          minimum: 1
+          description: Free cartons (1 for a reward).
+        order_number:
+          type: string
+          nullable: true
+          description: The order concerned; null for EARNED and EXPIRED.
+      required:
+      - at
+      - kind
+      - order_number
+      - quantity
+      - title
+    RewardHistoryKindEnum:
+      enum:
+      - EARNED
+      - CLAIMED
+      - USED
+      - EXPIRED
+      - VOLUME_FREE
+      type: string
+      description: |-
+        * `EARNED` - Reward earned
+        * `CLAIMED` - Reward put on an order
+        * `USED` - Reward used (order delivered)
+        * `EXPIRED` - Reward expired
+        * `VOLUME_FREE` - Free cartons with a delivered order (volume offer)
+    RewardStatusEnum:
+      enum:
+      - AVAILABLE
+      - CLAIMED
+      - USED
+      - EXPIRED
+      type: string
+      description: |-
+        * `AVAILABLE` - Can be used
+        * `CLAIMED` - On an order that is not delivered yet
+        * `USED` - Used on a delivered order
+        * `EXPIRED` - Expired without being used
+    Rewards:
+      type: object
+      description: The caller's free-carton rewards (ADR 0002 §9-§11).
+      properties:
+        available:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reward'
+          description: AVAILABLE rewards (soonest expiry first), then CLAIMED ones.
+            [] when none.
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/RewardHistoryEntry'
+          description: 'Newest first, at most the latest 100 entries: rewards earned,
+            claimed, used and expired, and the volume-offer free cartons of each delivered
+            order.'
+      required:
+      - available
+      - history
     RiderBankAccount:
       type: object
       description: Bank details for payouts, masked (09 §3). The full account number

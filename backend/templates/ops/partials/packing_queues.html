@@ -1,5 +1,5 @@
 {% load ops %}
-{# Packing queues of one store (05 §1.3; UX audit 2026-11-04 PC-02..06). Context: store, console (packing.Console), caps, actions, poll_seconds. Polls itself (pauses only while typing in a text field, at most 30 s, or while a dialog is open). data-new-orders / data-oldest-* feed the new-order banner and sound, which live OUTSIDE this region (#ops-alerts, orders.js). Money is shown as stored on the order, never computed. #}
+{# Packing queues of one store (05 §1.3; UX audit 2026-11-04 PC-02..06). Context: store, console (packing.Console), caps, actions, poll_seconds. Polls itself (pauses only while typing in a text field, at most 30 s, or while a dialog is open). data-new-orders / data-oldest-* feed the new-order banner and sound, which live OUTSIDE this region (#ops-alerts, orders.js). Money is shown as stored on the order, never computed. Free cartons (ADR 0002) are packed like paid lines and carry a FREE badge, their source and ₹0; test ids use line.key (SKU, plus the free source on a free line). #}
 <div id="packing-queues" hx-get="{% url 'ops:packing-queues' store.code %}" hx-swap="outerHTML"
      hx-trigger="every {{ poll_seconds }}s[opsPollAllowed('packing-queues')], ops:live[opsLiveAllowed('packing-queues')] from:body, ops:refresh from:body"
      data-new-orders="{{ console.new_order_ids }}" data-new-count="{{ console.new_count }}"
@@ -34,7 +34,7 @@
                                     <span class="ml-auto">{% sla_badge timer console.generated_at %}</span>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1" data-testid="amounts-{{ order.order_number }}">
-                                    <span>{{ ticket.units }} item{{ ticket.units|pluralize }}</span>
+                                    <span>{{ ticket.units }} item{{ ticket.units|pluralize }}{% if ticket.free_units %} <span class="ops-free-count" data-testid="free-count-{{ order.order_number }}">(incl. {{ ticket.free_units }} free)</span>{% endif %}</span>
                                     {% if ticket.cod %}
                                         <span>Cash on delivery: rider collects <strong>{{ order.grand_total|inr }}</strong></span>
                                     {% else %}
@@ -48,26 +48,27 @@
                                         <thead class="sr-only"><tr><th scope="col">Picked</th><th scope="col">Item</th><th scope="col">Pack</th><th scope="col">Actions</th></tr></thead>
                                         <tbody>
                                             {% for line in ticket.lines %}
-                                                <tr class="ops-pickrow{% if line.not_in_order %} ops-pickrow--gone{% endif %}" data-testid="line-{{ line.sku }}"
+                                                <tr class="ops-pickrow{% if line.not_in_order %} ops-pickrow--gone{% endif %}{% if line.is_free %} ops-pickrow--free{% endif %}" data-testid="line-{{ line.key }}"
                                                     {% if order.status == "PACKING" and not line.not_in_order %}x-on:click="if (!$event.target.closest('button, a, input')) toggle('{{ line.pk }}', !isChecked('{{ line.pk }}'))"{% endif %}>
                                                     <td class="ops-pickrow__tick">
                                                         {% if order.status == "PACKING" and not line.not_in_order %}
-                                                            <input type="checkbox" class="ops-check" aria-label="Picked {{ line.product_name }} {{ line.variant_name }}"
+                                                            <input type="checkbox" class="ops-check" aria-label="Picked {{ line.product_name }} {{ line.variant_name }}{% if line.is_free %} (free){% endif %}"
                                                                    x-bind:checked="isChecked('{{ line.pk }}')"
                                                                    x-on:change="toggle('{{ line.pk }}', $event.target.checked)">
                                                         {% endif %}
                                                     </td>
-                                                    <td class="ops-pickrow__item" aria-label="{{ line.product_name }} {{ line.variant_name }}">
+                                                    <td class="ops-pickrow__item" aria-label="{{ line.product_name }} {{ line.variant_name }}{% if line.is_free %} (free){% endif %}">
                                                         {% if line.rack %}<span class="ops-rack">{{ line.rack }}</span>{% endif %}
                                                         <span class="ops-product">{{ line.product_name }}</span>
                                                         <span class="ops-variant">{{ line.variant_name }}</span>
+                                                        {% if line.is_free %}<span class="ops-free" data-testid="free-{{ line.key }}">{% status_badge "free_source" line.free_source "md" %} <span class="ops-free__price">₹0</span></span>{% endif %}
                                                         <span class="ops-sku">{{ line.sku }}</span>
                                                     </td>
                                                     <td class="ops-pickrow__qty">
                                                         {% if line.not_in_order %}
                                                             <span class="ops-gone"><span class="material-symbols-outlined md-18" aria-hidden="true">block</span>Not in this order</span>
                                                         {% else %}
-                                                            <span class="ops-qty" data-testid="pack-{{ line.sku }}">× {{ line.to_pack }}</span>
+                                                            <span class="ops-qty" data-testid="pack-{{ line.key }}">× {{ line.to_pack }}</span>
                                                             {% if line.quantity_unavailable %}
                                                                 <span class="ops-tone-warning ops-short"><del aria-label="ordered {{ line.quantity }}">{{ line.quantity }}</del> {{ line.quantity_unavailable }} can't supply</span>
                                                             {% endif %}
@@ -76,13 +77,14 @@
                                                     <td class="ops-pickrow__action">
                                                         {% if ticket.adjustable and actions.mark_unavailable and not line.not_in_order %}
                                                             <button type="button" class="ops-button ops-button--secondary ops-button--cant-supply" x-data
-                                                                    aria-label="Can't supply {{ line.product_name }} {{ line.variant_name }}"
+                                                                    aria-label="Can't supply {{ line.product_name }} {{ line.variant_name }}{% if line.is_free %} (free){% endif %}"
                                                                     data-url="{% url 'ops:packing-unavailable' store.code order.pk %}" data-item="{{ line.pk }}"
-                                                                    data-product="{{ line.product_name }}" data-variant="{{ line.variant_name }}" data-sku="{{ line.sku }}"
+                                                                    data-product="{{ line.product_name }}" data-variant="{{ line.variant_name }}{% if line.is_free %} (free){% endif %}" data-sku="{{ line.sku }}"
+                                                                    data-free="{% if line.is_free %}1{% else %}0{% endif %}"
                                                                     data-quantity="{{ line.quantity }}" data-already="{{ line.quantity_unavailable }}" data-to-pack="{{ line.to_pack }}"
                                                                     data-would-empty="{% if line.would_empty %}1{% else %}0{% endif %}" data-payment="{{ order.payment_method }}"
                                                                     data-ticket="ticket-{{ order.pk }}"
-                                                                    x-on:click="$store.cantSupply.ask($el)" data-testid="cant-supply-{{ line.sku }}">
+                                                                    x-on:click="$store.cantSupply.ask($el)" data-testid="cant-supply-{{ line.key }}">
                                                                 <span class="material-symbols-outlined md-18" aria-hidden="true">remove_shopping_cart</span>Can't supply
                                                             </button>
                                                         {% endif %}

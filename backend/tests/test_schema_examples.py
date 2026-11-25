@@ -241,6 +241,7 @@ BILL_FIELDS = [
     "tip",
     "grand_total",
     "total_savings",
+    "free_items_value",  # ADR 0002 (free cartons)
 ]
 
 
@@ -272,7 +273,8 @@ def test_money_fields_are_decimal_strings(schema):
 
 
 def test_bill_is_exactly_08_6_2(schema):
-    """The bill the apps render: the 08 §6.2 amounts plus total_savings, all required."""
+    """The bill the apps render: the 08 §6.2 amounts plus total_savings and (ADR 0002)
+    free_items_value, all required."""
     bill = schema["components"]["schemas"]["Bill"]
     assert list(bill["properties"]) == BILL_FIELDS
     assert sorted(bill["required"]) == sorted(BILL_FIELDS)
@@ -380,7 +382,8 @@ def test_phase_3_enums(schema):
     )
     assert status["schema"]["enum"] == ["active", "past"]  # query enums are inlined
     assert status.get("required", False) is False
-    assert components["CouponDiscountTypeEnum"]["enum"] == ["FLAT", "PERCENT"]
+    # FREE_UNIT: free-carton rewards (ADR 0002, 2026-11-25)
+    assert components["CouponDiscountTypeEnum"]["enum"] == ["FLAT", "PERCENT", "FREE_UNIT"]
     assert components["CartLineIssueCodeEnum"]["enum"] == [
         "OUT_OF_STOCK",
         "QUANTITY_UNAVAILABLE",

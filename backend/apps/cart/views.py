@@ -90,6 +90,8 @@ CART_EXAMPLES = (
     ("No address selected", ex.CART_NO_ADDRESS),
     ("Address not served by this store", ex.CART_ADDRESS_NOT_SERVICEABLE),
     ("Store closed", ex.CART_STORE_CLOSED),
+    ("Free cartons: volume offer and a reward", ex.CART_FREE_CARTONS),
+    ("Free carton earned but out of stock", ex.CART_FREE_CARTON_NO_STOCK),
 )
 LINE_ID = OpenApiParameter("id", int, OpenApiParameter.PATH, description="Cart line `id`.")
 
@@ -354,23 +356,41 @@ class CartCouponView(APIView):
             "Applies `code` (case-insensitive) and replaces any coupon already applied. The "
             "discount is on the item total (or on the qualifying items for a category coupon), "
             "capped by `max_discount` and by the item total. Applying does not use the coupon "
-            "up: an order does (held while its payment is pending)."
+            "up: an order does (held while its payment is pending).\n\n"
+            "**Free-carton rewards** (ADR 0002, `discount_type` FREE_UNIT): send "
+            "`free_variant_id`, the size the customer picked; it must be sold at this store, be "
+            "of the same product category as a paid line in the cart, and have the stock. The "
+            "cart then has a free REWARD line in `free_lines` and no money "
+            "off. A reward takes the order's single coupon slot and still needs the store's "
+            "minimum paid cartons (`thresholds.min_order_units`; free cartons never count)."
         ),
         parameters=[STORE_ID_PARAMETER],
         request=CouponApplySerializer,
-        examples=request_examples(("Apply", ex.COUPON_APPLY_REQUEST)),
+        examples=request_examples(
+            ("Apply", ex.COUPON_APPLY_REQUEST),
+            ("Apply a free-carton reward", ex.COUPON_APPLY_REWARD_REQUEST),
+        ),
         responses=store_responses(
             {
                 200: ok_response(
-                    CartSerializer, "The cart with the coupon.", ("Applied", ex.CART_READY)
+                    CartSerializer,
+                    "The cart with the coupon.",
+                    ("Applied", ex.CART_READY),
+                    ("Free-carton reward applied", ex.CART_FREE_CARTONS),
                 ),
                 401: UNAUTHORIZED,
                 422: error_response(
                     "The coupon cannot be applied; nothing changed. `COUPON_INVALID`: unknown, "
                     "inactive or not started. `COUPON_EXPIRED`. `COUPON_NOT_ELIGIBLE`: "
                     "`details.reason` is `MIN_ORDER_VALUE` (with `min_order_value` and "
-                    "`amount_to_unlock`), `FIRST_ORDER_ONLY`, `NO_ELIGIBLE_ITEMS` or `STORE`. "
-                    "`COUPON_USAGE_EXCEEDED`: `details.scope` is `per_user` or `total`.",
+                    "`amount_to_unlock`), `FIRST_ORDER_ONLY`, `NO_ELIGIBLE_ITEMS` or `STORE`; for "
+                    "a free-carton reward also `MIN_ORDER_UNITS` (with `min_order_units`, "
+                    "`paid_units` and `units_to_unlock`: free cartons never count) or "
+                    "`FREE_VARIANT_UNAVAILABLE` (the size is not sold at this store, is not of "
+                    "the category of a paid line, or has no stock for it; with "
+                    "`free_variant_id`). "
+                    "`COUPON_USAGE_EXCEEDED`: `details.scope` is `per_user` or `total` (a reward "
+                    "already on another order).",
                     error_example(
                         ErrorCode.COUPON_INVALID,
                         "This coupon code is not valid.",
@@ -401,10 +421,37 @@ class CartCouponView(APIView):
                         "You have already used this coupon.",
                         {"code": "JIVO50", "scope": "per_user"},
                     ),
+                    error_example(
+                        ErrorCode.COUPON_NOT_ELIGIBLE,
+                        "Add 3 more cartons to use this reward (minimum 5 paid cartons).",
+                        {
+                            "code": "WEL7K2M9QPX",
+                            "reason": "MIN_ORDER_UNITS",
+                            "min_order_units": 5,
+                            "paid_units": 2,
+                            "units_to_unlock": 3,
+                        },
+                        name="COUPON_NOT_ELIGIBLE_MIN_UNITS",
+                    ),
+                    error_example(
+                        ErrorCode.COUPON_NOT_ELIGIBLE,
+                        "This size is not available for your free carton here. Choose another "
+                        "size.",
+                        {
+                            "code": "WEL7K2M9QPX",
+                            "reason": "FREE_VARIANT_UNAVAILABLE",
+                            "free_variant_id": 4003,
+                        },
+                        name="COUPON_NOT_ELIGIBLE_FREE_VARIANT",
+                    ),
                 ),
             },
             bad_request=(
                 validation_error({"code": ["This field may not be blank."]}, name="Blank code"),
+                validation_error(
+                    {"free_variant_id": ["Choose a size for your free carton."]},
+                    name="Reward without a size",
+                ),
             ),
         ),
     )
@@ -413,7 +460,10 @@ class CartCouponView(APIView):
         serializer = CouponApplySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         cart = services.get_cart(request.user, store)
-        services.apply_coupon(cart, store, request.user, serializer.validated_data["code"])
+        data = serializer.validated_data
+        services.apply_coupon(
+            cart, store, request.user, data["code"], free_variant_id=data.get("free_variant_id")
+        )
         return _cart(request, cart, store)
 
     @extend_schema(

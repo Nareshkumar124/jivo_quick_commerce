@@ -31,6 +31,14 @@ TERMINAL_STATUSES = frozenset(
 ACTIVE_STATUSES = frozenset(set(OrderStatus) - TERMINAL_STATUSES)
 
 
+class FreeSource(models.TextChoices):
+    """Why a line is free (ADR 0002): the volume offer (1 free carton for every N paid) or a
+    free-carton reward the customer applied."""
+
+    VOLUME_OFFER = "VOLUME_OFFER", "Volume offer"
+    REWARD = "REWARD", "Reward"
+
+
 class PaymentMethod(models.TextChoices):
     ONLINE = "ONLINE", "Pay online"
     COD = "COD", "Cash on delivery"

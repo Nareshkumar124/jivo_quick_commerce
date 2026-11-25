@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from apps.cart.tests.conftest import address, shop  # noqa: F401 - shared fixtures
+from apps.cart.tests.conftest import address, shop, water  # noqa: F401 - shared fixtures
 from apps.payments.gateways import FAKE_KEY_SECRET, razorpay_payment_signature
 from apps.payments.models import Payment
 

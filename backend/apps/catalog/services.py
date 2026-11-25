@@ -694,6 +694,7 @@ def buy_again(store: DarkStore, user) -> list[dict]:
         OrderItem.objects.filter(
             order__user=user,
             order__status=OrderStatus.DELIVERED,
+            is_free=False,  # a free carton (ADR 0002) was not bought
             quantity_unavailable__lt=F("quantity"),
             variant__in=sold_variants(store).values("pk"),
         )

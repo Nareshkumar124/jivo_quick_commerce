@@ -495,7 +495,7 @@
 			error: "",
 			chosen: null,
 			trigger: null,
-			line: { product: "", variant: "", sku: "", quantity: 0, already: 0, toPack: 0, wouldEmpty: false, payment: "", url: "", item: "", ticket: "" },
+			line: { product: "", variant: "", sku: "", quantity: 0, already: 0, toPack: 0, wouldEmpty: false, free: false, payment: "", url: "", item: "", ticket: "" },
 			ask(button) {
 				const data = button.dataset;
 				this.trigger = button;
@@ -507,6 +507,7 @@
 					already: parseInt(data.already, 10) || 0,
 					toPack: parseInt(data.toPack, 10) || 0,
 					wouldEmpty: data.wouldEmpty === "1",
+					free: data.free === "1",
 					payment: data.payment || "",
 					url: data.url || "",
 					item: data.item || "",
@@ -539,6 +540,12 @@
 				if (this.cancelsOrder()) {
 					return "<strong>This cancels the whole order.</strong> Nothing else is left to pack. " +
 						(online ? "Paid online: refunded in full." : "Cash on delivery: nothing to collect.");
+				}
+				if (this.line.free) {
+					// ADR 0002: a free carton is ₹0 and never cancels the order (wouldEmpty is false).
+					const left = this.line.toPack - this.chosen;
+					return (left ? "Customer will get <strong>" + left + " of " + this.line.quantity + "</strong> free. " : "This free carton will not be in this order. ") +
+						"It is free (₹0): the bill does not change and nothing is refunded or collected.";
 				}
 				const payment = online
 					? "Paid online: the difference is refunded and the customer is told."

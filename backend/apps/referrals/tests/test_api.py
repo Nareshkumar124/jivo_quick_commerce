@@ -48,8 +48,11 @@ class TestScreen:
         code = ReferralCode.objects.get(user=user).code
         assert response.json() == {
             "code": code,
-            "share_message": f"Use my code {code} on the Jivo app and we both get ₹90 off.",
+            "share_message": f"Use my code {code} on the Jivo app and we both get 1 free carton.",
             "is_enabled": True,
+            "reward_type": "FREE_UNIT",  # ADR-0002: one free carton each, no ₹ amount
+            "reward_quantity": 1,
+            "reward_label": "1 free carton",
             "reward_amount": "90.00",
             "reward_validity_days": 30,
             "reward_min_order_value": "0.00",
@@ -70,12 +73,12 @@ class TestScreen:
             },
         )
         body = auth_client.get(URL).json()
-        assert body["share_message"].endswith("we both get ₹150 off.")
+        assert body["share_message"].endswith("we both get 1 free carton.")
         assert (
             body["reward_amount"],
             body["reward_validity_days"],
             body["reward_min_order_value"],
-        ) == ("150.00", 14, "199.00")
+        ) == ("150.00", 14, "0.00")  # ADR-0002: the minimum is not used any more
 
     def test_counts_of_friends(self, auth_client, user):
         """`friends_joined` counts everyone who entered the caller's code;

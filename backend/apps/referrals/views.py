@@ -42,8 +42,10 @@ class ReferralView(APIView):
             "ready-made share message, the reward terms (current admin settings), whether the "
             "caller joined with a friend's code, and how many friends joined with theirs.\n\n"
             "When a referred customer's first order is delivered, **both** customers get a "
-            "personal coupon (FLAT `reward_amount` off, valid `reward_validity_days` days, one "
-            "use, only for them). It appears in `GET /cart/coupons/` with `is_personal: true`."
+            'free-carton reward (ADR 0002: `reward_type` FREE_UNIT, `reward_label` "1 free '
+            'carton", valid `reward_validity_days` days, one use, only for them). It appears in '
+            "`GET /account/rewards/` and in `GET /cart/coupons/` (`discount_type` FREE_UNIT, "
+            "`is_personal: true`). Rewards given before 2026-11-25 were ₹ coupons."
         ),
         responses=app_responses(
             {

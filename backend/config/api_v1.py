@@ -14,4 +14,5 @@ urlpatterns = [
     path("", include("apps.support.urls")),  # support tickets (Phase 7)
     path("", include("apps.notifications.urls")),  # inbox (Phase 6)
     path("", include("apps.referrals.urls")),  # refer a friend (2026-11-13)
+    path("", include("apps.promotions.urls")),  # free-carton rewards (ADR 0002, 2026-11-25)
 ]

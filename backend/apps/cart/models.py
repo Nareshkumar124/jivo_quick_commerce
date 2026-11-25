@@ -34,6 +34,15 @@ class Cart(TimeStampedModel):
         blank=True,
         related_name="carts",
     )
+    # ADR 0002: the size the customer picked for a free-carton reward (`coupon` FREE_UNIT).
+    free_variant = models.ForeignKey(
+        "catalog.ProductVariant",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="The free carton's size, for a free-carton reward on the cart.",
+    )
     address = models.ForeignKey(
         "accounts.Address",
         on_delete=models.SET_NULL,

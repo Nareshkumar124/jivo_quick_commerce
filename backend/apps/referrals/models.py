@@ -4,7 +4,9 @@
 - `ReferralCode`: each customer's own code, created on their first `GET /account/referral/`.
 - `Referral`: a customer (`referred`) entered another customer's (`referrer`) code. At most one
   per referred customer, ever. When the referred customer's first order is delivered, both get
-  a personal coupon (`apps.referrals.services.reward_for_order`).
+  a personal coupon (`apps.referrals.services.reward_for_order`): since ADR 0002 (2026-11-25) a
+  free-carton reward (FREE_UNIT) each; referrals rewarded before that got a ₹ FLAT coupon
+  (`reward_amount` set).
 Rows change only through `apps.referrals.services`.
 """
 
@@ -44,18 +46,27 @@ class ReferralSettings(TimeStampedModel):
         **MONEY,
         default=DEFAULT_REWARD_AMOUNT,
         validators=[MinValueValidator(Decimal("1.00")), MaxValueValidator(MAX_REWARD_AMOUNT)],
-        help_text="Rupees off for each of the two customers (a FLAT personal coupon).",
+        help_text=(
+            "Not used since ADR 0002 (2026-11-25): the referral reward is now one free carton "
+            "for each of the two customers. Kept for the referrals rewarded before."
+        ),
     )
     reward_validity_days = models.PositiveSmallIntegerField(
         default=DEFAULT_VALIDITY_DAYS,
         validators=[MinValueValidator(1), MaxValueValidator(365)],
-        help_text="Days the reward coupons stay valid after they are given.",
+        help_text=(
+            "Days a reward stays valid after it is given: the referral rewards and the welcome "
+            "reward (ADR 0002)."
+        ),
     )
     reward_min_order_value = models.DecimalField(
         **MONEY,
         default=DEFAULT_MIN_ORDER_VALUE,
         validators=[MinValueValidator(Decimal("0.00"))],
-        help_text="Minimum item total (before the coupon) to use a reward coupon. 0 = none.",
+        help_text=(
+            "Not used by free-carton rewards (ADR 0002): they need the store's minimum paid "
+            "cartons instead. Kept for the ₹ reward coupons given before."
+        ),
     )
     history = HistoricalRecords()
 
@@ -148,7 +159,12 @@ class Referral(TimeStampedModel):
         related_name="+",
         help_text="The referred customer's delivered order that gave the reward (or the VOID).",
     )
-    reward_amount = models.DecimalField(**MONEY, null=True, blank=True)
+    reward_amount = models.DecimalField(
+        **MONEY,
+        null=True,
+        blank=True,
+        help_text="Rupees of the old ₹ reward coupons; empty for free-carton rewards (ADR 0002).",
+    )
     referrer_coupon = models.ForeignKey(
         "promotions.Coupon", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
     )

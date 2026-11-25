@@ -653,6 +653,11 @@ SPECTACULAR_SETTINGS = {
         "PayoutStatusEnum": "apps.delivery.choices.PayoutStatus",
         # 2026-11-13: referral program
         "ReferralStatusEnum": "apps.referrals.choices.ReferralStatus",
+        # 2026-11-25: free cartons and rewards (ADR 0002)
+        "CouponSourceEnum": "apps.promotions.choices.CouponSource",
+        "FreeSourceEnum": "apps.orders.choices.FreeSource",
+        "RewardStatusEnum": "apps.promotions.choices.RewardStatus",
+        "RewardHistoryKindEnum": "apps.promotions.choices.RewardHistoryKind",
     },
     "TAGS": [
         {"name": "health", "description": "Liveness and readiness probes. No authentication."},

@@ -176,3 +176,75 @@ def test_other_store_pricing_is_not_reachable(client, store, pricing):
     assert client.get(change_url(other)).status_code == 404
     history = reverse("admin:stores_pricingconfig_history", args=[other.pk])
     assert client.get(history).status_code == 404
+
+
+class TestFreeCartonOffer:
+    """ADR 0002: `free_unit_every` (1 free carton per N paid; 0 = off) on the pricing pages."""
+
+    def test_edit_form_has_the_field_with_its_label_and_help(self, client, pricing):
+        from apps.stores.admin import FREE_OFFER_HELP, FREE_OFFER_LABEL
+
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        response = client.get(change_url(pricing))
+        assert response.status_code == 200
+        field = response.context["adminform"].form.fields["free_unit_every"]
+        assert field.label == FREE_OFFER_LABEL
+        assert field.help_text == FREE_OFFER_HELP == "1 free carton per N paid cartons; 0 = off."
+        html = response.content.decode()
+        assert "Free cartons (volume offer)" in html
+        assert 'name="free_unit_every"' in html
+
+    def test_super_admin_turns_the_offer_on_and_history_keeps_it(self, client, pricing):
+        admin_user = staff_in_role(roles.SUPER_ADMIN)
+        client.force_login(admin_user)
+        data = admin_form_data(client.get(change_url(pricing)))
+        assert data["free_unit_every"] == "0"  # model default: off
+        data["free_unit_every"] = "10"
+        response = client.post(change_url(pricing), data)
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        pricing.refresh_from_db()
+        assert pricing.free_unit_every == 10
+        latest = pricing.history.latest()
+        assert (latest.history_user, latest.free_unit_every) == (admin_user, 10)
+
+    def test_negative_is_refused(self, client, pricing):
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        data = admin_form_data(client.get(change_url(pricing)))
+        data["free_unit_every"] = "-1"
+        response = client.post(change_url(pricing), data)
+        assert response.status_code == 200
+        assert "free_unit_every" in response.context["adminform"].form.errors
+        pricing.refresh_from_db()
+        assert pricing.free_unit_every == 0
+
+    def test_finance_sees_it_in_words_and_cannot_change_it(self, client, pricing):
+        pricing.free_unit_every = 10
+        pricing.order_unit_label = "cartons"
+        pricing.save()
+        client.force_login(staff_in_role(roles.FINANCE))
+        response = client.get(change_url(pricing))
+        html = response.content.decode()
+        assert response.status_code == 200
+        assert "1 free per 10 paid cartons" in html
+        assert 'name="free_unit_every"' not in html
+        data = {"free_unit_every": "0", "_save": "Save"}
+        assert client.post(change_url(pricing), data).status_code == 403
+        pricing.refresh_from_db()
+        assert pricing.free_unit_every == 10
+
+    def test_list_column_and_defaults_note(self, client, pricing):
+        other = DarkStoreFactory(code="NOI-18", name="Jivo Noida 18")
+        PricingConfig.objects.create(store=other, free_unit_every=10, order_unit_label="cartons")
+        from apps.stores.admin import FREE_OFFER_LABEL
+
+        client.force_login(staff_in_role(roles.FINANCE))
+        response = client.get(reverse(LIST))
+        html = response.content.decode()
+        assert FREE_OFFER_LABEL in html  # the column header and the defaults note
+        assert "1 free per 10 paid cartons" in html
+        changelist = response.context["cl"]
+        shown = {
+            row.store.code: changelist.model_admin.free_offer(row) for row in changelist.result_list
+        }
+        assert shown == {"GGN-01": "Off", "NOI-18": "1 free per 10 paid cartons"}
+        assert (FREE_OFFER_LABEL, "Off") in response.context["pricing_defaults"]

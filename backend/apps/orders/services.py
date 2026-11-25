@@ -39,7 +39,14 @@ from apps.core.idempotency import IDEMPOTENCY_HEADER, KEY_REUSED
 from apps.core.money import money_str, rupees
 from apps.inventory import services as inventory
 from apps.orders import events
-from apps.orders.choices import ActorType, CancelReason, OrderStatus, PaymentMethod, PaymentStatus
+from apps.orders.choices import (
+    ActorType,
+    CancelReason,
+    FreeSource,
+    OrderStatus,
+    PaymentMethod,
+    PaymentStatus,
+)
 from apps.orders.models import Order, OrderItem, OrderStatusHistory
 from apps.orders.serializers import ORDER_ADDRESS_FIELDS
 from apps.payments.gateways import PaymentGatewayError, get_gateway, to_paise
@@ -489,28 +496,125 @@ def _place(
         actor_type=ActorType.CUSTOMER,
         note="T1: awaiting online payment" if online else "T2: cash on delivery",
     )
-    OrderItem.objects.bulk_create(_order_items(order, state.lines))
-    if coupon is not None:  # Lock 2: the coupon row (re-checks its limits)
+    if coupon is not None:  # Lock 2: the coupon row (re-checks its limits; a reward used once)
         use = promotions.hold_coupon if online else promotions.apply_coupon_now
         use(order, coupon, bill.coupon_discount)
-    inventory.reserve(  # Lock 3: stock rows, variant-id order
+    # Lock 3: stock rows, variant-id order. The free cartons are re-checked on the locked stock
+    # (ADR 0002: a free carton never blocks an order).
+    free_lines = _free_lines_on_locked_stock(order, store.pk, state)
+    OrderItem.objects.bulk_create(
+        [*_order_items(order, state.lines), *_free_order_items(order, free_lines)]
+    )
+    inventory.reserve(  # paid + free units together, one reservation per variant
         order,
         store.pk,
-        [
-            inventory.ReservationLine(
-                line.variant.pk,
-                line.item.quantity,
-                line.variant.max_qty_per_order,
-                line.variant.min_qty_per_order,
-            )
-            for line in state.lines
-        ],
+        reservation_lines(state.lines, free_lines),
         expires_at=expires_at if online else None,
     )
     if not online:  # ONLINE: the payment attempt and its event follow commit (_start_payment)
         _clear_ordered_lines(cart, order)
         events.emit(events.PLACED, order.pk)
     return order, True
+
+
+def _free_lines_on_locked_stock(order: Order, store_id: int, state) -> list:
+    """ADR 0002 §3/§6 at placement (code review): the cart's free cartons were chosen on the
+    stock read before the locks; a carton may have run out since. Under the stock row locks:
+    - the paid units must still fit, else 409 `STOCK_UNAVAILABLE` (paid units only, nothing
+      reserved; the transaction rolls back);
+    - a REWARD carton that no longer fits is dropped and the reward is **not** used: its
+      redemption is removed and the order keeps no coupon, so it stays AVAILABLE;
+    - the volume-offer carton is chosen again on the locked stock (cheapest size, then the
+      stock fallback); when no size fits, the order has no volume-offer carton.
+    Never more free cartons than the cart showed. Returns the free lines to store."""
+    paid_ids = [line.variant.pk for line in state.lines]
+    free_ids = [free.variant.pk for free in state.free_lines]
+    available = inventory.lock_available(store_id, [*paid_ids, *free_ids])
+    short = [
+        {
+            "variant_id": line.variant.pk,
+            "requested_quantity": line.item.quantity,
+            "orderable_quantity": inventory.orderable_quantity(
+                available.get(line.variant.pk, 0),
+                line.variant.max_qty_per_order,
+                line.variant.min_qty_per_order,
+            ),
+        }
+        for line in state.lines
+        if line.item.quantity > available.get(line.variant.pk, 0)
+    ]
+    if short:
+        raise ApiError(ErrorCode.STOCK_UNAVAILABLE, details={"items": short})
+    paid = {}
+    for line in state.lines:
+        paid[line.variant.pk] = paid.get(line.variant.pk, 0) + line.item.quantity
+    reward = next((f for f in state.free_lines if f.source == FreeSource.REWARD), None)
+    if reward is not None:
+        need = paid.get(reward.variant.pk, 0) + reward.quantity
+        if need > available.get(reward.variant.pk, 0):
+            _drop_reward(order)
+            reward = None
+    extra = {reward.variant.pk: reward.quantity} if reward is not None else {}
+    volume = None
+    if any(f.source == FreeSource.VOLUME_OFFER for f in state.free_lines):
+        volume, _offer = cart_services.volume_offer(
+            state.lines, state.rules, extra=extra, available=available
+        )
+    return [line for line in (volume, reward) if line is not None]
+
+
+def _drop_reward(order: Order) -> None:
+    """The reward's carton cannot be given after all: the order does not use the reward (its
+    redemption, made just before in this transaction, is removed; a reward gives no money off,
+    so the bill is unchanged)."""
+    promotions.forget_use(order)
+    order.coupon, order.coupon_code = None, ""
+    order.save(update_fields=["coupon", "coupon_code", "updated_at"])
+    logger.info("Order %s placed without its reward carton (out of stock)", order.order_number)
+
+
+def reservation_lines(paid_lines, free_lines) -> list[inventory.ReservationLine]:
+    """One reservation line per variant: its paid units plus its free cartons (ADR 0002 §5,
+    reserved in the same transaction and lock order as the paid ones)."""
+    wanted: dict[int, list] = {}
+    for line in paid_lines:
+        wanted[line.variant.pk] = [line.variant, line.item.quantity]
+    for free in free_lines:
+        entry = wanted.setdefault(free.variant.pk, [free.variant, 0])
+        entry[1] += free.quantity
+    return [
+        inventory.ReservationLine(
+            variant.pk, quantity, variant.max_qty_per_order, variant.min_qty_per_order
+        )
+        for variant, quantity in wanted.values()
+    ]
+
+
+def _free_order_items(order: Order, free_lines) -> list[OrderItem]:
+    """ADR 0002: the free cartons as order lines at ₹0, `is_free` with their source."""
+    items = []
+    for free in free_lines:
+        variant, product = free.variant, free.variant.product
+        items.append(
+            OrderItem(
+                order=order,
+                variant=variant,
+                product=product,
+                product_name=product.name,
+                variant_name=variant.name,
+                sku=variant.sku,
+                hsn_code=product.hsn_code or "",
+                gst_rate=product.gst_rate or Decimal("0.00"),
+                image=free.summary["image"],
+                mrp=variant.mrp,
+                selling_price=Decimal("0.00"),
+                quantity=free.quantity,
+                line_total=Decimal("0.00"),
+                is_free=True,
+                free_source=free.source,
+            )
+        )
+    return items
 
 
 def _order_items(order: Order, lines) -> list[OrderItem]:
@@ -541,12 +645,13 @@ def _clear_ordered_lines(cart: Cart, order: Order) -> None:
     """T2/T3 "cart cleared" (PM decision): remove the lines that were ordered, keep anything the
     customer added since, and drop the coupon (it now belongs to the order). The tip and the
     delivery instructions/note also reset, so the next order starts fresh (user, 2026-11-14)."""
-    ordered = order.items.values_list("variant_id", flat=True)
+    ordered = order.items.filter(is_free=False).values_list("variant_id", flat=True)
     CartItem.objects.filter(cart=cart, variant_id__in=ordered).delete()
     cart.coupon = None
+    cart.free_variant = None  # the reward's size goes with the coupon (ADR 0002)
     cart.tip = Decimal("0.00")
     cart.instructions = empty_instructions()
-    cart.save(update_fields=["coupon", "tip", "instructions", "updated_at"])
+    cart.save(update_fields=["coupon", "free_variant", "tip", "instructions", "updated_at"])
 
 
 # --------------------------------------------------------------------------- payment capture
@@ -981,6 +1086,8 @@ def reorder(user, store: StoreArea, order_id: int) -> tuple[list[dict], int]:
         cart = Cart.objects.select_for_update().get(pk=cart.pk)
         lines = {line.variant_id: line for line in cart.items.all()}
         for item in items:
+            if item.is_free:  # free cartons are never reordered; the cart computes its own
+                continue
             wanted = item.quantity - item.quantity_unavailable
             if wanted <= 0:  # the store could not supply this line at all: nothing to reorder
                 continue

@@ -27,6 +27,7 @@ from apps.delivery.choices import (
 from apps.orders.choices import (
     ActorType,
     CancelReason,
+    FreeSource,
     OrderCancelReason,
     OrderListStatus,
     OrderRefundReason,
@@ -113,6 +114,19 @@ class OrderLineSerializer(serializers.Serializer):
     )
     line_mrp_total = money("`mrp` x the units coming (`quantity` - `quantity_unavailable`).")
     line_total = money("`selling_price` x the units coming (`quantity` - `quantity_unavailable`).")
+    is_free = serializers.BooleanField(
+        help_text=(
+            'ADR 0002: a free carton (`selling_price` and `line_total` "0.00"): show it as '
+            '"FREE". Not part of `bill.item_total`; its value is in `bill.free_items_value`. '
+            "A free line the store could not supply is dropped (`quantity_unavailable`), with "
+            "nothing to refund."
+        )
+    )
+    free_source = serializers.ChoiceField(
+        choices=FreeSource.choices,
+        allow_null=True,
+        help_text="Why it is free: VOLUME_OFFER or REWARD. Null for a paid line.",
+    )
 
 
 class OrderTimelineEntrySerializer(serializers.Serializer):
@@ -238,7 +252,13 @@ class OrderSerializer(serializers.Serializer):
     payment_status = serializers.ChoiceField(choices=PaymentStatus.choices)
     store = OrderStoreSerializer()
     items = OrderLineSerializer(many=True)
-    item_count = serializers.IntegerField(min_value=1, help_text="Units (sum of quantities).")
+    item_count = serializers.IntegerField(
+        min_value=1,
+        help_text=(
+            "Paid units (sum of quantities); free cartons (`is_free` lines, ADR 0002) are not "
+            "counted, as in the cart's `item_count`."
+        ),
+    )
     bill = BillSerializer()
     coupon_code = serializers.CharField(allow_null=True, help_text="Null when none was used.")
     address = OrderAddressSerializer()
@@ -310,7 +330,9 @@ class OrderSummarySerializer(serializers.Serializer):
     payment_status = serializers.ChoiceField(choices=PaymentStatus.choices)
     store = OrderStoreSerializer()
     item_count = serializers.IntegerField(
-        min_value=1, help_text="Units still coming (sum of quantities), as on `Order`."
+        min_value=1,
+        help_text="Paid units still coming (sum of quantities; free cartons not counted), as on "
+        "`Order`.",
     )
     line_count = serializers.IntegerField(
         min_value=1,

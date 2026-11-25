@@ -21,6 +21,7 @@ from apps.core.models import TimeStampedModel
 from apps.orders.choices import (
     ACTIVE_STATUSES,
     ActorType,
+    FreeSource,
     OrderCancelReason,
     OrderStatus,
     PaymentMethod,
@@ -222,11 +223,31 @@ class OrderItem(TimeStampedModel):
     tax_amount = models.DecimalField(
         **MONEY, default=Decimal("0.00"), help_text="GST included in line_total (Phase 4)."
     )
+    # ADR 0002: a free carton (₹0), from the volume offer or a reward. Not part of the bill's
+    # item total; reserved and committed like paid units. `db_default` so the previous release
+    # (during a deploy) can still insert lines.
+    is_free = models.BooleanField(default=False, db_default=False)
+    free_source = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        db_default="",
+        choices=FreeSource.choices,
+        help_text="Why the line is free (VOLUME_OFFER or REWARD); empty for a paid line.",
+    )
 
     class Meta:
         ordering = ["id"]
         constraints = [
-            models.UniqueConstraint(fields=["order", "variant"], name="orderitem_unique_variant"),
+            # One paid line per variant, plus at most one free line per variant and source.
+            models.UniqueConstraint(
+                fields=["order", "variant", "free_source"], name="orderitem_unique_variant_source"
+            ),
+            models.CheckConstraint(
+                condition=(Q(is_free=False) & Q(free_source=""))
+                | (Q(is_free=True) & ~Q(free_source="") & Q(selling_price=0) & Q(line_total=0)),
+                name="orderitem_free_line_consistent",
+            ),
             models.CheckConstraint(
                 condition=Q(quantity__gte=1), name="orderitem_quantity_positive"
             ),

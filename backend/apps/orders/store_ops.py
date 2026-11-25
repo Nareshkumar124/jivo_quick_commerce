@@ -276,6 +276,10 @@ def mark_item_unavailable(order_id: int, item_id: int, *, unavailable: int, by) 
       what the rider collects.
     - Nothing left: the whole order is cancelled instead (T12, reason ITEMS_UNAVAILABLE, full
       refund), and the line keeps its quantities.
+    - Free cartons (ADR 0002 §6) are fixed once ordered: removing paid units keeps the free
+      cartons already earned. A free line the store cannot supply is dropped the same way
+      (its reservation released); it is ₹0, so the bill and refunds do not change. "Nothing
+      left" counts paid units only: an order is never left with free cartons alone.
     """
     from apps.payments import order_refunds
 
@@ -310,6 +314,7 @@ def mark_item_unavailable(order_id: int, item_id: int, *, unavailable: int, by) 
         left = sum(
             i.quantity - (unavailable if i.pk == item.pk else i.quantity_unavailable)
             for i in items.values()
+            if not i.is_free
         )
         actor_type = actor_type_for(by)
         if left == 0:
@@ -392,7 +397,19 @@ def mark_item_unavailable(order_id: int, item_id: int, *, unavailable: int, by) 
 def recompute_bill(order: Order, items: list[OrderItem]):
     """08 §6.3 through `compute_bill()` (the only money function): the units still coming at
     the order's own prices, the order's coupon discount kept (capped), fees capped at the
-    order's current fees, the same tip."""
+    order's current fees, the same tip. Free cartons (ADR 0002) are never part of the item
+    total, so only paid lines are billed; the free ones give `free_items_value`."""
+    free_lines = [
+        cart_services.BillLine(
+            variant_id=item.variant_id,
+            category_id=item.product.category_id,
+            mrp=item.mrp,
+            selling_price=item.selling_price,
+            quantity=item.quantity - item.quantity_unavailable,
+        )
+        for item in items
+        if item.is_free and item.quantity > item.quantity_unavailable
+    ]
     lines = [
         cart_services.BillLine(
             variant_id=item.variant_id,
@@ -402,7 +419,7 @@ def recompute_bill(order: Order, items: list[OrderItem]):
             quantity=item.quantity - item.quantity_unavailable,
         )
         for item in items
-        if item.quantity > item.quantity_unavailable
+        if not item.is_free and item.quantity > item.quantity_unavailable
     ]
     return cart_services.compute_bill(
         lines,
@@ -414,6 +431,7 @@ def recompute_bill(order: Order, items: list[OrderItem]):
             small_cart_fee=order.small_cart_fee,
             handling_fee=order.handling_fee,
         ),
+        free_lines=free_lines,
     )
 
 

@@ -3,11 +3,12 @@ dicts in the contract shapes, from orders loaded with `with_api_relations()`."""
 
 import math
 from datetime import datetime
+from decimal import Decimal
 
 from django.db.models import Prefetch, QuerySet
 from django.utils import timezone
 
-from apps.core.money import money_str
+from apps.core.money import money_str, round_money
 from apps.orders import ratings
 from apps.orders.choices import (
     OrderCancelReason,
@@ -56,7 +57,18 @@ def can_retry_payment(order: Order, now: datetime | None = None) -> bool:
     )
 
 
-def bill_body(order: Order) -> dict:
+def free_items_value(items) -> Decimal:
+    """ADR 0002: MRP x units coming of the order's free lines (dropped free units do not
+    count). From the prefetched lines, no query."""
+    values = (
+        item.mrp * (item.quantity - item.quantity_unavailable) for item in items if item.is_free
+    )
+    return round_money(sum(values, Decimal("0.00")))
+
+
+def bill_body(order: Order, items=None) -> dict:
+    items = list(order.items.all()) if items is None else items
+    free_value = free_items_value(items)
     return {
         "mrp_total": money_str(order.mrp_total),
         "item_total": money_str(order.item_total),
@@ -67,7 +79,8 @@ def bill_body(order: Order) -> dict:
         "handling_fee": money_str(order.handling_fee),
         "tip": money_str(order.tip),
         "grand_total": money_str(order.grand_total),
-        "total_savings": money_str(order.product_discount + order.coupon_discount),
+        "total_savings": money_str(order.product_discount + order.coupon_discount + free_value),
+        "free_items_value": money_str(free_value),
     }
 
 
@@ -86,13 +99,17 @@ def line_body(item: OrderItem) -> dict:
         "quantity_unavailable": item.quantity_unavailable,
         "line_mrp_total": money_str(item.mrp * coming),
         "line_total": money_str(item.line_total),
+        "is_free": item.is_free,
+        "free_source": item.free_source or None,
     }
 
 
 def units(items) -> int:
-    """Units coming (ordered minus unavailable). An order always keeps at least one: when the
-    last units are unavailable the order is cancelled instead (08 T8a)."""
-    return max(sum(item.quantity - item.quantity_unavailable for item in items), 1)
+    """Paid units coming (ordered minus unavailable), like the cart's `item_count`: free
+    cartons are not counted (ADR 0002; PM, 2026-11-25). An order always keeps at least one: when
+    the last paid units are unavailable the order is cancelled instead (08 T8a)."""
+    coming = sum(item.quantity - item.quantity_unavailable for item in items if not item.is_free)
+    return max(coming, 1)
 
 
 def timeline_body(order: Order) -> list[dict]:
@@ -131,7 +148,7 @@ def order_body(order: Order, now: datetime | None = None) -> dict:
         "store": {"id": order.store_id, "name": order.store.name},
         "items": [line_body(item) for item in items],
         "item_count": units(items),
-        "bill": bill_body(order),
+        "bill": bill_body(order, items),
         "coupon_code": order.coupon_code or None,
         "address": order.address_snapshot,
         "instructions": {

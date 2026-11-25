@@ -3,6 +3,7 @@
 from rest_framework import serializers
 
 from apps.catalog.serializers import money
+from apps.promotions.choices import DiscountType
 from apps.referrals.choices import ReferralStatus
 
 
@@ -14,8 +15,8 @@ class ReferredBySerializer(serializers.Serializer):
         choices=ReferralStatus.choices,
         help_text=(
             "PENDING: both get the reward when the caller's first order is delivered. "
-            "REWARDED: the reward coupon is in the caller's coupon list. VOID: no reward (the "
-            "program was off at that delivery)."
+            "REWARDED: the reward is in the caller's Rewards (`GET /account/rewards/`). VOID: no "
+            "reward (the program was off at that delivery)."
         ),
     )
     applied_at = serializers.DateTimeField(help_text="When the code was entered (UTC).")
@@ -33,11 +34,28 @@ class ReferralSerializer(serializers.Serializer):
     is_enabled = serializers.BooleanField(
         help_text="False: the program is paused (hide sharing; codes cannot be entered)."
     )
-    reward_amount = money('Rupees off for each of the two customers, e.g. "90.00".')
-    reward_validity_days = serializers.IntegerField(
-        help_text="Days the reward coupon stays valid after it is given."
+    reward_type = serializers.ChoiceField(
+        choices=DiscountType.choices,
+        help_text=(
+            "ADR 0002: FREE_UNIT = each of the two customers gets one free carton (show "
+            "`reward_label`, never a ₹ amount). The only value sent today."
+        ),
     )
-    reward_min_order_value = money('Minimum item total to use the reward coupon ("0.00" = none).')
+    reward_quantity = serializers.IntegerField(
+        min_value=1, help_text="Free cartons each customer gets (1)."
+    )
+    reward_label = serializers.CharField(help_text='Ready-made text, e.g. "1 free carton".')
+    reward_amount = money(
+        "Deprecated (ADR 0002): the old ₹ reward setting, not given any more. Use "
+        "`reward_type` / `reward_label`."
+    )
+    reward_validity_days = serializers.IntegerField(
+        help_text="Days the reward stays valid after it is given."
+    )
+    reward_min_order_value = money(
+        "Deprecated (ADR 0002): free-carton rewards need the store's minimum paid cartons "
+        'instead. Always "0.00".'
+    )
     can_apply_code = serializers.BooleanField(
         help_text=(
             "Show the 'Have a referral code?' box only when true: the program is on, the caller "

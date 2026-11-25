@@ -184,6 +184,15 @@ class PricingConfig(TimeStampedModel):
         db_default="items",
         help_text='What a unit is called, in the plural, shown to customers (e.g. "cartons").',
     )
+    # ADR 0002: the volume offer. `db_default` for the same reason as `min_order_units`.
+    free_unit_every = models.PositiveSmallIntegerField(
+        default=0,
+        db_default=0,
+        help_text=(
+            "Volume offer: 1 free carton for every this many paid cartons (e.g. 10). The free "
+            "carton is the cheapest size in the order. 0 = no offer."
+        ),
+    )
     delivery_fee = _money("25.00")
     free_delivery_threshold = _money(
         "299.00", help_text="Delivery is free when the item total is at least this."
