@@ -76,19 +76,30 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
       return;
     }
     if (_applying != null) return;
-    // A typed reward code is a free carton too: pick its size first.
-    final listed = ref.read(cartCouponsProvider).value ?? const [];
+    setState(() {
+      _applying = trimmed;
+      _error = null;
+    });
+    // A typed reward code is a free carton too: pick its size first. Wait
+    // for the coupon list if it is still loading; if it failed, the
+    // server's answer below still tells.
+    var listed = const <CouponOffer>[];
+    try {
+      listed = await ref.read(cartCouponsProvider.future);
+    } catch (_) {
+      // Decided by the apply answer instead.
+    }
+    if (!mounted) return;
     final reward = listed
         .where(
           (o) =>
               o.isFreeCarton && o.code.toUpperCase() == trimmed.toUpperCase(),
         )
         .firstOrNull;
-    if (reward != null) return _applyFreeCarton(reward.code);
-    setState(() {
-      _applying = trimmed;
-      _error = null;
-    });
+    if (reward != null) {
+      setState(() => _applying = null);
+      return _applyFreeCarton(reward.code);
+    }
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     try {
@@ -112,11 +123,18 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _applying = null;
-        _error = _describe(error);
-      });
+      setState(() => _applying = null);
+      // A reward code sent without a size: the server asks for one (400
+      // with `free_variant_id`, ADR 0002). Pick it instead of an error.
+      if (_needsSize(error)) return _applyFreeCarton(trimmed);
+      setState(() => _error = _describe(error));
     }
+  }
+
+  static bool _needsSize(Object error) {
+    final apiError = ApiError.from(error);
+    return apiError.code == ApiErrorCode.validationError &&
+        apiError.details.containsKey('free_variant_id');
   }
 
   /// The server's coupon error, with its details (e.g. how much to add).

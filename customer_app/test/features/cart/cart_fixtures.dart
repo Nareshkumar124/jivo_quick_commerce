@@ -131,8 +131,13 @@ class StubCartRepository implements CartRepository {
   List<CouponOffer> couponList = const [];
   Object? couponError;
 
+  /// When set, [coupons] answers only after it completes (still loading).
+  Completer<void>? couponsGate;
+
   @override
   Future<List<CouponOffer>> coupons() async {
+    final wait = couponsGate;
+    if (wait != null) await wait.future;
     final error = couponError;
     if (error != null) throw error;
     return couponList;

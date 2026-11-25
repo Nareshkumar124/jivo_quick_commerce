@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:customer_app/app/bootstrap.dart';
 import 'package:customer_app/app/redirect.dart';
 import 'package:customer_app/features/addresses/domain/saved_address.dart';
@@ -14,6 +16,9 @@ import 'package:customer_app/features/location/data/delivery_location_store.dart
 import 'package:customer_app/features/location/data/serviceability_repository.dart';
 import 'package:customer_app/features/location/domain/delivery_location.dart';
 import 'package:customer_app/features/location/presentation/delivery_controller.dart';
+import 'package:customer_app/features/rewards/domain/reward.dart';
+import 'package:customer_app/features/rewards/presentation/rewards_providers.dart';
+import 'package:jivo_core/jivo_core.dart' show ApiError, ApiErrorCode;
 import 'package:customer_app/features/search/presentation/search_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -196,5 +201,57 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('All products'), findsOneWidget);
     expect(container.read(homeFeedProvider).value!.buyAgain, isEmpty);
+  });
+
+  testWidgets('sign-out: the next user never sees the previous user\'s '
+      'rewards (ADR 0002)', (tester) async {
+    tallView(tester);
+    RewardsSummary rewardsOf(String code) => RewardsSummary(
+      available: [
+        Reward(
+          code: code,
+          title: '1 free carton',
+          source: RewardSource.welcome,
+          status: RewardStatus.available,
+        ),
+      ],
+    );
+    final app = TestApp(tokens: signedInTokens);
+    app.rewards.summary = rewardsOf('USER-A-1FC');
+    await app.pump(tester);
+    GoRouter.of(tester.element(find.byType(HomeScreen))).push(Routes.myCoupons);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reward-USER-A-1FC')), findsOneWidget);
+    final container = containerOf(tester);
+
+    await app.session.signOut();
+    await tester.pumpAndSettle();
+    expect(find.text('Log in or sign up'), findsOneWidget);
+    // Signed out: no rewards and no request for them.
+    final fetches = app.rewards.fetches;
+    final sub = container.listen(rewardsProvider, (_, _) {});
+    expect(ApiError.from(sub.read().error!).code, ApiErrorCode.authRequired);
+    sub.close();
+    expect(app.rewards.fetches, fetches);
+
+    // User B signs in; their rewards load slowly: user A's never show.
+    app.rewards.summary = rewardsOf('USER-B-1FC');
+    final gate = Completer<void>();
+    app.rewards.gate = gate.future;
+    await loginToOtp(tester, '9000000001');
+    await tester.enterText(
+      find.byKey(OtpScreen.otpFieldKey),
+      FakeAuthRepository.validOtp,
+    );
+    await tester.pumpAndSettle();
+    GoRouter.of(tester.element(find.byType(HomeScreen))).push(Routes.myCoupons);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const ValueKey('reward-USER-A-1FC')), findsNothing);
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('reward-USER-B-1FC')), findsOneWidget);
+    expect(find.byKey(const ValueKey('reward-USER-A-1FC')), findsNothing);
   });
 }

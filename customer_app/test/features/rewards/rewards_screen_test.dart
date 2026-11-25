@@ -273,6 +273,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Free carton reward applied'), findsOneWidget);
+
+    // The cart was pushed: Back returns to Rewards.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(RewardsScreen), findsOneWidget);
   });
 
   testWidgets('too few paid cartons: the server reason and Add cartons', (
@@ -367,6 +372,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(CartScreen), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(RewardsScreen), findsOneWidget);
   });
 
   testWidgets('nothing at all: empty states on both tabs', (tester) async {

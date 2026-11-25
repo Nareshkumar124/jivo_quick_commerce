@@ -43,6 +43,8 @@ RewardsSummary rewardsFromApi(api.Rewards r) => RewardsSummary(
   history: [for (final entry in r.history) _entry(entry)],
 );
 
+// The rewards list is free cartons only (ADR 0002): `discountType` keeps
+// its FREE_UNIT default.
 Reward _reward(api.Reward r) => Reward(
   code: r.code,
   title: r.title,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:customer_app/app/bootstrap.dart' show initializeFormatting;
 import 'package:customer_app/app/redirect.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
@@ -11,6 +13,7 @@ import 'package:customer_app/features/orders/presentation/order_detail_screen.da
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jivo_core/jivo_core.dart';
 
 import '../../helpers/test_app.dart';
 import 'cart_fixtures.dart';
@@ -318,6 +321,82 @@ void main() {
       expect(repo.calls, contains('coupon:WEL7K2M9QPX:1502'));
       expect(find.byType(CouponSheet), findsNothing);
       expect(find.text('Free carton added to your cart'), findsOneWidget);
+    });
+  });
+
+  group('a typed reward code', () {
+    const welcome = CouponOffer(
+      code: 'WEL7K2M9QPX',
+      title: '1 free carton',
+      description: 'Welcome reward',
+      isEligible: true,
+      isPersonal: true,
+      discountType: CouponDiscountType.freeUnit,
+      source: RewardSource.welcome,
+    );
+
+    List<String> applies(StubCartRepository repo) =>
+        repo.calls.where((c) => c.startsWith('coupon:')).toList();
+
+    Future<void> typeAndApply(WidgetTester tester, String code) async {
+      await tester.tap(find.byKey(const Key('apply-coupon')));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.enterText(find.byKey(const Key('coupon-code')), code);
+      await tester.tap(find.byKey(const Key('coupon-apply-code')));
+      await tester.pump();
+    }
+
+    Future<void> pickAndConfirm(WidgetTester tester) async {
+      expect(find.text('Pick a size for your free carton'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('free-size-1502')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('free-size-confirm')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('while the list is still loading: it waits, then opens the '
+        'size picker (nothing sent without a size)', (tester) async {
+      final gate = Completer<void>();
+      final repo = StubCartRepository(freeCart())
+        ..couponList = const [welcome]
+        ..couponsGate = gate;
+      await openCart(
+        tester,
+        TestApp(tokens: signedInTokens, cartRepository: repo),
+      );
+      await typeAndApply(tester, 'wel7k2m9qpx');
+      expect(applies(repo), isEmpty);
+
+      gate.complete();
+      await tester.pumpAndSettle();
+      expect(applies(repo), isEmpty);
+      await pickAndConfirm(tester);
+      expect(applies(repo), ['coupon:WEL7K2M9QPX:1502']);
+      expect(find.text('Free carton added to your cart'), findsOneWidget);
+    });
+
+    testWidgets('the list failed: the server asks for a size, the picker '
+        'opens instead of the raw error', (tester) async {
+      final repo = StubCartRepository(freeCart())
+        ..couponError = const ApiError(code: ApiErrorCode.network)
+        ..applyError = const ApiError(
+          code: ApiErrorCode.validationError,
+          rawCode: 'VALIDATION_ERROR',
+          statusCode: 400,
+          details: {
+            'free_variant_id': ['Choose a size for your free carton.'],
+          },
+        );
+      await openCart(
+        tester,
+        TestApp(tokens: signedInTokens, cartRepository: repo),
+      );
+      await typeAndApply(tester, 'WEL7K2M9QPX');
+      await tester.pumpAndSettle();
+      expect(find.text('Choose a size for your free carton.'), findsNothing);
+      await pickAndConfirm(tester);
+      expect(applies(repo), ['coupon:WEL7K2M9QPX', 'coupon:WEL7K2M9QPX:1502']);
     });
   });
 

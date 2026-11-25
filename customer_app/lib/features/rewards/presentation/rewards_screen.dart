@@ -273,7 +273,9 @@ class RewardCard extends ConsumerWidget {
     final applied = await showFreeSizeSheet(context, code: reward.code);
     if (!applied || !context.mounted) return;
     showMessage(context, l10n.freeCartonAdded);
-    context.go(Routes.cart);
+    // Pushed (on the root navigator, like the cart bar does): Back
+    // returns to Rewards.
+    await context.push(Routes.cart);
   }
 
   @override
@@ -375,7 +377,7 @@ class RewardCard extends ConsumerWidget {
                                 kJivoMinTouchTarget,
                               ),
                             ),
-                            onPressed: () => context.go(Routes.cart),
+                            onPressed: () => context.push(Routes.cart),
                             child: Text(l10n.rewardViewCart),
                           ),
                         ],
