@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -5,12 +7,20 @@ import '../features/cart/presentation/cart_bar.dart';
 import '../l10n/generated/app_localizations.dart';
 import 'theme.dart';
 
-/// The bottom tabs (`03 §1`): Home, Categories, Order again, Account. The
-/// floating cart bar sits above them on the shopping tabs.
+/// The bottom tabs (`03 §1`): Home, Order again, Account. The floating cart
+/// bar sits above them on the shopping tabs.
+///
+/// The Categories tab is hidden (user, 2026-11-25). Its router branch (1)
+/// stays, so `/categories` still opens; the bar then marks Home. To bring
+/// the tab back, add branch 1 to [_tabBranches] and its destination below.
 class AppShell extends StatelessWidget {
   const AppShell({required this.shell, super.key});
 
+  /// Router branch index of the Account tab.
   static const accountTab = 3;
+
+  /// The router branch behind each visible tab, in bar order.
+  static const _tabBranches = [0, 2, accountTab];
 
   final StatefulNavigationShell shell;
 
@@ -39,14 +49,20 @@ class AppShell extends StatelessWidget {
             child: MediaQuery.withClampedTextScaling(
               maxScaleFactor: 1.3,
               child: NavigationBar(
-                selectedIndex: shell.currentIndex,
-                onDestinationSelected: (index) => shell.goBranch(
-                  index,
-                  initialLocation: index == shell.currentIndex,
+                // A hidden branch (Categories) marks Home.
+                selectedIndex: max(
+                  0,
+                  _tabBranches.indexOf(shell.currentIndex),
                 ),
+                onDestinationSelected: (index) {
+                  final branch = _tabBranches[index];
+                  shell.goBranch(
+                    branch,
+                    initialLocation: branch == shell.currentIndex,
+                  );
+                },
                 destinations: [
                   tab(Icons.home_outlined, l10n.tabHome),
-                  tab(Icons.grid_view_outlined, l10n.tabCategories),
                   tab(Icons.replay_rounded, l10n.tabOrderAgain),
                   tab(Icons.person_outline_rounded, l10n.tabAccount),
                 ],

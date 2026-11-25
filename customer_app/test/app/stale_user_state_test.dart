@@ -8,6 +8,7 @@ import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/cart/domain/cart.dart';
 import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
+import 'package:customer_app/features/catalog/presentation/catalog_controllers.dart';
 import 'package:customer_app/features/home/presentation/home_screen.dart';
 import 'package:customer_app/features/location/data/delivery_location_store.dart';
 import 'package:customer_app/features/location/data/serviceability_repository.dart';
@@ -157,8 +158,9 @@ void main() {
     final app = TestApp(tokens: signedInTokens, catalogRepository: catalog);
     await app.pump(tester);
     expect(find.text('Home · Flat 4B, MG Road, New Delhi'), findsOneWidget);
-    expect(find.text('Previously bought'), findsOneWidget);
     final container = containerOf(tester);
+    // The rail is hidden on Home (2026-11-25), so check the feed itself.
+    expect(container.read(homeFeedProvider).value!.buyAgain, isNotEmpty);
     await container.read(recentSearchesProvider.notifier).add('ghee');
 
     await app.session.signOut();
@@ -193,6 +195,6 @@ void main() {
     await delivery.select(location, check.serviceability);
     await tester.pumpAndSettle();
     expect(find.text('All products'), findsOneWidget);
-    expect(find.text('Previously bought'), findsNothing);
+    expect(container.read(homeFeedProvider).value!.buyAgain, isEmpty);
   });
 }

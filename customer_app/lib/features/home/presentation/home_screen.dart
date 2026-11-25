@@ -208,15 +208,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           SliverToBoxAdapter(child: HomeProductRail(items: collection.items)),
         ],
-      if (feed.buyAgain.isNotEmpty) ...[
-        SliverToBoxAdapter(
-          child: HomeSectionHeader(
-            title: l10n.previouslyBought,
-            onSeeAll: () => context.go(Routes.orderAgain),
-          ),
-        ),
-        SliverToBoxAdapter(child: HomeProductRail(items: feed.buyAgain)),
-      ],
+      // No "Previously bought" rail: the user hid it (2026-11-25). The Order
+      // again tab stays. To bring it back, show
+      // HomeSectionHeader(title: l10n.previouslyBought) and
+      // HomeProductRail(items: feed.buyAgain) here.
       SliverToBoxAdapter(
         child: HomeSectionHeader(
           title: l10n.allProducts,

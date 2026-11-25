@@ -1,4 +1,5 @@
 import 'package:customer_app/app/bootstrap.dart';
+import 'package:customer_app/app/redirect.dart';
 import 'package:customer_app/features/home/presentation/home_screen.dart';
 import 'package:customer_app/features/location/domain/delivery_location.dart';
 import 'package:customer_app/shared/formatting/formatters.dart';
@@ -46,14 +47,21 @@ void main() {
     expect(find.text('Bestsellers'), findsOneWidget);
     expect(find.text('Offers'), findsOneWidget);
     expect(find.text('New launches'), findsOneWidget);
-    expect(find.text('Previously bought'), findsOneWidget);
+    // The "Previously bought" rail is hidden (user, 2026-11-25).
+    expect(find.text('Previously bought'), findsNothing);
     expect(find.text('See all'), findsWidgets);
     expect(find.byKey(const Key('store-closed-banner')), findsNothing);
     expect(find.byKey(const Key('cart-bar')), findsNothing);
-    // The bottom tabs.
-    for (final tab in ['Home', 'Categories', 'Order again', 'Account']) {
-      expect(find.text(tab), findsWidgets);
+    // The bottom tabs. The Categories tab is hidden (user, 2026-11-25).
+    Finder inBar(String label) => find.descendant(
+      of: find.byType(NavigationBar),
+      matching: find.text(label),
+    );
+    expect(find.byType(NavigationDestination), findsNWidgets(3));
+    for (final tab in ['Home', 'Order again', 'Account']) {
+      expect(inBar(tab), findsOneWidget);
     }
+    expect(inBar('Categories'), findsNothing);
   });
 
   testWidgets("ADD on a rail shows the cart bar with the server's total", (
@@ -156,7 +164,8 @@ void main() {
     final app = TestApp(tokens: signedInTokens);
     await app.pump(tester);
 
-    await tester.tap(find.text('Categories').last);
+    // No Categories tab any more: open the screen through the router.
+    routerOf(tester).go(Routes.categories);
     await tester.pumpAndSettle();
     await tester.tap(find.text('All').first);
     await tester.pumpAndSettle();
@@ -243,11 +252,12 @@ void main() {
     expect(find.text('Jivo Desi Ghee'), findsOneWidget);
   });
 
-  testWidgets('the categories tab shows the tree', (tester) async {
+  testWidgets('the categories screen shows the tree', (tester) async {
     tallView(tester);
     final app = TestApp(tokens: signedInTokens);
     await app.pump(tester);
-    await tester.tap(find.text('Categories').last);
+    // The tab is hidden, but the /categories route still opens the screen.
+    routerOf(tester).go(Routes.categories);
     await tester.pumpAndSettle();
     expect(find.text('Olive Oil'), findsOneWidget);
     expect(find.text('Desi Ghee'), findsOneWidget);
