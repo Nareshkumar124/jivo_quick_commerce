@@ -1264,10 +1264,10 @@ abstract class AppLocalizations {
   /// **'Search products'**
   String get searchHint;
 
-  /// Home search field placeholder (home redesign): Jivo's main ranges, then 'and more' because the catalog has other products too.
+  /// Home search field placeholder. Only water is sold now (user, 2026-11-25).
   ///
   /// In en, this message translates to:
-  /// **'Search water, oils and more'**
+  /// **'Search water'**
   String get homeSearchHint;
 
   /// Home section title: the compact category row (categories from GET /home/).

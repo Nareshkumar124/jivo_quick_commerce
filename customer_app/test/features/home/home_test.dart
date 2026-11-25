@@ -32,8 +32,8 @@ void main() {
 
     expect(find.text('Delivery in 14 mins'), findsOneWidget);
     expect(find.text('Home · Flat 4B, MG Road, New Delhi'), findsOneWidget);
-    // Jivo's main ranges, then "and more": the catalog is not only these.
-    expect(find.text('Search water, oils and more'), findsOneWidget);
+    // Only water is sold now (user, 2026-11-25).
+    expect(find.text('Search water'), findsOneWidget);
     expect(find.text('Deliver to'), findsOneWidget);
     expect(find.byKey(const Key('banner-carousel')), findsOneWidget);
     expect(find.text('Up to 20% off on olive oils'), findsOneWidget);

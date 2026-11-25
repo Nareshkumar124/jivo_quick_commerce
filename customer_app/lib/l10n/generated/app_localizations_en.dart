@@ -702,7 +702,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchHint => 'Search products';
 
   @override
-  String get homeSearchHint => 'Search water, oils and more';
+  String get homeSearchHint => 'Search water';
 
   @override
   String get homeCategories => 'Shop by category';

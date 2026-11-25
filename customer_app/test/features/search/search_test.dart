@@ -32,7 +32,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const Key('home-search')),
-        matching: find.text('Search water, oils and more'),
+        matching: find.text('Search water'),
       ),
       findsOneWidget,
     );
