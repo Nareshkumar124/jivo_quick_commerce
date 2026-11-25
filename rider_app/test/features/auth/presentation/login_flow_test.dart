@@ -334,7 +334,7 @@ void main() {
       expect(find.text('Account suspended'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('call-support')));
-      expect(h.urls.opened.single, Uri(scheme: 'tel', path: '+911800123456'));
+      expect(h.urls.opened.single, Uri(scheme: 'tel', path: '+919910557187'));
     });
   });
 

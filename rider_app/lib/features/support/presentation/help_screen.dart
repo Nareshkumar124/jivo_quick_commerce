@@ -11,10 +11,11 @@ import '../../../shared/errors/rider_error_text.dart';
 import '../../launch/presentation/launch_controller.dart';
 import '../../legal/data/legal_repository.dart';
 import '../domain/support_models.dart';
+import 'support_email_button.dart';
 import 'support_providers.dart';
 
-/// Help and support (04 §2.9, screen 20; P7): call support, raise a ticket,
-/// my tickets, the rider FAQs and the legal pages.
+/// Help and support (04 §2.9, screen 20; P7): call or email support, raise a
+/// ticket, my tickets, the rider FAQs and the legal pages.
 class HelpScreen extends ConsumerWidget {
   const HelpScreen({super.key});
 
@@ -28,6 +29,9 @@ class HelpScreen extends ConsumerWidget {
         ?.support
         .phone;
     final canCall = supportPhone != null && supportPhone.trim().isNotEmpty;
+    final supportEmail = supportEmailOf(
+      ref.watch(launchControllerProvider).config,
+    );
     final faqs = ref.watch(faqsProvider);
 
     Widget row(String key, IconData icon, String label, VoidCallback onTap) =>
@@ -69,6 +73,13 @@ class HelpScreen extends ConsumerWidget {
                     .open(Uri(scheme: 'tel', path: supportPhone)),
                 icon: const Icon(Icons.call),
                 label: Text(l10n.callSupport),
+              ),
+            ],
+            if (supportEmail != null) ...[
+              const SizedBox(height: 12),
+              SupportEmailButton(
+                key: const Key('help-email-support'),
+                email: supportEmail,
               ),
             ],
             const SizedBox(height: 8),

@@ -64,7 +64,7 @@ class FakeAppConfigRepository implements AppConfigRepository {
     'maintenance_message': scenario == FakeConfigScenario.maintenance
         ? 'Jivo is down for scheduled maintenance. We will be back by 6:00 AM.'
         : '',
-    'support': {'phone': '+911800123456', 'email': 'support@jivo.in'},
+    'support': {'phone': '+919910557187', 'email': 'info@jivo.in'},
     'policy_urls': {
       'terms': 'https://jivo.in/terms',
       'privacy': 'https://jivo.in/privacy',

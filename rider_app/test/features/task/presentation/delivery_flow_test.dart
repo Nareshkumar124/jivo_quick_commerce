@@ -271,7 +271,7 @@ void main() {
       expect(byKey('delivery-otp'), findsNothing);
 
       await tap(tester, 'call-support');
-      expect(h.urls.opened.last, Uri(scheme: 'tel', path: '+911800123456'));
+      expect(h.urls.opened.last, Uri(scheme: 'tel', path: '+919910557187'));
     });
   });
 
