@@ -174,7 +174,7 @@ All product tiles show the image, name, variant (e.g., 1 L), selling price, stru
 | Profile | View/edit name and email. The phone number is shown but is not editable in v1. |
 | Addresses | See 2.4 |
 | Notifications | In-app notification inbox [P6]. Toggle for promotional push. |
-| Help & support | FAQs, "Get help with an order" (choose an order, then an issue type, which creates a ticket with an optional photo), ticket list and replies, call support [P7] |
+| Help & support | FAQs, "Get help with an order" (choose an order, then an issue type, which creates a ticket with an optional photo), ticket list and replies, call or email support [P7] |
 | Legal | About, Terms, Privacy Policy, Refund Policy (CMS pages) |
 | App info | Version, rate us |
 | Refer & earn | The customer's own referral code with Copy and Share, the rules, and counts (friends joined, rewards earned). A new customer (no code entered, no order placed yet) can enter a friend's code once. See below. |

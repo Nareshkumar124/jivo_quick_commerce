@@ -13,9 +13,9 @@ import '../domain/support_models.dart';
 import 'support_controllers.dart';
 
 /// Help & support (`03 §2.11`, screen #31; P7 API since T-713): call
-/// support, "Get help with an order", my tickets and the FAQs. Where
-/// [supportAvailableProvider] is false (staging/prod for now) only the
-/// call option shows.
+/// or email support, "Get help with an order", my tickets and the FAQs.
+/// Where [supportAvailableProvider] is false (staging/prod for now) only
+/// the call and email options show.
 class HelpScreen extends ConsumerWidget {
   const HelpScreen({super.key});
 
@@ -24,7 +24,9 @@ class HelpScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final available = ref.watch(supportAvailableProvider);
-    final phone = ref.watch(launchStateProvider).config?.supportPhone;
+    final config = ref.watch(launchStateProvider).config;
+    final phone = config?.supportPhone;
+    final email = config?.supportEmail;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.helpTitle)),
@@ -61,7 +63,17 @@ class HelpScreen extends ConsumerWidget {
                     .read(urlOpenerProvider)
                     .open(Uri(scheme: 'tel', path: phone)),
               ),
-            if (!available && phone == null)
+            if (email != null)
+              ListTile(
+                key: const Key('help-email'),
+                leading: const Icon(Icons.mail_outline),
+                title: Text(l10n.emailSupport),
+                subtitle: Text(email),
+                onTap: () => ref
+                    .read(urlOpenerProvider)
+                    .open(Uri(scheme: 'mailto', path: email)),
+              ),
+            if (!available && phone == null && email == null)
               Padding(
                 padding: const EdgeInsets.all(JivoSpacing.gutter),
                 child: Text(l10n.helpComingSoon),

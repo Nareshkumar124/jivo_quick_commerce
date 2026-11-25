@@ -2216,6 +2216,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get callSupport => 'Call support';
 
   @override
+  String get emailSupport => 'Email us';
+
+  @override
   String get helpComingSoon => 'Support is coming soon to the app.';
 
   @override

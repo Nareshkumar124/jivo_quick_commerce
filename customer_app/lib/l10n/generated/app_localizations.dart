@@ -3603,6 +3603,12 @@ abstract class AppLocalizations {
   /// **'Call support'**
   String get callSupport;
 
+  /// Help: email customer care; the address shows under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Email us'**
+  String get emailSupport;
+
   /// Help when no contact option is available.
   ///
   /// In en, this message translates to:
