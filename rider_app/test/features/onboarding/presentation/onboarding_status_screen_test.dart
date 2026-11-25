@@ -149,7 +149,7 @@ void main() {
     testWidgets('support can be called', (tester) async {
       await openAs(tester, rejectedPhone);
       await tester.tap(byKey('call-support'));
-      expect(h.urls.opened.single, Uri(scheme: 'tel', path: '+911800123456'));
+      expect(h.urls.opened.single, Uri(scheme: 'tel', path: '+919910557187'));
     });
   });
 

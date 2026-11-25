@@ -20,10 +20,11 @@ import '../../onboarding/domain/kyc_document.dart';
 import '../../onboarding/domain/rider_profile.dart';
 import '../../onboarding/presentation/onboarding_providers.dart';
 import '../../onboarding/presentation/onboarding_text.dart';
+import '../../support/presentation/support_email_button.dart';
 
 /// Profile (04 §2.9, screen 18): photo, name, phone, home store, vehicle,
 /// KYC status and rating, from `GET /rider/me/`; the documents (re-upload
-/// of rejected ones), call support and log out.
+/// of rejected ones), call or email support and log out.
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -99,6 +100,9 @@ class _ProfileBody extends ConsumerWidget {
         .phone;
     final canCallSupport =
         supportPhone != null && supportPhone.trim().isNotEmpty;
+    final supportEmail = supportEmailOf(
+      ref.watch(launchControllerProvider).config,
+    );
     final devReview =
         ref.watch(appEnvProvider).showDevTools &&
         ref.watch(riderOnboardingRepositoryProvider)
@@ -249,6 +253,13 @@ class _ProfileBody extends ConsumerWidget {
                       icon: const Icon(Icons.call),
                       label: Text(l10n.callSupport),
                     ),
+                    if (supportEmail != null) ...[
+                      const SizedBox(height: 12),
+                      SupportEmailButton(
+                        key: const Key('profile-email-support'),
+                        email: supportEmail,
+                      ),
+                    ],
                   ],
                 ),
               ),

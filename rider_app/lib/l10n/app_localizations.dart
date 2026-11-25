@@ -926,6 +926,12 @@ abstract class AppLocalizations {
   /// **'Call support'**
   String get callSupport;
 
+  /// Button that opens the email app to write to Jivo customer care. The address is shown under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Email us'**
+  String get emailSupport;
+
   /// Progress through registration, documents and bank details.
   ///
   /// In en, this message translates to:

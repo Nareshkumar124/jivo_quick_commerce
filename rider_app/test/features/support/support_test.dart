@@ -3,17 +3,21 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart' show FormData;
 import 'package:flutter/material.dart' hide Page;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:jivo_api/jivo_api.dart' show AppConfig;
 import 'package:jivo_core/jivo_core.dart';
 import 'package:rider_app/app/routes.dart';
+import 'package:rider_app/features/launch/data/fake_app_config_repository.dart';
 import 'package:rider_app/features/onboarding/domain/image_picking.dart';
 import 'package:rider_app/features/support/data/support_repository.dart';
 import 'package:rider_app/features/support/domain/support_models.dart';
+import 'package:rider_app/features/support/presentation/support_email_button.dart';
 import 'package:rider_app/features/support/presentation/support_providers.dart';
 
 import '../../helpers/canned_http.dart';
 import '../../helpers/onboarding_fixtures.dart';
 import '../../helpers/records_helpers.dart';
 import '../../helpers/rider_app_harness.dart';
+import '../../helpers/support_config.dart';
 
 Map<String, Object?> _ticketJson({
   int id = 7,
@@ -60,6 +64,17 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('domain', () {
+    test('the support email is trimmed; a blank one means none', () {
+      AppConfig withEmail(String email) => AppConfig.fromJson({
+        ...FakeAppConfigRepository.exampleJson(FakeConfigScenario.normal),
+        'support': {'phone': '+919910557187', 'email': email},
+      });
+      expect(supportEmailOf(withEmail(' info@jivo.in ')), 'info@jivo.in');
+      expect(supportEmailOf(withEmail('')), isNull);
+      expect(supportEmailOf(withEmail('   ')), isNull);
+      expect(supportEmailOf(null), isNull);
+    });
+
     test('a draft sends the trimmed text, with no tag added', () {
       const draft = TicketDraft(
         topic: RiderTicketTopic.task,
@@ -693,7 +708,37 @@ void main() {
       expect(byKey('help-faq-error'), findsNothing);
       await tester.tap(byKey('help-call-support'));
       await tester.pumpAndSettle();
-      expect(h.urls.opened.last, Uri(scheme: 'tel', path: '+911800123456'));
+      expect(h.urls.opened.last, Uri(scheme: 'tel', path: '+919910557187'));
+    });
+
+    testWidgets('help shows Email us with the address and opens mailto', (
+      tester,
+    ) async {
+      final h = RiderTestHarness();
+      await openFromHome(tester, h, 'home-help');
+      final email = byKey('help-email-support');
+      expect(email, findsOneWidget);
+      expect(
+        find.descendant(of: email, matching: find.text('Email us')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: email, matching: find.text('info@jivo.in')),
+        findsOneWidget,
+      );
+      await tester.tap(email);
+      await tester.pumpAndSettle();
+      expect(h.urls.opened.last, Uri.parse('mailto:info@jivo.in'));
+    });
+
+    testWidgets('help hides Email us when the config has no email', (
+      tester,
+    ) async {
+      final h = RiderTestHarness()
+        ..config = SupportConfigRepository(email: ' ');
+      await openFromHome(tester, h, 'home-help');
+      expect(byKey('help-call-support'), findsOneWidget);
+      expect(byKey('help-email-support'), findsNothing);
     });
 
     testWidgets('prod: the records and help are on the home and open', (
