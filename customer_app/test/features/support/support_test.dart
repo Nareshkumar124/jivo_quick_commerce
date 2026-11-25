@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
+import 'package:customer_app/features/launch/data/config_repository.dart';
+import 'package:customer_app/features/launch/domain/launch_config.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
 import 'package:customer_app/features/support/data/support_repository.dart';
 import 'package:customer_app/features/support/domain/support_models.dart';
@@ -130,13 +132,55 @@ void main() {
       expect(find.byKey(const Key('faq-1')), findsOneWidget);
     });
 
-    testWidgets('real-API build: only the call option, no tickets', (
+    testWidgets('real-API build: only call and email, no tickets', (
       tester,
     ) async {
       await openHelp(tester, app(available: false));
       expect(find.byKey(const Key('help-tickets')), findsNothing);
       expect(find.byKey(const Key('help-new-ticket')), findsNothing);
       expect(find.text('Frequently asked questions'), findsNothing);
+    });
+
+    LaunchConfig contacts({String? phone, String? email}) => LaunchConfig(
+      maintenance: false,
+      termsVersion: FakeConfigRepository.sample.termsVersion,
+      policies: FakeConfigRepository.sample.policies,
+      supportPhone: phone,
+      supportEmail: email,
+    );
+
+    testWidgets('"Email us" shows the address and opens mailto', (
+      tester,
+    ) async {
+      final a = app(available: false);
+      await openHelp(tester, a);
+      expect(find.byKey(const Key('help-call')), findsOneWidget);
+      expect(find.text('+919910557187'), findsOneWidget);
+      expect(find.text('Email us'), findsOneWidget);
+      expect(find.text('info@jivo.in'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('help-email')));
+      await tester.pump();
+      expect(a.urls.opened.single, Uri.parse('mailto:info@jivo.in'));
+    });
+
+    testWidgets('no support email: no "Email us" row', (tester) async {
+      final a = app(available: false);
+      a.config.config = contacts(phone: '+919910557187');
+      await openHelp(tester, a);
+      expect(find.byKey(const Key('help-call')), findsOneWidget);
+      expect(find.byKey(const Key('help-email')), findsNothing);
+      expect(find.text('Email us'), findsNothing);
+    });
+
+    testWidgets('email only: the row shows and "coming soon" does not', (
+      tester,
+    ) async {
+      final a = app(available: false);
+      a.config.config = contacts(email: 'info@jivo.in');
+      await openHelp(tester, a);
+      expect(find.byKey(const Key('help-call')), findsNothing);
+      expect(find.byKey(const Key('help-email')), findsOneWidget);
+      expect(find.text('Support is coming soon to the app.'), findsNothing);
     });
 
     testWidgets('new ticket without an order: validation, then the thread', (
