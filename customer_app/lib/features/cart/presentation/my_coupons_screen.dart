@@ -1,90 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
-import '../../../app/redirect.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
-import '../../../shared/widgets/state_views.dart';
 import '../domain/cart.dart';
 import 'cart_texts.dart';
-import 'widgets/coupon_sheet.dart';
 
-/// Account > My coupons: every coupon `GET /cart/coupons/` lists for the
-/// customer, including personal rewards. Copy a code, then paste it in the
-/// cart. The repository adds the store id.
-class MyCouponsScreen extends ConsumerWidget {
-  const MyCouponsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final coupons = ref.watch(cartCouponsProvider);
-
-    Future<void> refresh() async {
-      ref.invalidate(cartCouponsProvider);
-      try {
-        await ref.read(cartCouponsProvider.future);
-      } catch (_) {
-        // The error view shows it.
-      }
-    }
-
-    Widget scrollable(Widget child) => LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-          child: child,
-        ),
-      ),
-    );
-
-    final Widget body = switch (coupons) {
-      AsyncData(:final value) when value.isEmpty => scrollable(
-        EmptyView(
-          message: l10n.myCouponsEmpty,
-          icon: Icons.local_offer_outlined,
-        ),
-      ),
-      AsyncData(:final value) => ListView.separated(
-        key: const Key('my-coupons-list'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(JivoSpacing.gutter),
-        itemCount: value.length,
-        separatorBuilder: (_, _) => const SizedBox(height: JivoSpacing.md),
-        itemBuilder: (context, index) => MyCouponCard(offer: value[index]),
-      ),
-      AsyncError(:final error)
-          when ApiError.from(error).code == ApiErrorCode.storeNotFound =>
-        scrollable(
-          EmptyView(
-            message: l10n.couponsNeedLocation,
-            icon: Icons.location_on_outlined,
-            action: FilledButton(
-              key: const Key('my-coupons-choose-location'),
-              onPressed: () => context.push(Routes.location),
-              child: Text(l10n.couponsChooseLocation),
-            ),
-          ),
-        ),
-      AsyncError(:final error) => scrollable(
-        ErrorRetryView(
-          error: error,
-          onRetry: () => ref.invalidate(cartCouponsProvider),
-        ),
-      ),
-      _ => const SkeletonList(),
-    };
-
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.myCoupons)),
-      body: RefreshIndicator(onRefresh: refresh, child: body),
-    );
-  }
-}
+/// The coupon cards of Account > Rewards (`RewardsScreen`, ADR 0002) and
+/// the coupon sheet's "For you" label. The screen itself moved to
+/// `features/rewards/presentation/rewards_screen.dart`.
 
 /// One coupon: title, copyable code chip, terms, expiry and, when it can't
 /// be used now, the server's reason.

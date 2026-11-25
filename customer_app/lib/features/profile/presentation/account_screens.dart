@@ -16,6 +16,8 @@ import '../../auth/presentation/auth_flow.dart';
 import '../../cms/data/cms_repository.dart';
 import '../../notifications/presentation/inbox_screen.dart';
 import '../../referral/presentation/referral_controller.dart';
+import '../../referral/presentation/referral_screen.dart'
+    show referralHeadlineText, referralRewardLabel;
 import 'profile_controllers.dart';
 import 'profile_form.dart';
 
@@ -80,8 +82,8 @@ class AccountScreen extends ConsumerWidget {
                 Expanded(
                   child: _QuickTile(
                     key: const Key('account-my-coupons'),
-                    icon: Icons.local_offer_outlined,
-                    label: l10n.myCoupons,
+                    icon: Icons.card_giftcard_outlined,
+                    label: l10n.rewardsTitle,
                     onTap: () => context.push(Routes.myCoupons),
                   ),
                 ),
@@ -353,8 +355,11 @@ class _ReferralStrip extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final colors = context.customerColors;
     final info = ref.watch(currentReferralProvider).value;
-    final reward = info == null ? null : formatRupeesOrNull(info.rewardAmount);
-    final active = info != null && info.isEnabled && reward != null;
+    // "1 free carton" or "₹90" (ADR 0002): never a ₹ amount for a carton.
+    final active =
+        info != null &&
+        info.isEnabled &&
+        referralRewardLabel(l10n, info) != null;
     final green = Theme.of(context).colorScheme.primary;
     final ink = Theme.of(context).colorScheme.onPrimaryContainer;
     return Material(
@@ -384,7 +389,7 @@ class _ReferralStrip extends ConsumerWidget {
                     children: [
                       Text(
                         active
-                            ? l10n.referralHeadline(reward)
+                            ? referralHeadlineText(l10n, info)
                             : l10n.referralStripGeneric,
                         style: Theme.of(context).textTheme.titleSmall
                             ?.copyWith(color: ink, fontWeight: FontWeight.w700),

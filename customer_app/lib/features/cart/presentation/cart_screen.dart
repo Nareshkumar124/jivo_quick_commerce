@@ -18,6 +18,7 @@ import 'widgets/cart_line_tile.dart';
 import 'widgets/checkout_blocker.dart';
 import 'widgets/coupon_sheet.dart';
 import 'widgets/delivery_address_card.dart';
+import 'widgets/free_line_tile.dart';
 import 'widgets/instructions_selector.dart';
 import 'widgets/price_tier_nudge_card.dart';
 import 'widgets/tip_selector.dart';
@@ -86,7 +87,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     });
 
     final Widget body;
-    if (snapshot.isEmpty) {
+    // A reward's free carton alone (nothing paid yet) still shows the
+    // cart: the line, the minimum to reach and Remove on the reward.
+    if (!snapshot.hasContent) {
       body = switch (cart.load) {
         CartLoad.idle || CartLoad.loading => const _CartSkeleton(),
         CartLoad.failed => ErrorRetryView(
@@ -116,7 +119,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       child: Scaffold(
         appBar: AppBar(title: Text(l10n.cartTitle)),
         body: body,
-        bottomNavigationBar: snapshot.isEmpty || snapshot.bill == null
+        bottomNavigationBar: !snapshot.hasContent || snapshot.bill == null
             ? null
             : _CheckoutBar(
                 snapshot: snapshot,
@@ -147,6 +150,9 @@ class _CartContent extends StatelessWidget {
     // The next volume price tier ("Add 3 more boxes to get ₹87/box").
     final tierNudge = priceTierNudge(l10n, snapshot);
     final tierParts = priceTierNudgeParts(l10n, snapshot);
+    // "Buy 10 get 1 free" (ADR 0002): the server's nudge and stock notice.
+    final freeNudge = freeOfferNudge(l10n, snapshot);
+    final freeNotice = snapshot.freeOffer?.notice?.trim();
     final loadError = cart.loadError;
     const gap = SizedBox(height: JivoSpacing.lg);
 
@@ -191,6 +197,24 @@ class _CartContent extends StatelessWidget {
           ),
           gap,
         ],
+        if (freeNudge != null) ...[
+          _Notice(
+            key: const Key('free-offer-nudge'),
+            icon: Icons.card_giftcard_outlined,
+            text: freeNudge,
+            color: context.jivoColors.success,
+          ),
+          gap,
+        ],
+        if (freeNotice != null && freeNotice.isNotEmpty) ...[
+          _Notice(
+            key: const Key('free-offer-notice'),
+            icon: Icons.info_outline,
+            text: freeNotice,
+            color: context.jivoColors.warning,
+          ),
+          gap,
+        ],
         const DeliveryAddressCard(),
         gap,
         Card(
@@ -204,6 +228,9 @@ class _CartContent extends StatelessWidget {
               children: [
                 for (final line in snapshot.lines)
                   CartLineTile(key: ValueKey(line.id), line: line),
+                // Free cartons at ₹0, after the paid lines (ADR 0002).
+                for (final line in snapshot.freeLines)
+                  FreeLineTile(line: line, every: snapshot.freeOffer?.every),
               ],
             ),
           ),
@@ -278,6 +305,25 @@ class _CouponRow extends ConsumerWidget {
       );
     }
     final applies = applied.isApplicable;
+    // A free-carton reward gives a ₹0 line, not a discount (ADR 0002).
+    if (applied.isFreeCarton && applies) {
+      return Card(
+        key: const Key('applied-coupon'),
+        margin: EdgeInsets.zero,
+        child: ListTile(
+          minTileHeight: kJivoMinTouchTarget,
+          leading: Icon(Icons.card_giftcard, color: context.jivoColors.success),
+          title: Text(l10n.couponFreeCartonApplied),
+          subtitle: Text(l10n.couponFreeCartonInOrder),
+          onTap: () => showCouponSheet(context),
+          trailing: TextButton(
+            key: const Key('remove-coupon'),
+            onPressed: busy ? null : () => _remove(context, ref),
+            child: Text(l10n.removeAction),
+          ),
+        ),
+      );
+    }
     return Card(
       key: const Key('applied-coupon'),
       margin: EdgeInsets.zero,

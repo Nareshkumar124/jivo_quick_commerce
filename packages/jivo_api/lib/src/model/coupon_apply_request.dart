@@ -18,19 +18,27 @@ part 'coupon_apply_request.g.dart';
 )
 class CouponApplyRequest {
   /// Returns a new [CouponApplyRequest] instance.
-  CouponApplyRequest({required this.code});
+  CouponApplyRequest({required this.code, this.freeVariantId});
 
   /// Coupon code as typed; case-insensitive.
   @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
+  /// ADR 0002: required for a free-carton reward (`discount_type` FREE_UNIT): the size the customer picked (`VariantSummary.id`), which must be sold at the store in `X-Store-Id`. Ignored for other coupons.
+  // minimum: 1
+  @JsonKey(name: r'free_variant_id', required: false, includeIfNull: false)
+  final int? freeVariantId;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is CouponApplyRequest && other.code == code;
+      other is CouponApplyRequest &&
+          other.code == code &&
+          other.freeVariantId == freeVariantId;
 
   @override
-  int get hashCode => code.hashCode;
+  int get hashCode =>
+      code.hashCode + (freeVariantId == null ? 0 : freeVariantId.hashCode);
 
   factory CouponApplyRequest.fromJson(Map<String, dynamic> json) =>
       _$CouponApplyRequestFromJson(json);

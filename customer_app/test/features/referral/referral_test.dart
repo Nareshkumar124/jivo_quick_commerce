@@ -27,17 +27,23 @@ import '../../app/stale_user_state_test.dart' show containerOf;
 import '../checkout/checkout_flow_test.dart'
     show appWithCart, openCheckout, tallView;
 
-/// The server's `Referral` examples (`account_referral_retrieve`).
+/// The server's `Referral` examples (`account_referral_retrieve`). The
+/// reward type (ADR 0002) is a ₹ amount here unless [rewardType] says
+/// `FREE_UNIT`.
 Map<String, Object?> referralJson({
   bool canApplyCode = true,
   Map<String, Object?>? referredBy,
   int friendsJoined = 0,
   int friendsRewarded = 0,
+  String rewardType = 'FLAT',
 }) => {
   'code': 'K7M2PQ',
   'share_message':
       'Use my code K7M2PQ on the Jivo app and we both get ₹90 off.',
   'is_enabled': true,
+  'reward_type': rewardType,
+  'reward_quantity': 1,
+  'reward_label': rewardType == 'FREE_UNIT' ? '1 free carton' : '₹90 off',
   'reward_amount': '90.00',
   'reward_validity_days': 30,
   'reward_min_order_value': '0.00',
@@ -654,6 +660,7 @@ void main() {
       expect(http.requests.single.path, endsWith('/api/v1/account/referral/'));
       expect(info.code, 'K7M2PQ');
       expect(info.rewardAmount, '90.00');
+      expect(info.rewardType, ReferralRewardType.amount);
       expect(info.rewardValidityDays, 30);
       expect(info.canApplyCode, isFalse);
       expect(info.friendsJoined, 3);

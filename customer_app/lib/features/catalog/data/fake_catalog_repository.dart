@@ -272,6 +272,20 @@ class FakeCatalogRepository implements CatalogRepository {
   };
 }
 
+/// The fake catalog's variant [variantId] with its product name, or null.
+/// Lets the dev flavor's fake cart (`FAKE_API=true`) find a size picked
+/// for a free-carton reward that is not in the cart yet.
+({String productName, CatalogVariant variant})? fakeCatalogVariant(
+  int variantId,
+) {
+  for (final p in _products) {
+    for (final v in p.variants) {
+      if (v.id == variantId) return (productName: p.name, variant: _variant(v));
+    }
+  }
+  return null;
+}
+
 /// The server's view of a variant's stock: low at 3 or fewer units, and
 /// out of stock when fewer than its minimum per order can be sold.
 CatalogVariant _variant(_Variant v, {bool detail = false}) {

@@ -21,6 +21,7 @@ import 'package:jivo_api/src/model/me.dart';
 import 'package:jivo_api/src/model/patched_me_request.dart';
 import 'package:jivo_api/src/model/referral.dart';
 import 'package:jivo_api/src/model/referral_apply_request.dart';
+import 'package:jivo_api/src/model/rewards.dart';
 
 class AccountApi {
   final Dio _dio;
@@ -120,7 +121,7 @@ class AccountApi {
   }
 
   /// My referral code and status
-  /// The caller&#39;s own referral code (created on the first call, never changed), a ready-made share message, the reward terms (current admin settings), whether the caller joined with a friend&#39;s code, and how many friends joined with theirs.  When a referred customer&#39;s first order is delivered, **both** customers get a personal coupon (FLAT &#x60;reward_amount&#x60; off, valid &#x60;reward_validity_days&#x60; days, one use, only for them). It appears in &#x60;GET /cart/coupons/&#x60; with &#x60;is_personal: true&#x60;.
+  /// The caller&#39;s own referral code (created on the first call, never changed), a ready-made share message, the reward terms (current admin settings), whether the caller joined with a friend&#39;s code, and how many friends joined with theirs.  When a referred customer&#39;s first order is delivered, **both** customers get a free-carton reward (ADR 0002: &#x60;reward_type&#x60; FREE_UNIT, &#x60;reward_label&#x60; \&quot;1 free carton\&quot;, valid &#x60;reward_validity_days&#x60; days, one use, only for them). It appears in &#x60;GET /account/rewards/&#x60; and in &#x60;GET /cart/coupons/&#x60; (&#x60;discount_type&#x60; FREE_UNIT, &#x60;is_personal: true&#x60;). Rewards given before 2026-11-25 were ₹ coupons.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -183,6 +184,77 @@ class AccountApi {
     }
 
     return Response<Referral>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// My free-carton rewards
+  /// ADR 0002: the caller&#39;s free-carton rewards (welcome and referral) and their history. A reward is a personal coupon with &#x60;discount_type&#x60; FREE_UNIT: tap **Use**, let the customer pick a size, then &#x60;POST /cart/coupon/&#x60; with &#x60;code&#x60; and &#x60;free_variant_id&#x60;. One reward or one coupon per order; the order still needs the store&#39;s minimum paid cartons. USED and EXPIRED rewards are only in &#x60;history&#x60;.
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Rewards] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Rewards>> accountRewardsRetrieve({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/account/rewards/';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Rewards? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<Rewards, Rewards>(rawData, 'Rewards', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Rewards>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

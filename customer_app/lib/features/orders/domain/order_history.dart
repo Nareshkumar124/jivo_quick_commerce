@@ -274,6 +274,7 @@ class OrderDetail {
     this.amountRefunded,
     this.invoiceAvailable = false,
     this.cancellation,
+    this.freeLines = const [],
   });
 
   final int id;
@@ -282,7 +283,14 @@ class OrderDetail {
   final PaymentMethod? paymentMethod;
   final PaymentStatus paymentStatus;
   final String storeName;
+
+  /// The paid lines. Free cartons are in [freeLines], so counts, reorder
+  /// and the unsupplied-items notice only ever see paid lines.
   final List<OrderLineItem> lines;
+
+  /// The free cartons fixed when the order was placed (ADR 0002), each at
+  /// ₹0.
+  final List<FreeLine> freeLines;
   final int itemCount;
   final CartBill bill;
   final String? couponCode;

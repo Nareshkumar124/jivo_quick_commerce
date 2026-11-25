@@ -23,6 +23,7 @@ import 'package:customer_app/features/location/domain/delivery_location.dart';
 import 'package:customer_app/features/notifications/data/notification_repository.dart';
 import 'package:customer_app/features/profile/data/profile_repository.dart';
 import 'package:customer_app/features/referral/data/referral_repository.dart';
+import 'package:customer_app/features/rewards/data/rewards_repository.dart';
 import 'package:customer_app/features/tracking/data/order_socket.dart';
 import 'package:customer_app/features/tracking/presentation/order_live.dart';
 import 'package:customer_app/shared/connectivity/connectivity.dart';
@@ -80,6 +81,9 @@ class TestApp {
 
   /// Refer a friend: a new customer who can still enter a code.
   final referral = FakeReferralRepository();
+
+  /// Rewards (ADR 0002): none unless a test adds some.
+  final rewards = FakeRewardsRepository();
   final addresses = FakeAddressRepository();
   final location = FakeDeviceLocation();
   final catalog = FakeCatalogRepository(latency: Duration.zero);
@@ -145,6 +149,7 @@ class TestApp {
           authRepositoryProvider.overrideWithValue(auth),
           profileRepositoryProvider.overrideWithValue(profile),
           referralRepositoryProvider.overrideWithValue(referral),
+          rewardsRepositoryProvider.overrideWithValue(rewards),
           addressRepositoryProvider.overrideWithValue(addresses),
           deviceLocationProvider.overrideWithValue(location),
           otpAutofillProvider.overrideWithValue(autofill),

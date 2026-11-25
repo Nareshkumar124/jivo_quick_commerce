@@ -27,6 +27,8 @@ abstract class _$BillCWProxy {
 
   Bill totalSavings(String totalSavings);
 
+  Bill freeItemsValue(String freeItemsValue);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `Bill(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -44,6 +46,7 @@ abstract class _$BillCWProxy {
     String tip,
     String grandTotal,
     String totalSavings,
+    String freeItemsValue,
   });
 }
 
@@ -86,6 +89,10 @@ class _$BillCWProxyImpl implements _$BillCWProxy {
   Bill totalSavings(String totalSavings) => this(totalSavings: totalSavings);
 
   @override
+  Bill freeItemsValue(String freeItemsValue) =>
+      this(freeItemsValue: freeItemsValue);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `Bill(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -103,6 +110,7 @@ class _$BillCWProxyImpl implements _$BillCWProxy {
     Object? tip = const $CopyWithPlaceholder(),
     Object? grandTotal = const $CopyWithPlaceholder(),
     Object? totalSavings = const $CopyWithPlaceholder(),
+    Object? freeItemsValue = const $CopyWithPlaceholder(),
   }) {
     return Bill(
       mrpTotal: mrpTotal == const $CopyWithPlaceholder()
@@ -145,6 +153,10 @@ class _$BillCWProxyImpl implements _$BillCWProxy {
           ? _value.totalSavings
           // ignore: cast_nullable_to_non_nullable
           : totalSavings as String,
+      freeItemsValue: freeItemsValue == const $CopyWithPlaceholder()
+          ? _value.freeItemsValue
+          // ignore: cast_nullable_to_non_nullable
+          : freeItemsValue as String,
     );
   }
 }
@@ -176,6 +188,7 @@ Bill _$BillFromJson(Map<String, dynamic> json) => $checkedCreate(
         'tip',
         'grand_total',
         'total_savings',
+        'free_items_value',
       ],
     );
     final val = Bill(
@@ -189,6 +202,7 @@ Bill _$BillFromJson(Map<String, dynamic> json) => $checkedCreate(
       tip: $checkedConvert('tip', (v) => v as String),
       grandTotal: $checkedConvert('grand_total', (v) => v as String),
       totalSavings: $checkedConvert('total_savings', (v) => v as String),
+      freeItemsValue: $checkedConvert('free_items_value', (v) => v as String),
     );
     return val;
   },
@@ -202,6 +216,7 @@ Bill _$BillFromJson(Map<String, dynamic> json) => $checkedCreate(
     'handlingFee': 'handling_fee',
     'grandTotal': 'grand_total',
     'totalSavings': 'total_savings',
+    'freeItemsValue': 'free_items_value',
   },
 );
 
@@ -216,4 +231,5 @@ Map<String, dynamic> _$BillToJson(Bill instance) => <String, dynamic>{
   'tip': instance.tip,
   'grand_total': instance.grandTotal,
   'total_savings': instance.totalSavings,
+  'free_items_value': instance.freeItemsValue,
 };

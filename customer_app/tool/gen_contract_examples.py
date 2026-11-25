@@ -18,6 +18,8 @@ PREFIXES = (
     'cart_', 'orders_', 'payments_razorpay_verify',
     # P7 support and CMS (T-713).
     'support_tickets_', 'pages_retrieve', 'faqs_list',
+    # ADR 0002: Rewards and the referral reward type.
+    'account_rewards_', 'account_referral_retrieve',
 )
 # Generic guards (401/426/503) are covered elsewhere; orders_create keeps
 # them for its gateway-unavailable 503.

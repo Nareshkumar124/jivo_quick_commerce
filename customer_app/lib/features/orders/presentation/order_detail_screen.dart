@@ -15,6 +15,7 @@ import '../../../shared/widgets/state_views.dart';
 import '../../addresses/domain/saved_address.dart';
 import '../../cart/domain/cart.dart';
 import '../../cart/presentation/widgets/bill_details.dart';
+import '../../cart/presentation/widgets/free_line_tile.dart';
 import '../../rating/presentation/rate_order_screen.dart';
 import '../../rating/presentation/rating_controllers.dart';
 import '../../tracking/domain/order_track.dart';
@@ -217,6 +218,8 @@ class _OrderBody extends ConsumerWidget {
         // Items.
         section(l10n.orderItemsTitle, [
           for (final line in order.lines) _OrderLineRow(line: line),
+          // Free cartons at ₹0, fixed when the order was placed (ADR 0002).
+          for (final line in order.freeLines) FreeLineRow(line: line),
           Text(
             l10n.orderItemCount(order.itemCount),
             style: theme.textTheme.bodySmall,

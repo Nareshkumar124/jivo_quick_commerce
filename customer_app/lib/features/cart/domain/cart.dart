@@ -27,10 +27,13 @@ class CartSnapshot {
     this.paymentOptions = const [],
     this.checkout = CheckoutStatus.unknown,
     this.storeOpen = true,
+    this.freeLines = const [],
+    this.freeOffer,
   });
 
   /// A snapshot built from the server's lines: [quantities] is read from
-  /// them (unit counts, not money).
+  /// the paid lines only (unit counts, not money). Free lines never reach
+  /// the steppers.
   factory CartSnapshot.fromLines({
     required List<CartLine> lines,
     required int itemCount,
@@ -43,6 +46,8 @@ class CartSnapshot {
     List<PaymentOption> paymentOptions = const [],
     CheckoutStatus checkout = CheckoutStatus.unknown,
     bool storeOpen = true,
+    List<FreeLine> freeLines = const [],
+    FreeOffer? freeOffer,
   }) => CartSnapshot(
     quantities: Map.unmodifiable({
       for (final line in lines) line.variantId: line.quantity,
@@ -59,6 +64,8 @@ class CartSnapshot {
     paymentOptions: List.unmodifiable(paymentOptions),
     checkout: checkout,
     storeOpen: storeOpen,
+    freeLines: List.unmodifiable(freeLines),
+    freeOffer: freeOffer,
   );
 
   static const empty = CartSnapshot();
@@ -102,7 +109,22 @@ class CartSnapshot {
   /// `Cart.store.is_open`.
   final bool storeOpen;
 
+  /// The free cartons on this cart (`free_lines`, ADR 0002): the volume
+  /// offer's and a reward's, each at ₹0. The server picks them; the app
+  /// only shows them, and they never count as paid units.
+  final List<FreeLine> freeLines;
+
+  /// The store's "buy N get 1 free" offer and how far the cart is from the
+  /// next free carton (`free_offer`); null when the store has no offer.
+  final FreeOffer? freeOffer;
+
+  /// No paid units (`item_count` is 0). A cart can still hold a reward's
+  /// free line then: see [hasContent].
   bool get isEmpty => itemCount == 0;
+
+  /// Something to show on the cart screen: paid units, or a free line
+  /// (e.g. a reward used before adding anything).
+  bool get hasContent => !isEmpty || freeLines.isNotEmpty;
 
   int quantityOf(int variantId) => quantities[variantId] ?? 0;
 
@@ -147,7 +169,105 @@ class CartSnapshot {
     paymentOptions: paymentOptions,
     checkout: checkout,
     storeOpen: storeOpen,
+    freeLines: freeLines,
+    freeOffer: freeOffer,
   );
+}
+
+/// Why a carton is free (`free_lines[].source`, `OrderItem.free_source`).
+enum FreeLineSource {
+  /// "Buy 10 get 1 free": added by the server for every N paid cartons.
+  volumeOffer('VOLUME_OFFER'),
+
+  /// A free-carton reward the customer used (welcome or referral).
+  reward('REWARD'),
+
+  /// A source this build doesn't know (a newer server).
+  unknown(null);
+
+  const FreeLineSource(this.wireValue);
+
+  final String? wireValue;
+
+  static FreeLineSource fromWire(String? value) => values.firstWhere(
+    (source) => source.wireValue != null && source.wireValue == value,
+    orElse: () => unknown,
+  );
+}
+
+/// A free carton line (ADR 0002): in the cart (`free_lines`) and on an
+/// order (its `is_free` items). Always ₹0; [mrp] and [value] are the
+/// server's strings for the struck-out price, never added up here.
+@immutable
+class FreeLine {
+  const FreeLine({
+    required this.variantId,
+    required this.productName,
+    required this.variantName,
+    required this.quantity,
+    required this.mrp,
+    required this.value,
+    required this.source,
+    this.productId,
+    this.productSlug,
+    this.imageUrl,
+    this.quantityUnavailable = 0,
+  });
+
+  final int variantId;
+  final int? productId;
+  final String? productSlug;
+  final String productName;
+
+  /// e.g. "1 L × 12".
+  final String variantName;
+  final String? imageUrl;
+  final int quantity;
+
+  /// The MRP of one carton.
+  final String mrp;
+
+  /// The server's MRP × [quantity] (what the customer gets for free).
+  final String value;
+  final FreeLineSource source;
+
+  /// Orders only: free cartons the store couldn't supply (dropped at ₹0,
+  /// nothing to refund, ADR 0002 rule 6).
+  final int quantityUnavailable;
+}
+
+/// The store's volume offer on this cart (`free_offer`, ADR 0002): 1 free
+/// carton for every [every] paid cartons. Every number and text is the
+/// server's.
+@immutable
+class FreeOffer {
+  const FreeOffer({
+    required this.every,
+    required this.paidUnits,
+    required this.freeUnits,
+    this.unitsToNextFree,
+    this.message = '',
+    this.notice,
+  });
+
+  /// Paid cartons per free carton (e.g. 10).
+  final int every;
+
+  /// Paid cartons counted for the offer (free ones never count).
+  final int paidUnits;
+
+  /// Free cartons this cart gets now.
+  final int freeUnits;
+
+  /// Paid cartons still to add for the next free one; null when unknown.
+  final int? unitsToNextFree;
+
+  /// The server's nudge, e.g. "Add 8 more cartons to get 1 more free".
+  final String message;
+
+  /// Set when an earned free carton can't be supplied (no stock): shown as
+  /// a notice, never a blocker.
+  final String? notice;
 }
 
 /// `CartLineIssueCodeEnum`.
@@ -273,6 +393,7 @@ class CartBill {
     required this.tip,
     required this.grandTotal,
     required this.totalSavings,
+    this.freeItemsValue = '0.00',
   });
 
   final String mrpTotal;
@@ -289,8 +410,13 @@ class CartBill {
   /// **To pay.**
   final String grandTotal;
 
-  /// "You save ₹X": the server's product + coupon discount.
+  /// "You save ₹X": the server's product + coupon discount, plus the free
+  /// cartons' value (ADR 0002).
   final String totalSavings;
+
+  /// The MRP value of the free cartons (`free_items_value`, ADR 0002).
+  /// Not part of the item total or the amount to pay; `"0.00"` when none.
+  final String freeItemsValue;
 }
 
 /// The store's thresholds and how far the cart is from them
@@ -424,6 +550,57 @@ class CheckoutStatus {
   final List<CheckoutBlocker> blockers;
 }
 
+/// What a coupon gives (`DiscountTypeEnum`).
+enum CouponDiscountType {
+  flat('FLAT'),
+  percent('PERCENT'),
+
+  /// One free carton (ADR 0002): a reward, applied with a chosen size
+  /// (`free_variant_id`).
+  freeUnit('FREE_UNIT'),
+
+  /// A type this build doesn't know (a newer server).
+  unknown(null);
+
+  const CouponDiscountType(this.wireValue);
+
+  final String? wireValue;
+
+  static CouponDiscountType fromWire(String? value) => values.firstWhere(
+    (type) => type.wireValue != null && type.wireValue == value,
+    orElse: () => unknown,
+  );
+}
+
+/// Why a personal coupon (a reward) was given (`Coupon.source`, ADR 0002).
+enum RewardSource {
+  /// The one-time gift on the first login of a new account.
+  welcome('WELCOME'),
+
+  /// The customer referred a friend whose first order was delivered.
+  referralReferrer('REFERRAL_REFERRER'),
+
+  /// The customer joined with a friend's code.
+  referralReferred('REFERRAL_REFERRED'),
+
+  /// Not a reward (an ordinary coupon).
+  none('NONE'),
+
+  /// A source this build doesn't know.
+  unknown(null);
+
+  const RewardSource(this.wireValue);
+
+  final String? wireValue;
+
+  static RewardSource fromWire(String? value) => values.firstWhere(
+    (source) => source.wireValue != null && source.wireValue == value,
+    orElse: () => unknown,
+  );
+
+  bool get isReferral => this == referralReferrer || this == referralReferred;
+}
+
 /// The coupon on the cart (`AppliedCoupon`).
 @immutable
 class AppliedCoupon {
@@ -433,6 +610,9 @@ class AppliedCoupon {
     required this.discount,
     this.isApplicable = true,
     this.message,
+    this.discountType = CouponDiscountType.unknown,
+    this.source = RewardSource.none,
+    this.freeVariantId,
   });
 
   final String code;
@@ -448,6 +628,15 @@ class AppliedCoupon {
 
   /// The server's reason when it doesn't apply.
   final String? message;
+
+  final CouponDiscountType discountType;
+  final RewardSource source;
+
+  /// The size chosen for a free-carton reward (`free_variant_id`).
+  final int? freeVariantId;
+
+  /// A free-carton reward: it adds a free line instead of a ₹ discount.
+  bool get isFreeCarton => discountType == CouponDiscountType.freeUnit;
 }
 
 /// `CouponIneligibleReasonEnum`.
@@ -476,6 +665,9 @@ class CouponOffer {
     this.endsAt,
     this.isPersonal = false,
     this.minOrderValue,
+    this.discountType = CouponDiscountType.unknown,
+    this.source = RewardSource.none,
+    this.freeVariantId,
   });
 
   final String code;
@@ -506,6 +698,17 @@ class CouponOffer {
 
   /// The coupon's minimum order value (server amount), if any.
   final String? minOrderValue;
+
+  final CouponDiscountType discountType;
+
+  /// Why it was given, for a reward (`source`).
+  final RewardSource source;
+
+  /// The size already chosen, when this free-carton reward is on the cart.
+  final int? freeVariantId;
+
+  /// A free-carton reward: applying it needs a size (`free_variant_id`).
+  bool get isFreeCarton => discountType == CouponDiscountType.freeUnit;
 }
 
 /// The delivery-instruction chips (`DeliveryInstructionChipEnum`).

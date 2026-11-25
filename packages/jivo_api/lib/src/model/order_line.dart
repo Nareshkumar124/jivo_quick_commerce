@@ -4,6 +4,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:jivo_api/src/model/free_source_enum.dart';
 import 'package:jivo_api/src/model/image_set.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -43,6 +44,10 @@ class OrderLine {
     required this.lineMrpTotal,
 
     required this.lineTotal,
+
+    required this.isFree,
+
+    required this.freeSource,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -90,6 +95,19 @@ class OrderLine {
   @JsonKey(name: r'line_total', required: true, includeIfNull: false)
   final String lineTotal;
 
+  /// ADR 0002: a free carton (`selling_price` and `line_total` \"0.00\"): show it as \"FREE\". Not part of `bill.item_total`; its value is in `bill.free_items_value`. A free line the store could not supply is dropped (`quantity_unavailable`), with nothing to refund.
+  @JsonKey(name: r'is_free', required: true, includeIfNull: false)
+  final bool isFree;
+
+  /// Why it is free: VOLUME_OFFER or REWARD. Null for a paid line.  * `VOLUME_OFFER` - Volume offer * `REWARD` - Reward
+  @JsonKey(
+    name: r'free_source',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: FreeSourceEnum.unknownDefaultOpenApi,
+  )
+  final FreeSourceEnum? freeSource;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -105,7 +123,9 @@ class OrderLine {
           other.quantity == quantity &&
           other.quantityUnavailable == quantityUnavailable &&
           other.lineMrpTotal == lineMrpTotal &&
-          other.lineTotal == lineTotal;
+          other.lineTotal == lineTotal &&
+          other.isFree == isFree &&
+          other.freeSource == freeSource;
 
   @override
   int get hashCode =>
@@ -120,7 +140,9 @@ class OrderLine {
       quantity.hashCode +
       quantityUnavailable.hashCode +
       lineMrpTotal.hashCode +
-      lineTotal.hashCode;
+      lineTotal.hashCode +
+      isFree.hashCode +
+      (freeSource == null ? 0 : freeSource.hashCode);
 
   factory OrderLine.fromJson(Map<String, dynamic> json) =>
       _$OrderLineFromJson(json);

@@ -1318,7 +1318,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get priceTierAddMore => 'Add more';
 
   @override
-  String get myCoupons => 'My coupons';
+  String get rewardsTitle => 'Rewards';
 
   @override
   String get couponForYou => 'For you';
@@ -1346,7 +1346,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get couponsChooseLocation => 'Choose location';
 
   @override
-  String get myCouponsEmpty => 'No coupons right now';
+  String get rewardsEmpty => 'No rewards or coupons right now';
 
   @override
   String priceTierNudgeLine(
@@ -2648,5 +2648,251 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String trackingRiderWithVehicle(String vehicle) {
     return 'Your delivery partner · $vehicle';
+  }
+
+  @override
+  String get rewardsTabAvailable => 'Available';
+
+  @override
+  String get rewardsTabHistory => 'History';
+
+  @override
+  String get rewardsSectionFreeCartons => 'Free cartons';
+
+  @override
+  String get rewardsSectionCoupons => 'Coupons';
+
+  @override
+  String get rewardsHistoryEmpty => 'No rewards history yet';
+
+  @override
+  String freeCartonCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count free cartons',
+      one: '1 free carton',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get rewardSourceWelcome => 'Welcome gift';
+
+  @override
+  String get rewardSourceReferral => 'Referral reward';
+
+  @override
+  String get rewardStatusAvailable => 'Available';
+
+  @override
+  String get rewardStatusClaimed => 'Claimed';
+
+  @override
+  String rewardOnOrder(String number) {
+    return 'On your order $number';
+  }
+
+  @override
+  String get rewardUse => 'Use';
+
+  @override
+  String get rewardUseSemantics => 'Use your free carton';
+
+  @override
+  String get rewardInCart => 'In your cart';
+
+  @override
+  String get rewardViewCart => 'View cart';
+
+  @override
+  String get rewardHistoryEarned => 'Earned';
+
+  @override
+  String get rewardHistoryClaimed => 'Claimed';
+
+  @override
+  String get rewardHistoryUsed => 'Used';
+
+  @override
+  String get rewardHistoryExpired => 'Expired';
+
+  @override
+  String get rewardHistoryVolumeFree => 'Volume offer';
+
+  @override
+  String rewardHistoryOrder(String number) {
+    return 'Order $number';
+  }
+
+  @override
+  String get freeSizeTitle => 'Pick a size for your free carton';
+
+  @override
+  String freeSizeMinNote(int minimum, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minimum,
+      locale: localeName,
+      other: 'Your order still needs at least $minimum paid $label.',
+      one: 'Your order still needs at least 1 paid carton.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String freeSizeWorth(String amount) {
+    return 'Worth $amount';
+  }
+
+  @override
+  String get freeSizeConfirm => 'Add free carton';
+
+  @override
+  String get freeSizeEmpty => 'No sizes are available at this store right now.';
+
+  @override
+  String get freeSizeNeedsLocation =>
+      'Choose your delivery location to pick a size';
+
+  @override
+  String freeSizeReplacesCoupon(String code) {
+    return 'This replaces coupon $code on your cart.';
+  }
+
+  @override
+  String rewardNeedsUnits(int count, int minimum, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Add $count more $label to use this reward (minimum $minimum paid $label)',
+      one: 'Add 1 more to use this reward (minimum $minimum paid $label)',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get rewardSizeUnavailable =>
+      'This size is not available for your free carton here. Choose another size.';
+
+  @override
+  String get rewardAddCartons => 'Add cartons';
+
+  @override
+  String get freeCartonAdded => 'Free carton added to your cart';
+
+  @override
+  String get freeTag => 'FREE';
+
+  @override
+  String freeSourceVolume(int every) {
+    return 'Buy $every get 1 free';
+  }
+
+  @override
+  String get freeSourceVolumeGeneric => 'Free with your order';
+
+  @override
+  String get freeSourceReward => 'Reward';
+
+  @override
+  String freeLineQuantity(int count) {
+    return 'Qty $count';
+  }
+
+  @override
+  String freeLineSemantics(
+    String name,
+    String variant,
+    int count,
+    String amount,
+  ) {
+    return '$name $variant, $count free, worth $amount';
+  }
+
+  @override
+  String freeLineUnavailable(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count free cartons could not be supplied',
+      one: '1 free carton could not be supplied',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String freeOfferNudge(int count, String label) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count more $label to get 1 more free',
+      one: 'Add 1 more to get 1 more free',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get billFreeCartons => 'Free cartons';
+
+  @override
+  String billFreeCartonsSemantics(String amount) {
+    return 'Free cartons worth $amount, free';
+  }
+
+  @override
+  String get couponFreeCartonApplied => 'Free carton reward applied';
+
+  @override
+  String get couponFreeCartonInOrder =>
+      'Your free carton is in the items above';
+
+  @override
+  String get couponFreeCartonOffer =>
+      'Get 1 free carton. Pick a size when you apply it.';
+
+  @override
+  String get checkoutFreeCartonsTitle => 'Free cartons';
+
+  @override
+  String referAndEarnReward(String reward) {
+    return 'Refer & earn $reward';
+  }
+
+  @override
+  String referralHeadlineReward(String reward) {
+    return 'Invite a friend. You and your friend each get $reward';
+  }
+
+  @override
+  String referralStep3Reward(String reward, int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other:
+          'When their first order is delivered, you and your friend each get $reward. Use it within $days days.',
+      one:
+          'When their first order is delivered, you and your friend each get $reward. Use it within 1 day.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String referralAppliedReward(String reward) {
+    return 'Code applied. You and your friend will each get $reward after your first delivery.';
+  }
+
+  @override
+  String referralStatusPendingReward(String reward) {
+    return 'You and your friend will each get $reward after your first delivery.';
+  }
+
+  @override
+  String get referralStatusRewardedReward =>
+      'Your free carton is in Rewards. Tap Use there to add it to your cart.';
+
+  @override
+  String referralPromptBodyReward(String reward) {
+    return 'Enter it before you place this order. You and your friend each get $reward after it is delivered.';
   }
 }

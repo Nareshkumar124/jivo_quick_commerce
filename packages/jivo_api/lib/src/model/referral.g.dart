@@ -13,6 +13,12 @@ abstract class _$ReferralCWProxy {
 
   Referral isEnabled(bool isEnabled);
 
+  Referral rewardType(CouponDiscountTypeEnum rewardType);
+
+  Referral rewardQuantity(int rewardQuantity);
+
+  Referral rewardLabel(String rewardLabel);
+
   Referral rewardAmount(String rewardAmount);
 
   Referral rewardValidityDays(int rewardValidityDays);
@@ -37,6 +43,9 @@ abstract class _$ReferralCWProxy {
     String code,
     String shareMessage,
     bool isEnabled,
+    CouponDiscountTypeEnum rewardType,
+    int rewardQuantity,
+    String rewardLabel,
     String rewardAmount,
     int rewardValidityDays,
     String rewardMinOrderValue,
@@ -62,6 +71,17 @@ class _$ReferralCWProxyImpl implements _$ReferralCWProxy {
 
   @override
   Referral isEnabled(bool isEnabled) => this(isEnabled: isEnabled);
+
+  @override
+  Referral rewardType(CouponDiscountTypeEnum rewardType) =>
+      this(rewardType: rewardType);
+
+  @override
+  Referral rewardQuantity(int rewardQuantity) =>
+      this(rewardQuantity: rewardQuantity);
+
+  @override
+  Referral rewardLabel(String rewardLabel) => this(rewardLabel: rewardLabel);
 
   @override
   Referral rewardAmount(String rewardAmount) =>
@@ -100,6 +120,9 @@ class _$ReferralCWProxyImpl implements _$ReferralCWProxy {
     Object? code = const $CopyWithPlaceholder(),
     Object? shareMessage = const $CopyWithPlaceholder(),
     Object? isEnabled = const $CopyWithPlaceholder(),
+    Object? rewardType = const $CopyWithPlaceholder(),
+    Object? rewardQuantity = const $CopyWithPlaceholder(),
+    Object? rewardLabel = const $CopyWithPlaceholder(),
     Object? rewardAmount = const $CopyWithPlaceholder(),
     Object? rewardValidityDays = const $CopyWithPlaceholder(),
     Object? rewardMinOrderValue = const $CopyWithPlaceholder(),
@@ -121,6 +144,18 @@ class _$ReferralCWProxyImpl implements _$ReferralCWProxy {
           ? _value.isEnabled
           // ignore: cast_nullable_to_non_nullable
           : isEnabled as bool,
+      rewardType: rewardType == const $CopyWithPlaceholder()
+          ? _value.rewardType
+          // ignore: cast_nullable_to_non_nullable
+          : rewardType as CouponDiscountTypeEnum,
+      rewardQuantity: rewardQuantity == const $CopyWithPlaceholder()
+          ? _value.rewardQuantity
+          // ignore: cast_nullable_to_non_nullable
+          : rewardQuantity as int,
+      rewardLabel: rewardLabel == const $CopyWithPlaceholder()
+          ? _value.rewardLabel
+          // ignore: cast_nullable_to_non_nullable
+          : rewardLabel as String,
       rewardAmount: rewardAmount == const $CopyWithPlaceholder()
           ? _value.rewardAmount
           // ignore: cast_nullable_to_non_nullable
@@ -173,6 +208,9 @@ Referral _$ReferralFromJson(Map<String, dynamic> json) => $checkedCreate(
         'code',
         'share_message',
         'is_enabled',
+        'reward_type',
+        'reward_quantity',
+        'reward_label',
         'reward_amount',
         'reward_validity_days',
         'reward_min_order_value',
@@ -186,6 +224,19 @@ Referral _$ReferralFromJson(Map<String, dynamic> json) => $checkedCreate(
       code: $checkedConvert('code', (v) => v as String),
       shareMessage: $checkedConvert('share_message', (v) => v as String),
       isEnabled: $checkedConvert('is_enabled', (v) => v as bool),
+      rewardType: $checkedConvert(
+        'reward_type',
+        (v) => $enumDecode(
+          _$CouponDiscountTypeEnumEnumMap,
+          v,
+          unknownValue: CouponDiscountTypeEnum.unknownDefaultOpenApi,
+        ),
+      ),
+      rewardQuantity: $checkedConvert(
+        'reward_quantity',
+        (v) => (v as num).toInt(),
+      ),
+      rewardLabel: $checkedConvert('reward_label', (v) => v as String),
       rewardAmount: $checkedConvert('reward_amount', (v) => v as String),
       rewardValidityDays: $checkedConvert(
         'reward_validity_days',
@@ -215,6 +266,9 @@ Referral _$ReferralFromJson(Map<String, dynamic> json) => $checkedCreate(
   fieldKeyMap: const {
     'shareMessage': 'share_message',
     'isEnabled': 'is_enabled',
+    'rewardType': 'reward_type',
+    'rewardQuantity': 'reward_quantity',
+    'rewardLabel': 'reward_label',
     'rewardAmount': 'reward_amount',
     'rewardValidityDays': 'reward_validity_days',
     'rewardMinOrderValue': 'reward_min_order_value',
@@ -229,6 +283,9 @@ Map<String, dynamic> _$ReferralToJson(Referral instance) => <String, dynamic>{
   'code': instance.code,
   'share_message': instance.shareMessage,
   'is_enabled': instance.isEnabled,
+  'reward_type': _$CouponDiscountTypeEnumEnumMap[instance.rewardType]!,
+  'reward_quantity': instance.rewardQuantity,
+  'reward_label': instance.rewardLabel,
   'reward_amount': instance.rewardAmount,
   'reward_validity_days': instance.rewardValidityDays,
   'reward_min_order_value': instance.rewardMinOrderValue,
@@ -236,4 +293,11 @@ Map<String, dynamic> _$ReferralToJson(Referral instance) => <String, dynamic>{
   'referred_by': instance.referredBy?.toJson(),
   'friends_joined': instance.friendsJoined,
   'friends_rewarded': instance.friendsRewarded,
+};
+
+const _$CouponDiscountTypeEnumEnumMap = {
+  CouponDiscountTypeEnum.FLAT: 'FLAT',
+  CouponDiscountTypeEnum.PERCENT: 'PERCENT',
+  CouponDiscountTypeEnum.FREE_UNIT: 'FREE_UNIT',
+  CouponDiscountTypeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

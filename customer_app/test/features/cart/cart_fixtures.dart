@@ -138,8 +138,29 @@ class StubCartRepository implements CartRepository {
     return couponList;
   }
 
+  /// When set, [applyCoupon] throws it (once).
+  Object? applyError;
+
+  /// When set, [applyCoupon] answers with it from then on (e.g. the cart
+  /// with the reward's free line).
+  CartSnapshot? afterApply;
+
   @override
-  Future<CartSnapshot> applyCoupon(String code) => _answer('coupon:$code');
+  Future<CartSnapshot> applyCoupon(String code, {int? freeVariantId}) async {
+    final error = applyError;
+    if (error != null) {
+      calls.add(
+        freeVariantId == null ? 'coupon:$code' : 'coupon:$code:$freeVariantId',
+      );
+      applyError = null;
+      throw error;
+    }
+    final next = afterApply;
+    if (next != null) snapshot = next;
+    return _answer(
+      freeVariantId == null ? 'coupon:$code' : 'coupon:$code:$freeVariantId',
+    );
+  }
 
   @override
   Future<CartSnapshot> removeCoupon() => _answer('coupon:remove');

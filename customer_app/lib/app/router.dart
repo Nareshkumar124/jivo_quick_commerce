@@ -14,7 +14,6 @@ import '../features/catalog/presentation/collection_screen.dart';
 import '../features/catalog/presentation/product_detail_screen.dart';
 import '../features/catalog/presentation/product_list_screen.dart';
 import '../features/cart/presentation/cart_screen.dart';
-import '../features/cart/presentation/my_coupons_screen.dart';
 import '../features/checkout/presentation/checkout_screen.dart';
 import '../features/checkout/presentation/order_success_screen.dart';
 import '../features/checkout/presentation/payment_failed_screen.dart';
@@ -36,6 +35,7 @@ import '../features/orders/presentation/orders_screen.dart';
 import '../features/profile/presentation/account_screens.dart';
 import '../features/rating/presentation/rate_order_screen.dart';
 import '../features/referral/presentation/referral_screen.dart';
+import '../features/rewards/presentation/rewards_screen.dart';
 import '../features/catalog/presentation/all_products_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/support/presentation/help_screen.dart';
@@ -282,7 +282,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         (_) => const DeleteAccountScreen(),
       ),
       route(Routes.referral, 'referral', (_) => const ReferralScreen()),
-      route(Routes.myCoupons, 'my_coupons', (_) => const MyCouponsScreen()),
+      // Rewards (was My coupons, ADR 0002): same path and name.
+      route(Routes.myCoupons, 'my_coupons', (_) => const RewardsScreen()),
     ],
   );
   ref.onDispose(router.dispose);

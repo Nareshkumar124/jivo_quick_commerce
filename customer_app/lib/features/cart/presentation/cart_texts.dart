@@ -104,14 +104,20 @@ String? minUnitsWarning(AppLocalizations l10n, CartThresholds? thresholds) {
 /// The volume-price nudge: "Add 3 more boxes to get ₹87/box on 1 L" when
 /// one line gets cheaper at the server's `next_price_tier`, or "Add 3 more
 /// boxes for lower prices" when several do. Null when there is no next tier,
-/// or while the cart is short of `min_order_units` (that warning comes
-/// first). The count, prices and label are the server's.
+/// when no line has volume prices (`price_tiers`; the slab data is being
+/// removed, ADR 0002), or while the cart is short of `min_order_units`
+/// (that warning comes first). The count, prices and label are the
+/// server's.
 String? priceTierNudge(AppLocalizations l10n, CartSnapshot cart) {
   final thresholds = cart.thresholds;
   final next = thresholds?.nextPriceTier;
   if (thresholds == null || next == null || next.unitsToNextTier <= 0) {
     return null;
   }
+  final tiered = cart.lines.any(
+    (line) => line.variant.hasPriceTiers || line.priceTier != null,
+  );
+  if (!tiered) return null;
   final short = thresholds.unitsToMinOrder;
   if (short != null && short > 0) return null;
   final count = next.unitsToNextTier;
@@ -153,6 +159,34 @@ String? priceTierNudge(AppLocalizations l10n, CartSnapshot cart) {
         : l10n.priceTierDetailMany,
   );
 }
+
+/// The free-carton nudge (ADR 0002): the server's `free_offer.message`
+/// ("Add 8 more cartons to get 1 more free"), or the same sentence from its
+/// `units_to_next_free` when it sends no text. Null without an offer or a
+/// number.
+String? freeOfferNudge(AppLocalizations l10n, CartSnapshot cart) {
+  final offer = cart.freeOffer;
+  if (offer == null) return null;
+  final message = offer.message.trim();
+  if (message.isNotEmpty) return message;
+  final toNext = offer.unitsToNextFree;
+  if (toNext == null || toNext <= 0) return null;
+  return l10n.freeOfferNudge(toNext, orderUnitLabel(l10n, cart.thresholds));
+}
+
+/// Why a carton is free: "Buy 10 get 1 free" (the server's
+/// `free_offer.every` when known) or "Reward".
+String freeLineSourceText(
+  AppLocalizations l10n,
+  FreeLineSource source, {
+  int? every,
+}) => switch (source) {
+  FreeLineSource.volumeOffer when every != null && every > 0 =>
+    l10n.freeSourceVolume(every),
+  FreeLineSource.reward => l10n.freeSourceReward,
+  FreeLineSource.volumeOffer ||
+  FreeLineSource.unknown => l10n.freeSourceVolumeGeneric,
+};
 
 /// Why a listed coupon can't be applied.
 String couponIneligibleText(AppLocalizations l10n, CouponOffer offer) =>
@@ -232,6 +266,22 @@ String cartErrorText(
       if (reason == 'FIRST_ORDER_ONLY') return l10n.couponFirstOrderOnly;
       if (reason == 'NO_ELIGIBLE_ITEMS') return l10n.couponNoEligibleItems;
       if (reason == 'STORE') return l10n.couponWrongStore;
+      // ADR 0002: a free-carton reward needs the store's minimum of paid
+      // cartons, and a size the store sells.
+      final unitsToUnlock = details['units_to_unlock'];
+      final minimum = details['min_order_units'];
+      if (reason == 'MIN_ORDER_UNITS' &&
+          unitsToUnlock is num &&
+          minimum is num) {
+        return l10n.rewardNeedsUnits(
+          unitsToUnlock.toInt(),
+          minimum.toInt(),
+          orderUnitLabel(l10n, cart?.thresholds),
+        );
+      }
+      if (reason == 'FREE_VARIANT_UNAVAILABLE') {
+        return l10n.rewardSizeUnavailable;
+      }
     default:
       break;
   }

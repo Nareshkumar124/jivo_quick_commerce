@@ -31,6 +31,10 @@ abstract class _$OrderLineCWProxy {
 
   OrderLine lineTotal(String lineTotal);
 
+  OrderLine isFree(bool isFree);
+
+  OrderLine freeSource(FreeSourceEnum? freeSource);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `OrderLine(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -50,6 +54,8 @@ abstract class _$OrderLineCWProxy {
     int quantityUnavailable,
     String lineMrpTotal,
     String lineTotal,
+    bool isFree,
+    FreeSourceEnum? freeSource,
   });
 }
 
@@ -99,6 +105,13 @@ class _$OrderLineCWProxyImpl implements _$OrderLineCWProxy {
   OrderLine lineTotal(String lineTotal) => this(lineTotal: lineTotal);
 
   @override
+  OrderLine isFree(bool isFree) => this(isFree: isFree);
+
+  @override
+  OrderLine freeSource(FreeSourceEnum? freeSource) =>
+      this(freeSource: freeSource);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `OrderLine(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -118,6 +131,8 @@ class _$OrderLineCWProxyImpl implements _$OrderLineCWProxy {
     Object? quantityUnavailable = const $CopyWithPlaceholder(),
     Object? lineMrpTotal = const $CopyWithPlaceholder(),
     Object? lineTotal = const $CopyWithPlaceholder(),
+    Object? isFree = const $CopyWithPlaceholder(),
+    Object? freeSource = const $CopyWithPlaceholder(),
   }) {
     return OrderLine(
       id: id == const $CopyWithPlaceholder()
@@ -168,6 +183,14 @@ class _$OrderLineCWProxyImpl implements _$OrderLineCWProxy {
           ? _value.lineTotal
           // ignore: cast_nullable_to_non_nullable
           : lineTotal as String,
+      isFree: isFree == const $CopyWithPlaceholder()
+          ? _value.isFree
+          // ignore: cast_nullable_to_non_nullable
+          : isFree as bool,
+      freeSource: freeSource == const $CopyWithPlaceholder()
+          ? _value.freeSource
+          // ignore: cast_nullable_to_non_nullable
+          : freeSource as FreeSourceEnum?,
     );
   }
 }
@@ -201,6 +224,8 @@ OrderLine _$OrderLineFromJson(Map<String, dynamic> json) => $checkedCreate(
         'quantity_unavailable',
         'line_mrp_total',
         'line_total',
+        'is_free',
+        'free_source',
       ],
     );
     final val = OrderLine(
@@ -222,6 +247,15 @@ OrderLine _$OrderLineFromJson(Map<String, dynamic> json) => $checkedCreate(
       ),
       lineMrpTotal: $checkedConvert('line_mrp_total', (v) => v as String),
       lineTotal: $checkedConvert('line_total', (v) => v as String),
+      isFree: $checkedConvert('is_free', (v) => v as bool),
+      freeSource: $checkedConvert(
+        'free_source',
+        (v) => $enumDecodeNullable(
+          _$FreeSourceEnumEnumMap,
+          v,
+          unknownValue: FreeSourceEnum.unknownDefaultOpenApi,
+        ),
+      ),
     );
     return val;
   },
@@ -234,6 +268,8 @@ OrderLine _$OrderLineFromJson(Map<String, dynamic> json) => $checkedCreate(
     'quantityUnavailable': 'quantity_unavailable',
     'lineMrpTotal': 'line_mrp_total',
     'lineTotal': 'line_total',
+    'isFree': 'is_free',
+    'freeSource': 'free_source',
   },
 );
 
@@ -250,4 +286,12 @@ Map<String, dynamic> _$OrderLineToJson(OrderLine instance) => <String, dynamic>{
   'quantity_unavailable': instance.quantityUnavailable,
   'line_mrp_total': instance.lineMrpTotal,
   'line_total': instance.lineTotal,
+  'is_free': instance.isFree,
+  'free_source': _$FreeSourceEnumEnumMap[instance.freeSource],
+};
+
+const _$FreeSourceEnumEnumMap = {
+  FreeSourceEnum.VOLUME_OFFER: 'VOLUME_OFFER',
+  FreeSourceEnum.REWARD: 'REWARD',
+  FreeSourceEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

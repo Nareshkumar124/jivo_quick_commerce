@@ -11,6 +11,12 @@ abstract class _$AppliedCouponCWProxy {
 
   AppliedCoupon title(String title);
 
+  AppliedCoupon discountType(CouponDiscountTypeEnum discountType);
+
+  AppliedCoupon source_(CouponSourceEnum source_);
+
+  AppliedCoupon freeVariantId(int? freeVariantId);
+
   AppliedCoupon discount(String discount);
 
   AppliedCoupon isApplicable(bool isApplicable);
@@ -28,6 +34,9 @@ abstract class _$AppliedCouponCWProxy {
   AppliedCoupon call({
     String code,
     String title,
+    CouponDiscountTypeEnum discountType,
+    CouponSourceEnum source_,
+    int? freeVariantId,
     String discount,
     bool isApplicable,
     String? message,
@@ -46,6 +55,17 @@ class _$AppliedCouponCWProxyImpl implements _$AppliedCouponCWProxy {
 
   @override
   AppliedCoupon title(String title) => this(title: title);
+
+  @override
+  AppliedCoupon discountType(CouponDiscountTypeEnum discountType) =>
+      this(discountType: discountType);
+
+  @override
+  AppliedCoupon source_(CouponSourceEnum source_) => this(source_: source_);
+
+  @override
+  AppliedCoupon freeVariantId(int? freeVariantId) =>
+      this(freeVariantId: freeVariantId);
 
   @override
   AppliedCoupon discount(String discount) => this(discount: discount);
@@ -71,6 +91,9 @@ class _$AppliedCouponCWProxyImpl implements _$AppliedCouponCWProxy {
   AppliedCoupon call({
     Object? code = const $CopyWithPlaceholder(),
     Object? title = const $CopyWithPlaceholder(),
+    Object? discountType = const $CopyWithPlaceholder(),
+    Object? source_ = const $CopyWithPlaceholder(),
+    Object? freeVariantId = const $CopyWithPlaceholder(),
     Object? discount = const $CopyWithPlaceholder(),
     Object? isApplicable = const $CopyWithPlaceholder(),
     Object? message = const $CopyWithPlaceholder(),
@@ -85,6 +108,18 @@ class _$AppliedCouponCWProxyImpl implements _$AppliedCouponCWProxy {
           ? _value.title
           // ignore: cast_nullable_to_non_nullable
           : title as String,
+      discountType: discountType == const $CopyWithPlaceholder()
+          ? _value.discountType
+          // ignore: cast_nullable_to_non_nullable
+          : discountType as CouponDiscountTypeEnum,
+      source_: source_ == const $CopyWithPlaceholder()
+          ? _value.source_
+          // ignore: cast_nullable_to_non_nullable
+          : source_ as CouponSourceEnum,
+      freeVariantId: freeVariantId == const $CopyWithPlaceholder()
+          ? _value.freeVariantId
+          // ignore: cast_nullable_to_non_nullable
+          : freeVariantId as int?,
       discount: discount == const $CopyWithPlaceholder()
           ? _value.discount
           // ignore: cast_nullable_to_non_nullable
@@ -125,6 +160,9 @@ AppliedCoupon _$AppliedCouponFromJson(Map<String, dynamic> json) =>
           requiredKeys: const [
             'code',
             'title',
+            'discount_type',
+            'source',
+            'free_variant_id',
             'discount',
             'is_applicable',
             'message',
@@ -134,6 +172,26 @@ AppliedCoupon _$AppliedCouponFromJson(Map<String, dynamic> json) =>
         final val = AppliedCoupon(
           code: $checkedConvert('code', (v) => v as String),
           title: $checkedConvert('title', (v) => v as String),
+          discountType: $checkedConvert(
+            'discount_type',
+            (v) => $enumDecode(
+              _$CouponDiscountTypeEnumEnumMap,
+              v,
+              unknownValue: CouponDiscountTypeEnum.unknownDefaultOpenApi,
+            ),
+          ),
+          source_: $checkedConvert(
+            'source',
+            (v) => $enumDecode(
+              _$CouponSourceEnumEnumMap,
+              v,
+              unknownValue: CouponSourceEnum.unknownDefaultOpenApi,
+            ),
+          ),
+          freeVariantId: $checkedConvert(
+            'free_variant_id',
+            (v) => (v as num?)?.toInt(),
+          ),
           discount: $checkedConvert('discount', (v) => v as String),
           isApplicable: $checkedConvert('is_applicable', (v) => v as bool),
           message: $checkedConvert('message', (v) => v as String?),
@@ -145,6 +203,9 @@ AppliedCoupon _$AppliedCouponFromJson(Map<String, dynamic> json) =>
         return val;
       },
       fieldKeyMap: const {
+        'discountType': 'discount_type',
+        'source_': 'source',
+        'freeVariantId': 'free_variant_id',
         'isApplicable': 'is_applicable',
         'amountToUnlock': 'amount_to_unlock',
       },
@@ -154,8 +215,26 @@ Map<String, dynamic> _$AppliedCouponToJson(AppliedCoupon instance) =>
     <String, dynamic>{
       'code': instance.code,
       'title': instance.title,
+      'discount_type': _$CouponDiscountTypeEnumEnumMap[instance.discountType]!,
+      'source': _$CouponSourceEnumEnumMap[instance.source_]!,
+      'free_variant_id': instance.freeVariantId,
       'discount': instance.discount,
       'is_applicable': instance.isApplicable,
       'message': instance.message,
       'amount_to_unlock': instance.amountToUnlock,
     };
+
+const _$CouponDiscountTypeEnumEnumMap = {
+  CouponDiscountTypeEnum.FLAT: 'FLAT',
+  CouponDiscountTypeEnum.PERCENT: 'PERCENT',
+  CouponDiscountTypeEnum.FREE_UNIT: 'FREE_UNIT',
+  CouponDiscountTypeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$CouponSourceEnumEnumMap = {
+  CouponSourceEnum.NONE: 'NONE',
+  CouponSourceEnum.WELCOME: 'WELCOME',
+  CouponSourceEnum.REFERRAL_REFERRER: 'REFERRAL_REFERRER',
+  CouponSourceEnum.REFERRAL_REFERRED: 'REFERRAL_REFERRED',
+  CouponSourceEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
