@@ -1869,6 +1869,9 @@ paths:
                       name: ''
                       email: null
                       marketing_opt_in: false
+                      business_category: null
+                      business_category_name: null
+                      business_name: ''
                       is_profile_complete: false
                       rider_status: NONE
                       created_at: '2026-11-02T10:15:00Z'
@@ -1886,6 +1889,9 @@ paths:
                       name: Asha Verma
                       email: asha.verma@example.com
                       marketing_opt_in: false
+                      business_category: 2
+                      business_category_name: Restaurant / Café
+                      business_name: Asha's Kitchen
                       is_profile_complete: true
                       rider_status: NONE
                       created_at: '2026-10-20T06:30:00Z'
@@ -1903,6 +1909,9 @@ paths:
                       name: ''
                       email: null
                       marketing_opt_in: false
+                      business_category: null
+                      business_category_name: null
+                      business_name: ''
                       is_profile_complete: false
                       rider_status: NONE
                       created_at: '2026-11-02T10:15:00Z'
@@ -1920,6 +1929,9 @@ paths:
                       name: Ravi Kumar
                       email: null
                       marketing_opt_in: false
+                      business_category: null
+                      business_category_name: null
+                      business_name: ''
                       is_profile_complete: true
                       rider_status: PENDING_KYC
                       created_at: '2026-10-28T04:00:00Z'
@@ -1937,6 +1949,9 @@ paths:
                       name: Asha Verma
                       email: asha.verma@example.com
                       marketing_opt_in: false
+                      business_category: 2
+                      business_category_name: Restaurant / Café
+                      business_name: Asha's Kitchen
                       is_profile_complete: true
                       rider_status: NONE
                       created_at: '2026-10-20T06:30:00Z'
@@ -2129,6 +2144,123 @@ paths:
                   summary: Malformed or wrong signature
           description: 'The refresh token is invalid, expired or already used: the
             session is over.'
+  /api/v1/business-categories/:
+    get:
+      operationId: business_categories_list
+      description: 'Active categories in display order (admin-managed). Not paginated:
+        the list is short. Send the chosen `id` as `business_category` on `PATCH /me/`.'
+      summary: Business categories for the complete-profile dropdown
+      tags:
+      - account
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BusinessCategory'
+              examples:
+                Category:
+                  value:
+                  - id: 2
+                    name: Restaurant / Café
+                    slug: restaurant-cafe
+          description: The categories. The example shows one entry of the list.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/cart/:
     get:
       operationId: cart_retrieve
@@ -8923,6 +9055,9 @@ paths:
                     name: Asha Verma
                     email: asha.verma@example.com
                     marketing_opt_in: false
+                    business_category: 2
+                    business_category_name: Restaurant / Café
+                    business_name: Asha's Kitchen
                     is_profile_complete: true
                     rider_status: NONE
                     created_at: '2026-10-20T06:30:00Z'
@@ -8933,6 +9068,9 @@ paths:
                     name: ''
                     email: null
                     marketing_opt_in: false
+                    business_category: null
+                    business_category_name: null
+                    business_name: ''
                     is_profile_complete: false
                     rider_status: NONE
                     created_at: '2026-11-02T10:15:00Z'
@@ -8944,6 +9082,9 @@ paths:
                     name: Ravi Kumar
                     email: null
                     marketing_opt_in: false
+                    business_category: null
+                    business_category_name: null
+                    business_name: ''
                     is_profile_complete: true
                     rider_status: PENDING_KYC
                     created_at: '2026-10-28T04:00:00Z'
@@ -9043,11 +9184,11 @@ paths:
             true`). `message` is the text to show.'
     patch:
       operationId: me_update
-      description: Partial update. `phone` cannot be changed in v1. `name` cannot
-        be blanked. `email` is optional (null or empty string removes it). An email
-        that cannot be used (e.g. it belongs to another account) is rejected with
-        a generic message.
-      summary: Update name, email or promotional-push consent
+      description: |-
+        Partial update. `phone` cannot be changed in v1. `name` cannot be blanked. `email` is optional (null or empty string removes it). An email that cannot be used (e.g. it belongs to another account) is rejected with a generic message.
+
+        **Complete-profile screen (03 §2.2):** Submit sends `name` with the optional `business_category` (an active id from `GET /business-categories/`) and `business_name`. Sending any of `name`, `business_category` or `business_name` marks the screen done (`is_profile_complete` becomes true). An unknown or inactive category is 400 `VALIDATION_ERROR` on `business_category`.
+      summary: Update name, email, business profile or promotional-push consent
       tags:
       - account
       requestBody:
@@ -9060,6 +9201,12 @@ paths:
                 value:
                   name: Asha Verma
                 summary: Complete profile
+              CompleteBusinessProfile:
+                value:
+                  name: Asha Verma
+                  business_category: 2
+                  business_name: Asha's Kitchen
+                summary: Complete business profile
               EditProfile:
                 value:
                   name: Asha Verma
@@ -9082,6 +9229,9 @@ paths:
                     name: Asha Verma
                     email: asha.verma@example.com
                     marketing_opt_in: false
+                    business_category: 2
+                    business_category_name: Restaurant / Café
+                    business_name: Asha's Kitchen
                     is_profile_complete: true
                     rider_status: NONE
                     created_at: '2026-10-20T06:30:00Z'
@@ -9110,6 +9260,15 @@ paths:
                         name:
                         - This field may not be blank.
                   summary: Blank name
+                UnknownOrInactiveCategory:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        business_category:
+                        - Choose a business category from the list.
+                  summary: Unknown or inactive category
           description: Invalid fields.
         '401':
           content:
@@ -10105,6 +10264,131 @@ paths:
                   value:
                     unread: 2
           description: The count.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
+  /api/v1/me/profile-prompt/skip/:
+    post:
+      operationId: me_profile_prompt_skip
+      description: 'The Skip button on the complete-profile screen (03 §2.2). Remembered
+        on the server, so `is_profile_complete` becomes true and the screen is not
+        shown again on any device. No body. Idempotent: always 200 with the user,
+        also when the profile was already submitted or skipped.'
+      summary: Skip the complete-profile screen
+      tags:
+      - account
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+              examples:
+                Skipped:
+                  value:
+                    id: 42
+                    phone: '+919876543210'
+                    name: ''
+                    email: null
+                    marketing_opt_in: false
+                    business_category: null
+                    business_category_name: null
+                    business_name: ''
+                    is_profile_complete: true
+                    rider_status: NONE
+                    created_at: '2026-11-02T10:15:00Z'
+          description: The user.
         '401':
           content:
             application/json:
@@ -25022,7 +25306,7 @@ components:
         is_new_user:
           type: boolean
           description: True when this verification created the account. Show the complete-profile
-            screen when `is_new_user` is true or `user.is_profile_complete` is false.
+            screen only while `user.is_profile_complete` is false (03 §2.2).
         rider_status:
           allOf:
           - $ref: '#/components/schemas/RiderStatusEnum'
@@ -25149,6 +25433,25 @@ components:
       - small_cart_fee
       - tip
       - total_savings
+    BusinessCategory:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+          description: Shown in the dropdown.
+        slug:
+          type: string
+          readOnly: true
+          description: Stable key, e.g. `restaurant-cafe`.
+          pattern: ^[-a-zA-Z0-9_]+$
+      required:
+      - id
+      - name
+      - slug
     CancelReasonEnum:
       enum:
       - CHANGE_PAYMENT_METHOD
@@ -26972,7 +27275,9 @@ components:
       - refresh
     Me:
       type: object
-      description: The signed-in user. PATCH accepts `name`, `email` and `marketing_opt_in`.
+      description: |-
+        The signed-in user. PATCH accepts `name`, `email`, `marketing_opt_in`,
+        `business_category` and `business_name`.
       properties:
         id:
           type: integer
@@ -26984,7 +27289,7 @@ components:
           description: Login phone. Not editable in v1.
         name:
           type: string
-          description: Required to complete the profile. Cannot be blanked.
+          description: Cannot be blanked once sent. Empty after a skipped profile.
           maxLength: 120
         email:
           type: string
@@ -26995,10 +27300,28 @@ components:
         marketing_opt_in:
           type: boolean
           description: Consent to promotional push notifications.
+        business_category:
+          type: integer
+          nullable: true
+          description: Optional. An id from `GET /business-categories/` (active only).
+            Null removes it.
+        business_category_name:
+          type: string
+          readOnly: true
+          nullable: true
+          description: The chosen category's name, for display. Null when none.
+        business_name:
+          type: string
+          description: Optional shop / business name. An empty string removes it.
+          maxLength: 120
         is_profile_complete:
           type: boolean
           readOnly: true
-          description: 'False until a name is set: show the complete-profile screen.'
+          description: 'False only for a new user who has neither submitted (PATCH
+            `/me/` with `name`, `business_category` or `business_name`) nor skipped
+            (`POST /me/profile-prompt/skip/`) the complete-profile screen: show that
+            screen while it is false. Accounts created before 2026-11-26 are always
+            true.'
         rider_status:
           allOf:
           - $ref: '#/components/schemas/RiderStatusEnum'
@@ -27016,6 +27339,7 @@ components:
           format: date-time
           readOnly: true
       required:
+      - business_category_name
       - created_at
       - id
       - is_profile_complete
@@ -28319,12 +28643,14 @@ components:
             and nothing is saved.
     PatchedMeRequest:
       type: object
-      description: The signed-in user. PATCH accepts `name`, `email` and `marketing_opt_in`.
+      description: |-
+        The signed-in user. PATCH accepts `name`, `email`, `marketing_opt_in`,
+        `business_category` and `business_name`.
       properties:
         name:
           type: string
           minLength: 1
-          description: Required to complete the profile. Cannot be blanked.
+          description: Cannot be blanked once sent. Empty after a skipped profile.
           maxLength: 120
         email:
           type: string
@@ -28335,6 +28661,15 @@ components:
         marketing_opt_in:
           type: boolean
           description: Consent to promotional push notifications.
+        business_category:
+          type: integer
+          nullable: true
+          description: Optional. An id from `GET /business-categories/` (active only).
+            Null removes it.
+        business_name:
+          type: string
+          description: Optional shop / business name. An empty string removes it.
+          maxLength: 120
     PatchedRiderProfileUpdateRequest:
       type: object
       description: |-

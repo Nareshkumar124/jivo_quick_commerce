@@ -17,6 +17,7 @@ SEED_STEPS: list[str] = [
     # Phase 1: roles (05 §3), staff per role, test customer + fixed-OTP phones, app config
     "apps.accounts.seed.seed_roles",
     "apps.accounts.seed.seed_staff",
+    "apps.accounts.seed.seed_business_categories",
     "apps.accounts.seed.seed_test_customers",
     "apps.cms.seed.seed_app_config",
     # Phase 2: demo store GGN-01 (Gurugram polygon), ~20 products, stock through the ledger

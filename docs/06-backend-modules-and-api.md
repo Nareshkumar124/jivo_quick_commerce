@@ -52,7 +52,9 @@ The probes take no credentials and are not throttled. They have no trailing slas
 | POST | `/api/v1/auth/otp/verify/` | Public | Verify OTP. Returns `access`, `refresh`, `user`, `is_new_user` (+ `rider_status` for the rider app). |
 | POST | `/api/v1/auth/token/refresh/` | Public | Rotate the refresh token |
 | POST | `/api/v1/auth/logout/` | Customer | Blacklist the refresh token, deactivate the device |
-| GET / PATCH | `/api/v1/me/` | Customer | Read / update name, email, notification prefs |
+| GET / PATCH | `/api/v1/me/` | Customer | Read / update name, email, notification prefs, business profile (`business_category` id, `business_name`; read also gives `business_category_name`) |
+| POST | `/api/v1/me/profile-prompt/skip/` | Customer | Skip the complete-profile screen (`me_profile_prompt_skip`): remembered server-side, idempotent, returns the user (added 2026-11-26) |
+| GET | `/api/v1/business-categories/` | Logged-in user | Active business categories for the complete-profile dropdown (`business_categories_list`): `[{id, name, slug}]` by `sort_order`, not paginated (added 2026-11-26) |
 | POST | `/api/v1/me/delete/` | Customer | Request account deletion (requires a fresh OTP) |
 | POST | `/api/v1/me/devices/` | Customer | Register/update the FCM token, platform, app, version |
 | GET | `/api/v1/config/app/` | Public | `min_supported_version`, `latest_version`, `maintenance`, support contacts, policy URLs, feature flags |
@@ -93,6 +95,7 @@ The access token's `app` claim (`customer`/`rider`) decides which app a session 
 | OTP login, token refresh | `auth/otp/request/`, `auth/otp/verify/`, `auth/token/refresh/` | Public (no access token) |
 | Logout | `auth/logout/` | Shared |
 | Profile, account deletion, devices | `me/`, `me/delete/`, `me/devices/` | Shared |
+| Complete-profile screen | `me/profile-prompt/skip/`, `business-categories/` | Shared (added 2026-11-26) |
 | Referral (refer a friend) | `account/referral/`, `account/referral/apply/` | Customer app (added 2026-11-13) |
 | Rewards (free cartons) | `account/rewards/` | Customer app (ADR 0002, added 2026-11-25) |
 | Notification inbox | `me/notifications/…` | Shared, entries scoped by the claim |

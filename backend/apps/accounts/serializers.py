@@ -12,6 +12,7 @@ from rest_framework import serializers
 from rest_framework.fields import empty
 
 from apps.accounts.choices import AddressLabel, AppName, OtpPurpose, Platform, RiderStatus
+from apps.accounts.models import BusinessCategory
 from apps.accounts.validators import (
     indian_mobile_validator,
     otp_code_validator,
@@ -97,15 +98,22 @@ class OtpVerifySerializer(serializers.Serializer):
     )
 
 
+class BusinessCategorySerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(read_only=True, help_text="Shown in the dropdown.")
+    slug = serializers.SlugField(read_only=True, help_text="Stable key, e.g. `restaurant-cafe`.")
+
+
 class MeSerializer(serializers.Serializer):
-    """The signed-in user. PATCH accepts `name`, `email` and `marketing_opt_in`."""
+    """The signed-in user. PATCH accepts `name`, `email`, `marketing_opt_in`,
+    `business_category` and `business_name`."""
 
     id = serializers.IntegerField(read_only=True)
     phone = serializers.CharField(
         read_only=True, allow_null=True, help_text="Login phone. Not editable in v1."
     )
     name = serializers.CharField(
-        max_length=120, help_text="Required to complete the profile. Cannot be blanked."
+        max_length=120, help_text="Cannot be blanked once sent. Empty after a skipped profile."
     )
     email = OptionalEmailField(
         required=False,
@@ -114,8 +122,35 @@ class MeSerializer(serializers.Serializer):
     marketing_opt_in = serializers.BooleanField(
         required=False, help_text="Consent to promotional push notifications."
     )
+    business_category = serializers.PrimaryKeyRelatedField(
+        queryset=BusinessCategory.objects.filter(is_active=True),
+        required=False,
+        allow_null=True,
+        error_messages={"does_not_exist": "Choose a business category from the list."},
+        help_text=(
+            "Optional. An id from `GET /business-categories/` (active only). Null removes it."
+        ),
+    )
+    business_category_name = serializers.CharField(
+        source="business_category.name",
+        read_only=True,
+        allow_null=True,
+        help_text="The chosen category's name, for display. Null when none.",
+    )
+    business_name = serializers.CharField(
+        max_length=120,
+        required=False,
+        allow_blank=True,
+        help_text="Optional shop / business name. An empty string removes it.",
+    )
     is_profile_complete = serializers.BooleanField(
-        read_only=True, help_text="False until a name is set: show the complete-profile screen."
+        read_only=True,
+        help_text=(
+            "False only for a new user who has neither submitted (PATCH `/me/` with `name`, "
+            "`business_category` or `business_name`) nor skipped "
+            "(`POST /me/profile-prompt/skip/`) the complete-profile screen: show that screen "
+            "while it is false. Accounts created before 2026-11-26 are always true."
+        ),
     )
     rider_status = serializers.ChoiceField(
         choices=RiderStatus.choices,
@@ -132,7 +167,7 @@ class AuthSessionSerializer(serializers.Serializer):
     is_new_user = serializers.BooleanField(
         help_text=(
             "True when this verification created the account. Show the complete-profile screen "
-            "when `is_new_user` is true or `user.is_profile_complete` is false."
+            "only while `user.is_profile_complete` is false (03 §2.2)."
         )
     )
     rider_status = serializers.ChoiceField(

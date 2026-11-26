@@ -11,7 +11,9 @@ from apps.core.exceptions import ApiError
 # Deliberately generic: must not confirm that another account uses the address.
 EMAIL_UNAVAILABLE = "This email can't be used."
 
-_EDITABLE = ("name", "email", "marketing_opt_in")
+_EDITABLE = ("name", "email", "marketing_opt_in", "business_category", "business_name")
+# Sending any of these submits the complete-profile screen (03 §2.2).
+_PROFILE_SCREEN_FIELDS = ("name", "business_category", "business_name")
 
 
 def _email_unavailable() -> ApiError:
@@ -29,11 +31,22 @@ def update_profile(user: User, data: dict) -> User:
             raise _email_unavailable()
     for key, value in changes.items():
         setattr(user, key, value)
+    if user.profile_completed_at is None and any(key in data for key in _PROFILE_SCREEN_FIELDS):
+        user.profile_completed_at = timezone.now()
     try:
         with transaction.atomic():
             user.save()
     except IntegrityError as exc:  # lost a race for the same email
         raise _email_unavailable() from exc
+    return user
+
+
+def skip_profile_prompt(user: User) -> User:
+    """Skip on the complete-profile screen (03 §2.2): remembered, so it is not asked again.
+    Idempotent: a repeat keeps the first time, and it does nothing once the profile is done."""
+    if not user.is_profile_complete:
+        user.profile_prompt_skipped_at = timezone.now()
+        user.save(update_fields=["profile_prompt_skipped_at", "updated_at"])
     return user
 
 

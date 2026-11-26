@@ -15,12 +15,13 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenRefreshView as SimpleJWTTokenRefreshView
 
 from apps.accounts import examples as ex
-from apps.accounts.models import Address
+from apps.accounts.models import Address, BusinessCategory
 from apps.accounts.serializers import (
     AccountDeleteSerializer,
     AccountDeletionSerializer,
     AddressSerializer,
     AuthSessionSerializer,
+    BusinessCategorySerializer,
     DeviceSerializer,
     DeviceUnregisterSerializer,
     LogoutSerializer,
@@ -376,15 +377,24 @@ class MeView(APIView):
     @extend_schema(
         operation_id="me_update",
         tags=["account"],
-        summary="Update name, email or promotional-push consent",
+        summary="Update name, email, business profile or promotional-push consent",
         description=(
             "Partial update. `phone` cannot be changed in v1. `name` cannot be blanked. "
             "`email` is optional (null or empty string removes it). An email that cannot be "
-            "used (e.g. it belongs to another account) is rejected with a generic message."
+            "used (e.g. it belongs to another account) is rejected with a generic message.\n\n"
+            "**Complete-profile screen (03 §2.2):** Submit sends `name` with the optional "
+            "`business_category` (an active id from `GET /business-categories/`) and "
+            "`business_name`. Sending any of `name`, `business_category` or `business_name` "
+            "marks the screen done (`is_profile_complete` becomes true). An unknown or inactive "
+            "category is 400 `VALIDATION_ERROR` on `business_category`."
         ),
         request=MeSerializer,
         examples=[
             _request_example("Complete profile", {"name": "Asha Verma"}),
+            _request_example(
+                "Complete business profile",
+                {"name": "Asha Verma", "business_category": 2, "business_name": "Asha's Kitchen"},
+            ),
             _request_example(
                 "Edit profile",
                 {"name": "Asha Verma", "email": "asha.verma@example.com", "marketing_opt_in": True},
@@ -399,6 +409,10 @@ class MeView(APIView):
                         {"email": ["This email can't be used."]}, name="Email unavailable"
                     ),
                     validation_error({"name": ["This field may not be blank."]}, name="Blank name"),
+                    validation_error(
+                        {"business_category": ["Choose a business category from the list."]},
+                        name="Unknown or inactive category",
+                    ),
                 ),
                 401: UNAUTHORIZED,
             }
@@ -409,6 +423,59 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         user = profile.update_profile(request.user, serializer.validated_data)
         return Response(MeSerializer(user).data)
+
+
+class ProfilePromptSkipView(APIView):
+    @extend_schema(
+        operation_id="me_profile_prompt_skip",
+        tags=["account"],
+        summary="Skip the complete-profile screen",
+        description=(
+            "The Skip button on the complete-profile screen (03 §2.2). Remembered on the server, "
+            "so `is_profile_complete` becomes true and the screen is not shown again on any "
+            "device. No body. Idempotent: always 200 with the user, also when the profile was "
+            "already submitted or skipped."
+        ),
+        request=None,
+        responses=app_responses(
+            {
+                200: _ok(
+                    MeSerializer,
+                    "The user.",
+                    ("Skipped", {**ex.NEW_ME, "is_profile_complete": True}),
+                ),
+                401: UNAUTHORIZED,
+            }
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        user = profile.skip_profile_prompt(request.user)
+        return Response(MeSerializer(user).data)
+
+
+class BusinessCategoryListView(APIView):
+    @extend_schema(
+        operation_id="business_categories_list",
+        tags=["account"],
+        summary="Business categories for the complete-profile dropdown",
+        description=(
+            "Active categories in display order (admin-managed). Not paginated: the list is "
+            "short. Send the chosen `id` as `business_category` on `PATCH /me/`."
+        ),
+        responses=app_responses(
+            {
+                200: _ok(
+                    BusinessCategorySerializer(many=True),
+                    "The categories. The example shows one entry of the list.",
+                    ("Category", ex.BUSINESS_CATEGORIES[1]),
+                ),
+                401: UNAUTHORIZED,
+            }
+        ),
+    )
+    def get(self, request: Request) -> Response:
+        categories = BusinessCategory.objects.filter(is_active=True).order_by("sort_order", "name")
+        return Response(BusinessCategorySerializer(categories, many=True).data)
 
 
 class AccountDeleteView(OtpThrottleMixin, APIView):
