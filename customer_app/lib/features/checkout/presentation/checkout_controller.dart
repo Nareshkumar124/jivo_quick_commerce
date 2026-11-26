@@ -4,6 +4,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/repositories.dart';
+import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../catalog/presentation/catalog_controllers.dart';
 import '../../orders/domain/order.dart';
@@ -24,6 +25,18 @@ PriceChange? priceChangeOf(ApiError error) {
   return before is String && after is String
       ? (before: before, after: after)
       : null;
+}
+
+/// [chosen] when the server offers it for [cart]; otherwise the first
+/// method it does offer (ONLINE, then COD). With nothing offered (or no
+/// payment options known yet) [chosen] is kept, and the screen's
+/// blocker explains why the order can't be placed.
+PaymentMethod offeredMethod(PaymentMethod chosen, CartSnapshot cart) {
+  if (cart.offers(chosen)) return chosen;
+  for (final method in PaymentMethod.values) {
+    if (cart.offers(method)) return method;
+  }
+  return chosen;
 }
 
 /// Where the place-order flow is.
@@ -90,7 +103,34 @@ class CheckoutController extends Notifier<CheckoutState> {
   PlaceOrderRequest? _keyRequest;
 
   @override
-  CheckoutState build() => const CheckoutState();
+  CheckoutState build() {
+    // DL-85: when the server turns ONLINE off for this cart (e.g.
+    // `ONLINE_DISABLED`), switch to a method it does offer (COD), so Place
+    // order works without the customer picking it.
+    ref.listen(
+      cartProvider.select((c) => c.snapshot.paymentOptions),
+      (_, _) => _followOffered(),
+    );
+    return const CheckoutState();
+  }
+
+  /// Moves [CheckoutState.method] to an offered one when the current one
+  /// is not offered (see [offeredMethod]). Never while placing an order.
+  void _followOffered() {
+    if (state.busy) return;
+    final offered = offeredMethod(
+      state.method,
+      ref.read(cartProvider).snapshot,
+    );
+    if (offered != state.method) {
+      state = CheckoutState(
+        method: offered,
+        result: state.result,
+        error: state.error,
+        pendingOrderId: state.pendingOrderId,
+      );
+    }
+  }
 
   void selectMethod(PaymentMethod method) {
     if (state.busy) return;
@@ -107,6 +147,7 @@ class CheckoutController extends Notifier<CheckoutState> {
     required String expectedGrandTotal,
   }) async {
     if (state.busy) return;
+    _followOffered();
     final method = state.method;
     var notice = state.priceChange;
     state = CheckoutState(
