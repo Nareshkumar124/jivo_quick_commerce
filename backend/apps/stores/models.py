@@ -323,3 +323,71 @@ class StaffStoreAccess(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.user} @ {self.store.code}"
+
+
+# ADR 0004 §1 (2026-11-26): delivery by pincode, managed from the admin (Super Admin only).
+PINCODE_REGEX = r"^[1-9][0-9]{5}$"  # the same rule as `pincode_validator`
+
+
+class DeliveryPincode(TimeStampedModel):
+    """A pincode a store delivers to (ADR 0004 §1). A store with any rows is in pincode mode:
+    an address is served only when its pincode is an active row of that store, and the location
+    check uses the active pincodes' outlines (`PincodeBoundary`, buffered 250 m) instead of the
+    service area. A store with no rows keeps the service-area rule. Changes go through
+    `apps.stores.services` (audited); every change refreshes the serviceability snapshot."""
+
+    store = models.ForeignKey(DarkStore, on_delete=models.CASCADE, related_name="delivery_pincodes")
+    pincode = models.CharField(max_length=6, validators=[pincode_validator])
+    area_name = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text='Optional name shown to customers, e.g. "Rajouri Garden".',
+    )
+    is_active = models.BooleanField(
+        default=True, help_text="Off: kept in the list, but nobody in this pincode is served."
+    )
+
+    class Meta:
+        ordering = ["store", "pincode"]
+        constraints = [
+            models.UniqueConstraint(fields=["store", "pincode"], name="deliverypincode_unique"),
+            models.CheckConstraint(
+                condition=models.Q(pincode__regex=PINCODE_REGEX),
+                name="deliverypincode_pincode_format",
+            ),
+        ]
+        permissions = [
+            (
+                "manage_delivery_pincodes",
+                "Can add, edit and switch on or off the pincodes a store delivers to",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.pincode} (store {self.store_id})"
+
+
+class PincodeBoundary(TimeStampedModel):
+    """The approximate outline of one pincode (ADR 0004 §1), loaded with
+    `manage.py import_pincode_boundaries` (Department of Posts and GSDL polygons, see
+    `apps/stores/data/README.md`). Used only by the location check of stores in pincode mode;
+    the address check uses the address pincode itself."""
+
+    pincode = models.CharField(max_length=6, unique=True, validators=[pincode_validator])
+    geom = gis_models.MultiPolygonField(srid=4326)
+    source = models.CharField(
+        max_length=60, blank=True, help_text='Where the outline comes from, e.g. "datagov+gsdl".'
+    )
+
+    class Meta:
+        ordering = ["pincode"]
+        verbose_name_plural = "pincode boundaries"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(pincode__regex=PINCODE_REGEX),
+                name="pincodeboundary_pincode_format",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.pincode

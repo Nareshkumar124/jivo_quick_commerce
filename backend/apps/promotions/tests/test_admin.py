@@ -22,6 +22,7 @@ from apps.ops_console.tests.helpers import (
     PRINCIPALS,
     expected_status,
     login_as,
+    offer_editor,
     staff_in_role,
 )
 from apps.orders.tests.factories import OrderFactory
@@ -148,7 +149,7 @@ def test_edit_only_for_coupon_managers(client, coupon, principal):
 class TestCreate:
     @pytest.fixture
     def manager(self, client):
-        user = staff_in_role(roles.CATALOG_MANAGER)
+        user = offer_editor()  # ADR 0004: editing needs promotions.manage_offers
         client.force_login(user)
         return user
 
@@ -262,7 +263,7 @@ class TestCreate:
 
 class TestHistoryAndDelete:
     def test_changes_record_who_made_them(self, client, coupon):
-        manager = staff_in_role(roles.CATALOG_MANAGER, name="Kiran Catalog")
+        manager = offer_editor(name="Kiran Catalog")
         client.force_login(manager)
         url = reverse("admin:promotions_coupon_change", args=[coupon.pk])
         client.post(
@@ -278,10 +279,18 @@ class TestHistoryAndDelete:
         assert client.post(version, {"_save": "Revert"}).status_code == 403
 
     def test_unused_coupon_can_be_deleted(self, client, coupon):
-        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+        client.force_login(offer_editor())
         url = reverse("admin:promotions_coupon_delete", args=[coupon.pk])
         assert client.post(url, {"post": "yes"}).status_code == 302
         assert not Coupon.objects.exists()
+
+    def test_catalog_manager_alone_cannot_delete(self, client, coupon):
+        """ADR 0004: the role still holds `delete_coupon`, but changing offers needs
+        `promotions.manage_offers` (Super Admin)."""
+        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+        url = reverse("admin:promotions_coupon_delete", args=[coupon.pk])
+        assert client.post(url, {"post": "yes"}).status_code == 403
+        assert Coupon.objects.filter(pk=coupon.pk).exists()
 
     def test_used_coupon_cannot_be_deleted(self, client, coupon, redemption):
         client.force_login(SuperUserFactory())

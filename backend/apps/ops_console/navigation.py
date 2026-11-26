@@ -167,6 +167,33 @@ MODULES: tuple[NavSection, ...] = (
             ),
         ),
     ),
+    # ADR 0004 §4: Super Admin only (each permission is given only to that group).
+    NavSection(
+        "Store management",
+        (
+            NavItem(
+                "Bottle prices",
+                "currency_rupee",
+                "ops:prices",
+                ("catalog.manage_prices",),
+                surface=OPS,
+            ),
+            NavItem(
+                "Offers",
+                "local_offer",
+                "ops:offers",
+                ("promotions.manage_offers",),
+                surface=OPS,
+            ),
+            NavItem(
+                "Delivery locations",
+                "pin_drop",
+                "ops:delivery",
+                ("stores.manage_delivery_pincodes",),
+                surface=OPS,
+            ),
+        ),
+    ),
     NavSection(
         "Orders",
         (

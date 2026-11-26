@@ -27,6 +27,19 @@ def staff_in_role(role: str, **kwargs):
     return user
 
 
+def offer_editor(**kwargs):
+    """ADR 0004: only `promotions.manage_offers` (Super Admin) changes coupons. For tests of
+    the coupon forms that need an editor *without* full customer access: a Catalog Manager also
+    given that one permission (the role alone now only views coupons)."""
+    from django.contrib.auth.models import Permission
+
+    user = staff_in_role(roles.CATALOG_MANAGER, **kwargs)
+    user.user_permissions.add(
+        Permission.objects.get(content_type__app_label="promotions", codename="manage_offers")
+    )
+    return user
+
+
 def make_principal(principal: str):
     """The user for a principal, or None for an anonymous visitor."""
     if principal == ANONYMOUS:
@@ -72,7 +85,15 @@ STORE_SCOPED = frozenset({roles.STORE_MANAGER, roles.STORE_STAFF})
 PRICING_VIEW_ROLES = frozenset({*_SA, roles.FINANCE})
 PRICING_EDIT_ROLES = frozenset(_SA)
 COUPON_VIEW_ROLES = frozenset({*_SA, roles.CATALOG_MANAGER, roles.SUPPORT, roles.FINANCE})
-COUPON_EDIT_ROLES = frozenset({*_SA, roles.CATALOG_MANAGER})
+# ADR 0004 (user, 2026-11-26): only a Super Admin changes prices, offers and delivery areas
+# (`catalog.manage_prices`, `promotions.manage_offers`, `stores.manage_delivery_pincodes`).
+# Coupons are offers; Catalog Manager now views them.
+OFFER_EDIT_ROLES = frozenset(_SA)
+PRICE_EDIT_ROLES = frozenset(_SA)
+COUPON_EDIT_ROLES = OFFER_EDIT_ROLES
+# The referral settings page itself (validity days, old ₹ fields) keeps its coupon managers;
+# its on/off and reward quantities are OFFER_EDIT_ROLES only.
+REFERRAL_SETTINGS_EDIT_ROLES = frozenset({*_SA, roles.CATALOG_MANAGER})
 ORDER_VIEW_ROLES = frozenset(
     {*_SA, roles.OPS, roles.STORE_MANAGER, roles.STORE_STAFF, roles.SUPPORT, roles.FINANCE}
 )

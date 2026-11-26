@@ -2,9 +2,15 @@
 "Catalog, collections, banners": Super Admin and Catalog Manager edit, Ops / Store Manager /
 Store Staff / Support view).
 
-The catalog is central (no store scoping). Prices are master data: variant MRP and selling price
-are edited here by catalog roles and kept in the variant's price history; store price overrides
-live in the inventory admin.
+The catalog is central (no store scoping). Prices are master data, kept in the variant's price
+history; store price overrides live in the inventory admin.
+
+ADR 0004 (user, 2026-11-26): only a Super Admin changes prices (`catalog.manage_prices`, normally
+through Ops "Store management → Bottle prices"). Without it, a saved variant's MRP and selling
+price are read-only here (variant page, the product page's variant rows, CSV import) and the
+volume price tiers are view-only; a crafted POST changes nothing (the fields are not in the
+form, or are disabled). A new variant still gets its first price from the catalog roles: it is
+on sale nowhere until a store has stock of it.
 """
 
 from django.contrib import admin
@@ -47,6 +53,25 @@ from apps.ops_console.admin_support import (
     LimitedImportForm,
     ReadOnlyHistoryAdmin,
 )
+from apps.ops_console.store_management import can_manage_prices
+
+PRICE_FIELDS = ("mrp", "selling_price")
+MSG_PRICE_LOCKED = "Only a Super Admin can change prices (Store management → Bottle prices)."
+
+
+class LockSavedPricesMixin:
+    """For a variant form: a saved variant's MRP and selling price are disabled, so Django keeps
+    the saved values whatever is posted. A new variant (no pk) keeps its price fields."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk is None:
+            return
+        for name in PRICE_FIELDS:
+            field = self.fields.get(name)
+            if field is not None:
+                field.disabled = True
+                field.help_text = MSG_PRICE_LOCKED
 
 
 class CatalogImportExportAdmin(ImportExportPermissionsMixin, ModelAdmin, ImportExportModelAdmin):
@@ -202,6 +227,13 @@ class ProductVariantInline(StackedInline):
             },
         ),
     )
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        if not can_manage_prices(request.user):
+            # ADR 0004: saved rows keep their price; new rows still take a first price.
+            formset.form = type(formset.form.__name__, (LockSavedPricesMixin, formset.form), {})
+        return formset
 
 
 class ProductImageInline(TabularInline):
@@ -362,6 +394,17 @@ class VariantPriceTierInline(TabularInline):
     fields = ("min_order_units", "price")
     ordering = ("min_order_units",)
 
+    # ADR 0004: tiers are prices, so only `catalog.manage_prices` adds, changes or removes them
+    # (Django ignores posted rows the inline may not add, change or delete).
+    def has_add_permission(self, request, obj=None) -> bool:
+        return super().has_add_permission(request, obj) and can_manage_prices(request.user)
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return super().has_change_permission(request, obj) and can_manage_prices(request.user)
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        return super().has_delete_permission(request, obj) and can_manage_prices(request.user)
+
 
 @admin.register(ProductVariant)
 class ProductVariantAdmin(ReadOnlyHistoryAdmin, CatalogImportExportAdmin):
@@ -399,6 +442,21 @@ class ProductVariantAdmin(ReadOnlyHistoryAdmin, CatalogImportExportAdmin):
         ("Codes", {"fields": (("barcode", "sap_item_code"), "weight_grams")}),
         (None, {"fields": (("is_active", "sort_order"),)}),
     )
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = tuple(super().get_readonly_fields(request, obj))
+        if obj is not None and not can_manage_prices(request.user):
+            fields += PRICE_FIELDS  # ADR 0004: left out of the form, so a POST can't set them
+        return fields
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is None or can_manage_prices(request.user):
+            return fieldsets
+        return tuple(
+            (title, {**options, "description": MSG_PRICE_LOCKED} if title == "Price" else options)
+            for title, options in fieldsets
+        )
 
     def get_search_results(self, request, queryset, search_term):
         queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)

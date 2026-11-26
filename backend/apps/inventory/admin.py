@@ -69,10 +69,10 @@ from apps.ops_console.selectors import ON_SALE
 
 ADJUST_STOCK = "inventory.adjust_stock"
 TOGGLE_AVAILABILITY = "inventory.toggle_availability"
-# Store price override: Super Admin / Catalog Manager (apps/accounts/roles.py). There is no
-# dedicated permission yet (reported to the backend); the price authority is the permission to
-# change variant prices.
-SET_STORE_PRICE = "catalog.change_productvariant"
+# Store price override: ADR 0004 (user, 2026-11-26), only a Super Admin changes prices. The
+# price permission `catalog.manage_prices` (Super Admin only); every other role sees the store
+# price read-only, and the field is not in their form.
+SET_STORE_PRICE = "catalog.manage_prices"
 
 # Fields of StoreInventory a user may change, by the permission that unlocks them.
 EDITABLE_BY_PERMISSION = {

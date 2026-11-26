@@ -8,11 +8,12 @@ class StoresConfig(AppConfig):
     verbose_name = "Stores & serviceability"
 
     def ready(self) -> None:
-        """Serviceability snapshot invalidation (apps.stores.services.store_areas)."""
-        from apps.stores.models import DarkStore, StoreTiming
+        """Serviceability snapshot invalidation (apps.stores.services.store_areas). Delivery
+        pincodes and their outlines are part of the snapshot too (ADR 0004)."""
+        from apps.stores.models import DarkStore, DeliveryPincode, PincodeBoundary, StoreTiming
         from apps.stores.services import bump_stores_version
 
-        for model in (DarkStore, StoreTiming):
+        for model in (DarkStore, StoreTiming, DeliveryPincode, PincodeBoundary):
             uid = f"stores-areas-{model.__name__}"
             post_save.connect(bump_stores_version, sender=model, dispatch_uid=f"{uid}-s")
             post_delete.connect(bump_stores_version, sender=model, dispatch_uid=f"{uid}-d")

@@ -18,7 +18,7 @@ from django.utils import timezone
 
 from apps.accounts import roles
 from apps.accounts.tests.factories import UserFactory
-from apps.ops_console.tests.helpers import admin_form_data, staff_in_role
+from apps.ops_console.tests.helpers import admin_form_data, offer_editor, staff_in_role
 from apps.promotions import services
 from apps.promotions.admin import MSG_OWNER_NOT_CUSTOMER, PUBLIC_COUPON
 from apps.promotions.models import Coupon
@@ -67,6 +67,14 @@ def personal(customer):
 
 def login_role(client, role):
     user = staff_in_role(role)
+    client.force_login(user)
+    return user
+
+
+def login_editor(client):
+    """A coupon editor without full customer access (ADR 0004: a Catalog Manager also
+    given `promotions.manage_offers`)."""
+    user = offer_editor()
     client.force_login(user)
     return user
 
@@ -156,20 +164,20 @@ class TestList:
 
 class TestCreate:
     def test_public_by_default(self, client):
-        login_role(client, roles.CATALOG_MANAGER)
+        login_editor(client)
         response = client.post(reverse(ADD), add_data())
         assert response.status_code == 302, response.context["adminform"].form.errors
         assert Coupon.objects.get(code="GOODWILL1").owner is None
 
     def test_personal_for_a_customer(self, client, customer):
-        login_role(client, roles.CATALOG_MANAGER)
+        login_editor(client)
         response = client.post(reverse(ADD), add_data(owner=str(customer.pk)))
         assert response.status_code == 302, response.context["adminform"].form.errors
         assert Coupon.objects.get(code="GOODWILL1").owner == customer
 
     @pytest.mark.parametrize("who", ["staff", "blocked", "missing", "text"])
     def test_owner_must_be_an_active_customer(self, client, who):
-        manager = login_role(client, roles.CATALOG_MANAGER)
+        manager = login_editor(client)
         value = {
             "staff": lambda: str(manager.pk),
             "blocked": lambda: str(UserFactory(is_active=False).pk),
@@ -182,7 +190,7 @@ class TestCreate:
         assert not Coupon.objects.filter(code="GOODWILL1").exists()
 
     def test_limited_role_gets_a_masked_label_and_no_lookup(self, client, customer):
-        login_role(client, roles.CATALOG_MANAGER)
+        login_editor(client)
         html = client.get(reverse(ADD)).content.decode()
         assert 'name="owner"' in html
         assert "lookup_id_owner" not in html
@@ -214,7 +222,7 @@ class TestOwnerIsReadOnlyOnceSaved:
     @pytest.mark.parametrize("kind", ["personal", "public"])
     def test_crafted_post_cannot_change_the_owner(self, client, customer, public, personal, kind):
         coupon = personal if kind == "personal" else public
-        login_role(client, roles.CATALOG_MANAGER)
+        login_editor(client)
         url = reverse("admin:promotions_coupon_change", args=[coupon.pk])
         response = client.get(url)
         assert 'name="owner"' not in response.content.decode()
