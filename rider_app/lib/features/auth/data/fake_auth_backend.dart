@@ -96,6 +96,9 @@ class FakeAuthBackend implements AuthRepository, AccountRepository {
       'email': null,
       'marketing_opt_in': false,
       'is_profile_complete': status != RiderStatusEnum.NONE,
+      'business_category': null,
+      'business_category_name': null,
+      'business_name': '',
       'rider_status': status.value,
       'created_at': '2026-10-28T04:00:00Z',
     });
@@ -161,6 +164,9 @@ class FakeAuthBackend implements AuthRepository, AccountRepository {
       'email': null,
       'marketing_opt_in': false,
       'is_profile_complete': true,
+      'business_category': null,
+      'business_category_name': null,
+      'business_name': '',
       'rider_status': statusForPhone(phoneE164).value,
       'created_at': '2026-10-28T04:00:00Z',
     });

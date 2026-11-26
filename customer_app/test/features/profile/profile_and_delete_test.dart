@@ -1,6 +1,10 @@
 import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/domain/auth_models.dart';
+import 'package:customer_app/features/auth/presentation/complete_profile_screen.dart';
 import 'package:customer_app/features/location/data/delivery_location_store.dart';
+import 'package:customer_app/features/profile/domain/user_profile.dart';
+import 'package:customer_app/features/profile/presentation/business_category_field.dart';
+import 'package:customer_app/features/profile/presentation/profile_form.dart';
 import 'package:customer_app/features/search/data/recent_searches_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,60 +24,220 @@ Future<void> signInAsNewUser(TestApp app, WidgetTester tester) async {
 }
 
 void main() {
-  group('complete profile', () {
-    testWidgets('requires a name and checks the email format', (tester) async {
+  group('complete profile (03 §2.2)', () {
+    // The fake profile server holds the same new user the fake login made.
+    TestApp newUserApp() {
       final app = TestApp();
+      app.profile.profile = const UserProfile(
+        id: 2,
+        phone: '+919876543210',
+        name: '',
+        isProfileComplete: false,
+      );
+      return app;
+    }
+
+    testWidgets('shows name, category dropdown, business name; no email', (
+      tester,
+    ) async {
+      final app = newUserApp();
       await signInAsNewUser(app, tester);
 
-      await tester.enterText(find.byKey(const Key('profile-email')), 'asha@');
-      await tester.tap(find.text('Continue'));
+      expect(find.text('Tell us about you'), findsOneWidget);
+      expect(find.byKey(const Key('profile-name')), findsOneWidget);
+      expect(find.byKey(BusinessCategoryField.dropdownKey), findsOneWidget);
+      expect(
+        find.byKey(CompleteProfileScreen.businessNameFieldKey),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('profile-email')), findsNothing);
+      expect(find.text('Submit'), findsOneWidget);
+      expect(find.text('Skip'), findsOneWidget);
+      expect(app.profile.categoryLoads, 1);
+    });
+
+    testWidgets('Submit requires a name', (tester) async {
+      final app = newUserApp();
+      await signInAsNewUser(app, tester);
+
+      await tester.tap(find.byKey(CompleteProfileScreen.submitKey));
       await tester.pumpAndSettle();
 
       expect(find.text('Please enter your name.'), findsOneWidget);
-      expect(find.text('Enter a valid email address.'), findsOneWidget);
+      expect(app.profile.businessSubmits, isEmpty);
+      expect(find.text('Tell us about you'), findsOneWidget);
     });
 
-    testWidgets('shows the generic message for a rejected email', (
+    testWidgets('Submit sends name, category and business name, then home', (
       tester,
     ) async {
-      final app = TestApp();
+      final app = newUserApp();
+      await signInAsNewUser(app, tester);
+
+      await tester.enterText(
+        find.byKey(const Key('profile-name')),
+        'Asha Verma',
+      );
+      await tester.tap(find.byKey(BusinessCategoryField.dropdownKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Restaurant / Café').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(CompleteProfileScreen.businessNameFieldKey),
+        'Asha Kitchen',
+      );
+      await tester.tap(find.byKey(CompleteProfileScreen.submitKey));
+      await tester.pumpAndSettle();
+
+      expect(app.profile.businessSubmits.single, (
+        'Asha Verma',
+        2,
+        'Asha Kitchen',
+      ));
+      expect(app.profile.skips, 0);
+      expect(find.byKey(const Key('home-screen')), findsOneWidget);
+    });
+
+    testWidgets('Submit with only a name leaves the category out', (
+      tester,
+    ) async {
+      final app = newUserApp();
+      await signInAsNewUser(app, tester);
+
+      await tester.enterText(find.byKey(const Key('profile-name')), 'Asha');
+      await tester.tap(find.byKey(CompleteProfileScreen.submitKey));
+      await tester.pumpAndSettle();
+
+      expect(app.profile.businessSubmits.single, ('Asha', null, ''));
+      expect(find.byKey(const Key('home-screen')), findsOneWidget);
+    });
+
+    testWidgets('Skip calls the skip endpoint and goes home', (tester) async {
+      final app = newUserApp();
+      await signInAsNewUser(app, tester);
+
+      await tester.tap(find.byKey(CompleteProfileScreen.skipKey));
+      await tester.pumpAndSettle();
+
+      expect(app.profile.skips, 1);
+      expect(app.profile.businessSubmits, isEmpty);
+      expect(find.byKey(const Key('home-screen')), findsOneWidget);
+
+      // No name after Skip: the account header shows a prompt, not a blank.
+      await tester.tap(find.byTooltip('Account'));
+      await tester.pumpAndSettle();
+      expect(find.text('Add your name'), findsOneWidget);
+    });
+
+    testWidgets('a failed Skip stays on the screen', (tester) async {
+      final app = newUserApp();
+      app.profile.skipError = const ApiError(code: ApiErrorCode.network);
+      await signInAsNewUser(app, tester);
+
+      await tester.tap(find.byKey(CompleteProfileScreen.skipKey));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tell us about you'), findsOneWidget);
+      expect(find.byKey(const Key('home-screen')), findsNothing);
+    });
+
+    testWidgets('a rejected category shows under the dropdown', (
+      tester,
+    ) async {
+      final app = newUserApp();
       app.profile.updateError = const ApiError(
         code: ApiErrorCode.validationError,
         statusCode: 400,
         details: {
-          'email': ["This email can't be used."],
+          'business_category': ['Choose a business category from the list.'],
         },
       );
       await signInAsNewUser(app, tester);
 
-      await tester.enterText(
-        find.byKey(const Key('profile-name')),
-        'Asha Verma',
-      );
-      await tester.enterText(
-        find.byKey(const Key('profile-email')),
-        'taken@example.com',
-      );
-      await tester.tap(find.text('Continue'));
+      await tester.enterText(find.byKey(const Key('profile-name')), 'Asha');
+      await tester.tap(find.byKey(CompleteProfileScreen.submitKey));
       await tester.pumpAndSettle();
 
-      expect(find.text("This email can't be used."), findsOneWidget);
+      expect(
+        find.text('Choose a business category from the list.'),
+        findsOneWidget,
+      );
       expect(find.text('Tell us about you'), findsOneWidget);
     });
 
-    testWidgets('saving the name finishes sign-up', (tester) async {
-      final app = TestApp();
+    testWidgets('the category list failing shows Retry, which reloads it', (
+      tester,
+    ) async {
+      final app = newUserApp();
+      app.profile.categoriesError = const ApiError(
+        code: ApiErrorCode.network,
+      );
       await signInAsNewUser(app, tester);
 
-      await tester.enterText(
-        find.byKey(const Key('profile-name')),
-        'Asha Verma',
-      );
-      await tester.tap(find.text('Continue'));
+      expect(find.text("Couldn't load business categories."), findsOneWidget);
+      expect(find.byKey(BusinessCategoryField.dropdownKey), findsNothing);
+      expect(find.text('Submit'), findsOneWidget);
+
+      app.profile.categoriesError = null;
+      await tester.tap(find.byKey(BusinessCategoryField.retryKey));
       await tester.pumpAndSettle();
 
-      expect(app.profile.profile.name, 'Asha Verma');
+      expect(app.profile.categoryLoads, 2);
+      expect(find.byKey(BusinessCategoryField.dropdownKey), findsOneWidget);
+    });
+
+    testWidgets('an existing user with a complete profile goes home', (
+      tester,
+    ) async {
+      final app = TestApp();
+      await app.pump(tester);
+      await loginToOtp(tester, '9000000001');
+      await tester.enterText(
+        find.byKey(const Key('otp-field')),
+        FakeAuthRepository.validOtp,
+      );
+      await tester.pumpAndSettle();
+
       expect(find.byKey(const Key('home-screen')), findsOneWidget);
+      expect(app.profile.categoryLoads, 0);
+    });
+  });
+
+  group('edit profile', () {
+    testWidgets('shows and saves the business fields', (tester) async {
+      final app = TestApp(tokens: signedInTokens);
+      app.profile.profile = const UserProfile(
+        id: 1,
+        phone: '+919000000001',
+        name: 'Test Customer',
+        isProfileComplete: true,
+        businessCategoryId: 1,
+        businessCategoryName: 'Kirana / General store',
+        businessName: 'Old Shop',
+      );
+      await app.pump(tester);
+      await tester.tap(find.byTooltip('Account'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('account-edit')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kirana / General store'), findsOneWidget);
+      expect(find.text('Old Shop'), findsOneWidget);
+
+      await tester.tap(find.byKey(BusinessCategoryField.dropdownKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Household').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(ProfileForm.businessNameFieldKey),
+        'New Shop',
+      );
+      await tester.ensureVisible(find.text('Save'));
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(app.profile.profile.businessCategoryId, 3);
+      expect(app.profile.profile.businessName, 'New Shop');
     });
   });
 

@@ -24,7 +24,7 @@ class CouponApplyRequest {
   @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-  /// ADR 0002: required for a free-carton reward (`discount_type` FREE_UNIT): the size the customer picked (`VariantSummary.id`), which must be sold at the store in `X-Store-Id`. Ignored for other coupons.
+  /// ADR 0002: required for a free-carton reward (`discount_type` FREE_UNIT): the size the customer picked (`VariantSummary.id`). It must be sold at the store in `X-Store-Id`, be of the same product category as a paid line in the cart (a water reward goes on a water order) and have the stock. Ignored for other coupons.
   // minimum: 1
   @JsonKey(name: r'free_variant_id', required: false, includeIfNull: false)
   final int? freeVariantId;

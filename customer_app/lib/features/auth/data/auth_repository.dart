@@ -38,6 +38,9 @@ UserProfile userProfileFromMe(Me me) => UserProfile(
   name: me.name,
   email: (me.email?.isEmpty ?? true) ? null : me.email,
   isProfileComplete: me.isProfileComplete,
+  businessCategoryId: me.businessCategory,
+  businessCategoryName: me.businessCategoryName,
+  businessName: me.businessName ?? '',
 );
 
 class ApiAuthRepository implements AuthRepository {

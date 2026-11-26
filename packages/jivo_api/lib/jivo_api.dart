@@ -36,6 +36,7 @@ export 'package:jivo_api/src/model/arrived_customer_request.dart';
 export 'package:jivo_api/src/model/auth_session.dart';
 export 'package:jivo_api/src/model/banner_link_type_enum.dart';
 export 'package:jivo_api/src/model/bill.dart';
+export 'package:jivo_api/src/model/business_category.dart';
 export 'package:jivo_api/src/model/cancel_reason_enum.dart';
 export 'package:jivo_api/src/model/cancelled_by_enum.dart';
 export 'package:jivo_api/src/model/cart.dart';

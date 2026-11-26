@@ -8,6 +8,7 @@ import 'package:jivo_api/src/model/applied_coupon.dart';
 import 'package:jivo_api/src/model/arrived_customer_request.dart';
 import 'package:jivo_api/src/model/auth_session.dart';
 import 'package:jivo_api/src/model/bill.dart';
+import 'package:jivo_api/src/model/business_category.dart';
 import 'package:jivo_api/src/model/cart.dart';
 import 'package:jivo_api/src/model/cart_item_add_request.dart';
 import 'package:jivo_api/src/model/cart_item_update_request.dart';
@@ -259,6 +260,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'BannerLinkTypeEnum':
     case 'Bill':
       return Bill.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'BusinessCategory':
+      return BusinessCategory.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'CancelReasonEnum':
     case 'CancelledByEnum':
     case 'Cart':

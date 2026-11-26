@@ -39,6 +39,8 @@ class SignInResult {
   /// This login restored an account inside its deletion grace period.
   final bool deletionCancelled;
 
-  /// `03 §2.2`: new users and incomplete profiles go to complete-profile.
-  bool get needsProfile => isNewUser || !user.isProfileComplete;
+  /// `03 §2.2`: complete-profile shows only while the server says the
+  /// profile is incomplete (neither submitted nor skipped). [isNewUser] is
+  /// not used for routing.
+  bool get needsProfile => !user.isProfileComplete;
 }

@@ -6,7 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// * `MIN_ORDER_VALUE` - The item total is below the coupon's minimum. * `FIRST_ORDER_ONLY` - Only for your first order. * `NO_ELIGIBLE_ITEMS` - No items in the cart qualify for this coupon. * `STORE` - Not valid at this store. * `MIN_ORDER_UNITS` - A free-carton reward needs the order's minimum paid cartons. * `FREE_VARIANT_UNAVAILABLE` - The size chosen for the free carton is not available at this store.
+/// * `MIN_ORDER_VALUE` - The item total is below the coupon's minimum. * `FIRST_ORDER_ONLY` - Only for your first order. * `NO_ELIGIBLE_ITEMS` - No items in the cart qualify for this coupon. * `STORE` - Not valid at this store. * `MIN_ORDER_UNITS` - A free-carton reward needs the order's minimum paid cartons. * `FREE_VARIANT_UNAVAILABLE` - The size chosen for the free carton is not available here (not sold at this store, not of the category of a paid line, or out of stock).
 enum CouponIneligibleReasonEnum {
   @JsonValue(r'MIN_ORDER_VALUE')
   MIN_ORDER_VALUE(r'MIN_ORDER_VALUE'),

@@ -52,20 +52,50 @@ class ProfileFormState {
   /// The server rejected the email (generic message by design).
   bool get emailRejected =>
       error != null && ApiError.from(error!).fieldErrors.containsKey('email');
+
+  /// The server rejected the business category (unknown or inactive).
+  bool get categoryRejected => businessCategoryRejected(error);
+
+  /// A field error the form shows next to its field, not as a general one.
+  bool get hasFieldError => emailRejected || categoryRejected;
 }
 
-/// Saves name and email: complete-profile and edit profile.
+/// `VALIDATION_ERROR` on `business_category` (an unknown or inactive id):
+/// the forms show it under the dropdown (`03 §2.2`).
+bool businessCategoryRejected(Object? error) =>
+    error != null &&
+    ApiError.from(error).fieldErrors.containsKey('business_category');
+
+/// `GET /business-categories/` for the complete-profile and edit-profile
+/// dropdowns. Invalidate it to retry.
+final businessCategoriesProvider =
+    FutureProvider.autoDispose<List<BusinessCategory>>(
+      (ref) => ref.watch(profileRepositoryProvider).businessCategories(),
+      retry: noAutomaticRetry,
+    );
+
+/// Saves Edit profile: name, email and the business fields.
 class ProfileFormController extends Notifier<ProfileFormState> {
   @override
   ProfileFormState build() => const ProfileFormState();
 
-  Future<bool> save({required String name, String? email}) async {
+  Future<bool> save({
+    required String name,
+    String? email,
+    int? businessCategoryId,
+    String? businessName,
+  }) async {
     if (state.saving) return false;
     state = const ProfileFormState(saving: true);
     try {
       final user = await ref
           .read(profileRepositoryProvider)
-          .updateProfile(name: name, email: email);
+          .updateProfile(
+            name: name,
+            email: email,
+            businessCategoryId: businessCategoryId,
+            businessName: businessName,
+          );
       ref.read(currentUserProvider.notifier).replace(user);
       state = const ProfileFormState(saved: true);
       return true;

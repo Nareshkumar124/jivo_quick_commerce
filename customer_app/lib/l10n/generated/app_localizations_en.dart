@@ -185,7 +185,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get completeProfileTitle => 'Tell us about you';
 
   @override
-  String get completeProfileSubtitle => 'We\'ll use your name for deliveries.';
+  String get completeProfileSubtitle =>
+      'We\'ll use your name for deliveries. Your business details help us serve you better.';
+
+  @override
+  String get completeProfileSubmit => 'Submit';
+
+  @override
+  String get completeProfileSkip => 'Skip';
+
+  @override
+  String get businessCategoryLabel => 'Business category (optional)';
+
+  @override
+  String get businessCategoryHint => 'Select your type of business';
+
+  @override
+  String get businessCategoriesLoading => 'Loading business categories';
+
+  @override
+  String get businessCategoriesError => 'Couldn\'t load business categories.';
+
+  @override
+  String get businessCategoryInvalid =>
+      'Choose a business category from the list.';
+
+  @override
+  String get businessNameLabel => 'Business name (optional)';
+
+  @override
+  String get addYourName => 'Add your name';
 
   @override
   String get nameLabel => 'Full name';

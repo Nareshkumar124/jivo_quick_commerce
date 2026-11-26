@@ -11,7 +11,7 @@ flowchart TD
     S -->|logged out| L[Login: phone]
     OB --> L
     L --> O[OTP verify]
-    O -->|new user| PC[Complete profile: name]
+    O -->|profile not complete| PC[Complete profile: name, business; Skip / Submit]
     O -->|existing| LOC
     PC --> LOC[Location: detect / pick on map]
     LOC -->|not serviceable| NS[Not serviceable + Notify me]
@@ -56,7 +56,7 @@ Until a delivery location is chosen, Home shows a "Choose a delivery location" p
 |---------|---------|
 | Phone login | Indian mobile number (+91, 10 digits, validated). Consent checkbox/text for T&C and Privacy Policy. |
 | OTP verify | 6-digit OTP, autofilled on Android via SMS Retriever. Resend after a 30 s countdown. Errors for wrong or expired OTP. Lockout message when rate-limited. |
-| New-user profile | **Shown only right after the first OTP sign-up** (updated 2026-11-26, user request). One screen with **Name**, **Business category** (dropdown from `GET /business-categories/`, active ones in admin order) and **Business name**, plus **Skip** and **Submit**. Submit sends `PATCH /me/` with `name` and the optional `business_category` (id) and `business_name`; Skip calls `POST /me/profile-prompt/skip/`. Either one is remembered on the server, so the screen never shows again on any device. The app shows the screen only while `is_profile_complete` is false (it is false only for a new user who has neither submitted nor skipped; accounts created before 2026-11-26 are already true). The business fields stay editable later via `PATCH /me/`. Email stays optional (Edit profile). |
+| New-user profile | **Shown only right after the first OTP sign-up** (updated 2026-11-26, user request). One screen with **Name**, **Business category** (dropdown from `GET /business-categories/`, active ones in admin order) and **Business name**, plus **Skip** and **Submit**. Submit sends `PATCH /me/` with `name` and the optional `business_category` (id) and `business_name`; Skip calls `POST /me/profile-prompt/skip/`. Either one is remembered on the server, so the screen never shows again on any device. The app shows the screen only while `is_profile_complete` is false (it is false only for a new user who has neither submitted nor skipped; accounts created before 2026-11-26 are already true). The business fields stay editable later via `PATCH /me/`. Email stays optional (Edit profile). **App (built 2026-11-26):** Submit needs a Name; category and business name are optional. The dropdown shows a skeleton while loading and "Couldn't load business categories." with Retry on failure (Submit still works without it); a rejected category (`VALIDATION_ERROR` on `business_category`) shows under the dropdown. Both buttons are disabled while either request runs. After Skip the name is empty: the Account header shows "Add your name" with a person icon. Edit profile shows Name, Email, Business category and Business name; a saved category can be changed there but not cleared (the generated client drops `null`). |
 | Session | Tokens in secure storage. Silent refresh. On refresh failure, log out to the login screen. |
 | Logout | Revokes the refresh token, unregisters the device's FCM token, clears local data |
 | Delete account | Account → Delete account → confirm via OTP → account anonymised per policy (Play Store and DPDP requirement) |

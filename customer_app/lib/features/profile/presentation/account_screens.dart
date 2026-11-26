@@ -249,13 +249,15 @@ class _ProfileHeader extends StatelessWidget {
             child: CircleAvatar(
               radius: 30,
               backgroundColor: colors.softTint,
-              child: Text(
-                _initials(name),
-                style: text.titleLarge?.copyWith(
-                  color: scheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              child: name.trim().isEmpty
+                  ? Icon(Icons.person_outline, color: scheme.onPrimaryContainer)
+                  : Text(
+                      _initials(name),
+                      style: text.titleLarge?.copyWith(
+                        color: scheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: JivoSpacing.md),
@@ -263,12 +265,16 @@ class _ProfileHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // No name after a skipped profile (`03 §2.2`).
                 Text(
-                  name,
+                  name.trim().isEmpty ? l10n.addYourName : name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: text.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
+                    color: name.trim().isEmpty
+                        ? scheme.onSurfaceVariant
+                        : null,
                   ),
                 ),
                 Text(
@@ -503,6 +509,9 @@ class EditProfileScreen extends ConsumerWidget {
                 buttonLabel: l10n.save,
                 initialName: value.name,
                 initialEmail: value.email,
+                initialBusinessCategoryId: value.businessCategoryId,
+                initialBusinessCategoryName: value.businessCategoryName,
+                initialBusinessName: value.businessName,
                 onSaved: () {
                   showMessage(context, l10n.profileSaved);
                   context.pop();

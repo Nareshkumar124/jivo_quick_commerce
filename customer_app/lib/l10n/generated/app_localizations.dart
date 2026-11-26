@@ -421,8 +421,62 @@ abstract class AppLocalizations {
   /// Complete-profile helper text.
   ///
   /// In en, this message translates to:
-  /// **'We\'ll use your name for deliveries.'**
+  /// **'We\'ll use your name for deliveries. Your business details help us serve you better.'**
   String get completeProfileSubtitle;
+
+  /// Complete-profile primary button: saves name and business details.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get completeProfileSubmit;
+
+  /// Complete-profile secondary button: not now, never asked again.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get completeProfileSkip;
+
+  /// Business category dropdown label.
+  ///
+  /// In en, this message translates to:
+  /// **'Business category (optional)'**
+  String get businessCategoryLabel;
+
+  /// Business category dropdown hint when nothing is picked.
+  ///
+  /// In en, this message translates to:
+  /// **'Select your type of business'**
+  String get businessCategoryHint;
+
+  /// Screen-reader label while the business categories load.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading business categories'**
+  String get businessCategoriesLoading;
+
+  /// The business category list failed to load; a Retry button follows.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load business categories.'**
+  String get businessCategoriesError;
+
+  /// The server rejected the chosen business category (unknown or inactive).
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a business category from the list.'**
+  String get businessCategoryInvalid;
+
+  /// Shop or business name field label.
+  ///
+  /// In en, this message translates to:
+  /// **'Business name (optional)'**
+  String get businessNameLabel;
+
+  /// Account header when the user has no name yet (skipped the profile).
+  ///
+  /// In en, this message translates to:
+  /// **'Add your name'**
+  String get addYourName;
 
   /// Name field label.
   ///

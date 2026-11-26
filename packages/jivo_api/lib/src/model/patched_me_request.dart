@@ -18,9 +18,19 @@ part 'patched_me_request.g.dart';
 )
 class PatchedMeRequest {
   /// Returns a new [PatchedMeRequest] instance.
-  PatchedMeRequest({this.name, this.email, this.marketingOptIn});
+  PatchedMeRequest({
+    this.name,
 
-  /// Required to complete the profile. Cannot be blanked.
+    this.email,
+
+    this.marketingOptIn,
+
+    this.businessCategory,
+
+    this.businessName,
+  });
+
+  /// Cannot be blanked once sent. Empty after a skipped profile.
   @JsonKey(name: r'name', required: false, includeIfNull: false)
   final String? name;
 
@@ -32,19 +42,31 @@ class PatchedMeRequest {
   @JsonKey(name: r'marketing_opt_in', required: false, includeIfNull: false)
   final bool? marketingOptIn;
 
+  /// Optional. An id from `GET /business-categories/` (active only). Null removes it.
+  @JsonKey(name: r'business_category', required: false, includeIfNull: false)
+  final int? businessCategory;
+
+  /// Optional shop / business name. An empty string removes it.
+  @JsonKey(name: r'business_name', required: false, includeIfNull: false)
+  final String? businessName;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is PatchedMeRequest &&
           other.name == name &&
           other.email == email &&
-          other.marketingOptIn == marketingOptIn;
+          other.marketingOptIn == marketingOptIn &&
+          other.businessCategory == businessCategory &&
+          other.businessName == businessName;
 
   @override
   int get hashCode =>
       name.hashCode +
       (email == null ? 0 : email.hashCode) +
-      marketingOptIn.hashCode;
+      marketingOptIn.hashCode +
+      (businessCategory == null ? 0 : businessCategory.hashCode) +
+      businessName.hashCode;
 
   factory PatchedMeRequest.fromJson(Map<String, dynamic> json) =>
       _$PatchedMeRequestFromJson(json);

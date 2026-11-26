@@ -45,7 +45,7 @@ class AuthSession {
   @JsonKey(name: r'user', required: true, includeIfNull: false)
   final Me user;
 
-  /// True when this verification created the account. Show the complete-profile screen when `is_new_user` is true or `user.is_profile_complete` is false.
+  /// True when this verification created the account. Show the complete-profile screen only while `user.is_profile_complete` is false (03 §2.2).
   @JsonKey(name: r'is_new_user', required: true, includeIfNull: false)
   final bool isNewUser;
 

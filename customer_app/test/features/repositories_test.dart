@@ -3,6 +3,8 @@ import 'package:customer_app/features/addresses/domain/saved_address.dart';
 import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/domain/auth_models.dart';
 import 'package:customer_app/features/profile/data/profile_repository.dart';
+import 'package:customer_app/features/profile/presentation/profile_controllers.dart'
+    show businessCategoryRejected;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
 
@@ -13,6 +15,9 @@ final meJson = {
   'phone': '+919000000002',
   'name': '',
   'email': null,
+  'business_category': null,
+  'business_category_name': null,
+  'business_name': '',
   'is_profile_complete': false,
   'rider_status': 'NONE',
   'created_at': '2026-11-02T10:15:00Z',
@@ -117,6 +122,120 @@ void main() {
     expect(http.body(0), {'name': 'Asha', 'email': ''});
     expect(user.isProfileComplete, isTrue);
     expect(user.email, isNull);
+  });
+
+  group('complete profile (03 §2.2)', () {
+    test('submit sends name, category id and business name', () async {
+      final http = FakeHttp(
+        (_) => (
+          200,
+          {
+            ...meJson,
+            'name': 'Asha Verma',
+            'business_category': 2,
+            'business_category_name': 'Restaurant / Café',
+            'business_name': "Asha's Kitchen",
+            'is_profile_complete': true,
+          },
+        ),
+      );
+
+      final user = await ApiProfileRepository(http.api())
+          .submitBusinessProfile(
+            name: ' Asha Verma ',
+            businessCategoryId: 2,
+            businessName: " Asha's Kitchen ",
+          );
+
+      expect(http.requests.single.method, 'PATCH');
+      expect(http.requests.single.path, endsWith('/api/v1/me/'));
+      expect(http.body(0), {
+        'name': 'Asha Verma',
+        'business_category': 2,
+        'business_name': "Asha's Kitchen",
+      });
+      expect(user.isProfileComplete, isTrue);
+      expect(user.businessCategoryId, 2);
+      expect(user.businessCategoryName, 'Restaurant / Café');
+      expect(user.businessName, "Asha's Kitchen");
+    });
+
+    test('submit without a category leaves it out of the body', () async {
+      final http = FakeHttp(
+        (_) => (200, {...meJson, 'name': 'Asha', 'is_profile_complete': true}),
+      );
+
+      await ApiProfileRepository(
+        http.api(),
+      ).submitBusinessProfile(name: 'Asha');
+
+      expect(http.body(0), {'name': 'Asha', 'business_name': ''});
+    });
+
+    test('skip posts to the skip endpoint with no body', () async {
+      final http = FakeHttp(
+        (_) => (200, {...meJson, 'is_profile_complete': true}),
+      );
+
+      final user = await ApiProfileRepository(http.api()).skipProfilePrompt();
+
+      expect(http.requests.single.method, 'POST');
+      expect(
+        http.requests.single.path,
+        endsWith('/api/v1/me/profile-prompt/skip/'),
+      );
+      expect(http.requests.single.data, isNull);
+      expect(user.isProfileComplete, isTrue);
+      expect(user.name, isEmpty);
+    });
+
+    test('business categories map id, name and slug', () async {
+      final http = FakeHttp(
+        (_) => (
+          200,
+          [
+            {'id': 2, 'name': 'Restaurant / Café', 'slug': 'restaurant-cafe'},
+            {'id': 5, 'name': 'Kirana', 'slug': 'kirana'},
+          ],
+        ),
+      );
+
+      final list = await ApiProfileRepository(
+        http.api(),
+      ).businessCategories();
+
+      expect(http.requests.single.method, 'GET');
+      expect(
+        http.requests.single.path,
+        endsWith('/api/v1/business-categories/'),
+      );
+      expect(list.map((c) => c.id), [2, 5]);
+      expect(list.first.name, 'Restaurant / Café');
+      expect(list.first.slug, 'restaurant-cafe');
+    });
+
+    test('a rejected category surfaces as a field error', () async {
+      final http = FakeHttp(
+        (_) => (
+          400,
+          {
+            'error': {
+              'code': 'VALIDATION_ERROR',
+              'message': 'Some fields are invalid.',
+              'details': {
+                'business_category': ['Choose a business category from the list.'],
+              },
+            },
+          },
+        ),
+      );
+
+      final error = await ApiProfileRepository(http.api())
+          .submitBusinessProfile(name: 'Asha', businessCategoryId: 99)
+          .then<Object?>((_) => null, onError: (Object e) => e);
+
+      expect(businessCategoryRejected(error), isTrue);
+    });
   });
 
   test(

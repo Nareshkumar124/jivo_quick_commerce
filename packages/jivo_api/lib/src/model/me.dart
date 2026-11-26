@@ -30,6 +30,12 @@ class Me {
 
     this.marketingOptIn,
 
+    this.businessCategory,
+
+    required this.businessCategoryName,
+
+    this.businessName,
+
     required this.isProfileComplete,
 
     required this.riderStatus,
@@ -44,7 +50,7 @@ class Me {
   @JsonKey(name: r'phone', required: true, includeIfNull: true)
   final String? phone;
 
-  /// Required to complete the profile. Cannot be blanked.
+  /// Cannot be blanked once sent. Empty after a skipped profile.
   @JsonKey(name: r'name', required: true, includeIfNull: false)
   final String name;
 
@@ -56,7 +62,19 @@ class Me {
   @JsonKey(name: r'marketing_opt_in', required: false, includeIfNull: false)
   final bool? marketingOptIn;
 
-  /// False until a name is set: show the complete-profile screen.
+  /// Optional. An id from `GET /business-categories/` (active only). Null removes it.
+  @JsonKey(name: r'business_category', required: false, includeIfNull: false)
+  final int? businessCategory;
+
+  /// The chosen category's name, for display. Null when none.
+  @JsonKey(name: r'business_category_name', required: true, includeIfNull: true)
+  final String? businessCategoryName;
+
+  /// Optional shop / business name. An empty string removes it.
+  @JsonKey(name: r'business_name', required: false, includeIfNull: false)
+  final String? businessName;
+
+  /// False only for a new user who has neither submitted (PATCH `/me/` with `name`, `business_category` or `business_name`) nor skipped (`POST /me/profile-prompt/skip/`) the complete-profile screen: show that screen while it is false. Accounts created before 2026-11-26 are always true.
   @JsonKey(name: r'is_profile_complete', required: true, includeIfNull: false)
   final bool isProfileComplete;
 
@@ -81,6 +99,9 @@ class Me {
           other.name == name &&
           other.email == email &&
           other.marketingOptIn == marketingOptIn &&
+          other.businessCategory == businessCategory &&
+          other.businessCategoryName == businessCategoryName &&
+          other.businessName == businessName &&
           other.isProfileComplete == isProfileComplete &&
           other.riderStatus == riderStatus &&
           other.createdAt == createdAt;
@@ -92,6 +113,9 @@ class Me {
       name.hashCode +
       (email == null ? 0 : email.hashCode) +
       marketingOptIn.hashCode +
+      (businessCategory == null ? 0 : businessCategory.hashCode) +
+      (businessCategoryName == null ? 0 : businessCategoryName.hashCode) +
+      businessName.hashCode +
       isProfileComplete.hashCode +
       riderStatus.hashCode +
       createdAt.hashCode;

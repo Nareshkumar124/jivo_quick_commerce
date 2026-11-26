@@ -107,7 +107,7 @@ void main() {
         find.byKey(const Key('profile-name')),
         'Integration Tester',
       );
-      await tester.tap(find.text('Continue'));
+      await tester.tap(find.text('Submit'));
       await pumpUntilFound(tester, home);
     }
     expect(home, findsOneWidget);
