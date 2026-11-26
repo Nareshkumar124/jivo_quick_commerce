@@ -11871,9 +11871,20 @@ paths:
                         or choose cash on delivery.
                       details: {}
                   summary: PAYMENT_GATEWAY_UNAVAILABLE
+                ONLINEPAYMENTSDISABLED:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Online payment is not available yet. Please choose
+                        cash on delivery.
+                      details:
+                        reason: ONLINE_PAYMENTS_DISABLED
+                  summary: ONLINE_PAYMENTS_DISABLED
           description: 'Maintenance mode (`MAINTENANCE`), or the payment gateway could
             not be reached (`SERVICE_UNAVAILABLE`; nothing was created and no stock
-            is held: retry with the same `Idempotency-Key`, or offer COD).'
+            is held: retry with the same `Idempotency-Key`, or offer COD). `SERVICE_UNAVAILABLE`
+            with `details.reason` `ONLINE_PAYMENTS_DISABLED`: online payment is switched
+            off (cash on delivery only, DL-85); nothing was created: choose COD.'
         '400':
           content:
             application/json:
@@ -15072,9 +15083,20 @@ paths:
                         or choose cash on delivery.
                       details: {}
                   summary: PAYMENT_GATEWAY_UNAVAILABLE
+                ONLINEPAYMENTSDISABLED:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Online payment is not available yet. Please choose
+                        cash on delivery.
+                      details:
+                        reason: ONLINE_PAYMENTS_DISABLED
+                  summary: ONLINE_PAYMENTS_DISABLED
           description: 'Maintenance mode (`MAINTENANCE`), or the payment gateway could
             not be reached (`SERVICE_UNAVAILABLE`; nothing was created and no stock
-            is held: retry with the same `Idempotency-Key`, or offer COD).'
+            is held: retry with the same `Idempotency-Key`, or offer COD). `SERVICE_UNAVAILABLE`
+            with `details.reason` `ONLINE_PAYMENTS_DISABLED`: online payment is switched
+            off (cash on delivery only, DL-85); nothing was created: choose COD.'
         '426':
           content:
             application/json:
@@ -15890,8 +15912,19 @@ paths:
                         or choose cash on delivery.
                       details: {}
                   summary: PAYMENT_GATEWAY_UNAVAILABLE
+                ONLINEPAYMENTSDISABLED:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Online payment is not available yet. Please choose
+                        cash on delivery.
+                      details:
+                        reason: ONLINE_PAYMENTS_DISABLED
+                  summary: ONLINE_PAYMENTS_DISABLED
           description: 'Maintenance mode (`MAINTENANCE`), or the payment gateway could
-            not be reached (`SERVICE_UNAVAILABLE`): nothing changed; call verify again.'
+            not be reached (`SERVICE_UNAVAILABLE`): nothing changed; call verify again.
+            `SERVICE_UNAVAILABLE` with `details.reason` `ONLINE_PAYMENTS_DISABLED`:
+            online payment is switched off (cash on delivery only, DL-85).'
         '426':
           content:
             application/json:
@@ -16044,7 +16077,8 @@ paths:
                   summary: SERVICE_UNAVAILABLE
           description: '`SERVICE_UNAVAILABLE`: the event cannot be applied yet (a
             refund whose gateway id is still being recorded). Nothing is stored; Razorpay
-            retries it.'
+            retries it. Also while online payment is switched off (DL-85) and no webhook
+            secret is set.'
   /api/v1/products/:
     get:
       operationId: products_list
@@ -29009,11 +29043,13 @@ components:
       - COD_DISABLED
       - ABOVE_LIMIT
       - NOT_ALLOWED
+      - ONLINE_DISABLED
       type: string
       description: |-
         * `COD_DISABLED` - The store does not offer cash on delivery.
         * `ABOVE_LIMIT` - The order is above the cash-on-delivery limit.
         * `NOT_ALLOWED` - Cash on delivery is not available for this account.
+        * `ONLINE_DISABLED` - Online payment is not available yet.
     PaymentVerifyRequest:
       type: object
       properties:

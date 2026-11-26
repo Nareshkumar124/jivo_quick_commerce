@@ -51,3 +51,5 @@ class PaymentUnavailableReason(models.TextChoices):
     COD_DISABLED = "COD_DISABLED", "The store does not offer cash on delivery."
     ABOVE_LIMIT = "ABOVE_LIMIT", "The order is above the cash-on-delivery limit."
     NOT_ALLOWED = "NOT_ALLOWED", "Cash on delivery is not available for this account."
+    # DL-85: `ONLINE_PAYMENTS_ENABLED` is off (cash on delivery only).
+    ONLINE_DISABLED = "ONLINE_DISABLED", "Online payment is not available yet."

@@ -4,6 +4,8 @@
   QR Codes: `upi_qr`, single use, fixed amount) for exactly the order's `grand_total` (the amount
   due, from the server-side order). A repeat returns the same QR; an expired one is replaced.
   Off (`COD_UPI_QR_ENABLED`) or with no gateway keys: 503 `SERVICE_UNAVAILABLE` (take cash).
+  Online payment switched off (`ONLINE_PAYMENTS_ENABLED`, DL-85): the same 503 with
+  `details.reason` `ONLINE_PAYMENTS_DISABLED`, before any gateway call.
   The gateway call runs outside any row lock.
 - **The server confirms payment** (`record_credit`): the signed webhook `qr_code.credited`, or a
   gateway lookup (`refresh`) when the rider delivers with UPI or asks for the QR again (a missed
@@ -37,6 +39,7 @@ from apps.delivery.choices import DeliveryTaskStatus as TS
 from apps.delivery.models import CodQr, DeliveryTask
 from apps.orders.choices import OrderStatus, PaymentMethod
 from apps.orders.models import Order
+from apps.payments.switch import REASON, online_payments_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +52,7 @@ OPEN = (CodQrStatus.PENDING, CodQrStatus.PAID)
 def available() -> bool:
     from apps.payments.gateways import get_gateway
 
-    if not settings.COD_UPI_QR_ENABLED:
+    if not settings.COD_UPI_QR_ENABLED or not online_payments_enabled():
         return False
     try:
         return get_gateway().qr_available
@@ -128,6 +131,8 @@ def get_or_create(user, task_id: int, now: datetime | None = None) -> CodQr:
     if task is None:
         raise ApiError(ErrorCode.NOT_FOUND, MSG_TASK_NOT_FOUND)
     _check_task(task, task.order)
+    if not online_payments_enabled():  # DL-85: cash on delivery only, no gateway call at all
+        raise ApiError(ErrorCode.SERVICE_UNAVAILABLE, MSG_UNAVAILABLE, details={"reason": REASON})
     existing = current(task)
     if existing is not None and existing.status == CodQrStatus.PENDING:
         refresh(existing)

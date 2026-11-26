@@ -8,6 +8,7 @@ Views are thin: validate, then `apps.payments.services` (which ends in
 `orders.services.capture_payment()`).
 """
 
+from django.conf import settings
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.exceptions import ValidationError
@@ -39,6 +40,8 @@ from apps.payments.serializers import (
     RazorpayWebhookEventSerializer,
     WebhookAckSerializer,
 )
+from apps.payments.switch import MSG_ONLINE_DISABLED, online_payments_enabled
+from apps.payments.switch import REASON as ONLINE_DISABLED_REASON
 
 TAGS = ["payments"]
 SIGNATURE_HEADER = "X-Razorpay-Signature"
@@ -50,12 +53,20 @@ INVALID_WEBHOOK_SIGNATURE = "The webhook signature is invalid."
 # Local development only: the fake gateway's FAKE_GATEWAY_DOWN switch (P3-TC-63).
 VERIFY_UNAVAILABLE = error_response(
     "Maintenance mode (`MAINTENANCE`), or the payment gateway could not be reached "
-    "(`SERVICE_UNAVAILABLE`): nothing changed; call verify again.",
+    "(`SERVICE_UNAVAILABLE`): nothing changed; call verify again. `SERVICE_UNAVAILABLE` with "
+    "`details.reason` `ONLINE_PAYMENTS_DISABLED`: online payment is switched off (cash on "
+    "delivery only, DL-85).",
     *app_responses({})[503].examples,
     error_example(
         ErrorCode.SERVICE_UNAVAILABLE,
         "Online payment is temporarily unavailable. Try again, or choose cash on delivery.",
         name="PAYMENT_GATEWAY_UNAVAILABLE",
+    ),
+    error_example(
+        ErrorCode.SERVICE_UNAVAILABLE,
+        MSG_ONLINE_DISABLED,
+        {"reason": ONLINE_DISABLED_REASON},
+        name="ONLINE_PAYMENTS_DISABLED",
     ),
 )
 
@@ -194,7 +205,8 @@ class RazorpayWebhookView(APIView):
             ),
             503: error_response(
                 "`SERVICE_UNAVAILABLE`: the event cannot be applied yet (a refund whose gateway "
-                "id is still being recorded). Nothing is stored; Razorpay retries it.",
+                "id is still being recorded). Nothing is stored; Razorpay retries it. Also "
+                "while online payment is switched off (DL-85) and no webhook secret is set.",
                 error_example(ErrorCode.SERVICE_UNAVAILABLE),
             ),
         },
@@ -202,6 +214,15 @@ class RazorpayWebhookView(APIView):
     def post(self, request: Request) -> Response:
         # The HMAC covers the raw bytes: read them before anything parses the body.
         body = request.body
+        if not online_payments_enabled() and not settings.RAZORPAY_WEBHOOK_SECRET:
+            # DL-85: cash on delivery only and no secret to check the signature with. Nothing
+            # is stored and the gateway is never loaded (no 500); with a secret, events are
+            # still applied (a payment or refund started before the switch was turned off).
+            raise ApiError(
+                ErrorCode.SERVICE_UNAVAILABLE,
+                MSG_ONLINE_DISABLED,
+                details={"reason": ONLINE_DISABLED_REASON},
+            )
         if not get_gateway().verify_webhook_signature(body, request.headers.get(SIGNATURE_HEADER)):
             raise ApiError(ErrorCode.PAYMENT_VERIFICATION_FAILED, INVALID_WEBHOOK_SIGNATURE)
         event_id = (request.headers.get(EVENT_ID_HEADER) or "").strip()

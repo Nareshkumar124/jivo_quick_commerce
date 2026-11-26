@@ -152,6 +152,25 @@ def test_real_gateway_without_keys_is_unavailable(at_customer, settings):
     assert response.status_code == 503
 
 
+def test_cod_only_switch_refuses_the_qr_without_a_gateway_call(at_customer, settings, monkeypatch):
+    """DL-85: online payment switched off -> 503 with reason ONLINE_PAYMENTS_DISABLED, before
+    any gateway call; the rider takes cash. Switched on again, the QR works."""
+    settings.ONLINE_PAYMENTS_ENABLED = False
+    assert cod_qr.available() is False
+
+    def boom():
+        raise AssertionError("no gateway call while online payment is off")
+
+    monkeypatch.setattr("apps.payments.gateways.get_gateway", boom)
+    response = at_customer.client.post(qr_url(at_customer))
+    assert response.status_code == 503
+    assert response.json()["error"]["details"] == {"reason": "ONLINE_PAYMENTS_DISABLED"}
+    assert not CodQr.objects.filter(task_id=at_customer.task_id).exists()
+    monkeypatch.undo()
+    settings.ONLINE_PAYMENTS_ENABLED = True
+    assert at_customer.client.post(qr_url(at_customer)).status_code == 200
+
+
 def test_expired_qr_is_replaced(at_customer, settings):
     settings.COD_QR_EXPIRY_SECONDS = 60  # inside the 15-minute access token
     f = at_customer

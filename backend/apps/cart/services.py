@@ -51,6 +51,7 @@ from apps.core.exceptions import ApiError
 from apps.core.money import ZERO, money_str, round_money, rupees
 from apps.inventory.services import availability
 from apps.orders.choices import FreeSource, PaymentMethod
+from apps.payments.switch import MSG_ONLINE_DISABLED, online_payments_enabled
 from apps.promotions import services as promotions
 from apps.promotions.choices import CouponIneligibleReason
 from apps.stores.models import PricingConfig
@@ -945,12 +946,13 @@ def cod_unavailable(rules: PricingRules, user, grand_total: Decimal):
 
 def _payment_methods(state: CartState, user) -> list[dict]:
     cod = cod_unavailable(state.rules, user, state.bill.grand_total)
+    online = online_payments_enabled()
     return [
         {
             "method": PaymentMethod.ONLINE,
-            "is_available": True,
-            "unavailable_reason": None,
-            "message": None,
+            "is_available": online,
+            "unavailable_reason": None if online else PaymentUnavailableReason.ONLINE_DISABLED,
+            "message": None if online else MSG_ONLINE_DISABLED,
         },
         {
             "method": PaymentMethod.COD,
