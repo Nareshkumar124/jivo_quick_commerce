@@ -1,6 +1,7 @@
 """Customer referrals (07 §2.5a, added 2026-11-13).
 
-- `ReferralSettings`: one row (id 1) the admin edits: on/off, reward amount, validity, minimum.
+- `ReferralSettings`: one row (id 1) the admin edits: on/off, reward amount, validity, minimum,
+  and (ADR 0003) the free cartons of the welcome reward and of each referral reward.
 - `ReferralCode`: each customer's own code, created on their first `GET /account/referral/`.
 - `Referral`: a customer (`referred`) entered another customer's (`referrer`) code. At most one
   per referred customer, ever. When the referred customer's first order is delivered, both get
@@ -29,6 +30,10 @@ DEFAULT_REWARD_AMOUNT = Decimal("90.00")
 DEFAULT_VALIDITY_DAYS = 30
 DEFAULT_MIN_ORDER_VALUE = Decimal("0.00")
 MAX_REWARD_AMOUNT = Decimal("1000.00")
+# ADR 0003: free cartons per reward (welcome and referral). The same bound as a FREE_UNIT
+# coupon's `value` (`apps.promotions.models.MAX_FREE_UNITS`).
+DEFAULT_REWARD_QUANTITY = 1
+MAX_REWARD_QUANTITY = 10
 
 
 class ReferralSettings(TimeStampedModel):
@@ -47,8 +52,9 @@ class ReferralSettings(TimeStampedModel):
         default=DEFAULT_REWARD_AMOUNT,
         validators=[MinValueValidator(Decimal("1.00")), MaxValueValidator(MAX_REWARD_AMOUNT)],
         help_text=(
-            "Not used since ADR 0002 (2026-11-25): the referral reward is now one free carton "
-            "for each of the two customers. Kept for the referrals rewarded before."
+            "Not used since ADR 0002 (2026-11-25): the referral reward is now free cartons "
+            "for each of the two customers (`reward_quantity`). Kept for the referrals rewarded "
+            "before."
         ),
     )
     reward_validity_days = models.PositiveSmallIntegerField(
@@ -68,6 +74,27 @@ class ReferralSettings(TimeStampedModel):
             "cartons instead. Kept for the ₹ reward coupons given before."
         ),
     )
+    # ADR 0003: how many free cartons each reward gives. Read when a reward is created; rewards
+    # given earlier keep their own number. `db_default` so the previous release (during a
+    # deploy) can still create the row.
+    welcome_reward_quantity = models.PositiveSmallIntegerField(
+        default=DEFAULT_REWARD_QUANTITY,
+        db_default=DEFAULT_REWARD_QUANTITY,
+        validators=[MinValueValidator(1), MaxValueValidator(MAX_REWARD_QUANTITY)],
+        help_text=(
+            "Free cartons in the welcome reward of a new customer account (1 to 10). Rewards "
+            "already given keep their own number."
+        ),
+    )
+    reward_quantity = models.PositiveSmallIntegerField(
+        default=DEFAULT_REWARD_QUANTITY,
+        db_default=DEFAULT_REWARD_QUANTITY,
+        validators=[MinValueValidator(1), MaxValueValidator(MAX_REWARD_QUANTITY)],
+        help_text=(
+            "Free cartons each of the two customers gets for a referral (1 to 10). Rewards "
+            "already given keep their own number."
+        ),
+    )
     history = HistoricalRecords()
 
     class Meta:
@@ -85,6 +112,16 @@ class ReferralSettings(TimeStampedModel):
             models.CheckConstraint(
                 condition=Q(reward_validity_days__gte=1),
                 name="referralsettings_validity_at_least_1",
+            ),
+            # ADR 0003: 1 to 10 free cartons per reward.
+            models.CheckConstraint(
+                condition=Q(welcome_reward_quantity__gte=1)
+                & Q(welcome_reward_quantity__lte=MAX_REWARD_QUANTITY),
+                name="referralsettings_welcome_quantity_1_to_10",
+            ),
+            models.CheckConstraint(
+                condition=Q(reward_quantity__gte=1) & Q(reward_quantity__lte=MAX_REWARD_QUANTITY),
+                name="referralsettings_reward_quantity_1_to_10",
             ),
         ]
 

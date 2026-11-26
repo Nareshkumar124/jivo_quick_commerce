@@ -400,6 +400,16 @@ class ProductVariantAdmin(ReadOnlyHistoryAdmin, CatalogImportExportAdmin):
         (None, {"fields": (("is_active", "sort_order"),)}),
     )
 
+    def get_search_results(self, request, queryset, search_term):
+        queryset, may_have_duplicates = super().get_search_results(request, queryset, search_term)
+        from apps.stores.admin import is_free_size_lookup
+
+        if is_free_size_lookup(request):
+            # ADR 0003: the pricing page's "Free carton size" offers active variants only (the
+            # form validates the same list).
+            queryset = queryset.filter(is_active=True, product__is_active=True)
+        return queryset, may_have_duplicates
+
     @display(description="Discount")
     def discount(self, obj) -> str:
         if not obj.mrp or obj.selling_price >= obj.mrp:

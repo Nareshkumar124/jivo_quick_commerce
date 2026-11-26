@@ -6,6 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:jivo_api/src/model/coupon_source_enum.dart';
 import 'package:jivo_api/src/model/reward_status_enum.dart';
+import 'package:jivo_api/src/model/free_variant.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -25,6 +26,10 @@ class Reward {
 
     required this.title,
 
+    required this.quantity,
+
+    required this.freeVariant,
+
     required this.source_,
 
     required this.status,
@@ -34,13 +39,22 @@ class Reward {
     required this.orderNumber,
   });
 
-  /// Apply it with `POST /cart/coupon/` {`code`, `free_variant_id`} (the customer picks the size).
+  /// Apply it with `POST /cart/coupon/`: {`code`} alone when `free_variant` is set (ADR 0003, no size sheet), else {`code`, `free_variant_id`} with the size the customer picks (ADR 0002).
   @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-  /// e.g. \"1 free carton: welcome reward\".
+  /// e.g. \"2 free cartons: welcome reward\".
   @JsonKey(name: r'title', required: true, includeIfNull: false)
   final String title;
+
+  /// ADR 0003: free cartons this reward gives (e.g. 2). Fixed when the reward is given.
+  // minimum: 1
+  @JsonKey(name: r'quantity', required: true, includeIfNull: false)
+  final int quantity;
+
+  /// ADR 0003: the size of the free cartons, the store's fixed free size (show \"2 free cartons · 1 L x 12\"; **Use** applies it without a size sheet). The store is the one in the optional `X-Store-Id` header, else the store of the caller's cart. Null when that store has no fixed size (or there is no store yet): then the customer picks the size (ADR 0002).
+  @JsonKey(name: r'free_variant', required: true, includeIfNull: true)
+  final FreeVariant? freeVariant;
 
   /// WELCOME, REFERRAL_REFERRER or REFERRAL_REFERRED.  * `NONE` - Made by staff * `WELCOME` - Welcome reward (new account) * `REFERRAL_REFERRER` - Referral reward (you invited a friend) * `REFERRAL_REFERRED` - Referral reward (you joined with a friend's code)
   @JsonKey(
@@ -74,6 +88,8 @@ class Reward {
       other is Reward &&
           other.code == code &&
           other.title == title &&
+          other.quantity == quantity &&
+          other.freeVariant == freeVariant &&
           other.source_ == source_ &&
           other.status == status &&
           other.expiresAt == expiresAt &&
@@ -83,6 +99,8 @@ class Reward {
   int get hashCode =>
       code.hashCode +
       title.hashCode +
+      quantity.hashCode +
+      (freeVariant == null ? 0 : freeVariant.hashCode) +
       source_.hashCode +
       status.hashCode +
       (expiresAt == null ? 0 : expiresAt.hashCode) +

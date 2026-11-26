@@ -12,11 +12,13 @@ import '../domain/reward.dart';
 /// The signed-in customer's rewards (`GET /account/rewards/`). Loaded each
 /// time the Rewards screen opens (auto-dispose), so a reward used, claimed
 /// or earned since shows its new state. Nobody signed in: `AUTH_REQUIRED`
-/// without a request.
+/// without a request. Sent with the serving store (each reward names that
+/// store's fixed free size, ADR 0003), so a store change reloads it.
 final rewardsProvider = FutureProvider.autoDispose<RewardsSummary>((ref) {
   if (ref.watch(signedInUserIdProvider) == null) {
     throw const ApiError(code: ApiErrorCode.authRequired);
   }
+  ref.watch(currentStoreIdProvider);
   return ref.watch(rewardsRepositoryProvider).fetch();
 });
 

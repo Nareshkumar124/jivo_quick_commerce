@@ -125,7 +125,10 @@ void main() {
     await app.pump(tester);
 
     expect(find.text('Not delivering here'), findsOneWidget);
-    expect(find.text("We don't deliver to this location yet."), findsOneWidget);
+    // The coming-soon banner: the app's headline, the server's message.
+    expect(find.byKey(const Key('coming-soon-banner')), findsOneWidget);
+    expect(find.text("We're coming to your area soon!"), findsOneWidget);
+    expect(find.text("We're not delivering here yet."), findsOneWidget);
     expect(find.text('Change location'), findsOneWidget);
   });
 

@@ -19,6 +19,8 @@ abstract class _$FreeOfferCWProxy {
 
   FreeOffer notice(String? notice);
 
+  FreeOffer freeVariant(FreeVariant? freeVariant);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `FreeOffer(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -32,6 +34,7 @@ abstract class _$FreeOfferCWProxy {
     int unitsToNextFree,
     String message,
     String? notice,
+    FreeVariant? freeVariant,
   });
 }
 
@@ -61,6 +64,10 @@ class _$FreeOfferCWProxyImpl implements _$FreeOfferCWProxy {
   FreeOffer notice(String? notice) => this(notice: notice);
 
   @override
+  FreeOffer freeVariant(FreeVariant? freeVariant) =>
+      this(freeVariant: freeVariant);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `FreeOffer(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -74,6 +81,7 @@ class _$FreeOfferCWProxyImpl implements _$FreeOfferCWProxy {
     Object? unitsToNextFree = const $CopyWithPlaceholder(),
     Object? message = const $CopyWithPlaceholder(),
     Object? notice = const $CopyWithPlaceholder(),
+    Object? freeVariant = const $CopyWithPlaceholder(),
   }) {
     return FreeOffer(
       every: every == const $CopyWithPlaceholder()
@@ -100,6 +108,10 @@ class _$FreeOfferCWProxyImpl implements _$FreeOfferCWProxy {
           ? _value.notice
           // ignore: cast_nullable_to_non_nullable
           : notice as String?,
+      freeVariant: freeVariant == const $CopyWithPlaceholder()
+          ? _value.freeVariant
+          // ignore: cast_nullable_to_non_nullable
+          : freeVariant as FreeVariant?,
     );
   }
 }
@@ -127,6 +139,7 @@ FreeOffer _$FreeOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
         'units_to_next_free',
         'message',
         'notice',
+        'free_variant',
       ],
     );
     final val = FreeOffer(
@@ -139,6 +152,11 @@ FreeOffer _$FreeOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
       ),
       message: $checkedConvert('message', (v) => v as String),
       notice: $checkedConvert('notice', (v) => v as String?),
+      freeVariant: $checkedConvert(
+        'free_variant',
+        (v) =>
+            v == null ? null : FreeVariant.fromJson(v as Map<String, dynamic>),
+      ),
     );
     return val;
   },
@@ -146,6 +164,7 @@ FreeOffer _$FreeOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
     'paidUnits': 'paid_units',
     'freeUnits': 'free_units',
     'unitsToNextFree': 'units_to_next_free',
+    'freeVariant': 'free_variant',
   },
 );
 
@@ -156,4 +175,5 @@ Map<String, dynamic> _$FreeOfferToJson(FreeOffer instance) => <String, dynamic>{
   'units_to_next_free': instance.unitsToNextFree,
   'message': instance.message,
   'notice': instance.notice,
+  'free_variant': instance.freeVariant?.toJson(),
 };

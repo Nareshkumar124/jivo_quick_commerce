@@ -30,11 +30,12 @@ paths:
                   value:
                     code: K7M2PQ
                     share_message: Use my code K7M2PQ on the Jivo app and we both
-                      get 1 free carton.
+                      get 2 free cartons.
                     is_enabled: true
                     reward_type: FREE_UNIT
-                    reward_quantity: 1
-                    reward_label: 1 free carton
+                    reward_quantity: 2
+                    reward_label: 2 free cartons
+                    welcome_reward_quantity: 2
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -47,11 +48,12 @@ paths:
                   value:
                     code: K7M2PQ
                     share_message: Use my code K7M2PQ on the Jivo app and we both
-                      get 1 free carton.
+                      get 2 free cartons.
                     is_enabled: true
                     reward_type: FREE_UNIT
-                    reward_quantity: 1
-                    reward_label: 1 free carton
+                    reward_quantity: 2
+                    reward_label: 2 free cartons
+                    welcome_reward_quantity: 2
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -67,11 +69,12 @@ paths:
                   value:
                     code: XR4TNW
                     share_message: Use my code XR4TNW on the Jivo app and we both
-                      get 1 free carton.
+                      get 2 free cartons.
                     is_enabled: true
                     reward_type: FREE_UNIT
-                    reward_quantity: 1
-                    reward_label: 1 free carton
+                    reward_quantity: 2
+                    reward_label: 2 free cartons
+                    welcome_reward_quantity: 2
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -87,11 +90,12 @@ paths:
                   value:
                     code: K7M2PQ
                     share_message: Use my code K7M2PQ on the Jivo app and we both
-                      get 1 free carton.
+                      get 2 free cartons.
                     is_enabled: false
                     reward_type: FREE_UNIT
-                    reward_quantity: 1
-                    reward_label: 1 free carton
+                    reward_quantity: 2
+                    reward_label: 2 free cartons
+                    welcome_reward_quantity: 2
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -241,11 +245,12 @@ paths:
                   value:
                     code: K7M2PQ
                     share_message: Use my code K7M2PQ on the Jivo app and we both
-                      get 1 free carton.
+                      get 2 free cartons.
                     is_enabled: true
                     reward_type: FREE_UNIT
-                    reward_quantity: 1
-                    reward_label: 1 free carton
+                    reward_quantity: 2
+                    reward_label: 2 free cartons
+                    welcome_reward_quantity: 2
                     reward_amount: '90.00'
                     reward_validity_days: 30
                     reward_min_order_value: '0.00'
@@ -432,13 +437,23 @@ paths:
   /api/v1/account/rewards/:
     get:
       operationId: account_rewards_retrieve
-      description: 'ADR 0002: the caller''s free-carton rewards (welcome and referral)
-        and their history. A reward is a personal coupon with `discount_type` FREE_UNIT:
-        tap **Use**, let the customer pick a size, then `POST /cart/coupon/` with
-        `code` and `free_variant_id`. One reward or one coupon per order; the order
-        still needs the store''s minimum paid cartons. USED and EXPIRED rewards are
-        only in `history`.'
+      description: 'ADR 0002/0003: the caller''s free-carton rewards (welcome and
+        referral) and their history. A reward is a personal coupon with `discount_type`
+        FREE_UNIT giving `quantity` free cartons. Tap **Use**: when `free_variant`
+        is set (the store''s fixed free size, ADR 0003) send `POST /cart/coupon/`
+        with `code` only; else let the customer pick a size and send `code` and `free_variant_id`.
+        One reward or one coupon per order; the order still needs the store''s minimum
+        paid cartons. USED and EXPIRED rewards are only in `history`.'
       summary: My free-carton rewards
+      parameters:
+      - in: header
+        name: X-Store-Id
+        schema:
+          type: integer
+        description: 'Optional: the store the app has selected (`store.id` from `GET
+          /serviceability/`). Used to show that store''s fixed free size (ADR 0003).
+          Missing, malformed, unknown or deactivated: the store of the caller''s cart
+          is used instead (never an error).'
       tags:
       - account
       security:
@@ -454,13 +469,23 @@ paths:
                   value:
                     available:
                     - code: WEL7K2M9QPX
-                      title: '1 free carton: welcome reward'
+                      title: '2 free cartons: welcome reward'
+                      quantity: 2
+                      free_variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        product_name: Jivo Water
                       source: WELCOME
                       status: AVAILABLE
                       expires_at: '2026-12-25T09:30:00Z'
                       order_number: null
                     - code: REF4Q8N2KXW
-                      title: '1 free carton: you invited a friend'
+                      title: '2 free cartons: you invited a friend'
+                      quantity: 2
+                      free_variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        product_name: Jivo Water
                       source: REFERRAL_REFERRER
                       status: CLAIMED
                       expires_at: '2026-12-20T11:00:00Z'
@@ -469,7 +494,7 @@ paths:
                     - at: '2026-11-24T08:15:00Z'
                       kind: CLAIMED
                       title: 'Referral reward: you invited a friend'
-                      quantity: 1
+                      quantity: 2
                       order_number: JV-261124-000318
                     - at: '2026-11-22T12:40:00Z'
                       kind: VOLUME_FREE
@@ -479,13 +504,26 @@ paths:
                     - at: '2026-11-20T11:00:00Z'
                       kind: EARNED
                       title: 'Referral reward: you invited a friend'
-                      quantity: 1
+                      quantity: 2
                       order_number: null
                     - at: '2026-11-18T09:30:00Z'
                       kind: EARNED
                       title: Welcome reward
-                      quantity: 1
+                      quantity: 2
                       order_number: null
+                StoreWithoutAFixedFreeSize:
+                  value:
+                    available:
+                    - code: WEL7K2M9QPX
+                      title: '2 free cartons: welcome reward'
+                      quantity: 2
+                      free_variant: null
+                      source: WELCOME
+                      status: AVAILABLE
+                      expires_at: '2026-12-25T09:30:00Z'
+                      order_number: null
+                    history: []
+                  summary: Store without a fixed free size
                 NoRewards:
                   value:
                     available: []
@@ -2256,6 +2294,7 @@ paths:
                       discount_type: FLAT
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -2426,6 +2465,7 @@ paths:
                       discount_type: FLAT
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -3011,6 +3051,7 @@ paths:
                       discount_type: FLAT
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                       discount: '0.00'
                       is_applicable: false
                       message: Add items worth ₹74 more to use this coupon.
@@ -3364,6 +3405,7 @@ paths:
                       discount_type: FLAT
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -3519,6 +3561,7 @@ paths:
                       discount_type: FREE_UNIT
                       source: WELCOME
                       free_variant_id: 4002
+                      free_quantity: 1
                       discount: '0.00'
                       is_applicable: true
                       message: null
@@ -3628,6 +3671,7 @@ paths:
                       units_to_next_free: 8
                       message: Add 8 more cartons to get 1 more free
                       notice: null
+                      free_variant: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -3741,6 +3785,7 @@ paths:
                       message: Add 10 more cartons to get 1 more free
                       notice: Your free carton is out of stock right now, so it is
                         not added.
+                      free_variant: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -3764,6 +3809,230 @@ paths:
                       can_place_order: true
                       blockers: []
                   summary: Free carton earned but out of stock
+                FreeCartonsInTheStore'sFixed1LSize(ADR0003):
+                  value:
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: true
+                      opens_at: null
+                    items:
+                    - id: 511
+                      product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 8
+                      price_per_unit: '110.00'
+                      previous_selling_price: null
+                      price_tier: null
+                      next_tier_price: null
+                      line_mrp_total: '880.00'
+                      line_total: '880.00'
+                      issue: null
+                    - id: 512
+                      product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4002
+                        name: 500 ml x 24 (carton)
+                        mrp: '140.00'
+                        selling_price: '140.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '11.67'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 4
+                      price_per_unit: '140.00'
+                      previous_selling_price: null
+                      price_tier: null
+                      next_tier_price: null
+                      line_mrp_total: '560.00'
+                      line_total: '560.00'
+                      issue: null
+                    item_count: 12
+                    coupon:
+                      code: WEL7K2M9QPX
+                      title: '2 free cartons: welcome reward'
+                      discount_type: FREE_UNIT
+                      source: WELCOME
+                      free_variant_id: 4001
+                      free_quantity: 2
+                      discount: '0.00'
+                      is_applicable: true
+                      message: null
+                      amount_to_unlock: null
+                    tip: '0.00'
+                    instructions:
+                      chips: []
+                      note: ''
+                    address:
+                      id: 12
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                      is_default: true
+                      is_serviceable: true
+                      created_at: '2026-10-20T06:35:00Z'
+                      updated_at: '2026-10-20T06:35:00Z'
+                    bill:
+                      mrp_total: '1440.00'
+                      item_total: '1440.00'
+                      product_discount: '0.00'
+                      coupon_discount: '0.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '0.00'
+                      grand_total: '1440.00'
+                      total_savings: '330.00'
+                      free_items_value: '330.00'
+                    free_lines:
+                    - product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 1
+                      mrp: '110.00'
+                      value: '110.00'
+                      source: VOLUME_OFFER
+                    - product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 2
+                      mrp: '110.00'
+                      value: '220.00'
+                      source: REWARD
+                    free_offer:
+                      every: 10
+                      paid_units: 12
+                      free_units: 1
+                      units_to_next_free: 8
+                      message: Add 8 more cartons to get 1 more free
+                      notice: null
+                      free_variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        product_name: Jivo Water
+                    thresholds:
+                      min_order_value: '99.00'
+                      amount_to_min_order: null
+                      free_delivery_threshold: '299.00'
+                      amount_to_free_delivery: null
+                      min_order_units: 5
+                      units_to_min_order: null
+                      order_unit_label: cartons
+                      tier_units: 0
+                      next_price_tier: null
+                    payment_methods:
+                    - method: ONLINE
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    - method: COD
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    checkout:
+                      can_place_order: true
+                      blockers: []
+                  summary: Free cartons in the store's fixed 1 L size (ADR 0003)
           description: The cart.
         '401':
           content:
@@ -4061,6 +4330,7 @@ paths:
                       discount_type: FLAT
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -4552,7 +4822,7 @@ paths:
       description: |-
         Applies `code` (case-insensitive) and replaces any coupon already applied. The discount is on the item total (or on the qualifying items for a category coupon), capped by `max_discount` and by the item total. Applying does not use the coupon up: an order does (held while its payment is pending).
 
-        **Free-carton rewards** (ADR 0002, `discount_type` FREE_UNIT): send `free_variant_id`, the size the customer picked; it must be sold at this store, be of the same product category as a paid line in the cart, and have the stock. The cart then has a free REWARD line in `free_lines` and no money off. A reward takes the order's single coupon slot and still needs the store's minimum paid cartons (`thresholds.min_order_units`; free cartons never count).
+        **Free-carton rewards** (`discount_type` FREE_UNIT): the cart gets a free REWARD line of `free_quantity` cartons (the reward's own number, e.g. 2) in `free_lines` and no money off. **ADR 0003:** when the store has a fixed free size (`free_offer.free_variant`, e.g. 1 L), send only `code`: the server uses that size (the category rule below does not apply to it); a different `free_variant_id` is 422 `FREE_VARIANT_UNAVAILABLE`. **Otherwise (ADR 0002):** send `free_variant_id`, the size the customer picked; it must be sold at this store and be of the same product category as a paid line in the cart. Either way the size needs the stock for the cart's paid units of it plus the reward's cartons. A reward takes the order's single coupon slot and still needs the store's minimum paid cartons (`thresholds.min_order_units`; free cartons never count).
       summary: Apply a coupon
       parameters:
       - in: header
@@ -4581,6 +4851,10 @@ paths:
                   code: WEL7K2M9QPX
                   free_variant_id: 4002
                 summary: Apply a free-carton reward
+              ApplyAFree-cartonReward(fixedFreeSize,ADR0003):
+                value:
+                  code: WEL7K2M9QPX
+                summary: Apply a free-carton reward (fixed free size, ADR 0003)
         required: true
       security:
       - jwtAuth: []
@@ -4678,6 +4952,7 @@ paths:
                       discount_type: FLAT
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -4830,6 +5105,7 @@ paths:
                       discount_type: FREE_UNIT
                       source: WELCOME
                       free_variant_id: 4002
+                      free_quantity: 1
                       discount: '0.00'
                       is_applicable: true
                       message: null
@@ -4939,6 +5215,7 @@ paths:
                       units_to_next_free: 8
                       message: Add 8 more cartons to get 1 more free
                       notice: null
+                      free_variant: null
                     thresholds:
                       min_order_value: '99.00'
                       amount_to_min_order: null
@@ -4962,6 +5239,230 @@ paths:
                       can_place_order: true
                       blockers: []
                   summary: Free-carton reward applied
+                Free-cartonRewardApplied(fixed1LSize,ADR0003):
+                  value:
+                    store:
+                      id: 1
+                      name: Jivo Sector 14, Gurugram
+                      is_open: true
+                      opens_at: null
+                    items:
+                    - id: 511
+                      product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 8
+                      price_per_unit: '110.00'
+                      previous_selling_price: null
+                      price_tier: null
+                      next_tier_price: null
+                      line_mrp_total: '880.00'
+                      line_total: '880.00'
+                      issue: null
+                    - id: 512
+                      product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4002
+                        name: 500 ml x 24 (carton)
+                        mrp: '140.00'
+                        selling_price: '140.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '11.67'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 4
+                      price_per_unit: '140.00'
+                      previous_selling_price: null
+                      price_tier: null
+                      next_tier_price: null
+                      line_mrp_total: '560.00'
+                      line_total: '560.00'
+                      issue: null
+                    item_count: 12
+                    coupon:
+                      code: WEL7K2M9QPX
+                      title: '2 free cartons: welcome reward'
+                      discount_type: FREE_UNIT
+                      source: WELCOME
+                      free_variant_id: 4001
+                      free_quantity: 2
+                      discount: '0.00'
+                      is_applicable: true
+                      message: null
+                      amount_to_unlock: null
+                    tip: '0.00'
+                    instructions:
+                      chips: []
+                      note: ''
+                    address:
+                      id: 12
+                      label: home
+                      custom_label: ''
+                      receiver_name: Asha Verma
+                      receiver_phone: '+919876543210'
+                      house: Flat 402, Tower B
+                      building_street: Sunshine Apartments, MG Road
+                      landmark: Opposite City Mall
+                      area: Sector 14
+                      city: Gurugram
+                      state: Haryana
+                      pincode: '122001'
+                      lat: 28.4595
+                      lng: 77.0266
+                      is_default: true
+                      is_serviceable: true
+                      created_at: '2026-10-20T06:35:00Z'
+                      updated_at: '2026-10-20T06:35:00Z'
+                    bill:
+                      mrp_total: '1440.00'
+                      item_total: '1440.00'
+                      product_discount: '0.00'
+                      coupon_discount: '0.00'
+                      delivery_fee: '0.00'
+                      small_cart_fee: '0.00'
+                      handling_fee: '0.00'
+                      tip: '0.00'
+                      grand_total: '1440.00'
+                      total_savings: '330.00'
+                      free_items_value: '330.00'
+                    free_lines:
+                    - product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 1
+                      mrp: '110.00'
+                      value: '110.00'
+                      source: VOLUME_OFFER
+                    - product:
+                        id: 401
+                        slug: jivo-water
+                        name: Jivo Water
+                        brand: Jivo
+                        is_veg: true
+                      variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        mrp: '110.00'
+                        selling_price: '110.00'
+                        discount_amount: '0.00'
+                        discount_percent: 0
+                        unit_price:
+                          amount: '9.17'
+                          per: 1 L
+                        stock_status: IN_STOCK
+                        orderable_quantity: 50
+                        units_left: null
+                        max_qty_per_order: 50
+                        min_qty_per_order: 1
+                        price_tiers: []
+                        image:
+                          thumbnail: https://media.jivo.in/catalog/5d2f8a/jivo-water-256.webp
+                          medium: https://media.jivo.in/catalog/5d2f8a/jivo-water-512.webp
+                          large: https://media.jivo.in/catalog/5d2f8a/jivo-water-1024.webp
+                          alt_text: Jivo Water carton
+                      quantity: 2
+                      mrp: '110.00'
+                      value: '220.00'
+                      source: REWARD
+                    free_offer:
+                      every: 10
+                      paid_units: 12
+                      free_units: 1
+                      units_to_next_free: 8
+                      message: Add 8 more cartons to get 1 more free
+                      notice: null
+                      free_variant:
+                        id: 4001
+                        name: 1 L x 12 (carton)
+                        product_name: Jivo Water
+                    thresholds:
+                      min_order_value: '99.00'
+                      amount_to_min_order: null
+                      free_delivery_threshold: '299.00'
+                      amount_to_free_delivery: null
+                      min_order_units: 5
+                      units_to_min_order: null
+                      order_unit_label: cartons
+                      tier_units: 0
+                      next_price_tier: null
+                    payment_methods:
+                    - method: ONLINE
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    - method: COD
+                      is_available: true
+                      unavailable_reason: null
+                      message: null
+                    checkout:
+                      can_place_order: true
+                      blockers: []
+                  summary: Free-carton reward applied (fixed 1 L size, ADR 0003)
           description: The cart with the coupon.
         '401':
           content:
@@ -5093,6 +5594,28 @@ paths:
                         reason: FREE_VARIANT_UNAVAILABLE
                         free_variant_id: 4003
                   summary: COUPON_NOT_ELIGIBLE_FREE_VARIANT
+                COUPONNOTELIGIBLENOTTHEFIXEDSIZE:
+                  value:
+                    error:
+                      code: COUPON_NOT_ELIGIBLE
+                      message: Free cartons here come in one size only. Apply the
+                        reward without choosing a size.
+                      details:
+                        code: WEL7K2M9QPX
+                        reason: FREE_VARIANT_UNAVAILABLE
+                        free_variant_id: 4002
+                  summary: COUPON_NOT_ELIGIBLE_NOT_THE_FIXED_SIZE
+                COUPONNOTELIGIBLEFIXEDSIZENOSTOCK:
+                  value:
+                    error:
+                      code: COUPON_NOT_ELIGIBLE
+                      message: The free cartons for this reward are out of stock here
+                        right now.
+                      details:
+                        code: WEL7K2M9QPX
+                        reason: FREE_VARIANT_UNAVAILABLE
+                        free_variant_id: 4001
+                  summary: COUPON_NOT_ELIGIBLE_FIXED_SIZE_NO_STOCK
           description: 'The coupon cannot be applied; nothing changed. `COUPON_INVALID`:
             unknown, inactive or not started. `COUPON_EXPIRED`. `COUPON_NOT_ELIGIBLE`:
             `details.reason` is `MIN_ORDER_VALUE` (with `min_order_value` and `amount_to_unlock`),
@@ -5100,9 +5623,9 @@ paths:
             reward also `MIN_ORDER_UNITS` (with `min_order_units`, `paid_units` and
             `units_to_unlock`: free cartons never count) or `FREE_VARIANT_UNAVAILABLE`
             (the size is not sold at this store, is not of the category of a paid
-            line, or has no stock for it; with `free_variant_id`). `COUPON_USAGE_EXCEEDED`:
-            `details.scope` is `per_user` or `total` (a reward already on another
-            order).'
+            line, or has no stock for it; ADR 0003: a size other than the store''s
+            fixed free size; with `free_variant_id`). `COUPON_USAGE_EXCEEDED`: `details.scope`
+            is `per_user` or `total` (a reward already on another order).'
         '400':
           content:
             application/json:
@@ -5541,6 +6064,7 @@ paths:
                       is_personal: true
                       source: REFERRAL_REFERRER
                       free_variant_id: null
+                      free_quantity: null
                     - code: OILS15
                       title: 15% off cooking oils
                       description: On edible oils, up to ₹150.
@@ -5558,6 +6082,7 @@ paths:
                       is_personal: false
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                     - code: JIVO10
                       title: 10% off
                       description: On orders of ₹499 or more, up to ₹100.
@@ -5575,6 +6100,7 @@ paths:
                       is_personal: false
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                     - code: JIVO50
                       title: Flat ₹50 off
                       description: On orders of ₹299 or more.
@@ -5592,12 +6118,13 @@ paths:
                       is_personal: false
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                     - code: WEL7K2M9QPX
-                      title: '1 free carton: welcome reward'
-                      description: Welcome to Jivo. One free carton of the size you
-                        choose, only for you.
+                      title: '2 free cartons: welcome reward'
+                      description: 'Welcome to Jivo: 2 free cartons with an order,
+                        only for you.'
                       discount_type: FREE_UNIT
-                      value: '1.00'
+                      value: '2.00'
                       max_discount: null
                       min_order_value: '0.00'
                       ends_at: '2026-12-25T09:30:00Z'
@@ -5609,7 +6136,8 @@ paths:
                       amount_to_unlock: null
                       is_personal: true
                       source: WELCOME
-                      free_variant_id: null
+                      free_variant_id: 4001
+                      free_quantity: 2
                     - code: BIGSAVE200
                       title: Flat ₹200 off
                       description: On orders of ₹1,499 or more.
@@ -5627,6 +6155,7 @@ paths:
                       is_personal: false
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                     - code: WELCOME100
                       title: ₹100 off your first order
                       description: On your first order of ₹399 or more.
@@ -5644,6 +6173,7 @@ paths:
                       is_personal: false
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                 NoneAvailable:
                   value:
                     results: []
@@ -5929,6 +6459,7 @@ paths:
                       discount_type: FLAT
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -6333,6 +6864,7 @@ paths:
                       discount_type: FLAT
                       source: NONE
                       free_variant_id: null
+                      free_quantity: null
                       discount: '50.00'
                       is_applicable: true
                       message: null
@@ -13845,6 +14377,7 @@ paths:
                         discount_type: FLAT
                         source: NONE
                         free_variant_id: null
+                        free_quantity: null
                         discount: '50.00'
                         is_applicable: true
                         message: null
@@ -14001,6 +14534,7 @@ paths:
                         discount_type: FLAT
                         source: NONE
                         free_variant_id: null
+                        free_quantity: null
                         discount: '50.00'
                         is_applicable: true
                         message: null
@@ -24930,7 +25464,7 @@ components:
 
             * `FLAT` - Flat amount off
             * `PERCENT` - Percent off
-            * `FREE_UNIT` - One free carton (reward)
+            * `FREE_UNIT` - Free cartons (reward)
         source:
           allOf:
           - $ref: '#/components/schemas/CouponSourceEnum'
@@ -24944,8 +25478,16 @@ components:
         free_variant_id:
           type: integer
           nullable: true
-          description: 'FREE_UNIT only: the size picked for the free carton (`VariantSummary.id`,
-            sent as `free_variant_id` when applying). Null for other coupons.'
+          description: 'FREE_UNIT only: the size of the free cartons (`VariantSummary.id`).
+            ADR 0003: when the store has a fixed free size (`free_offer.free_variant`),
+            it is that size; else the size the customer picked (ADR 0002). Null for
+            other coupons.'
+        free_quantity:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'ADR 0003: FREE_UNIT only, the number of free cartons the reward
+            gives (e.g. 2). Null for other coupons.'
         discount:
           type: string
           format: decimal
@@ -24975,6 +25517,7 @@ components:
       - code
       - discount
       - discount_type
+      - free_quantity
       - free_variant_id
       - is_applicable
       - message
@@ -25761,11 +26304,14 @@ components:
           type: integer
           minimum: 1
           nullable: true
-          description: 'ADR 0002: required for a free-carton reward (`discount_type`
-            FREE_UNIT): the size the customer picked (`VariantSummary.id`). It must
-            be sold at the store in `X-Store-Id`, be of the same product category
-            as a paid line in the cart (a water reward goes on a water order) and
-            have the stock. Ignored for other coupons.'
+          description: 'For a free-carton reward (`discount_type` FREE_UNIT). ADR
+            0003: when the store in `X-Store-Id` has a fixed free size (`free_offer.free_variant`),
+            leave it out (or send that size''s id): the server uses the fixed size;
+            any other id is 422 `COUPON_NOT_ELIGIBLE` (FREE_VARIANT_UNAVAILABLE).
+            Otherwise (ADR 0002) it is required: the size the customer picked (`VariantSummary.id`),
+            sold at the store, of the same product category as a paid line in the
+            cart (a water reward goes on a water order) and with the stock. Ignored
+            for other coupons.'
       required:
       - code
     CouponDiscountTypeEnum:
@@ -25777,7 +26323,7 @@ components:
       description: |-
         * `FLAT` - Flat amount off
         * `PERCENT` - Percent off
-        * `FREE_UNIT` - One free carton (reward)
+        * `FREE_UNIT` - Free cartons (reward)
     CouponIneligibleReasonEnum:
       enum:
       - MIN_ORDER_VALUE
@@ -25793,7 +26339,7 @@ components:
         * `NO_ELIGIBLE_ITEMS` - No items in the cart qualify for this coupon.
         * `STORE` - Not valid at this store.
         * `MIN_ORDER_UNITS` - A free-carton reward needs the order's minimum paid cartons.
-        * `FREE_VARIANT_UNAVAILABLE` - The size chosen for the free carton is not available here (not sold at this store, not of the category of a paid line, or out of stock).
+        * `FREE_VARIANT_UNAVAILABLE` - The size chosen for the free carton is not available here (not sold at this store, not of the category of a paid line, out of stock, or not the store's fixed free size).
     CouponList:
       type: object
       properties:
@@ -25824,17 +26370,17 @@ components:
           allOf:
           - $ref: '#/components/schemas/CouponDiscountTypeEnum'
           description: |-
-            FREE_UNIT (ADR 0002): a free-carton reward. Applying it needs `free_variant_id` (the size the customer picks); it gives no money off (`savings` "0.00").
+            FREE_UNIT (ADR 0002/0003): a free-carton reward of `free_quantity` cartons. It gives no money off (`savings` "0.00"). When `free_variant_id` is already set (the store's fixed free size, ADR 0003), apply it without a size; else the customer picks the size.
 
             * `FLAT` - Flat amount off
             * `PERCENT` - Percent off
-            * `FREE_UNIT` - One free carton (reward)
+            * `FREE_UNIT` - Free cartons (reward)
         value:
           type: string
           format: decimal
           pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
           description: 'FLAT: rupees off ("50.00"). PERCENT: percent off ("10.00"
-            = 10%). FREE_UNIT: free cartons ("1.00").'
+            = 10%). FREE_UNIT: the number of free cartons ("2.00"; use `free_quantity`).'
         max_discount:
           type: string
           format: decimal
@@ -25896,14 +26442,23 @@ components:
         free_variant_id:
           type: integer
           nullable: true
-          description: 'FREE_UNIT and applied to the cart: the size picked for the
-            free carton. Null otherwise.'
+          description: 'FREE_UNIT only. ADR 0003: the store''s fixed free size when
+            it has one (applied or not; apply the reward without a size). Otherwise
+            (ADR 0002) the size picked when the reward is applied to the cart, else
+            null. Null for other coupons.'
+        free_quantity:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: 'ADR 0003: FREE_UNIT only, the number of free cartons (e.g.
+            2). Null for other coupons.'
       required:
       - amount_to_unlock
       - code
       - description
       - discount_type
       - ends_at
+      - free_quantity
       - free_variant_id
       - ineligible_reason
       - is_applied
@@ -26552,7 +27107,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/FreeSourceEnum'
           description: |-
-            VOLUME_OFFER: 1 free for every `free_offer.every` paid cartons (the cheapest size in the cart). REWARD: the free-carton reward applied as the cart's coupon.
+            VOLUME_OFFER: 1 free for every `free_offer.every` paid cartons (the store's fixed free size `free_offer.free_variant` when set, ADR 0003; else the cheapest size in the cart). REWARD: the free-carton reward applied as the cart's coupon.
 
             * `VOLUME_OFFER` - Volume offer
             * `REWARD` - Reward
@@ -26594,12 +27149,22 @@ components:
         notice:
           type: string
           nullable: true
-          description: Set when a free carton was earned but no size in the cart has
-            the stock for it (no free carton is given). Show it as a notice; it does
-            not block checkout. Null otherwise.
+          description: 'Set when a free carton was earned but the store cannot supply
+            it (the fixed free size has no stock, ADR 0003; or no size in the cart
+            has the stock, ADR 0002): no free carton is given. Show it as a notice;
+            it does not block checkout. Null otherwise.'
+        free_variant:
+          allOf:
+          - $ref: '#/components/schemas/FreeVariant'
+          nullable: true
+          description: 'ADR 0003: the store''s fixed free size; every free carton
+            (this offer and rewards) is this size, e.g. "Jivo Water 1 L x 12". Shown
+            also before a free carton is earned. Null when the store has none: the
+            free cartons are then the cheapest size in the cart (ADR 0002).'
       required:
       - every
       - free_units
+      - free_variant
       - message
       - notice
       - paid_units
@@ -26612,6 +27177,24 @@ components:
       description: |-
         * `VOLUME_OFFER` - Volume offer
         * `REWARD` - Reward
+    FreeVariant:
+      type: object
+      description: 'ADR 0003: the size every free carton uses at the store (e.g. "Jivo
+        Water", "1 L x 12").'
+      properties:
+        id:
+          type: integer
+          description: '`VariantSummary.id`.'
+        name:
+          type: string
+          description: The size, e.g. "1 L x 12".
+        product_name:
+          type: string
+          description: The product, e.g. "Jivo Water".
+      required:
+      - id
+      - name
+      - product_name
     HealthCheckStatusEnum:
       enum:
       - ok
@@ -28924,18 +29507,25 @@ components:
           allOf:
           - $ref: '#/components/schemas/CouponDiscountTypeEnum'
           description: |-
-            ADR 0002: FREE_UNIT = each of the two customers gets one free carton (show `reward_label`, never a ₹ amount). The only value sent today.
+            ADR 0002: FREE_UNIT = each of the two customers gets `reward_quantity` free cartons (show `reward_label`, never a ₹ amount). The only value sent today.
 
             * `FLAT` - Flat amount off
             * `PERCENT` - Percent off
-            * `FREE_UNIT` - One free carton (reward)
+            * `FREE_UNIT` - Free cartons (reward)
         reward_quantity:
           type: integer
           minimum: 1
-          description: Free cartons each customer gets (1).
+          description: 'ADR 0003: free cartons each of the two customers gets (the
+            admin setting, e.g. 2): "You and your friend each get 2 free cartons".'
         reward_label:
           type: string
-          description: Ready-made text, e.g. "1 free carton".
+          description: Ready-made text, e.g. "2 free cartons" ("1 free carton" for
+            1).
+        welcome_reward_quantity:
+          type: integer
+          minimum: 1
+          description: 'ADR 0003: free cartons of the welcome reward a new customer
+            account gets (the admin setting, e.g. 2).'
         reward_amount:
           type: string
           format: decimal
@@ -28982,6 +29572,7 @@ components:
       - reward_type
       - reward_validity_days
       - share_message
+      - welcome_reward_quantity
     ReferralApplyRequest:
       type: object
       properties:
@@ -29093,11 +29684,27 @@ components:
       properties:
         code:
           type: string
-          description: Apply it with `POST /cart/coupon/` {`code`, `free_variant_id`}
-            (the customer picks the size).
+          description: 'Apply it with `POST /cart/coupon/`: {`code`} alone when `free_variant`
+            is set (ADR 0003, no size sheet), else {`code`, `free_variant_id`} with
+            the size the customer picks (ADR 0002).'
         title:
           type: string
-          description: 'e.g. "1 free carton: welcome reward".'
+          description: 'e.g. "2 free cartons: welcome reward".'
+        quantity:
+          type: integer
+          minimum: 1
+          description: 'ADR 0003: free cartons this reward gives (e.g. 2). Fixed when
+            the reward is given.'
+        free_variant:
+          allOf:
+          - $ref: '#/components/schemas/FreeVariant'
+          nullable: true
+          description: 'ADR 0003: the size of the free cartons, the store''s fixed
+            free size (show "2 free cartons · 1 L x 12"; **Use** applies it without
+            a size sheet). The store is the one in the optional `X-Store-Id` header,
+            else the store of the caller''s cart. Null when that store has no fixed
+            size (or there is no store yet): then the customer picks the size (ADR
+            0002).'
         source:
           allOf:
           - $ref: '#/components/schemas/CouponSourceEnum'
@@ -29130,7 +29737,9 @@ components:
       required:
       - code
       - expires_at
+      - free_variant
       - order_number
+      - quantity
       - source
       - status
       - title
@@ -29159,7 +29768,7 @@ components:
         quantity:
           type: integer
           minimum: 1
-          description: Free cartons (1 for a reward).
+          description: 'Free cartons (for a reward: its own quantity, ADR 0003).'
         order_number:
           type: string
           nullable: true

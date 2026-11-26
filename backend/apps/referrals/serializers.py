@@ -37,14 +37,27 @@ class ReferralSerializer(serializers.Serializer):
     reward_type = serializers.ChoiceField(
         choices=DiscountType.choices,
         help_text=(
-            "ADR 0002: FREE_UNIT = each of the two customers gets one free carton (show "
-            "`reward_label`, never a ₹ amount). The only value sent today."
+            "ADR 0002: FREE_UNIT = each of the two customers gets `reward_quantity` free "
+            "cartons (show `reward_label`, never a ₹ amount). The only value sent today."
         ),
     )
     reward_quantity = serializers.IntegerField(
-        min_value=1, help_text="Free cartons each customer gets (1)."
+        min_value=1,
+        help_text=(
+            "ADR 0003: free cartons each of the two customers gets (the admin setting, e.g. 2): "
+            '"You and your friend each get 2 free cartons".'
+        ),
     )
-    reward_label = serializers.CharField(help_text='Ready-made text, e.g. "1 free carton".')
+    reward_label = serializers.CharField(
+        help_text='Ready-made text, e.g. "2 free cartons" ("1 free carton" for 1).'
+    )
+    welcome_reward_quantity = serializers.IntegerField(
+        min_value=1,
+        help_text=(
+            "ADR 0003: free cartons of the welcome reward a new customer account gets (the "
+            "admin setting, e.g. 2)."
+        ),
+    )
     reward_amount = money(
         "Deprecated (ADR 0002): the old ₹ reward setting, not given any more. Use "
         "`reward_type` / `reward_label`."

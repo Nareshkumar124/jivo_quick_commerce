@@ -146,6 +146,8 @@ class TestPlacement:
             {
                 "code": welcome.code,
                 "title": "1 free carton: welcome reward",
+                "quantity": 1,  # ADR-0003: the reward's own number
+                "free_variant": None,  # this store has no fixed free size
                 "source": "WELCOME",
                 "status": "CLAIMED",
                 "expires_at": body["available"][0]["expires_at"],

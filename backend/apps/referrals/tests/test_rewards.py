@@ -105,7 +105,8 @@ class TestReward:
         assert {note.user_id for note in sent} == {user.pk, friend.pk}
         for note in sent:
             assert note.title == "You earned 1 free carton"
-            assert "Your 1 free carton is in Rewards: pick a size and use it by" in note.body
+            # ADR-0003: no "pick a size" (the store may fix it); the reward's own number
+            assert "Find your reward (1 free carton) in Rewards and use it by" in note.body
             assert note.sms_status == DeliveryStatus.NONE
             assert note.data["link"] == "jivo://account/referral"
             assert note.in_inbox

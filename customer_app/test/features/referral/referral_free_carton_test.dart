@@ -8,22 +8,44 @@ import '../../helpers/test_app.dart';
 import '../checkout/checkout_flow_test.dart' show appWithCart, openCheckout;
 import 'referral_test.dart' show enterAndApply, pumpReferral;
 
-/// ADR 0002: the referral reward is a free carton for both people. The
-/// copy then says "1 free carton" and never a ₹ amount; the old ₹ reward
-/// keeps its ₹ copy.
+/// ADR 0002: the referral reward is free cartons for both people, never a
+/// ₹ amount; the old ₹ reward keeps its ₹ copy. ADR 0003: the number is the
+/// server's `reward_quantity` (2 on staging), with correct plurals.
 void main() {
   setUpAll(initializeFormatting);
 
-  FakeReferralRepository freeCarton({ReferredBy? referredBy}) =>
-      FakeReferralRepository(
-        rewardType: ReferralRewardType.freeCarton,
-        referredBy: referredBy,
-      );
+  FakeReferralRepository freeCarton({
+    ReferredBy? referredBy,
+    int quantity = 2,
+  }) => FakeReferralRepository(
+    rewardType: ReferralRewardType.freeCarton,
+    referredBy: referredBy,
+    rewardQuantity: quantity,
+  );
 
-  testWidgets('free carton: headline and rule 3 name the carton, no ₹', (
+  testWidgets('2 free cartons: headline and rule 3 name them, no ₹', (
     tester,
   ) async {
     await pumpReferral(tester, freeCarton());
+    expect(
+      find.text('Invite a friend. You and your friend each get 2 free cartons'),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'When their first order is delivered, you and your friend each get '
+        '2 free cartons. Use it within 30 days.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('₹'), findsNothing);
+    expect(find.textContaining('1 free carton'), findsNothing);
+  });
+
+  testWidgets('1 free carton: the singular, from the server number', (
+    tester,
+  ) async {
+    await pumpReferral(tester, freeCarton(quantity: 1));
     expect(
       find.text('Invite a friend. You and your friend each get 1 free carton'),
       findsOneWidget,
@@ -35,31 +57,30 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.textContaining('₹'), findsNothing);
+    expect(find.textContaining('free cartons'), findsNothing);
   });
 
-  testWidgets('free carton: applying a code confirms the carton', (
-    tester,
-  ) async {
+  testWidgets('free cartons: applying a code confirms them', (tester) async {
     await pumpReferral(tester, freeCarton());
     await enterAndApply(tester, 'AB3K7P');
     expect(
       find.text(
-        'Code applied. You and your friend will each get 1 free carton '
+        'Code applied. You and your friend will each get 2 free cartons '
         'after your first delivery.',
       ),
       findsOneWidget,
     );
     expect(
       find.text(
-        'You and your friend will each get 1 free carton after your first '
+        'You and your friend will each get 2 free cartons after your first '
         'delivery.',
       ),
       findsOneWidget,
     );
   });
 
-  testWidgets('free carton: a rewarded code points to Rewards', (tester) async {
+  testWidgets('free cartons: a rewarded code points to Rewards, with no '
+      'number (a given reward keeps its own quantity)', (tester) async {
     await pumpReferral(
       tester,
       freeCarton(
@@ -72,7 +93,7 @@ void main() {
     );
     expect(
       find.text(
-        'Your free carton is in Rewards. Tap Use there to add it to your cart.',
+        'Your reward is in Rewards. Tap Use there to add it to your cart.',
       ),
       findsOneWidget,
     );
@@ -84,24 +105,37 @@ void main() {
     expect(find.textContaining('free carton'), findsNothing);
   });
 
-  testWidgets('free carton: the Account strip names the carton', (
-    tester,
-  ) async {
+  testWidgets('free cartons: the Account strip names them', (tester) async {
     final app = TestApp(tokens: signedInTokens);
     app.referral.rewardType = ReferralRewardType.freeCarton;
     await app.pump(tester);
     await tester.tap(find.byTooltip('Account'));
     await tester.pumpAndSettle();
     expect(
-      find.text('Invite a friend. You and your friend each get 1 free carton'),
+      find.text('Invite a friend. You and your friend each get 2 free cartons'),
       findsOneWidget,
     );
     expect(find.text('Invite a friend, you both get ₹90 off'), findsNothing);
   });
 
-  testWidgets('checkout card: free carton and ₹ copy', (tester) async {
+  testWidgets('checkout card: 2 free cartons', (tester) async {
     final app = await appWithCart();
     app.referral.rewardType = ReferralRewardType.freeCarton;
+    await openCheckout(tester, app);
+    expect(
+      find.text(
+        'Enter it before you place this order. You and your friend each get '
+        '2 free cartons after it is delivered.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('checkout card: 1 free carton', (tester) async {
+    final app = await appWithCart();
+    app.referral
+      ..rewardType = ReferralRewardType.freeCarton
+      ..rewardQuantity = 1;
     await openCheckout(tester, app);
     expect(
       find.text(

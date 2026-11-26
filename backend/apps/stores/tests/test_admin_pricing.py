@@ -10,6 +10,8 @@ T-304).
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from apps.accounts import roles
@@ -191,7 +193,7 @@ class TestFreeCartonOffer:
         assert field.label == FREE_OFFER_LABEL
         assert field.help_text == FREE_OFFER_HELP == "1 free carton per N paid cartons; 0 = off."
         html = response.content.decode()
-        assert "Free cartons (volume offer)" in html
+        assert "Free cartons (volume offer and rewards)" in html  # ADR 0003 title
         assert 'name="free_unit_every"' in html
 
     def test_super_admin_turns_the_offer_on_and_history_keeps_it(self, client, pricing):
@@ -248,3 +250,168 @@ class TestFreeCartonOffer:
         }
         assert shown == {"GGN-01": "Off", "NOI-18": "1 free per 10 paid cartons"}
         assert (FREE_OFFER_LABEL, "Off") in response.context["pricing_defaults"]
+
+
+class TestFreeCartonSize:
+    """ADR 0003: `free_unit_variant` ("Free carton size") on the pricing pages: every free
+    carton (volume offer and rewards) is that variant; empty = the ADR 0002 rule."""
+
+    AUTOCOMPLETE = {
+        "app_label": "stores",
+        "model_name": "pricingconfig",
+        "field_name": "free_unit_variant",
+    }
+
+    @staticmethod
+    def sold_at(store, **kwargs):
+        """A variant with a stock row at `store` (the model only accepts a size sold there; out
+        of stock is fine)."""
+        from apps.catalog.tests.factories import VariantFactory
+        from apps.inventory.models import StoreInventory
+
+        variant = VariantFactory(product__name="Jivo Packaged Water", **kwargs)
+        StoreInventory.objects.create(store=store, variant=variant)
+        return variant
+
+    @pytest.fixture
+    def one_litre(self, store):
+        return self.sold_at(store, sku="JV-WTR-1L-12", name="1 L x 12")
+
+    @pytest.fixture
+    def retired(self, store):
+        return self.sold_at(store, sku="JV-WTR-2L-6", name="2 L x 6", is_active=False)
+
+    def test_editor_gets_an_autocomplete_with_label_and_model_help(self, client, pricing):
+        from apps.stores.admin import FREE_SIZE_LABEL
+
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        response = client.get(change_url(pricing))
+        assert response.status_code == 200
+        field = response.context["adminform"].form.fields["free_unit_variant"]
+        assert field.label == FREE_SIZE_LABEL == "Free carton size"
+        model_help = PricingConfig._meta.get_field("free_unit_variant").help_text
+        assert field.help_text == model_help
+        assert field.required is False  # empty = the ADR 0002 rule
+        html = response.content.decode()
+        assert "Free cartons (volume offer and rewards)" in html
+        assert 'name="free_unit_variant"' in html
+        assert "admin-autocomplete" in html
+
+    def test_super_admin_sets_the_size_and_history_keeps_it(self, client, pricing, one_litre):
+        admin_user = staff_in_role(roles.SUPER_ADMIN)
+        client.force_login(admin_user)
+        data = admin_form_data(client.get(change_url(pricing)))
+        assert data["free_unit_variant"] == ""  # model default: not fixed
+        data.update({"free_unit_variant": str(one_litre.pk), "free_unit_every": "10"})
+        response = client.post(change_url(pricing), data)
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        pricing.refresh_from_db()
+        assert pricing.free_unit_variant == one_litre
+        latest = pricing.history.latest()
+        assert (latest.history_user, latest.free_unit_variant_id) == (admin_user, one_litre.pk)
+        # Cleared again: back to the cheapest size in the order.
+        data["free_unit_variant"] = ""
+        response = client.post(change_url(pricing), data)
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        pricing.refresh_from_db()
+        assert pricing.free_unit_variant is None
+
+    def test_an_inactive_variant_is_refused(self, client, pricing, retired):
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        data = admin_form_data(client.get(change_url(pricing)))
+        data["free_unit_variant"] = str(retired.pk)
+        response = client.post(change_url(pricing), data)
+        assert response.status_code == 200
+        assert "free_unit_variant" in response.context["adminform"].form.errors
+        pricing.refresh_from_db()
+        assert pricing.free_unit_variant_id is None
+
+    def test_a_size_not_sold_at_the_store_shows_the_model_error(self, client, pricing):
+        from apps.catalog.tests.factories import VariantFactory
+
+        elsewhere = VariantFactory(name="1 L x 12")  # active, but no stock row at GGN-01
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        data = admin_form_data(client.get(change_url(pricing)))
+        data["free_unit_variant"] = str(elsewhere.pk)
+        response = client.post(change_url(pricing), data)
+        assert response.status_code == 200
+        errors = response.context["adminform"].form.errors["free_unit_variant"]
+        assert errors == ["This size is not sold at this store. Choose one it sells."]
+        pricing.refresh_from_db()
+        assert pricing.free_unit_variant_id is None
+
+    def test_a_saved_size_deactivated_later_never_blocks_other_edits(
+        self, client, pricing, retired
+    ):
+        PricingConfig.objects.filter(pk=pricing.pk).update(free_unit_variant=retired)
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        data = admin_form_data(client.get(change_url(pricing)))
+        assert data["free_unit_variant"] == str(retired.pk)
+        data["handling_fee"] = "4.00"
+        response = client.post(change_url(pricing), data)
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        pricing.refresh_from_db()
+        assert (pricing.free_unit_variant_id, pricing.handling_fee) == (retired.pk, Decimal("4"))
+
+    def test_autocomplete_offers_active_variants_only(self, client, pricing, one_litre, retired):
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
+        url = reverse("admin:autocomplete")
+        response = client.get(url, {**self.AUTOCOMPLETE, "term": "Packaged Water"})
+        assert response.status_code == 200
+        assert [row["id"] for row in response.json()["results"]] == [str(one_litre.pk)]
+        # The variants list itself still finds both.
+        variants = client.get(
+            reverse("admin:catalog_productvariant_changelist"), {"q": "Packaged Water"}
+        )
+        assert {v.pk for v in variants.context["cl"].result_list} == {one_litre.pk, retired.pk}
+
+    def test_finance_sees_the_size_in_words_and_cannot_change_it(self, client, pricing, one_litre):
+        PricingConfig.objects.filter(pk=pricing.pk).update(
+            free_unit_every=10, order_unit_label="cartons", free_unit_variant=one_litre
+        )
+        client.force_login(staff_in_role(roles.FINANCE))
+        response = client.get(change_url(pricing))
+        html = response.content.decode()
+        assert response.status_code == 200
+        assert "1 free 1 L x 12 per 10 paid cartons" in html
+        assert "Free carton size" in html
+        assert "Jivo Packaged Water 1 L x 12 (JV-WTR-1L-12)" in html
+        assert 'name="free_unit_variant"' not in html
+        response = client.post(change_url(pricing), {"free_unit_variant": "", "_save": "Save"})
+        assert response.status_code == 403
+        pricing.refresh_from_db()
+        assert pricing.free_unit_variant_id == one_litre.pk
+
+    def test_finance_sees_not_fixed_when_empty(self, client, pricing):
+        from apps.stores.admin import FREE_SIZE_NOT_FIXED
+
+        client.force_login(staff_in_role(roles.FINANCE))
+        html = client.get(change_url(pricing)).content.decode()
+        assert FREE_SIZE_NOT_FIXED in html
+
+    def test_list_column_defaults_note_and_queries(self, client, pricing, one_litre):
+        from apps.catalog.tests.factories import VariantFactory
+        from apps.stores.admin import FREE_SIZE_LABEL, FREE_SIZE_NOT_FIXED
+
+        PricingConfig.objects.filter(pk=pricing.pk).update(
+            free_unit_every=10, order_unit_label="cartons", free_unit_variant=one_litre
+        )
+        client.force_login(staff_in_role(roles.FINANCE))
+        client.get(reverse(LIST))  # warm-up (first-request caches)
+        with CaptureQueriesContext(connection) as few:
+            response = client.get(reverse(LIST))
+        assert response.status_code == 200
+        assert "1 free 1 L x 12 per 10 paid cartons" in response.content.decode()
+        defaults = response.context["pricing_defaults"]
+        assert (FREE_SIZE_LABEL, FREE_SIZE_NOT_FIXED) in defaults
+        assert ("Min order units", "Off") in defaults  # 0 = no minimum
+        assert ("Order unit label", "items") in defaults  # the label itself, not "On"
+        for code in ("NOI-18", "FBD-02", "DEL-03"):
+            PricingConfig.objects.create(  # .create() skips clean(): no stock row needed
+                store=DarkStoreFactory(code=code),
+                free_unit_every=10,
+                free_unit_variant=VariantFactory(),
+            )
+        with CaptureQueriesContext(connection) as many:
+            assert client.get(reverse(LIST)).status_code == 200
+        assert len(many) == len(few)

@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from apps.cart.serializers import money_or_null
+from apps.cart.serializers import FreeVariantSerializer, money_or_null
 from apps.catalog.serializers import money
 from apps.promotions.choices import (
     CouponIneligibleReason,
@@ -24,13 +24,15 @@ class CouponOfferSerializer(serializers.Serializer):
     discount_type = serializers.ChoiceField(
         choices=DiscountType.choices,
         help_text=(
-            "FREE_UNIT (ADR 0002): a free-carton reward. Applying it needs `free_variant_id` "
-            '(the size the customer picks); it gives no money off (`savings` "0.00").'
+            "FREE_UNIT (ADR 0002/0003): a free-carton reward of `free_quantity` cartons. It "
+            'gives no money off (`savings` "0.00"). When `free_variant_id` is already set (the '
+            "store's fixed free size, ADR 0003), apply it without a size; else the customer "
+            "picks the size."
         ),
     )
     value = money(
-        'FLAT: rupees off ("50.00"). PERCENT: percent off ("10.00" = 10%). FREE_UNIT: free '
-        'cartons ("1.00").'
+        'FLAT: rupees off ("50.00"). PERCENT: percent off ("10.00" = 10%). FREE_UNIT: the '
+        'number of free cartons ("2.00"; use `free_quantity`).'
     )
     max_discount = money_or_null("Cap on the discount (PERCENT coupons); null when uncapped.")
     min_order_value = money('Minimum `item_total` (before the coupon), "0.00" when none.')
@@ -66,8 +68,16 @@ class CouponOfferSerializer(serializers.Serializer):
     free_variant_id = serializers.IntegerField(
         allow_null=True,
         help_text=(
-            "FREE_UNIT and applied to the cart: the size picked for the free carton. Null "
-            "otherwise."
+            "FREE_UNIT only. ADR 0003: the store's fixed free size when it has one (applied or "
+            "not; apply the reward without a size). Otherwise (ADR 0002) the size picked when "
+            "the reward is applied to the cart, else null. Null for other coupons."
+        ),
+    )
+    free_quantity = serializers.IntegerField(
+        allow_null=True,
+        min_value=1,
+        help_text=(
+            "ADR 0003: FREE_UNIT only, the number of free cartons (e.g. 2). Null for other coupons."
         ),
     )
 
@@ -91,11 +101,28 @@ class RewardSerializer(serializers.Serializer):
 
     code = serializers.CharField(
         help_text=(
-            "Apply it with `POST /cart/coupon/` {`code`, `free_variant_id`} (the customer picks "
-            "the size)."
+            "Apply it with `POST /cart/coupon/`: {`code`} alone when `free_variant` is set "
+            "(ADR 0003, no size sheet), else {`code`, `free_variant_id`} with the size the "
+            "customer picks (ADR 0002)."
         )
     )
-    title = serializers.CharField(help_text='e.g. "1 free carton: welcome reward".')
+    title = serializers.CharField(help_text='e.g. "2 free cartons: welcome reward".')
+    quantity = serializers.IntegerField(
+        min_value=1,
+        help_text=(
+            "ADR 0003: free cartons this reward gives (e.g. 2). Fixed when the reward is given."
+        ),
+    )
+    free_variant = FreeVariantSerializer(
+        allow_null=True,
+        help_text=(
+            "ADR 0003: the size of the free cartons, the store's fixed free size (show "
+            '"2 free cartons · 1 L x 12"; **Use** applies it without a size sheet). The store '
+            "is the one in the optional `X-Store-Id` header, else the store of the caller's "
+            "cart. Null when that store has no fixed size (or there is no store yet): then the "
+            "customer picks the size (ADR 0002)."
+        ),
+    )
     source = serializers.ChoiceField(
         choices=CouponSource.choices, help_text="WELCOME, REFERRAL_REFERRER or REFERRAL_REFERRED."
     )
@@ -128,7 +155,9 @@ class RewardHistoryEntrySerializer(serializers.Serializer):
         ),
     )
     title = serializers.CharField(help_text='Display text, e.g. "Welcome reward".')
-    quantity = serializers.IntegerField(min_value=1, help_text="Free cartons (1 for a reward).")
+    quantity = serializers.IntegerField(
+        min_value=1, help_text="Free cartons (for a reward: its own quantity, ADR 0003)."
+    )
     order_number = serializers.CharField(
         allow_null=True, help_text="The order concerned; null for EARNED and EXPIRED."
     )

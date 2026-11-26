@@ -51,9 +51,9 @@ class ApiReferralRepository implements ReferralRepository {
 
 /// Maps the generated `Referral` to the app model. `reward_type`
 /// `FREE_UNIT` (ADR 0002) is a free-carton reward of `reward_quantity`
-/// cartons; the app words it itself (l10n) rather than showing the
-/// server's English `reward_label`, and never shows the deprecated
-/// `reward_amount` for it.
+/// cartons (a server setting, 2 on staging: ADR 0003); the app words it
+/// itself with l10n plurals rather than showing the server's English
+/// `reward_label`, and never shows the deprecated `reward_amount` for it.
 ReferralInfo referralFromApi(api.Referral r) => ReferralInfo(
   code: r.code,
   shareMessage: r.shareMessage,
@@ -81,6 +81,7 @@ ReferralInfo referralFromApi(api.Referral r) => ReferralInfo(
   },
   friendsJoined: r.friendsJoined,
   friendsRewarded: r.friendsRewarded,
+  welcomeRewardQuantity: r.welcomeRewardQuantity,
 );
 
 Future<T> _guard<T>(Future<T> Function() call) async {
@@ -104,13 +105,22 @@ class FakeReferralRepository implements ReferralRepository {
     this.friendsRewarded = 1,
     this.friendCodes = const {'AB3K7P', 'JIVO90'},
     this.rewardType = ReferralRewardType.amount,
+    this.rewardQuantity = 2,
+    this.welcomeRewardQuantity = 2,
   });
 
   final String code;
   bool isEnabled;
 
-  /// ₹90 off (the old reward) or a free carton (ADR 0002).
+  /// ₹90 off (the old reward) or free cartons (ADR 0002).
   ReferralRewardType rewardType;
+
+  /// Free cartons each person gets (`reward_quantity`): 2, as on staging
+  /// (ADR 0003).
+  int rewardQuantity;
+
+  /// `welcome_reward_quantity`: 2, as on staging (ADR 0003).
+  int? welcomeRewardQuantity;
 
   /// An order was already placed: codes can no longer be entered.
   bool hasOrders;
@@ -133,7 +143,8 @@ class FakeReferralRepository implements ReferralRepository {
   ReferralInfo get info => ReferralInfo(
     code: code,
     shareMessage: rewardType == ReferralRewardType.freeCarton
-        ? 'Use my code $code on the Jivo app and we each get 1 free carton. '
+        ? 'Use my code $code on the Jivo app and we each get '
+              '$rewardQuantity free carton${rewardQuantity == 1 ? '' : 's'}. '
               'https://jivo.in/app'
         : 'Use my code $code on the Jivo app and we both get ₹90 off. '
               'https://jivo.in/app',
@@ -148,6 +159,8 @@ class FakeReferralRepository implements ReferralRepository {
     referredBy: referredBy,
     friendsJoined: friendsJoined,
     friendsRewarded: friendsRewarded,
+    rewardQuantity: rewardQuantity,
+    welcomeRewardQuantity: welcomeRewardQuantity,
   );
 
   @override

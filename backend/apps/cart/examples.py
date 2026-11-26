@@ -224,6 +224,7 @@ JIVO50 = {
     "discount_type": "FLAT",
     "source": "NONE",
     "free_variant_id": None,
+    "free_quantity": None,
     "discount": "50.00",
     "is_applicable": True,
     "message": None,
@@ -522,6 +523,7 @@ WELCOME_REWARD_APPLIED = {
     "discount_type": "FREE_UNIT",
     "source": "WELCOME",
     "free_variant_id": 4002,
+    "free_quantity": 1,
     "discount": ZERO,
     "is_applicable": True,
     "message": None,
@@ -534,6 +536,7 @@ FREE_OFFER_12 = {
     "units_to_next_free": 8,
     "message": "Add 8 more cartons to get 1 more free",
     "notice": None,
+    "free_variant": None,  # ADR 0002 store: no fixed free size (the cheapest size in the cart)
 }
 CART_FREE_CARTONS = {
     **CART_READY,
@@ -599,7 +602,39 @@ CART_FREE_CARTON_NO_STOCK = {
         "units_to_next_free": 10,
         "message": "Add 10 more cartons to get 1 more free",
         "notice": "Your free carton is out of stock right now, so it is not added.",
+        "free_variant": None,
     },
+}
+
+# ADR 0003: the store's fixed free size is the 1 L carton (`free_offer.free_variant`), so every
+# free carton is 1 L whatever the paid sizes. The same 12 paid cartons (1 L x8 + 500 ml x4) earn
+# 1 free 1 L carton (volume offer), and the welcome reward, applied without a size, adds its
+# 2 free 1 L cartons. `free_items_value` = 3 x ₹110 = ₹330.
+FREE_VARIANT_1L = {"id": 4001, "name": "1 L x 12 (carton)", "product_name": "Jivo Water"}
+FREE_WATER_1L_REWARD_X2 = {
+    "product": WATER_PRODUCT,
+    "variant": WATER_1L,
+    "quantity": 2,
+    "mrp": "110.00",
+    "value": "220.00",
+    "source": "REWARD",
+}
+WELCOME_REWARD_X2_APPLIED = {
+    **WELCOME_REWARD_APPLIED,
+    "title": "2 free cartons: welcome reward",
+    "free_variant_id": 4001,
+    "free_quantity": 2,
+}
+CART_FREE_CARTONS_FIXED_SIZE = {
+    **CART_FREE_CARTONS,
+    "coupon": WELCOME_REWARD_X2_APPLIED,
+    "bill": {
+        **CART_FREE_CARTONS["bill"],
+        "total_savings": "330.00",
+        "free_items_value": "330.00",
+    },
+    "free_lines": [FREE_WATER_1L_VOLUME, FREE_WATER_1L_REWARD_X2],
+    "free_offer": {**FREE_OFFER_12, "free_variant": FREE_VARIANT_1L},
 }
 
 # The carts whose bills tests recompute from 08 §6.2.
@@ -617,6 +652,7 @@ ALL_CARTS = {
     "CART_STORE_CLOSED": CART_STORE_CLOSED,
     "CART_FREE_CARTONS": CART_FREE_CARTONS,
     "CART_FREE_CARTON_NO_STOCK": CART_FREE_CARTON_NO_STOCK,
+    "CART_FREE_CARTONS_FIXED_SIZE": CART_FREE_CARTONS_FIXED_SIZE,
 }
 
 # --------------------------------------------------------------------------- requests
@@ -628,6 +664,8 @@ CART_UPDATE_REQUEST = {"tip": "20.00", "instructions": INSTRUCTIONS, "address_id
 CART_UPDATE_TIP_REQUEST = {"tip": "30.00"}
 COUPON_APPLY_REQUEST = {"code": "jivo50"}
 COUPON_APPLY_REWARD_REQUEST = {"code": "WEL7K2M9QPX", "free_variant_id": 4002}
+# ADR 0003: the store has a fixed free size, so the reward is applied without a size.
+COUPON_APPLY_REWARD_FIXED_SIZE_REQUEST = {"code": "WEL7K2M9QPX"}
 
 # --------------------------------------------------------------------------- error details
 

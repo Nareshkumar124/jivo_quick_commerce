@@ -90,6 +90,54 @@ void main() {
       expect(cart.coupon?.isFreeCarton ?? false, isFalse);
     });
 
+    test('ADR 0003: the store\'s fixed free size and the reward quantity '
+        'are carried as sent', () async {
+      answer = (_, _) => contractExample(
+        "cart_retrieve/200/FreeCartonsInTheStore'sFixed1LSize(ADR0003)",
+      );
+      final cart = await repository.load();
+
+      final offer = cart.freeOffer!;
+      expect(
+        offer.freeVariant,
+        const FreeVariant(
+          id: 4001,
+          name: '1 L x 12 (carton)',
+          productName: 'Jivo Water',
+        ),
+      );
+      final coupon = cart.coupon!;
+      expect(coupon.freeQuantity, 2);
+      expect(coupon.freeVariantId, 4001);
+      // The reward line is the server's 2 cartons of the 1 L size.
+      final reward = cart.freeLines.singleWhere(
+        (line) => line.source == FreeLineSource.reward,
+      );
+      expect(reward.variantId, 4001);
+      expect(reward.quantity, 2);
+    });
+
+    test('no fixed free size: free_variant is null', () async {
+      answer = (_, _) => contractExample(
+        'cart_retrieve/200/FreeCartons:VolumeOfferAndAReward',
+      );
+      final cart = await repository.load();
+      expect(cart.freeOffer!.freeVariant, isNull);
+      expect(cart.coupon!.freeQuantity, 1);
+    });
+
+    test(
+      'ADR 0003: a reward with the fixed size sends only the code',
+      () async {
+        answer = (_, _) => contractExample(
+          'cart_coupon_apply/200/Free-cartonRewardApplied(fixed1LSize,ADR0003)',
+        );
+        final cart = await repository.applyCoupon('WEL7K2M9QPX');
+        expect(http.body(0), {'code': 'WEL7K2M9QPX'});
+        expect(cart.coupon!.freeQuantity, 2);
+      },
+    );
+
     test('applying a reward sends free_variant_id', () async {
       answer = (_, _) =>
           contractExample('cart_coupon_apply/200/Free-cartonRewardApplied');
@@ -132,6 +180,10 @@ void main() {
       expect(reward.isFreeCarton, isTrue);
       expect(reward.discountType, CouponDiscountType.freeUnit);
       expect(reward.source, RewardSource.welcome);
+      // ADR 0003: 2 cartons, the store's fixed size pre-filled.
+      expect(reward.freeQuantity, 2);
+      expect(reward.freeVariantId, 4001);
+      expect(reward.hasFixedFreeSize, isTrue);
       final old = offers.singleWhere((o) => o.code == 'REFK7M2PQ9X');
       expect(old.isFreeCarton, isFalse);
       expect(old.discountType, CouponDiscountType.flat);
@@ -179,6 +231,17 @@ void main() {
       expect(claimed.status, RewardStatus.claimed);
       expect(claimed.orderNumber, 'JV-261124-000318');
       expect(claimed.source, RewardSource.referralReferrer);
+      // ADR 0003: the quantity and the fixed free size, as sent.
+      expect(welcome.quantity, 2);
+      expect(
+        welcome.freeVariant,
+        const FreeVariant(
+          id: 4001,
+          name: '1 L x 12 (carton)',
+          productName: 'Jivo Water',
+        ),
+      );
+      expect(welcome.hasFixedSize, isTrue);
 
       expect(summary.history.map((e) => e.kind), [
         RewardHistoryKind.claimed,
@@ -187,6 +250,25 @@ void main() {
         RewardHistoryKind.earned,
       ]);
       expect(summary.history[1].quantity, 2);
+    });
+
+    test('with a store: X-Store-Id is sent', () async {
+      answer = (_, _) =>
+          contractExample('account_rewards_retrieve/200/Rewards');
+      await ApiRewardsRepository(http.api(), () => 7).fetch();
+      expect('${http.requests.single.headers['X-Store-Id']}', '7');
+    });
+
+    test('a store without a fixed free size: no free_variant, the size '
+        'is picked', () async {
+      answer = (_, _) => contractExample(
+        'account_rewards_retrieve/200/StoreWithoutAFixedFreeSize',
+      );
+      final summary = await ApiRewardsRepository(http.api(), () => 7).fetch();
+      final reward = summary.available.single;
+      expect(reward.quantity, 2);
+      expect(reward.freeVariant, isNull);
+      expect(reward.hasFixedSize, isFalse);
     });
 
     test('no rewards', () async {
@@ -219,6 +301,8 @@ void main() {
     final info = await ApiReferralRepository(http.api()).fetch();
     expect(info.rewardType, ReferralRewardType.freeCarton);
     expect(info.isFreeCarton, isTrue);
-    expect(info.rewardQuantity, 1);
+    // ADR 0003: the server's settings (2 on staging).
+    expect(info.rewardQuantity, 2);
+    expect(info.welcomeRewardQuantity, 2);
   });
 }

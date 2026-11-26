@@ -55,6 +55,8 @@ class CouponOffer {
     required this.source_,
 
     required this.freeVariantId,
+
+    required this.freeQuantity,
   });
 
   /// Upper case. Apply with `POST /cart/coupon/`.
@@ -69,7 +71,7 @@ class CouponOffer {
   @JsonKey(name: r'description', required: true, includeIfNull: false)
   final String description;
 
-  /// FREE_UNIT (ADR 0002): a free-carton reward. Applying it needs `free_variant_id` (the size the customer picks); it gives no money off (`savings` \"0.00\").  * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - One free carton (reward)
+  /// FREE_UNIT (ADR 0002/0003): a free-carton reward of `free_quantity` cartons. It gives no money off (`savings` \"0.00\"). When `free_variant_id` is already set (the store's fixed free size, ADR 0003), apply it without a size; else the customer picks the size.  * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - Free cartons (reward)
   @JsonKey(
     name: r'discount_type',
     required: true,
@@ -78,7 +80,7 @@ class CouponOffer {
   )
   final CouponDiscountTypeEnum discountType;
 
-  /// FLAT: rupees off (\"50.00\"). PERCENT: percent off (\"10.00\" = 10%). FREE_UNIT: free cartons (\"1.00\").
+  /// FLAT: rupees off (\"50.00\"). PERCENT: percent off (\"10.00\" = 10%). FREE_UNIT: the number of free cartons (\"2.00\"; use `free_quantity`).
   @JsonKey(name: r'value', required: true, includeIfNull: false)
   final String value;
 
@@ -135,9 +137,14 @@ class CouponOffer {
   )
   final CouponSourceEnum source_;
 
-  /// FREE_UNIT and applied to the cart: the size picked for the free carton. Null otherwise.
+  /// FREE_UNIT only. ADR 0003: the store's fixed free size when it has one (applied or not; apply the reward without a size). Otherwise (ADR 0002) the size picked when the reward is applied to the cart, else null. Null for other coupons.
   @JsonKey(name: r'free_variant_id', required: true, includeIfNull: true)
   final int? freeVariantId;
+
+  /// ADR 0003: FREE_UNIT only, the number of free cartons (e.g. 2). Null for other coupons.
+  // minimum: 1
+  @JsonKey(name: r'free_quantity', required: true, includeIfNull: true)
+  final int? freeQuantity;
 
   @override
   bool operator ==(Object other) =>
@@ -159,7 +166,8 @@ class CouponOffer {
           other.amountToUnlock == amountToUnlock &&
           other.isPersonal == isPersonal &&
           other.source_ == source_ &&
-          other.freeVariantId == freeVariantId;
+          other.freeVariantId == freeVariantId &&
+          other.freeQuantity == freeQuantity;
 
   @override
   int get hashCode =>
@@ -179,7 +187,8 @@ class CouponOffer {
       (amountToUnlock == null ? 0 : amountToUnlock.hashCode) +
       isPersonal.hashCode +
       source_.hashCode +
-      (freeVariantId == null ? 0 : freeVariantId.hashCode);
+      (freeVariantId == null ? 0 : freeVariantId.hashCode) +
+      (freeQuantity == null ? 0 : freeQuantity.hashCode);
 
   factory CouponOffer.fromJson(Map<String, dynamic> json) =>
       _$CouponOfferFromJson(json);

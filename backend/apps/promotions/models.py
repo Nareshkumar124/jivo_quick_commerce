@@ -4,8 +4,9 @@ A coupon with an `owner` is personal (07 §2.5, added 2026-11-13): only that cus
 the coupon sheet and can apply or use it (`apps.promotions.services.is_for`). Referral rewards
 are personal coupons.
 
-Free-carton rewards (ADR 0002) are personal coupons too: `discount_type` FREE_UNIT (value 1 =
-one carton, no money off) with a `source` (WELCOME, REFERRAL_REFERRER, REFERRAL_REFERRED). A
+Free-carton rewards (ADR 0002) are personal coupons too: `discount_type` FREE_UNIT (`value` =
+the number of free cartons, a whole number from 1 to 10 since ADR 0003; no money off) with a
+`source` (WELCOME, REFERRAL_REFERRER, REFERRAL_REFERRED). A
 customer has at most one WELCOME reward (database rule). Their status (AVAILABLE, CLAIMED, USED,
 EXPIRED) is derived from the coupon's redemptions and their orders
 (`apps.promotions.rewards`).
@@ -33,6 +34,9 @@ from apps.promotions.choices import CouponSource, DiscountType
 
 COUPON_CODE_MAX_LENGTH = 30
 MONEY = {"max_digits": 12, "decimal_places": 2}
+# ADR 0003: a FREE_UNIT coupon's `value` is the number of free cartons, a whole number 1 to 10.
+MAX_FREE_UNITS = 10
+FREE_UNIT_VALUES = list(range(1, MAX_FREE_UNITS + 1))
 
 
 class Coupon(TimeStampedModel):
@@ -49,8 +53,8 @@ class Coupon(TimeStampedModel):
         **MONEY,
         validators=[MinValueValidator(Decimal("0.01"))],
         help_text=(
-            "FLAT: rupees off. PERCENT: percent off (at most 100). FREE_UNIT: free cartons "
-            "(always 1)."
+            "FLAT: rupees off. PERCENT: percent off (at most 100). FREE_UNIT: the number of "
+            "free cartons, a whole number from 1 to 10."
         ),
     )
     max_discount = models.DecimalField(
@@ -140,10 +144,11 @@ class Coupon(TimeStampedModel):
                 | Q(ends_at__gt=F("starts_at")),
                 name="coupon_ends_after_start",
             ),
-            # ADR 0002: a free-carton coupon gives exactly one carton.
+            # ADR 0003 (replaced ADR 0002's "exactly 1"): a free-carton coupon gives a whole
+            # number of cartons from 1 to 10.
             models.CheckConstraint(
-                condition=~Q(discount_type=DiscountType.FREE_UNIT) | Q(value=1),
-                name="coupon_free_unit_is_one",
+                condition=~Q(discount_type=DiscountType.FREE_UNIT) | Q(value__in=FREE_UNIT_VALUES),
+                name="coupon_free_unit_quantity_1_to_10",
             ),
             # ADR 0002 (code review): a free-carton coupon is always a personal reward, never a
             # public coupon or a staff one.
@@ -167,6 +172,14 @@ class Coupon(TimeStampedModel):
     def __str__(self) -> str:
         return self.code
 
+    @property
+    def free_units(self) -> int:
+        """ADR 0003: the free cartons a FREE_UNIT reward gives (its `value`, a whole number);
+        0 for other coupons."""
+        if self.discount_type != DiscountType.FREE_UNIT or self.value is None:
+            return 0
+        return int(self.value)
+
     def save(self, *args, **kwargs) -> None:
         self.code = (self.code or "").strip().upper()
         super().save(*args, **kwargs)
@@ -178,8 +191,10 @@ class Coupon(TimeStampedModel):
             raise ValidationError({"value": "A percent coupon is at most 100."})
         if self.discount_type == DiscountType.FREE_UNIT:
             errors = {}
-            if self.value != 1:
-                errors["value"] = "A free-carton coupon gives exactly 1 carton."
+            if self.value is None or self.value not in FREE_UNIT_VALUES:
+                errors["value"] = (
+                    f"A free-carton coupon gives a whole number of cartons, 1 to {MAX_FREE_UNITS}."
+                )
             if self.owner_id is None or self.source == CouponSource.NONE:
                 errors["discount_type"] = (
                     "Free-carton coupons are rewards made by the system (welcome and referral) "

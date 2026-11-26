@@ -6,7 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - One free carton (reward)
+/// * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - Free cartons (reward)
 enum CouponDiscountTypeEnum {
   @JsonValue(r'FLAT')
   FLAT(r'FLAT'),

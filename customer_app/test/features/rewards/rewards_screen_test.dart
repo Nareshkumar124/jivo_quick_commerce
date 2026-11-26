@@ -12,6 +12,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../helpers/test_app.dart';
 import '../cart/cart_fixtures.dart';
+import '../cart/cart_screen_test.dart' show textOf;
 import '../cart/free_cartons_cart_test.dart' show freeCart, freeLine, cartons;
 
 final _expiry = DateTime.utc(2026, 12, 25, 9, 30);
@@ -436,5 +437,230 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Retry'), findsWidgets);
     expect(find.byKey(const Key('rewards-history')), findsNothing);
+  });
+  group('ADR 0003: 2 free cartons of the store\'s fixed 1 L size', () {
+    const oneLitre = FreeVariant(
+      id: 1501,
+      name: '1 L × 12',
+      productName: 'Jivo Water',
+    );
+    final fixed = RewardsSummary(
+      available: [
+        Reward(
+          code: 'WEL7K2M9QPX',
+          title: '2 free cartons: welcome reward',
+          source: RewardSource.welcome,
+          status: RewardStatus.available,
+          expiresAt: _expiry,
+          quantity: 2,
+          freeVariant: oneLitre,
+        ),
+      ],
+    );
+    const fixedOffer = CouponOffer(
+      code: 'WEL7K2M9QPX',
+      title: '2 free cartons',
+      description: '',
+      isEligible: true,
+      isPersonal: true,
+      discountType: CouponDiscountType.freeUnit,
+      source: RewardSource.welcome,
+      freeVariantId: 1501,
+      freeQuantity: 2,
+    );
+
+    StubCartRepository cartWith({List<CouponOffer> offers = const []}) =>
+        StubCartRepository(
+            cartSnapshot(lines: [cartLine()], thresholds: cartons),
+          )
+          ..couponList = offers
+          ..afterApply = freeCart(
+            free: [
+              freeLine(
+                variantId: 1501,
+                quantity: 2,
+                source: FreeLineSource.reward,
+              ),
+            ],
+            offer: null,
+            coupon: const AppliedCoupon(
+              code: 'WEL7K2M9QPX',
+              title: '2 free cartons',
+              discount: '0.00',
+              discountType: CouponDiscountType.freeUnit,
+              freeVariantId: 1501,
+              freeQuantity: 2,
+            ),
+          );
+
+    List<String> applies(StubCartRepository repo) =>
+        repo.calls.where((c) => c.startsWith('coupon:')).toList();
+
+    testWidgets('the card shows the quantity and the size', (tester) async {
+      await openRewards(tester, rewards: fixed, repo: cartWith());
+      expect(
+        textOf(tester, 'reward-title-WEL7K2M9QPX'),
+        '2 free cartons · 1 L × 12',
+      );
+      expect(find.text('1 free carton'), findsNothing);
+      expect(find.bySemanticsLabel('Use your 2 free cartons'), findsOneWidget);
+    });
+
+    testWidgets('Use applies it at once, with no size sheet, and opens the '
+        'cart', (tester) async {
+      final repo = cartWith();
+      await openRewards(tester, rewards: fixed, repo: repo);
+
+      await tester.tap(find.byKey(const ValueKey('reward-use-WEL7K2M9QPX')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('free-size-sheet')), findsNothing);
+      // No size sent: the server uses the store's fixed size.
+      expect(applies(repo), ['coupon:WEL7K2M9QPX']);
+      expect(find.byType(CartScreen), findsOneWidget);
+      expect(find.text('2 free cartons added to your cart'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('cart-free-line-1501-reward')),
+        findsOneWidget,
+      );
+      expect(find.text('Your 2 free cartons are in the items above'), findsOne);
+    });
+
+    testWidgets('a fixed size known only from the coupon list '
+        '(free_variant_id) is applied at once too', (tester) async {
+      final repo = cartWith(offers: const [fixedOffer]);
+      await openRewards(
+        tester,
+        rewards: RewardsSummary(
+          available: [
+            Reward(
+              code: 'WEL7K2M9QPX',
+              title: '2 free cartons',
+              source: RewardSource.welcome,
+              status: RewardStatus.available,
+              expiresAt: _expiry,
+              quantity: 2,
+            ),
+          ],
+        ),
+        repo: repo,
+      );
+      expect(textOf(tester, 'reward-title-WEL7K2M9QPX'), '2 free cartons');
+      await tester.tap(find.byKey(const ValueKey('reward-use-WEL7K2M9QPX')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('free-size-sheet')), findsNothing);
+      expect(applies(repo), ['coupon:WEL7K2M9QPX']);
+      expect(find.byType(CartScreen), findsOneWidget);
+    });
+
+    testWidgets('no fixed size at all: the size sheet is the fallback, in '
+        'the reward\'s plural', (tester) async {
+      final repo = cartWith();
+      await openRewards(
+        tester,
+        rewards: RewardsSummary(
+          available: [
+            Reward(
+              code: 'WEL7K2M9QPX',
+              title: '2 free cartons',
+              source: RewardSource.welcome,
+              status: RewardStatus.available,
+              expiresAt: _expiry,
+              quantity: 2,
+            ),
+          ],
+        ),
+        repo: repo,
+      );
+      await tester.tap(find.byKey(const ValueKey('reward-use-WEL7K2M9QPX')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('free-size-sheet')), findsOneWidget);
+      expect(find.text('Pick a size for your 2 free cartons'), findsOneWidget);
+      expect(applies(repo), isEmpty);
+
+      await tester.tap(find.byKey(const ValueKey('free-size-1502')));
+      await tester.pumpAndSettle();
+      expect(find.text('Add 2 free cartons'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('free-size-confirm')));
+      await tester.pumpAndSettle();
+      expect(applies(repo), ['coupon:WEL7K2M9QPX:1502']);
+      expect(find.byType(CartScreen), findsOneWidget);
+    });
+
+    testWidgets('the cart\'s store still wants a size: the sheet opens '
+        'instead of an error', (tester) async {
+      final repo = cartWith()
+        ..applyError = const ApiError(
+          code: ApiErrorCode.validationError,
+          rawCode: 'VALIDATION_ERROR',
+          statusCode: 400,
+          details: {
+            'free_variant_id': ['Choose a size for your free carton.'],
+          },
+        );
+      await openRewards(tester, rewards: fixed, repo: repo);
+      await tester.tap(find.byKey(const ValueKey('reward-use-WEL7K2M9QPX')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('free-size-sheet')), findsOneWidget);
+      expect(find.text('Choose a size for your free carton.'), findsNothing);
+    });
+
+    testWidgets('too few paid cartons: the server reason and Add cartons, '
+        'the cart stays closed', (tester) async {
+      final repo = cartWith()
+        ..applyError = const ApiError(
+          code: ApiErrorCode.couponNotEligible,
+          rawCode: 'COUPON_NOT_ELIGIBLE',
+          statusCode: 422,
+          details: {
+            'reason': 'MIN_ORDER_UNITS',
+            'min_order_units': 5,
+            'paid_units': 2,
+            'units_to_unlock': 3,
+          },
+        );
+      await openRewards(tester, rewards: fixed, repo: repo);
+      await tester.tap(find.byKey(const ValueKey('reward-use-WEL7K2M9QPX')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Add 3 more cartons to use this reward (minimum 5 paid cartons)',
+        ),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(SnackBarAction, 'Add cartons'), findsOne);
+      expect(find.byType(CartScreen), findsNothing);
+      expect(find.byKey(const Key('free-size-sheet')), findsNothing);
+      // Use works again.
+      final use = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('reward-use-WEL7K2M9QPX')),
+      );
+      expect(use.onPressed, isNotNull);
+    });
+
+    testWidgets('the fixed size is not available: no "choose another size"', (
+      tester,
+    ) async {
+      final repo = cartWith()
+        ..applyError = const ApiError(
+          code: ApiErrorCode.couponNotEligible,
+          statusCode: 422,
+          details: {
+            'reason': 'FREE_VARIANT_UNAVAILABLE',
+            'free_variant_id': 1501,
+          },
+        );
+      await openRewards(tester, rewards: fixed, repo: repo);
+      await tester.tap(find.byKey(const ValueKey('reward-use-WEL7K2M9QPX')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'The free carton size is not available at this store right now. '
+          'Please try again later.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Choose another size'), findsNothing);
+    });
   });
 }

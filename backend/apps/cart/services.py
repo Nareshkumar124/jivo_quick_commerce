@@ -9,10 +9,13 @@ prices and stock on every read. It never reserves stock (08 §6.1). A line above
 can supply is flagged (`issue`) and blocks checkout; the server never changes the cart silently.
 
 Free cartons (ADR 0002) are computed here too, next to `load_lines()`, and passed into
-`compute_bill()`: the store's volume offer (1 free carton for every `free_unit_every` paid ones,
-the cheapest size in the cart) and a free-carton reward applied as the cart's coupon. They cost
-₹0: never part of `item_total`, the fees, the coupon minimum or the COD limit; their MRP value is
-`free_items_value` (part of `total_savings`). Free cartons never count as paid units.
+`compute_bill()`: the store's volume offer (1 free carton for every `free_unit_every` paid ones)
+and a free-carton reward applied as the cart's coupon (`value` cartons, ADR 0003). Their size is
+the store's fixed free size (`PricingConfig.free_unit_variant`, ADR 0003) when it has one; else
+the volume offer uses the cheapest size in the cart and the reward the size the customer picked
+(ADR 0002). They cost ₹0: never part of `item_total`, the fees, the coupon minimum or the COD
+limit; their MRP value is `free_items_value` (part of `total_savings`). Free cartons never count
+as paid units.
 
 Every cart and coupon operation goes through this module. Callers pass the store as resolved from
 `X-Store-Id` (`apps.stores.services.StoreArea`: id, name, hours and service area, no query).
@@ -49,7 +52,6 @@ from apps.inventory.services import availability
 from apps.orders.choices import FreeSource, PaymentMethod
 from apps.promotions import services as promotions
 from apps.promotions.choices import CouponIneligibleReason
-from apps.promotions.rewards import REWARD_UNITS
 from apps.stores.models import PricingConfig
 from apps.stores.services import StoreArea, status_message, store_status
 
@@ -83,6 +85,8 @@ class PricingRules:
     min_order_units: int = 0  # 0 = no minimum
     order_unit_label: str = "items"
     free_unit_every: int = 0  # ADR 0002 volume offer: 1 free per this many paid; 0 = off
+    free_unit_variant_id: int | None = None  # ADR 0003: the size of every free carton; None =
+    # the ADR 0002 rules (cheapest size in the cart; the customer picks a reward's size)
 
     @classmethod
     def from_config(cls, config: PricingConfig) -> "PricingRules":
@@ -98,6 +102,7 @@ class PricingRules:
             min_order_units=config.min_order_units,
             order_unit_label=config.order_unit_label,
             free_unit_every=config.free_unit_every,
+            free_unit_variant_id=config.free_unit_variant_id,
         )
 
 
@@ -561,19 +566,74 @@ def _paid_of(lines: Sequence[CartLine], variant_id: int) -> int:
     return sum(counted_units(line) for line in lines if line.variant.pk == variant_id)
 
 
-def reward_size_ok(variant: ProductVariant | None, lines: Sequence[CartLine]) -> bool:
-    """A reward's size can be given (ADR 0002 §9): sold at the store, of the same product
-    category as at least one paid line of the cart (a water reward goes on a water order; PM,
-    2026-11-25), and with the stock for the cart's paid units of that size plus the free
-    carton."""
+def reward_size_ok(
+    variant: ProductVariant | None,
+    lines: Sequence[CartLine],
+    quantity: int = 1,
+    *,
+    fixed: bool = False,
+) -> bool:
+    """A reward's size can be given: sold at the store, with the stock for the cart's paid
+    units of that size plus the reward's `quantity` cartons (ADR 0003: `value` cartons). The
+    size the customer picked (ADR 0002 §9) must also be of the same product category as at
+    least one paid line of the cart (a water reward goes on a water order; PM, 2026-11-25); the
+    store's fixed free size (`fixed`, ADR 0003) skips that check."""
     if variant is None or not variant.inv_is_available:
         return False
-    paid_categories = {
-        line.variant.product.category_id for line in lines if counted_units(line) > 0
-    }
-    if variant.product.category_id not in paid_categories:
-        return False
-    return _paid_of(lines, variant.pk) + REWARD_UNITS <= stock_units(variant)
+    if not fixed:
+        paid_categories = {
+            line.variant.product.category_id for line in lines if counted_units(line) > 0
+        }
+        if variant.product.category_id not in paid_categories:
+            return False
+    return _paid_of(lines, variant.pk) + quantity <= stock_units(variant)
+
+
+def free_variant_body(variant: ProductVariant | None) -> dict | None:
+    """ADR 0003: the API `FreeVariant` {id, name, product_name}, or None."""
+    if variant is None:
+        return None
+    return {"id": variant.pk, "name": variant.name, "product_name": variant.product.name}
+
+
+def fixed_free_variant(
+    store_id: int, rules: PricingRules, lines: Sequence[CartLine], *, full: bool = True
+) -> ProductVariant | None:
+    """ADR 0003: the store's fixed free size with its store price and stock (the cart line's
+    variant when the cart has it, else one more read), or None when the store has none. `full`
+    also loads the images.
+
+    Pass `full=True` wherever a free line of it may be rendered (`FreeLine.as_dict()` ->
+    `variant_summary()`): without the image prefetch the line silently has no image. `full=False`
+    is only for stock checks and `free_variant_body()`. A switched-off size (`inv_is_available`
+    false) has 0 `stock_units()`, so it never gets a free line."""
+    variant_id = rules.free_unit_variant_id
+    if variant_id is None:
+        return None
+    for line in lines:
+        if line.variant.pk == variant_id:
+            return line.variant
+    return store_variants(store_id, [variant_id], with_images=full).get(variant_id)
+
+
+def fixed_free_variant_body(store_id: int | None) -> dict | None:
+    """ADR 0003 (`GET /account/rewards/`): the `FreeVariant` of the store's fixed free size, or
+    None when the store has none (one query)."""
+    if store_id is None:
+        return None
+    config = (
+        PricingConfig.objects.select_related("free_unit_variant__product")
+        .filter(store_id=store_id)
+        .first()
+    )
+    return free_variant_body(config.free_unit_variant if config is not None else None)
+
+
+def _summary_of(variant: ProductVariant, lines: Sequence[CartLine]) -> dict:
+    for line in lines:
+        if line.variant.pk == variant.pk:
+            return line.summary
+    return variant_summary(variant, variant.product)
 
 
 def volume_offer(
@@ -582,14 +642,22 @@ def volume_offer(
     *,
     extra: dict[int, int] | None = None,
     available: dict[int, int] | None = None,
+    fixed: ProductVariant | None = None,
 ) -> tuple[FreeLine | None, dict | None]:
-    """ADR 0002 §3: `paid // every` free cartons of the cheapest size in the cart (lowest unit
-    price among the paid lines; a tie goes to the size with more paid units, then the lowest
-    variant id). That size must have the stock for its paid units, any other free carton of it
-    (`extra`, e.g. a reward) and these free ones; else the next-cheapest size that can. When
-    none can, no free carton and a `notice`. Returns (the free line or None, the API
-    `free_offer` or None when the store has no offer). `available` (variant id -> units) is
-    the stock read under the placement's row locks; by default, the stock the cart read."""
+    """ADR 0002 §3: `paid // every` free cartons.
+
+    - ADR 0003: when the store has a fixed free size (`rules.free_unit_variant_id`; `fixed` is
+      that variant from `fixed_free_variant()`), they are always that size, whatever the paid
+      sizes: no cheapest-size rule and no fallback.
+    - Else (ADR 0002) the cheapest size in the cart (lowest unit price among the paid lines; a
+      tie goes to the size with more paid units, then the lowest variant id), or the
+      next-cheapest that has the stock.
+
+    The size must have the stock for its paid units, any other free carton of it (`extra`, e.g.
+    a reward) and these free ones. When it cannot, no free carton and a `notice`. Returns (the
+    free line or None, the API `free_offer` or None when the store has no offer). `available`
+    (variant id -> units) is the stock read under the placement's row locks; by default, the
+    stock the cart read."""
     every = rules.free_unit_every
     if not every:
         return None, None
@@ -598,16 +666,22 @@ def volume_offer(
     free = paid // every
     chosen, notice = None, None
     if free:
-        candidates = sorted(
-            (line for line in lines if counted_units(line) > 0),
-            key=lambda line: (line.unit_price, -counted_units(line), line.variant.pk),
-        )
-        for line in candidates:
-            variant = line.variant
+        if rules.free_unit_variant_id is not None:
+            candidates = [fixed] if fixed is not None else []
+        else:
+            candidates = [
+                line.variant
+                for line in sorted(
+                    (line for line in lines if counted_units(line) > 0),
+                    key=lambda line: (line.unit_price, -counted_units(line), line.variant.pk),
+                )
+            ]
+        for variant in candidates:
             need = _paid_of(lines, variant.pk) + extra.get(variant.pk, 0) + free
             stock = available.get(variant.pk, 0) if available is not None else stock_units(variant)
             if need <= stock:
-                chosen = FreeLine(variant, line.summary, free, FreeSource.VOLUME_OFFER)
+                summary = _summary_of(variant, lines)
+                chosen = FreeLine(variant, summary, free, FreeSource.VOLUME_OFFER)
                 break
         if chosen is None:
             notice = MSG_FREE_NO_STOCK
@@ -620,6 +694,9 @@ def volume_offer(
         "units_to_next_free": to_next,
         "message": f"Add {to_next} more {rules.order_unit_label} to get 1{more} free",
         "notice": notice,
+        "free_variant": (
+            free_variant_body(fixed) if rules.free_unit_variant_id is not None else None
+        ),
     }
     return chosen, offer
 
@@ -690,6 +767,10 @@ class CartState:
     # ADR 0002: free cartons (volume offer first, then the reward) and the volume offer body
     free_lines: list[FreeLine] = field(default_factory=list)
     free_offer: dict | None = None
+    # ADR 0003: the store's fixed free size (None: the ADR 0002 rules) and the size of a
+    # free-carton reward on the cart (the fixed size, else the one the customer picked)
+    fixed_free_variant: ProductVariant | None = None
+    reward_variant_id: int | None = None
 
     @property
     def bill_lines(self) -> list[BillLine]:
@@ -756,35 +837,60 @@ def free_cartons(
     rules: PricingRules,
     *,
     reward: ProductVariant | None = None,
+    reward_units: int = 1,
+    fixed: ProductVariant | None = None,
 ) -> tuple[list[FreeLine], dict | None]:
-    """ADR 0002: the cart's free lines (the volume offer, then the reward's carton when
-    `reward` is the size of an applicable reward) and the API `free_offer`."""
-    extra = {reward.pk: REWARD_UNITS} if reward is not None else {}
-    volume, offer = volume_offer(lines, rules, extra=extra)
+    """ADR 0002: the cart's free lines (the volume offer, then the reward's `reward_units`
+    cartons when `reward` is the size of an applicable reward) and the API `free_offer`.
+    `fixed` is the store's fixed free size (ADR 0003), or None."""
+    extra = {reward.pk: reward_units} if reward is not None else {}
+    volume, offer = volume_offer(lines, rules, extra=extra, fixed=fixed)
     free = [volume] if volume is not None else []
     if reward is not None:
-        summary = variant_summary(reward, reward.product)
-        free.append(FreeLine(reward, summary, REWARD_UNITS, FreeSource.REWARD))
+        free.append(FreeLine(reward, _summary_of(reward, lines), reward_units, FreeSource.REWARD))
     return free, offer
+
+
+def _no_stock_message(rules: PricingRules) -> str:
+    """The FREE_VARIANT_UNAVAILABLE message when the reward's size cannot be given: with a
+    fixed free size the customer cannot choose another one (ADR 0003)."""
+    if rules.free_unit_variant_id is not None:
+        return promotions.MSG_FREE_VARIANT_NO_STOCK
+    return promotions.MSG_FREE_VARIANT
+
+
+def reward_size_id(cart: Cart, rules: PricingRules) -> int | None:
+    """The size of a free-carton reward on the cart: the store's fixed free size (ADR 0003),
+    else the size the customer picked (ADR 0002)."""
+    if rules.free_unit_variant_id is not None:
+        return rules.free_unit_variant_id
+    return cart.free_variant_id
 
 
 def evaluate(cart: Cart, store: StoreArea, user, *, now: datetime | None = None) -> CartState:
     lines = load_lines(cart, store.pk)
     rules = pricing_rules(store.pk)
     bill_lines = [line.bill_line for line in lines]
-    check, reward = None, None
+    is_reward = promotions.is_free_unit(cart.coupon)
+    # A free line of the fixed size is possible only with a reward or a free carton earned:
+    # load its images only then (one light read otherwise, for `free_offer.free_variant`).
+    earned = bool(rules.free_unit_every) and paid_units(lines) >= rules.free_unit_every
+    fixed = fixed_free_variant(store.pk, rules, lines, full=is_reward or earned)
+    size_id = reward_size_id(cart, rules) if is_reward else None
+    check, reward, units = None, None, 0
     if cart.coupon is not None:
         prefetch_related_objects([cart.coupon], "stores", "categories__children")
         check = check_cart_coupon(cart.coupon, lines, rules, user=user, store_id=store.pk, now=now)
-        if check.ok and promotions.is_free_unit(cart.coupon):
-            reward = reward_variant(store.pk, cart.free_variant_id, lines)
-            if not reward_size_ok(reward, lines):
-                check, reward = (
-                    promotions.free_variant_check(cart.coupon, cart.free_variant_id),
-                    None,
+        if check.ok and is_reward:
+            units = cart.coupon.free_units
+            reward = fixed if fixed is not None else reward_variant(store.pk, size_id, lines)
+            if not reward_size_ok(reward, lines, units, fixed=fixed is not None):
+                check = promotions.free_variant_check(
+                    cart.coupon, size_id, _no_stock_message(rules)
                 )
+                reward = None
     coupon = cart.coupon if check is not None and check.ok else None
-    free_lines, offer = free_cartons(lines, rules, reward=reward)
+    free_lines, offer = free_cartons(lines, rules, reward=reward, reward_units=units, fixed=fixed)
     bill = compute_bill(
         bill_lines,
         rules,
@@ -792,7 +898,7 @@ def evaluate(cart: Cart, store: StoreArea, user, *, now: datetime | None = None)
         tip=cart.tip,
         free_lines=[line.bill_line for line in free_lines],
     )
-    return CartState(lines, rules, check, bill, free_lines, offer)
+    return CartState(lines, rules, check, bill, free_lines, offer, fixed, size_id)
 
 
 def _thresholds(state: CartState) -> dict:
@@ -872,7 +978,8 @@ def _coupon_body(state: CartState, cart: Cart) -> dict | None:
         "title": coupon.title,
         "discount_type": coupon.discount_type,
         "source": coupon.source,
-        "free_variant_id": cart.free_variant_id if promotions.is_free_unit(coupon) else None,
+        "free_variant_id": state.reward_variant_id,
+        "free_quantity": coupon.free_units if promotions.is_free_unit(coupon) else None,
         "discount": money_str(state.bill.coupon_discount),
         "is_applicable": check.ok,
         "message": check.message,
@@ -889,7 +996,9 @@ def _coupon_blocker(check) -> dict:
             "or remove the coupon."
         )
     elif check.reason == CouponIneligibleReason.FREE_VARIANT_UNAVAILABLE:
-        message = f"{check.message} Or remove the reward to continue."
+        # "Choose another size. Or remove ..." (ADR 0002); a fixed size cannot be changed.
+        joiner = "Or remove" if check.message == promotions.MSG_FREE_VARIANT else "Remove"
+        message = f"{check.message} {joiner} the reward to continue."
     else:
         message = f"{check.message} Remove it to continue."
     return {"code": check.error.value, "message": message}
@@ -1008,6 +1117,7 @@ def coupon_list_body(cart: Cart, store: StoreArea, user, *, now: datetime | None
         min_units=rules.min_order_units,
         unit_label=rules.order_unit_label,
         free_variant_id=cart.free_variant_id,
+        fixed_free_variant_id=rules.free_unit_variant_id,
     )
     return {"results": offers}
 
@@ -1183,13 +1293,17 @@ def apply_coupon(
     """`POST /cart/coupon/`: apply `code` (replacing any coupon) if the cart qualifies now;
     otherwise 422 with the reason and nothing changes.
 
-    A free-carton reward (ADR 0002, FREE_UNIT) also needs `free_variant_id`, the size the
-    customer picked (400 when missing, checked after the coupon's own rules so another
-    customer's code still looks unknown): it must be sold at this store, be of the same
-    product category as a paid line of the cart, and have the stock for the cart's paid units
-    of that size plus the free carton (422 `COUPON_NOT_ELIGIBLE`, FREE_VARIANT_UNAVAILABLE).
-    The reward needs the store's minimum paid cartons (422 MIN_ORDER_UNITS). It takes the
-    cart's single coupon slot."""
+    A free-carton reward (FREE_UNIT, `value` cartons) gets its size checked after the coupon's
+    own rules (so another customer's code still looks unknown):
+    - ADR 0003, the store has a fixed free size: `free_variant_id` may be left out (the fixed
+      size is used); any other id is 422 `COUPON_NOT_ELIGIBLE` (FREE_VARIANT_UNAVAILABLE). The
+      category rule does not apply to the fixed size.
+    - ADR 0002, no fixed size: `free_variant_id` is the size the customer picked (400 when
+      missing). It must be sold at this store and be of the same product category as a paid
+      line of the cart (422 FREE_VARIANT_UNAVAILABLE).
+    Either way the size needs the stock for the cart's paid units of it plus the reward's
+    cartons (422 FREE_VARIANT_UNAVAILABLE). The reward needs the store's minimum paid cartons
+    (422 MIN_ORDER_UNITS). It takes the cart's single coupon slot."""
     coupon = promotions.find_coupon(code)
     if coupon is None:
         raise ApiError(
@@ -1204,11 +1318,24 @@ def apply_coupon(
         raise check.as_error()
     size = None
     if promotions.is_free_unit(coupon):
-        if free_variant_id is None:
+        fixed_id = rules.free_unit_variant_id
+        if fixed_id is not None:
+            if free_variant_id is not None and free_variant_id != fixed_id:
+                raise promotions.free_variant_check(
+                    coupon, free_variant_id, promotions.MSG_FREE_VARIANT_NOT_FIXED
+                ).as_error()
+            size = fixed_id
+        elif free_variant_id is None:
             raise ValidationError({"free_variant_id": [MSG_FREE_VARIANT_REQUIRED]})
-        if not reward_size_ok(reward_variant(store.pk, free_variant_id, lines), lines):
-            raise promotions.free_variant_check(coupon, free_variant_id).as_error()
-        size = free_variant_id
+        else:
+            size = free_variant_id
+        variant = (
+            fixed_free_variant(store.pk, rules, lines, full=False)
+            if fixed_id is not None
+            else reward_variant(store.pk, size, lines)
+        )
+        if not reward_size_ok(variant, lines, coupon.free_units, fixed=fixed_id is not None):
+            raise promotions.free_variant_check(coupon, size, _no_stock_message(rules)).as_error()
     cart.coupon, cart.free_variant_id = coupon, size
     cart.save(update_fields=["coupon", "free_variant", "updated_at"])
 

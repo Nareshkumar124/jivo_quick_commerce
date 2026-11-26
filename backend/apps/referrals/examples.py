@@ -1,16 +1,18 @@
 """Example payloads for the referral contract (06 §2.1 "Referral"). Since ADR 0002 the reward is
-one free carton for each of the two customers, valid 30 days (default settings). `reward_amount`
+free cartons for each of the two customers, valid 30 days; since ADR 0003 their number is a setting
+(`reward_quantity`, 2 on staging, like `welcome_reward_quantity`). `reward_amount`
 is the old ₹ setting, kept for older apps and not given any more."""
 
-SHARE = "Use my code {code} on the Jivo app and we both get 1 free carton."
+SHARE = "Use my code {code} on the Jivo app and we both get 2 free cartons."
 
 NEW_CUSTOMER = {
     "code": "K7M2PQ",
     "share_message": SHARE.format(code="K7M2PQ"),
     "is_enabled": True,
     "reward_type": "FREE_UNIT",
-    "reward_quantity": 1,
-    "reward_label": "1 free carton",
+    "reward_quantity": 2,
+    "reward_label": "2 free cartons",
+    "welcome_reward_quantity": 2,
     "reward_amount": "90.00",
     "reward_validity_days": 30,
     "reward_min_order_value": "0.00",

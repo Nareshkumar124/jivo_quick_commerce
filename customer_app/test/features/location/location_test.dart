@@ -80,7 +80,9 @@ void main() {
     await tester.tap(find.byKey(const Key('detect-location')));
     await tester.pumpAndSettle();
 
-    expect(find.text("We're not in your area yet"), findsOneWidget);
+    expect(find.text("We're coming to your area soon!"), findsOneWidget);
+    // The server's message for this location, not an area in the app.
+    expect(find.text("We're not delivering here yet."), findsOneWidget);
     await tester.tap(find.text('Notify me'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('notify-done')), findsOneWidget);

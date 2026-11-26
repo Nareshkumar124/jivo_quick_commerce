@@ -137,6 +137,9 @@ STORE_SCOPED = {
     "orders_create",
     "orders_reorder",  # Phase 4: the cart is priced at that store
 }
+# ADR 0003: operations that take X-Store-Id as an optional hint (never an error; the store's
+# fixed free size), so they document no 400/404 for it.
+STORE_HINTED = {"account_rewards_retrieve"}
 # Phase 3: operations that take the Idempotency-Key header (02 §5).
 IDEMPOTENT = {"orders_create", "orders_retry_payment"}
 
@@ -209,6 +212,10 @@ def test_store_scoped_operations_require_the_store_header(schema):
     for path, _method, operation in operations(schema):
         op_id = operation["operationId"]
         headers = {p["name"]: p for p in operation.get("parameters", []) if p["in"] == "header"}
+        if op_id in STORE_HINTED:
+            assert headers["X-Store-Id"].get("required", False) is False, op_id  # optional
+            assert headers["X-Store-Id"]["schema"] == {"type": "integer"}, op_id
+            continue
         if op_id not in STORE_SCOPED:
             assert "X-Store-Id" not in headers, op_id
             continue

@@ -56,9 +56,11 @@ class ApiCartRepository implements CartRepository {
     return [for (final offer in list.results) _offer(offer)];
   });
 
-  /// A free-carton reward sends the picked size as `free_variant_id`
-  /// (ADR 0002); the server answers 400 without it, or 422
-  /// `COUPON_NOT_ELIGIBLE` (`MIN_ORDER_UNITS`, `FREE_VARIANT_UNAVAILABLE`).
+  /// A free-carton reward is sent without `free_variant_id` when the store
+  /// has a fixed free size (ADR 0003: the server uses it), else with the
+  /// picked size (ADR 0002; the server answers 400 without it). Errors:
+  /// 422 `COUPON_NOT_ELIGIBLE` (`MIN_ORDER_UNITS`,
+  /// `FREE_VARIANT_UNAVAILABLE`).
   @override
   Future<CartSnapshot> applyCoupon(String code, {int? freeVariantId}) => _call(
     () => _cart.cartCouponApply(
@@ -112,6 +114,7 @@ CartSnapshot cartFromApi(api.Cart c) => CartSnapshot.fromLines(
       discountType: CouponDiscountType.fromWire(coupon.discountType.value),
       source: RewardSource.fromWire(coupon.source_.value),
       freeVariantId: coupon.freeVariantId,
+      freeQuantity: coupon.freeQuantity,
     ),
   },
   freeLines: [for (final line in c.freeLines) _freeLine(line)],
@@ -124,6 +127,7 @@ CartSnapshot cartFromApi(api.Cart c) => CartSnapshot.fromLines(
       unitsToNextFree: offer.unitsToNextFree,
       message: offer.message,
       notice: offer.notice,
+      freeVariant: freeVariantFromApi(offer.freeVariant),
     ),
   },
   tip: c.tip,
@@ -195,6 +199,12 @@ CartBill billFromApi(api.Bill b) => CartBill(
   totalSavings: b.totalSavings,
   freeItemsValue: b.freeItemsValue,
 );
+
+/// The store's fixed free size (`FreeVariant`, ADR 0003) as sent; null
+/// when the store has none.
+FreeVariant? freeVariantFromApi(api.FreeVariant? v) => v == null
+    ? null
+    : FreeVariant(id: v.id, name: v.name, productName: v.productName);
 
 /// A cart `FreeLine` (ADR 0002): always ₹0; `mrp` and `value` as sent.
 FreeLine _freeLine(api.FreeLine l) {
@@ -302,6 +312,7 @@ CouponOffer _offer(api.CouponOffer o) => CouponOffer(
   discountType: CouponDiscountType.fromWire(o.discountType.value),
   source: RewardSource.fromWire(o.source_.value),
   freeVariantId: o.freeVariantId,
+  freeQuantity: o.freeQuantity,
 );
 
 InstructionTag? _chipFromApi(

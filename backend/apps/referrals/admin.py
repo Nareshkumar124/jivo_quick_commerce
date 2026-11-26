@@ -13,6 +13,10 @@ All by model permissions (`referrals.*`, granted in `apps.accounts.roles`), neve
   `reward_min_order_value` are no longer used for new rewards: they sit in their own
   "old ₹ rewards only" section. The referral list says "1 free carton" for free-carton rewards
   and the ₹ amount for the older ones.
+- ADR 0003 (2026-11-26): the number of free cartons is a setting: `welcome_reward_quantity`
+  ("Welcome gift") and `reward_quantity` (each person of a referral), 1 to 10. A reward keeps
+  the quantity it was given with (its coupon's `value`), so the referral list reads "N free
+  cartons" from the coupon, never from today's setting.
 - Referrals and referral codes: read-only for everyone, superusers included. Rows change only
   through `apps.referrals.services` (customers enter codes in the app; the reward is a Celery
   task). Customers are shown per the PII policy (`ops_console.pii`): a masked phone for roles
@@ -33,6 +37,7 @@ from unfold.decorators import display
 from apps.core import audit
 from apps.ops_console import status
 from apps.ops_console.admin_support import ReadOnlyHistoryAdmin
+from apps.ops_console.cartons import free_cartons
 from apps.ops_console.money import RupeeInput, inr
 from apps.ops_console.pii import can_view_full_phone, customer_label
 from apps.promotions import rewards
@@ -44,6 +49,13 @@ AUDIT_SETTINGS_CHANGE = "referral_settings.change"
 OLD_REWARDS = "(old ₹ rewards only)"
 LABEL_REWARD_AMOUNT = f"Reward amount {OLD_REWARDS}"
 LABEL_MIN_ORDER = f"Minimum item total {OLD_REWARDS}"
+# ADR 0003: free cartons per reward.
+LABEL_WELCOME_QUANTITY = "Welcome gift (free cartons)"
+LABEL_REWARD_QUANTITY = "Referral reward per person (free cartons)"
+QUANTITY_FIELDS = {
+    "welcome_reward_quantity": "welcome_reward_cartons",
+    "reward_quantity": "reward_cartons",
+}
 
 # Badge per referral status (labels unique: unfold's `@display(label=...)` maps label -> tone).
 REFERRAL_BADGES = {
@@ -83,13 +95,24 @@ class _ReadOnlyAdmin(ModelAdmin):
 class ReferralSettingsForm(forms.ModelForm):
     class Meta:
         model = ReferralSettings
-        fields = ("is_enabled", "reward_amount", "reward_validity_days", "reward_min_order_value")
+        fields = (
+            "is_enabled",
+            "welcome_reward_quantity",
+            "reward_quantity",
+            "reward_amount",
+            "reward_validity_days",
+            "reward_min_order_value",
+        )
         widgets = {
+            "welcome_reward_quantity": forms.NumberInput(attrs={"min": "1", "max": "10"}),
+            "reward_quantity": forms.NumberInput(attrs={"min": "1", "max": "10"}),
             "reward_amount": RupeeInput(attrs={"min": "1", "max": "1000"}),
             "reward_min_order_value": RupeeInput,
         }
         labels = {
             "is_enabled": "Referral program on",
+            "welcome_reward_quantity": LABEL_WELCOME_QUANTITY,
+            "reward_quantity": LABEL_REWARD_QUANTITY,
             "reward_amount": LABEL_REWARD_AMOUNT,
             "reward_validity_days": "Reward valid for (days)",
             "reward_min_order_value": LABEL_MIN_ORDER,
@@ -99,9 +122,17 @@ class ReferralSettingsForm(forms.ModelForm):
                 "Off: customers cannot enter a code, and a friend whose first order is "
                 "delivered while it is off gets no reward."
             ),
+            "welcome_reward_quantity": (
+                "Free cartons a new customer account gets (1 to 10). Rewards already given keep "
+                "their own quantity."
+            ),
+            "reward_quantity": (
+                "Free cartons each of the two customers gets when the friend's first order is "
+                "delivered (1 to 10). Rewards already given keep their own quantity."
+            ),
             "reward_amount": (
-                "Not used for new rewards: the referral reward is now 1 free carton each. Kept "
-                "from the old ₹ off reward (₹1 to ₹1,000)."
+                "Not used for new rewards: the referral reward is now free cartons. Kept from "
+                "the old ₹ off reward (₹1 to ₹1,000)."
             ),
             "reward_validity_days": "Days each reward (referral and welcome) can be used, from "
             "the day it is given (1 to 365).",
@@ -117,6 +148,8 @@ class ReferralSettingsAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
     readonly_fields = (
         "updated_at",
         "reward_label",
+        "welcome_reward_cartons",
+        "reward_cartons",
         "reward_amount_inr",
         "reward_min_order_value_inr",
     )
@@ -125,12 +158,19 @@ class ReferralSettingsAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
         (
             "Reward",
             {
-                "fields": ("reward_label", "reward_validity_days"),
+                "fields": (
+                    "reward_label",
+                    "welcome_reward_quantity",
+                    "reward_quantity",
+                    "reward_validity_days",
+                ),
                 "description": (
-                    "Both customers get 1 free carton (a one-use personal reward; they pick the "
-                    "size) when the friend's first order is delivered. New customer accounts "
-                    "get a welcome reward with the same validity. The validity is read when a "
-                    "reward is given: a change applies to rewards given from now on."
+                    "New customer accounts get the welcome gift. When a friend's first order is "
+                    "delivered, both customers get the referral reward. Each is a one-use "
+                    "personal reward of free cartons of the store's free carton size (Pricing "
+                    "config; where none is set, the customer picks the size). The quantities "
+                    "and the validity are read when a reward is given: a change applies to "
+                    "rewards given from now on."
                 ),
             },
         ),
@@ -164,16 +204,15 @@ class ReferralSettingsAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
 
     def get_fieldsets(self, request, obj=None):
         if obj is not None and not self.has_change_permission(request, obj):
-            # View-only roles: the amounts in rupees instead of bare numbers.
+            # View-only roles: the amounts in rupees and the quantities as "N free cartons",
+            # instead of bare numbers.
+            shown = {name: f"{name}_inr" for name in self.money_fields} | QUANTITY_FIELDS
             return tuple(
                 (
                     title,
                     {
                         **options,
-                        "fields": tuple(
-                            f"{name}_inr" if name in self.money_fields else name
-                            for name in options["fields"]
-                        ),
+                        "fields": tuple(shown.get(name, name) for name in options["fields"]),
                     },
                 )
                 for title, options in self.fieldsets
@@ -190,6 +229,8 @@ class ReferralSettingsAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
                 {
                     "fields": sorted(form.changed_data),
                     "is_enabled": obj.is_enabled,
+                    "welcome_reward_quantity": obj.welcome_reward_quantity,
+                    "reward_quantity": obj.reward_quantity,
                     "reward_amount": f"{obj.reward_amount:.2f}",
                     "reward_validity_days": obj.reward_validity_days,
                     "reward_min_order_value": f"{obj.reward_min_order_value:.2f}",
@@ -197,9 +238,22 @@ class ReferralSettingsAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
                 ip=request.META.get("REMOTE_ADDR"),
             )
 
-    @display(description="Reward (each)")
+    @display(description="New rewards")
     def reward_label(self, obj) -> str:
-        return rewards.REWARD_LABEL
+        """The saved settings in words (ADR 0003), e.g. "Welcome gift: 2 free cartons.
+        Referral: 2 free cartons for each person."."""
+        return (
+            f"Welcome gift: {free_cartons(obj.welcome_reward_quantity)}. "
+            f"Referral: {free_cartons(obj.reward_quantity)} for each person."
+        )
+
+    @display(description=LABEL_WELCOME_QUANTITY)
+    def welcome_reward_cartons(self, obj) -> str:
+        return free_cartons(obj.welcome_reward_quantity)
+
+    @display(description=LABEL_REWARD_QUANTITY)
+    def reward_cartons(self, obj) -> str:
+        return free_cartons(obj.reward_quantity)
 
     @display(description=LABEL_REWARD_AMOUNT)
     def reward_amount_inr(self, obj) -> str:
@@ -261,9 +315,9 @@ class ReferralAdmin(_ReadOnlyAdmin):
                     "note",
                 ),
                 "description": (
-                    "Given once, when the friend's first order is delivered: 1 free carton for "
-                    "each customer, as a one-use personal reward (see Coupons). Older referrals "
-                    "got a ₹ off coupon."
+                    "Given once, when the friend's first order is delivered: free cartons for "
+                    "each customer (the quantity set when it was given), as a one-use personal "
+                    "reward (see Coupons). Older referrals got a ₹ off coupon."
                 ),
             },
         ),
@@ -317,8 +371,9 @@ class ReferralAdmin(_ReadOnlyAdmin):
     @display(description="Reward (each)", ordering="reward_amount")
     def reward(self, obj) -> str:
         # ADR 0002: a free-carton reward has no ₹ amount; older referrals keep theirs.
+        # ADR 0003: its cartons are the coupon's own quantity (both get the same).
         if obj.referrer_coupon_id and rewards.is_reward(obj.referrer_coupon):
-            return rewards.REWARD_LABEL
+            return free_cartons(obj.referrer_coupon.value)
         return inr(obj.reward_amount)
 
     @display(description="Referrer's coupon")

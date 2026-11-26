@@ -18,9 +18,12 @@ Support and Finance view; DL-45, DL-46).
   `str(user)` (the phone).
 - Free-carton rewards (ADR 0002: `discount_type` FREE_UNIT, with a `source`: welcome or
   referral) are made by the system only, so FREE_UNIT is not offered on the form. On a reward's
-  page the type, value, cap and minimum are replaced by "1 free carton" and the reward's status,
+  page the type, value, cap and minimum are replaced by "N free cartons" and the reward's status,
   and its usage limits (one use) are read-only, also against a crafted POST (the fields are not
   in the form). The list shows and filters the type and the source.
+- ADR 0003: a reward's `value` is its number of free cartons (1 to 10), so the list, the
+  reward's page and the redemptions say "N free cartons" from it; the cartons are the store's
+  free carton size (Pricing config).
 """
 
 from urllib.parse import urlencode
@@ -40,6 +43,7 @@ from unfold.widgets import UnfoldForeignKeyRawIdWidget
 
 from apps.ops_console import status
 from apps.ops_console.admin_support import ReadOnlyHistoryAdmin
+from apps.ops_console.cartons import free_cartons
 from apps.ops_console.money import RupeeInput, inr
 from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.pii import can_view_full_phone, customer_label
@@ -72,9 +76,10 @@ REWARD_FIELDSET = (
     {
         "fields": ("reward_kind", "reward_status"),
         "description": (
-            "A free-carton reward gives no money off: the customer picks the size when using "
-            "it, and the order still needs the store's minimum paid cartons. One use; its type "
-            "and limits are fixed. Switch it off or change its end date if needed."
+            "A free-carton reward gives no money off: its cartons are the store's free carton "
+            "size (Pricing config; where none is set, the customer picks the size), and the "
+            "order still needs the store's minimum paid cartons. One use; its type, number of "
+            "cartons and limits are fixed. Switch it off or change its end date if needed."
         ),
     },
 )
@@ -446,7 +451,7 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
     @display(description="Discount", ordering="value")
     def discount(self, obj) -> str:
         if rewards.is_reward(obj):
-            return rewards.REWARD_LABEL  # no money off (ADR 0002)
+            return free_cartons(obj.value)  # no money off (ADR 0002); N cartons (ADR 0003)
         if obj.discount_type == DiscountType.PERCENT:
             text = f"{obj.value.normalize():f}% off"
             if obj.max_discount is not None:
@@ -507,7 +512,7 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
 
     @display(description="Reward")
     def reward_kind(self, obj) -> str:
-        return f"{rewards.REWARD_LABEL} (₹0; the customer picks the size)"
+        return f"{free_cartons(obj.value)} (₹0, the store's free carton size)"
 
     @display(description="Reward status")
     def reward_status(self, obj) -> str:
@@ -647,7 +652,8 @@ class CouponRedemptionAdmin(StoreScopedAdminMixin, ModelAdmin):
     @display(description="Discount", ordering="discount_amount")
     def discount(self, obj) -> str:
         if rewards.is_reward(obj.coupon):
-            return rewards.REWARD_LABEL  # a free line at ₹0 on the order (ADR 0002)
+            # A free line at ₹0 on the order (ADR 0002), of the coupon's quantity (ADR 0003).
+            return free_cartons(obj.coupon.value)
         return inr(obj.discount_amount)
 
     @display(description="Status", label=status.label_tones(status.REDEMPTION))

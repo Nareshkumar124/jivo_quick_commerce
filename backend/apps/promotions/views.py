@@ -11,6 +11,8 @@ from apps.core.schema import UNAUTHORIZED, app_responses, ok_response
 from apps.promotions import examples as ex
 from apps.promotions import rewards
 from apps.promotions.serializers import RewardsSerializer
+from apps.stores.context import optional_store_id
+from apps.stores.schema import OPTIONAL_STORE_ID_PARAMETER
 
 
 class RewardsView(APIView):
@@ -21,18 +23,22 @@ class RewardsView(APIView):
         tags=["account"],
         summary="My free-carton rewards",
         description=(
-            "ADR 0002: the caller's free-carton rewards (welcome and referral) and their "
-            "history. A reward is a personal coupon with `discount_type` FREE_UNIT: tap **Use**, "
-            "let the customer pick a size, then `POST /cart/coupon/` with `code` and "
-            "`free_variant_id`. One reward or one coupon per order; the order still needs the "
-            "store's minimum paid cartons. USED and EXPIRED rewards are only in `history`."
+            "ADR 0002/0003: the caller's free-carton rewards (welcome and referral) and their "
+            "history. A reward is a personal coupon with `discount_type` FREE_UNIT giving "
+            "`quantity` free cartons. Tap **Use**: when `free_variant` is set (the store's fixed "
+            "free size, ADR 0003) send `POST /cart/coupon/` with `code` only; else let the "
+            "customer pick a size and send `code` and `free_variant_id`. One reward or one "
+            "coupon per order; the order still needs the store's minimum paid cartons. USED and "
+            "EXPIRED rewards are only in `history`."
         ),
+        parameters=[OPTIONAL_STORE_ID_PARAMETER],
         responses=app_responses(
             {
                 200: ok_response(
                     RewardsSerializer,
                     "The caller's rewards.",
                     ("Rewards", ex.REWARDS),
+                    ("Store without a fixed free size", ex.REWARDS_NO_FIXED_SIZE),
                     ("No rewards", ex.REWARDS_EMPTY),
                 ),
                 401: UNAUTHORIZED,
@@ -40,4 +46,7 @@ class RewardsView(APIView):
         ),
     )
     def get(self, request: Request) -> Response:
-        return Response(RewardsSerializer(rewards.rewards_body(request.user)).data)
+        store_id = rewards.store_for_rewards(request.user, optional_store_id(request))
+        return Response(
+            RewardsSerializer(rewards.rewards_body(request.user, store_id=store_id)).data
+        )

@@ -48,7 +48,12 @@ String? checkoutBlockerText(AppLocalizations l10n, CartSnapshot cart) {
   return switch (blocker.code) {
     CheckoutBlockerCode.cartEmpty => l10n.cartEmpty,
     CheckoutBlockerCode.addressRequired => l10n.chooseSavedAddress,
-    CheckoutBlockerCode.notServiceable => l10n.blockerNotServiceable,
+    // The server's text (the delivery areas are managed from the admin);
+    // the app's own when it sends none.
+    CheckoutBlockerCode.notServiceable =>
+      blocker.message.trim().isEmpty
+          ? l10n.blockerNotServiceable
+          : blocker.message.trim(),
     CheckoutBlockerCode.storeClosed => l10n.cartStoreClosed,
     CheckoutBlockerCode.stockUnavailable => l10n.cartProblemsBanner,
     CheckoutBlockerCode.minQtyRequired => l10n.blockerMinQtyRequired,
@@ -204,11 +209,15 @@ String couponIneligibleText(AppLocalizations l10n, CouponOffer offer) =>
 /// A failed cart or checkout call, with the server's `details` where they
 /// say what changed (`06 §2.5`, `§2.6`); otherwise the generic message.
 /// [cart] (or [names], by variant id) names the lines in stock problems.
+/// [fixedFreeSize]: a free-carton reward was applied without a size, so the
+/// server used the store's fixed free size (ADR 0003) and there is no other
+/// size to choose.
 String cartErrorText(
   BuildContext context,
   Object error, {
   CartSnapshot? cart,
   Map<int, String> names = const {},
+  bool fixedFreeSize = false,
 }) {
   final l10n = AppLocalizations.of(context);
   final apiError = ApiError.from(error);
@@ -280,7 +289,9 @@ String cartErrorText(
         );
       }
       if (reason == 'FREE_VARIANT_UNAVAILABLE') {
-        return l10n.rewardSizeUnavailable;
+        return fixedFreeSize
+            ? l10n.rewardFixedSizeUnavailable
+            : l10n.rewardSizeUnavailable;
       }
     default:
       break;

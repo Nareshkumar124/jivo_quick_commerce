@@ -6,9 +6,10 @@ from django.db import models
 class DiscountType(models.TextChoices):
     FLAT = "FLAT", "Flat amount off"
     PERCENT = "PERCENT", "Percent off"
-    # ADR 0002: a reward of one free carton (no money off). The customer picks the size when
-    # applying it (`free_variant_id`); the order gets a free line at ₹0.
-    FREE_UNIT = "FREE_UNIT", "One free carton (reward)"
+    # ADR 0002/0003: a reward of `value` free cartons (no money off). The size is the store's
+    # fixed free size, else the customer picks it (`free_variant_id`); the order gets a free line
+    # at ₹0.
+    FREE_UNIT = "FREE_UNIT", "Free cartons (reward)"
 
 
 class CouponSource(models.TextChoices):
@@ -35,7 +36,8 @@ class CouponIneligibleReason(models.TextChoices):
     FREE_VARIANT_UNAVAILABLE = (
         "FREE_VARIANT_UNAVAILABLE",
         "The size chosen for the free carton is not available here (not sold at this store, "
-        "not of the category of a paid line, or out of stock).",
+        "not of the category of a paid line, out of stock, or not the store's fixed free "
+        "size).",
     )
 
 

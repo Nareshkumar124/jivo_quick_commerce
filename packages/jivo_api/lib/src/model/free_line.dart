@@ -55,7 +55,7 @@ class FreeLine {
   @JsonKey(name: r'value', required: true, includeIfNull: false)
   final String value;
 
-  /// VOLUME_OFFER: 1 free for every `free_offer.every` paid cartons (the cheapest size in the cart). REWARD: the free-carton reward applied as the cart's coupon.  * `VOLUME_OFFER` - Volume offer * `REWARD` - Reward
+  /// VOLUME_OFFER: 1 free for every `free_offer.every` paid cartons (the store's fixed free size `free_offer.free_variant` when set, ADR 0003; else the cheapest size in the cart). REWARD: the free-carton reward applied as the cart's coupon.  * `VOLUME_OFFER` - Volume offer * `REWARD` - Reward
   @JsonKey(
     name: r'source',
     required: true,

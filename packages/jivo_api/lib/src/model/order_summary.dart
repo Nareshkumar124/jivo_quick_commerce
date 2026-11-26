@@ -88,7 +88,7 @@ class OrderSummary {
   @JsonKey(name: r'store', required: true, includeIfNull: false)
   final OrderStore store;
 
-  /// Units still coming (sum of quantities), as on `Order`.
+  /// Paid units still coming (sum of quantities; free cartons not counted), as on `Order`.
   // minimum: 1
   @JsonKey(name: r'item_count', required: true, includeIfNull: false)
   final int itemCount;

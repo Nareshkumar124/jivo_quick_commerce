@@ -1348,11 +1348,17 @@ abstract class AppLocalizations {
   /// **'Choose a delivery location to see what\'s in stock near you.'**
   String get homeNeedsLocation;
 
-  /// Home when the saved location is no longer serviceable.
+  /// Coming-soon banner headline when the location is not serviceable (home and the not-serviceable screen).
   ///
   /// In en, this message translates to:
-  /// **'We don\'t deliver to this location yet.'**
-  String get notServiceableInline;
+  /// **'We\'re coming to your area soon!'**
+  String get comingSoonTitle;
+
+  /// Coming-soon banner text when the server sends no message for a location it doesn't serve (the server's message, managed from the admin, is shown instead when there is one).
+  ///
+  /// In en, this message translates to:
+  /// **'We don\'t deliver to this location yet, but we\'re growing fast. We\'ll start here soon.'**
+  String get comingSoonBody;
 
   /// Button that opens the location picker.
   ///
@@ -1695,12 +1701,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter address manually'**
   String get enterAddressManually;
-
-  /// Not-serviceable screen title.
-  ///
-  /// In en, this message translates to:
-  /// **'We\'re not in your area yet'**
-  String get notServiceableTitle;
 
   /// Not-serviceable screen text.
   ///
@@ -4365,11 +4365,11 @@ abstract class AppLocalizations {
   /// **'Use'**
   String get rewardUse;
 
-  /// Screen reader label of the Use button on a free-carton reward.
+  /// Screen reader label of the Use button on a free-carton reward. count = the reward's quantity (ADR 0003).
   ///
   /// In en, this message translates to:
-  /// **'Use your free carton'**
-  String get rewardUseSemantics;
+  /// **'{count, plural, =1{Use your free carton} other{Use your {count} free cartons}}'**
+  String rewardUseSemantics(int count);
 
   /// Reward card: this reward is applied to the current cart.
   ///
@@ -4419,11 +4419,11 @@ abstract class AppLocalizations {
   /// **'Order {number}'**
   String rewardHistoryOrder(String number);
 
-  /// Size picker sheet title (Rewards > Use, or Apply on a free-carton reward).
+  /// Size picker sheet title (Rewards > Use, or Apply on a free-carton reward), only when the store has no fixed free size. count = the reward's quantity.
   ///
   /// In en, this message translates to:
-  /// **'Pick a size for your free carton'**
-  String get freeSizeTitle;
+  /// **'{count, plural, =1{Pick a size for your free carton} other{Pick a size for your {count} free cartons}}'**
+  String freeSizeTitle(int count);
 
   /// Size picker: the free carton does not count toward the store's minimum. minimum = min_order_units, label = order_unit_label.
   ///
@@ -4437,11 +4437,11 @@ abstract class AppLocalizations {
   /// **'Worth {amount}'**
   String freeSizeWorth(String amount);
 
-  /// Size picker button: applies the reward with the chosen size.
+  /// Size picker button: applies the reward with the chosen size. count = the reward's quantity.
   ///
   /// In en, this message translates to:
-  /// **'Add free carton'**
-  String get freeSizeConfirm;
+  /// **'{count, plural, =1{Add free carton} other{Add {count} free cartons}}'**
+  String freeSizeConfirm(int count);
 
   /// Size picker: the store sells no water size in stock.
   ///
@@ -4479,11 +4479,23 @@ abstract class AppLocalizations {
   /// **'Add cartons'**
   String get rewardAddCartons;
 
-  /// Snackbar after a free-carton reward is applied.
+  /// Snackbar after a free-carton reward is applied. count = the reward's quantity from the server.
   ///
   /// In en, this message translates to:
-  /// **'Free carton added to your cart'**
-  String get freeCartonAdded;
+  /// **'{count, plural, =1{Free carton added to your cart} other{{count} free cartons added to your cart}}'**
+  String freeCartonsAdded(int count);
+
+  /// Reward apply refused with COUPON_NOT_ELIGIBLE reason FREE_VARIANT_UNAVAILABLE when the store has a fixed free size (ADR 0003), so there is no other size to choose.
+  ///
+  /// In en, this message translates to:
+  /// **'The free carton size is not available at this store right now. Please try again later.'**
+  String get rewardFixedSizeUnavailable;
+
+  /// Reward card title when the server names the free size (ADR 0003), e.g. 2 free cartons · 1 L × 12. count = quantity, size = free_variant.name.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 free carton · {size}} other{{count} free cartons · {size}}}'**
+  String freeCartonsOfSize(int count, String size);
 
   /// Tag on a free carton line (cart, checkout, order).
   ///
@@ -4532,6 +4544,18 @@ abstract class AppLocalizations {
   /// **'{count, plural, =1{1 free carton could not be supplied} other{{count} free cartons could not be supplied}}'**
   String freeLineUnavailable(int count);
 
+  /// Cart free-offer banner headline when the order already earns free cartons. count = free_offer.free_units.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{You get 1 free carton with this order!} other{You get {count} free cartons with this order!}}'**
+  String freeOfferEarned(int count);
+
+  /// Cart free-offer banner: the store's fixed free size (ADR 0003). size = free_offer.free_variant product and size, e.g. Jivo Water 1 L × 12.
+  ///
+  /// In en, this message translates to:
+  /// **'Free carton size: {size}'**
+  String freeOfferSizeHint(String size);
+
   /// Cart nudge when the server sends no message text. count = free_offer.units_to_next_free, label = order_unit_label.
   ///
   /// In en, this message translates to:
@@ -4556,17 +4580,23 @@ abstract class AppLocalizations {
   /// **'Free carton reward applied'**
   String get couponFreeCartonApplied;
 
-  /// Cart coupon row subtitle for a free-carton reward.
+  /// Cart coupon row subtitle for a free-carton reward. count = the coupon's free_quantity.
   ///
   /// In en, this message translates to:
-  /// **'Your free carton is in the items above'**
-  String get couponFreeCartonInOrder;
+  /// **'{count, plural, =1{Your free carton is in the items above} other{Your {count} free cartons are in the items above}}'**
+  String couponFreeCartonInOrder(int count);
 
-  /// Coupon sheet: what a free-carton reward gives.
+  /// Coupon sheet: what a free-carton reward gives when the store has no fixed free size. count = free_quantity.
   ///
   /// In en, this message translates to:
-  /// **'Get 1 free carton. Pick a size when you apply it.'**
-  String get couponFreeCartonOffer;
+  /// **'{count, plural, =1{Get 1 free carton. Pick a size when you apply it.} other{Get {count} free cartons. Pick a size when you apply them.}}'**
+  String couponFreeCartonOffer(int count);
+
+  /// Coupon sheet: what a free-carton reward gives when the store has a fixed free size (ADR 0003; no size to pick). count = free_quantity.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Get 1 free carton.} other{Get {count} free cartons.}}'**
+  String couponFreeCartonsFixed(int count);
 
   /// Checkout: heading above the free lines.
   ///
@@ -4604,10 +4634,10 @@ abstract class AppLocalizations {
   /// **'You and your friend will each get {reward} after your first delivery.'**
   String referralStatusPendingReward(String reward);
 
-  /// Joined-with card, REWARDED, free-carton reward.
+  /// Joined-with card, REWARDED, free-carton reward. No number: a reward keeps the quantity it was given with (ADR 0003), which can differ from today's reward_quantity.
   ///
   /// In en, this message translates to:
-  /// **'Your free carton is in Rewards. Tap Use there to add it to your cart.'**
+  /// **'Your reward is in Rewards. Tap Use there to add it to your cart.'**
   String get referralStatusRewardedReward;
 
   /// Checkout card body, free-carton reward.

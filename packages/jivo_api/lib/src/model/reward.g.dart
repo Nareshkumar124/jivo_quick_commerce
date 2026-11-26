@@ -11,6 +11,10 @@ abstract class _$RewardCWProxy {
 
   Reward title(String title);
 
+  Reward quantity(int quantity);
+
+  Reward freeVariant(FreeVariant? freeVariant);
+
   Reward source_(CouponSourceEnum source_);
 
   Reward status(RewardStatusEnum status);
@@ -28,6 +32,8 @@ abstract class _$RewardCWProxy {
   Reward call({
     String code,
     String title,
+    int quantity,
+    FreeVariant? freeVariant,
     CouponSourceEnum source_,
     RewardStatusEnum status,
     DateTime? expiresAt,
@@ -46,6 +52,13 @@ class _$RewardCWProxyImpl implements _$RewardCWProxy {
 
   @override
   Reward title(String title) => this(title: title);
+
+  @override
+  Reward quantity(int quantity) => this(quantity: quantity);
+
+  @override
+  Reward freeVariant(FreeVariant? freeVariant) =>
+      this(freeVariant: freeVariant);
 
   @override
   Reward source_(CouponSourceEnum source_) => this(source_: source_);
@@ -69,6 +82,8 @@ class _$RewardCWProxyImpl implements _$RewardCWProxy {
   Reward call({
     Object? code = const $CopyWithPlaceholder(),
     Object? title = const $CopyWithPlaceholder(),
+    Object? quantity = const $CopyWithPlaceholder(),
+    Object? freeVariant = const $CopyWithPlaceholder(),
     Object? source_ = const $CopyWithPlaceholder(),
     Object? status = const $CopyWithPlaceholder(),
     Object? expiresAt = const $CopyWithPlaceholder(),
@@ -83,6 +98,14 @@ class _$RewardCWProxyImpl implements _$RewardCWProxy {
           ? _value.title
           // ignore: cast_nullable_to_non_nullable
           : title as String,
+      quantity: quantity == const $CopyWithPlaceholder()
+          ? _value.quantity
+          // ignore: cast_nullable_to_non_nullable
+          : quantity as int,
+      freeVariant: freeVariant == const $CopyWithPlaceholder()
+          ? _value.freeVariant
+          // ignore: cast_nullable_to_non_nullable
+          : freeVariant as FreeVariant?,
       source_: source_ == const $CopyWithPlaceholder()
           ? _value.source_
           // ignore: cast_nullable_to_non_nullable
@@ -122,6 +145,8 @@ Reward _$RewardFromJson(Map<String, dynamic> json) => $checkedCreate(
       requiredKeys: const [
         'code',
         'title',
+        'quantity',
+        'free_variant',
         'source',
         'status',
         'expires_at',
@@ -131,6 +156,12 @@ Reward _$RewardFromJson(Map<String, dynamic> json) => $checkedCreate(
     final val = Reward(
       code: $checkedConvert('code', (v) => v as String),
       title: $checkedConvert('title', (v) => v as String),
+      quantity: $checkedConvert('quantity', (v) => (v as num).toInt()),
+      freeVariant: $checkedConvert(
+        'free_variant',
+        (v) =>
+            v == null ? null : FreeVariant.fromJson(v as Map<String, dynamic>),
+      ),
       source_: $checkedConvert(
         'source',
         (v) => $enumDecode(
@@ -156,6 +187,7 @@ Reward _$RewardFromJson(Map<String, dynamic> json) => $checkedCreate(
     return val;
   },
   fieldKeyMap: const {
+    'freeVariant': 'free_variant',
     'source_': 'source',
     'expiresAt': 'expires_at',
     'orderNumber': 'order_number',
@@ -165,6 +197,8 @@ Reward _$RewardFromJson(Map<String, dynamic> json) => $checkedCreate(
 Map<String, dynamic> _$RewardToJson(Reward instance) => <String, dynamic>{
   'code': instance.code,
   'title': instance.title,
+  'quantity': instance.quantity,
+  'free_variant': instance.freeVariant?.toJson(),
   'source': _$CouponSourceEnumEnumMap[instance.source_]!,
   'status': _$RewardStatusEnumEnumMap[instance.status]!,
   'expires_at': instance.expiresAt?.toIso8601String(),

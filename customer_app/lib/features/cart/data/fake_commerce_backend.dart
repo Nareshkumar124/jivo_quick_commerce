@@ -29,6 +29,7 @@ class FakeBillRules {
     this.paymentWindow = const Duration(minutes: 15),
     this.eta = const Duration(minutes: 15),
     this.freeUnitEvery = 0,
+    this.freeUnitVariantId,
   });
 
   static const demo = FakeBillRules();
@@ -55,6 +56,11 @@ class FakeBillRules {
   /// `PricingConfig.free_unit_every` (ADR 0002): 1 free carton for every
   /// this many paid ones; 0 = no volume offer (the default).
   final int freeUnitEvery;
+
+  /// `PricingConfig.free_unit_variant` (ADR 0003): every free carton (the
+  /// volume offer's and rewards') is this variant; null = the ADR 0002
+  /// rules (cheapest size; rewards need a picked size).
+  final int? freeUnitVariantId;
   final Duration paymentWindow;
   final Duration eta;
 }
@@ -73,14 +79,17 @@ class FakeCoupon {
     this.expired = false,
     this.freeUnit = false,
     this.source = RewardSource.none,
+    this.freeQuantity = 1,
   });
 
-  /// A personal free-carton reward (`FREE_UNIT`, ADR 0002).
+  /// A personal free-carton reward (`FREE_UNIT`, ADR 0002) of
+  /// [freeQuantity] cartons (ADR 0003).
   const FakeCoupon.freeCarton({
     required this.code,
     this.title = '1 free carton',
     this.description = 'Pick any water size',
     this.source = RewardSource.welcome,
+    this.freeQuantity = 1,
   }) : minItemTotal = 0,
        flatOff = null,
        percentOff = null,
@@ -103,8 +112,12 @@ class FakeCoupon {
   /// Not listed; applying it is `COUPON_EXPIRED`.
   final bool expired;
 
-  /// One free carton of a size the customer picks (`free_variant_id`).
+  /// Free cartons: of the store's fixed size (ADR 0003), else of a size
+  /// the customer picks (`free_variant_id`).
   final bool freeUnit;
+
+  /// Free cartons a [freeUnit] reward gives (`free_quantity`, ADR 0003).
+  final int freeQuantity;
 
   /// Why it was given (rewards only).
   final RewardSource source;
@@ -395,7 +408,11 @@ class FakeCommerceBackend
           isPersonal: true,
           discountType: CouponDiscountType.freeUnit,
           source: reward.source,
-          freeVariantId: applied ? _rewardSize?.variant.id : null,
+          // ADR 0003: pre-filled with the store's fixed free size.
+          freeVariantId: applied
+              ? _rewardSize?.variant.id
+              : rules.freeUnitVariantId,
+          freeQuantity: reward.freeQuantity,
         ),
       );
     }
@@ -434,6 +451,25 @@ class FakeCommerceBackend
         status: 422,
         details: {'scope': 'per_user'},
       );
+    }
+    if (coupon.freeUnit && rules.freeUnitVariantId != null) {
+      // ADR 0003: the store's fixed free size; no size needed, and another
+      // size (or the fixed one not sold here) is FREE_VARIANT_UNAVAILABLE.
+      final fixed = rules.freeUnitVariantId!;
+      final size = _sizeFor(fixed);
+      if ((freeVariantId != null && freeVariantId != fixed) || size == null) {
+        _fail(
+          ApiErrorCode.couponNotEligible,
+          status: 422,
+          details: {
+            'reason': 'FREE_VARIANT_UNAVAILABLE',
+            'free_variant_id': freeVariantId ?? fixed,
+          },
+        );
+      }
+      _couponCode = coupon.code;
+      _rewardSize = size;
+      return _snapshot();
     }
     if (coupon.freeUnit) {
       // ADR 0002: the size is required and must be sold at this store.
@@ -1397,6 +1433,7 @@ class FakeCommerceBackend
         discountType: CouponDiscountType.freeUnit,
         source: rule.source,
         freeVariantId: _rewardSize?.variant.id,
+        freeQuantity: rule.freeQuantity,
       );
     } else if (code != null && rule != null) {
       final result = _evaluate(rule, itemTotal);
@@ -1557,8 +1594,10 @@ class FakeCommerceBackend
   /// ADR 0002, as the server does it: 1 free carton per
   /// [FakeBillRules.freeUnitEvery] paid ones, of the cheapest size in the
   /// order (ties: more paid units, then the lower variant id) that can
-  /// supply paid + free; none can → no free carton and a notice. Plus one
-  /// carton of the size picked for an applied free-carton [reward].
+  /// supply paid + free; none can → no free carton and a notice. With a
+  /// fixed free size (ADR 0003) they are all that size instead, whatever
+  /// sizes are paid for. Plus the applied free-carton [reward]'s cartons
+  /// (its [FakeCoupon.freeQuantity]) of the fixed or picked size.
   ({List<FreeLine> freeLines, FreeOffer? freeOffer}) _freeCartons(
     List<_PaidLine> paid,
     FakeCoupon? reward,
@@ -1571,7 +1610,22 @@ class FakeCommerceBackend
       final earned = paidUnits ~/ every;
       String? notice;
       var given = 0;
-      if (earned > 0) {
+      final fixedId = rules.freeUnitVariantId;
+      final fixed = fixedId == null ? null : _sizeFor(fixedId);
+      if (earned > 0 && fixedId != null) {
+        final paidLine = paid
+            .where((line) => line.preview.variant.id == fixedId)
+            .firstOrNull;
+        final enough = paidLine != null
+            ? paidLine.orderable >= paidLine.quantity + earned
+            : fixed != null && fixed.variant.orderableQuantity >= earned;
+        if (fixed == null || !enough) {
+          notice = "We couldn't add your free carton: not enough stock.";
+        } else {
+          given = earned;
+          lines.add(_freeLine(fixed, earned, FreeLineSource.volumeOffer));
+        }
+      } else if (earned > 0) {
         final cheapest = [...paid]
           ..sort((a, b) {
             final byPrice = a.price.compareTo(b.price);
@@ -1603,11 +1657,18 @@ class FakeCommerceBackend
             ? 'Add $toNext more $label to get 1 free'
             : 'Add $toNext more $label to get 1 more free',
         notice: notice,
+        freeVariant: fixed == null
+            ? null
+            : FreeVariant(
+                id: fixed.variant.id,
+                name: fixed.variant.name,
+                productName: fixed.productName,
+              ),
       );
     }
     final size = _rewardSize;
     if (reward != null && reward.freeUnit && size != null) {
-      lines.add(_freeLine(size, 1, FreeLineSource.reward));
+      lines.add(_freeLine(size, reward.freeQuantity, FreeLineSource.reward));
     }
     return (freeLines: lines, freeOffer: offer);
   }

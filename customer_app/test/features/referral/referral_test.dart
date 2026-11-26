@@ -44,6 +44,7 @@ Map<String, Object?> referralJson({
   'reward_type': rewardType,
   'reward_quantity': 1,
   'reward_label': rewardType == 'FREE_UNIT' ? '1 free carton' : '₹90 off',
+  'welcome_reward_quantity': 1,
   'reward_amount': '90.00',
   'reward_validity_days': 30,
   'reward_min_order_value': '0.00',
@@ -460,7 +461,11 @@ void main() {
       final app = TestApp(tokens: signedInTokens);
       app.referral.fetchError = const ApiError(code: ApiErrorCode.network);
       await openAccount(app, tester);
-      expect(find.text('Refer a friend'), findsOneWidget);
+      // The invite strip is the only referral entry (no "Refer a friend"
+      // tile since 2026-11-26); it stays, with its generic text.
+      expect(find.byKey(const Key('account-referral')), findsOneWidget);
+      expect(find.text('Invite friends and earn rewards'), findsOneWidget);
+      expect(find.text('Refer a friend'), findsNothing);
     });
 
     testWidgets('applying from the account row hides the line', (tester) async {

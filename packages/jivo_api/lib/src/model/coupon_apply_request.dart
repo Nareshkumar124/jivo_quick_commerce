@@ -24,7 +24,7 @@ class CouponApplyRequest {
   @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-  /// ADR 0002: required for a free-carton reward (`discount_type` FREE_UNIT): the size the customer picked (`VariantSummary.id`), which must be sold at the store in `X-Store-Id`. Ignored for other coupons.
+  /// For a free-carton reward (`discount_type` FREE_UNIT). ADR 0003: when the store in `X-Store-Id` has a fixed free size (`free_offer.free_variant`), leave it out (or send that size's id): the server uses the fixed size; any other id is 422 `COUPON_NOT_ELIGIBLE` (FREE_VARIANT_UNAVAILABLE). Otherwise (ADR 0002) it is required: the size the customer picked (`VariantSummary.id`), sold at the store, of the same product category as a paid line in the cart (a water reward goes on a water order) and with the stock. Ignored for other coupons.
   // minimum: 1
   @JsonKey(name: r'free_variant_id', required: false, includeIfNull: false)
   final int? freeVariantId;

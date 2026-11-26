@@ -196,9 +196,10 @@ class AccountApi {
   }
 
   /// My free-carton rewards
-  /// ADR 0002: the caller&#39;s free-carton rewards (welcome and referral) and their history. A reward is a personal coupon with &#x60;discount_type&#x60; FREE_UNIT: tap **Use**, let the customer pick a size, then &#x60;POST /cart/coupon/&#x60; with &#x60;code&#x60; and &#x60;free_variant_id&#x60;. One reward or one coupon per order; the order still needs the store&#39;s minimum paid cartons. USED and EXPIRED rewards are only in &#x60;history&#x60;.
+  /// ADR 0002/0003: the caller&#39;s free-carton rewards (welcome and referral) and their history. A reward is a personal coupon with &#x60;discount_type&#x60; FREE_UNIT giving &#x60;quantity&#x60; free cartons. Tap **Use**: when &#x60;free_variant&#x60; is set (the store&#39;s fixed free size, ADR 0003) send &#x60;POST /cart/coupon/&#x60; with &#x60;code&#x60; only; else let the customer pick a size and send &#x60;code&#x60; and &#x60;free_variant_id&#x60;. One reward or one coupon per order; the order still needs the store&#39;s minimum paid cartons. USED and EXPIRED rewards are only in &#x60;history&#x60;.
   ///
   /// Parameters:
+  /// * [xStoreId] - Optional: the store the app has selected (`store.id` from `GET /serviceability/`). Used to show that store's fixed free size (ADR 0003). Missing, malformed, unknown or deactivated: the store of the caller's cart is used instead (never an error).
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -209,6 +210,7 @@ class AccountApi {
   /// Returns a [Future] containing a [Response] with a [Rewards] as data
   /// Throws [DioException] if API call or serialization fails
   Future<Response<Rewards>> accountRewardsRetrieve({
+    int? xStoreId,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -219,7 +221,10 @@ class AccountApi {
     final _path = r'/api/v1/account/rewards/';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        if (xStoreId != null) r'X-Store-Id': xStoreId,
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
           {'type': 'http', 'scheme': 'bearer', 'name': 'jwtAuth'},
