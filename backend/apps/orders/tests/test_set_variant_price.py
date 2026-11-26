@@ -51,7 +51,16 @@ class TestService:
         }
         assert variant.history.count() >= 2  # saved through the model (price history)
 
-    @pytest.mark.parametrize("price", ["0", "-1", "0.001", "10000.01", "abc", "", "NaN", None])
+    @pytest.mark.parametrize(
+        "price",
+        [
+            *("0", "-1", "0.001", "10000.01", "abc", "", "NaN", None, True),
+            # Strict parsing (code review): plain ASCII digits and one dot only
+            *("1_000", "1 000", "1e3", "+5", "5.", ".5", "1.2.3", "Infinity"),
+            *("\u0663\u0660\u0660", "\uff13\uff10\uff10", "\u0969\u0966\u0966", "300\u00a0"),
+        ],
+        ids=lambda value: repr(value),
+    )
     def test_invalid_prices(self, shop, admin_user, price):
         with pytest.raises(ValidationError) as error:
             set_variant_price(shop.canola_1l, price, actor=admin_user)
@@ -61,6 +70,10 @@ class TestService:
     def test_limits(self, shop, admin_user):
         assert set_variant_price(shop.canola_1l, "0.01", actor=admin_user)
         assert set_variant_price(shop.canola_1l, "10000", actor=admin_user)
+        assert set_variant_price(shop.canola_1l, " 299.5 ", actor=admin_user)  # outer spaces ok
+        assert shop.canola_1l.selling_price == Decimal("299.50")
+        assert set_variant_price(shop.canola_1l, Decimal("310.00"), actor=admin_user)
+        assert set_variant_price(shop.canola_1l, 320, actor=admin_user)
 
     def test_refused_while_price_tiers_exist(self, shop, admin_user):
         VariantPriceTier.objects.create(

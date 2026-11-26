@@ -3,20 +3,14 @@
 
 {% block content %}
     {# Offers (ADR 0004 §3, §4.2; Super Admin only: promotions.manage_offers). Three cards: buy-N-get-1 per store, rewards, public coupons. #}
-    {# Context: volume (rows: row = store_management.VolumeRow, form), free_size, rewards (ReferralSettings), rewards_form, quantities, page (public coupons with state, value_text, confirm_toggle), actions. #}
+    {# Context: volume (rows: row = store_management.VolumeRow, form), rewards (ReferralSettings), rewards_form, page (public coupons with state, value_text, confirm_toggle), actions. #}
     {# Every change calls a promotions.offers service behind a confirm dialog; the confirm texts get the typed numbers in place of {n} / {w} / {r}. #}
     <div id="sm-region" class="ops-sm-cards" hx-get="{{ request.get_full_path }}" hx-select="#sm-region" hx-swap="outerHTML" hx-trigger="ops:refresh from:body">
 
         {# ------------------------------------------------------------ buy N get 1 #}
         <section class="bg-white border border-base-200 ops-card p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-labelledby="sec-volume" data-testid="card-volume">
             <h2 id="sec-volume" class="font-semibold text-base text-font-important-light dark:text-font-important-dark">Buy N get 1 free</h2>
-            <p class="mb-3 mt-1 ops-text-secondary">For every N paid cartons in one order, the customer gets 1 carton free. Set it per store. Off = no free cartons from this offer.</p>
-            {% if not free_size %}
-                <div class="mb-3 ops-consequence" role="note" data-testid="volume-needs-update">
-                    <span class="material-symbols-outlined md-18" aria-hidden="true">info</span>
-                    <p>These settings can be changed here after the free-carton update is installed. Until then they are shown only.</p>
-                </div>
-            {% endif %}
+            <p class="mb-3 mt-1 ops-text-secondary">For every N paid cartons in one order, the customer gets 1 carton free. Set it per store. Off = no free cartons from this offer. The free carton size is also the size of reward cartons at that store.</p>
             {% for item in volume %}
                 {% with row=item.row form=item.form %}
                     <form class="ops-sm-row" method="post" action="{% url 'ops:offer-volume' row.store.pk %}"
@@ -37,20 +31,14 @@
                                 {% include "unfold/helpers/label.html" with text="Off" %}
                             {% endif %}
                         </div>
-                        {% if free_size %}
-                            <div class="ops-sm-row__fields">
-                                {% include "ops/components/form_field.html" with field=form.enabled %}
-                                <div x-show="on">{% include "ops/components/form_field.html" with field=form.every %}</div>
-                                <div x-show="on">{% include "ops/components/form_field.html" with field=form.free_variant %}</div>
-                            </div>
-                            <div class="ops-sm-row__actions">
-                                <button type="submit" class="ops-button"{% if not actions.set_volume_offer %} disabled title="Not available yet"{% endif %} data-testid="save-volume-{{ row.store.pk }}">Save</button>
-                            </div>
-                        {% else %}
-                            <p class="ops-sm-row__fields ops-text-secondary">
-                                {% if row.on %}1 free carton for every {{ row.every }} paid cartons.{% else %}No offer.{% endif %}
-                            </p>
-                        {% endif %}
+                        <div class="ops-sm-row__fields">
+                            {% include "ops/components/form_field.html" with field=form.enabled %}
+                            <div x-show="on">{% include "ops/components/form_field.html" with field=form.every %}</div>
+                            {% include "ops/components/form_field.html" with field=form.free_variant %}
+                        </div>
+                        <div class="ops-sm-row__actions">
+                            <button type="submit" class="ops-button"{% if not actions.set_volume_offer %} disabled title="Not available yet"{% endif %} data-testid="save-volume-{{ row.store.pk }}">Save</button>
+                        </div>
                     </form>
                 {% endwith %}
             {% empty %}
@@ -62,32 +50,18 @@
         <section class="bg-white border border-base-200 ops-card p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-labelledby="sec-rewards" data-testid="card-rewards">
             <h2 id="sec-rewards" class="font-semibold text-base text-font-important-light dark:text-font-important-dark">Rewards</h2>
             <p class="mb-3 mt-1 ops-text-secondary">Free cartons for new customers and for inviting friends. A change applies to rewards given from now on; rewards already given keep their number.</p>
-            {% if not quantities %}
-                <div class="mb-3 ops-consequence" role="note" data-testid="rewards-needs-update">
-                    <span class="material-symbols-outlined md-18" aria-hidden="true">info</span>
-                    <p>The number of free cartons can be changed here after the free-carton update is installed. Today you can turn referrals on or off.</p>
-                </div>
-            {% endif %}
             <form method="post" action="{% url 'ops:offer-rewards' %}" hx-post="{% url 'ops:offer-rewards' %}" hx-swap="none"
-                  x-data="{ on: {{ rewards.is_enabled|yesno:'true,false' }}, w: '{% if quantities %}{{ rewards.welcome_reward_quantity }}{% endif %}', r: '{% if quantities %}{{ rewards.reward_quantity }}{% endif %}' }"
-                  {% if quantities %}
-                      data-confirm-on="New customers get {w} free carton(s) as a welcome gift. For each referral, both people get {r} free carton(s). Rewards already given keep their number."
-                      data-confirm-off="Turn off referrals? Customers can't use a friend's code, and a friend whose first order is delivered while referrals are off gets no reward. New customers still get {w} free carton(s) as a welcome gift."
-                      hx-confirm="Save the rewards? Rewards already given keep their number."
-                      x-bind:hx-confirm="(on ? $el.dataset.confirmOn : $el.dataset.confirmOff).replace('{w}', String(w).trim() || '?').replace('{r}', String(r).trim() || '?')"
-                  {% else %}
-                      data-confirm-on="Turn on referrals? Customers can use a friend's code again." data-confirm-off="Turn off referrals? Customers can't use a friend's code, and a friend whose first order is delivered while referrals are off gets no reward."
-                      hx-confirm="Save the referral setting?"
-                      x-bind:hx-confirm="on ? $el.dataset.confirmOn : $el.dataset.confirmOff"
-                  {% endif %}
+                  x-data="{ on: {{ rewards.is_enabled|yesno:'true,false' }}, w: '{{ rewards.welcome_reward_quantity }}', r: '{{ rewards.reward_quantity }}' }"
+                  data-confirm-on="New customers get {w} free carton(s) as a welcome gift. For each referral, both people get {r} free carton(s). Rewards already given keep their number."
+                  data-confirm-off="Turn off referrals? Customers can't use a friend's code, and a friend whose first order is delivered while referrals are off gets no reward. New customers still get {w} free carton(s) as a welcome gift."
+                  hx-confirm="Save the rewards? Rewards already given keep their number."
+                  x-bind:hx-confirm="(on ? $el.dataset.confirmOn : $el.dataset.confirmOff).replace('{w}', String(w).trim() || '?').replace('{r}', String(r).trim() || '?')"
                   data-confirm-title="Save the rewards?" data-confirm-label="Save rewards" data-testid="rewards-form">
                 {% csrf_token %}
                 <div class="ops-sm-row__fields">
                     {% include "ops/components/form_field.html" with field=rewards_form.referral_enabled %}
-                    {% if quantities %}
-                        {% include "ops/components/form_field.html" with field=rewards_form.welcome %}
-                        {% include "ops/components/form_field.html" with field=rewards_form.referral %}
-                    {% endif %}
+                    {% include "ops/components/form_field.html" with field=rewards_form.welcome %}
+                    {% include "ops/components/form_field.html" with field=rewards_form.referral %}
                 </div>
                 <div class="mt-3">
                     <button type="submit" class="ops-button"{% if not actions.set_rewards %} disabled title="Not available yet"{% endif %} data-testid="save-rewards">Save rewards</button>

@@ -31,7 +31,10 @@
                     {% if group.missing_outlines %}
                         <div class="mb-3 ops-consequence" role="note" data-testid="outline-warning-{{ group.store.pk }}">
                             <span class="material-symbols-outlined md-18" aria-hidden="true">warning</span>
-                            <p>{% for row in group.missing_outlines %}{{ row.pincode }}{% if not forloop.last %}, {% endif %}{% endfor %}: {{ no_outline }}</p>
+                            <div>
+                                <p>{{ no_outline }}</p>
+                                <p class="font-semibold">Pincode{{ group.missing_outlines|length|pluralize }}: {% for row in group.missing_outlines %}{{ row.pincode }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+                            </div>
                         </div>
                     {% endif %}
                     <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">

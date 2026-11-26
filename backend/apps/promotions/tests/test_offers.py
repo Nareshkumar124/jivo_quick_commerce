@@ -1,7 +1,7 @@
 """ADR 0004 §3: the "Offers" page services (`apps.promotions.offers`). Public coupons reuse the
 coupon rules; a disabled or expired coupon is hidden and refused by the existing checks. The
-buy-N-get-1 and rewards services use the ADR 0003 fields (branch backend/free-cartons-1l): their
-tests run once those fields exist."""
+buy-N-get-1 and rewards services set the ADR 0003 fields (the store's free size, the reward
+quantities)."""
 
 from datetime import timedelta
 from decimal import Decimal
@@ -33,12 +33,6 @@ FLAT_50 = {
     "value": Decimal("50.00"),
     "min_order_value": Decimal("299.00"),
 }
-
-HAS_ADR_0003 = any(field.name == "free_unit_variant" for field in PricingConfig._meta.get_fields())
-needs_adr_0003 = pytest.mark.skipif(
-    not HAS_ADR_0003,
-    reason="needs the ADR 0003 fields of backend/free-cartons-1l (merged before this branch)",
-)
 
 
 @pytest.fixture
@@ -216,7 +210,6 @@ class TestTheAppSeesIt:
         assert (response.status_code, response.json()["error"]["code"]) == (422, "COUPON_EXPIRED")
 
 
-@needs_adr_0003
 class TestVolumeOffer:
     def test_set_volume_offer(self, admin_user, shop):  # noqa: F811
         store, size = shop.store_model, shop.canola_1l
@@ -231,7 +224,14 @@ class TestVolumeOffer:
             "free_unit_variant_id": [size.pk, None],
         }
 
-    @pytest.mark.parametrize("every", [-1, "abc", True])
+    @pytest.mark.parametrize(
+        "every",
+        [
+            *(-1, "abc", True, None, "2.0", "+2", "1_0", "1 0"),
+            *("\u0661\u0660", "\uff11\uff10", "\u0967\u0966"),  # Arabic-Indic, fullwidth, Hindi
+        ],
+        ids=lambda value: repr(value),
+    )
     def test_invalid_every(self, admin_user, shop, every):  # noqa: F811
         with pytest.raises(ValidationError) as error:
             offers.set_volume_offer(shop.store_model, every, actor=admin_user)
@@ -247,7 +247,6 @@ class TestVolumeOffer:
             offers.set_volume_offer(shop.store_model, 10, actor=role_user(roles.CATALOG_MANAGER))
 
 
-@needs_adr_0003
 class TestRewardQuantities:
     def test_set_reward_quantities(self, admin_user):
         from apps.referrals.models import ReferralSettings
@@ -268,7 +267,7 @@ class TestRewardQuantities:
             "is_enabled": [True, False],
         }
 
-    @pytest.mark.parametrize("quantity", [0, 11, "x"])
+    @pytest.mark.parametrize("quantity", [0, 11, "x", "1_0", "\u0663", "\uff13", " 3 3"])
     def test_one_to_ten(self, admin_user, quantity):
         with pytest.raises(ValidationError):
             offers.set_reward_quantities(actor=admin_user, referral_quantity=quantity)

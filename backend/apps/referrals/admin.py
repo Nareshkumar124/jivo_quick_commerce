@@ -3,6 +3,9 @@
 Who: the roles that manage coupons edit the settings (05 §3 "Coupons": Super Admin, Catalog
 Manager); the roles that view coupons view the settings, referrals and codes (Support, Finance).
 All by model permissions (`referrals.*`, granted in `apps.accounts.roles`), never by group name.
+ADR 0004 (user, 2026-11-26): the referral on/off and the reward quantities are offers, so only
+`promotions.manage_offers` (Super Admin) changes them; for the others they are read-only (not in
+the form). The validity days and the old ₹ fields keep the rule above.
 
 - Referral settings: a single row (id 1, like App configuration). The list page opens it; no
   add, no delete. Changes are kept in its history (django-simple-history, view-only) and in the
@@ -40,6 +43,7 @@ from apps.ops_console.admin_support import ReadOnlyHistoryAdmin
 from apps.ops_console.cartons import free_cartons
 from apps.ops_console.money import RupeeInput, inr
 from apps.ops_console.pii import can_view_full_phone, customer_label
+from apps.ops_console.store_management import can_manage_offers
 from apps.promotions import rewards
 from apps.referrals.choices import ReferralStatus
 from apps.referrals.models import Referral, ReferralCode, ReferralSettings
@@ -56,6 +60,8 @@ QUANTITY_FIELDS = {
     "welcome_reward_quantity": "welcome_reward_cartons",
     "reward_quantity": "reward_cartons",
 }
+# ADR 0004: without `promotions.manage_offers` these show in words (read-only).
+OFFER_FIELDS = {"is_enabled": "program_state", **QUANTITY_FIELDS}
 
 # Badge per referral status (labels unique: unfold's `@display(label=...)` maps label -> tone).
 REFERRAL_BADGES = {
@@ -148,6 +154,7 @@ class ReferralSettingsAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
     readonly_fields = (
         "updated_at",
         "reward_label",
+        "program_state",
         "welcome_reward_cartons",
         "reward_cartons",
         "reward_amount_inr",
@@ -203,10 +210,16 @@ class ReferralSettingsAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
         return False
 
     def get_fieldsets(self, request, obj=None):
+        shown = {}
+        if not can_manage_offers(request.user):
+            # ADR 0004: the referral switch and the reward quantities are offers (Super Admin
+            # only): shown in words and left out of the form, so a POST can't change them.
+            shown = OFFER_FIELDS
         if obj is not None and not self.has_change_permission(request, obj):
             # View-only roles: the amounts in rupees and the quantities as "N free cartons",
             # instead of bare numbers.
-            shown = {name: f"{name}_inr" for name in self.money_fields} | QUANTITY_FIELDS
+            shown = {name: f"{name}_inr" for name in self.money_fields} | OFFER_FIELDS
+        if shown:
             return tuple(
                 (
                     title,
@@ -246,6 +259,10 @@ class ReferralSettingsAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
             f"Welcome gift: {free_cartons(obj.welcome_reward_quantity)}. "
             f"Referral: {free_cartons(obj.reward_quantity)} for each person."
         )
+
+    @display(description="Referral program")
+    def program_state(self, obj) -> str:
+        return "On" if obj.is_enabled else "Off"
 
     @display(description=LABEL_WELCOME_QUANTITY)
     def welcome_reward_cartons(self, obj) -> str:

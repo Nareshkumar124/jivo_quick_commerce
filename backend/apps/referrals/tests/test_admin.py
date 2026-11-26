@@ -25,13 +25,14 @@ from apps.accounts.tests.factories import StaffUserFactory, SuperUserFactory, Us
 from apps.core.models import AuditLog
 from apps.ops_console.tests.helpers import (
     ANONYMOUS,
-    COUPON_EDIT_ROLES,
     COUPON_VIEW_ROLES,
     NON_STAFF,
     PRINCIPALS,
+    REFERRAL_SETTINGS_EDIT_ROLES,
     SUPERUSER,
     expected_status,
     login_as,
+    staff_in_role,
 )
 from apps.orders.choices import OrderStatus
 from apps.orders.tests.factories import OrderFactory
@@ -63,10 +64,12 @@ def _roles_grant_referrals() -> bool:
 
 GRANTED = _roles_grant_referrals()
 VIEW_ROLES = COUPON_VIEW_ROLES if GRANTED else frozenset({SUPERUSER})
-EDIT_ROLES = COUPON_EDIT_ROLES if GRANTED else frozenset({SUPERUSER})
+EDIT_ROLES = REFERRAL_SETTINGS_EDIT_ROLES if GRANTED else frozenset({SUPERUSER})
 
 VIEW_SETTINGS = "referrals.view_referralsettings"
 CHANGE_SETTINGS = "referrals.change_referralsettings"
+# ADR 0004: the referral on/off and the reward quantities also need this (Super Admin).
+MANAGE_OFFERS = "promotions.manage_offers"
 VIEW_REFERRAL = "referrals.view_referral"
 VIEW_CODE = "referrals.view_referralcode"
 FULL_PII = "accounts.view_customer"
@@ -213,7 +216,7 @@ class TestSettingsPermissions:
         assert config.reward_amount == Decimal("90.00")
 
     def test_change_saves_audits_and_keeps_history(self, client, config):
-        editor = staff_with(VIEW_SETTINGS, CHANGE_SETTINGS)
+        editor = staff_with(VIEW_SETTINGS, CHANGE_SETTINGS, MANAGE_OFFERS)
         client.force_login(editor)
         response = client.post(
             change_url(),
@@ -276,7 +279,7 @@ class TestSettingsPermissions:
         ],
     )
     def test_out_of_range_values_are_refused(self, client, config, field, value):
-        client.force_login(staff_with(VIEW_SETTINGS, CHANGE_SETTINGS))
+        client.force_login(staff_with(VIEW_SETTINGS, CHANGE_SETTINGS, MANAGE_OFFERS))
         response = client.post(change_url(), settings_post(**{field: value}))
         assert response.status_code == 200
         assert field in response.context["adminform"].form.errors
@@ -535,7 +538,7 @@ class TestRewardQuantities:
     a reward keeps the quantity it was given with."""
 
     def test_editor_sees_the_two_fields_with_their_labels(self, client, config):
-        client.force_login(staff_with(VIEW_SETTINGS, CHANGE_SETTINGS))
+        client.force_login(staff_with(VIEW_SETTINGS, CHANGE_SETTINGS, MANAGE_OFFERS))
         response = client.get(change_url())
         assert response.status_code == 200
         form = response.context["adminform"].form
@@ -548,7 +551,7 @@ class TestRewardQuantities:
         assert "Welcome gift: 1 free carton. Referral: 1 free carton for each person." in html
 
     def test_editor_sets_two_cartons_audited_and_kept_in_history(self, client, config):
-        editor = staff_with(VIEW_SETTINGS, CHANGE_SETTINGS)
+        editor = staff_with(VIEW_SETTINGS, CHANGE_SETTINGS, MANAGE_OFFERS)
         client.force_login(editor)
         response = client.post(
             change_url(), settings_post(welcome_reward_quantity="2", reward_quantity="2")
@@ -599,3 +602,49 @@ class TestRewardQuantities:
         assert "2 free cartons" in response.content.decode()
         detail = client.get(reverse("admin:referrals_referral_change", args=[done.pk]))
         assert "2 free cartons" in detail.content.decode()
+
+
+class TestOffersNeedTheOffersPermission:
+    """ADR 0004 (user, 2026-11-26): only a Super Admin changes offers. The referral on/off and
+    the reward quantities need `promotions.manage_offers`; a settings editor without it (the
+    Catalog Manager) sees them in words, and a forged POST leaves them as they are. The
+    validity days and the old ₹ fields stay theirs."""
+
+    def test_catalog_manager_sees_the_offer_fields_read_only(self, client, config):
+        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+        html = client.get(change_url()).content.decode()
+        for name in ("is_enabled", "welcome_reward_quantity", "reward_quantity"):
+            assert f'name="{name}"' not in html, name
+        assert 'name="reward_validity_days"' in html
+        assert 'name="_save"' in html
+        assert "Referral program" in html
+
+    def test_forged_offer_values_are_ignored(self, client, config):
+        editor = staff_with(VIEW_SETTINGS, CHANGE_SETTINGS)
+        client.force_login(editor)
+        response = client.post(
+            change_url(),
+            settings_post(
+                is_enabled=None,
+                welcome_reward_quantity="5",
+                reward_quantity="6",
+                reward_validity_days="40",
+            ),
+        )
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        config.refresh_from_db()
+        assert config.reward_validity_days == 40
+        assert config.is_enabled is True
+        assert (config.welcome_reward_quantity, config.reward_quantity) == (1, 1)
+
+    @pytest.mark.parametrize("principal", [roles.SUPER_ADMIN, SUPERUSER])
+    def test_super_admin_changes_them(self, client, config, principal):
+        login_as(client, principal)
+        response = client.post(
+            change_url(),
+            settings_post(is_enabled=None, welcome_reward_quantity="2", reward_quantity="3"),
+        )
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        config.refresh_from_db()
+        assert config.is_enabled is False
+        assert (config.welcome_reward_quantity, config.reward_quantity) == (2, 3)

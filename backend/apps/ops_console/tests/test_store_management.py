@@ -7,10 +7,8 @@
   confirm dialog, and shows the service's message, refusals in plain words.
 - The sidebar group "Store management" shows only for Super Admin (both sidebars).
 
-Two fields come from the ADR 0003 branch (backend/free-cartons-1l, merged first):
-`PricingConfig.free_unit_variant` and the reward quantities. The tests that save them are
-`skipif` until those fields exist; the panel side of the buy-N-get-1 form is tested now with a
-stand-in service.
+The offers page also saves the ADR 0003 fields: the store's free carton size
+(`PricingConfig.free_unit_variant`) and the reward quantities.
 """
 
 import html
@@ -50,7 +48,7 @@ from apps.ops_console.tests.helpers import (
 from apps.promotions.choices import DiscountType
 from apps.promotions.models import Coupon
 from apps.referrals.models import ReferralSettings
-from apps.stores.models import DeliveryPincode, PincodeBoundary
+from apps.stores.models import DeliveryPincode, PincodeBoundary, PricingConfig
 from apps.stores.tests.factories import DarkStoreFactory
 
 pytestmark = pytest.mark.django_db
@@ -58,17 +56,6 @@ pytestmark = pytest.mark.django_db
 HX = {"HTTP_HX_REQUEST": "true"}
 MANAGERS = frozenset({roles.SUPER_ADMIN, SUPERUSER})
 THIS = "apps.ops_console.tests.test_store_management"
-
-HAS_FREE_SIZE = sm.has_free_size()
-HAS_QUANTITIES = sm.has_reward_quantities()
-needs_free_size = pytest.mark.skipif(
-    not HAS_FREE_SIZE,
-    reason="PricingConfig.free_unit_variant arrives with backend/free-cartons-1l (ADR 0003)",
-)
-needs_quantities = pytest.mark.skipif(
-    not HAS_QUANTITIES,
-    reason="ReferralSettings reward quantities arrive with backend/free-cartons-1l (ADR 0003)",
-)
 
 CALLS: list[tuple] = []
 
@@ -426,7 +413,9 @@ def test_offers_page_has_three_cards_and_confirm_dialogs(client, world):
     volume = page.split(f'data-testid="volume-{world.store.pk}"')[0].rsplit("<form", 1)[1]
     assert "data-confirm-on=" in volume
     assert "data-confirm-off=" in volume
-    assert ("volume-needs-update" in page) is not HAS_FREE_SIZE
+    assert f'id="vol{world.store.pk}_free_variant"' in page  # the free size, per store
+    assert 'id="id_welcome"' in page
+    assert 'id="id_referral"' in page
 
 
 def test_coupon_states(client, world):
@@ -597,7 +586,6 @@ def test_rewards_referral_switch_calls_the_service(client, world):
     assert AuditLog.objects.filter(action="offer.rewards").exists()
 
 
-@needs_quantities
 def test_rewards_quantities_are_saved(client, world):
     login_as(client, roles.SUPER_ADMIN)
     data = {"referral_enabled": "on", "welcome": "2", "referral": "3"}
@@ -605,27 +593,20 @@ def test_rewards_quantities_are_saved(client, world):
     assert response.status_code == 204
     config = ReferralSettings.load()
     assert (config.welcome_reward_quantity, config.reward_quantity) == (2, 3)
-    response = client.post(reverse("ops:offer-rewards"), {**data, "welcome": "99"}, **HX)
-    assert response.status_code == 400
-    assert refusal_message(response).startswith("Enter 1 to ")
+    assert config.is_enabled
+    # The limits are the model's (1 to 10), in plain words; nothing is saved.
+    for wrong in ("99", "0"):
+        response = client.post(reverse("ops:offer-rewards"), {**data, "welcome": wrong}, **HX)
+        assert response.status_code == 400
+        assert refusal_message(response) == "Enter 1 to 10."
+    response = client.post(reverse("ops:offer-rewards"), {**data, "referral": ""}, **HX)
+    assert refusal_message(response) == "Enter the number of free cartons."
+    assert ReferralSettings.load().welcome_reward_quantity == 2
 
 
-@pytest.mark.skipif(HAS_FREE_SIZE, reason="the free-carton fields are on this branch")
-def test_volume_offer_waits_for_the_free_carton_update(client, world):
-    login_as(client, roles.SUPER_ADMIN)
-    page = page_text(client.get(reverse("ops:offers")))
-    assert 'data-testid="volume-needs-update"' in page
-    response = client.post(
-        reverse("ops:offer-volume", args=[world.store.pk]), {"enabled": "on", "every": "10"}, **HX
-    )
-    assert response.status_code == 501
-    assert "free-carton update" in refusal_message(response)
-
-
-def test_volume_offer_form_calls_the_service(client, world, monkeypatch):
-    """The panel side, whatever the branch: a stand-in service gets the parsed values."""
+def test_volume_offer_form_passes_the_values(client, world, monkeypatch):
+    """The form's values reach the service as typed (a stand-in records the call)."""
     CALLS.clear()
-    monkeypatch.setattr(sm, "has_free_size", lambda: True)
     monkeypatch.setitem(sm.SERVICES, sm.SET_VOLUME_OFFER, (THIS, "stand_in"))
     user = login_as(client, roles.SUPER_ADMIN)
     url = reverse("ops:offer-volume", args=[world.store.pk])
@@ -653,18 +634,28 @@ def test_volume_offer_form_calls_the_service(client, world, monkeypatch):
     assert len(CALLS) == 2
 
 
-@needs_free_size
 def test_volume_offer_is_saved(client, world):
-    from apps.stores.models import PricingConfig
-
     login_as(client, roles.SUPER_ADMIN)
     url = reverse("ops:offer-volume", args=[world.store.pk])
     data = {"enabled": "on", "every": "10", "free_variant": str(world.water.pk)}
     response = client.post(url, data, **HX)
     assert response.status_code == 204
+    assert toast(response)["message"] == "Buy 10 get 1 free is on at GGN-01. Carts show it at once."
     config = PricingConfig.objects.get(store=world.store)
     assert (config.free_unit_every, config.free_unit_variant_id) == (10, world.water.pk)
-    assert AuditLog.objects.filter(action="offer.volume").exists()
+    assert AuditLog.objects.filter(action="offer.volume").count() == 1
+    # The page shows it: on, N and the chosen size.
+    page = page_text(client.get(reverse("ops:offers")))
+    form = page.split(f'data-testid="volume-{world.store.pk}"')[1].split("</form>")[0]
+    assert 'value="10"' in form
+    assert f'<option value="{world.water.pk}" selected>' in form
+
+    response = client.post(url, data, **HX)
+    assert toast(response) == {"message": "Nothing changed at GGN-01.", "tone": "info"}
+    response = client.post(url, {"every": "", "free_variant": str(world.water.pk)}, **HX)
+    assert toast(response)["message"] == "Buy-N-get-1 is off at GGN-01."
+    config.refresh_from_db()
+    assert (config.free_unit_every, config.free_unit_variant_id) == (0, world.water.pk)
 
 
 # --------------------------------------------------------------------------- delivery locations
@@ -684,6 +675,7 @@ def test_delivery_page_lists_pincodes_and_warns_about_outlines(client, world):
     assert "warning" in row.split(f'data-testid="outline-{world.pin.pk}"')[1].split("</td>")[0]
     assert f'data-testid="outline-warning-{world.store.pk}"' in page
     assert sm.MSG_NO_OUTLINE in page
+    assert "can't find the store from their location until an outline is imported" in page
     # The confirm dialog says what customers will experience; it is the store's last pincode.
     assert (
         "Turn off delivery to 110027 (Rajouri Garden)? Customers there will see \"We don't "
@@ -735,7 +727,7 @@ def test_add_pincode_calls_the_service(client, world):
     assert AuditLog.objects.get(action="delivery_pincode.add").actor == user
     page = page_text(response)
     assert "Pincode 110018 (Hari Nagar) added to GGN-01. Customers there can order now." in page
-    assert f"110018: {sm.MSG_NO_OUTLINE}" in page  # the warning message
+    assert f"{sm.MSG_NO_OUTLINE} Pincode: 110018." in page  # the warning message
 
 
 @pytest.mark.parametrize(

@@ -34,6 +34,7 @@ from apps.ops_console.maps import MAP_FORMFIELD_OVERRIDES, MAP_MEDIA, feature, r
 from apps.ops_console.money import RupeeInput, inr
 from apps.ops_console.pii import can_view_full_phone, mask_phone
 from apps.ops_console.scoping import StoreScopedAdminMixin, visible_stores
+from apps.ops_console.store_management import can_manage_offers, can_manage_pincodes
 from apps.stores.models import (
     PRICING_MONEY_FIELDS,
     DarkStore,
@@ -141,12 +142,24 @@ class DarkStoreAdmin(StoreScopedAdminMixin, ModelAdmin):
     def has_delete_permission(self, request, obj=None) -> bool:
         return False  # deactivate instead: stock, orders and invoices reference the store
 
+    def has_add_permission(self, request) -> bool:
+        # ADR 0004: a new store needs its delivery area, which only a Super Admin sets
+        # (`stores.manage_delivery_pincodes`). Today only Super Admin adds stores anyway.
+        return super().has_add_permission(request) and can_manage_pincodes(request.user)
+
     def get_fieldsets(self, request, obj=None):
-        """View-only roles get read-only maps instead of the editors (raw coordinates)."""
+        """View-only roles get read-only maps instead of the editors (raw coordinates). ADR 0004:
+        without `stores.manage_delivery_pincodes` the service area is a read-only map too (not in
+        the form, so a POST can't change it)."""
         fieldsets = super().get_fieldsets(request, obj)
-        if obj is None or self.has_change_permission(request, obj):
+        if obj is None:
             return fieldsets
-        swap = {"location": "location_display", "service_area": "service_area_map"}
+        if self.has_change_permission(request, obj):
+            if can_manage_pincodes(request.user):
+                return fieldsets
+            swap = {"service_area": "service_area_map"}
+        else:
+            swap = {"location": "location_display", "service_area": "service_area_map"}
         return [
             (title, {**options, "fields": tuple(swap.get(f, f) for f in options["fields"])})
             for title, options in fieldsets
@@ -322,6 +335,8 @@ FREE_OFFER_HELP = "1 free carton per N paid cartons; 0 = off."
 # ADR 0003: the size of every free carton (`free_unit_variant`).
 FREE_SIZE_LABEL = "Free carton size"
 FREE_SIZE_NOT_FIXED = "Not fixed: the cheapest size in the order"
+# ADR 0004: without `promotions.manage_offers` the two offer fields show in words (read-only).
+OFFER_DISPLAY = (("free_unit_every", "free_offer"), ("free_unit_variant", "free_size"))
 
 
 def free_offer_text(every: int, unit_label: str = "cartons", size: str = "") -> str:
@@ -421,12 +436,16 @@ class PricingConfigAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmin
         store = (("Store", {"fields": ("store",)}),)
         record = (("Record", {"fields": ("created_at", "updated_at")}),)
         fieldsets = PRICING_FIELDSETS
+        shown = {}
+        if not can_manage_offers(request.user):
+            # ADR 0004: the volume offer and the free carton size are offers (Super Admin
+            # only): shown in words and left out of the form, so a POST can't change them.
+            shown = dict(OFFER_DISPLAY)
         if obj is not None and not self.has_change_permission(request, obj):
             # View-only roles (Finance): the amounts in rupees instead of bare numbers, and the
             # volume offer and the free carton size in words.
-            shown = {name: f"{name}_inr" for name in PRICING_MONEY_FIELDS}
-            shown["free_unit_every"] = "free_offer"
-            shown["free_unit_variant"] = "free_size"
+            shown = {name: f"{name}_inr" for name in PRICING_MONEY_FIELDS} | dict(OFFER_DISPLAY)
+        if shown:
             fieldsets = tuple(
                 (
                     title,

@@ -44,9 +44,6 @@ from apps.stores.services import stores_for
 PRICES_PER_PAGE = 50
 COUPONS_PER_PAGE = 25
 MAX_QUERY = 60
-MSG_NEEDS_FREE_SIZE = (
-    "The buy-N-get-1 settings can be changed here after the free-carton update is installed."
-)
 MSG_BAD_SWITCH = "Choose on or off."
 FORM_METHODS = ["GET", "POST"]
 
@@ -142,16 +139,16 @@ def price_set(request, variant_id: int):
 # --------------------------------------------------------------------------- offers
 
 
-def _offers_context(request, rewards_form=None) -> dict:
+def _offers_context(request) -> dict:
     user = request.user
-    quantities = sm.has_reward_quantities()
     settings_row = sm.referral_settings()
-    if rewards_form is None:
-        initial = {"referral_enabled": settings_row.is_enabled}
-        if quantities:
-            initial["welcome"] = settings_row.welcome_reward_quantity
-            initial["referral"] = settings_row.reward_quantity
-        rewards_form = RewardsForm(initial=initial, quantities=quantities)
+    rewards_form = RewardsForm(
+        initial={
+            "referral_enabled": settings_row.is_enabled,
+            "welcome": settings_row.welcome_reward_quantity,
+            "referral": settings_row.reward_quantity,
+        }
+    )
     page = Paginator(sm.coupon_list(), COUPONS_PER_PAGE).get_page(request.GET.get("page"))
     now = timezone.now()
     for coupon in page.object_list:
@@ -159,7 +156,6 @@ def _offers_context(request, rewards_form=None) -> dict:
         coupon.value_text = sm.coupon_value(coupon)
         coupon.confirm_toggle = sm.coupon_toggle_confirm(coupon)
     volume = []
-    free_size = sm.has_free_size()
     for row in sm.volume_rows(stores_for(user)):
         form = VolumeOfferForm(
             initial={"enabled": row.on, "every": row.every or None, "free_variant": row.variant_id},
@@ -169,10 +165,8 @@ def _offers_context(request, rewards_form=None) -> dict:
         volume.append({"row": row, "form": form})
     return {
         "volume": volume,
-        "free_size": free_size,
         "rewards": settings_row,
         "rewards_form": rewards_form,
-        "quantities": quantities,
         "page": page,
         "actions": {action: sm.available(action) for action in sm.SERVICES},
     }
@@ -192,8 +186,6 @@ def offer_volume(request, store_id: int):
     if store is None:
         raise Http404("No such store.")
     back = reverse("ops:offers")
-    if not sm.has_free_size():
-        return _refused(request, MSG_NEEDS_FREE_SIZE, 501, back)
     form = VolumeOfferForm(request.POST, sizes=sm.store_sizes([store.pk]).get(store.pk, []))
     if not form.is_valid():
         return _refused(request, _form_message(form), 400, back)
@@ -219,8 +211,7 @@ def offer_volume(request, store_id: int):
 @require_POST
 def offer_rewards(request):
     back = reverse("ops:offers")
-    quantities = sm.has_reward_quantities()
-    form = RewardsForm(request.POST, quantities=quantities)
+    form = RewardsForm(request.POST)
     if not form.is_valid():
         return _refused(request, _form_message(form), 400, back)
     data = form.cleaned_data
@@ -230,8 +221,8 @@ def offer_rewards(request):
         lambda: sm.set_rewards(
             actor=request.user,
             referral_enabled=data["referral_enabled"],
-            welcome=data.get("welcome"),
-            referral=data.get("referral"),
+            welcome=data["welcome"],
+            referral=data["referral"],
         ),
     )
     if refused:
@@ -453,7 +444,7 @@ def pincode_add(request):
             "order until you activate it.",
         )
     if not sm.pincodes_for(request.user).filter(pk=row.pk, has_outline=True).exists():
-        messages.warning(request, f"{row.pincode}: {sm.MSG_NO_OUTLINE}")
+        messages.warning(request, f"{sm.MSG_NO_OUTLINE} Pincode: {row.pincode}.")
     return redirect("ops:delivery")
 
 

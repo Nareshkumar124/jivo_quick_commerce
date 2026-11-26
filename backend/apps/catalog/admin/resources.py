@@ -27,8 +27,13 @@ from import_export import fields, resources, widgets
 from apps.catalog.models import Category, Product, ProductVariant
 from apps.catalog.validators import LABEL_TEXT_KEYS
 from apps.ops_console.admin_support import SpreadsheetImportMixin
+from apps.ops_console.store_management import can_manage_prices
 
 HIGHLIGHT_SEPARATOR = "|"
+MSG_IMPORT_PRICE_LOCKED = (
+    "Only a Super Admin can change the price of an existing size. Keep its MRP and selling "
+    "price as they are, or ask a Super Admin (Store management → Bottle prices)."
+)
 
 
 class StrictBooleanWidget(widgets.BooleanWidget):
@@ -265,3 +270,19 @@ class ProductVariantResource(SpreadsheetImportMixin, resources.ModelResource):
         fields = VARIANT_FIELDS
         export_order = VARIANT_FIELDS
         import_order = VARIANT_FIELDS
+
+    def import_instance(self, instance, row, **kwargs):
+        """ADR 0004: in the admin (the import passes the signed-in `user`), only a Super Admin
+        (`catalog.manage_prices`) changes a saved variant's MRP or selling price; any other row
+        that would change one is refused with a plain message and nothing is imported. A new
+        variant takes its first price. Scripted loads (no `user`, e.g. `bulk_load`) are not
+        limited here."""
+        saved = (instance.mrp, instance.selling_price) if instance.pk is not None else None
+        super().import_instance(instance, row, **kwargs)
+        if (
+            "user" in kwargs
+            and saved is not None
+            and (instance.mrp, instance.selling_price) != saved
+            and not can_manage_prices(kwargs["user"])
+        ):
+            raise ValidationError({"mrp": MSG_IMPORT_PRICE_LOCKED})

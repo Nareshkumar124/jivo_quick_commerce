@@ -14,7 +14,7 @@ Default variant (one definition, used by SQL sorting and by the tile):
 
 import re
 from collections.abc import Iterable, Sequence
-from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -740,17 +740,18 @@ def can_manage_prices(user) -> bool:
     return bool(user and user.is_active and user.is_staff and user.has_perm(MANAGE_PRICES))
 
 
+# Plain ASCII digits and at most one dot with 1-2 decimals (BUG-0002: never `\d`). `Decimal()`
+# alone would also take "1_000", other scripts' digits, exponents and "NaN".
+PRICE_TEXT = re.compile(r"[0-9]+(?:\.[0-9]{1,2})?")
+ASCII_SPACE = " \t\r\n"  # outer spaces only; a no-break space is refused
+
+
 def _clean_price(value) -> Decimal:
-    try:
-        price = Decimal(str(value).strip())
-    except (InvalidOperation, ValueError):
-        raise ValidationError({"price": MSG_PRICE_INVALID}) from None
-    if (
-        not price.is_finite()
-        or price <= 0
-        or price > MAX_VARIANT_PRICE
-        or price != price.quantize(Decimal("0.01"))
-    ):
+    text = "" if value is None or isinstance(value, bool) else str(value).strip(ASCII_SPACE)
+    if not PRICE_TEXT.fullmatch(text):
+        raise ValidationError({"price": MSG_PRICE_INVALID})
+    price = Decimal(text)
+    if price <= 0 or price > MAX_VARIANT_PRICE:
         raise ValidationError({"price": MSG_PRICE_INVALID})
     return price.quantize(Decimal("0.01"))
 

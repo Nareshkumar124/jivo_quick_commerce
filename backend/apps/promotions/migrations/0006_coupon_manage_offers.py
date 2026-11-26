@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('promotions', '0004_coupon_free_unit_is_a_reward'),
+        ('promotions', '0005_free_unit_quantity'),
     ]
 
     operations = [

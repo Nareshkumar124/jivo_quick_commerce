@@ -30,10 +30,9 @@ A service missing from the branch raises `ActionUnavailable` (the view answers 5
 available yet"), never a half-done change. Refusals come back as `Refused`: the plain message
 for a toast, plus the per-field messages so a form can show them next to its fields.
 
-Two fields come with ADR 0003 (branch backend/free-cartons-1l, merged before this one):
-`PricingConfig.free_unit_variant` and `ReferralSettings.welcome_reward_quantity` /
-`reward_quantity`. Until they exist the buy-N-get-1 card is read-only and the rewards card
-saves only the referral on/off (`has_free_size()`, `has_reward_quantities()`).
+The offers page also edits the ADR 0003 fields: `PricingConfig.free_unit_variant` (the size
+every free carton uses at a store, for buy-N-get-1 and rewards) and
+`ReferralSettings.welcome_reward_quantity` / `reward_quantity`.
 
 Money is display only: prices are the stored values, typed prices go to the service as text.
 """
@@ -43,7 +42,6 @@ from decimal import Decimal
 
 from django.core.exceptions import (
     NON_FIELD_ERRORS,
-    FieldDoesNotExist,
     PermissionDenied,
     ValidationError,
 )
@@ -88,9 +86,26 @@ SERVICES: dict[str, tuple[str, str]] = {
 }
 
 MSG_NO_PERMISSION = "Only a Super Admin can change this."
+# The location check (before an address exists) needs the pincode's outline (ADR 0004 §1).
 MSG_NO_OUTLINE = (
-    "No map outline for this pincode. Customers are checked by their address pincode only."
+    "No map outline for this pincode: customers there can't find the store from their location "
+    "until an outline is imported."
 )
+
+
+def can_manage_prices(user) -> bool:
+    """Also used by the Django admin (catalog and inventory) to lock prices (ADR 0004)."""
+    return bool(user and user.has_perm(MANAGE_PRICES))
+
+
+def can_manage_offers(user) -> bool:
+    """Also used by the Django admin (coupons, pricing config, referral settings)."""
+    return bool(user and user.has_perm(MANAGE_OFFERS))
+
+
+def can_manage_pincodes(user) -> bool:
+    """Also used by the Django admin (a store's service area)."""
+    return bool(user and user.has_perm(MANAGE_PINCODES))
 
 
 class Refused(ActionRefused):
@@ -204,34 +219,6 @@ def number(value) -> str:
     return text[:-3] if text.endswith(".00") else text
 
 
-def cartons(count: int) -> str:
-    return f"{count} free carton" if count == 1 else f"{count} free cartons"
-
-
-def has_field(model, name: str) -> bool:
-    try:
-        model._meta.get_field(name)
-    except FieldDoesNotExist:
-        return False
-    return True
-
-
-def has_free_size() -> bool:
-    """ADR 0003 `PricingConfig.free_unit_variant` is on this branch."""
-    from apps.stores.models import PricingConfig
-
-    return has_field(PricingConfig, "free_unit_variant")
-
-
-def has_reward_quantities() -> bool:
-    """ADR 0003 `ReferralSettings.welcome_reward_quantity` / `reward_quantity` are here."""
-    from apps.referrals.models import ReferralSettings
-
-    return has_field(ReferralSettings, "welcome_reward_quantity") and has_field(
-        ReferralSettings, "reward_quantity"
-    )
-
-
 def variant_label(variant) -> str:
     return f"{variant.product.name} {variant.name}"
 
@@ -295,24 +282,18 @@ class VolumeRow:
         return self.every > 0
 
     @property
-    def size_label(self) -> str:
-        for pk, label in self.sizes:
-            if pk == self.variant_id:
-                return label
-        return "Cheapest size in the order"
-
-    @property
     def confirm_on(self) -> str:
         return (
             f"Customers at {self.store.code} get 1 free carton for every {{n}} paid cartons "
-            "in one order. Carts show the change at once."
+            "in one order. Carts show the change at once. The free carton size is also used "
+            "for reward cartons at this store."
         )
 
     @property
     def confirm_off(self) -> str:
         return (
             f"Turn off buy-N-get-1 at {self.store.code}? Carts there stop getting free cartons "
-            "from this offer at once."
+            "from this offer at once. The free carton size is still used for reward cartons."
         )
 
     @property
@@ -353,7 +334,6 @@ def volume_rows(stores) -> list[VolumeRow]:
     from apps.stores.models import PricingConfig
 
     default_every = PricingConfig._meta.get_field("free_unit_every").default
-    free_size = has_free_size()
     stores = list(stores.select_related("pricing").order_by("code"))
     sizes = store_sizes(store.pk for store in stores)
     rows = []
@@ -363,7 +343,7 @@ def volume_rows(stores) -> list[VolumeRow]:
             VolumeRow(
                 store=store,
                 every=config.free_unit_every if config else default_every,
-                variant_id=getattr(config, "free_unit_variant_id", None) if free_size else None,
+                variant_id=config.free_unit_variant_id if config else None,
                 sizes=sizes.get(store.pk, []),
             )
         )

@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stores', '0006_pricing_free_unit_every'),
+        ('stores', '0007_pricing_free_unit_variant'),
     ]
 
     operations = [

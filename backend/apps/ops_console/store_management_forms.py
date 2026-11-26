@@ -90,6 +90,7 @@ class VolumeOfferForm(forms.Form):
     )
     free_variant = forms.TypedChoiceField(
         label="Free carton size",
+        help_text="Used for every free carton at this store: this offer and rewards.",
         required=False,
         coerce=int,
         empty_value=None,
@@ -127,12 +128,8 @@ class RewardsForm(forms.Form):
         error_messages={**COUNT_ERRORS, **_required("Enter the number of free cartons.")},
     )
 
-    def __init__(self, *args, quantities: bool = True, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not quantities:
-            del self.fields["welcome"]
-            del self.fields["referral"]
-            return
         for name, model_field, model in (
             ("welcome", "welcome_reward_quantity", "w"),
             ("referral", "reward_quantity", "r"),
@@ -189,7 +186,8 @@ class CouponForm(forms.Form):
         widget=UnfoldAdminSelectWidget,
         error_messages={
             **_required("Choose the type."),
-            "invalid_choice": "Choose ₹ off or % off.",
+            # "%%": Django formats this message with the value ("% o" would be a format code).
+            "invalid_choice": "Choose ₹ off or %% off.",
         },
     )
     value = forms.DecimalField(

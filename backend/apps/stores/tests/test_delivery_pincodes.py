@@ -166,17 +166,19 @@ class TestMessage:
 
 class TestRealOutline:
     def test_bundled_file_puts_rajouri_garden_in_110027(self):
-        """ADR 0004 data check: the Delhi file's 110027 outline holds the three landmarks, and
-        a store delivering to 110027 serves them (its Gurugram service area is ignored)."""
+        """ADR 0004 data check: the bundled Delhi file (data.gov.in polygons only: the repo is
+        public) holds the three landmarks in 110027, and a store delivering to 110027 serves
+        them (its Gurugram service area is ignored)."""
         call_command("import_pincode_boundaries", "--commit", stdout=StringIO())
-        assert PincodeBoundary.objects.count() == 96
+        assert PincodeBoundary.objects.count() == 95  # 110009 has no data.gov.in polygon
+        assert set(PincodeBoundary.objects.values_list("source", flat=True)) == {"datagov"}
         geom = PincodeBoundary.objects.get(pincode="110027").geom
         for lat, lng in (RAJOURI_GARDEN_METRO, TAGORE_GARDEN_METRO, SUBHASH_NAGAR):
             assert geom.contains(Point(lng, lat, srid=4326))
         store = DarkStoreFactory()
         pin(store, area_name="Rajouri Garden / Tagore Garden / Subhash Nagar")
-        assert served(RAJOURI_GARDEN_METRO)
-        assert served(SUBHASH_NAGAR)
+        for landmark in (RAJOURI_GARDEN_METRO, TAGORE_GARDEN_METRO, SUBHASH_NAGAR):
+            assert served(landmark)
         assert not served(CENTER)  # inside the store's own (Gurugram) area: ignored now
         assert check_serviceability(*RAJOURI_GARDEN_METRO)["store"]["id"] == store.pk
 
@@ -385,6 +387,18 @@ class TestImportCommand:
         geom = PincodeBoundary.objects.get().geom
         assert geom.contains(Point(77.05, 28.45, srid=4326))
         assert geom.contains(Point(77.08, 28.48, srid=4326))
+
+    def test_absolute_file_path_and_source_label(self, tmp_path):
+        """How a file kept outside the repo (e.g. the merged data.gov.in + GSDL outlines) is
+        loaded on a server: an absolute `--file` and the `--source` label on every row."""
+        path = (tmp_path / "merged.geojson").resolve()
+        path.write_text(
+            json.dumps({"type": "FeatureCollection", "features": [feature("110027")]}),
+            encoding="utf-8",
+        )
+        out = run("--file", str(path), "--source", "datagov+gsdl", "--commit")
+        assert "added 1" in out
+        assert PincodeBoundary.objects.get().source == "datagov+gsdl"
 
     def test_bad_files(self, tmp_path):
         from django.core.management.base import CommandError

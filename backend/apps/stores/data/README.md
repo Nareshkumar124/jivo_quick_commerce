@@ -1,8 +1,14 @@
 # Pincode outlines (ADR 0004 §1)
 
-`pincodes_delhi.geojson` holds the approximate outline of **every Delhi pincode** (110001 to
-110099, 96 pincodes). It is a GeoJSON FeatureCollection in WGS84. Each feature has the
-properties `pincode` and `source` (`datagov+gsdl`, `datagov` or `gsdl`).
+`pincodes_delhi.geojson` holds the approximate outline of the Delhi pincodes (110001 to 110099,
+**95 pincodes**) from **one open source only: data.gov.in** (GODL-India), because this repository
+is public. It is a GeoJSON FeatureCollection in WGS84. Each feature has the properties `pincode`
+and `source` (`datagov`).
+
+Not in this file: **110009** (data.gov.in has no polygon for it), and the extra coverage the GSDL
+polygons add to some pincodes (110027 is 5.2 km² here and 6.7 km² with GSDL; the biggest gaps
+are 110030, 110094 and 110086). A merged data.gov.in + GSDL file is kept **outside the
+repository** and loaded on a server with `--file` (see below).
 
 The outlines are used only for the **location check** of stores that deliver by pincode. The
 point must fall inside an active pincode's outline, widened by 250 m. The address check uses the
@@ -13,34 +19,43 @@ Load it (a dry run first, then save):
 ```bash
 uv run python manage.py import_pincode_boundaries            # dry run: shows what would change
 uv run python manage.py import_pincode_boundaries --commit   # saves; safe to run again
+# another file (absolute path), with the source label saved on each outline:
+uv run python manage.py import_pincode_boundaries --file /path/to/pincodes_delhi_merged.geojson --source datagov+gsdl --commit
 ```
 
-## Sources and licences
+## Source and licence
 
 | Source | What | Licence |
 |---|---|---|
 | Department of Posts, "All India Pincode Boundary" on data.gov.in (https://www.data.gov.in/catalog/all-india-pincode-boundary-geo-json) | One polygon per pincode | Government Open Data License - India (GODL-India), https://www.data.gov.in/Godl |
-| Geospatial Delhi Ltd (GSDL), Delhi pincode / sub-locality polygons (https://gsdl.org.in) | Many sub-locality polygons tagged with a pincode | The mirror below states "CC0 1.0 but attribute datameet and the original government source where possible". It also lists the GSDL layer under its "not-so-open" maps, so GSDL's own terms are not stated. Check with Jivo before redistributing this file publicly. |
 
-Both were downloaded from the mirror https://github.com/ramSeraph/indian_admin_boundaries,
-release `postal` (`Datagov_Pincode_Boundaries.geojsonl.7z` and `GSDL_Pincodes.geojsonl.7z`),
-on 2026-11-26. Attribution: Department of Posts / data.gov.in, Geospatial Delhi Ltd, datameet.
+Downloaded on 2026-11-26 from the mirror https://github.com/ramSeraph/indian_admin_boundaries,
+release `postal`, file `Datagov_Pincode_Boundaries.geojsonl.7z`. Attribution: Department of
+Posts / data.gov.in.
+
+The merged file kept outside the repository also uses the Geospatial Delhi Ltd (GSDL) pincode /
+sub-locality polygons (same mirror, `GSDL_Pincodes.geojsonl.7z`). The mirror states "CC0 1.0 but
+attribute datameet and the original government source where possible", but lists the GSDL layer
+under its "not-so-open" maps, so GSDL's own terms are not stated. That is why it is not
+published here.
 
 ## How the file was built
 
-1. For every pincode 110xxx, take all polygons from both sources and make them valid.
+1. For every pincode 110xxx, take its data.gov.in polygons and make them valid.
 2. Merge (union) them into one outline per pincode.
 3. Simplify by 0.0001 degrees (about 10 m) and round coordinates to 5 decimals (about 1 m).
 
-The result is about 160 KB. Check: the 110027 outline contains Rajouri Garden metro
+The result is about 115 KB. Check: the 110027 outline contains Rajouri Garden metro
 (28.64906, 77.12272), Tagore Garden metro (28.64373, 77.11282) and Subhash Nagar
-(28.63635, 77.11521).
+(28.63635, 77.11521), even without the 250 m widening.
 
-To rebuild it, unpack the two `.7z` files, then run the script below:
+To rebuild it, unpack the `.7z` file, then run the script below. The second file is the GSDL
+source; pass an empty file for the data.gov.in-only build (this file), or
+`GSDL_Pincodes.geojsonl` for the merged one.
 
 ```bash
 uv run --no-project --with shapely python build_pincodes_delhi.py \
-    Datagov_Pincode_Boundaries.geojsonl GSDL_Pincodes.geojsonl pincodes_delhi.geojson 0.0001
+    Datagov_Pincode_Boundaries.geojsonl empty.geojsonl pincodes_delhi.geojson 0.0001
 ```
 
 ```python

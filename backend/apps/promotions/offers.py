@@ -13,10 +13,10 @@ audit log. Nothing new is stored: they edit the existing models.
 - Rewards (`ReferralSettings.is_enabled`, `welcome_reward_quantity`, `reward_quantity`):
   `set_reward_quantities`.
 
-`free_unit_variant` and the two reward quantities come with ADR 0003 (branch
-backend/free-cartons-1l, merged before this one); their two services use those fields.
+`free_unit_variant` and the two reward quantities come from ADR 0003.
 """
 
+import re
 from datetime import datetime
 from decimal import Decimal
 
@@ -35,7 +35,11 @@ MSG_CAP_REQUIRED = "A percent coupon needs a maximum discount (cap) in rupees."
 MSG_NO_CAP_ON_FLAT = "A flat coupon has no cap: its value is the discount. Leave this empty."
 MSG_CODE_SPACES = "Use letters and numbers without spaces, e.g. JIVO50."
 MSG_PERSONAL = "This is a customer's personal reward. It can't be changed here."
-MSG_WHOLE_NUMBER = "Enter a whole number."
+MSG_WHOLE_NUMBER = "Enter a whole number, 0 or more, with the digits 0-9."
+# Plain ASCII digits only (BUG-0002: never `\d`). `int()` alone would also take "1_000",
+# other scripts' digits, "+2" and "-1".
+WHOLE_TEXT = re.compile(r"[0-9]+")
+ASCII_SPACE = " \t\r\n"  # outer spaces only; a no-break space is refused
 
 # What the page may set on a public coupon. `owner` and `source` are fixed (public, NONE).
 COUPON_FIELDS = frozenset(
@@ -78,13 +82,10 @@ def _plain(value):
 
 
 def _whole(value, field: str) -> int:
-    if isinstance(value, bool):
+    text = "" if value is None or isinstance(value, bool) else str(value).strip(ASCII_SPACE)
+    if not WHOLE_TEXT.fullmatch(text):
         raise ValidationError({field: MSG_WHOLE_NUMBER})
-    try:
-        number = int(str(value).strip())
-    except (TypeError, ValueError):
-        raise ValidationError({field: MSG_WHOLE_NUMBER}) from None
-    return number
+    return int(text)
 
 
 # --------------------------------------------------------------------------- public coupons
@@ -223,8 +224,6 @@ def set_volume_offer(store, every, variant=None, *, actor) -> bool:
 
     _require(actor)
     every = _whole(every, "free_unit_every")
-    if every < 0:
-        raise ValidationError({"free_unit_every": "Enter 0 (no offer) or more."})
     store_id = getattr(store, "pk", store)
     variant_id = getattr(variant, "pk", variant)
     with transaction.atomic():
