@@ -36,7 +36,7 @@ This is the PM's summary view, kept short. The details are in:
 | R-5 | Gate backlog: P0–P7 unsigned; `main` not updated since 2026-11-04 | Phases pile up without sign-off | QA verdicts, then demo and sign-off per phase; PR `develop` → `main` |
 | J-1 | Jivo catalog inputs: real GST rates and HSN, FSSAI/label info, SAP item codes, printed MRPs (DL-67 uses test GST 5% and site prices) | Prices and invoices are test-only | Jivo Finance (H-18) before go-live |
 | J-2 | D-01 Razorpay keys | Fake gateway only; no real online payment | Jivo to provide test, then live keys |
-| J-3 | D-02 SMS provider and DLT | No real OTP SMS (Twilio trial blocked, DL-48) | H-06 |
+| J-3 | D-02 SMS provider and DLT | Login OTP SMS works on the test server (user check, 2026-11-26); order SMS templates still open | H-06 |
 | J-4 | D-19 Firebase (FCM) projects | Push is a no-op; apps rely on sockets and polling | Jivo to create the projects |
 | J-5 | D-11 Play Console (and Apple account) | No store release; real riders can't get background location approval | Jivo to open the accounts |
 | J-6 | D-05 production hosting, D-04 SSO, D-14/D-16/D-10/D-12 defaults | Production and staff SSO blocked; PM defaults in use | H-13 and the open decisions in doc 11 |
