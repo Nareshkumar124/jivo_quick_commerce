@@ -107,6 +107,15 @@ SMS_OTP_DLT_TEMPLATE_ID = "1007000000000000001"
 # Tests never read real gateway keys, whatever backend/.env says (MSG91 tests set fake ones).
 MSG91_AUTH_KEY = ""
 MSG91_FLOW_IDS: dict[str, str] = {}
+BHASHSMS_USER = ""
+BHASHSMS_PASSWORD = ""
+BHASHSMS_API_URL = "http://bhashsms.com/api/sendmsg.php"
+BHASHSMS_HTTP_METHOD = "GET"
+BHASHSMS_TEMPLATE_ID_PARAM = ""
+BHASHSMS_ENTITY_ID = ""
+BHASHSMS_ENTITY_ID_PARAM = ""
+# The default OTP text (the approved DLT template), whatever backend/.env says.
+SMS_OTP_TEMPLATE = SMS_OTP_DEFAULT_TEMPLATE
 # Phase 6: push into a list, DLT ids for every notification event with SMS, fast auth timeout.
 PUSH_BACKEND = "apps.notifications.push.LocmemPushBackend"
 # T-821: tests never call Google; routes use the straight-line provider (provider tests mock HTTP).

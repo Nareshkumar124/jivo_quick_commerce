@@ -504,13 +504,30 @@ TWILIO_MESSAGING_SERVICE_SID = env_str("TWILIO_MESSAGING_SERVICE_SID", default="
 # System check accounts.E007 requires the key and the OTP flow; W001 lists unmapped events.
 MSG91_AUTH_KEY = env_str("MSG91_AUTH_KEY", default="")
 MSG91_FLOW_IDS: dict[str, str] = env_dict("MSG91_FLOW_IDS", default={})
-# Must match the DLT-registered template text exactly. {app_hash} is the Android SMS Retriever
-# hash of the app that asked (blank if unset).
-SMS_OTP_TEMPLATE = env_str(
-    "SMS_OTP_TEMPLATE",
-    default="<#> {otp} is your Jivo verification code. It expires in 5 minutes. "
-    "Do not share it with anyone. {app_hash}",
+# BhashSMS HTTP API (D-02, the chosen gateway since 2026-11-26; SMS_BACKEND=
+# apps.notifications.sms.BhashSmsBackend; MSG91 stays the backup). Credentials only from env.
+# Sends the rendered DLT text with SMS_SENDER_ID (the DLT header, e.g. JIVOJI). Default: GET to
+# the plain-http URL, the one proven with real sends; it puts the password in the URL, so switch
+# to https + POST once BhashSMS confirms them (W002 warns in production). BHASHSMS_TEMPLATE_ID_PARAM
+# / BHASHSMS_ENTITY_ID_PARAM: the field names BhashSMS uses for the DLT template id / entity id,
+# only if it asks for them (empty = not sent). Checks accounts.E008/E009 require the user,
+# password, sender, SMS_OTP_DLT_TEMPLATE_ID and a valid URL/method.
+BHASHSMS_USER = env_str("BHASHSMS_USER", default="")
+BHASHSMS_PASSWORD = env_str("BHASHSMS_PASSWORD", default="")
+BHASHSMS_API_URL = env_str("BHASHSMS_API_URL", default="http://bhashsms.com/api/sendmsg.php")
+BHASHSMS_HTTP_METHOD = env_str("BHASHSMS_HTTP_METHOD", default="GET")
+BHASHSMS_TEMPLATE_ID_PARAM = env_str("BHASHSMS_TEMPLATE_ID_PARAM", default="")
+BHASHSMS_ENTITY_ID = env_str("BHASHSMS_ENTITY_ID", default="")
+BHASHSMS_ENTITY_ID_PARAM = env_str("BHASHSMS_ENTITY_ID_PARAM", default="")
+# Must match the DLT-registered template text exactly. Placeholders: {otp} and {app_hash} (the
+# Android SMS Retriever hash of the app that asked). Default: the approved BhashSMS/Jio DLT OTP
+# template (OTP01, id 1207172050323409701, one variable = the code). It has no app hash, so SMS
+# Retriever autofill does not work with it; users type the code. An empty value means the default.
+SMS_OTP_DEFAULT_TEMPLATE = (
+    "Dear Customer, your OTP for login is {otp}. Please do not share the OTP with anyone. "
+    "Team Jivo."
 )
+SMS_OTP_TEMPLATE = env_str("SMS_OTP_TEMPLATE", default="") or SMS_OTP_DEFAULT_TEMPLATE
 SMS_RETRIEVER_APP_HASHES = {
     "customer": env_str("SMS_APP_HASH_CUSTOMER", default=""),
     "rider": env_str("SMS_APP_HASH_RIDER", default=""),

@@ -353,6 +353,7 @@ class TestOtpTaskWithMsg91:
         assert _payload(urlopen.calls[0][0])["recipients"][0]["app_hash"] == ""
 
     def test_variables_match_the_rendered_text(self, msg91):
+        msg91.SMS_OTP_TEMPLATE = "<#> {otp} is your Jivo code. {app_hash}"
         variables = otp_service.otp_sms_variables(CODE, "customer")
         assert variables == {"otp": CODE, "app_hash": APP_HASH}
         text = otp_service.render_otp_sms(CODE, "customer")

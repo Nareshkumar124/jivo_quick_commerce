@@ -33,7 +33,7 @@ def request_otp(client, phone=PHONE, app="customer", purpose=None, capture=None)
 
 def sent_code() -> str:
     """The OTP in the last SMS (locmem backend)."""
-    return sms.outbox[-1].body.split()[1]
+    return sms.outbox[-1].variables["otp"]
 
 
 def verify(client, code, phone=PHONE, app="customer", terms=TERMS):
@@ -66,11 +66,16 @@ class TestRequest:
         message = sms.outbox[-1]
         assert message.to == PHONE
         assert message.dlt_template_id == "1007000000000000001"
-        assert message.body.startswith("<#> ")
+        assert message.body == (
+            f"Dear Customer, your OTP for login is {code}. Please do not share the OTP with "
+            "anyone. Team Jivo."
+        )
 
     def test_appends_the_sms_retriever_hash_of_the_app(
         self, api_client, settings, django_capture_on_commit_callbacks
     ):
+        """A template with {app_hash} (SMS Retriever format) gets the asking app's hash."""
+        settings.SMS_OTP_TEMPLATE = "<#> {otp} is your Jivo code. {app_hash}"
         settings.SMS_RETRIEVER_APP_HASHES = {"customer": "FA+9qCX9VSu", "rider": ""}
         request_otp(api_client, capture=django_capture_on_commit_callbacks)
         assert sms.outbox[-1].body.endswith("FA+9qCX9VSu")

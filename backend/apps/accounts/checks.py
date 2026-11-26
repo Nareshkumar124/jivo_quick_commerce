@@ -132,6 +132,51 @@ def check_msg91_settings(app_configs, **kwargs):
 
 
 @register()
+def check_bhashsms_settings(app_configs, **kwargs):
+    """D-02 (BhashSMS, the chosen gateway): the BhashSMS backend needs its login, the DLT sender
+    id, the OTP DLT template id (E008), an http(s) API URL without a query and a GET/POST method
+    (E009). Errors in every environment, so a misconfiguration fails at startup rather than on
+    the first OTP. W002: a plain-http URL in production sends the password unencrypted (the
+    proven default until BhashSMS confirms https for the account)."""
+    from apps.notifications.sms import BHASHSMS_BACKEND, BHASHSMS_HTTP_METHODS
+
+    if settings.SMS_BACKEND != BHASHSMS_BACKEND:
+        return []
+    names = ("BHASHSMS_USER", "BHASHSMS_PASSWORD", "SMS_SENDER_ID", "SMS_OTP_DLT_TEMPLATE_ID")
+    missing = [name for name in names if not getattr(settings, name, "")]
+    errors = []
+    if missing:
+        errors.append(
+            Error(
+                f"SMS_BACKEND is BhashSmsBackend but {', '.join(missing)} is not set.",
+                hint="Set the BHASHSMS_* and SMS_* variables in the environment (backend/.env).",
+                id="accounts.E008",
+            )
+        )
+    url = getattr(settings, "BHASHSMS_API_URL", "")
+    if url and (not url.startswith(("http://", "https://")) or "?" in url):
+        errors.append(
+            Error(
+                "BHASHSMS_API_URL must be an http:// or https:// URL without a query string.",
+                id="accounts.E009",
+            )
+        )
+    method = (getattr(settings, "BHASHSMS_HTTP_METHOD", "") or "GET").upper()
+    if method not in BHASHSMS_HTTP_METHODS:
+        errors.append(Error("BHASHSMS_HTTP_METHOD must be GET or POST.", id="accounts.E009"))
+    if url.startswith("http://") and settings.APP_ENVIRONMENT == "production":
+        errors.append(
+            Warning(
+                "BHASHSMS_API_URL is plain http: the BhashSMS password and OTP text travel "
+                "unencrypted.",
+                hint="Switch to https (and BHASHSMS_HTTP_METHOD=POST) once BhashSMS confirms it.",
+                id="accounts.W002",
+            )
+        )
+    return errors
+
+
+@register()
 def check_signing_keys(app_configs, **kwargs):
     """T-814 (L3): deployed environments sign JWTs with their own `JWT_SIGNING_KEY`, never with
     `DJANGO_SECRET_KEY` (a leak of one must not forge the other), and an explicit `OTP_HASH_KEY`
