@@ -118,6 +118,8 @@ class Coupon(TimeStampedModel):
 
     class Meta:
         ordering = ["code"]
+        # ADR 0004 §3: the "Offers" page (apps.promotions.offers). Super Admin only.
+        permissions = [("manage_offers", "Can change offers: coupons, buy-N-get-1 and rewards")]
         constraints = [
             models.UniqueConstraint(Upper("code"), name="coupon_code_unique_ci"),
             models.CheckConstraint(condition=Q(value__gt=0), name="coupon_value_positive"),

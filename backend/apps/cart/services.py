@@ -24,7 +24,6 @@ from datetime import datetime
 from decimal import Decimal
 
 from django.conf import settings
-from django.contrib.gis.geos import Point
 from django.db import transaction
 from django.db.models import F, FilteredRelation, Prefetch, Q, Value
 from django.db.models.functions import Coalesce
@@ -661,8 +660,16 @@ def resolve_address(user, address_id: int) -> Address:
 
 
 def serves(store: StoreArea, address: Address) -> bool:
-    """True when the address pin is inside this store's service area (no query)."""
-    return store.area.contains(Point(float(address.lng), float(address.lat), srid=4326))
+    """True when this store delivers to the address (no query): its pin is inside the store's
+    service area or, for a store in pincode mode (ADR 0004), its pincode is an active delivery
+    pincode of the store (`StoreArea.delivers_to`)."""
+    return store.delivers_to(address.lat, address.lng, address.pincode)
+
+
+def not_served_message(store: StoreArea, address: Address, default: str) -> str:
+    """The `NOT_SERVICEABLE` message for an address `serves()` refused: for a store in pincode
+    mode, the ADR 0004 message naming its active pincodes; else `default`."""
+    return store.not_delivered_message() or default
 
 
 def _cart_address(cart: Cart, user) -> Address | None:
@@ -942,8 +949,10 @@ def blockers(state: CartState, *, status, store: StoreArea, address: Address | N
         found.append(
             {
                 "code": CheckoutBlockerCode.NOT_SERVICEABLE,
-                "message": (
-                    f"{store.name} does not deliver to this address. Choose another address."
+                "message": not_served_message(
+                    store,
+                    address,
+                    f"{store.name} does not deliver to this address. Choose another address.",
                 ),
             }
         )
@@ -1144,7 +1153,7 @@ def update_cart(cart: Cart, store: StoreArea, user, data: dict) -> None:
         if not serves(store, address):
             raise ApiError(
                 ErrorCode.NOT_SERVICEABLE,
-                MSG_ADDRESS_NOT_SERVED,
+                not_served_message(store, address, MSG_ADDRESS_NOT_SERVED),
                 details={"address_id": address.pk},
             )
         cart.address = address

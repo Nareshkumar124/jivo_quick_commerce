@@ -1,0 +1,155 @@
+{% extends "ops/base.html" %}
+{% load ops %}
+
+{% block content %}
+    {# Offers (ADR 0004 §3, §4.2; Super Admin only: promotions.manage_offers). Three cards: buy-N-get-1 per store, rewards, public coupons. #}
+    {# Context: volume (rows: row = store_management.VolumeRow, form), free_size, rewards (ReferralSettings), rewards_form, quantities, page (public coupons with state, value_text, confirm_toggle), actions. #}
+    {# Every change calls a promotions.offers service behind a confirm dialog; the confirm texts get the typed numbers in place of {n} / {w} / {r}. #}
+    <div id="sm-region" class="ops-sm-cards" hx-get="{{ request.get_full_path }}" hx-select="#sm-region" hx-swap="outerHTML" hx-trigger="ops:refresh from:body">
+
+        {# ------------------------------------------------------------ buy N get 1 #}
+        <section class="bg-white border border-base-200 ops-card p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-labelledby="sec-volume" data-testid="card-volume">
+            <h2 id="sec-volume" class="font-semibold text-base text-font-important-light dark:text-font-important-dark">Buy N get 1 free</h2>
+            <p class="mb-3 mt-1 ops-text-secondary">For every N paid cartons in one order, the customer gets 1 carton free. Set it per store. Off = no free cartons from this offer.</p>
+            {% if not free_size %}
+                <div class="mb-3 ops-consequence" role="note" data-testid="volume-needs-update">
+                    <span class="material-symbols-outlined md-18" aria-hidden="true">info</span>
+                    <p>These settings can be changed here after the free-carton update is installed. Until then they are shown only.</p>
+                </div>
+            {% endif %}
+            {% for item in volume %}
+                {% with row=item.row form=item.form %}
+                    <form class="ops-sm-row" method="post" action="{% url 'ops:offer-volume' row.store.pk %}"
+                          hx-post="{% url 'ops:offer-volume' row.store.pk %}" hx-swap="none"
+                          x-data="{ on: {{ row.on|yesno:'true,false' }}, n: '{% if row.on %}{{ row.every }}{% endif %}' }"
+                          data-confirm-on="{{ row.confirm_on }}" data-confirm-off="{{ row.confirm_off }}"
+                          hx-confirm="{{ row.confirm_now }}"
+                          x-bind:hx-confirm="on ? $el.dataset.confirmOn.replace('{n}', String(n).trim() || '?') : $el.dataset.confirmOff"
+                          data-confirm-title="Save the offer for {{ row.store.code }}?" data-confirm-label="Save offer"
+                          data-testid="volume-{{ row.store.pk }}">
+                        {% csrf_token %}
+                        <div class="ops-sm-row__name">
+                            <span class="font-semibold">{{ row.store.code }}</span>
+                            <span class="ops-text-secondary">{{ row.store.name }}</span>
+                            {% if row.on %}
+                                {% include "unfold/helpers/label.html" with text="On" variant="success" %}
+                            {% else %}
+                                {% include "unfold/helpers/label.html" with text="Off" %}
+                            {% endif %}
+                        </div>
+                        {% if free_size %}
+                            <div class="ops-sm-row__fields">
+                                {% include "ops/components/form_field.html" with field=form.enabled %}
+                                <div x-show="on">{% include "ops/components/form_field.html" with field=form.every %}</div>
+                                <div x-show="on">{% include "ops/components/form_field.html" with field=form.free_variant %}</div>
+                            </div>
+                            <div class="ops-sm-row__actions">
+                                <button type="submit" class="ops-button"{% if not actions.set_volume_offer %} disabled title="Not available yet"{% endif %} data-testid="save-volume-{{ row.store.pk }}">Save</button>
+                            </div>
+                        {% else %}
+                            <p class="ops-sm-row__fields ops-text-secondary">
+                                {% if row.on %}1 free carton for every {{ row.every }} paid cartons.{% else %}No offer.{% endif %}
+                            </p>
+                        {% endif %}
+                    </form>
+                {% endwith %}
+            {% empty %}
+                {% include "ops/components/empty_state.html" with title="No stores yet" icon="store" compact=1 %}
+            {% endfor %}
+        </section>
+
+        {# ------------------------------------------------------------ rewards #}
+        <section class="bg-white border border-base-200 ops-card p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-labelledby="sec-rewards" data-testid="card-rewards">
+            <h2 id="sec-rewards" class="font-semibold text-base text-font-important-light dark:text-font-important-dark">Rewards</h2>
+            <p class="mb-3 mt-1 ops-text-secondary">Free cartons for new customers and for inviting friends. A change applies to rewards given from now on; rewards already given keep their number.</p>
+            {% if not quantities %}
+                <div class="mb-3 ops-consequence" role="note" data-testid="rewards-needs-update">
+                    <span class="material-symbols-outlined md-18" aria-hidden="true">info</span>
+                    <p>The number of free cartons can be changed here after the free-carton update is installed. Today you can turn referrals on or off.</p>
+                </div>
+            {% endif %}
+            <form method="post" action="{% url 'ops:offer-rewards' %}" hx-post="{% url 'ops:offer-rewards' %}" hx-swap="none"
+                  x-data="{ on: {{ rewards.is_enabled|yesno:'true,false' }}, w: '{% if quantities %}{{ rewards.welcome_reward_quantity }}{% endif %}', r: '{% if quantities %}{{ rewards.reward_quantity }}{% endif %}' }"
+                  {% if quantities %}
+                      data-confirm-on="New customers get {w} free carton(s) as a welcome gift. For each referral, both people get {r} free carton(s). Rewards already given keep their number."
+                      data-confirm-off="Turn off referrals? Customers can't use a friend's code, and a friend whose first order is delivered while referrals are off gets no reward. New customers still get {w} free carton(s) as a welcome gift."
+                      hx-confirm="Save the rewards? Rewards already given keep their number."
+                      x-bind:hx-confirm="(on ? $el.dataset.confirmOn : $el.dataset.confirmOff).replace('{w}', String(w).trim() || '?').replace('{r}', String(r).trim() || '?')"
+                  {% else %}
+                      data-confirm-on="Turn on referrals? Customers can use a friend's code again." data-confirm-off="Turn off referrals? Customers can't use a friend's code, and a friend whose first order is delivered while referrals are off gets no reward."
+                      hx-confirm="Save the referral setting?"
+                      x-bind:hx-confirm="on ? $el.dataset.confirmOn : $el.dataset.confirmOff"
+                  {% endif %}
+                  data-confirm-title="Save the rewards?" data-confirm-label="Save rewards" data-testid="rewards-form">
+                {% csrf_token %}
+                <div class="ops-sm-row__fields">
+                    {% include "ops/components/form_field.html" with field=rewards_form.referral_enabled %}
+                    {% if quantities %}
+                        {% include "ops/components/form_field.html" with field=rewards_form.welcome %}
+                        {% include "ops/components/form_field.html" with field=rewards_form.referral %}
+                    {% endif %}
+                </div>
+                <div class="mt-3">
+                    <button type="submit" class="ops-button"{% if not actions.set_rewards %} disabled title="Not available yet"{% endif %} data-testid="save-rewards">Save rewards</button>
+                </div>
+            </form>
+        </section>
+
+        {# ------------------------------------------------------------ coupons #}
+        <section class="bg-white border border-base-200 ops-card p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-labelledby="sec-coupons" data-testid="card-coupons">
+            <div class="flex flex-wrap gap-2 items-center justify-between">
+                <h2 id="sec-coupons" class="font-semibold text-base text-font-important-light dark:text-font-important-dark">Coupons</h2>
+                {% if actions.create_coupon %}
+                    <a class="ops-button" href="{% url 'ops:coupon-add' %}" data-testid="add-coupon"><span class="material-symbols-outlined md-18" aria-hidden="true">add</span>Add coupon</a>
+                {% endif %}
+            </div>
+            <p class="mb-3 mt-1 ops-text-secondary">Codes any customer can use at checkout. A disabled or expired coupon is hidden in the app and can't be used. Personal rewards are not listed here.</p>
+            {% if page.object_list %}
+                <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                    <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                        <thead><tr class="bg-base-50 dark:bg-base-900">
+                            <th scope="col">Code</th><th scope="col">Title</th><th scope="col">Value</th><th scope="col">Min. order</th><th scope="col">Ends (IST)</th><th scope="col">Status</th><th scope="col"><span class="sr-only">Actions</span></th>
+                        </tr></thead>
+                        <tbody>
+                            {% for coupon in page.object_list %}
+                                <tr data-testid="coupon-{{ coupon.pk }}">
+                                    <td class="font-semibold">{{ coupon.code }}</td>
+                                    <td>{{ coupon.title }}</td>
+                                    <td class="ops-tabular">{{ coupon.value_text }}</td>
+                                    <td class="ops-tabular">{% if coupon.min_order_value %}{{ coupon.min_order_value|inr }}{% else %}None{% endif %}</td>
+                                    <td>{% if coupon.ends_at %}{{ coupon.ends_at|date:"d M Y, H:i" }}{% else %}Never{% endif %}</td>
+                                    <td>{% include "unfold/helpers/label.html" with text=coupon.state.label variant=coupon.state.tone %}</td>
+                                    <td>
+                                        <div class="flex flex-wrap gap-2 justify-end">
+                                            <a class="ops-button ops-button--secondary" href="{% url 'ops:coupon-edit' coupon.pk %}" data-testid="edit-coupon-{{ coupon.pk }}">Edit</a>
+                                            <form method="post" action="{% url 'ops:coupon-active' coupon.pk %}" hx-post="{% url 'ops:coupon-active' coupon.pk %}" hx-swap="none"
+                                                  hx-confirm="{{ coupon.confirm_toggle }}"
+                                                  data-confirm-title="{% if coupon.is_active %}Disable {{ coupon.code }}?{% else %}Enable {{ coupon.code }}?{% endif %}"
+                                                  data-confirm-label="{% if coupon.is_active %}Disable{% else %}Enable{% endif %}"
+                                                  {% if coupon.is_active %}data-confirm-tone="danger"{% endif %}>
+                                                {% csrf_token %}
+                                                <input type="hidden" name="active" value="{% if coupon.is_active %}0{% else %}1{% endif %}">
+                                                <button type="submit" class="ops-button {% if coupon.is_active %}ops-button--outline-danger{% else %}ops-button--secondary{% endif %}"
+                                                        {% if not actions.set_coupon_active %}disabled title="Not available yet"{% endif %}
+                                                        data-testid="toggle-coupon-{{ coupon.pk }}">{% if coupon.is_active %}Disable{% else %}Enable{% endif %}</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if page.paginator.num_pages > 1 %}
+                    <nav class="flex flex-wrap gap-2 items-center mt-3" aria-label="Coupon pages">
+                        <span class="mr-auto ops-text-secondary">{{ page.start_index }}&ndash;{{ page.end_index }} of {{ page.paginator.count }}</span>
+                        {% if page.has_previous %}<a class="ops-page" href="{% url 'ops:offers' %}{% querystring page=page.previous_page_number %}">Previous</a>{% endif %}
+                        {% if page.has_next %}<a class="ops-page" href="{% url 'ops:offers' %}{% querystring page=page.next_page_number %}">Next</a>{% endif %}
+                    </nav>
+                {% endif %}
+            {% else %}
+                {% include "ops/components/empty_state.html" with title="No coupons yet" message="Add a coupon to give customers money off." icon="sell" compact=1 %}
+            {% endif %}
+        </section>
+    </div>
+{% endblock %}

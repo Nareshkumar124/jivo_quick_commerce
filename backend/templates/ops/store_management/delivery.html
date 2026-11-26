@@ -1,0 +1,92 @@
+{% extends "ops/base.html" %}
+
+{% block content %}
+    {# Delivery locations (ADR 0004 §1, §4.3; Super Admin only: stores.manage_delivery_pincodes). Context: groups (store_management.StorePincodes: store, rows with has_outline and confirm_toggle), no_outline, actions. #}
+    {# Add / Edit are form pages; Activate / Deactivate post with HTMX behind a confirm dialog. Every change calls a stores.services pincode service. #}
+    <div class="ops-sm-help mb-4" data-testid="delivery-help">
+        <span class="material-symbols-outlined md-18" aria-hidden="true">info</span>
+        <div>
+            <p class="font-semibold">Customers can order only from active pincodes.</p>
+            <p>The app checks the pincode of the customer's delivery address. A store with no pincodes still delivers inside its map area; once it has a pincode, it delivers only to its active pincodes.</p>
+        </div>
+    </div>
+
+    <div id="sm-region" class="ops-sm-cards" hx-get="{{ request.get_full_path }}" hx-select="#sm-region" hx-swap="outerHTML" hx-trigger="ops:refresh from:body">
+        {% for group in groups %}
+            <section class="bg-white border border-base-200 ops-card p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800" aria-labelledby="store-{{ group.store.pk }}" data-testid="store-{{ group.store.pk }}">
+                <div class="flex flex-wrap gap-2 items-center justify-between">
+                    <h2 id="store-{{ group.store.pk }}" class="font-semibold text-base text-font-important-light dark:text-font-important-dark">{{ group.store.code }} <span class="font-medium ops-text-secondary">{{ group.store.name }}</span></h2>
+                    {% if actions.add_pincode %}
+                        <a class="ops-button" href="{% url 'ops:pincode-add' %}?store={{ group.store.pk }}" data-testid="add-pincode-{{ group.store.pk }}"><span class="material-symbols-outlined md-18" aria-hidden="true">add</span>Add pincode</a>
+                    {% endif %}
+                </div>
+                {% if group.pincode_mode %}
+                    <p class="mb-3 mt-1 ops-text-secondary">{{ group.active_count }} of {{ group.rows|length }} pincode{{ group.rows|length|pluralize }} active.</p>
+                    {% if group.pincode_mode and not group.active_count %}
+                        <div class="mb-3 ops-consequence" role="alert" data-testid="no-active-{{ group.store.pk }}">
+                            <span class="material-symbols-outlined md-18" aria-hidden="true">warning</span>
+                            <p>No active pincode: this store takes no new orders. Activate a pincode to start again.</p>
+                        </div>
+                    {% endif %}
+                    {% if group.missing_outlines %}
+                        <div class="mb-3 ops-consequence" role="note" data-testid="outline-warning-{{ group.store.pk }}">
+                            <span class="material-symbols-outlined md-18" aria-hidden="true">warning</span>
+                            <p>{% for row in group.missing_outlines %}{{ row.pincode }}{% if not forloop.last %}, {% endif %}{% endfor %}: {{ no_outline }}</p>
+                        </div>
+                    {% endif %}
+                    <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                        <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                            <thead><tr class="bg-base-50 dark:bg-base-900">
+                                <th scope="col">Pincode</th><th scope="col">Area name</th><th scope="col">Status</th><th scope="col">Map outline</th><th scope="col"><span class="sr-only">Actions</span></th>
+                            </tr></thead>
+                            <tbody>
+                                {% for row in group.rows %}
+                                    <tr data-testid="pincode-{{ row.pk }}">
+                                        <td class="font-semibold ops-tabular">{{ row.pincode }}</td>
+                                        <td>{{ row.area_name|default:"-" }}</td>
+                                        <td>
+                                            {% if row.is_active %}
+                                                {% include "unfold/helpers/label.html" with text="Active" variant="success" %}
+                                            {% else %}
+                                                {% include "unfold/helpers/label.html" with text="Inactive" %}
+                                            {% endif %}
+                                        </td>
+                                        <td data-testid="outline-{{ row.pk }}">
+                                            {% if row.has_outline %}
+                                                Yes
+                                            {% elif row.is_active %}
+                                                <span class="ops-tone-warning inline-flex gap-1 items-center" title="{{ no_outline }}"><span class="material-symbols-outlined md-18" aria-hidden="true">warning</span>No</span>
+                                            {% else %}
+                                                No
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="flex flex-wrap gap-2 justify-end">
+                                                <a class="ops-button ops-button--secondary" href="{% url 'ops:pincode-edit' row.pk %}" data-testid="edit-pincode-{{ row.pk }}">Edit</a>
+                                                <form method="post" action="{% url 'ops:pincode-active' row.pk %}" hx-post="{% url 'ops:pincode-active' row.pk %}" hx-swap="none"
+                                                      hx-confirm="{{ row.confirm_toggle }}"
+                                                      data-confirm-title="{% if row.is_active %}Deactivate {{ row.pincode }}?{% else %}Activate {{ row.pincode }}?{% endif %}"
+                                                      data-confirm-label="{% if row.is_active %}Deactivate{% else %}Activate{% endif %}"
+                                                      {% if row.is_active %}data-confirm-tone="danger"{% endif %}>
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="active" value="{% if row.is_active %}0{% else %}1{% endif %}">
+                                                    <button type="submit" class="ops-button {% if row.is_active %}ops-button--outline-danger{% else %}ops-button--secondary{% endif %}"
+                                                            {% if not actions.set_pincode_active %}disabled title="Not available yet"{% endif %}
+                                                            data-testid="toggle-pincode-{{ row.pk }}">{% if row.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="mt-1 ops-text-secondary" data-testid="map-area-{{ group.store.pk }}">No pincodes yet: this store delivers inside its map area. When you add a pincode, it delivers only to its active pincodes.</p>
+                {% endif %}
+            </section>
+        {% empty %}
+            {% include "ops/components/empty_state.html" with title="No stores yet" icon="store" %}
+        {% endfor %}
+    </div>
+{% endblock %}

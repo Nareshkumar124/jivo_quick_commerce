@@ -14,8 +14,10 @@ Default variant (one definition, used by SQL sorting and by the tile):
 
 import re
 from collections.abc import Iterable, Sequence
-from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal
+from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal, InvalidOperation
 
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import (
     Case,
     DecimalField,
@@ -51,6 +53,7 @@ from apps.catalog.models import (
     VariantUnit,
 )
 from apps.catalog.validators import LABEL_TEXT_KEYS
+from apps.core import audit
 from apps.inventory.services import availability
 from apps.stores.models import DarkStore
 
@@ -719,3 +722,71 @@ def buy_again(store: DarkStore, user) -> list[dict]:
     ]
     rail.sort(key=_card_out_of_stock)  # stable: keeps the recency order
     return rail[:RAIL_SIZE]
+
+
+# --------------------------------------------------------------------------- bottle prices
+# ADR 0004 §2: the admin's "Bottle prices" page (Super Admin only, `catalog.manage_prices`).
+
+MANAGE_PRICES = "catalog.manage_prices"
+MAX_VARIANT_PRICE = Decimal("10000.00")
+MSG_PRICE_NO_PERMISSION = "Only a Super Admin can change prices."
+MSG_PRICE_INVALID = "Enter a price above ₹0 and at most ₹10,000, with at most 2 decimals."
+MSG_PRICE_HAS_TIERS = (
+    "This item has volume prices (price tiers). Remove them first, then set one price."
+)
+
+
+def can_manage_prices(user) -> bool:
+    return bool(user and user.is_active and user.is_staff and user.has_perm(MANAGE_PRICES))
+
+
+def _clean_price(value) -> Decimal:
+    try:
+        price = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError):
+        raise ValidationError({"price": MSG_PRICE_INVALID}) from None
+    if (
+        not price.is_finite()
+        or price <= 0
+        or price > MAX_VARIANT_PRICE
+        or price != price.quantize(Decimal("0.01"))
+    ):
+        raise ValidationError({"price": MSG_PRICE_INVALID})
+    return price.quantize(Decimal("0.01"))
+
+
+def set_variant_price(variant: ProductVariant, price, *, actor) -> bool:
+    """Set a bottle's price: MRP = selling price = `price` (the user's rule since ADR 0001: no
+    false "% off"). Returns whether anything changed. Refused (`ValidationError` on `price` or
+    `mrp`) for a price outside ₹0.01-₹10,000 or with more than 2 decimals, for a variant that
+    still has `VariantPriceTier` rows, and when a store price override would be above the new
+    MRP (`ProductVariant.clean`); `PermissionDenied` without `catalog.manage_prices`.
+
+    Saved through the model (history, catalog cache invalidated by the save signal) and
+    audited with the old and new prices. Carts and checkout read the live price, so they change
+    at once; placed orders keep their price snapshot (08 §6: nothing re-prices an order). A
+    store `price_override` still wins at its store."""
+    if not can_manage_prices(actor):
+        raise PermissionDenied(MSG_PRICE_NO_PERMISSION)
+    price = _clean_price(price)
+    with transaction.atomic():
+        locked = ProductVariant.objects.select_for_update().get(pk=variant.pk)
+        if locked.price_tiers.exists():
+            raise ValidationError({"price": MSG_PRICE_HAS_TIERS})
+        old_mrp, old_price = locked.mrp, locked.selling_price
+        if old_mrp == price and old_price == price:
+            return False
+        locked.mrp = locked.selling_price = price
+        locked.clean()  # a store override above the new MRP is refused (review #3)
+        locked.save(update_fields=["mrp", "selling_price", "updated_at"])
+        audit.record(
+            actor,
+            "variant.price",
+            locked,
+            {
+                "mrp": [money(old_mrp), money(price)],
+                "selling_price": [money(old_price), money(price)],
+            },
+        )
+    variant.mrp = variant.selling_price = price
+    return True

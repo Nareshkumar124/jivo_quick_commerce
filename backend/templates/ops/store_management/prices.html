@@ -1,0 +1,84 @@
+{% extends "ops/base.html" %}
+{% load ops %}
+
+{% block content %}
+    {# Bottle prices (ADR 0004 §2, §4.1; Super Admin only: catalog.manage_prices). Context: page (Paginator page of ProductVariant with product, has_tiers, overrides, label, confirm_template), query, can_save. #}
+    {# Prices are the stored values. A save calls catalog.services.set_variant_price (MRP = selling price); the confirm text gets the typed price in place of {price}. #}
+    <div class="ops-sm-help mb-4" data-testid="prices-help">
+        <span class="material-symbols-outlined md-18" aria-hidden="true">info</span>
+        <p>The price of one carton. A new price shows in customers' carts and at checkout at once. Orders already placed keep their price. A store price (set per store in <a class="underline" href="{% url 'admin:inventory_storeinventory_changelist' %}">Stock per store</a>) still wins at that store.</p>
+    </div>
+
+    <form id="price-search" class="ops-table__filters" method="get" action="{% url 'ops:prices' %}" role="search"
+          hx-get="{% url 'ops:prices' %}" hx-target="#sm-region" hx-select="#sm-region" hx-swap="outerHTML" hx-push-url="true"
+          hx-trigger="input changed delay:400ms from:#price-q, search from:#price-q, submit">
+        <div class="ops-field">
+            <label class="block font-semibold mb-2 text-font-important-light dark:text-font-important-dark" for="price-q">Search</label>
+            <input id="price-q" type="search" name="q" value="{{ query }}" maxlength="60" placeholder="Product name, size or SKU" autocomplete="off"
+                   class="bg-white border border-base-200 px-3 py-2 rounded-default w-full dark:bg-base-900 dark:border-base-700">
+        </div>
+        <noscript><button type="submit" class="ops-button ops-button--secondary">Search</button></noscript>
+    </form>
+
+    <div id="sm-region" hx-get="{{ request.get_full_path }}" hx-select="#sm-region" hx-swap="outerHTML" hx-trigger="ops:refresh from:body" data-testid="prices-table">
+        {% if page.object_list %}
+            <div class="border border-base-200 overflow-x-auto rounded-default dark:border-base-800">
+                <table class="border-separate border-spacing-none ops-dispatch-table w-full">
+                    <thead><tr class="bg-base-50 dark:bg-base-900">
+                        <th scope="col">Product</th><th scope="col">Size</th><th scope="col">Price per carton</th><th scope="col">Store prices</th><th scope="col">Change price</th>
+                    </tr></thead>
+                    <tbody>
+                        {% for variant in page.object_list %}
+                            <tr data-testid="price-row-{{ variant.pk }}">
+                                <td>{{ variant.product.name }}<span class="ops-sku">{{ variant.sku }}</span></td>
+                                <td>{{ variant.name }}{% if variant.net_quantity and variant.net_quantity != variant.name %}<span class="ops-sku">{{ variant.net_quantity }}</span>{% endif %}</td>
+                                <td class="font-semibold ops-tabular" data-testid="price-{{ variant.pk }}">{{ variant.selling_price|inr }}</td>
+                                <td data-testid="overrides-{{ variant.pk }}">
+                                    {% for row in variant.overrides %}
+                                        <span class="ops-sm-pill" title="{{ row.store.name }}">{{ row.store.code }} {{ row.price_override|inr }}</span>
+                                    {% empty %}
+                                        <span class="ops-text-secondary">Same everywhere</span>
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    {% if variant.has_tiers %}
+                                        <p class="ops-text-secondary" data-testid="tiers-{{ variant.pk }}">Has volume prices (price tiers). <a class="underline" href="{% url 'admin:catalog_productvariant_change' variant.pk %}">Remove them first</a>, then set one price here.</p>
+                                    {% else %}
+                                        <form class="ops-sm-inline" method="post" action="{% url 'ops:price-set' variant.pk %}"
+                                              hx-post="{% url 'ops:price-set' variant.pk %}" hx-swap="none"
+                                              x-data="{ price: '{{ variant.selling_price }}' }"
+                                              data-confirm-template="{{ variant.confirm_template }}"
+                                              hx-confirm="Change the price of {{ variant.label }}? Customers will see this at once. Orders already placed keep their price."
+                                              x-bind:hx-confirm="$el.dataset.confirmTemplate.replace('{price}', price.trim())"
+                                              data-confirm-title="Change the price?" data-confirm-label="Save price"
+                                              data-testid="price-form-{{ variant.pk }}">
+                                            {% csrf_token %}
+                                            <label class="sr-only" for="price-{{ variant.pk }}">New price for {{ variant.label }} (₹)</label>
+                                            <span class="ops-sm-rupee" aria-hidden="true">₹</span>
+                                            <input id="price-{{ variant.pk }}" name="price" value="{{ variant.selling_price }}" required inputmode="decimal" maxlength="12" autocomplete="off"
+                                                   x-model="price" class="bg-white border border-base-200 ops-sm-price ops-tabular px-3 py-2 rounded-default dark:bg-base-900 dark:border-base-700">
+                                            <button type="submit" class="ops-button ops-button--secondary"{% if not can_save %} disabled title="Not available yet"{% endif %}
+                                                    {% if can_save %}x-bind:disabled="!price.trim() || price.trim() === '{{ variant.selling_price }}'"{% endif %}
+                                                    data-testid="save-price-{{ variant.pk }}">Save</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if page.paginator.num_pages > 1 %}
+                <nav class="flex flex-wrap gap-2 items-center mt-3" aria-label="Pagination">
+                    <span class="mr-auto ops-text-secondary">{{ page.start_index }}&ndash;{{ page.end_index }} of {{ page.paginator.count }}</span>
+                    {% if page.has_previous %}<a class="ops-page" href="{% url 'ops:prices' %}{% querystring page=page.previous_page_number %}">Previous</a>{% endif %}
+                    {% if page.has_next %}<a class="ops-page" href="{% url 'ops:prices' %}{% querystring page=page.next_page_number %}">Next</a>{% endif %}
+                </nav>
+            {% endif %}
+        {% elif query %}
+            {% include "ops/components/empty_state.html" with title="No sizes match your search" message="Try another product name or SKU." icon="search_off" compact=1 %}
+        {% else %}
+            {% include "ops/components/empty_state.html" with title="No sizes on sale yet" message="Active products and sizes appear here." icon="inventory_2" compact=1 %}
+        {% endif %}
+    </div>
+{% endblock %}

@@ -178,6 +178,8 @@ class ProductVariant(TimeStampedModel):
 
     class Meta:
         ordering = ["sort_order", "id"]
+        # ADR 0004 §2: the "Bottle prices" page (catalog.services.set_variant_price). Super Admin.
+        permissions = [("manage_prices", "Can change bottle prices (Store management)")]
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(selling_price__gt=0, selling_price__lte=models.F("mrp")),

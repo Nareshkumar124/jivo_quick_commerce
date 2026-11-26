@@ -96,8 +96,13 @@ Implemented with Django Groups + model permissions + **store scoping**. Store st
 | Support tickets | ✔ | ✔ | | | | ✔ | |
 | Reports | ✔ | ✔ | own store | | catalog | | ✔ |
 | Audit log | ✔ | | | | | | ✔ view |
+| Store management: bottle prices (ADR 0004) | ✔ | | | | | | |
+| Store management: offers (ADR 0004) | ✔ | | | | | | |
+| Store management: delivery locations / pincodes (ADR 0004) | ✔ | | | | | | |
 
 Refund limits and other thresholds are settings, not hard-coded.
+
+Store management (ADR 0004, user decision 2026-11-26): `catalog.manage_prices`, `promotions.manage_offers` and `stores.manage_delivery_pincodes` (`roles.STORE_MANAGEMENT`) belong to Super Admin only (and superusers), through `roles.sync_roles()`; no other role may hold them (tested). The pages call only the services named in 06 §2.3, which re-check these permissions and write the audit log.
 
 Phase 2 store scoping (P2 R3, code review #2): `apps.stores.services.stores_for(user)` fails closed. Superusers and the global roles (Super Admin, Ops, Catalog Manager, Support, Finance: `roles.GLOBAL_ROLES`) see every store. Anyone in a store role (Store Manager, Store Staff) sees only their `StaffStoreAccess` stores, **even if they also hold a global role** (the stricter role wins; PM decision, 2026-11-03). Unknown groups never widen access; no role means no store.
 

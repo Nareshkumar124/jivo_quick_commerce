@@ -40,8 +40,9 @@ def live_addresses(user: User):
 
 
 def with_serviceability(queryset: QuerySet[Address]) -> QuerySet[Address]:
-    """Annotate `is_serviceable`: inside an active store's service area (one EXISTS subquery
-    per row, no extra queries)."""
+    """Annotate `is_serviceable`: an active store delivers to the address (its service area,
+    or its active delivery pincodes in pincode mode, ADR 0004). One EXISTS subquery per row, no
+    extra queries."""
     return queryset.annotate(address_point=address_point_expression()).annotate(
         is_serviceable=serviceable_exists("address_point")
     )

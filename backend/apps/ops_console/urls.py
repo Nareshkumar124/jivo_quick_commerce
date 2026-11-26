@@ -8,13 +8,48 @@ from apps.ops_console import (
     mfa,
     order_views,
     report_views,
+    store_management_views,
     support_views,
     views,
 )
 
 app_name = "ops"
 
+sm_views = store_management_views
 urlpatterns = [
+    # Store management (ADR 0004 §4; Super Admin only)
+    path("store-management/prices/", sm_views.prices, name="prices"),
+    path("store-management/prices/<int:variant_id>/", sm_views.price_set, name="price-set"),
+    path("store-management/offers/", sm_views.offers, name="offers"),
+    path(
+        "store-management/offers/stores/<int:store_id>/buy-n-get-1/",
+        sm_views.offer_volume,
+        name="offer-volume",
+    ),
+    path("store-management/offers/rewards/", sm_views.offer_rewards, name="offer-rewards"),
+    path("store-management/offers/coupons/add/", sm_views.coupon_add, name="coupon-add"),
+    path(
+        "store-management/offers/coupons/<int:coupon_id>/edit/",
+        sm_views.coupon_edit,
+        name="coupon-edit",
+    ),
+    path(
+        "store-management/offers/coupons/<int:coupon_id>/active/",
+        sm_views.coupon_active,
+        name="coupon-active",
+    ),
+    path("store-management/delivery/", sm_views.delivery, name="delivery"),
+    path("store-management/delivery/add/", sm_views.pincode_add, name="pincode-add"),
+    path(
+        "store-management/delivery/<int:pincode_id>/edit/",
+        sm_views.pincode_edit,
+        name="pincode-edit",
+    ),
+    path(
+        "store-management/delivery/<int:pincode_id>/active/",
+        sm_views.pincode_active,
+        name="pincode-active",
+    ),
     path("", views.dashboard, name="dashboard"),
     path("dashboard/customer-kpis/", views.dashboard_customer_kpis, name="dashboard-kpis"),
     path("dashboard/signups/", views.dashboard_signups, name="dashboard-signups"),
