@@ -32,6 +32,7 @@ API = "api/v1/"
 GROUPS = {
     "auth/": SHARED,
     "me/": SHARED,
+    "business-categories/": SHARED,  # complete-profile dropdown (2026-11-26)
     "addresses/": SHARED,
     "config/": SHARED,
     "pages/": SHARED,

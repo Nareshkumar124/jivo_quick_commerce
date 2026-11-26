@@ -10,10 +10,11 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.management.base import CommandError
+from django.utils import timezone
 
 from apps.accounts import roles
 from apps.accounts.choices import AddressLabel
-from apps.accounts.models import Address, User
+from apps.accounts.models import Address, BusinessCategory, User
 from config.env import env_str
 
 STAFF = [
@@ -27,6 +28,29 @@ STAFF = [
 ]
 
 TEST_CUSTOMER_PHONE = "+919000000001"
+
+# The complete-profile dropdown (03 §2.2). Same list as migration accounts.0009.
+BUSINESS_CATEGORIES = [
+    ("retail-shop", "Retail shop"),
+    ("restaurant-cafe", "Restaurant / Café"),
+    ("hotel", "Hotel"),
+    ("office", "Office"),
+    ("hospital-clinic", "Hospital / Clinic"),
+    ("school-college", "School / College"),
+    ("home-use", "Home use"),
+    ("other", "Other"),
+]
+
+
+def seed_business_categories(stdout, options) -> None:
+    """Idempotent: creates missing categories; admin edits to existing ones are kept."""
+    created = 0
+    for index, (slug, name) in enumerate(BUSINESS_CATEGORIES, start=1):
+        _, was_created = BusinessCategory.objects.get_or_create(
+            slug=slug, defaults={"name": name, "sort_order": index * 10}
+        )
+        created += was_created
+    stdout.write(f"  business categories: {len(BUSINESS_CATEGORIES)} ({created} created)")
 
 
 def _staff_password() -> str | None:
@@ -71,6 +95,8 @@ def seed_test_customers(stdout, options) -> None:
         customer.set_unusable_password()
     if not customer.name:
         customer.name = "Test Customer"
+    if not customer.is_profile_complete:
+        customer.profile_completed_at = timezone.now()
     customer.save()
     if not Address.objects.filter(user=customer, is_deleted=False).exists():
         Address.objects.create(

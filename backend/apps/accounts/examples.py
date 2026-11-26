@@ -34,6 +34,9 @@ ME = {
     "name": "Asha Verma",
     "email": "asha.verma@example.com",
     "marketing_opt_in": False,
+    "business_category": 2,
+    "business_category_name": "Restaurant / Café",
+    "business_name": "Asha's Kitchen",
     "is_profile_complete": True,
     "rider_status": "NONE",
     "created_at": "2026-10-20T06:30:00Z",
@@ -44,6 +47,9 @@ NEW_ME = {
     "name": "",
     "email": None,
     "marketing_opt_in": False,
+    "business_category": None,
+    "business_category_name": None,
+    "business_name": "",
     "is_profile_complete": False,
     "rider_status": "NONE",
     "created_at": "2026-11-02T10:15:00Z",
@@ -54,10 +60,20 @@ RIDER_ME = {
     "name": "Ravi Kumar",
     "email": None,
     "marketing_opt_in": False,
+    "business_category": None,
+    "business_category_name": None,
+    "business_name": "",
     "is_profile_complete": True,
     "rider_status": "PENDING_KYC",
     "created_at": "2026-10-28T04:00:00Z",
 }
+
+BUSINESS_CATEGORIES = [
+    {"id": 1, "name": "Retail shop", "slug": "retail-shop"},
+    {"id": 2, "name": "Restaurant / Café", "slug": "restaurant-cafe"},
+    {"id": 3, "name": "Hotel", "slug": "hotel"},
+    {"id": 8, "name": "Other", "slug": "other"},
+]
 
 OTP_SENT = {"otp_length": 6, "expires_in_seconds": 300, "resend_after_seconds": 30}
 

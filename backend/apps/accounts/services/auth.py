@@ -239,6 +239,8 @@ def anonymise_user(user_id: int) -> bool:
         user.phone = None
         user.email = None
         user.name = ""
+        user.business_name = ""
+        user.business_category = None
         user.deletion_reason = ""
         user.marketing_opt_in = False
         user.is_active = False
