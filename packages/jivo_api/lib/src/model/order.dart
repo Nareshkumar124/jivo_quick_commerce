@@ -120,7 +120,7 @@ class Order {
   @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<OrderLine> items;
 
-  /// Units (sum of quantities).
+  /// Paid units (sum of quantities); free cartons (`is_free` lines, ADR 0002) are not counted, as in the cart's `item_count`.
   // minimum: 1
   @JsonKey(name: r'item_count', required: true, includeIfNull: false)
   final int itemCount;

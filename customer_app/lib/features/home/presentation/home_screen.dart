@@ -17,6 +17,7 @@ import '../../catalog/presentation/catalog_controllers.dart';
 import '../../catalog/presentation/widgets/paged_product_grid.dart';
 import '../../catalog/presentation/widgets/product_tile.dart'
     show productGridMaxExtent;
+import '../../location/presentation/coming_soon_banner.dart';
 import '../../location/presentation/delivery_controller.dart';
 import '../../location/presentation/location_options.dart';
 import '../../location/presentation/store_closed_banner.dart';
@@ -145,14 +146,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ];
     }
     if (!serviceability.serviceable) {
+      // "We're coming to your area soon!" and Change location.
       return [
         fill(
-          EmptyView(
-            message: l10n.notServiceableInline,
-            icon: Icons.wrong_location_outlined,
-            action: FilledButton(
-              onPressed: () => showAddressSwitcher(context),
-              child: Text(l10n.changeLocation),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(JivoSpacing.gutter),
+              child: Column(
+                key: const Key('home-not-serviceable'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ComingSoonBanner(message: serviceability.message),
+                  const SizedBox(height: JivoSpacing.xl),
+                  FilledButton(
+                    onPressed: () => showAddressSwitcher(context),
+                    child: Text(l10n.changeLocation),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -19,6 +19,7 @@ import 'widgets/checkout_blocker.dart';
 import 'widgets/coupon_sheet.dart';
 import 'widgets/delivery_address_card.dart';
 import 'widgets/free_line_tile.dart';
+import 'widgets/free_offer_banner.dart';
 import 'widgets/instructions_selector.dart';
 import 'widgets/price_tier_nudge_card.dart';
 import 'widgets/tip_selector.dart';
@@ -150,9 +151,11 @@ class _CartContent extends StatelessWidget {
     // The next volume price tier ("Add 3 more boxes to get ₹87/box").
     final tierNudge = priceTierNudge(l10n, snapshot);
     final tierParts = priceTierNudgeParts(l10n, snapshot);
-    // "Buy 10 get 1 free" (ADR 0002): the server's nudge and stock notice.
+    // "Buy 10 get 1 free" (ADR 0002): the server's nudge, the free cartons
+    // earned and the stock notice.
+    final freeOffer = snapshot.freeOffer;
     final freeNudge = freeOfferNudge(l10n, snapshot);
-    final freeNotice = snapshot.freeOffer?.notice?.trim();
+    final freeNotice = freeOffer?.notice?.trim();
     final loadError = cart.loadError;
     const gap = SizedBox(height: JivoSpacing.lg);
 
@@ -160,6 +163,16 @@ class _CartContent extends StatelessWidget {
       key: const Key('cart-content'),
       padding: const EdgeInsets.all(JivoSpacing.gutter),
       children: [
+        // The free-carton offer first: the cart's most eye-catching card.
+        if (freeOffer != null &&
+            FreeOfferBanner.shows(freeOffer, freeNudge)) ...[
+          FreeOfferBanner(
+            key: const Key('free-offer-nudge'),
+            offer: freeOffer,
+            nudge: freeNudge,
+          ),
+          gap,
+        ],
         if (tierNudge != null && tierParts != null) ...[
           PriceTierNudgeCard(
             key: const Key('price-tier-nudge'),
@@ -194,15 +207,6 @@ class _CartContent extends StatelessWidget {
             icon: Icons.inventory_2_outlined,
             text: minUnits,
             color: theme.colorScheme.error,
-          ),
-          gap,
-        ],
-        if (freeNudge != null) ...[
-          _Notice(
-            key: const Key('free-offer-nudge'),
-            icon: Icons.card_giftcard_outlined,
-            text: freeNudge,
-            color: context.jivoColors.success,
           ),
           gap,
         ],
@@ -314,7 +318,9 @@ class _CouponRow extends ConsumerWidget {
           minTileHeight: kJivoMinTouchTarget,
           leading: Icon(Icons.card_giftcard, color: context.jivoColors.success),
           title: Text(l10n.couponFreeCartonApplied),
-          subtitle: Text(l10n.couponFreeCartonInOrder),
+          subtitle: Text(
+            l10n.couponFreeCartonInOrder(applied.freeQuantity ?? 1),
+          ),
           onTap: () => showCouponSheet(context),
           trailing: TextButton(
             key: const Key('remove-coupon'),

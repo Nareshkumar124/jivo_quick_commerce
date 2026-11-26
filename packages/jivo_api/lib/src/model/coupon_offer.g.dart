@@ -41,6 +41,8 @@ abstract class _$CouponOfferCWProxy {
 
   CouponOffer freeVariantId(int? freeVariantId);
 
+  CouponOffer freeQuantity(int? freeQuantity);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CouponOffer(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -65,6 +67,7 @@ abstract class _$CouponOfferCWProxy {
     bool isPersonal,
     CouponSourceEnum source_,
     int? freeVariantId,
+    int? freeQuantity,
   });
 }
 
@@ -132,6 +135,10 @@ class _$CouponOfferCWProxyImpl implements _$CouponOfferCWProxy {
       this(freeVariantId: freeVariantId);
 
   @override
+  CouponOffer freeQuantity(int? freeQuantity) =>
+      this(freeQuantity: freeQuantity);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CouponOffer(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -156,6 +163,7 @@ class _$CouponOfferCWProxyImpl implements _$CouponOfferCWProxy {
     Object? isPersonal = const $CopyWithPlaceholder(),
     Object? source_ = const $CopyWithPlaceholder(),
     Object? freeVariantId = const $CopyWithPlaceholder(),
+    Object? freeQuantity = const $CopyWithPlaceholder(),
   }) {
     return CouponOffer(
       code: code == const $CopyWithPlaceholder()
@@ -226,6 +234,10 @@ class _$CouponOfferCWProxyImpl implements _$CouponOfferCWProxy {
           ? _value.freeVariantId
           // ignore: cast_nullable_to_non_nullable
           : freeVariantId as int?,
+      freeQuantity: freeQuantity == const $CopyWithPlaceholder()
+          ? _value.freeQuantity
+          // ignore: cast_nullable_to_non_nullable
+          : freeQuantity as int?,
     );
   }
 }
@@ -264,6 +276,7 @@ CouponOffer _$CouponOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
         'is_personal',
         'source',
         'free_variant_id',
+        'free_quantity',
       ],
     );
     final val = CouponOffer(
@@ -311,6 +324,10 @@ CouponOffer _$CouponOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
         'free_variant_id',
         (v) => (v as num?)?.toInt(),
       ),
+      freeQuantity: $checkedConvert(
+        'free_quantity',
+        (v) => (v as num?)?.toInt(),
+      ),
     );
     return val;
   },
@@ -326,6 +343,7 @@ CouponOffer _$CouponOfferFromJson(Map<String, dynamic> json) => $checkedCreate(
     'isPersonal': 'is_personal',
     'source_': 'source',
     'freeVariantId': 'free_variant_id',
+    'freeQuantity': 'free_quantity',
   },
 );
 
@@ -349,6 +367,7 @@ Map<String, dynamic> _$CouponOfferToJson(CouponOffer instance) =>
       'is_personal': instance.isPersonal,
       'source': _$CouponSourceEnumEnumMap[instance.source_]!,
       'free_variant_id': instance.freeVariantId,
+      'free_quantity': instance.freeQuantity,
     };
 
 const _$CouponDiscountTypeEnumEnumMap = {

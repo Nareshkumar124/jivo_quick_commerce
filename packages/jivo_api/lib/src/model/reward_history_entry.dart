@@ -48,7 +48,7 @@ class RewardHistoryEntry {
   @JsonKey(name: r'title', required: true, includeIfNull: false)
   final String title;
 
-  /// Free cartons (1 for a reward).
+  /// Free cartons (for a reward: its own quantity, ADR 0003).
   // minimum: 1
   @JsonKey(name: r'quantity', required: true, includeIfNull: false)
   final int quantity;

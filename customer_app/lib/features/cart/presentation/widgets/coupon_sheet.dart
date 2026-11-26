@@ -53,19 +53,26 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
     super.dispose();
   }
 
-  /// A free-carton reward (ADR 0002) needs a size: the size sheet applies
-  /// it, then this sheet closes with a confirmation.
-  Future<void> _applyFreeCarton(String code) async {
+  /// A free-carton reward whose store has no fixed free size (ADR 0002)
+  /// needs a size: the size sheet applies it, then this sheet closes with a
+  /// confirmation. [quantity] is the reward's number of free cartons.
+  Future<void> _pickFreeSize(String code, {required int quantity}) async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     setState(() => _error = null);
-    final applied = await showFreeSizeSheet(context, code: code);
+    final applied = await showFreeSizeSheet(
+      context,
+      code: code,
+      quantity: quantity,
+    );
     if (!applied || !mounted) return;
+    final added =
+        ref.read(cartProvider).snapshot.coupon?.freeQuantity ?? quantity;
     navigator.pop();
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(l10n.freeCartonAdded)));
+      ..showSnackBar(SnackBar(content: Text(l10n.freeCartonsAdded(added))));
   }
 
   Future<void> _apply(String code) async {
@@ -80,9 +87,9 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
       _applying = trimmed;
       _error = null;
     });
-    // A typed reward code is a free carton too: pick its size first. Wait
-    // for the coupon list if it is still loading; if it failed, the
-    // server's answer below still tells.
+    // A typed code may be a free-carton reward. Wait for the coupon list
+    // if it is still loading; if it failed, the server's answer below
+    // still tells. With no fixed free size it needs a size first.
     var listed = const <CouponOffer>[];
     try {
       listed = await ref.read(cartCouponsProvider.future);
@@ -96,49 +103,48 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
               o.isFreeCarton && o.code.toUpperCase() == trimmed.toUpperCase(),
         )
         .firstOrNull;
-    if (reward != null) {
+    final quantity = reward?.freeQuantity ?? 1;
+    if (reward != null && !reward.hasFixedFreeSize) {
       setState(() => _applying = null);
-      return _applyFreeCarton(reward.code);
+      return _pickFreeSize(reward.code, quantity: quantity);
     }
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     try {
+      // A reward with the store's fixed free size goes without a size
+      // (ADR 0003): the server uses that size.
       await ref.read(cartProvider.notifier).applyCoupon(trimmed);
       final applied = ref.read(cartProvider).snapshot.coupon;
       if (!mounted) return;
       navigator.pop();
       if (applied != null) {
+        final text = applied.isFreeCarton
+            ? l10n.freeCartonsAdded(applied.freeQuantity ?? quantity)
+            : l10n.couponAppliedMessage(
+                applied.code,
+                displayRupees(applied.discount),
+              );
         messenger
           ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(
-                l10n.couponAppliedMessage(
-                  applied.code,
-                  displayRupees(applied.discount),
-                ),
-              ),
-            ),
-          );
+          ..showSnackBar(SnackBar(content: Text(text)));
       }
     } catch (error) {
       if (!mounted) return;
       setState(() => _applying = null);
-      // A reward code sent without a size: the server asks for one (400
-      // with `free_variant_id`, ADR 0002). Pick it instead of an error.
-      if (_needsSize(error)) return _applyFreeCarton(trimmed);
+      // A reward code sent without a size where the store has no fixed
+      // size: the server asks for one (400 with `free_variant_id`, ADR
+      // 0002). Pick it instead of an error.
+      if (isFreeSizeRequired(error)) {
+        return _pickFreeSize(trimmed, quantity: quantity);
+      }
       setState(() => _error = _describe(error));
     }
   }
 
-  static bool _needsSize(Object error) {
-    final apiError = ApiError.from(error);
-    return apiError.code == ApiErrorCode.validationError &&
-        apiError.details.containsKey('free_variant_id');
-  }
-
   /// The server's coupon error, with its details (e.g. how much to add).
-  String _describe(Object error) => cartErrorText(context, error);
+  /// Nothing here sends a size, so a size refused is the store's own.
+  String _describe(Object error) =>
+      cartErrorText(context, error, fixedFreeSize: true);
 
   @override
   Widget build(BuildContext context) {
@@ -231,8 +237,11 @@ class _CouponSheetState extends ConsumerState<CouponSheet> {
                       applying: _applying == offer.code,
                       onApply: busy
                           ? null
-                          : offer.isFreeCarton
-                          ? () => _applyFreeCarton(offer.code)
+                          : offer.isFreeCarton && !offer.hasFixedFreeSize
+                          ? () => _pickFreeSize(
+                              offer.code,
+                              quantity: offer.freeQuantity ?? 1,
+                            )
                           : () => _apply(offer.code),
                     );
                   },
@@ -309,7 +318,13 @@ class _CouponCard extends StatelessWidget {
                       ),
                     if (offer.isFreeCarton)
                       Text(
-                        l10n.couponFreeCartonOffer,
+                        offer.hasFixedFreeSize
+                            ? l10n.couponFreeCartonsFixed(
+                                offer.freeQuantity ?? 1,
+                              )
+                            : l10n.couponFreeCartonOffer(
+                                offer.freeQuantity ?? 1,
+                              ),
                         key: ValueKey('coupon-free-carton-${offer.code}'),
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: context.jivoColors.success,

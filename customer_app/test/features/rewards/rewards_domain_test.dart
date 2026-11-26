@@ -171,6 +171,43 @@ void main() {
         isTrue,
       );
     });
+
+    test('ADR 0003: the coupon list fixed size and quantity reach the '
+        'reward card', () {
+      const fixed = CouponOffer(
+        code: 'wel1',
+        title: '2 free cartons',
+        description: '',
+        isEligible: true,
+        discountType: CouponDiscountType.freeUnit,
+        freeVariantId: 4001,
+        freeQuantity: 2,
+      );
+      const onlyListed = CouponOffer(
+        code: 'REF2',
+        title: '2 free cartons',
+        description: '',
+        isEligible: true,
+        discountType: CouponDiscountType.freeUnit,
+        freeVariantId: 4001,
+        freeQuantity: 2,
+      );
+      final split = splitRewardsAndCoupons(
+        rewards: [reward('WEL1')],
+        coupons: const [fixed, onlyListed],
+      );
+      final welcome = split.rewards.first;
+      expect(welcome.hasFixedSize, isTrue);
+      expect(welcome.freeVariantId, 4001);
+      final extra = split.rewards.last;
+      expect(extra.code, 'REF2');
+      expect(extra.quantity, 2);
+      expect(extra.hasFixedSize, isTrue);
+
+      // No fixed size anywhere: the size sheet (ADR 0002).
+      expect(reward('X').hasFixedSize, isFalse);
+      expect(reward('X').quantity, 1);
+    });
   });
 
   test('size options: in-stock variants once, in catalog order', () {
