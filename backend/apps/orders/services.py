@@ -522,10 +522,12 @@ def _free_lines_on_locked_stock(order: Order, store_id: int, state) -> list:
     stock read before the locks; a carton may have run out since. Under the stock row locks:
     - the paid units must still fit, else 409 `STOCK_UNAVAILABLE` (paid units only, nothing
       reserved; the transaction rolls back);
-    - a REWARD carton that no longer fits is dropped and the reward is **not** used: its
-      redemption is removed and the order keeps no coupon, so it stays AVAILABLE;
-    - the volume-offer carton is chosen again on the locked stock (cheapest size, then the
-      stock fallback); when no size fits, the order has no volume-offer carton.
+    - a REWARD line (all its cartons, ADR 0003) that no longer fits is dropped and the reward
+      is **not** used: its redemption is removed and the order keeps no coupon, so it stays
+      AVAILABLE;
+    - the volume-offer cartons are chosen again on the locked stock: the store's fixed free
+      size (ADR 0003; no fallback), else the cheapest size, then the stock fallback (ADR
+      0002); when no size fits, the order has no volume-offer carton.
     Never more free cartons than the cart showed. Returns the free lines to store."""
     paid_ids = [line.variant.pk for line in state.lines]
     free_ids = [free.variant.pk for free in state.free_lines]
@@ -558,7 +560,11 @@ def _free_lines_on_locked_stock(order: Order, store_id: int, state) -> list:
     volume = None
     if any(f.source == FreeSource.VOLUME_OFFER for f in state.free_lines):
         volume, _offer = cart_services.volume_offer(
-            state.lines, state.rules, extra=extra, available=available
+            state.lines,
+            state.rules,
+            extra=extra,
+            available=available,
+            fixed=state.fixed_free_variant,
         )
     return [line for line in (volume, reward) if line is not None]
 

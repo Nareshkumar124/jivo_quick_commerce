@@ -173,8 +173,17 @@ class AppliedCouponSerializer(serializers.Serializer):
     free_variant_id = serializers.IntegerField(
         allow_null=True,
         help_text=(
-            "FREE_UNIT only: the size picked for the free carton (`VariantSummary.id`, sent as "
-            "`free_variant_id` when applying). Null for other coupons."
+            "FREE_UNIT only: the size of the free cartons (`VariantSummary.id`). ADR 0003: when "
+            "the store has a fixed free size (`free_offer.free_variant`), it is that size; else "
+            "the size the customer picked (ADR 0002). Null for other coupons."
+        ),
+    )
+    free_quantity = serializers.IntegerField(
+        allow_null=True,
+        min_value=1,
+        help_text=(
+            "ADR 0003: FREE_UNIT only, the number of free cartons the reward gives (e.g. 2). "
+            "Null for other coupons."
         ),
     )
     discount = money('The discount it gives this cart now ("0.00" when it does not apply).')
@@ -196,6 +205,14 @@ class AppliedCouponSerializer(serializers.Serializer):
     )
 
 
+class FreeVariantSerializer(serializers.Serializer):
+    """ADR 0003: the size every free carton uses at the store (e.g. "Jivo Water", "1 L x 12")."""
+
+    id = serializers.IntegerField(help_text="`VariantSummary.id`.")
+    name = serializers.CharField(help_text='The size, e.g. "1 L x 12".')
+    product_name = serializers.CharField(help_text='The product, e.g. "Jivo Water".')
+
+
 class FreeLineSerializer(serializers.Serializer):
     """ADR 0002: a free carton on the cart (₹0). Computed by the server on every cart read:
     never add, remove or price these in the app."""
@@ -210,8 +227,9 @@ class FreeLineSerializer(serializers.Serializer):
     source = serializers.ChoiceField(
         choices=FreeSource.choices,
         help_text=(
-            "VOLUME_OFFER: 1 free for every `free_offer.every` paid cartons (the cheapest size "
-            "in the cart). REWARD: the free-carton reward applied as the cart's coupon."
+            "VOLUME_OFFER: 1 free for every `free_offer.every` paid cartons (the store's fixed "
+            "free size `free_offer.free_variant` when set, ADR 0003; else the cheapest size in "
+            "the cart). REWARD: the free-carton reward applied as the cart's coupon."
         ),
     )
 
@@ -241,9 +259,19 @@ class FreeOfferSerializer(serializers.Serializer):
     notice = serializers.CharField(
         allow_null=True,
         help_text=(
-            "Set when a free carton was earned but no size in the cart has the stock for it (no "
-            "free carton is given). Show it as a notice; it does not block checkout. Null "
+            "Set when a free carton was earned but the store cannot supply it (the fixed free "
+            "size has no stock, ADR 0003; or no size in the cart has the stock, ADR 0002): no "
+            "free carton is given. Show it as a notice; it does not block checkout. Null "
             "otherwise."
+        ),
+    )
+    free_variant = FreeVariantSerializer(
+        allow_null=True,
+        help_text=(
+            "ADR 0003: the store's fixed free size; every free carton (this offer and rewards) "
+            'is this size, e.g. "Jivo Water 1 L x 12". Shown also before a free carton is '
+            "earned. Null when the store has none: the free cartons are then the cheapest size "
+            "in the cart (ADR 0002)."
         ),
     )
 
@@ -457,9 +485,12 @@ class CouponApplySerializer(serializers.Serializer):
         allow_null=True,
         min_value=1,
         help_text=(
-            "ADR 0002: required for a free-carton reward (`discount_type` FREE_UNIT): the size "
-            "the customer picked (`VariantSummary.id`). It must be sold at the store in "
-            "`X-Store-Id`, be of the same product category as a paid line in the cart (a water "
-            "reward goes on a water order) and have the stock. Ignored for other coupons."
+            "For a free-carton reward (`discount_type` FREE_UNIT). ADR 0003: when the store in "
+            "`X-Store-Id` has a fixed free size (`free_offer.free_variant`), leave it out (or "
+            "send that size's id): the server uses the fixed size; any other id is 422 "
+            "`COUPON_NOT_ELIGIBLE` (FREE_VARIANT_UNAVAILABLE). Otherwise (ADR 0002) it is "
+            "required: the size the customer picked (`VariantSummary.id`), sold at the store, of "
+            "the same product category as a paid line in the cart (a water reward goes on a "
+            "water order) and with the stock. Ignored for other coupons."
         ),
     )

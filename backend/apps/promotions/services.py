@@ -13,10 +13,10 @@ Checks, in this order (the first failure is the answer):
 7. a category coupon with no qualifying item -> `COUPON_NOT_ELIGIBLE` (NO_ELIGIBLE_ITEMS).
 
 Free-carton rewards (ADR 0002, `DiscountType.FREE_UNIT`) give no money off (discount 0); the
-cart adds a free carton of the size the customer picked. Between steps 5 and 6 they need the
-store's minimum paid cartons (at least 1; free cartons never count) -> `COUPON_NOT_ELIGIBLE`
-(MIN_ORDER_UNITS). The size itself is checked by the cart (FREE_VARIANT_UNAVAILABLE,
-`free_variant_check`), which knows the store's stock.
+cart adds `value` free cartons (ADR 0003) of the store's fixed free size, else of the size the
+customer picked. Between steps 5 and 6 they need the store's minimum paid cartons (at least 1;
+free cartons never count) -> `COUPON_NOT_ELIGIBLE` (MIN_ORDER_UNITS). The size itself is checked
+by the cart (FREE_VARIANT_UNAVAILABLE, `free_variant_check`), which knows the store's stock.
 
 Discount (PM decision, Phase 3): FLAT = the value; PERCENT = value % of the eligible subtotal,
 rounded half-up to the paisa; capped by `max_discount` and by the eligible subtotal (all items,
@@ -59,6 +59,11 @@ MSG_USED_UP = "This coupon has been fully redeemed."
 MSG_FIRST_ORDER = "This coupon is only for your first order."
 MSG_NO_ITEMS = "No items in your cart qualify for this coupon."
 MSG_FREE_VARIANT = "This size is not available for your free carton here. Choose another size."
+# ADR 0003: the store has a fixed free size, so the customer cannot choose another one.
+MSG_FREE_VARIANT_NOT_FIXED = (
+    "Free cartons here come in one size only. Apply the reward without choosing a size."
+)
+MSG_FREE_VARIANT_NO_STOCK = "The free cartons for this reward are out of stock here right now."
 
 
 class CouponLine(Protocol):
@@ -224,12 +229,17 @@ def is_free_unit(coupon: Coupon | None) -> bool:
     return coupon is not None and coupon.discount_type == DiscountType.FREE_UNIT
 
 
-def free_variant_check(coupon: Coupon, free_variant_id: int | None) -> CouponCheck:
-    """ADR 0002: the size picked for a free-carton reward cannot be given at this store."""
+def free_variant_check(
+    coupon: Coupon, free_variant_id: int | None, message: str = MSG_FREE_VARIANT
+) -> CouponCheck:
+    """ADR 0002: the size picked for a free-carton reward cannot be given at this store.
+    ADR 0003 (a fixed free size) passes its own `message`: a size other than the fixed one
+    (`MSG_FREE_VARIANT_NOT_FIXED`) or the fixed one without the stock
+    (`MSG_FREE_VARIANT_NO_STOCK`)."""
     return CouponCheck(
         coupon,
         ErrorCode.COUPON_NOT_ELIGIBLE,
-        MSG_FREE_VARIANT,
+        message,
         CouponIneligibleReason.FREE_VARIANT_UNAVAILABLE,
         free_variant_id=free_variant_id,
     )
@@ -346,10 +356,12 @@ def coupon_offers(
     min_units: int = 0,
     unit_label: str = "items",
     free_variant_id: int | None = None,
+    fixed_free_variant_id: int | None = None,
 ) -> list[dict]:
     """The 'Apply coupon' sheet (`CouponOffer` dicts): eligible first by savings, then the
     rest by code. Coupons this customer (or everyone) has used up are left out. A free-carton
-    reward on the cart shows its size (`free_variant_id`)."""
+    reward shows its size: the store's fixed free size for every reward (ADR 0003,
+    `fixed_free_variant_id`), else the size picked for the one on the cart (`free_variant_id`)."""
     now = now or timezone.now()
     coupons = list(listed_coupons(store_id, now, user))
     usages = usage_for(coupons, user)
@@ -372,11 +384,10 @@ def coupon_offers(
         if check.error == ErrorCode.COUPON_USAGE_EXCEEDED:
             continue
         is_applied = applied is not None and applied.pk == coupon.pk
-        offers.append(
-            offer_body(
-                check, applied=is_applied, free_variant_id=free_variant_id if is_applied else None
-            )
-        )
+        size = fixed_free_variant_id
+        if size is None and is_applied:
+            size = free_variant_id
+        offers.append(offer_body(check, applied=is_applied, free_variant_id=size))
     eligible = sorted(
         (offer for offer in offers if offer["is_eligible"]),
         key=lambda offer: (-Decimal(offer["savings"]), offer["code"]),
@@ -413,6 +424,7 @@ def offer_body(check: CouponCheck, *, applied: bool, free_variant_id: int | None
         "is_personal": coupon.owner_id is not None,
         "source": coupon.source,
         "free_variant_id": free_variant_id if is_free_unit(coupon) else None,
+        "free_quantity": coupon.free_units if is_free_unit(coupon) else None,
     }
 
 
@@ -523,9 +535,10 @@ def create_personal_coupon(
     source: str = CouponSource.NONE,
 ) -> Coupon:
     """A coupon only `owner` can see and use, once, until `now + valid_days` (added 2026-11-13
-    for referral rewards): FLAT `amount` off, or (ADR 0002) a FREE_UNIT reward (`amount` 1 =
-    one carton) with its `source`. Its code is generated (`prefix` + 8 characters); a clash
-    with an existing code (any case) is retried with a new code. Any other refusal of the
+    for referral rewards): FLAT `amount` off, or (ADR 0002) a FREE_UNIT reward (`amount` = its
+    number of free cartons, 1 to 10 since ADR 0003) with its `source`. Its code is generated
+    (`prefix` + 8 characters); a clash with an existing code (any case) is retried with a new
+    code. Any other refusal of the
     database (e.g. a second WELCOME reward) is raised. Runs in the caller's transaction (a
     savepoint per attempt)."""
     now = now or timezone.now()

@@ -220,6 +220,30 @@ def test_slip_lists_free_cartons_and_counts_them(client, store, packing_order):
     assert f'data-testid="slip-pack-{volume.sku}-free-volume_offer">Pack 1<' in html
 
 
+def test_two_carton_reward_line_on_the_pick_list_and_slip(client, store):
+    """ADR 0003: a reward can be 2 free cartons (one free line of quantity 2), all 1 L."""
+    order = make_order(store, OrderStatus.PACKING, lines=0, order_number="JV-FREE-0030")
+    water_1l = VariantFactory(sku="JV-FREE-0030-1L", name="1 L x 12")
+    water_500 = VariantFactory(sku="JV-FREE-0030-500", name="500 ml x 24")
+    paid = paid_line(order, water_500)
+    volume = free_line(order, water_1l)
+    reward = free_line(order, water_1l, FreeSource.REWARD, quantity=2)
+    login_with_stores(client, roles.STORE_STAFF, store)
+
+    html = client.get(reverse("ops:packing-queues", args=[store.code]), **HX).content.decode()
+    reward_key = f"{reward.sku}-free-reward"
+    assert f'data-testid="pack-{paid.sku}">× 10<' in html  # noqa: RUF001
+    assert f'data-testid="pack-{volume.sku}-free-volume_offer">× 1<' in html  # noqa: RUF001
+    assert f'data-testid="pack-{reward_key}">× 2<' in html  # noqa: RUF001
+    assert f'data-testid="free-count-{order.order_number}">(incl. 3 free)' in html
+    assert "13 items" in html
+
+    slip = client.get(reverse("ops:packing-slip", args=[store.code, order.pk])).content.decode()
+    assert "13 items (incl. 3 free)" in slip
+    assert f'data-testid="slip-pack-{reward_key}">Pack 2<' in slip
+    assert f'data-testid="slip-free-{reward_key}">FREE: REWARD ₹0' in slip
+
+
 # --------------------------------------------------------------------------- returns
 
 

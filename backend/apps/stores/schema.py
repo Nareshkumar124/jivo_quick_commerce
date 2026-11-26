@@ -29,6 +29,18 @@ STORE_ID_PARAMETER = OpenApiParameter(
     ),
 )
 
+OPTIONAL_STORE_ID_PARAMETER = OpenApiParameter(
+    STORE_HEADER,
+    OpenApiTypes.INT,
+    OpenApiParameter.HEADER,
+    required=False,
+    description=(
+        "Optional: the store the app has selected (`store.id` from `GET /serviceability/`). "
+        "Used to show that store's fixed free size (ADR 0003). Missing, malformed, unknown or "
+        "deactivated: the store of the caller's cart is used instead (never an error)."
+    ),
+)
+
 STORE_HEADER_MISSING = validation_error(
     {STORE_HEADER: [HEADER_REQUIRED]}, name="X_STORE_ID_MISSING"
 )

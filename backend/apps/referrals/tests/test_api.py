@@ -51,8 +51,9 @@ class TestScreen:
             "share_message": f"Use my code {code} on the Jivo app and we both get 1 free carton.",
             "is_enabled": True,
             "reward_type": "FREE_UNIT",  # ADR-0002: one free carton each, no ₹ amount
-            "reward_quantity": 1,
+            "reward_quantity": 1,  # ADR-0003: the settings' default (2 on staging)
             "reward_label": "1 free carton",
+            "welcome_reward_quantity": 1,
             "reward_amount": "90.00",
             "reward_validity_days": 30,
             "reward_min_order_value": "0.00",

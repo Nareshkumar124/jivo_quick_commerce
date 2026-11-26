@@ -7,7 +7,8 @@
   `referrals.reward_referral` after commit, which calls `reward_for_order`: both customers get a
   free-carton reward (ADR 0002, 2026-11-25: a personal FREE_UNIT coupon from
   `apps.promotions.rewards.create_reward`, sources REFERRAL_REFERRER / REFERRAL_REFERRED; it
-  replaced the ₹ FLAT coupon) and the referral becomes REWARDED. The referral row is locked and
+  replaced the ₹ FLAT coupon; ADR 0003: `ReferralSettings.reward_quantity` cartons each, read
+  at that moment) and the referral becomes REWARDED. The referral row is locked and
   only a PENDING one is rewarded, so the reward is given exactly once per referred customer,
   whatever the retries or later orders. If the program is off at that moment the referral
   becomes VOID (no reward later).
@@ -114,15 +115,15 @@ def summary(user) -> dict:
         joined=Count("id"), rewarded=Count("id", filter=Q(status=ReferralStatus.REWARDED))
     )
     can_apply = config.is_enabled and referral is None and not promotions.has_placed_order(user)
+    label = rewards.carton_label(config.reward_quantity)  # ADR 0003: the setting, e.g. 2
     return {
         "code": own.code,
-        "share_message": (
-            f"Use my code {own.code} on the Jivo app and we both get {rewards.REWARD_LABEL}."
-        ),
+        "share_message": f"Use my code {own.code} on the Jivo app and we both get {label}.",
         "is_enabled": config.is_enabled,
         "reward_type": DiscountType.FREE_UNIT,
-        "reward_quantity": rewards.REWARD_UNITS,
-        "reward_label": rewards.REWARD_LABEL,
+        "reward_quantity": config.reward_quantity,
+        "reward_label": label,
+        "welcome_reward_quantity": config.welcome_reward_quantity,
         "reward_amount": money_str(config.reward_amount),  # deprecated (ADR 0002)
         "reward_validity_days": config.reward_validity_days,
         "reward_min_order_value": money_str(0),  # deprecated (ADR 0002): not used
@@ -201,7 +202,7 @@ def _notify(referral: Referral) -> None:
                     user,
                     REWARD_EVENT,
                     {
-                        "reward": rewards.REWARD_LABEL,
+                        "reward": rewards.carton_label(coupon.free_units),
                         "reason": reason,
                         "expires_on": _expires_on(coupon),
                         "ref": referral.pk,
@@ -243,12 +244,13 @@ def reward_for_order(order_id: int, *, now=None) -> str:
             referral.save(update_fields=["status", "reward_order", "note", "updated_at"])
             logger.info("Referral %s void (program off), order %s", referral.pk, order_id)
             return "void"
-        # ADR 0002: one free carton each (no ₹ amount any more).
+        # ADR 0002: free cartons each (no ₹ amount any more); ADR 0003: `reward_quantity`
+        # cartons each, from the settings read now.
         referral.referrer_coupon = rewards.create_reward(
-            referral.referrer, source=CouponSource.REFERRAL_REFERRER, now=now
+            referral.referrer, source=CouponSource.REFERRAL_REFERRER, now=now, config=config
         )
         referral.referred_coupon = rewards.create_reward(
-            referral.referred, source=CouponSource.REFERRAL_REFERRED, now=now
+            referral.referred, source=CouponSource.REFERRAL_REFERRED, now=now, config=config
         )
         referral.status = ReferralStatus.REWARDED
         referral.reward_amount = None

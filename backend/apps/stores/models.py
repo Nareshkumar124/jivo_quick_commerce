@@ -190,7 +190,21 @@ class PricingConfig(TimeStampedModel):
         db_default=0,
         help_text=(
             "Volume offer: 1 free carton for every this many paid cartons (e.g. 10). The free "
-            "carton is the cheapest size in the order. 0 = no offer."
+            "carton is the store's free size below, else the cheapest size in the order. 0 = no "
+            "offer."
+        ),
+    )
+    # ADR 0003: the one size every free carton uses (volume offer and rewards). Nullable: the
+    # previous release (during a deploy) inserts rows without it.
+    free_unit_variant = models.ForeignKey(
+        "catalog.ProductVariant",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text=(
+            "The size every free carton uses (volume offer and rewards). Empty = cheapest size "
+            "in the order (ADR 0002)."
         ),
     )
     delivery_fee = _money("25.00")
@@ -246,8 +260,24 @@ class PricingConfig(TimeStampedModel):
                 "small_cart_threshold",
                 "Set a threshold above zero, or the small-cart fee never applies.",
             )
+        message = self.free_unit_variant_error()
+        if message:
+            errors.setdefault("free_unit_variant", message)
         if errors:
             raise ValidationError(errors)
+
+    def free_unit_variant_error(self) -> str | None:
+        """ADR 0003: the free size must be a size this store sells (it has a stock row here),
+        or no free carton could ever be given. Out of stock is fine: the cart then shows a
+        notice. None when it is fine or not set."""
+        if self.free_unit_variant_id is None or self.store_id is None:
+            return None
+        from apps.inventory.models import StoreInventory
+
+        sold_here = StoreInventory.objects.filter(
+            store_id=self.store_id, variant_id=self.free_unit_variant_id
+        ).exists()
+        return None if sold_here else "This size is not sold at this store. Choose one it sells."
 
 
 class ServiceabilityRequest(TimeStampedModel):

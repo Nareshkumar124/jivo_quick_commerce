@@ -128,6 +128,37 @@ class TestDetail:
         # Item total and grand total stay as stored: free cartons are not charged.
         assert html.count("₹1,100.00") >= 2
 
+    def test_two_carton_reward_line(self, client, shop):
+        """ADR 0003: a reward of 2 free 1 L cartons is one free line of quantity 2."""
+        order = OrderFactory(store=shop["own"], order_number="JV-FREE-000404")
+        water_1l = VariantFactory(
+            sku="JW-1L-B", name="1 L x 12", mrp=Decimal("110.00"), selling_price=Decimal("110.00")
+        )
+        water_500 = VariantFactory(
+            sku="JW-500-B", name="500 ml x 24", mrp=Decimal("140.00"), selling_price=Decimal("140")
+        )
+        line(order, water_500, quantity=10)
+        line(order, water_1l, quantity=1, source=FreeSource.VOLUME_OFFER)
+        reward = line(order, water_1l, quantity=2, source=FreeSource.REWARD)
+        client.force_login(staff_in_role(roles.FINANCE))
+        response = client.get(change_url(order))
+        html = response.content.decode()
+        assert response.status_code == 200
+        (items,) = (
+            formset
+            for formset in response.context["inline_admin_formsets"]
+            if formset.formset.model is OrderItem
+        )
+        quantities = {
+            (form.form.instance.sku, form.form.instance.free_source): form.form.instance.quantity
+            for form in items
+        }
+        assert quantities[(reward.sku, FreeSource.REWARD)] == 2
+        assert "Free: reward" in html
+        # 3 free 1 L cartons x ₹110 MRP (the backend's helper), not charged.
+        assert FREE_VALUE_LABEL in html
+        assert "₹330.00" in html
+
     def test_no_free_row_without_free_cartons(self, client, shop):
         plain = OrderFactory(store=shop["own"], order_number="JV-FREE-000303")
         line(plain, VariantFactory(), quantity=2)

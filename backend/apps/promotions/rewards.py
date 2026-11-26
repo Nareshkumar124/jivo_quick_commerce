@@ -1,15 +1,19 @@
 """Free-carton rewards (ADR 0002 §7-§13), built on the personal coupon system (no second
 rewards system).
 
-A reward is a personal `Coupon` (`owner` set) with `discount_type` FREE_UNIT (value 1 = one
-carton, no money off), one use, an expiry and a `source`:
+A reward is a personal `Coupon` (`owner` set) with `discount_type` FREE_UNIT (`value` = its
+number of free cartons, no money off), one use, an expiry and a `source`. ADR 0003: the number
+comes from `ReferralSettings` when the reward is created (`welcome_reward_quantity` for WELCOME,
+`reward_quantity` for each referral reward); rewards given earlier keep their own number.
 - WELCOME: one per customer account created from now on, given by the OTP login that creates
   the account (`grant_welcome_reward`; the database keeps at most one per owner);
 - REFERRAL_REFERRER / REFERRAL_REFERRED: both people of a referral, when the friend's first
   order is delivered (`apps.referrals.services.reward_for_order`).
 
-The customer applies it like any coupon, with the size they pick (`free_variant_id`); the cart
-then has a free REWARD line, and the order stores it as a free order line. It takes the order's
+The customer applies it like any coupon: without a size when the store has a fixed free size
+(ADR 0003, `PricingConfig.free_unit_variant`), else with the size they pick (`free_variant_id`,
+ADR 0002); the cart then has a free REWARD line of `value` cartons, and the order stores it as a
+free order line. It takes the order's
 single coupon slot, and the order still needs the store's minimum paid cartons.
 
 **Status** (ADR 0002 §10) is derived, never stored, from the coupon's redemption that counts
@@ -32,18 +36,18 @@ from django.utils import timezone
 from apps.promotions.choices import CouponSource, DiscountType, RewardHistoryKind, RewardStatus
 from apps.promotions.models import COUNTED_STATUSES, Coupon, CouponRedemption
 
-REWARD_UNITS = 1  # cartons per reward (Coupon.value of a FREE_UNIT coupon)
-REWARD_LABEL = "1 free carton"
+# ADR 0003: a reward's cartons are its own `Coupon.free_units`; `carton_label()` is the text.
 HISTORY_LIMIT = 100
 WELCOME_CONSTRAINT = "coupon_one_welcome_reward_per_owner"
 
-TITLES = {
-    CouponSource.WELCOME: "1 free carton: welcome reward",
-    CouponSource.REFERRAL_REFERRER: "1 free carton: you invited a friend",
-    CouponSource.REFERRAL_REFERRED: "1 free carton: you joined with a friend's code",
+# Titles are "<N free cartons>: <reason>" (ADR 0003: N is the reward's own number).
+TITLE_REASONS = {
+    CouponSource.WELCOME: "welcome reward",
+    CouponSource.REFERRAL_REFERRER: "you invited a friend",
+    CouponSource.REFERRAL_REFERRED: "you joined with a friend's code",
 }
 DESCRIPTIONS = {
-    CouponSource.WELCOME: "Welcome to Jivo. One free carton of the size you choose, only for you.",
+    CouponSource.WELCOME: "Welcome to Jivo: {label} with an order, only for you.",
     CouponSource.REFERRAL_REFERRER: "Your reward for inviting a friend. One use, only for you.",
     CouponSource.REFERRAL_REFERRED: (
         "Your reward for joining with a friend's code. One use, only for you."
@@ -67,24 +71,38 @@ def is_reward(coupon: Coupon | None) -> bool:
     return coupon is not None and coupon.discount_type == DiscountType.FREE_UNIT
 
 
-def reward_validity_days() -> int:
+def carton_label(quantity: int) -> str:
+    """ADR 0003: "1 free carton" / "2 free cartons"."""
+    return f"{quantity} free carton{'' if quantity == 1 else 's'}"
+
+
+def reward_title(source: str, quantity: int) -> str:
+    return f"{carton_label(quantity)}: {TITLE_REASONS[source]}"
+
+
+def setting_quantity(config, source: str) -> int:
+    """ADR 0003: the free cartons a new reward of `source` gives (`ReferralSettings`)."""
+    if source == CouponSource.WELCOME:
+        return config.welcome_reward_quantity
+    return config.reward_quantity
+
+
+def create_reward(owner, *, source: str, now: datetime | None = None, config=None) -> Coupon:
+    """A new free-carton reward for `owner`: its number of cartons and its validity days are
+    read from `ReferralSettings` now (`config`, loaded when not given; ADR 0003). Runs in the
+    caller's transaction."""
+    from apps.promotions.services import create_personal_coupon
     from apps.referrals.models import ReferralSettings
 
-    return ReferralSettings.load().reward_validity_days
-
-
-def create_reward(owner, *, source: str, now: datetime | None = None) -> Coupon:
-    """A new free-carton reward for `owner`, valid `ReferralSettings.reward_validity_days`
-    days. Runs in the caller's transaction."""
-    from apps.promotions.services import create_personal_coupon
-
+    config = config or ReferralSettings.load()
+    quantity = setting_quantity(config, source)
     return create_personal_coupon(
         owner,
-        amount=REWARD_UNITS,
-        valid_days=reward_validity_days(),
+        amount=quantity,
+        valid_days=config.reward_validity_days,
         min_order_value=0,
-        title=TITLES[source],
-        description=DESCRIPTIONS[source],
+        title=reward_title(source, quantity),
+        description=DESCRIPTIONS[source].format(label=carton_label(quantity)),
         prefix=PREFIXES[source],
         now=now,
         discount_type=DiscountType.FREE_UNIT,
@@ -164,11 +182,13 @@ def rewards_of(user):
 # --------------------------------------------------------------------------- the Rewards screen
 
 
-def _reward_body(state: RewardState) -> dict:
+def _reward_body(state: RewardState, free_variant: dict | None) -> dict:
     coupon = state.coupon
     return {
         "code": coupon.code,
         "title": coupon.title,
+        "quantity": coupon.free_units,
+        "free_variant": free_variant,
         "source": coupon.source,
         "status": state.status,
         "expires_at": coupon.ends_at,
@@ -176,7 +196,7 @@ def _reward_body(state: RewardState) -> dict:
     }
 
 
-def _entry(at, kind: str, title: str, quantity: int = REWARD_UNITS, order=None) -> dict:
+def _entry(at, kind: str, title: str, quantity: int, order=None) -> dict:
     return {
         "at": at,
         "kind": kind,
@@ -189,17 +209,20 @@ def _entry(at, kind: str, title: str, quantity: int = REWARD_UNITS, order=None) 
 def _history(state: RewardState, now: datetime) -> list[dict]:
     coupon = state.coupon
     title = HISTORY_TITLES.get(coupon.source, coupon.title)
-    entries = [_entry(coupon.created_at, RewardHistoryKind.EARNED, title)]
+    units = coupon.free_units
+    entries = [_entry(coupon.created_at, RewardHistoryKind.EARNED, title, units)]
     for redemption in coupon.redemptions.all():
         order = redemption.order
-        entries.append(_entry(redemption.created_at, RewardHistoryKind.CLAIMED, title, order=order))
+        entries.append(
+            _entry(redemption.created_at, RewardHistoryKind.CLAIMED, title, units, order=order)
+        )
     if state.status == RewardStatus.USED:
         order = state.order
         at = order.delivered_at or order.delivery_failed_at or order.updated_at
-        entries.append(_entry(at, RewardHistoryKind.USED, title, order=order))
+        entries.append(_entry(at, RewardHistoryKind.USED, title, units, order=order))
     elif state.status == RewardStatus.EXPIRED:
         at = coupon.ends_at if coupon.ends_at is not None and coupon.ends_at <= now else None
-        entries.append(_entry(at or coupon.updated_at, RewardHistoryKind.EXPIRED, title))
+        entries.append(_entry(at or coupon.updated_at, RewardHistoryKind.EXPIRED, title, units))
     return entries
 
 
@@ -236,8 +259,27 @@ def _volume_history(user) -> list[dict]:
     return entries
 
 
-def rewards_body(user, *, now: datetime | None = None) -> dict:
-    """`GET /account/rewards/` (the `Rewards` component): the caller's own rewards only."""
+def store_for_rewards(user, header_store_id: int | None) -> int | None:
+    """ADR 0003: the store whose fixed free size the Rewards screen shows: the active store in
+    the optional `X-Store-Id` header, else the store of the caller's cart (its last store), else
+    None. Never an error."""
+    from apps.cart.models import Cart
+    from apps.core.exceptions import ApiError
+    from apps.stores.services import active_store
+
+    if header_store_id is not None:
+        try:
+            return active_store(header_store_id).pk
+        except ApiError:
+            pass  # unknown or deactivated: fall back to the cart's store
+    return Cart.objects.filter(user=user).values_list("store_id", flat=True).first()
+
+
+def rewards_body(user, *, now: datetime | None = None, store_id: int | None = None) -> dict:
+    """`GET /account/rewards/` (the `Rewards` component): the caller's own rewards only.
+    `free_variant` is the fixed free size of `store_id` (ADR 0003), the same for each reward."""
+    from apps.cart.services import fixed_free_variant_body
+
     now = now or timezone.now()
     states = [reward_state(coupon, now) for coupon in rewards_of(user)]
     available = sorted(
@@ -248,7 +290,9 @@ def rewards_body(user, *, now: datetime | None = None) -> dict:
     history = [entry for state in states for entry in _history(state, now)]
     history += _volume_history(user)
     history.sort(key=lambda entry: (entry["at"], entry["kind"]), reverse=True)
+    shown = [*available, *claimed]
+    free_variant = fixed_free_variant_body(store_id) if shown else None
     return {
-        "available": [_reward_body(state) for state in [*available, *claimed]],
+        "available": [_reward_body(state, free_variant) for state in shown],
         "history": history[:HISTORY_LIMIT],
     }

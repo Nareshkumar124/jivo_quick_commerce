@@ -104,12 +104,20 @@ class TestWelcomeReward:
 
 
 class TestModel:
-    def test_a_free_unit_coupon_is_one_carton(self, user):
+    def test_a_free_unit_coupon_is_at_most_ten_cartons(self, user):
+        """ADR-0003 replaced "exactly 1 carton" with a whole number 1 to 10 (more cases in
+        test_rewards_quantity.py)."""
         coupon = Coupon(
-            code="FREE2", title="Two", discount_type=DiscountType.FREE_UNIT, value=Decimal(2)
+            code="FREE11",
+            title="Eleven",
+            discount_type=DiscountType.FREE_UNIT,
+            value=Decimal(11),
+            owner=user,
+            source=CouponSource.WELCOME,
         )
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as error:
             coupon.clean()
+        assert list(error.value.message_dict) == ["value"]
         with pytest.raises(IntegrityError), transaction.atomic():
             coupon.save()
 
