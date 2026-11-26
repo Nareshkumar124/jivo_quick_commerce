@@ -22,6 +22,32 @@ class _RecordingBackend extends FakeCommerceBackend {
 
   final keys = <String>[];
   final failures = <Object>[];
+  final methods = <PaymentMethod>[];
+
+  /// When set, the cart offers these payment options instead.
+  List<PaymentOption>? options;
+
+  @override
+  Future<CartSnapshot> load({int? addressId}) async {
+    final cart = await super.load(addressId: addressId);
+    final replaced = options;
+    if (replaced == null) return cart;
+    return CartSnapshot.fromLines(
+      lines: cart.lines,
+      itemCount: cart.itemCount,
+      bill: cart.bill,
+      coupon: cart.coupon,
+      tip: cart.tip,
+      instructions: cart.instructions,
+      addressId: cart.addressId,
+      thresholds: cart.thresholds,
+      paymentOptions: replaced,
+      checkout: cart.checkout,
+      storeOpen: cart.storeOpen,
+      freeLines: cart.freeLines,
+      freeOffer: cart.freeOffer,
+    );
+  }
 
   @override
   Future<PlacedOrder> placeOrder(
@@ -29,6 +55,7 @@ class _RecordingBackend extends FakeCommerceBackend {
     required String idempotencyKey,
   }) {
     keys.add(idempotencyKey);
+    methods.add(request.paymentMethod);
     if (failures.isNotEmpty) throw failures.removeAt(0);
     return super.placeOrder(request, idempotencyKey: idempotencyKey);
   }
@@ -176,6 +203,86 @@ void main() {
     // cart reloads empty (the server cleared it, `08` T2).
     expect(cartEmptyAtResult, isFalse);
     expect(container.read(cartProvider).snapshot.isEmpty, isTrue);
+  });
+
+  group('cash-only switch (DL-85)', () {
+    const onlineOff = PaymentOption(
+      method: PaymentMethod.online,
+      available: false,
+      reason: PaymentUnavailableReason.unknown, // ONLINE_DISABLED
+    );
+    const codOn = PaymentOption(method: PaymentMethod.cod, available: true);
+    const codOff = PaymentOption(
+      method: PaymentMethod.cod,
+      available: false,
+      reason: PaymentUnavailableReason.codDisabled,
+    );
+
+    test('ONLINE off: checkout switches to COD once the cart loads', () async {
+      backend.options = [onlineOff, codOn];
+      expect(container.read(checkoutProvider).method, PaymentMethod.online);
+      await pumpEventQueue();
+      expect(container.read(checkoutProvider).method, PaymentMethod.cod);
+
+      await place();
+      expect(backend.methods, [PaymentMethod.cod]);
+      expect(container.read(checkoutProvider).result, isA<OrderConfirmed>());
+    });
+
+    test(
+      'ONLINE off: Place order sends COD even if ONLINE was chosen',
+      () async {
+        backend.options = [onlineOff, codOn];
+        container.read(checkoutProvider);
+        await pumpEventQueue();
+        checkout().selectMethod(PaymentMethod.online);
+        await place();
+        expect(backend.methods, [PaymentMethod.cod]);
+      },
+    );
+
+    test('a chosen COD stays when both are offered', () async {
+      container.read(checkoutProvider);
+      await pumpEventQueue();
+      checkout().selectMethod(PaymentMethod.cod);
+      await container.read(cartProvider.notifier).refresh();
+      expect(container.read(checkoutProvider).method, PaymentMethod.cod);
+    });
+
+    test('nothing offered: the method is kept', () async {
+      backend.options = [onlineOff, codOff];
+      container.read(checkoutProvider);
+      await pumpEventQueue();
+      expect(container.read(checkoutProvider).method, PaymentMethod.online);
+    });
+
+    test('offeredMethod', () {
+      const both = CartSnapshot(
+        paymentOptions: [
+          PaymentOption(method: PaymentMethod.online, available: true),
+          codOn,
+        ],
+      );
+      expect(offeredMethod(PaymentMethod.cod, both), PaymentMethod.cod);
+      expect(
+        offeredMethod(
+          PaymentMethod.online,
+          const CartSnapshot(paymentOptions: [onlineOff, codOn]),
+        ),
+        PaymentMethod.cod,
+      );
+      expect(
+        offeredMethod(
+          PaymentMethod.online,
+          const CartSnapshot(paymentOptions: [onlineOff, codOff]),
+        ),
+        PaymentMethod.online,
+      );
+      expect(
+        offeredMethod(PaymentMethod.online, CartSnapshot.empty),
+        PaymentMethod.online,
+      );
+    });
   });
 
   test('keys are random v4 UUIDs', () {
