@@ -31,6 +31,8 @@ class AppliedCoupon {
 
     required this.freeVariantId,
 
+    required this.freeQuantity,
+
     required this.discount,
 
     required this.isApplicable,
@@ -47,7 +49,7 @@ class AppliedCoupon {
   @JsonKey(name: r'title', required: true, includeIfNull: false)
   final String title;
 
-  /// FREE_UNIT: a free-carton reward (ADR 0002). It gives no money off (`discount` is \"0.00\"); its carton is in `free_lines` with `source` REWARD.  * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - One free carton (reward)
+  /// FREE_UNIT: a free-carton reward (ADR 0002). It gives no money off (`discount` is \"0.00\"); its carton is in `free_lines` with `source` REWARD.  * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - Free cartons (reward)
   @JsonKey(
     name: r'discount_type',
     required: true,
@@ -65,9 +67,14 @@ class AppliedCoupon {
   )
   final CouponSourceEnum source_;
 
-  /// FREE_UNIT only: the size picked for the free carton (`VariantSummary.id`, sent as `free_variant_id` when applying). Null for other coupons.
+  /// FREE_UNIT only: the size of the free cartons (`VariantSummary.id`). ADR 0003: when the store has a fixed free size (`free_offer.free_variant`), it is that size; else the size the customer picked (ADR 0002). Null for other coupons.
   @JsonKey(name: r'free_variant_id', required: true, includeIfNull: true)
   final int? freeVariantId;
+
+  /// ADR 0003: FREE_UNIT only, the number of free cartons the reward gives (e.g. 2). Null for other coupons.
+  // minimum: 1
+  @JsonKey(name: r'free_quantity', required: true, includeIfNull: true)
+  final int? freeQuantity;
 
   /// The discount it gives this cart now (\"0.00\" when it does not apply).
   @JsonKey(name: r'discount', required: true, includeIfNull: false)
@@ -94,6 +101,7 @@ class AppliedCoupon {
           other.discountType == discountType &&
           other.source_ == source_ &&
           other.freeVariantId == freeVariantId &&
+          other.freeQuantity == freeQuantity &&
           other.discount == discount &&
           other.isApplicable == isApplicable &&
           other.message == message &&
@@ -106,6 +114,7 @@ class AppliedCoupon {
       discountType.hashCode +
       source_.hashCode +
       (freeVariantId == null ? 0 : freeVariantId.hashCode) +
+      (freeQuantity == null ? 0 : freeQuantity.hashCode) +
       discount.hashCode +
       isApplicable.hashCode +
       (message == null ? 0 : message.hashCode) +

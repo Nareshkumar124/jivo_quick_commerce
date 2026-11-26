@@ -236,6 +236,34 @@ class FreeLine {
   final int quantityUnavailable;
 }
 
+/// The store's fixed free-carton size (ADR 0003, `PricingConfig.
+/// free_unit_variant`): every free carton, from the volume offer or a
+/// reward, is this variant. Names as the server sends them.
+@immutable
+class FreeVariant {
+  const FreeVariant({
+    required this.id,
+    required this.name,
+    required this.productName,
+  });
+
+  final int id;
+
+  /// e.g. "1 L × 12".
+  final String name;
+  final String productName;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FreeVariant &&
+      other.id == id &&
+      other.name == name &&
+      other.productName == productName;
+
+  @override
+  int get hashCode => Object.hash(id, name, productName);
+}
+
 /// The store's volume offer on this cart (`free_offer`, ADR 0002): 1 free
 /// carton for every [every] paid cartons. Every number and text is the
 /// server's.
@@ -248,6 +276,7 @@ class FreeOffer {
     this.unitsToNextFree,
     this.message = '',
     this.notice,
+    this.freeVariant,
   });
 
   /// Paid cartons per free carton (e.g. 10).
@@ -268,6 +297,10 @@ class FreeOffer {
   /// Set when an earned free carton can't be supplied (no stock): shown as
   /// a notice, never a blocker.
   final String? notice;
+
+  /// The size every free carton is (ADR 0003); null when the store has no
+  /// fixed free size (the ADR 0002 cheapest-size rule).
+  final FreeVariant? freeVariant;
 }
 
 /// `CartLineIssueCodeEnum`.
@@ -555,8 +588,9 @@ enum CouponDiscountType {
   flat('FLAT'),
   percent('PERCENT'),
 
-  /// One free carton (ADR 0002): a reward, applied with a chosen size
-  /// (`free_variant_id`).
+  /// Free cartons (ADR 0002, 0003): a reward of `free_quantity` cartons,
+  /// of the store's fixed size, or of a chosen size (`free_variant_id`)
+  /// when the store has none.
   freeUnit('FREE_UNIT'),
 
   /// A type this build doesn't know (a newer server).
@@ -613,6 +647,7 @@ class AppliedCoupon {
     this.discountType = CouponDiscountType.unknown,
     this.source = RewardSource.none,
     this.freeVariantId,
+    this.freeQuantity,
   });
 
   final String code;
@@ -632,8 +667,13 @@ class AppliedCoupon {
   final CouponDiscountType discountType;
   final RewardSource source;
 
-  /// The size chosen for a free-carton reward (`free_variant_id`).
+  /// The free carton's size (`free_variant_id`): the store's fixed size
+  /// (ADR 0003) or the one chosen.
   final int? freeVariantId;
+
+  /// Free cartons this reward gives (`free_quantity`, ADR 0003); null for
+  /// other coupons, or from a server before ADR 0003.
+  final int? freeQuantity;
 
   /// A free-carton reward: it adds a free line instead of a ₹ discount.
   bool get isFreeCarton => discountType == CouponDiscountType.freeUnit;
@@ -668,6 +708,7 @@ class CouponOffer {
     this.discountType = CouponDiscountType.unknown,
     this.source = RewardSource.none,
     this.freeVariantId,
+    this.freeQuantity,
   });
 
   final String code;
@@ -704,11 +745,21 @@ class CouponOffer {
   /// Why it was given, for a reward (`source`).
   final RewardSource source;
 
-  /// The size already chosen, when this free-carton reward is on the cart.
+  /// A free-carton reward's size: the store's fixed free size, pre-filled
+  /// by the server (ADR 0003), or the size chosen when it is on the cart.
   final int? freeVariantId;
 
-  /// A free-carton reward: applying it needs a size (`free_variant_id`).
+  /// Free cartons this reward gives (`free_quantity`, ADR 0003); null for
+  /// other coupons, or from a server before ADR 0003.
+  final int? freeQuantity;
+
+  /// A free-carton reward (`FREE_UNIT`).
   bool get isFreeCarton => discountType == CouponDiscountType.freeUnit;
+
+  /// A free-carton reward the server applies without a size choice: the
+  /// store has a fixed free size (ADR 0003). Otherwise applying it needs a
+  /// size (the size sheet).
+  bool get hasFixedFreeSize => isFreeCarton && freeVariantId != null;
 }
 
 /// The delivery-instruction chips (`DeliveryInstructionChipEnum`).

@@ -91,6 +91,7 @@ export 'package:jivo_api/src/model/faq.dart';
 export 'package:jivo_api/src/model/free_line.dart';
 export 'package:jivo_api/src/model/free_offer.dart';
 export 'package:jivo_api/src/model/free_source_enum.dart';
+export 'package:jivo_api/src/model/free_variant.dart';
 export 'package:jivo_api/src/model/health_check_status_enum.dart';
 export 'package:jivo_api/src/model/health_checks.dart';
 export 'package:jivo_api/src/model/health_live.dart';

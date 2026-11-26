@@ -30,8 +30,9 @@ abstract interface class CartRepository {
   Future<List<CouponOffer>> coupons();
 
   /// `POST /cart/coupon/ {code, free_variant_id}`. A free-carton reward
-  /// (`FREE_UNIT`, ADR 0002) needs [freeVariantId]: the size the customer
-  /// picked, sold at the cart's store. It takes the cart's coupon slot.
+  /// (`FREE_UNIT`) takes the cart's coupon slot. When the store has a fixed
+  /// free size (ADR 0003) [freeVariantId] is left out and the server uses
+  /// that size; otherwise it is the size the customer picked (ADR 0002).
   Future<CartSnapshot> applyCoupon(String code, {int? freeVariantId});
 
   /// `DELETE /cart/coupon/`.

@@ -70,6 +70,7 @@ class ReferralInfo {
     this.referredBy,
     this.rewardType = ReferralRewardType.amount,
     this.rewardQuantity = 1,
+    this.welcomeRewardQuantity,
   });
 
   /// The customer's own code (upper case). Never changes.
@@ -88,8 +89,14 @@ class ReferralInfo {
   /// Rupees off, or free cartons (ADR 0002).
   final ReferralRewardType rewardType;
 
-  /// Free cartons each customer gets (1) for [ReferralRewardType.freeCarton].
+  /// Free cartons each customer gets for [ReferralRewardType.freeCarton]
+  /// (`reward_quantity`, a server setting: 2 on staging, ADR 0003). All
+  /// referral copy uses it; never assume 1.
   final int rewardQuantity;
+
+  /// Free cartons in the welcome gift (`welcome_reward_quantity`, ADR
+  /// 0003); null when the server doesn't send it.
+  final int? welcomeRewardQuantity;
 
   bool get isFreeCarton => rewardType == ReferralRewardType.freeCarton;
 
@@ -126,7 +133,8 @@ class ReferralInfo {
       other.friendsJoined == friendsJoined &&
       other.friendsRewarded == friendsRewarded &&
       other.rewardType == rewardType &&
-      other.rewardQuantity == rewardQuantity;
+      other.rewardQuantity == rewardQuantity &&
+      other.welcomeRewardQuantity == welcomeRewardQuantity;
 
   @override
   int get hashCode => Object.hash(
@@ -142,5 +150,6 @@ class ReferralInfo {
     friendsRewarded,
     rewardType,
     rewardQuantity,
+    welcomeRewardQuantity,
   );
 }

@@ -44,6 +44,7 @@ Map<String, Object?> referralJson({
   'reward_type': rewardType,
   'reward_quantity': 1,
   'reward_label': rewardType == 'FREE_UNIT' ? '1 free carton' : '₹90 off',
+  'welcome_reward_quantity': 1,
   'reward_amount': '90.00',
   'reward_validity_days': 30,
   'reward_min_order_value': '0.00',

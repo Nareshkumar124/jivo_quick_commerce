@@ -47,6 +47,7 @@ import 'package:jivo_api/src/model/error_envelope.dart';
 import 'package:jivo_api/src/model/faq.dart';
 import 'package:jivo_api/src/model/free_line.dart';
 import 'package:jivo_api/src/model/free_offer.dart';
+import 'package:jivo_api/src/model/free_variant.dart';
 import 'package:jivo_api/src/model/health_checks.dart';
 import 'package:jivo_api/src/model/health_live.dart';
 import 'package:jivo_api/src/model/health_ready.dart';
@@ -374,6 +375,8 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'FreeOffer':
       return FreeOffer.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'FreeSourceEnum':
+    case 'FreeVariant':
+      return FreeVariant.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'HealthCheckStatusEnum':
     case 'HealthChecks':
       return HealthChecks.fromJson(value as Map<String, dynamic>) as ReturnType;

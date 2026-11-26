@@ -17,6 +17,8 @@ abstract class _$AppliedCouponCWProxy {
 
   AppliedCoupon freeVariantId(int? freeVariantId);
 
+  AppliedCoupon freeQuantity(int? freeQuantity);
+
   AppliedCoupon discount(String discount);
 
   AppliedCoupon isApplicable(bool isApplicable);
@@ -37,6 +39,7 @@ abstract class _$AppliedCouponCWProxy {
     CouponDiscountTypeEnum discountType,
     CouponSourceEnum source_,
     int? freeVariantId,
+    int? freeQuantity,
     String discount,
     bool isApplicable,
     String? message,
@@ -68,6 +71,10 @@ class _$AppliedCouponCWProxyImpl implements _$AppliedCouponCWProxy {
       this(freeVariantId: freeVariantId);
 
   @override
+  AppliedCoupon freeQuantity(int? freeQuantity) =>
+      this(freeQuantity: freeQuantity);
+
+  @override
   AppliedCoupon discount(String discount) => this(discount: discount);
 
   @override
@@ -94,6 +101,7 @@ class _$AppliedCouponCWProxyImpl implements _$AppliedCouponCWProxy {
     Object? discountType = const $CopyWithPlaceholder(),
     Object? source_ = const $CopyWithPlaceholder(),
     Object? freeVariantId = const $CopyWithPlaceholder(),
+    Object? freeQuantity = const $CopyWithPlaceholder(),
     Object? discount = const $CopyWithPlaceholder(),
     Object? isApplicable = const $CopyWithPlaceholder(),
     Object? message = const $CopyWithPlaceholder(),
@@ -120,6 +128,10 @@ class _$AppliedCouponCWProxyImpl implements _$AppliedCouponCWProxy {
           ? _value.freeVariantId
           // ignore: cast_nullable_to_non_nullable
           : freeVariantId as int?,
+      freeQuantity: freeQuantity == const $CopyWithPlaceholder()
+          ? _value.freeQuantity
+          // ignore: cast_nullable_to_non_nullable
+          : freeQuantity as int?,
       discount: discount == const $CopyWithPlaceholder()
           ? _value.discount
           // ignore: cast_nullable_to_non_nullable
@@ -163,6 +175,7 @@ AppliedCoupon _$AppliedCouponFromJson(Map<String, dynamic> json) =>
             'discount_type',
             'source',
             'free_variant_id',
+            'free_quantity',
             'discount',
             'is_applicable',
             'message',
@@ -192,6 +205,10 @@ AppliedCoupon _$AppliedCouponFromJson(Map<String, dynamic> json) =>
             'free_variant_id',
             (v) => (v as num?)?.toInt(),
           ),
+          freeQuantity: $checkedConvert(
+            'free_quantity',
+            (v) => (v as num?)?.toInt(),
+          ),
           discount: $checkedConvert('discount', (v) => v as String),
           isApplicable: $checkedConvert('is_applicable', (v) => v as bool),
           message: $checkedConvert('message', (v) => v as String?),
@@ -206,6 +223,7 @@ AppliedCoupon _$AppliedCouponFromJson(Map<String, dynamic> json) =>
         'discountType': 'discount_type',
         'source_': 'source',
         'freeVariantId': 'free_variant_id',
+        'freeQuantity': 'free_quantity',
         'isApplicable': 'is_applicable',
         'amountToUnlock': 'amount_to_unlock',
       },
@@ -218,6 +236,7 @@ Map<String, dynamic> _$AppliedCouponToJson(AppliedCoupon instance) =>
       'discount_type': _$CouponDiscountTypeEnumEnumMap[instance.discountType]!,
       'source': _$CouponSourceEnumEnumMap[instance.source_]!,
       'free_variant_id': instance.freeVariantId,
+      'free_quantity': instance.freeQuantity,
       'discount': instance.discount,
       'is_applicable': instance.isApplicable,
       'message': instance.message,

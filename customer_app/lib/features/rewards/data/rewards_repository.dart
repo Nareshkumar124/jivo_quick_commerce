@@ -4,14 +4,18 @@ import 'package:jivo_api/jivo_api.dart'
     show JivoApi, Reward, RewardHistoryEntry, Rewards;
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../cart/data/api_cart_repository.dart' show freeVariantFromApi;
 import '../../cart/domain/cart.dart';
 import '../domain/reward.dart';
 
-/// The customer's rewards (`GET /account/rewards/`, ADR 0002). Account
-/// data: no `X-Store-Id`. Implementations throw [ApiError].
+/// The customer's rewards (`GET /account/rewards/`, ADR 0002, 0003).
+/// Account data, but sent with the serving store's `X-Store-Id` when there
+/// is one, so each reward names that store's fixed free size
+/// (`free_variant`, ADR 0003). Implementations throw [ApiError].
 ///
-/// Using a reward is not here: it is the cart's apply-coupon call with
-/// `free_variant_id` (`CartRepository.applyCoupon`).
+/// Using a reward is not here: it is the cart's apply-coupon call
+/// (`CartRepository.applyCoupon`), with no `free_variant_id` when the store
+/// has a fixed free size (ADR 0003), else with the size picked.
 abstract interface class RewardsRepository {
   /// Available and claimed rewards, and the history.
   Future<RewardsSummary> fetch();
@@ -19,16 +23,20 @@ abstract interface class RewardsRepository {
 
 /// `GET /account/rewards/` (`account_rewards_retrieve`) on the generated
 /// client. This file is the only place that uses the generated reward
-/// types.
+/// types. [storeId] reads the serving store at call time (optional
+/// `X-Store-Id`; left out when there is no store yet).
 class ApiRewardsRepository implements RewardsRepository {
-  const ApiRewardsRepository(this._api);
+  const ApiRewardsRepository(this._api, [this._storeId]);
 
   final api.JivoApi _api;
+  final int? Function()? _storeId;
 
   @override
   Future<RewardsSummary> fetch() async {
     try {
-      final response = await _api.getAccountApi().accountRewardsRetrieve();
+      final response = await _api.getAccountApi().accountRewardsRetrieve(
+        xStoreId: _storeId?.call(),
+      );
       return rewardsFromApi(response.data!);
     } on DioException catch (e) {
       throw ApiError.fromDioException(e);
@@ -52,6 +60,8 @@ Reward _reward(api.Reward r) => Reward(
   status: RewardStatus.fromWire(r.status.value),
   expiresAt: r.expiresAt,
   orderNumber: r.orderNumber,
+  quantity: r.quantity,
+  freeVariant: freeVariantFromApi(r.freeVariant),
 );
 
 RewardHistoryEntry _entry(api.RewardHistoryEntry e) => RewardHistoryEntry(
@@ -67,9 +77,11 @@ RewardHistoryEntry _entry(api.RewardHistoryEntry e) => RewardHistoryEntry(
 class FakeRewardsRepository implements RewardsRepository {
   FakeRewardsRepository({this.summary = RewardsSummary.empty});
 
-  /// The dev flavor's demo: a welcome gift to use, a referral reward on an
-  /// order, and some history. [welcomeCode] is also a reward the fake cart
-  /// accepts (`app/repositories.dart`).
+  /// The dev flavor's demo (ADR 0003: 2 free 1 L cartons each): a welcome
+  /// gift to use, a referral reward on an order, and some history.
+  /// [welcomeCode] is also a reward the fake cart accepts
+  /// (`app/repositories.dart`), of the fake store's fixed free size
+  /// [demoFreeVariant].
   factory FakeRewardsRepository.demo({DateTime? now}) {
     final today = (now ?? DateTime.now()).toUtc();
     return FakeRewardsRepository(
@@ -77,18 +89,22 @@ class FakeRewardsRepository implements RewardsRepository {
         available: [
           Reward(
             code: welcomeCode,
-            title: '1 free carton',
+            title: '2 free cartons',
             source: RewardSource.welcome,
             status: RewardStatus.available,
             expiresAt: today.add(const Duration(days: 28)),
+            quantity: demoQuantity,
+            freeVariant: demoFreeVariant,
           ),
           Reward(
-            code: 'REF-1FC-7P2K',
-            title: '1 free carton',
+            code: 'REF-2FC-7P2K',
+            title: '2 free cartons',
             source: RewardSource.referralReferrer,
             status: RewardStatus.claimed,
             expiresAt: today.add(const Duration(days: 20)),
             orderNumber: 'JV-261124-001002',
+            quantity: demoQuantity,
+            freeVariant: demoFreeVariant,
           ),
         ],
         history: [
@@ -96,11 +112,13 @@ class FakeRewardsRepository implements RewardsRepository {
             at: today.subtract(const Duration(days: 2)),
             kind: RewardHistoryKind.earned,
             title: 'Welcome gift',
+            quantity: demoQuantity,
           ),
           RewardHistoryEntry(
             at: today.subtract(const Duration(days: 1)),
             kind: RewardHistoryKind.claimed,
             title: 'Referral reward',
+            quantity: demoQuantity,
             orderNumber: 'JV-261124-001002',
           ),
           RewardHistoryEntry(
@@ -116,7 +134,17 @@ class FakeRewardsRepository implements RewardsRepository {
   }
 
   /// The demo welcome reward's code.
-  static const welcomeCode = 'WELCOME-1FC';
+  static const welcomeCode = 'WELCOME-2FC';
+
+  /// Free cartons in each demo reward (staging's setting, ADR 0003).
+  static const demoQuantity = 2;
+
+  /// The fake store's fixed free size: the fake catalog's 1 L water.
+  static const demoFreeVariant = FreeVariant(
+    id: 1501,
+    name: '1 L',
+    productName: 'Jivo Packaged Drinking Water',
+  );
 
   RewardsSummary summary;
 

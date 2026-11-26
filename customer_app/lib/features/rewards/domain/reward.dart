@@ -2,10 +2,11 @@ import 'package:flutter/foundation.dart';
 
 import '../../cart/domain/cart.dart';
 
-/// Rewards (ADR 0002, `GET /account/rewards/`): the customer's free-carton
-/// rewards (welcome gift, referral) and their history. A reward is a
-/// personal coupon on the server, so it is used through the cart's normal
-/// apply-coupon call with the size the customer picks.
+/// Rewards (ADR 0002, 0003, `GET /account/rewards/`): the customer's
+/// free-carton rewards (welcome gift, referral) and their history. A reward
+/// is a personal coupon on the server, so it is used through the cart's
+/// normal apply-coupon call: with no size when the store has a fixed free
+/// size (ADR 0003), else with the size the customer picks.
 
 /// `status` of a reward (ADR 0002 rule 10).
 enum RewardStatus {
@@ -48,6 +49,9 @@ class Reward {
     this.expiresAt,
     this.orderNumber,
     this.discountType = CouponDiscountType.freeUnit,
+    this.quantity = 1,
+    this.freeVariant,
+    this.freeVariantId,
   });
 
   /// The personal coupon's code (what apply-coupon takes).
@@ -68,10 +72,42 @@ class Reward {
   /// the server may add later is shown with its [title].
   final CouponDiscountType discountType;
 
+  /// Free cartons it gives (`quantity`, ADR 0003). The server's number; a
+  /// server before ADR 0003 doesn't send it, and its rewards were 1.
+  final int quantity;
+
+  /// The free carton's size, when the store has a fixed one
+  /// (`free_variant`, ADR 0003). Shown on the card ("1 L × 12").
+  final FreeVariant? freeVariant;
+
+  /// The fixed size's id from the cart's coupon list (`CouponOffer.
+  /// free_variant_id`), when the rewards list didn't name a size.
+  final int? freeVariantId;
+
   bool get isFreeCarton => discountType == CouponDiscountType.freeUnit;
 
   /// Can be used now (the Use button).
   bool get canUse => status == RewardStatus.available;
+
+  /// The server gave a fixed free size (ADR 0003): Use applies the reward
+  /// directly, with no size sheet. Otherwise the size sheet picks one.
+  bool get hasFixedSize => freeVariant != null || freeVariantId != null;
+
+  /// This reward with what the cart's coupon list adds: the store's fixed
+  /// size and the quantity, when the rewards list didn't send them.
+  Reward withOffer(CouponOffer offer) => Reward(
+    code: code,
+    title: title,
+    source: source,
+    status: status,
+    expiresAt: expiresAt,
+    orderNumber: orderNumber,
+    discountType: discountType,
+    quantity: quantity,
+    freeVariant: freeVariant,
+    freeVariantId:
+        freeVariantId ?? (offer.isApplied ? null : offer.freeVariantId),
+  );
 }
 
 /// `history[].kind`.
@@ -162,11 +198,25 @@ class RewardsSummary {
 ///   have (e.g. while the rewards list failed to load), as an available
 ///   reward so it can still be used;
 /// - [RewardsAndCoupons.coupons]: the other coupons.
+///
+/// A reward that is also in the coupon list takes the coupon's fixed free
+/// size when the rewards list named none (ADR 0003, [Reward.withOffer]).
 RewardsAndCoupons splitRewardsAndCoupons({
   required List<Reward> rewards,
   required List<CouponOffer> coupons,
 }) {
+  final offers = <String, CouponOffer>{};
+  for (final coupon in coupons) {
+    offers.putIfAbsent(coupon.code.toUpperCase(), () => coupon);
+  }
   final known = {for (final reward in rewards) reward.code.toUpperCase()};
+  final listed = [
+    for (final reward in rewards)
+      switch (offers[reward.code.toUpperCase()]) {
+        final offer? when offer.isFreeCarton => reward.withOffer(offer),
+        _ => reward,
+      },
+  ];
   final extra = <Reward>[];
   final plain = <CouponOffer>[];
   for (final coupon in coupons) {
@@ -179,13 +229,15 @@ RewardsAndCoupons splitRewardsAndCoupons({
           source: coupon.source,
           status: RewardStatus.available,
           expiresAt: coupon.endsAt,
+          quantity: coupon.freeQuantity ?? 1,
+          freeVariantId: coupon.isApplied ? null : coupon.freeVariantId,
         ),
       );
     } else {
       plain.add(coupon);
     }
   }
-  return RewardsAndCoupons(rewards: [...rewards, ...extra], coupons: plain);
+  return RewardsAndCoupons(rewards: [...listed, ...extra], coupons: plain);
 }
 
 /// See [splitRewardsAndCoupons].

@@ -751,7 +751,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Choose a delivery location to see what\'s in stock near you.';
 
   @override
-  String get notServiceableInline => 'We don\'t deliver to this location yet.';
+  String get comingSoonTitle => 'We\'re coming to your area soon!';
+
+  @override
+  String get comingSoonBody =>
+      'We don\'t deliver to this location yet, but we\'re growing fast. We\'ll start here soon.';
 
   @override
   String get changeLocation => 'Change location';
@@ -940,9 +944,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get enterAddressManually => 'Enter address manually';
-
-  @override
-  String get notServiceableTitle => 'We\'re not in your area yet';
 
   @override
   String get notServiceableBody =>
@@ -2700,7 +2701,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rewardUse => 'Use';
 
   @override
-  String get rewardUseSemantics => 'Use your free carton';
+  String rewardUseSemantics(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Use your $count free cartons',
+      one: 'Use your free carton',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get rewardInCart => 'In your cart';
@@ -2729,7 +2738,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get freeSizeTitle => 'Pick a size for your free carton';
+  String freeSizeTitle(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Pick a size for your $count free cartons',
+      one: 'Pick a size for your free carton',
+    );
+    return '$_temp0';
+  }
 
   @override
   String freeSizeMinNote(int minimum, String label) {
@@ -2748,7 +2765,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get freeSizeConfirm => 'Add free carton';
+  String freeSizeConfirm(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Add $count free cartons',
+      one: 'Add free carton',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get freeSizeEmpty => 'No sizes are available at this store right now.';
@@ -2782,7 +2807,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rewardAddCartons => 'Add cartons';
 
   @override
-  String get freeCartonAdded => 'Free carton added to your cart';
+  String freeCartonsAdded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count free cartons added to your cart',
+      one: 'Free carton added to your cart',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get rewardFixedSizeUnavailable =>
+      'The free carton size is not available at this store right now. Please try again later.';
+
+  @override
+  String freeCartonsOfSize(int count, String size) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count free cartons · $size',
+      one: '1 free carton · $size',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get freeTag => 'FREE';
@@ -2825,6 +2873,22 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String freeOfferEarned(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'You get $count free cartons with this order!',
+      one: 'You get 1 free carton with this order!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String freeOfferSizeHint(String size) {
+    return 'Free carton size: $size';
+  }
+
+  @override
   String freeOfferNudge(int count, String label) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
@@ -2847,12 +2911,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get couponFreeCartonApplied => 'Free carton reward applied';
 
   @override
-  String get couponFreeCartonInOrder =>
-      'Your free carton is in the items above';
+  String couponFreeCartonInOrder(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Your $count free cartons are in the items above',
+      one: 'Your free carton is in the items above',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get couponFreeCartonOffer =>
-      'Get 1 free carton. Pick a size when you apply it.';
+  String couponFreeCartonOffer(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Get $count free cartons. Pick a size when you apply them.',
+      one: 'Get 1 free carton. Pick a size when you apply it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String couponFreeCartonsFixed(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Get $count free cartons.',
+      one: 'Get 1 free carton.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get checkoutFreeCartonsTitle => 'Free cartons';
@@ -2892,7 +2981,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get referralStatusRewardedReward =>
-      'Your free carton is in Rewards. Tap Use there to add it to your cart.';
+      'Your reward is in Rewards. Tap Use there to add it to your cart.';
 
   @override
   String referralPromptBodyReward(String reward) {

@@ -8,6 +8,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../cart/presentation/cart_controller.dart';
+import '../../cart/presentation/cart_texts.dart';
 import '../../cart/presentation/my_coupons_screen.dart' show MyCouponCard;
 import '../../cart/presentation/widgets/coupon_sheet.dart'
     show cartCouponsProvider;
@@ -22,8 +23,9 @@ import 'rewards_providers.dart';
 /// - **Available:** the free-carton rewards that can be used or are on an
 ///   order (`GET /account/rewards/` `available`), each with an Available or
 ///   Claimed chip, then the coupons from `GET /cart/coupons/` (copyable
-///   codes). Use opens the size picker, applies the reward to the cart and
-///   opens the cart.
+///   codes). Use applies the reward to the cart and opens the cart: directly
+///   when the store has a fixed free size (ADR 0003), else after the size
+///   picker.
 /// - **History:** earned, claimed, used, expired and volume-offer free
 ///   cartons, newest first, with dates and order numbers.
 ///
@@ -259,27 +261,109 @@ class _NeedsLocation extends StatelessWidget {
   }
 }
 
-/// One reward: "1 free carton", where it came from, its expiry, the
-/// Available / Claimed chip ("On your order …" when claimed), and Use (or
-/// "In your cart" with View cart when it is already on the cart).
-class RewardCard extends ConsumerWidget {
+/// One reward: "2 free cartons · 1 L × 12" (the server's quantity and
+/// fixed size, ADR 0003), where it came from, its expiry, the Available /
+/// Claimed chip ("On your order …" when claimed), and Use (or "In your
+/// cart" with View cart when it is already on the cart).
+///
+/// Use: with a fixed free size the reward is applied at once (no size
+/// sheet) and the cart opens; its error shows in a snackbar (with Add
+/// cartons when more paid cartons are needed). Without one, or when the
+/// server still asks for a size, the size sheet picks it.
+class RewardCard extends ConsumerStatefulWidget {
   const RewardCard({required this.reward, this.inCart = false, super.key});
 
   final Reward reward;
   final bool inCart;
 
-  Future<void> _use(BuildContext context) async {
+  @override
+  ConsumerState<RewardCard> createState() => _RewardCardState();
+}
+
+class _RewardCardState extends ConsumerState<RewardCard> {
+  bool _applying = false;
+
+  Reward get reward => widget.reward;
+
+  Future<void> _use() async {
+    if (_applying) return;
+    if (!reward.hasFixedSize) return _pickSize();
+    setState(() => _applying = true);
+    try {
+      // ADR 0003: no `free_variant_id`; the server uses the store's size.
+      await ref.read(cartProvider.notifier).applyCoupon(reward.code);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _applying = false);
+      // The cart's store has no fixed size after all: pick one.
+      if (isFreeSizeRequired(error)) return _pickSize();
+      _showError(error);
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _applying = false);
+    await _openCart();
+  }
+
+  Future<void> _pickSize() async {
+    final applied = await showFreeSizeSheet(
+      context,
+      code: reward.code,
+      quantity: reward.quantity,
+    );
+    if (!applied || !mounted) return;
+    await _openCart();
+  }
+
+  Future<void> _openCart() async {
     final l10n = AppLocalizations.of(context);
-    final applied = await showFreeSizeSheet(context, code: reward.code);
-    if (!applied || !context.mounted) return;
-    showMessage(context, l10n.freeCartonAdded);
+    final quantity =
+        ref.read(cartProvider).snapshot.coupon?.freeQuantity ?? reward.quantity;
+    showMessage(context, l10n.freeCartonsAdded(quantity));
     // Pushed (on the root navigator, like the cart bar does): Back
     // returns to Rewards.
     await context.push(Routes.cart);
   }
 
+  void _showError(Object error) {
+    final l10n = AppLocalizations.of(context);
+    final needsCartons =
+        ApiError.from(error).details['reason'] == 'MIN_ORDER_UNITS';
+    final text = cartErrorText(
+      context,
+      error,
+      cart: ref.read(cartProvider).snapshot,
+      fixedFreeSize: true,
+    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: ValueKey('reward-error-${reward.code}'),
+          content: Text(text),
+          action: needsCartons
+              ? SnackBarAction(
+                  label: l10n.rewardAddCartons,
+                  onPressed: () => context.push(Routes.allProducts),
+                )
+              : null,
+        ),
+      );
+  }
+
+  /// "2 free cartons · 1 L × 12", "2 free cartons" without a named size,
+  /// or the server's title for a reward that is not a free carton.
+  String _title(AppLocalizations l10n) {
+    if (!reward.isFreeCarton) return reward.title;
+    final size = reward.freeVariant?.name.trim();
+    return size == null || size.isEmpty
+        ? l10n.freeCartonCount(reward.quantity)
+        : l10n.freeCartonsOfSize(reward.quantity, size);
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final inCart = widget.inCart;
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
@@ -313,9 +397,7 @@ class RewardCard extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          reward.isFreeCarton
-                              ? l10n.freeCartonCount(1)
-                              : reward.title,
+                          _title(l10n),
                           key: ValueKey('reward-title-$code'),
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
@@ -387,11 +469,21 @@ class RewardCard extends ConsumerWidget {
                         style: FilledButton.styleFrom(
                           minimumSize: const Size(96, kJivoMinTouchTarget),
                         ),
-                        onPressed: () => _use(context),
-                        child: Text(
-                          l10n.rewardUse,
-                          semanticsLabel: l10n.rewardUseSemantics,
-                        ),
+                        onPressed: _applying ? null : _use,
+                        child: _applying
+                            ? SizedBox.square(
+                                key: ValueKey('reward-applying-$code'),
+                                dimension: 20,
+                                child: const CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                l10n.rewardUse,
+                                semanticsLabel: l10n.rewardUseSemantics(
+                                  reward.quantity,
+                                ),
+                              ),
                       ),
               ),
             ],

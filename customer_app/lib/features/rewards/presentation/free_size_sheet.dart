@@ -13,12 +13,26 @@ import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_texts.dart';
 import 'rewards_providers.dart';
 
+/// The server wants a size for a free-carton reward: 400 with
+/// `free_variant_id` (ADR 0002; a store with no fixed free size). The
+/// caller then opens the size sheet instead of showing an error.
+bool isFreeSizeRequired(Object error) {
+  final apiError = ApiError.from(error);
+  return apiError.code == ApiErrorCode.validationError &&
+      apiError.details.containsKey('free_variant_id');
+}
+
 /// Opens the size picker for the free-carton reward [code] (ADR 0002) and
 /// applies it to the cart with the size the customer picks. Returns true
 /// once the server applied it (the cart then holds the free line).
+///
+/// Only a fallback since ADR 0003: a reward whose store has a fixed free
+/// size is applied directly, with no sheet. [quantity] is the reward's
+/// number of free cartons (the server's), for the copy.
 Future<bool> showFreeSizeSheet(
   BuildContext context, {
   required String code,
+  int quantity = 1,
 }) async {
   final applied = await showModalBottomSheet<bool>(
     context: context,
@@ -27,7 +41,7 @@ Future<bool> showFreeSizeSheet(
     useSafeArea: true,
     builder: (context) => Theme(
       data: lightPageTheme(Theme.of(context)),
-      child: FreeSizeSheet(code: code),
+      child: FreeSizeSheet(code: code, quantity: quantity),
     ),
   );
   return applied ?? false;
@@ -41,9 +55,12 @@ Future<bool> showFreeSizeSheet(
 /// that the order still needs the store's minimum of paid cartons, and
 /// when the reward will replace a coupon already on the cart.
 class FreeSizeSheet extends ConsumerStatefulWidget {
-  const FreeSizeSheet({required this.code, super.key});
+  const FreeSizeSheet({required this.code, this.quantity = 1, super.key});
 
   final String code;
+
+  /// Free cartons the reward gives (the server's number), for the copy.
+  final int quantity;
 
   @override
   ConsumerState<FreeSizeSheet> createState() => _FreeSizeSheetState();
@@ -183,7 +200,7 @@ class _FreeSizeSheetState extends ConsumerState<FreeSizeSheet> {
                   Semantics(
                     header: true,
                     child: Text(
-                      l10n.freeSizeTitle,
+                      l10n.freeSizeTitle(widget.quantity),
                       style: theme.textTheme.titleMedium,
                     ),
                   ),
@@ -257,7 +274,7 @@ class _FreeSizeSheetState extends ConsumerState<FreeSizeSheet> {
                 ),
                 child: BusyButton(
                   key: const Key('free-size-confirm'),
-                  label: l10n.freeSizeConfirm,
+                  label: l10n.freeSizeConfirm(widget.quantity),
                   busy: _applying,
                   onPressed: picked == null ? null : () => _apply(picked),
                 ),

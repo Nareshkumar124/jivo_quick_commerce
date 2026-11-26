@@ -85,7 +85,10 @@ final referralRepositoryProvider = Provider<ReferralRepository>(
 final rewardsRepositoryProvider = Provider<RewardsRepository>(
   (ref) => _fake(ref)
       ? FakeRewardsRepository.demo()
-      : ApiRewardsRepository(ref.watch(jivoApiProvider)),
+      : ApiRewardsRepository(
+          ref.watch(jivoApiProvider),
+          () => ref.read(currentStoreIdProvider),
+        ),
 );
 
 final addressRepositoryProvider = Provider<AddressRepository>(
@@ -134,12 +137,21 @@ final cartAvailableProvider = Provider<bool>(
 final fakeCommerceBackendProvider = Provider<FakeCommerceBackend>(
   (ref) =>
       FakeCommerceBackend(
-          // The demo rules, plus "buy 10 get 1 free" (ADR 0002).
-          rules: const FakeBillRules(freeUnitEvery: 10),
+          // The demo rules, plus "buy 10 get 1 free" (ADR 0002), every
+          // free carton the 1 L size (ADR 0003).
+          rules: FakeBillRules(
+            freeUnitEvery: 10,
+            freeUnitVariantId: FakeRewardsRepository.demoFreeVariant.id,
+          ),
           variantLookup: fakeCatalogVariant,
         )
         ..rewardCoupons.add(
-          const FakeCoupon.freeCarton(code: FakeRewardsRepository.welcomeCode),
+          const FakeCoupon.freeCarton(
+            code: FakeRewardsRepository.welcomeCode,
+            title: '2 free cartons',
+            description: 'Free 1 L cartons',
+            freeQuantity: FakeRewardsRepository.demoQuantity,
+          ),
         )
         ..seedDemoOrders(),
 );

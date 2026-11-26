@@ -33,6 +33,8 @@ class Referral {
 
     required this.rewardLabel,
 
+    required this.welcomeRewardQuantity,
+
     required this.rewardAmount,
 
     required this.rewardValidityDays,
@@ -60,7 +62,7 @@ class Referral {
   @JsonKey(name: r'is_enabled', required: true, includeIfNull: false)
   final bool isEnabled;
 
-  /// ADR 0002: FREE_UNIT = each of the two customers gets one free carton (show `reward_label`, never a ₹ amount). The only value sent today.  * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - One free carton (reward)
+  /// ADR 0002: FREE_UNIT = each of the two customers gets `reward_quantity` free cartons (show `reward_label`, never a ₹ amount). The only value sent today.  * `FLAT` - Flat amount off * `PERCENT` - Percent off * `FREE_UNIT` - Free cartons (reward)
   @JsonKey(
     name: r'reward_type',
     required: true,
@@ -69,14 +71,23 @@ class Referral {
   )
   final CouponDiscountTypeEnum rewardType;
 
-  /// Free cartons each customer gets (1).
+  /// ADR 0003: free cartons each of the two customers gets (the admin setting, e.g. 2): \"You and your friend each get 2 free cartons\".
   // minimum: 1
   @JsonKey(name: r'reward_quantity', required: true, includeIfNull: false)
   final int rewardQuantity;
 
-  /// Ready-made text, e.g. \"1 free carton\".
+  /// Ready-made text, e.g. \"2 free cartons\" (\"1 free carton\" for 1).
   @JsonKey(name: r'reward_label', required: true, includeIfNull: false)
   final String rewardLabel;
+
+  /// ADR 0003: free cartons of the welcome reward a new customer account gets (the admin setting, e.g. 2).
+  // minimum: 1
+  @JsonKey(
+    name: r'welcome_reward_quantity',
+    required: true,
+    includeIfNull: false,
+  )
+  final int welcomeRewardQuantity;
 
   /// Deprecated (ADR 0002): the old ₹ reward setting, not given any more. Use `reward_type` / `reward_label`.
   @JsonKey(name: r'reward_amount', required: true, includeIfNull: false)
@@ -120,6 +131,7 @@ class Referral {
           other.rewardType == rewardType &&
           other.rewardQuantity == rewardQuantity &&
           other.rewardLabel == rewardLabel &&
+          other.welcomeRewardQuantity == welcomeRewardQuantity &&
           other.rewardAmount == rewardAmount &&
           other.rewardValidityDays == rewardValidityDays &&
           other.rewardMinOrderValue == rewardMinOrderValue &&
@@ -136,6 +148,7 @@ class Referral {
       rewardType.hashCode +
       rewardQuantity.hashCode +
       rewardLabel.hashCode +
+      welcomeRewardQuantity.hashCode +
       rewardAmount.hashCode +
       rewardValidityDays.hashCode +
       rewardMinOrderValue.hashCode +

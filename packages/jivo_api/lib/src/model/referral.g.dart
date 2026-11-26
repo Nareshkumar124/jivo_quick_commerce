@@ -19,6 +19,8 @@ abstract class _$ReferralCWProxy {
 
   Referral rewardLabel(String rewardLabel);
 
+  Referral welcomeRewardQuantity(int welcomeRewardQuantity);
+
   Referral rewardAmount(String rewardAmount);
 
   Referral rewardValidityDays(int rewardValidityDays);
@@ -46,6 +48,7 @@ abstract class _$ReferralCWProxy {
     CouponDiscountTypeEnum rewardType,
     int rewardQuantity,
     String rewardLabel,
+    int welcomeRewardQuantity,
     String rewardAmount,
     int rewardValidityDays,
     String rewardMinOrderValue,
@@ -82,6 +85,10 @@ class _$ReferralCWProxyImpl implements _$ReferralCWProxy {
 
   @override
   Referral rewardLabel(String rewardLabel) => this(rewardLabel: rewardLabel);
+
+  @override
+  Referral welcomeRewardQuantity(int welcomeRewardQuantity) =>
+      this(welcomeRewardQuantity: welcomeRewardQuantity);
 
   @override
   Referral rewardAmount(String rewardAmount) =>
@@ -123,6 +130,7 @@ class _$ReferralCWProxyImpl implements _$ReferralCWProxy {
     Object? rewardType = const $CopyWithPlaceholder(),
     Object? rewardQuantity = const $CopyWithPlaceholder(),
     Object? rewardLabel = const $CopyWithPlaceholder(),
+    Object? welcomeRewardQuantity = const $CopyWithPlaceholder(),
     Object? rewardAmount = const $CopyWithPlaceholder(),
     Object? rewardValidityDays = const $CopyWithPlaceholder(),
     Object? rewardMinOrderValue = const $CopyWithPlaceholder(),
@@ -156,6 +164,11 @@ class _$ReferralCWProxyImpl implements _$ReferralCWProxy {
           ? _value.rewardLabel
           // ignore: cast_nullable_to_non_nullable
           : rewardLabel as String,
+      welcomeRewardQuantity:
+          welcomeRewardQuantity == const $CopyWithPlaceholder()
+          ? _value.welcomeRewardQuantity
+          // ignore: cast_nullable_to_non_nullable
+          : welcomeRewardQuantity as int,
       rewardAmount: rewardAmount == const $CopyWithPlaceholder()
           ? _value.rewardAmount
           // ignore: cast_nullable_to_non_nullable
@@ -211,6 +224,7 @@ Referral _$ReferralFromJson(Map<String, dynamic> json) => $checkedCreate(
         'reward_type',
         'reward_quantity',
         'reward_label',
+        'welcome_reward_quantity',
         'reward_amount',
         'reward_validity_days',
         'reward_min_order_value',
@@ -237,6 +251,10 @@ Referral _$ReferralFromJson(Map<String, dynamic> json) => $checkedCreate(
         (v) => (v as num).toInt(),
       ),
       rewardLabel: $checkedConvert('reward_label', (v) => v as String),
+      welcomeRewardQuantity: $checkedConvert(
+        'welcome_reward_quantity',
+        (v) => (v as num).toInt(),
+      ),
       rewardAmount: $checkedConvert('reward_amount', (v) => v as String),
       rewardValidityDays: $checkedConvert(
         'reward_validity_days',
@@ -269,6 +287,7 @@ Referral _$ReferralFromJson(Map<String, dynamic> json) => $checkedCreate(
     'rewardType': 'reward_type',
     'rewardQuantity': 'reward_quantity',
     'rewardLabel': 'reward_label',
+    'welcomeRewardQuantity': 'welcome_reward_quantity',
     'rewardAmount': 'reward_amount',
     'rewardValidityDays': 'reward_validity_days',
     'rewardMinOrderValue': 'reward_min_order_value',
@@ -286,6 +305,7 @@ Map<String, dynamic> _$ReferralToJson(Referral instance) => <String, dynamic>{
   'reward_type': _$CouponDiscountTypeEnumEnumMap[instance.rewardType]!,
   'reward_quantity': instance.rewardQuantity,
   'reward_label': instance.rewardLabel,
+  'welcome_reward_quantity': instance.welcomeRewardQuantity,
   'reward_amount': instance.rewardAmount,
   'reward_validity_days': instance.rewardValidityDays,
   'reward_min_order_value': instance.rewardMinOrderValue,

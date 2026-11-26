@@ -7,10 +7,11 @@ import '../../../app/redirect.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/state_views.dart';
+import 'coming_soon_banner.dart';
 import 'location_flow.dart';
 
-/// "We're not in your area yet" with Notify me and Try another address
-/// (`03 §2.3`).
+/// The "We're coming to your area soon!" banner, the location checked, and
+/// Notify me and Try another address (`03 §2.3`).
 class NotServiceableScreen extends ConsumerStatefulWidget {
   const NotServiceableScreen({this.args, super.key});
 
@@ -65,22 +66,9 @@ class _NotServiceableScreenState extends ConsumerState<NotServiceableScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.wrong_location_outlined,
-                size: 64,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: JivoSpacing.lg),
-              Semantics(
-                header: true,
-                child: Text(
-                  l10n.notServiceableTitle,
-                  style: theme.textTheme.titleLarge,
-                  textAlign: TextAlign.center,
-                ),
-              ),
+              ComingSoonBanner(message: widget.args?.serviceability?.message),
               if (location != null) ...[
-                const SizedBox(height: JivoSpacing.sm),
+                const SizedBox(height: JivoSpacing.lg),
                 Text(
                   location.subtitle ??
                       '${location.title} · ${formatCoordinate(location.point.lat)}, '
