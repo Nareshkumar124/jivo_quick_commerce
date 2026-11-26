@@ -76,6 +76,8 @@ def check_razorpay_keys(app_configs, **kwargs):
 
     if settings.APP_ENVIRONMENT not in DEPLOYED_ENVIRONMENTS:
         return []
+    if not getattr(settings, "ONLINE_PAYMENTS_ENABLED", True):
+        return []  # DL-85: cash on delivery only, no Razorpay call is ever made.
     if getattr(settings, "PAYMENT_GATEWAY", "") != RAZORPAY_GATEWAY or is_dry_run_deployment():
         return []
     missing = [name for name in RAZORPAY_SETTINGS if not getattr(settings, name, "")]
