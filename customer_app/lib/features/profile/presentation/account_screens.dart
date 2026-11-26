@@ -93,11 +93,13 @@ class AccountScreen extends ConsumerWidget {
             Row(
               children: [
                 Expanded(
+                  // Help & support (was a second "Refer a friend" entry; the
+                  // invite strip below is the only way to the referral page).
                   child: _QuickTile(
-                    key: const Key('account-referral-tile'),
-                    icon: Icons.card_giftcard_outlined,
-                    label: l10n.referAFriend,
-                    onTap: () => context.push(Routes.referral),
+                    key: const Key('account-help'),
+                    icon: Icons.support_agent,
+                    label: l10n.helpTitle,
+                    onTap: () => context.push(Routes.help),
                   ),
                 ),
                 const SizedBox(width: JivoSpacing.md),
@@ -122,12 +124,6 @@ class AccountScreen extends ConsumerWidget {
                   label: l10n.notificationsTitle,
                   trailing: const InboxUnreadBadge(),
                   onTap: () => context.push(Routes.notifications),
-                ),
-                _Row(
-                  key: const Key('account-help'),
-                  icon: Icons.help_outline,
-                  label: l10n.helpTitle,
-                  onTap: () => context.push(Routes.help),
                 ),
                 if (inAppPages)
                   for (final (label, slug, icon) in [
