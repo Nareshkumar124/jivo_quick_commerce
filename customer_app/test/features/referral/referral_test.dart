@@ -461,7 +461,11 @@ void main() {
       final app = TestApp(tokens: signedInTokens);
       app.referral.fetchError = const ApiError(code: ApiErrorCode.network);
       await openAccount(app, tester);
-      expect(find.text('Refer a friend'), findsOneWidget);
+      // The invite strip is the only referral entry (no "Refer a friend"
+      // tile since 2026-11-26); it stays, with its generic text.
+      expect(find.byKey(const Key('account-referral')), findsOneWidget);
+      expect(find.text('Invite friends and earn rewards'), findsOneWidget);
+      expect(find.text('Refer a friend'), findsNothing);
     });
 
     testWidgets('applying from the account row hides the line', (tester) async {
