@@ -41,6 +41,7 @@ import '../features/search/presentation/search_screen.dart';
 import '../features/support/presentation/help_screen.dart';
 import '../features/support/presentation/ticket_screens.dart';
 import '../features/tracking/presentation/tracking_screen.dart';
+import '../shared/navigation/parent_back_scope.dart';
 import 'app_shell.dart';
 import 'launch_state.dart';
 import 'providers.dart';
@@ -168,29 +169,49 @@ final routerProvider = Provider<GoRouter>((ref) {
         'collection',
         (state) => CollectionScreen(slug: state.pathParameters['slug']!),
       ),
+      // The order screens can be opened with nothing behind them (`go`
+      // after an order is placed or rated): back then goes to a parent
+      // instead of closing the app. My orders → Home; the order and its
+      // tracking → My orders; rating → the order. Never back into
+      // checkout, payment or the order-placed screen (`go` replaced them).
       route(
         '/orders/:id',
         'order_detail',
-        (state) => OrderDetailScreen(
-          orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        (state) => ParentBackScope(
+          fallback: Routes.orders,
+          child: OrderDetailScreen(
+            orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+          ),
         ),
       ),
       route(
         '/orders/:id/track',
         'order_tracking',
-        (state) => TrackingScreen(
-          orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        (state) => ParentBackScope(
+          fallback: Routes.orders,
+          child: TrackingScreen(
+            orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+          ),
         ),
       ),
+      route('/orders/:id/rate', 'rate_order', (state) {
+        final orderId = int.tryParse(state.pathParameters['id'] ?? '') ?? 0;
+        return ParentBackScope(
+          fallback: Routes.order(orderId),
+          child: RateOrderScreen(
+            orderId: orderId,
+            initialStars: int.tryParse(
+              state.uri.queryParameters['stars'] ?? '',
+            ),
+          ),
+        );
+      }),
       route(
-        '/orders/:id/rate',
-        'rate_order',
-        (state) => RateOrderScreen(
-          orderId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
-          initialStars: int.tryParse(state.uri.queryParameters['stars'] ?? ''),
-        ),
+        Routes.orders,
+        'orders',
+        (_) =>
+            const ParentBackScope(fallback: Routes.home, child: OrdersScreen()),
       ),
-      route(Routes.orders, 'orders', (_) => const OrdersScreen()),
       route(Routes.help, 'help', (_) => const HelpScreen()),
       route(Routes.tickets, 'tickets', (_) => const TicketListScreen()),
       route(

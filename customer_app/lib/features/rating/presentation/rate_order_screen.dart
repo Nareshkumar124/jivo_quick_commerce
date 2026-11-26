@@ -5,6 +5,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/redirect.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../../shared/navigation/parent_back_scope.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../domain/order_rating.dart';
 import 'rating_controllers.dart';
@@ -63,6 +64,10 @@ class _RateOrderScreenState extends ConsumerState<RateOrderScreen> {
     }
   }
 
+  /// Opened with nothing behind it: back to the order (`ParentBackScope`).
+  Widget? _back(BuildContext context) =>
+      parentBackButton(context, defaultFallback: Routes.order(widget.orderId));
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -86,7 +91,10 @@ class _RateOrderScreenState extends ConsumerState<RateOrderScreen> {
     // form: the server refuses a second rating anyway.
     if (existingState.isLoading && !existingState.hasValue) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.rateOrderTitle)),
+        appBar: AppBar(
+          leading: _back(context),
+          title: Text(l10n.rateOrderTitle),
+        ),
         body: const Center(
           child: CircularProgressIndicator(key: Key('rate-order-loading')),
         ),
@@ -94,7 +102,10 @@ class _RateOrderScreenState extends ConsumerState<RateOrderScreen> {
     }
     if (existing != null && !form.submitting) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.rateOrderTitle)),
+        appBar: AppBar(
+          leading: _back(context),
+          title: Text(l10n.rateOrderTitle),
+        ),
         body: ListView(
           key: const Key('rate-order-done'),
           padding: const EdgeInsets.all(JivoSpacing.gutter),
@@ -134,7 +145,7 @@ class _RateOrderScreenState extends ConsumerState<RateOrderScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.rateOrderTitle)),
+      appBar: AppBar(leading: _back(context), title: Text(l10n.rateOrderTitle)),
       body: ListView(
         key: const Key('rate-order'),
         padding: const EdgeInsets.all(JivoSpacing.gutter),

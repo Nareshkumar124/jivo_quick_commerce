@@ -10,6 +10,7 @@ import '../../../app/theme.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
+import '../../../shared/navigation/parent_back_scope.dart';
 import '../../../shared/widgets/product_image.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../addresses/domain/saved_address.dart';
@@ -77,13 +78,11 @@ class OrderDetailScreen extends ConsumerWidget {
   }
 }
 
-/// Back to Home when the screen was opened with nothing behind it (from
-/// the order-placed screen or a deep link); null keeps the normal back.
-Widget? homeBackButton(BuildContext context) {
-  final router = GoRouter.maybeOf(context);
-  if (router == null || router.canPop()) return null;
-  return BackButton(onPressed: () => router.go(Routes.home));
-}
+/// The app bar's back when the screen was opened with nothing behind it
+/// (from the order-placed screen or a deep link): to the router's parent
+/// ([ParentBackScope], My orders), else Home. Null keeps the normal back.
+Widget? homeBackButton(BuildContext context) =>
+    parentBackButton(context, defaultFallback: Routes.home);
 
 class _OrderBody extends ConsumerWidget {
   const _OrderBody({required this.order});

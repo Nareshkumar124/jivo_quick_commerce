@@ -6,6 +6,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/redirect.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
+import '../../../shared/navigation/parent_back_scope.dart';
 import '../../../shared/widgets/product_image.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../domain/order_history.dart';
@@ -22,7 +23,11 @@ class OrdersScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.myOrders)),
+      appBar: AppBar(
+        // Opened with nothing behind it (e.g. "See all" on Home): to Home.
+        leading: parentBackButton(context, defaultFallback: Routes.home),
+        title: Text(l10n.myOrders),
+      ),
       body: switch (ref.watch(orderListProvider)) {
         AsyncData(:final value) when value.items.isEmpty => EmptyView(
           key: const Key('orders-empty'),

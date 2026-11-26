@@ -214,7 +214,8 @@ class _MoreOrders extends StatelessWidget {
     final theme = Theme.of(context);
     return InkWell(
       key: const Key('active-orders-more'),
-      onTap: () => context.go(Routes.orders),
+      // Pushed over Home, so back returns to Home as it was.
+      onTap: () => context.push(Routes.orders),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: kJivoMinTouchTarget),
         child: Padding(
