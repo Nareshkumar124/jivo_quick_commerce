@@ -121,6 +121,8 @@ def rewarded_referral(referrer=None) -> Referral:
 def settings_post(**overrides) -> dict:
     data = {
         "is_enabled": "on",
+        "welcome_reward_quantity": "1",
+        "reward_quantity": "1",
         "reward_amount": "90.00",
         "reward_validity_days": "30",
         "reward_min_order_value": "0.00",
@@ -241,6 +243,8 @@ class TestSettingsPermissions:
                 "reward_validity_days",
             ],
             "is_enabled": False,
+            "welcome_reward_quantity": 1,
+            "reward_quantity": 1,
             "reward_amount": "75.50",
             "reward_validity_days": 45,
             "reward_min_order_value": "199.00",
@@ -252,7 +256,7 @@ class TestSettingsPermissions:
     def test_change_form_has_short_help_texts(self, client, config):
         client.force_login(staff_with(VIEW_SETTINGS, CHANGE_SETTINGS))
         html = client.get(change_url()).content.decode()
-        assert "Not used for new rewards: the referral reward is now 1 free carton each." in html
+        assert "Not used for new rewards: the referral reward is now free cartons." in html
         assert "Reward amount (old ₹ rewards only)" in html
         assert "Minimum item total (old ₹ rewards only)" in html
         assert "1 free carton" in html  # the reward now (ADR 0002)
@@ -265,6 +269,10 @@ class TestSettingsPermissions:
             ("reward_validity_days", "0"),
             ("reward_validity_days", "366"),
             ("reward_min_order_value", "-1"),
+            ("welcome_reward_quantity", "0"),
+            ("welcome_reward_quantity", "11"),
+            ("reward_quantity", "0"),
+            ("reward_quantity", "11"),
         ],
     )
     def test_out_of_range_values_are_refused(self, client, config, field, value):
@@ -520,3 +528,74 @@ class TestFreeCartonRewards:
         assert "Old ₹ rewards" in html
         assert "1 free carton" in html
         assert "₹90.00" in html
+
+
+class TestRewardQuantities:
+    """ADR 0003: the welcome gift and the referral reward are N free cartons (settings, 1-10);
+    a reward keeps the quantity it was given with."""
+
+    def test_editor_sees_the_two_fields_with_their_labels(self, client, config):
+        client.force_login(staff_with(VIEW_SETTINGS, CHANGE_SETTINGS))
+        response = client.get(change_url())
+        assert response.status_code == 200
+        form = response.context["adminform"].form
+        assert form.fields["welcome_reward_quantity"].label == "Welcome gift (free cartons)"
+        reward_label = "Referral reward per person (free cartons)"
+        assert form.fields["reward_quantity"].label == reward_label
+        html = response.content.decode()
+        assert 'name="welcome_reward_quantity"' in html
+        assert 'name="reward_quantity"' in html
+        assert "Welcome gift: 1 free carton. Referral: 1 free carton for each person." in html
+
+    def test_editor_sets_two_cartons_audited_and_kept_in_history(self, client, config):
+        editor = staff_with(VIEW_SETTINGS, CHANGE_SETTINGS)
+        client.force_login(editor)
+        response = client.post(
+            change_url(), settings_post(welcome_reward_quantity="2", reward_quantity="2")
+        )
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        config.refresh_from_db()
+        assert (config.welcome_reward_quantity, config.reward_quantity) == (2, 2)
+        entry = AuditLog.objects.get(action=AUDIT_SETTINGS_CHANGE)
+        assert entry.changes["fields"] == ["reward_quantity", "welcome_reward_quantity"]
+        assert (entry.changes["welcome_reward_quantity"], entry.changes["reward_quantity"]) == (
+            2,
+            2,
+        )
+        assert config.history.first().history_user == editor
+        html = client.get(change_url()).content.decode()
+        assert "Welcome gift: 2 free cartons. Referral: 2 free cartons for each person." in html
+
+    def test_viewer_sees_n_free_cartons_and_cannot_change_them(self, client, config):
+        ReferralSettings.objects.filter(pk=config.pk).update(
+            welcome_reward_quantity=2, reward_quantity=3
+        )
+        client.force_login(staff_with(VIEW_SETTINGS))
+        response = client.get(change_url())
+        html = response.content.decode()
+        assert response.status_code == 200
+        assert 'name="reward_quantity"' not in html
+        assert "Welcome gift (free cartons)" in html
+        assert "Referral reward per person (free cartons)" in html
+        assert "2 free cartons" in html
+        assert "3 free cartons" in html
+        response = client.post(change_url(), settings_post(reward_quantity="9"))
+        assert response.status_code == 403
+        config.refresh_from_db()
+        assert config.reward_quantity == 3
+
+    def test_referral_list_reads_the_quantity_from_the_coupons(self, client):
+        from apps.promotions.models import Coupon
+
+        done = rewarded_referral()
+        Coupon.objects.filter(pk__in=[done.referrer_coupon_id, done.referred_coupon_id]).update(
+            value=Decimal("2")
+        )
+        client.force_login(staff_with(VIEW_REFERRAL))
+        response = client.get(reverse(REFERRALS))
+        assert response.status_code == 200
+        (row,) = response.context["cl"].result_list
+        assert response.context["cl"].model_admin.reward(row) == "2 free cartons"
+        assert "2 free cartons" in response.content.decode()
+        detail = client.get(reverse("admin:referrals_referral_change", args=[done.pk]))
+        assert "2 free cartons" in detail.content.decode()

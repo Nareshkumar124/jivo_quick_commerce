@@ -1,7 +1,7 @@
 """Coupons admin: free-carton rewards (ADR 0002; `DiscountType.FREE_UNIT` with a `source`).
 
-- The list says "1 free carton" (no ₹ amount), shows the source, and filters by type and
-  source. A reward's redemptions say "1 free carton" too.
+- The list says "N free cartons" from the coupon's `value` (ADR 0003; no ₹ amount), shows the
+  source, and filters by type and source. A reward's redemptions say "N free cartons" too.
 - A reward's page has no type, value, cap or minimum fields (a "Reward" section with "1 free
   carton" and the reward's status instead), and its usage limits are read-only: a crafted POST
   cannot turn it into money off or give it more uses. Its end date and on/off switch stay
@@ -58,6 +58,14 @@ def reward(owner) -> Coupon:
 
 
 @pytest.fixture
+def two_cartons(reward) -> Coupon:
+    """ADR 0003: a reward of 2 free cartons (`value` = its number of cartons)."""
+    Coupon.objects.filter(pk=reward.pk).update(value=Decimal("2"))
+    reward.refresh_from_db()
+    return reward
+
+
+@pytest.fixture
 def flat() -> Coupon:
     return Coupon.objects.create(
         code="JIVO50", title="Flat ₹50 off", discount_type="FLAT", value=Decimal("50.00")
@@ -107,7 +115,7 @@ class TestList:
         response = client.get(reverse(LIST))
         html = response.content.decode()
         assert response.status_code == 200
-        assert rewards.REWARD_LABEL in html
+        assert "1 free carton" in html
         assert "Welcome reward (new account)" in html
         assert "Made by staff" in html  # the staff coupon's source
         assert STORE_MINIMUM in html  # a reward's minimum is the store's cartons, not ₹0
@@ -137,7 +145,21 @@ class TestList:
         client.force_login(staff_in_role(roles.FINANCE))
         html = client.get(reverse(REDEMPTIONS)).content.decode()
         assert reward.code in html
-        assert rewards.REWARD_LABEL in html
+        assert "1 free carton" in html
+
+    def test_two_carton_reward_in_the_list_and_its_redemption(self, client, two_cartons, flat):
+        """ADR 0003: the quantity comes from the reward itself (plural from 2)."""
+        claim(two_cartons)
+        client.force_login(staff_in_role(roles.FINANCE))
+        response = client.get(reverse(LIST))
+        assert response.status_code == 200
+        assert "2 free cartons" in response.content.decode()
+        assert response.context["cl"].model_admin.discount(two_cartons) == "2 free cartons"
+        response = client.get(reverse(REDEMPTIONS))
+        assert response.status_code == 200
+        (row,) = response.context["cl"].result_list
+        assert response.context["cl"].model_admin.discount(row) == "2 free cartons"
+        assert "2 free cartons" in response.content.decode()
 
 
 # --------------------------------------------------------------------------- reward page
@@ -160,9 +182,25 @@ class TestRewardPage:
             assert name not in form.fields, name  # shown read-only
         assert {"ends_at", "is_active", "title"} <= set(form.fields)
         html = response.content.decode()
-        assert "1 free carton (₹0; the customer picks the size)" in html
+        assert "1 free carton (₹0, the store&#x27;s free carton size)" in html
         assert "Can be used" in html  # reward status: AVAILABLE
         assert "Welcome reward (new account)" in html
+
+    def test_two_carton_reward_page(self, client, manager, two_cartons):
+        response = client.get(change_url(two_cartons))
+        assert response.status_code == 200
+        assert "value" not in response.context["adminform"].form.fields  # fixed (ADR 0003)
+        assert "2 free cartons (₹0, the store&#x27;s free carton size)" in (
+            response.content.decode()
+        )
+
+    def test_crafted_post_cannot_change_the_number_of_cartons(self, client, manager, two_cartons):
+        data = admin_form_data(client.get(change_url(two_cartons)))
+        data["value"] = "10"
+        response = client.post(change_url(two_cartons), data)
+        assert response.status_code == 302, response.context["adminform"].form.errors
+        two_cartons.refresh_from_db()
+        assert two_cartons.value == Decimal("2.00")
 
     def test_crafted_post_cannot_change_the_reward_terms(self, client, manager, reward):
         data = admin_form_data(client.get(change_url(reward)))

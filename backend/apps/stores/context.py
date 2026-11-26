@@ -33,6 +33,15 @@ def store_id_from_header(request: Request) -> int:
     return int(raw)
 
 
+def optional_store_id(request: Request) -> int | None:
+    """ADR 0003 (`GET /account/rewards/`): the store id in an **optional** `X-Store-Id` header,
+    or None when it is missing or malformed (never an error: the caller falls back)."""
+    raw = (request.headers.get(STORE_HEADER) or "").strip()
+    if not _STORE_ID_RE.match(raw) or int(raw) < 1:
+        return None
+    return int(raw)
+
+
 def get_store(request: Request):
     """The active store in `X-Store-Id` (a cached `StoreArea`: id, name, hours; no database
     query when warm): 400 for a missing or malformed header, 404 `STORE_NOT_FOUND` for an

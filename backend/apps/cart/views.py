@@ -92,6 +92,7 @@ CART_EXAMPLES = (
     ("Store closed", ex.CART_STORE_CLOSED),
     ("Free cartons: volume offer and a reward", ex.CART_FREE_CARTONS),
     ("Free carton earned but out of stock", ex.CART_FREE_CARTON_NO_STOCK),
+    ("Free cartons in the store's fixed 1 L size (ADR 0003)", ex.CART_FREE_CARTONS_FIXED_SIZE),
 )
 LINE_ID = OpenApiParameter("id", int, OpenApiParameter.PATH, description="Cart line `id`.")
 
@@ -357,18 +358,27 @@ class CartCouponView(APIView):
             "discount is on the item total (or on the qualifying items for a category coupon), "
             "capped by `max_discount` and by the item total. Applying does not use the coupon "
             "up: an order does (held while its payment is pending).\n\n"
-            "**Free-carton rewards** (ADR 0002, `discount_type` FREE_UNIT): send "
-            "`free_variant_id`, the size the customer picked; it must be sold at this store, be "
-            "of the same product category as a paid line in the cart, and have the stock. The "
-            "cart then has a free REWARD line in `free_lines` and no money "
-            "off. A reward takes the order's single coupon slot and still needs the store's "
-            "minimum paid cartons (`thresholds.min_order_units`; free cartons never count)."
+            "**Free-carton rewards** (`discount_type` FREE_UNIT): the cart gets a free REWARD "
+            "line of `free_quantity` cartons (the reward's own number, e.g. 2) in `free_lines` "
+            "and no money off. **ADR 0003:** when the store has a fixed free size "
+            "(`free_offer.free_variant`, e.g. 1 L), send only `code`: the server uses that size "
+            "(the category rule below does not apply to it); a different `free_variant_id` is "
+            "422 `FREE_VARIANT_UNAVAILABLE`. **Otherwise (ADR 0002):** send `free_variant_id`, "
+            "the size the customer picked; it must be sold at this store and be of the same "
+            "product category as a paid line in the cart. Either way the size needs the stock "
+            "for the cart's paid units of it plus the reward's cartons. A reward takes the "
+            "order's single coupon slot and still needs the store's minimum paid cartons "
+            "(`thresholds.min_order_units`; free cartons never count)."
         ),
         parameters=[STORE_ID_PARAMETER],
         request=CouponApplySerializer,
         examples=request_examples(
             ("Apply", ex.COUPON_APPLY_REQUEST),
             ("Apply a free-carton reward", ex.COUPON_APPLY_REWARD_REQUEST),
+            (
+                "Apply a free-carton reward (fixed free size, ADR 0003)",
+                ex.COUPON_APPLY_REWARD_FIXED_SIZE_REQUEST,
+            ),
         ),
         responses=store_responses(
             {
@@ -377,6 +387,10 @@ class CartCouponView(APIView):
                     "The cart with the coupon.",
                     ("Applied", ex.CART_READY),
                     ("Free-carton reward applied", ex.CART_FREE_CARTONS),
+                    (
+                        "Free-carton reward applied (fixed 1 L size, ADR 0003)",
+                        ex.CART_FREE_CARTONS_FIXED_SIZE,
+                    ),
                 ),
                 401: UNAUTHORIZED,
                 422: error_response(
@@ -387,8 +401,8 @@ class CartCouponView(APIView):
                     "a free-carton reward also `MIN_ORDER_UNITS` (with `min_order_units`, "
                     "`paid_units` and `units_to_unlock`: free cartons never count) or "
                     "`FREE_VARIANT_UNAVAILABLE` (the size is not sold at this store, is not of "
-                    "the category of a paid line, or has no stock for it; with "
-                    "`free_variant_id`). "
+                    "the category of a paid line, or has no stock for it; ADR 0003: a size "
+                    "other than the store's fixed free size; with `free_variant_id`). "
                     "`COUPON_USAGE_EXCEEDED`: `details.scope` is `per_user` or `total` (a reward "
                     "already on another order).",
                     error_example(
@@ -443,6 +457,27 @@ class CartCouponView(APIView):
                             "free_variant_id": 4003,
                         },
                         name="COUPON_NOT_ELIGIBLE_FREE_VARIANT",
+                    ),
+                    error_example(
+                        ErrorCode.COUPON_NOT_ELIGIBLE,
+                        "Free cartons here come in one size only. Apply the reward without "
+                        "choosing a size.",
+                        {
+                            "code": "WEL7K2M9QPX",
+                            "reason": "FREE_VARIANT_UNAVAILABLE",
+                            "free_variant_id": 4002,
+                        },
+                        name="COUPON_NOT_ELIGIBLE_NOT_THE_FIXED_SIZE",
+                    ),
+                    error_example(
+                        ErrorCode.COUPON_NOT_ELIGIBLE,
+                        "The free cartons for this reward are out of stock here right now.",
+                        {
+                            "code": "WEL7K2M9QPX",
+                            "reason": "FREE_VARIANT_UNAVAILABLE",
+                            "free_variant_id": 4001,
+                        },
+                        name="COUPON_NOT_ELIGIBLE_FIXED_SIZE_NO_STOCK",
                     ),
                 ),
             },

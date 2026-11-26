@@ -30,6 +30,9 @@ SERVICE_AREA = MultiPolygon(
 )
 SCOPED_STAFF = ("store.manager@jivo.test", "store.staff@jivo.test")
 DEMO_FREE_UNIT_EVERY = 10  # ADR 0002 volume offer on the demo store
+# ADR 0003: the demo store's fixed free size, the 1 L water carton (its catalog SKU, as in
+# apps/catalog/data/jivo_water_flat_rates.json).
+WATER_1L_SKU = "JVW-WTR-1L-12"
 
 
 def seed_stores(stdout, options) -> None:
@@ -68,3 +71,27 @@ def seed_stores(stdout, options) -> None:
         if user is not None:
             grant_store_access(user, store)
     stdout.write(f"  store {store.code} ({'created' if created else 'updated'}), open 07-23 IST")
+
+
+def seed_free_unit_variant(stdout, options) -> None:
+    """ADR 0003 (after the catalog and stock steps): every free carton at the demo store is the
+    1 L water carton (`PricingConfig.free_unit_variant`), when the store sells it. Only an empty
+    setting is filled, so a size chosen in the admin survives re-seeding."""
+    from apps.catalog.models import ProductVariant
+
+    pricing = PricingConfig.objects.filter(store__code=DEMO_STORE_CODE).first()
+    if pricing is None:
+        return
+    prefix = f"  free carton size at {DEMO_STORE_CODE}:"
+    if pricing.free_unit_variant_id is not None:
+        stdout.write(f"{prefix} kept (variant {pricing.free_unit_variant_id})")
+        return
+    variant = ProductVariant.objects.filter(
+        sku=WATER_1L_SKU, inventory__store_id=pricing.store_id
+    ).first()
+    if variant is None:
+        stdout.write(f"{prefix} none ({WATER_1L_SKU} not sold there)")
+        return
+    pricing.free_unit_variant = variant
+    pricing.save(update_fields=["free_unit_variant", "updated_at"])
+    stdout.write(f"{prefix} {WATER_1L_SKU} (variant {variant.pk})")

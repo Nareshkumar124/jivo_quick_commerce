@@ -15,16 +15,20 @@
   A store without a row is billed with the model defaults (D-09, DL-43), shown above the list.
   ADR 0002: `free_unit_every` (the volume offer, 1 free carton per N paid; 0 = off) is edited
   in its own fieldset; viewers see it in words.
+  ADR 0003: `free_unit_variant` ("Free carton size", e.g. the 1 L x 12 carton) is the size of
+  every free carton, volume offer and rewards. Picked with an autocomplete of active variants
+  (a deactivated one stays allowed while it is the saved value); empty = the ADR 0002 rule.
 """
 
 from django.contrib import admin, messages
 from django.db import models
-from django.db.models import BooleanField, Value
+from django.db.models import BooleanField, Q, Value
 from django.urls import reverse
 from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action, display
 
+from apps.catalog.models import ProductVariant
 from apps.ops_console.admin_support import ReadOnlyHistoryAdmin
 from apps.ops_console.maps import MAP_FORMFIELD_OVERRIDES, MAP_MEDIA, feature, read_only_map
 from apps.ops_console.money import RupeeInput, inr
@@ -294,12 +298,15 @@ PRICING_FIELDSETS = (
         },
     ),
     (
-        "Free cartons (volume offer)",
+        "Free cartons (volume offer and rewards)",
         {
-            "fields": ("free_unit_every",),
+            "fields": ("free_unit_every", "free_unit_variant"),
             "description": (
-                "The free carton is the cheapest size in the order, at ₹0. Free cartons are not "
-                "part of the item total and never count toward the minimum units."
+                "Every free carton (the volume offer and the welcome and referral rewards) is "
+                "the free carton size, at ₹0, whatever sizes are paid for. Empty size: the "
+                "cheapest size in the order, and the customer picks a reward's size. Free "
+                "cartons are not part of the item total and never count toward the minimum "
+                "units."
             ),
         },
     ),
@@ -312,13 +319,39 @@ PRICING_FIELDSETS = (
 # ADR 0002: the volume offer (the model's verbose name is "free unit every").
 FREE_OFFER_LABEL = "Free carton every (paid cartons)"
 FREE_OFFER_HELP = "1 free carton per N paid cartons; 0 = off."
+# ADR 0003: the size of every free carton (`free_unit_variant`).
+FREE_SIZE_LABEL = "Free carton size"
+FREE_SIZE_NOT_FIXED = "Not fixed: the cheapest size in the order"
 
 
-def free_offer_text(every: int, unit_label: str = "cartons") -> str:
-    """`free_unit_every` in words, for viewers and the list (display only)."""
+def free_offer_text(every: int, unit_label: str = "cartons", size: str = "") -> str:
+    """`free_unit_every` (and the free carton size's name, when fixed) in words, for viewers
+    and the list (display only), e.g. "1 free 1 L x 12 per 10 paid cartons"."""
     if not every:
         return "Off"
-    return f"1 free per {every} paid {unit_label or 'cartons'}"
+    free = f"1 free {size}" if size else "1 free"
+    return f"{free} per {every} paid {unit_label or 'cartons'}"
+
+
+def free_size_choices(current_id: int | None = None):
+    """The variants offered as the free carton size: active ones of active products, plus the
+    saved one (so a later deactivation never blocks saving the rest of the row)."""
+    keep = Q(is_active=True, product__is_active=True)
+    if current_id is not None:
+        keep |= Q(pk=current_id)
+    return ProductVariant.objects.filter(keep).select_related("product")
+
+
+def is_free_size_lookup(request) -> bool:
+    """True for the admin autocomplete request of the free carton size field."""
+    match = getattr(request, "resolver_match", None)
+    return (
+        match is not None
+        and match.url_name == "autocomplete"
+        and request.GET.get("app_label") == "stores"
+        and request.GET.get("model_name") == "pricingconfig"
+        and request.GET.get("field_name") == "free_unit_variant"
+    )
 
 
 def _rupee_field(name: str):
@@ -342,7 +375,17 @@ def pricing_defaults() -> list[tuple[str, str]]:
             if name == "free_unit_every":
                 rows.append((FREE_OFFER_LABEL, free_offer_text(default)))
                 continue
-            value = inr(default) if name in PRICING_MONEY_FIELDS else ("On" if default else "Off")
+            if name == "free_unit_variant":
+                rows.append((FREE_SIZE_LABEL, FREE_SIZE_NOT_FIXED))
+                continue
+            if name in PRICING_MONEY_FIELDS:
+                value = inr(default)
+            elif isinstance(field, models.CharField):
+                value = default  # the unit label (it read "On" before)
+            elif isinstance(field, models.BooleanField) or not default:
+                value = "On" if default else "Off"  # a 0 count is a rule switched off
+            else:
+                value = str(default)
             rows.append((field.verbose_name.capitalize(), value))
     return rows
 
@@ -360,7 +403,7 @@ class PricingConfigAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmin
         "updated_at",
     )
     list_display_links = ("store_label",)
-    list_select_related = ("store",)
+    list_select_related = ("store", "free_unit_variant")
     list_filter = ("cod_enabled",)
     search_fields = ("store__code", "store__name", "store__city")
     search_help_text = "Store code, name or city"
@@ -370,6 +413,8 @@ class PricingConfigAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmin
         **ModelAdmin.formfield_overrides,
         models.DecimalField: {"widget": RupeeInput},
     }
+    # ADR 0003: searched by SKU, product or size (ProductVariantAdmin's search; active only).
+    autocomplete_fields = ("free_unit_variant",)
     readonly_fields = ("created_at", "updated_at")
 
     def get_fieldsets(self, request, obj=None):
@@ -378,9 +423,10 @@ class PricingConfigAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmin
         fieldsets = PRICING_FIELDSETS
         if obj is not None and not self.has_change_permission(request, obj):
             # View-only roles (Finance): the amounts in rupees instead of bare numbers, and the
-            # volume offer in words.
+            # volume offer and the free carton size in words.
             shown = {name: f"{name}_inr" for name in PRICING_MONEY_FIELDS}
             shown["free_unit_every"] = "free_offer"
+            shown["free_unit_variant"] = "free_size"
             fieldsets = tuple(
                 (
                     title,
@@ -398,11 +444,21 @@ class PricingConfigAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmin
         if db_field.name == "free_unit_every" and formfield is not None:
             formfield.label = FREE_OFFER_LABEL
             formfield.help_text = FREE_OFFER_HELP
+        if db_field.name == "free_unit_variant" and formfield is not None:
+            formfield.label = FREE_SIZE_LABEL  # the help text is the model's
         return formfield
+
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        form = super().get_form(request, obj, change, **kwargs)
+        size = form.base_fields.get("free_unit_variant")
+        if size is not None:
+            # Validated server-side too: a crafted POST cannot pick an inactive variant.
+            size.queryset = free_size_choices(obj.free_unit_variant_id if obj else None)
+        return form
 
     def get_readonly_fields(self, request, obj=None):
         fields = (*super().get_readonly_fields(request, obj),)
-        fields += ("free_offer",)
+        fields += ("free_offer", "free_size")
         fields += tuple(f"{name}_inr" for name in PRICING_MONEY_FIELDS)
         if obj is not None:
             fields += ("store",)  # one row per store; never moved to another store
@@ -460,7 +516,16 @@ class PricingConfigAdmin(StoreScopedAdminMixin, ReadOnlyHistoryAdmin, ModelAdmin
 
     @display(description=FREE_OFFER_LABEL, ordering="free_unit_every")
     def free_offer(self, obj) -> str:
-        return free_offer_text(obj.free_unit_every, obj.order_unit_label)
+        size = obj.free_unit_variant.name if obj.free_unit_variant_id else ""
+        return free_offer_text(obj.free_unit_every, obj.order_unit_label, size)
+
+    @display(description=FREE_SIZE_LABEL)
+    def free_size(self, obj) -> str:
+        """For viewers: the product and size (not a link: not every viewer opens variants)."""
+        variant = obj.free_unit_variant if obj.free_unit_variant_id else None
+        if variant is None:
+            return FREE_SIZE_NOT_FIXED
+        return f"{variant.product.name} {variant.name} ({variant.sku})"
 
 
 for _name in PRICING_MONEY_FIELDS:

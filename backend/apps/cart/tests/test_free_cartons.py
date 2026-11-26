@@ -204,6 +204,7 @@ class TestRewardOnTheCart:
             "discount_type": "FREE_UNIT",
             "source": "WELCOME",
             "free_variant_id": water.half.pk,
+            "free_quantity": 1,  # ADR-0003: the reward's cartons
             "discount": "0.00",
             "is_applicable": True,
             "message": None,

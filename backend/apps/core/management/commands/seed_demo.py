@@ -23,6 +23,8 @@ SEED_STEPS: list[str] = [
     "apps.stores.seed.seed_stores",
     "apps.catalog.seed.seed_catalog",
     "apps.inventory.seed.seed_stock",
+    # 2026-11-26 (ADR 0003): GGN-01's fixed free carton size, the 1 L water carton if sold
+    "apps.stores.seed.seed_free_unit_variant",
     # Phase 3: D-09 pricing on the demo store (stores step above), demo coupons
     "apps.promotions.seed.seed_coupons",
     # Phase 4: a delivered demo order for the test customer (invoice, reorder, order history)
