@@ -1,6 +1,6 @@
 # Production on the same server: plan
 
-**Status (2026-11-26): steps 1-4 partly done, infrastructure running, app blocked on Razorpay live keys. See §6.** Each further step needs the owner's go-ahead.
+**Status (2026-11-26): steps 1-4 done. The app runs in cash-on-delivery-only mode (DL-85), reachable only on 127.0.0.1:18002 (no domain, no nginx yet). See §6.** Each further step needs the owner's go-ahead.
 **No secret values ever go in this folder.** The repository is public.
 
 Production runs on the same shared server as staging (`138.252.101.117`), **next to** the staging
@@ -78,32 +78,42 @@ websites and the staging stack must not be disturbed.
 
 ## 6. What was done on the server (2026-11-26)
 
-**Status: infrastructure only. The app is NOT running yet**: the release check stops on the
-missing Razorpay **live** keys (P3), as intended. No nginx, no certbot, no demo data. Staging and
-the other sites were checked before and after: identical status codes, `nginx -T` unchanged.
+**Status: the app is running in cash-on-delivery-only mode** (`ONLINE_PAYMENTS_ENABLED=false`,
+DL-85, approved by the owner). It is reachable only on `127.0.0.1:18002`: no nginx, no certbot,
+no domain yet (P1). Empty database, no demo data. Staging and the other sites were checked before
+and after both rounds: identical status codes, `nginx -T` md5 unchanged.
 
 Files in this folder: `compose.prod.yml` (project `jqcprod`, from the staging compose with smaller
-memory caps) and `env.example` (names only).
+memory caps; the server copy is identical) and `env.example` (names only).
 
 | Step | Result |
 |---|---|
 | Discovery | 14 CPUs, 26 GB RAM (about 10 GB available), **swap 10 of 12 GB used**, 94 GB free disk. 127.0.0.1:18002 and :19002 were free. Staging (`jqc`, 7 containers) healthy. |
 | Folder | `/srv/jqc-prod/` with `compose/ env/ (700) env/keys-backup/ (700) src/ static/ cache/ acme/ logs/ backups/` |
-| Secrets | Freshly generated on the server (not copied from staging, never printed): `env/backend.env`, `env/postgres.env`, `env/minio.env` (600). `FIELD_ENCRYPTION_KEYS` backup: `env/keys-backup/FIELD_ENCRYPTION_KEYS.20261126-113522` (600). **Copy it offline.** No `SEED_DEMO_ALLOWED`, `OTP_TEST_NUMBERS`, `LOADTEST_DATA_ALLOWED`. |
-| Domain | **Placeholder** `prod-domain-pending.jivo.in` in `DJANGO_ALLOWED_HOSTS`, CSRF origin, S3 media/presign URLs, `DEFAULT_FROM_EMAIL` (backend.env) and `JQCPROD_HOST` (`compose/.env`). Replace all of them when P1 is known. A reserved name (`*.invalid`) was not used on purpose: it would make `check --deploy` skip the Razorpay check. |
-| SMS / FCM / Maps / Sentry / email | Not set. SMS falls back to `UnconfiguredSmsBackend` (passes checks, sends fail loudly). Push disabled (warning only). Email: dummy backend. |
-| Image | `jqcprod-backend:3bdb522` built from `main` `3bdb522` (`git -c core.autocrlf=false archive`), source in `src/3bdb522/`. |
+| Secrets | Freshly generated on the server (not copied from staging, never printed): `env/backend.env`, `env/postgres.env`, `env/minio.env` (600). `FIELD_ENCRYPTION_KEYS` backup: `env/keys-backup/FIELD_ENCRYPTION_KEYS.20261126-113522` (600). **Copy it offline.** No `SEED_DEMO_ALLOWED`, `OTP_TEST_NUMBERS`, `LOADTEST_DATA_ALLOWED`, `JQC_SKIP_STARTUP_CHECK`, no Razorpay keys. |
+| Cash only | `ONLINE_PAYMENTS_ENABLED=false` appended to `env/backend.env` (copy before the change: `env/backend.env.bak-20261126-cod`, 600). Checked in the web container: `online_payments_enabled()` is `False`, settings `config.settings.production`. |
+| Domain | **Placeholder** `prod-domain-pending.jivo.in` in `DJANGO_ALLOWED_HOSTS`, CSRF origin, S3 media/presign URLs, `DEFAULT_FROM_EMAIL` (backend.env) and `JQCPROD_HOST` (`compose/.env`). Replace all of them when P1 is known, then restart web, worker, worker-slow, beat. |
+| SMS / FCM / Maps / Sentry / email | Not set. SMS falls back to `UnconfiguredSmsBackend` (passes checks, sends fail loudly). Push disabled (`notifications.W001`, warning only). Email: dummy backend. |
+| Image | `jqcprod-backend:56b778d` built from `main` `56b778d` (`git -c core.autocrlf=false archive`), source in `src/56b778d/`, build log `logs/build-56b778d.log`. Old image `jqcprod-backend:3bdb522` kept (never ran the app). `compose/DEPLOYED_SHA` = `56b778d`. |
 | Infra | `jqcprod-postgres-1`, `jqcprod-redis-1`, `jqcprod-minio-1` running and healthy (network `jqcprod_net`, volumes `jqcprod_*`, MinIO on 127.0.0.1:19002). Buckets `jivo-media` (private) and `jivo-public` (anonymous GetObject only). |
-| Release | `check --deploy` failed: `payments.E003` (Razorpay keys missing). Warning `notifications.W001` (no FCM). `migrate` did not run; the DB is empty. Log: `logs/release-3bdb522.log`. |
+| Release | First try on `3bdb522` stopped on `payments.E003` (no live keys), as intended. On `56b778d` with the switch off: `check --deploy` passed (only `notifications.W001`), `migrate` applied 132 migrations on the fresh DB. Log: `logs/release-56b778d.log`. **No `seed_demo`**: 0 users, 0 products. |
+| Static | Copied from the image to `/srv/jqc-prod/static/` (13 MB, manifest present). |
+| App | `jqcprod-web-1` (healthy), `jqcprod-worker-1`, `jqcprod-worker-slow-1`, `jqcprod-beat-1` up. `curl -H 'Host: prod-domain-pending.jivo.in' http://127.0.0.1:18002/health/ready` = 200 `{"database":"ok","redis":"ok"}`. Celery ping: `celery@` and `slow@` both OK. Beat: DatabaseScheduler started and sends due tasks. |
+| Memory after start | Host: 9.5 GB available, swap 9.6 of 12 GB. jqcprod total about 1.3 GB (web 392 MB, worker 406 MB, worker-slow 236 MB, beat 139 MB, postgres 45 MB, minio 64 MB, redis 3 MB). |
 
-**Next, once the Razorpay live keys are in `backend.env`:** `run --rm release` (check + migrate),
-copy static files to `/srv/jqc-prod/static/`, `up -d web worker worker-slow beat`, then
-`curl -fsS -H 'Host: <domain>' http://127.0.0.1:18002/health/ready`. nginx + TLS only after P1.
+**Next:** P1 domain + DNS, then the one nginx file and TLS (step 5), real data (step 6), backups
+and monitoring (step 7). Online payment: put the Razorpay **live** keys and webhook secret in
+`backend.env`, set `ONLINE_PAYMENTS_ENABLED=true`, run `release`, restart web and workers.
+
+**Stop the app only (keeps DB and infra):**
+```bash
+cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:56b778d docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
+```
 
 **Undo (touches only production):**
 ```bash
 cd /srv/jqc-prod/compose && JQCPROD_IMAGE=x docker compose -p jqcprod -f compose.prod.yml down   # keeps volumes
 # full removal, only if nothing is needed:
-docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522
+docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d
 sudo rm -rf /srv/jqc-prod
 ```
