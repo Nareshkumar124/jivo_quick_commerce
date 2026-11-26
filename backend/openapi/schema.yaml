@@ -27304,7 +27304,8 @@ components:
           type: integer
           nullable: true
           description: Optional. An id from `GET /business-categories/` (active only).
-            Null removes it.
+            Null removes it. Re-sending the user's current category is accepted even
+            if it was deactivated since.
         business_category_name:
           type: string
           readOnly: true
@@ -27317,11 +27318,11 @@ components:
         is_profile_complete:
           type: boolean
           readOnly: true
-          description: 'False only for a new user who has neither submitted (PATCH
-            `/me/` with `name`, `business_category` or `business_name`) nor skipped
-            (`POST /me/profile-prompt/skip/`) the complete-profile screen: show that
-            screen while it is false. Accounts created before 2026-11-26 are always
-            true.'
+          description: 'Always true for riders and staff. Otherwise false only for
+            a new user who has (PATCH `/me/` with `name`, `business_category` or `business_name`)
+            nor skipped (`POST /me/profile-prompt/skip/`) the complete-profile screen:
+            show that screen while it is false. Accounts created before 2026-11-26
+            are always true.'
         rider_status:
           allOf:
           - $ref: '#/components/schemas/RiderStatusEnum'
@@ -28665,7 +28666,8 @@ components:
           type: integer
           nullable: true
           description: Optional. An id from `GET /business-categories/` (active only).
-            Null removes it.
+            Null removes it. Re-sending the user's current category is accepted even
+            if it was deactivated since.
         business_name:
           type: string
           description: Optional shop / business name. An empty string removes it.

@@ -139,9 +139,12 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     @property
     def is_profile_complete(self) -> bool:
-        """False only for a user who has neither submitted nor skipped the complete-profile
-        screen. Accounts that existed before 2026-11-26 were marked done by migration 0009."""
-        return self.profile_completed_at is not None or self.profile_prompt_skipped_at is not None
+        """False only for a customer who has neither submitted nor skipped the complete-profile
+        screen (03 §2.2). Riders and staff never get that prompt, so they are always complete.
+        Accounts that existed before 2026-11-26 were marked done by migration 0009."""
+        if self.profile_completed_at is not None or self.profile_prompt_skipped_at is not None:
+            return True
+        return self.is_staff or self.rider_status != RiderStatus.NONE
 
     @property
     def rider_status(self) -> str:

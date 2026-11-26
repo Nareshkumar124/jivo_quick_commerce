@@ -98,6 +98,9 @@ class OtpVerifySerializer(serializers.Serializer):
     )
 
 
+CATEGORY_NOT_IN_LIST = "Choose a business category from the list."
+
+
 class BusinessCategorySerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
     name = serializers.CharField(read_only=True, help_text="Shown in the dropdown.")
@@ -123,12 +126,13 @@ class MeSerializer(serializers.Serializer):
         required=False, help_text="Consent to promotional push notifications."
     )
     business_category = serializers.PrimaryKeyRelatedField(
-        queryset=BusinessCategory.objects.filter(is_active=True),
+        queryset=BusinessCategory.objects.all(),
         required=False,
         allow_null=True,
-        error_messages={"does_not_exist": "Choose a business category from the list."},
+        error_messages={"does_not_exist": CATEGORY_NOT_IN_LIST},
         help_text=(
-            "Optional. An id from `GET /business-categories/` (active only). Null removes it."
+            "Optional. An id from `GET /business-categories/` (active only). Null removes it. "
+            "Re-sending the user's current category is accepted even if it was deactivated since."
         ),
     )
     business_category_name = serializers.CharField(
@@ -146,7 +150,8 @@ class MeSerializer(serializers.Serializer):
     is_profile_complete = serializers.BooleanField(
         read_only=True,
         help_text=(
-            "False only for a new user who has neither submitted (PATCH `/me/` with `name`, "
+            "Always true for riders and staff. Otherwise false only for a new user who has "
+            "(PATCH `/me/` with `name`, "
             "`business_category` or `business_name`) nor skipped "
             "(`POST /me/profile-prompt/skip/`) the complete-profile screen: show that screen "
             "while it is false. Accounts created before 2026-11-26 are always true."
@@ -158,6 +163,16 @@ class MeSerializer(serializers.Serializer):
         help_text="Rider profile status; NONE without a rider profile (`POST /rider/register/`).",
     )
     created_at = serializers.DateTimeField(read_only=True)
+
+    def validate_business_category(self, value):
+        """Only switching TO an inactive category is refused: a form that re-sends the user's
+        current (since deactivated) category still saves. Needs `request` in the context."""
+        if value is None or value.is_active:
+            return value
+        request = self.context.get("request")
+        if request is not None and request.user.business_category_id == value.pk:
+            return value
+        raise serializers.ValidationError(CATEGORY_NOT_IN_LIST)
 
 
 class AuthSessionSerializer(serializers.Serializer):

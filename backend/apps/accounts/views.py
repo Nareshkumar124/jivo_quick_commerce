@@ -419,7 +419,7 @@ class MeView(APIView):
         ),
     )
     def patch(self, request: Request) -> Response:
-        serializer = MeSerializer(data=request.data, partial=True)
+        serializer = MeSerializer(data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = profile.update_profile(request.user, serializer.validated_data)
         return Response(MeSerializer(user).data)

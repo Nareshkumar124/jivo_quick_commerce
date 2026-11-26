@@ -4,6 +4,9 @@
    edits survive a re-run).
 2. Only sign-ups after this change are asked for the business profile: every user that already
    exists is marked done (`profile_completed_at` = now), so `is_profile_complete` is true for them.
+
+The reverse is intentionally a no-op: 0008's reverse drops the table and columns anyway, and
+un-marking users could not tell migrated users from ones who really submitted.
 """
 
 from django.db import migrations

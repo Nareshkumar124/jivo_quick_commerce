@@ -43,7 +43,8 @@ def update_profile(user: User, data: dict) -> User:
 
 def skip_profile_prompt(user: User) -> User:
     """Skip on the complete-profile screen (03 §2.2): remembered, so it is not asked again.
-    Idempotent: a repeat keeps the first time, and it does nothing once the profile is done."""
+    Idempotent in effect: once the prompt is skipped or submitted, a repeat changes nothing
+    (two calls racing at the same moment may each write a time; the later one is kept)."""
     if not user.is_profile_complete:
         user.profile_prompt_skipped_at = timezone.now()
         user.save(update_fields=["profile_prompt_skipped_at", "updated_at"])

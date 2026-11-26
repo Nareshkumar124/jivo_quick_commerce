@@ -13,7 +13,8 @@ from freezegun import freeze_time
 from apps.accounts.models import BusinessCategory
 from apps.accounts.seed import BUSINESS_CATEGORIES, seed_business_categories
 from apps.accounts.services import auth as auth_service
-from apps.accounts.tests.factories import UserFactory
+from apps.accounts.tests.factories import StaffUserFactory, UserFactory
+from apps.delivery.tests.factories import RiderFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -116,6 +117,25 @@ class TestSubmit:
         assert response.status_code == 200
         assert response.json()["is_profile_complete"] is False
 
+    def test_resending_current_deactivated_category_is_kept(self, user, auth_client, category):
+        """Review fix: only switching TO an inactive category is refused."""
+        user.business_category = category
+        user.save()
+        category.is_active = False
+        category.save()
+        response = auth_client.patch(
+            ME,
+            {"name": "Asha", "business_category": category.pk, "business_name": "Shop"},
+            format="json",
+        )
+        assert response.status_code == 200, response.content
+        assert response.json()["business_category"] == category.pk
+        other = BusinessCategory.objects.create(name="Old", slug="old", is_active=False)
+        body = error(auth_client.patch(ME, {"business_category": other.pk}, format="json"), 400)
+        assert body["details"] == {
+            "business_category": ["Choose a business category from the list."]
+        }
+
     def test_inactive_category_rejected(self, new_user, make_auth_client, category):
         category.is_active = False
         category.save()
@@ -204,6 +224,23 @@ class TestSkip:
 
     def test_needs_login(self, api_client):
         assert error(api_client.post(SKIP), 401)["code"] == "AUTH_REQUIRED"
+
+
+class TestRidersAndStaff:
+    """Riders and staff never get the customer prompt: always complete."""
+
+    def test_rider_me_is_complete(self, make_auth_client):
+        rider = RiderFactory(user__name="", user__profile_completed_at=None)
+        body = make_auth_client(rider.user, "rider").get(ME).json()
+        assert body["is_profile_complete"] is True
+        assert body["rider_status"] != "NONE"
+
+    def test_staff_is_complete(self):
+        staff = StaffUserFactory(profile_completed_at=None)
+        assert staff.is_profile_complete is True
+
+    def test_rider_app_user_before_registering_is_not_special(self, new_user):
+        assert new_user.is_profile_complete is False
 
 
 class TestDataMigration:
