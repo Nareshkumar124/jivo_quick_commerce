@@ -38,7 +38,7 @@ class MapEditWidget(OSMWidget):
     class Media:
         extend = False
         css = {"all": (OL_CSS, "gis/css/ol3.css", "ops/css/map-edit.css")}
-        js = (OL_JS, "gis/js/OLMapWidget.js")
+        js = (OL_JS, "gis/js/OLMapWidget.js", "ops/js/map-locate.js")
 
 
 MAP_FORMFIELD_OVERRIDES = {
