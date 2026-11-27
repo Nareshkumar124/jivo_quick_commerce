@@ -128,6 +128,15 @@ echo 56b778d > DEPLOYED_SHA
 # catalog only (empties the catalog again): restore backups/pre-catalog-20261127.dump with pg_restore --clean
 ```
 
+### 2026-11-27 update 2: code `ff30e9c` (owner approved)
+
+| Step | Result |
+|---|---|
+| Code | `jqcprod-backend:ff30e9c` built from pushed `main` `ff30e9c` (store management, prices, offers, delivery pincodes; source `src/ff30e9c/`, log `logs/build-ff30e9c.log`). Pre-deploy dump `backups/pre-ff30e9c.dump` (600). `release`: `check --deploy` no issues; migrated `catalog.0007_productvariant_manage_prices`, `promotions.0006_coupon_manage_offers`, `stores.0008_delivery_pincodes` (`logs/release-ff30e9c.log`). Static copied additively. beat stopped, then web, worker, worker-slow, beat up on the new image. `compose/DEPLOYED_SHA` = `ff30e9c`. Old images `f1cb51e` and `56b778d` kept (`3bdb522` was no longer present on the host). |
+| Verify | `https://quick.jivo.in/health/ready` 200; `/admin/` → login page; Celery ping `celery@` and `slow@` OK; `online_payments_enabled()` False. Staging and other sites identical before/after; `nginx -T` md5 unchanged (nginx not touched). |
+
+**Rollback:** `cd /srv/jqc-prod/compose && docker compose -p jqcprod -f compose.prod.yml stop beat && JQCPROD_IMAGE=jqcprod-backend:f1cb51e docker compose -p jqcprod -f compose.prod.yml up -d web worker worker-slow beat && echo f1cb51e > DEPLOYED_SHA` (migrations are additive; the old code runs on the new schema).
+
 **Next (2026-11-27):** stores/staff (step 6), backups and monitoring (step 7), SMS (P4), production Firebase (P5).
 
 **Earlier next steps (2026-11-26):** P1 domain + DNS, then the one nginx file and TLS (step 5), real data (step 6), backups
@@ -136,14 +145,14 @@ and monitoring (step 7). Online payment: put the Razorpay **live** keys and webh
 
 **Stop the app only (keeps DB and infra):**
 ```bash
-cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:f1cb51e docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
+cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:ff30e9c docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
 ```
 
 **Undo (touches only production):**
 ```bash
 cd /srv/jqc-prod/compose && JQCPROD_IMAGE=x docker compose -p jqcprod -f compose.prod.yml down   # keeps volumes
 # full removal, only if nothing is needed:
-docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d jqcprod-backend:f1cb51e
+docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d jqcprod-backend:f1cb51e jqcprod-backend:ff30e9c
 sudo rm -rf /srv/jqc-prod
 ```
 
