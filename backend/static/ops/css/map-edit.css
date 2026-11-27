@@ -1,0 +1,19 @@
+/* Map editor in admin forms (MapEditWidget). Django 5.2's gis/css/ol3.css gives `.dj_map` no
+   size, so without this the map is 0px high and only "Delete all Features" shows. */
+.dj_map_wrapper {
+    float: none;
+    max-width: 100%;
+    width: 720px;
+}
+
+.dj_map {
+    border: 1px solid var(--color-base-200);
+    border-radius: var(--border-radius);
+    height: 420px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.dark .dj_map {
+    border-color: var(--color-base-800);
+}
