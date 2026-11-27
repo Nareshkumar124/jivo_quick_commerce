@@ -137,6 +137,10 @@ echo 56b778d > DEPLOYED_SHA
 
 **Rollback:** `cd /srv/jqc-prod/compose && docker compose -p jqcprod -f compose.prod.yml stop beat && JQCPROD_IMAGE=jqcprod-backend:f1cb51e docker compose -p jqcprod -f compose.prod.yml up -d web worker worker-slow beat && echo f1cb51e > DEPLOYED_SHA` (migrations are additive; the old code runs on the new schema).
 
+### 2026-11-27 update 3: code `a231672` (owner approved)
+
+Store map editor CSS only (`static/ops/css/map-edit.css`, one line in `ops_console/maps.py`), no migrations. Pre-deploy dump `backups/pre-a231672.dump` (600); `jqcprod-backend:a231672` built from pushed `main`; `release`: no issues, no migrations; static copied additively (`ops/css/map-edit.018eb56dabdd.css` in the manifest); beat stopped, web/worker/worker-slow/beat restarted; `compose/DEPLOYED_SHA` = `a231672`. Verified: `https://quick.jivo.in/health/ready` 200, `/static/ops/css/map-edit.css` and the hashed name 200 (`text/css`, hashed one immutable), Celery `celery@`/`slow@` OK. Staging and other sites identical before/after, nginx untouched. Old images `ff30e9c`, `f1cb51e`, `56b778d` kept. **Rollback:** as update 2, with `jqcprod-backend:ff30e9c` and `echo ff30e9c > DEPLOYED_SHA`.
+
 **Next (2026-11-27):** stores/staff (step 6), backups and monitoring (step 7), SMS (P4), production Firebase (P5).
 
 **Earlier next steps (2026-11-26):** P1 domain + DNS, then the one nginx file and TLS (step 5), real data (step 6), backups
@@ -145,14 +149,14 @@ and monitoring (step 7). Online payment: put the Razorpay **live** keys and webh
 
 **Stop the app only (keeps DB and infra):**
 ```bash
-cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:ff30e9c docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
+cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:a231672 docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
 ```
 
 **Undo (touches only production):**
 ```bash
 cd /srv/jqc-prod/compose && JQCPROD_IMAGE=x docker compose -p jqcprod -f compose.prod.yml down   # keeps volumes
 # full removal, only if nothing is needed:
-docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d jqcprod-backend:f1cb51e jqcprod-backend:ff30e9c
+docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d jqcprod-backend:f1cb51e jqcprod-backend:ff30e9c jqcprod-backend:a231672
 sudo rm -rf /srv/jqc-prod
 ```
 
