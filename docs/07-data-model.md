@@ -137,6 +137,10 @@ erDiagram
 
 **ServiceabilityRequest**: `location` (Point), `user` (nullable), `phone` (nullable), `address_text`.
 
+**DeliveryPincode** (added 2026-11-26, ADR 0004 §1): `store`, `pincode` (6 digits, `pincode_validator` + check constraint), `area_name` (optional label shown to customers), `is_active`, timestamps; unique (`store`, `pincode`); permission `stores.manage_delivery_pincodes` (Super Admin only). A store with **any** rows is in **pincode mode**: an address is served only when its pincode is an active row of that store, and the location check uses the active pincodes' outlines (below, widened 250 m) instead of `service_area`. A store with no rows keeps the service-area rule. Changed only through `apps.stores.services.add_delivery_pincode` / `update_delivery_pincode` / `set_delivery_pincode_active` (audited).
+
+**PincodeBoundary** (added 2026-11-26, ADR 0004 §1): `pincode` (unique), `geom` (MultiPolygon, 4326), `source`, timestamps. Approximate pincode outlines loaded with `manage.py import_pincode_boundaries` (dry run unless `--commit`; the bundled `apps/stores/data/pincodes_delhi.geojson` holds 95 Delhi pincodes from data.gov.in only, GODL-India, because the repo is public; a merged data.gov.in + GSDL file is kept outside the repo and loaded with `--file ... --source datagov+gsdl`; see the README next to it).
+
 **StaffStoreAccess**: `user`, `store`, unique together. Lives in the `stores` app (not `accounts`), so accounts does not depend on stores (migration `stores.0001_initial`). Scope staff querysets with `apps.stores.services.stores_for(user)`: superusers and the global roles see every store; anyone in a store role (Store Manager / Store Staff) only theirs, even with an extra group; unknown groups or no role: none (05 §3). Grant and revoke with `grant_store_access()` / `revoke_store_access()`.
 
 > Overlapping service areas: if a point falls inside several active stores' polygons, choose the **nearest open** store (tie-break by `priority` field on DarkStore).

@@ -5,8 +5,12 @@
   when paused, or without timings).
 - `check_serviceability()`: active stores whose `service_area` contains the point, choosing open
   stores first, then the nearest, then the lowest `priority` (07 §2.2). ETA per 08 §8. Runs on a
-  cached snapshot of the store areas (GEOS in-process, no database on the hot path).
+  cached snapshot of the store areas (GEOS in-process, no database on the hot path). A store
+  with delivery pincodes (ADR 0004, pincode mode) covers its active pincodes' outlines + 250 m
+  instead, and serves an address only when its pincode is active (`StoreArea.delivers_to`).
 - `serviceable_exists()` / `address_point_expression()`: PostGIS `EXISTS` for address lists.
+- `add_delivery_pincode()` / `update_delivery_pincode()` / `set_delivery_pincode_active()`:
+  the admin's delivery locations (ADR 0004, Super Admin only, audited).
 - `stores_for(user)`: the stores a staff user may see (05 §3).
 - `set_accepting_orders()`: pause / resume orders at a store (panel), actor recorded.
 """
@@ -21,16 +25,25 @@ from zoneinfo import ZoneInfo
 from django.conf import settings
 from django.contrib.gis.db.models import PointField
 from django.contrib.gis.geos import GEOSGeometry, Point
+from django.contrib.postgres.aggregates import JSONBAgg
 from django.core.cache import cache
-from django.db import transaction
-from django.db.models import Exists, F, FloatField, Func, OuterRef, QuerySet, Value
-from django.db.models.functions import Cast, Coalesce
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import IntegrityError, connection, transaction
+from django.db.models import Exists, F, FloatField, Func, OuterRef, Q, QuerySet, Value
+from django.db.models.functions import Cast, Coalesce, JSONObject
 from django.utils import timezone
 
 from apps.accounts import roles
+from apps.accounts.validators import pincode_validator
+from apps.core import audit
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
-from apps.stores.models import DarkStore, ServiceabilityRequest, StoreTiming
+from apps.stores.models import (
+    DarkStore,
+    DeliveryPincode,
+    ServiceabilityRequest,
+    StoreTiming,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -150,13 +163,23 @@ def eta_minutes(store: DarkStore, distance_km: float) -> int:
     return max(1, math.ceil(total))
 
 
-# The serviceability hot path never touches the database: active stores (area, location, hours)
-# are cached as a snapshot keyed by a version that store/timing changes bump (immediately and
-# again after commit). Point-in-polygon runs in-process with GEOS, the engine PostGIS uses. A
-# cache miss (or Redis outage) loads the snapshot from PostGIS (2 queries).
+# The serviceability hot path never touches the database: active stores (area, location, hours,
+# delivery pincodes and their outlines) are cached as a snapshot keyed by a version that store,
+# timing and pincode changes bump (immediately and again after commit). Point-in-polygon runs
+# in-process with GEOS, the engine PostGIS uses. A cache miss (or Redis outage) loads the
+# snapshot from PostGIS (2 queries, plus 1 when a store delivers by pincode).
 STORES_VERSION_KEY = "stores:areas:version"
 SNAPSHOT_KEY = "stores:areas:{version}"
 EARTH_RADIUS_KM = 6371.0088
+
+# ADR 0004 §1: delivery by pincode. A pincode outline is approximate, so the location check
+# accepts points up to 250 m outside it; the address check (the address pincode) is exact.
+PINCODE_BUFFER_METRES = 250
+MAX_PLACES_IN_MESSAGE = 3
+MSG_NOT_DELIVERED = "We don't deliver here yet. We'll come to your area soon."
+MSG_NOT_DELIVERED_PLACES = (
+    "We don't deliver here yet. We deliver in {places}. We'll come to your area soon."
+)
 
 
 class Window(NamedTuple):
@@ -179,10 +202,55 @@ class StoreArea:
     area: object  # GEOS PreparedGeometry
     windows: tuple[Window, ...]
     is_active: bool = True
+    # ADR 0004 §1: the store has DeliveryPincode rows (active or not), so pincode rules apply.
+    pincode_mode: bool = False
+    pincodes: tuple[str, ...] = ()  # its active pincodes
+    places: tuple[str, ...] = ()  # the active pincodes as the customer message names them
+    outline: object = None  # GEOS PreparedGeometry: active pincodes' outlines + 250 m, or None
+
+    def covers(self, point: Point) -> bool:
+        """The location check (`GET /serviceability/`, before any address exists): in pincode
+        mode, inside the buffered outline of an active pincode (none without outlines); else
+        inside the service area."""
+        if self.pincode_mode:
+            return self.outline is not None and self.outline.contains(point)
+        return self.area.contains(point)
+
+    def delivers_to(self, lat, lng, pincode: str | None) -> bool:
+        """The address check (`cart.services.serves()`, the exact rule): in pincode mode, the
+        address pincode (stripped) is an active pincode of this store; else the address pin is
+        inside the service area."""
+        if self.pincode_mode:
+            return (pincode or "").strip() in self.pincodes
+        return self.area.contains(store_point(lat, lng))
+
+    def not_delivered_message(self) -> str | None:
+        """In pincode mode, the customer message for an address `delivers_to` refused (it names
+        the active pincodes); None otherwise (the caller's own message)."""
+        return not_delivered_message(self.places) if self.pincode_mode else None
+
+
+def not_delivered_message(places) -> str:
+    """ADR 0004 §1, the one place that words it: the customer message when a store in pincode
+    mode does not deliver to an address or a location. Names at most 3 places, then "and
+    more"."""
+    places = list(places)
+    if not places:
+        return MSG_NOT_DELIVERED
+    shown = ", ".join(places[:MAX_PLACES_IN_MESSAGE])
+    if len(places) > MAX_PLACES_IN_MESSAGE:
+        shown += " and more"
+    return MSG_NOT_DELIVERED_PLACES.format(places=shown)
+
+
+def place_label(pincode: str, area_name: str) -> str:
+    """How the message names an active pincode: "Rajouri Garden (110027)", or "110027"."""
+    return f"{area_name} ({pincode})" if area_name else pincode
 
 
 def bump_stores_version(**kwargs) -> None:
-    """Signal receiver (DarkStore, StoreTiming): drop the cached snapshot now and after commit."""
+    """Signal receiver (DarkStore, StoreTiming, DeliveryPincode, PincodeBoundary): drop the
+    cached snapshot now and after commit."""
     _bump_areas()
     transaction.on_commit(_bump_areas)
 
@@ -195,8 +263,46 @@ def _bump_areas() -> None:
         logger.warning("could not bump %s", STORES_VERSION_KEY, exc_info=True)
 
 
+# Geography buffer = metres; quad_segs=4 keeps the rounded corners small in the snapshot.
+PINCODE_OUTLINES_SQL = (
+    "SELECT dp.store_id, ST_AsBinary(ST_Union("
+    "ST_Buffer(pb.geom::geography, %s, 'quad_segs=4')::geometry)) "
+    "FROM stores_deliverypincode dp JOIN stores_pincodeboundary pb ON pb.pincode = dp.pincode "
+    "WHERE dp.is_active AND dp.store_id = ANY(%s) GROUP BY dp.store_id"
+)
+
+
+def _pincode_outlines(store_ids: list[int]) -> dict[int, bytes]:
+    """Per store: the union of its active pincodes' outlines, each buffered 250 m (as
+    geography, so in metres), as WKB. One query; a store whose active pincodes have no outline
+    is missing (its location check then covers nothing)."""
+    if not store_ids:
+        return {}
+    with connection.cursor() as cursor:
+        cursor.execute(PINCODE_OUTLINES_SQL, [PINCODE_BUFFER_METRES, store_ids])
+        return {store_id: bytes(wkb) for store_id, wkb in cursor.fetchall() if wkb}
+
+
 def _load_snapshot() -> list[dict]:
-    stores = DarkStore.objects.filter(is_active=True).prefetch_related("timings")
+    rows = JSONBAgg(
+        JSONObject(
+            pincode="delivery_pincodes__pincode",
+            area_name="delivery_pincodes__area_name",
+            is_active="delivery_pincodes__is_active",
+        ),
+        filter=Q(delivery_pincodes__isnull=False),
+        order_by="delivery_pincodes__pincode",
+    )
+    stores = list(
+        DarkStore.objects.filter(is_active=True)
+        .annotate(pincode_rows=rows)
+        .prefetch_related("timings")
+    )
+    active = {
+        store.pk: [row for row in (store.pincode_rows or []) if row["is_active"]]
+        for store in stores
+    }
+    outlines = _pincode_outlines([pk for pk, pins in active.items() if pins])
     return [
         {
             "pk": store.pk,
@@ -208,9 +314,17 @@ def _load_snapshot() -> list[dict]:
             "lng": store.location.x,
             "area_wkb": bytes(store.service_area.wkb),
             "windows": [(t.weekday, t.opens_at, t.closes_at) for t in store.timings.all()],
+            "pincode_mode": bool(store.pincode_rows),
+            "pincodes": [row["pincode"] for row in active[store.pk]],
+            "places": [place_label(row["pincode"], row["area_name"]) for row in active[store.pk]],
+            "outline_wkb": outlines.get(store.pk),
         }
         for store in stores
     ]
+
+
+def _prepared(wkb: bytes | None):
+    return GEOSGeometry(memoryview(wkb), srid=4326).prepared if wkb else None
 
 
 def _snapshot() -> list[dict]:
@@ -245,6 +359,11 @@ def store_areas() -> list[StoreArea]:
             lng=row["lng"],
             area=GEOSGeometry(memoryview(row["area_wkb"]), srid=4326).prepared,
             windows=tuple(Window(*w) for w in sorted(row["windows"], key=lambda w: (w[0], w[1]))),
+            # .get(): a snapshot cached by the release before ADR 0004 has no pincode keys
+            pincode_mode=row.get("pincode_mode", False),
+            pincodes=tuple(row.get("pincodes", ())),
+            places=tuple(row.get("places", ())),
+            outline=_prepared(row.get("outline_wkb")),
         )
         for row in _snapshot()
     ]
@@ -259,15 +378,17 @@ def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 def check_serviceability(lat: float, lng: float, now: datetime | None = None) -> dict:
     """`GET /serviceability/` body: `{serviceable, store, eta_minutes, message}` (DL-27).
-    Active stores whose area contains the point; open first, then nearest, then priority."""
+    Active stores that cover the point (`StoreArea.covers`: the service area, or in pincode mode
+    the active pincodes' outlines, ADR 0004); open first, then nearest, then priority."""
     point = store_point(lat, lng)
-    candidates = [area for area in store_areas() if area.area.contains(point)]
+    areas = store_areas()
+    candidates = [area for area in areas if area.covers(point)]
     if not candidates:
         return {
             "serviceable": False,
             "store": None,
             "eta_minutes": None,
-            "message": MSG_NOT_SERVICEABLE,
+            "message": _location_message(areas),
         }
     ranked = sorted(
         (
@@ -300,16 +421,45 @@ def address_point_expression() -> Coalesce:
     return Coalesce(F("location"), _decimal_point("lat", "lng"), output_field=PointField(srid=4326))
 
 
-def serviceable_exists(point_ref: str = "address_point") -> Exists:
-    """`Exists` subquery for annotations: an active store's area contains `OuterRef(point_ref)`."""
+def _location_message(areas: list[StoreArea]) -> str:
+    """Not served at this location: with stores in pincode mode, name their active pincodes
+    (ADR 0004 §1); else the notify-me message."""
+    places = []
+    for area in sorted(areas, key=lambda a: (a.priority, a.pk)):
+        if area.pincode_mode:
+            places.extend(place for place in area.places if place not in places)
+    if any(area.pincode_mode for area in areas):
+        return not_delivered_message(places)
+    return MSG_NOT_SERVICEABLE
+
+
+def serviceable_exists(point_ref: str = "address_point", pincode_ref: str = "pincode") -> Exists:
+    """`Exists` subquery for address annotations, the address rule of `StoreArea.delivers_to`
+    in SQL: an active store has the address pincode `OuterRef(pincode_ref)` as an active
+    delivery pincode, or has no delivery pincodes and its area contains `OuterRef(point_ref)`."""
+    pincode_mode = Exists(DeliveryPincode.objects.filter(store=OuterRef("pk")))
+    active_pincode = Exists(
+        DeliveryPincode.objects.filter(
+            store=OuterRef("pk"), is_active=True, pincode=OuterRef(OuterRef(pincode_ref))
+        )
+    )
     return Exists(
-        DarkStore.objects.filter(is_active=True, service_area__contains=OuterRef(point_ref))
+        DarkStore.objects.filter(is_active=True).filter(
+            Q(active_pincode) | (~Q(pincode_mode) & Q(service_area__contains=OuterRef(point_ref)))
+        )
     )
 
 
 def is_point_serviceable(lat, lng) -> bool:
+    """The location check: some active store covers the point."""
     point = store_point(lat, lng)
-    return any(area.area.contains(point) for area in store_areas())
+    return any(area.covers(point) for area in store_areas())
+
+
+def is_address_serviceable(lat, lng, pincode: str | None) -> bool:
+    """The address check (the address list's flag for a new or moved address): some active
+    store delivers to it (`StoreArea.delivers_to`)."""
+    return any(area.delivers_to(lat, lng, pincode) for area in store_areas())
 
 
 # --------------------------------------------------------------------------- store operations
@@ -454,3 +604,140 @@ def revoke_store_access(user, store: DarkStore) -> None:
     from apps.stores.models import StaffStoreAccess
 
     StaffStoreAccess.objects.filter(user=user, store=store).delete()
+
+
+# --------------------------------------------------------------------------- delivery pincodes
+# ADR 0004 §1: the admin's "Delivery locations" page calls only these. Super Admin only
+# (`stores.manage_delivery_pincodes`); each change is audited. The DeliveryPincode save signal
+# refreshes the serviceability snapshot, so a change applies to the next request.
+
+MANAGE_DELIVERY_PINCODES = "stores.manage_delivery_pincodes"
+MSG_PINCODE_NO_PERMISSION = "Only a Super Admin can change delivery pincodes."
+MSG_PINCODE_FORMAT = "Enter a 6-digit pincode, e.g. 110027."
+MSG_PINCODE_TAKEN = "This store already delivers to this pincode."
+MSG_PINCODE_STORE = "Choose a store."
+
+
+def can_manage_delivery_pincodes(user) -> bool:
+    return bool(
+        user and user.is_active and user.is_staff and user.has_perm(MANAGE_DELIVERY_PINCODES)
+    )
+
+
+def _require_pincode_manager(actor) -> None:
+    if not can_manage_delivery_pincodes(actor):
+        raise PermissionDenied(MSG_PINCODE_NO_PERMISSION)
+
+
+def _clean_pincode(value) -> str:
+    pincode = str(value or "").strip()
+    try:
+        pincode_validator(pincode)
+    except ValidationError:
+        raise ValidationError({"pincode": MSG_PINCODE_FORMAT}) from None
+    return pincode
+
+
+def _clean_area_name(value) -> str:
+    name = " ".join(str(value or "").split())
+    limit = DeliveryPincode._meta.get_field("area_name").max_length
+    if len(name) > limit:
+        raise ValidationError({"area_name": f"Use at most {limit} characters."})
+    return name
+
+
+def _save_pincode(row: DeliveryPincode, fields: list[str] | None = None) -> None:
+    """Save, turning a raced duplicate (unique store + pincode) into a field error."""
+    try:
+        with transaction.atomic():
+            row.save(update_fields=fields)
+    except IntegrityError as error:
+        if "deliverypincode_unique" in str(error):
+            raise ValidationError({"pincode": MSG_PINCODE_TAKEN}) from error
+        raise
+
+
+def add_delivery_pincode(
+    store, pincode, *, area_name: str = "", is_active: bool = True, actor
+) -> DeliveryPincode:
+    """Add a pincode the store delivers to. The store's first row switches it to pincode mode
+    (ADR 0004 §1). `store` is a DarkStore or its id. Raises `ValidationError` per field
+    (`store`, `pincode`, `area_name`) and `PermissionDenied`; saves nothing then."""
+    _require_pincode_manager(actor)
+    store_id = getattr(store, "pk", store)
+    pincode = _clean_pincode(pincode)
+    area_name = _clean_area_name(area_name)
+    with transaction.atomic():
+        found = DarkStore.objects.filter(pk=store_id).first() if store_id else None
+        if found is None:
+            raise ValidationError({"store": MSG_PINCODE_STORE})
+        if DeliveryPincode.objects.filter(store=found, pincode=pincode).exists():
+            raise ValidationError({"pincode": MSG_PINCODE_TAKEN})
+        row = DeliveryPincode(
+            store=found, pincode=pincode, area_name=area_name, is_active=bool(is_active)
+        )
+        _save_pincode(row)
+        audit.record(
+            actor,
+            "delivery_pincode.add",
+            row,
+            {
+                "store_id": found.pk,
+                "pincode": pincode,
+                "is_active": row.is_active,
+                "area_name_set": bool(area_name),
+            },
+        )
+    return row
+
+
+def update_delivery_pincode(row: DeliveryPincode, *, actor, pincode=None, area_name=None) -> bool:
+    """Edit a delivery pincode's number and/or area name (None = keep). Returns whether
+    anything changed. Same errors as `add_delivery_pincode`."""
+    _require_pincode_manager(actor)
+    new_pincode = None if pincode is None else _clean_pincode(pincode)
+    new_name = None if area_name is None else _clean_area_name(area_name)
+    with transaction.atomic():
+        locked = DeliveryPincode.objects.select_for_update().get(pk=row.pk)
+        changes, fields = {}, []
+        if new_pincode is not None and new_pincode != locked.pincode:
+            taken = DeliveryPincode.objects.filter(store_id=locked.store_id, pincode=new_pincode)
+            if taken.exclude(pk=locked.pk).exists():
+                raise ValidationError({"pincode": MSG_PINCODE_TAKEN})
+            changes["pincode"] = [locked.pincode, new_pincode]
+            locked.pincode = new_pincode
+            fields.append("pincode")
+        if new_name is not None and new_name != locked.area_name:
+            changes["area_name_changed"] = True  # free text stays out of the audit log
+            locked.area_name = new_name
+            fields.append("area_name")
+        if not fields:
+            return False
+        _save_pincode(locked, [*fields, "updated_at"])
+        audit.record(
+            actor, "delivery_pincode.update", locked, {"store_id": locked.store_id, **changes}
+        )
+    row.pincode, row.area_name = locked.pincode, locked.area_name
+    return True
+
+
+def set_delivery_pincode_active(row: DeliveryPincode, active: bool, *, actor) -> bool:
+    """Switch a delivery pincode on or off (an inactive one is kept, but not delivered to; the
+    store stays in pincode mode). Returns whether anything changed."""
+    _require_pincode_manager(actor)
+    active = bool(active)
+    with transaction.atomic():
+        locked = DeliveryPincode.objects.select_for_update().get(pk=row.pk)
+        if locked.is_active == active:
+            row.is_active = active
+            return False
+        locked.is_active = active
+        locked.save(update_fields=["is_active", "updated_at"])
+        audit.record(
+            actor,
+            "delivery_pincode.activate" if active else "delivery_pincode.deactivate",
+            locked,
+            {"store_id": locked.store_id, "pincode": locked.pincode, "is_active": active},
+        )
+    row.is_active = active
+    return True

@@ -309,21 +309,24 @@ class AddressSerializer(serializers.Serializer):
     )
     is_serviceable = serializers.SerializerMethodField(
         help_text=(
-            "True when the pin is inside an active store's service area (open or not), checked "
-            "on every read. An unserviceable address can be saved but not used for an order: "
-            "show it flagged (03 §2.4). Added in Phase 2."
+            "True when an active store (open or not) delivers to the address, checked on every "
+            "read: the pin is inside its service area or, for a store that delivers by pincode "
+            "(ADR 0004), the address pincode is one of its active pincodes. An unserviceable "
+            "address can be saved but not used for an order: show it flagged (03 §2.4). Added "
+            "in Phase 2."
         )
     )
     created_at = serializers.DateTimeField(read_only=True)
     updated_at = serializers.DateTimeField(read_only=True)
 
     def get_is_serviceable(self, address) -> bool:
-        # Annotated by addresses.with_serviceability() on reads; computed for a new or moved pin.
+        # Annotated by addresses.with_serviceability() on reads; computed for a new or moved
+        # address (the same address rule, ADR 0004).
         value = getattr(address, "is_serviceable", None)
         if value is None:
-            from apps.stores.services import is_point_serviceable
+            from apps.stores.services import is_address_serviceable
 
-            return is_point_serviceable(address.lat, address.lng)
+            return is_address_serviceable(address.lat, address.lng, address.pincode)
         return bool(value)
 
 

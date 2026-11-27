@@ -1,5 +1,6 @@
-"""Promotions admin (05 §2 "Coupons", 05 §3 "Coupons": Super Admin and Catalog Manager manage,
-Support and Finance view; DL-45, DL-46).
+"""Promotions admin (05 §2 "Coupons", 05 §3 "Coupons"; DL-45, DL-46). ADR 0004 (user,
+2026-11-26): only a Super Admin changes offers, so adding, changing and deleting coupons also
+needs `promotions.manage_offers`; Catalog Manager, Support and Finance view.
 
 - Coupons: every type the model supports (flat, percent with a cap, category, first order only,
   hidden code), validity window and usage limits. Changes are kept in the coupon's history
@@ -48,9 +49,13 @@ from apps.ops_console.money import RupeeInput, inr
 from apps.ops_console.params import parse_ascii_id
 from apps.ops_console.pii import can_view_full_phone, customer_label
 from apps.ops_console.scoping import ScopedStoreFilter, StoreScopedAdminMixin
+from apps.ops_console.store_management import can_manage_offers
 from apps.promotions import rewards
 from apps.promotions.choices import DiscountType, RewardStatus
 from apps.promotions.models import COUNTED_STATUSES, Coupon, CouponRedemption
+
+# The coupon rule texts live once, in the offers services (ADR 0004); the form uses the same.
+from apps.promotions.offers import MSG_CAP_REQUIRED, MSG_CODE_SPACES, MSG_NO_CAP_ON_FLAT
 from apps.promotions.services import (
     MSG_CODE_LOCKED,
     MSG_CODE_TAKEN,
@@ -64,9 +69,6 @@ from apps.promotions.services import (
 # Redemptions that use up the coupon (HELD + APPLIED), as the usage limits count them.
 COUNTED = Q(redemptions__status__in=COUNTED_STATUSES)
 
-MSG_CAP_REQUIRED = "A percent coupon needs a maximum discount (cap) in rupees."
-MSG_NO_CAP_ON_FLAT = "A flat coupon has no cap: its value is the discount. Leave this empty."
-MSG_CODE_SPACES = "Use letters and numbers without spaces, e.g. JIVO50."
 MSG_OWNER_NOT_CUSTOMER = "Enter the id of an active customer account (not a staff account)."
 PUBLIC_COUPON = "Public (everyone)"
 
@@ -435,8 +437,19 @@ class CouponAdmin(ReadOnlyHistoryAdmin, ModelAdmin):
             request._coupon_save_refusal = refused.error
             return super().changeform_view(request, object_id, form_url, extra_context)
 
+    # ADR 0004 (user, 2026-11-26): only a Super Admin changes offers. Adding, changing and
+    # deleting coupons also needs `promotions.manage_offers`; every other coupon role views only
+    # (Django refuses their POST with 403).
+    def has_add_permission(self, request) -> bool:
+        return super().has_add_permission(request) and can_manage_offers(request.user)
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        return super().has_change_permission(request, obj) and can_manage_offers(request.user)
+
     def has_delete_permission(self, request, obj=None) -> bool:
         if not super().has_delete_permission(request, obj):
+            return False
+        if not can_manage_offers(request.user):
             return False
         # Used coupons are referenced by redemptions and orders (protected): switch them off.
         return obj is None or not (obj.redemptions.exists() or obj.orders.exists())

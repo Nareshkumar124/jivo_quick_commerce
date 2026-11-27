@@ -211,6 +211,15 @@ for _role, _extra in {
 }.items():
     ROLE_PERMISSIONS[_role] = [*ROLE_PERMISSIONS[_role], *_extra]
 
+# ADR 0004 (2026-11-26, user): the "Store management" pages (bottle prices, offers, delivery
+# pincodes) are Super Admin only. Super Admin gets these through SUPER_ADMIN_APPS (catalog,
+# promotions, stores); no other role may list them (accounts/tests/test_store_management_roles).
+STORE_MANAGEMENT = (
+    "catalog.manage_prices",
+    "promotions.manage_offers",
+    "stores.manage_delivery_pincodes",
+)
+
 # Roles limited to the stores in StaffStoreAccess.
 STORE_SCOPED_ROLES = frozenset({STORE_MANAGER, STORE_STAFF})
 # Roles that see every store (05 §3). An explicit allow-list: any other group (unknown, or a

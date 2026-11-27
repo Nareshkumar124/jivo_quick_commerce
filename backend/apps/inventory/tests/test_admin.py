@@ -284,7 +284,7 @@ class TestStockFieldsAreNeverEditable:
         assert ledger(shop["own"], shop["variant"]).count() == 1
 
     def test_price_override_above_mrp_shows_the_service_message(self, client, shop):
-        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
         row = shop["own_row"]
         response = client.post(self.change_url(row), {"price_override": "999.00", "_save": "Save"})
         assert response.status_code == 200
@@ -292,14 +292,36 @@ class TestStockFieldsAreNeverEditable:
         row.refresh_from_db()
         assert row.price_override is None
 
-    def test_catalog_manager_sets_a_store_price(self, client, shop):
-        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+    def test_super_admin_sets_a_store_price(self, client, shop):
+        client.force_login(staff_in_role(roles.SUPER_ADMIN))
         row = shop["own_row"]
-        response = client.post(self.change_url(row), {"price_override": "299.00", "_save": "Save"})
+        response = client.post(
+            self.change_url(row),
+            {
+                "is_available": "on",
+                "low_stock_threshold": "5",
+                "rack_location": "",
+                "price_override": "299.00",
+                "_save": "Save",
+            },
+        )
         assert response.status_code == 302
         row.refresh_from_db()
         assert str(row.price_override) == "299.00"
         assert row.history.latest().price_override == row.price_override  # audit trail
+
+    def test_catalog_manager_sees_the_store_price_read_only(self, client, shop):
+        """ADR 0004: only a Super Admin changes prices (`catalog.manage_prices`). The Catalog
+        Manager views the row; a forged POST is refused and changes nothing."""
+        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+        row = shop["own_row"]
+        page = client.get(self.change_url(row))
+        assert page.status_code == 200
+        assert 'name="price_override"' not in page.content.decode()
+        response = client.post(self.change_url(row), {"price_override": "299.00", "_save": "Save"})
+        assert response.status_code == 403
+        row.refresh_from_db()
+        assert row.price_override is None
 
     def test_store_manager_cannot_change_the_price(self, client, shop):
         client.force_login(manager_of(shop["own"]))
@@ -320,10 +342,15 @@ class TestStockFieldsAreNeverEditable:
         row.refresh_from_db()
         assert row.price_override is None
 
-    def test_catalog_manager_post_changes_only_the_price(self, client, shop):
-        """Tamper: the Catalog Manager's form holds only `price_override`; forged values for
-        the other settings and the stock numbers are ignored."""
-        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+    def test_price_only_user_post_changes_only_the_price(self, client, shop):
+        """Tamper: a Catalog Manager also given `catalog.manage_prices` has a form with only
+        `price_override`; forged values for the other settings and the stock numbers are
+        ignored."""
+        from django.contrib.auth.models import Permission
+
+        user = staff_in_role(roles.CATALOG_MANAGER)
+        user.user_permissions.add(Permission.objects.get(codename="manage_prices"))
+        client.force_login(user)
         row = shop["own_row"]
         before = (row.is_available, row.low_stock_threshold, row.rack_location)
         response = client.post(

@@ -1,0 +1,36 @@
+{% extends "ops/base.html" %}
+
+{% block content %}
+    {# Add / edit form for the store management pages (coupons, pincodes). Context: form, action, back_url, back_label, intro (list of lines), submit_label, confirm_title, confirm_message, confirm_label, testid. #}
+    {# A plain POST behind the confirm dialog (ops.js data-ops-confirm). On a refusal the view renders this page again with the service's messages next to the fields. #}
+    <p class="mb-4"><a class="inline-flex gap-1 items-center ops-text-secondary underline" href="{{ back_url }}"><span class="material-symbols-outlined md-18" aria-hidden="true">arrow_back</span>{{ back_label }}</a></p>
+
+    <section class="bg-white border border-base-200 max-w-2xl ops-card p-4 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800">
+        {% for line in intro %}<p class="mb-2 ops-text-secondary">{{ line }}</p>{% endfor %}
+
+        {% if form.non_field_errors %}
+            <div class="mb-3 mt-3 ops-consequence ops-consequence--danger" role="alert" data-testid="form-errors">
+                <span class="material-symbols-outlined md-18" aria-hidden="true">error</span>
+                <div>{% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}</div>
+            </div>
+        {% elif form.errors %}
+            <div class="mb-3 mt-3 ops-consequence" role="alert" data-testid="form-errors">
+                <span class="material-symbols-outlined md-18" aria-hidden="true">error</span>
+                <p>Please fix the fields marked below.</p>
+            </div>
+        {% endif %}
+
+        <form class="ops-sm-form mt-3" method="post" action="{{ action }}" novalidate
+              data-ops-confirm="{{ confirm_message }}" data-confirm-title="{{ confirm_title }}" data-confirm-label="{{ confirm_label }}"
+              data-testid="{{ testid }}">
+            {% csrf_token %}
+            {% for field in form %}
+                {% include "ops/components/form_field.html" with field=field %}
+            {% endfor %}
+            <div class="flex flex-wrap gap-2 mt-2">
+                <button type="submit" class="ops-button" data-testid="form-submit">{{ submit_label }}</button>
+                <a class="ops-button ops-button--secondary" href="{{ back_url }}">Cancel</a>
+            </div>
+        </form>
+    </section>
+{% endblock %}

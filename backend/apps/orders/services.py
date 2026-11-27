@@ -441,7 +441,7 @@ def _place(
     if not cart_services.serves(store, address):
         raise ApiError(
             ErrorCode.NOT_SERVICEABLE,
-            cart_services.MSG_ADDRESS_NOT_SERVED,
+            cart_services.not_served_message(store, address, cart_services.MSG_ADDRESS_NOT_SERVED),
             details={"address_id": address.pk},
         )
     now = timezone.now()

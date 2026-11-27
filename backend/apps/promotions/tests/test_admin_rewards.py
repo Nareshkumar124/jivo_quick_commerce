@@ -24,6 +24,7 @@ from apps.ops_console.tests.helpers import (
     admin_form_data,
     expected_status,
     login_as,
+    offer_editor,
     staff_in_role,
 )
 from apps.orders.choices import OrderStatus
@@ -168,7 +169,7 @@ class TestList:
 class TestRewardPage:
     @pytest.fixture
     def manager(self, client):
-        user = staff_in_role(roles.CATALOG_MANAGER)
+        user = offer_editor()  # ADR 0004: editing needs promotions.manage_offers
         client.force_login(user)
         return user
 
@@ -268,14 +269,14 @@ class TestRewardPage:
 
 class TestAdd:
     def test_free_unit_is_not_offered(self, client):
-        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+        client.force_login(offer_editor())
         form = client.get(reverse(ADD)).context["adminform"].form
         offered = {value for value, _label in form.fields["discount_type"].choices}
         assert DiscountType.FREE_UNIT not in offered
         assert {DiscountType.FLAT, DiscountType.PERCENT} <= offered
 
     def test_posting_free_unit_is_refused(self, client):
-        client.force_login(staff_in_role(roles.CATALOG_MANAGER))
+        client.force_login(offer_editor())
         data = admin_form_data(client.get(reverse(ADD)))
         data.update(
             {

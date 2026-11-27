@@ -10,8 +10,7 @@ from decimal import Decimal
 import pytest
 from django.urls import reverse
 
-from apps.accounts import roles
-from apps.ops_console.tests.helpers import staff_in_role
+from apps.ops_console.tests.helpers import offer_editor
 from apps.promotions import services
 from apps.promotions.admin import MSG_CODE_LOCKED, MSG_CODE_TAKEN, CouponAdminForm
 from apps.promotions.models import Coupon, RedemptionStatus
@@ -29,7 +28,7 @@ FLAT = {"discount_type": "FLAT", "max_discount": ""}
 
 @pytest.fixture
 def manager(client):
-    user = staff_in_role(roles.CATALOG_MANAGER)
+    user = offer_editor()  # ADR 0004: editing needs promotions.manage_offers
     client.force_login(user)
     return user
 
