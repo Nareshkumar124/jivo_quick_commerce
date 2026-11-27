@@ -57,6 +57,7 @@ from apps.payments.refunds import (
     LATE_CAPTURE,
     request_refund,
 )
+from apps.payments.switch import ensure_online_payments_enabled
 from apps.promotions import services as promotions
 from apps.stores.services import (
     StoreArea,
@@ -205,7 +206,12 @@ def place_order(
     (`_start_payment`). If the gateway call fails, the order is ended (T4: reservation and
     coupon hold released) and its Idempotency-Key is freed, so the app's retry starts afresh.
     An order left without an attempt (a crash in between) is completed by a replay of its key
-    or failed by `expire_unpaid_orders` when its payment window ends, never left reserved."""
+    or failed by `expire_unpaid_orders` when its payment window ends, never left reserved.
+
+    DL-85: with `ONLINE_PAYMENTS_ENABLED` off an ONLINE order is refused (503
+    `SERVICE_UNAVAILABLE`, reason `ONLINE_PAYMENTS_DISABLED`) before anything is created."""
+    if payment_method == PaymentMethod.ONLINE:
+        ensure_online_payments_enabled()
     fingerprint = request_fingerprint(store.pk, address_id, payment_method, expected_grand_total)
     order = _replay(user, idempotency_key, fingerprint)
     if order is not None:
@@ -834,6 +840,7 @@ def retry_payment(user, order_id: int, idempotency_key: str) -> tuple[Order, Pay
     if order is None:
         raise NotFound(MSG_NOT_FOUND)
     _check_retryable(order)
+    ensure_online_payments_enabled()  # DL-85: cash on delivery only, no gateway call.
     existing = order.payments.filter(idempotency_key=idempotency_key).first()
     if existing is not None:
         return order, existing

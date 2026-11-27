@@ -102,6 +102,10 @@ erDiagram
 | phone | char(15), unique, nullable | E.164 (`+91XXXXXXXXXX`). Login identifier for customers and riders. Validated as `+` and 7–14 digits (fits char(15)); blank is stored as NULL. Phase 1 adds the +91 rule for OTP login. |
 | email | email, nullable, unique when set | Staff login. Stored lowercase (case-insensitive login); blank is stored as NULL. It is the Django `USERNAME_FIELD`, because only staff log in with a password (sessions); phone OTP login (P1) does not go through the password backend. |
 | name | char(120) | |
+| business_category | FK BusinessCategory, nullable, SET_NULL | Added 2026-11-26 (03 §2.2): the customer's kind of business, from the complete-profile screen. Optional. Cleared on anonymisation. |
+| business_name | char(120), blank | Added 2026-11-26: optional shop / business name. Cleared on anonymisation. |
+| profile_completed_at | datetime, nullable | Added 2026-11-26: set the first time the user submits the complete-profile screen (a `PATCH /me/` with `name`, `business_category` or `business_name`). Migration `accounts.0009` set it for every user that existed before, so only new sign-ups are asked. |
+| profile_prompt_skipped_at | datetime, nullable | Added 2026-11-26: set when the user taps Skip on that screen (first time kept). The API's `is_profile_complete` is true when either this or `profile_completed_at` is set. |
 | is_active, is_staff, is_superuser | bool | Django standard |
 | auth_id | char(64), nullable, unique | Link to the Jivo Auth identity if adopted for staff (D-04). Reserved in Phase 0: read-only in the admin, set only by the Jivo Auth integration. |
 | marketing_opt_in | bool | Promotional push consent |
@@ -110,6 +114,8 @@ erDiagram
 | anonymised_at | datetime, nullable | Set when `anonymise_deleted_accounts` erased the personal data (makes the job idempotent). |
 | terms_version, terms_accepted_at | char(32), datetime | DPDP consent: the Terms & Privacy version accepted at OTP login and when; updated whenever the version changes. |
 | cod_blocked | bool, default false | Added in Phase 3 (PM default): cash on delivery is not offered (08 T2; the cart shows COD `NOT_ALLOWED`). Set by ops for now; repeated refused deliveries set it from Phase 5. |
+
+**BusinessCategory** (added 2026-11-26, 03 §2.2): `name` (char(80), unique), `slug` (unique), `sort_order`, `is_active`. Admin-editable; the app lists only active ones. Defaults seeded by migration `accounts.0009` and `seed_demo`: Retail shop, Restaurant / Café, Hotel, Office, Hospital / Clinic, School / College, Home use, Other. Deleting one sets its users' `business_category` to null; deactivate instead.
 
 **OTPRequest**: `phone`, `app` (customer/rider), `purpose` (login/delete_account; added in Phase 1 for the OTP-confirmed account deletion), `code_hash` (never plain: HMAC-SHA256 keyed with the secret key), `expires_at` (5 min), `attempts`, `verified_at`, `sms_sent_at` (keeps `send_otp_sms` idempotent), `ip`, `user_agent`.
 

@@ -20,7 +20,7 @@ from unfold.forms import AdminPasswordChangeForm
 
 from apps.accounts import roles
 from apps.accounts.forms import UserChangeForm, UserCreationForm
-from apps.accounts.models import Address, Customer, Device, User
+from apps.accounts.models import Address, BusinessCategory, Customer, Device, User
 from apps.accounts.services.auth import anonymise_user
 from apps.accounts.services.customers import (
     block_customer,
@@ -731,3 +731,20 @@ class CustomerAdmin(ModelAdmin):
         count = sum(anonymise_user(pk) for pk in ids)
         self.message_user(request, f"Anonymised {count} customer(s).", messages.SUCCESS)
         return None
+
+
+# --------------------------------------------------------------------------- business categories
+
+
+@admin.register(BusinessCategory)
+class BusinessCategoryAdmin(ModelAdmin):
+    """The complete-profile dropdown (03 §2.2). Only active ones are offered in the app;
+    deactivate instead of deleting (a deleted category is cleared from its users)."""
+
+    list_display = ("name", "slug", "sort_order", "is_active", "updated_at")
+    list_editable = ("sort_order", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("name", "slug")
+    ordering = ("sort_order", "name")
+    prepopulated_fields = {"slug": ("name",)}
+    fields = ("name", "slug", "sort_order", "is_active")

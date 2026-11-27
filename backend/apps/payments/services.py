@@ -28,6 +28,7 @@ from apps.payments.serializers import (
     RAZORPAY_PAYMENT_ID_PATTERN,
     RAZORPAY_QR_ID_PATTERN,
 )
+from apps.payments.switch import ensure_online_payments_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ def verify_payment(
     order = orders.own_orders(user).filter(pk=order_id).first()
     if order is None:
         raise NotFound(orders.MSG_NOT_FOUND)
+    ensure_online_payments_enabled()  # DL-85: cash on delivery only, no gateway call.
     if not order.payments.filter(gateway_order_id=razorpay_order_id).exists():
         raise ApiError(ErrorCode.PAYMENT_VERIFICATION_FAILED)
     from apps.payments.gateways import PaymentGatewayError

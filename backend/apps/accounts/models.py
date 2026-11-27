@@ -24,6 +24,24 @@ phone_validator = RegexValidator(
 )
 
 
+class BusinessCategory(TimeStampedModel):
+    """The customer's kind of business (07 §2.1), picked on the complete-profile screen
+    (03 §2.2). Edited in the admin; the app lists the active ones by `sort_order`."""
+
+    name = models.CharField(max_length=80, unique=True)
+    slug = models.SlugField(max_length=80, unique=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "business category"
+        verbose_name_plural = "business categories"
+        ordering = ("sort_order", "name")
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     """One table for everyone (02 §6). Fields per 07 §2.1.
 
@@ -49,6 +67,25 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         help_text="Stored lowercase. Login identifier for staff.",
     )
     name = models.CharField(max_length=120, blank=True)
+    # Business profile (03 §2.2, 2026-11-26): asked once, right after the first OTP sign-up.
+    business_category = models.ForeignKey(
+        BusinessCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="users",
+    )
+    business_name = models.CharField(max_length=120, blank=True)
+    profile_completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the user submitted the complete-profile screen (name / business).",
+    )
+    profile_prompt_skipped_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the user tapped Skip on the complete-profile screen.",
+    )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(
         default=False, help_text="Can log in to the admin site and the Ops Console."
@@ -102,7 +139,12 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     @property
     def is_profile_complete(self) -> bool:
-        return bool(self.name.strip())
+        """False only for a customer who has neither submitted nor skipped the complete-profile
+        screen (03 §2.2). Riders and staff never get that prompt, so they are always complete.
+        Accounts that existed before 2026-11-26 were marked done by migration 0009."""
+        if self.profile_completed_at is not None or self.profile_prompt_skipped_at is not None:
+            return True
+        return self.is_staff or self.rider_status != RiderStatus.NONE
 
     @property
     def rider_status(self) -> str:

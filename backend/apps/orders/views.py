@@ -55,6 +55,8 @@ from apps.orders.serializers import (
     PaginatedOrderSummaryListSerializer,
     ReorderResultSerializer,
 )
+from apps.payments.switch import MSG_ONLINE_DISABLED
+from apps.payments.switch import REASON as ONLINE_DISABLED_REASON
 from apps.stores.context import get_store
 from apps.stores.schema import STORE_ID_PARAMETER, store_responses
 
@@ -73,9 +75,17 @@ GATEWAY_UNAVAILABLE = error_example(
 PAYMENT_UNAVAILABLE = error_response(
     "Maintenance mode (`MAINTENANCE`), or the payment gateway could not be reached "
     "(`SERVICE_UNAVAILABLE`; nothing was created and no stock is held: retry with the same "
-    "`Idempotency-Key`, or offer COD).",
+    "`Idempotency-Key`, or offer COD). `SERVICE_UNAVAILABLE` with `details.reason` "
+    "`ONLINE_PAYMENTS_DISABLED`: online payment is switched off (cash on delivery only, DL-85); "
+    "nothing was created: choose COD.",
     *MAINTENANCE.examples,
     GATEWAY_UNAVAILABLE,
+    error_example(
+        ErrorCode.SERVICE_UNAVAILABLE,
+        MSG_ONLINE_DISABLED,
+        {"reason": ONLINE_DISABLED_REASON},
+        name="ONLINE_PAYMENTS_DISABLED",
+    ),
 )
 COUPON_ERRORS = (
     error_example(

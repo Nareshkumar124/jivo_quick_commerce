@@ -20,6 +20,7 @@ from apps.orders.models import Order, OrderItem, OrderStatusHistory
 from apps.payments.gateways import get_gateway, to_paise
 from apps.payments.models import Payment, PaymentAttemptStatus, Refund
 from apps.payments.order_refunds import customer_refunds
+from apps.payments.switch import online_payments_enabled
 
 MERCHANT_NAME = "Jivo"
 SUMMARY_IMAGES = 4
@@ -50,7 +51,8 @@ def can_cancel(order: Order) -> bool:
 def can_retry_payment(order: Order, now: datetime | None = None) -> bool:
     now = now or timezone.now()
     return (
-        order.payment_method == PaymentMethod.ONLINE
+        online_payments_enabled()  # DL-85: no Retry and no checkout while COD-only
+        and order.payment_method == PaymentMethod.ONLINE
         and order.status == OrderStatus.PAYMENT_PENDING
         and order.payment_expires_at is not None
         and now < order.payment_expires_at

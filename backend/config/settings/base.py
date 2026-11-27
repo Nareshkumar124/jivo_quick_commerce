@@ -768,6 +768,11 @@ CART_MAX_TIP = Decimal(env_str("CART_MAX_TIP", default="500.00"))
 # Payment gateway (D-01, DL-21): Razorpay by default, behind apps.payments.gateways. local.py and
 # test.py default to FakeRazorpayGateway; staging and production refuse it (payments.E001).
 PAYMENT_GATEWAY = env_str("PAYMENT_GATEWAY", default="apps.payments.gateways.RazorpayGateway")
+# DL-85 "cash on delivery only" switch: false refuses online checkout, payment retry, verify and
+# the COD UPI QR (503 SERVICE_UNAVAILABLE, reason ONLINE_PAYMENTS_DISABLED), shows ONLINE as
+# unavailable in the cart and skips payments.E003, so production can run before Razorpay live
+# keys exist. Default true everywhere (nothing changes unless set). apps.payments.switch.
+ONLINE_PAYMENTS_ENABLED = env_bool("ONLINE_PAYMENTS_ENABLED", default=True)
 # Razorpay keys (test keys on staging, live keys in production). Environment only, never
 # committed. Empty here: the Razorpay gateway fails loudly when used without them.
 RAZORPAY_KEY_ID = env_str("RAZORPAY_KEY_ID", default="")

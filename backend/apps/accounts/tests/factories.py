@@ -1,4 +1,5 @@
 import factory
+from django.utils import timezone
 
 from apps.accounts.models import User
 
@@ -12,6 +13,9 @@ class UserFactory(factory.django.DjangoModelFactory):
 
     phone = factory.Sequence(lambda n: f"+9190000{n:05d}")
     name = factory.Faker("name", locale="en_IN")
+    # A named factory user has finished the complete-profile screen (03 §2.2). Pass
+    # `profile_completed_at=None` for a fresh sign-up.
+    profile_completed_at = factory.LazyFunction(timezone.now)
 
     @factory.post_generation
     def password(self, create, extracted, **kwargs):

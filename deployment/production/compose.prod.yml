@@ -1,0 +1,195 @@
+# JQC PRODUCTION backend on the shared server, next to staging (deployment/production/README.md).
+#
+# Based on infra/deploy/compose.prod.yml (staging, project `jqc`), but fully separate:
+# compose project `jqcprod`, network `jqcprod_net`, volumes `jqcprod_*`, folder /srv/jqc-prod/,
+# host ports 127.0.0.1:18002 (web) and 127.0.0.1:19002 (MinIO API), settings
+# config.settings.production. Postgres, Redis and the MinIO console are not published at all.
+# Rules R1-R10 of plan.md §0 apply.
+#
+# Lives on the server as /srv/jqc-prod/compose/compose.prod.yml. Secrets live only in
+# /srv/jqc-prod/env/*.env (mode 600, generated on the server, never in git, never copied from
+# staging). Non-secret interpolation values live in /srv/jqc-prod/compose/.env:
+#   JQCPROD_HOST=<production domain>      (Host header of the web healthcheck)
+#   JQCPROD_FCM_KEY_FILE=<path>           (optional, production FCM key; unset = push disabled)
+#
+# ALWAYS name the project and this file explicitly; never run a staging command here:
+#   cd /srv/jqc-prod/compose
+#   JQCPROD_IMAGE=jqcprod-backend:<sha> docker compose -p jqcprod -f compose.prod.yml up -d postgres redis minio
+#   JQCPROD_IMAGE=jqcprod-backend:<sha> docker compose -p jqcprod -f compose.prod.yml run --rm release
+#   JQCPROD_IMAGE=jqcprod-backend:<sha> docker compose -p jqcprod -f compose.prod.yml up -d web worker worker-slow beat
+#
+# Memory caps are smaller than staging's (shared host: about 10 GB RAM available and swap mostly
+# used on 2026-11-26). Real idle use of the whole stack is under 1 GB. Raise them before launch
+# only after checking `free -h` and `docker stats`.
+
+name: jqcprod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app: &app
+  image: ${JQCPROD_IMAGE:?set JQCPROD_IMAGE=jqcprod-backend:<git-sha>}
+  env_file:
+    - path: ${JQCPROD_ENV_DIR:-/srv/jqc-prod/env}/backend.env
+      required: true
+  networks: [jqcprod_net]
+  # Production FCM key (D-19), read-only. Unset mounts /dev/null: push disabled
+  # (notifications.W001) as long as backend.env leaves FCM_CREDENTIALS_FILE unset.
+  volumes:
+    - ${JQCPROD_FCM_KEY_FILE:-/dev/null}:/run/secrets/fcm-service-account.json:ro
+  restart: unless-stopped
+  logging: *logging
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    env_file:
+      - path: ${JQCPROD_ENV_DIR:-/srv/jqc-prod/env}/postgres.env
+        required: true
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=100"]
+    volumes:
+      - jqcprod_pgdata:/var/lib/postgresql/data
+    networks: [jqcprod_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 1024m
+    cpus: 2
+    shm_size: 256m
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    image: redis:7.4.12-alpine
+    # Cache, broker and channel layer: no persistence needed (docs/deployment.md §7.5).
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb",
+              "--maxmemory-policy", "noeviction"]
+    volumes:
+      - jqcprod_redisdata:/data
+    networks: [jqcprod_net]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 384m
+    cpus: 1
+    restart: unless-stopped
+    logging: *logging
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
+    env_file:
+      - path: ${JQCPROD_ENV_DIR:-/srv/jqc-prod/env}/minio.env
+        required: true
+    volumes:
+      - jqcprod_miniodata:/data
+    networks: [jqcprod_net]
+    ports:
+      # For the future host nginx /media/ (public bucket only). Console (9001) is not published.
+      - "127.0.0.1:19002:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    mem_limit: 512m
+    cpus: 1
+    restart: unless-stopped
+    logging: *logging
+
+  # One-off per deploy: check --deploy against the real env, then migrate (docs/deployment.md §8).
+  release:
+    <<: *app
+    command: ["jqc-release"]
+    restart: "no"
+    profiles: ["release"]
+    environment:
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "0"
+    mem_limit: 768m
+
+  web:
+    <<: *app
+    command: ["gunicorn", "config.asgi:application",
+              "--worker-class", "jqc_asgi_worker.JqcUvicornWorker",
+              "--bind", "0.0.0.0:8000", "--workers", "3", "--graceful-timeout", "30",
+              "--no-control-socket"]   # as the image CMD: no writable $HOME (backend/Dockerfile)
+    environment:
+      POSTGRES_POOL: "true"
+      POSTGRES_CONN_MAX_AGE: "0"
+    ports:
+      - "127.0.0.1:18002:8000"
+    healthcheck:
+      # Host header: DJANGO_ALLOWED_HOSTS lists only the production domain.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/health/ready', headers={'Host': '${JQCPROD_HOST:?set JQCPROD_HOST in /srv/jqc-prod/compose/.env}'}), timeout=5)"
+      interval: 15s
+      timeout: 8s
+      retries: 5
+      start_period: 40s
+    mem_limit: 1280m
+    cpus: 2
+
+  # Two Celery queues (T-817); both workers must always run (see infra/deploy/compose.prod.yml).
+  worker:
+    <<: *app
+    command: ["celery", "-A", "config", "worker", "-l", "INFO", "-Q", "celery",
+              "-n", "celery@%h", "--concurrency", "4"]
+    environment:
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "60"
+    stop_grace_period: 60s
+    mem_limit: 768m
+    cpus: 2
+
+  worker-slow:
+    <<: *app
+    command: ["celery", "-A", "config", "worker", "-l", "INFO", "-Q", "slow",
+              "-n", "slow@%h", "--concurrency", "2", "--max-tasks-per-child", "50",
+              "--time-limit", "1800", "--soft-time-limit", "1500"]
+    environment:
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "60"
+    stop_grace_period: 300s
+    mem_limit: 768m
+    cpus: 1
+
+  # Exactly ONE beat per environment. Never scale it.
+  beat:
+    <<: *app
+    command: ["celery", "-A", "config", "beat", "-l", "INFO",
+              "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+    environment:
+      POSTGRES_POOL: "false"
+      POSTGRES_CONN_MAX_AGE: "60"
+    mem_limit: 256m
+    cpus: 0.5
+
+networks:
+  jqcprod_net:
+    name: jqcprod_net
+
+volumes:
+  jqcprod_pgdata:
+    name: jqcprod_pgdata
+  jqcprod_redisdata:
+    name: jqcprod_redisdata
+  jqcprod_miniodata:
+    name: jqcprod_miniodata
