@@ -1,6 +1,6 @@
 # Production on the same server: plan
 
-**Status (2026-11-27): steps 1-4 done, catalog loaded, domain `quick.jivo.in` set in the app. Cash on delivery only (DL-85). Reachable only on 127.0.0.1:18002 until DNS for `quick.jivo.in` exists; then run §7 (nginx + TLS). See §6.** Each further step needs the owner's go-ahead.
+**Status (2026-11-27): live at `https://quick.jivo.in` (nginx site file + Let's Encrypt certificate). Cash on delivery only (DL-85). Catalog loaded; no stores or staff yet. See §6 and §7.** Each further step needs the owner's go-ahead.
 **No secret values ever go in this folder.** The repository is public.
 
 Production runs on the same shared server as staging (`138.252.101.117`), **next to** the staging
@@ -11,7 +11,7 @@ websites and the staging stack must not be disturbed.
 
 | Item | Staging (today) | Production (new) |
 |---|---|---|
-| Domain | `jqc.jivo.in` | `quick.jivo.in` (DNS not set yet, 2026-11-27) |
+| Domain | `jqc.jivo.in` | `quick.jivo.in` (DNS + TLS since 2026-11-27) |
 | Settings | `config.settings.staging` | `config.settings.production` |
 | Compose project / network | `jqc` / `jqc_net` | `jqcprod` / `jqcprod_net` |
 | Volumes | `jqc_*` | `jqcprod_pgdata`, `jqcprod_redisdata`, `jqcprod_miniodata` |
@@ -115,7 +115,7 @@ before we started; not ours, not touched.)
 | SMS | **Not configured, also not on staging**: staging's env has no SMS settings (it runs `UnconfiguredSmsBackend` and uses OTP test numbers). So nothing was copied; production still has `UnconfiguredSmsBackend` and **real OTP SMS will not send** until the SMS provider settings exist (P4, H-06/H-24). |
 | Cash only | `ONLINE_PAYMENTS_ENABLED=false`; `online_payments_enabled()` is `False` after the restart. No Razorpay keys. |
 | Catalog | Files in `/srv/jqc-prod/import/` (catalog CSVs and manifests from `f1cb51e`, `shop_jivo_in` photos from the PM's PC, drive photos copied read-only from staging's `/srv/jqc/data/drive-import/images`). Dump before: `backups/pre-catalog-20261127.dump` (600). `import_catalog --commit`: 15 categories, 49 products, 111 variants (99 active). `import_catalog_images --commit`: 228 + 207 = 435 images (3 duplicate rows ignored). Prices: all 83 SKUs that also exist on staging have the same MRP and selling price. GST 5% placeholder, HSN/FSSAI blank, as in the files. Not done: banners, category images, collections (later, in Admin), stock (none), no `seed_demo`, 0 users, 0 stores. Note: staging has deactivated some of these SKUs by hand (74 active there); production has every variant the files mark active. |
-| nginx | `nginx/quick.jivo.in.conf` staged at `/srv/jqc-prod/compose/nginx/quick.jivo.in.conf`. Tested in isolation (`nginx -t -c` on a throwaway main config, HTTP-only and full with a throwaway cert): OK. **Not enabled, nginx not reloaded, no certbot.** Run §7 once DNS points here. |
+| nginx + TLS | Done the same day once DNS pointed here (owner approved): §7 run as written. See "§7 result" below. |
 | Verify | `curl -H 'Host: quick.jivo.in' http://127.0.0.1:18002/health/ready` = 200 `{"database":"ok","redis":"ok"}`; Celery ping `celery@` and `slow@` OK. |
 
 **Rollback of this update:**
@@ -128,7 +128,7 @@ echo 56b778d > DEPLOYED_SHA
 # catalog only (empties the catalog again): restore backups/pre-catalog-20261127.dump with pg_restore --clean
 ```
 
-**Next (2026-11-27):** DNS A record `quick.jivo.in` → `138.252.101.117`, then §7. Then stores/staff (step 6), backups and monitoring (step 7), SMS (P4), production Firebase (P5).
+**Next (2026-11-27):** stores/staff (step 6), backups and monitoring (step 7), SMS (P4), production Firebase (P5).
 
 **Earlier next steps (2026-11-26):** P1 domain + DNS, then the one nginx file and TLS (step 5), real data (step 6), backups
 and monitoring (step 7). Online payment: put the Razorpay **live** keys and webhook secret in
@@ -147,7 +147,7 @@ docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker imag
 sudo rm -rf /srv/jqc-prod
 ```
 
-## 7. nginx + TLS for `quick.jivo.in` (run only once DNS points to `138.252.101.117`)
+## 7. nginx + TLS for `quick.jivo.in` (DONE 2026-11-27, kept as the runbook)
 
 The site file is `nginx/quick.jivo.in.conf` in this folder (generated from the staging file: every
 name `jqcprod_`, upstream `127.0.0.1:18002`, MinIO `127.0.0.1:19002`, files under `/srv/jqc-prod/`).
@@ -187,3 +187,20 @@ sudo certbot renew --dry-run --cert-name quick.jivo.in
 sudo rm /etc/nginx/sites-enabled/quick.jivo.in.conf && sudo nginx -t && sudo systemctl reload nginx
 # later, if not needed: sudo certbot delete --cert-name quick.jivo.in; sudo rm /etc/nginx/sites-available/quick.jivo.in.conf
 ```
+
+### §7 result (2026-11-27, owner approved)
+
+- DNS: `quick.jivo.in` → `138.252.101.117` (checked against 8.8.8.8 and the server's resolver).
+- Steps 1-4 run as written. `nginx -t` passed both times (only the host's existing warnings from
+  other sites' files); `systemctl reload nginx` only, never restart. The HTTP-only copy is kept at
+  `/srv/jqc-prod/compose/nginx/quick.jivo.in.http-only.conf`.
+- Installed: `/etc/nginx/sites-available/quick.jivo.in.conf` + `sites-enabled` symlink;
+  `/srv/jqc-prod/cache/nginx-media` (www-data, 700); certificate `/etc/letsencrypt/live/quick.jivo.in/`
+  (expires 2027-02-25, renewal file `renewal/quick.jivo.in.conf`, deploy hook = reload,
+  `certbot renew --dry-run --cert-name quick.jivo.in` succeeded). No other certificate touched.
+- Before/after: all other `server_name`s gave identical status codes after the HTTP reload and after the
+  HTTPS reload; staging `https://jqc.jivo.in/health/ready` 200 throughout.
+- Checks from outside: `https://quick.jivo.in/health/ready` 200 `{"database":"ok","redis":"ok"}`;
+  `/admin/` → 302 to the login page (form loads); HSTS header present; `http://` → 301 to `https://`;
+  `/static/` 200; a product image under `/media/` 200 (`image/webp`).
+
