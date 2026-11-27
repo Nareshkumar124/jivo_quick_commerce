@@ -1,6 +1,6 @@
 # Production on the same server: plan
 
-**Status (2026-11-26): steps 1-4 done. The app runs in cash-on-delivery-only mode (DL-85), reachable only on 127.0.0.1:18002 (no domain, no nginx yet). See §6.** Each further step needs the owner's go-ahead.
+**Status (2026-11-27): steps 1-4 done, catalog loaded, domain `quick.jivo.in` set in the app. Cash on delivery only (DL-85). Reachable only on 127.0.0.1:18002 until DNS for `quick.jivo.in` exists; then run §7 (nginx + TLS). See §6.** Each further step needs the owner's go-ahead.
 **No secret values ever go in this folder.** The repository is public.
 
 Production runs on the same shared server as staging (`138.252.101.117`), **next to** the staging
@@ -11,13 +11,13 @@ websites and the staging stack must not be disturbed.
 
 | Item | Staging (today) | Production (new) |
 |---|---|---|
-| Domain | `jqc.jivo.in` | **to decide** (e.g. `quick.jivo.in` or `api.quick.jivo.in`) |
+| Domain | `jqc.jivo.in` | `quick.jivo.in` (DNS not set yet, 2026-11-27) |
 | Settings | `config.settings.staging` | `config.settings.production` |
 | Compose project / network | `jqc` / `jqc_net` | `jqcprod` / `jqcprod_net` |
 | Volumes | `jqc_*` | `jqcprod_pgdata`, `jqcprod_redisdata`, `jqcprod_miniodata` |
 | Folder on server | `/srv/jqc/` | `/srv/jqc-prod/` (same layout: compose, env, src, static, cache, acme, logs, backups) |
 | Host ports (127.0.0.1 only) | 18001 web, 19000 MinIO | 18002 web, 19002 MinIO (check free with `ss -tlnp`) |
-| nginx file | `jqc.jivo.in.conf` | one new file `<prod-domain>.conf`, zones/maps prefixed `jqcprod_` |
+| nginx file | `jqc.jivo.in.conf` | one new file `quick.jivo.in.conf` (`nginx/` here), zones/maps prefixed `jqcprod_` |
 | Database | own Postgres container | own Postgres container, **fresh DB, no demo data** |
 | Secrets | `/srv/jqc/env/` | `/srv/jqc-prod/env/`, all **newly generated** (never copied from staging) |
 | Razorpay | test keys | **live keys + live webhook secret** |
@@ -101,19 +101,89 @@ memory caps; the server copy is identical) and `env.example` (names only).
 | App | `jqcprod-web-1` (healthy), `jqcprod-worker-1`, `jqcprod-worker-slow-1`, `jqcprod-beat-1` up. `curl -H 'Host: prod-domain-pending.jivo.in' http://127.0.0.1:18002/health/ready` = 200 `{"database":"ok","redis":"ok"}`. Celery ping: `celery@` and `slow@` both OK. Beat: DatabaseScheduler started and sends due tasks. |
 | Memory after start | Host: 9.5 GB available, swap 9.6 of 12 GB. jqcprod total about 1.3 GB (web 392 MB, worker 406 MB, worker-slow 236 MB, beat 139 MB, postgres 45 MB, minio 64 MB, redis 3 MB). |
 
-**Next:** P1 domain + DNS, then the one nginx file and TLS (step 5), real data (step 6), backups
+### 2026-11-27 update (owner approved)
+
+Staging and the other sites were checked before and after: identical status codes, `nginx -T`
+md5 unchanged, live nginx never reloaded. (`jivo-erp_frontend_1` was already restart-looping
+before we started; not ours, not touched.)
+
+| Step | Result |
+|---|---|
+| Code | `jqcprod-backend:f1cb51e` built from pushed `main` `f1cb51e` (`git -c core.autocrlf=false archive`; source `src/f1cb51e/`, log `logs/build-f1cb51e.log`). Pre-deploy dump `backups/pre-f1cb51e.dump` (600). `release`: `check --deploy` no issues, no new migrations (`logs/release-f1cb51e.log`). Static copied additively (root-owned folder, copy with `sudo cp -a`). web, worker, worker-slow, beat restarted (beat stopped first). `compose/DEPLOYED_SHA` = `f1cb51e`. Old images `56b778d` and `3bdb522` kept. |
+| Domain | `prod-domain-pending.jivo.in` replaced by `quick.jivo.in` in `env/backend.env` (allowed hosts, CSRF origin, S3 public media domain, presign URL, `DEFAULT_FROM_EMAIL`) and `compose/.env` (`JQCPROD_HOST`). Backups: `env/backend.env.bak-20261127-domain`, `compose/.env.bak-20261127-domain` (600). The old host now gets 400. |
+| Push / Maps (same as test) | `GOOGLE_MAPS_SERVER_KEY` copied from staging's env; `FCM_CREDENTIALS_FILE=/run/secrets/fcm-service-account.json`; staging's FCM key file copied to `env/fcm-service-account.json` (0440, root, same group as staging's copy so the container user can read it) and mounted via `JQCPROD_FCM_KEY_FILE` in `compose/.env`. `notifications.W001` is gone. **Note:** this is the test Firebase project; replace it with the production one (P5) before launch. |
+| SMS | **Not configured, also not on staging**: staging's env has no SMS settings (it runs `UnconfiguredSmsBackend` and uses OTP test numbers). So nothing was copied; production still has `UnconfiguredSmsBackend` and **real OTP SMS will not send** until the SMS provider settings exist (P4, H-06/H-24). |
+| Cash only | `ONLINE_PAYMENTS_ENABLED=false`; `online_payments_enabled()` is `False` after the restart. No Razorpay keys. |
+| Catalog | Files in `/srv/jqc-prod/import/` (catalog CSVs and manifests from `f1cb51e`, `shop_jivo_in` photos from the PM's PC, drive photos copied read-only from staging's `/srv/jqc/data/drive-import/images`). Dump before: `backups/pre-catalog-20261127.dump` (600). `import_catalog --commit`: 15 categories, 49 products, 111 variants (99 active). `import_catalog_images --commit`: 228 + 207 = 435 images (3 duplicate rows ignored). Prices: all 83 SKUs that also exist on staging have the same MRP and selling price. GST 5% placeholder, HSN/FSSAI blank, as in the files. Not done: banners, category images, collections (later, in Admin), stock (none), no `seed_demo`, 0 users, 0 stores. Note: staging has deactivated some of these SKUs by hand (74 active there); production has every variant the files mark active. |
+| nginx | `nginx/quick.jivo.in.conf` staged at `/srv/jqc-prod/compose/nginx/quick.jivo.in.conf`. Tested in isolation (`nginx -t -c` on a throwaway main config, HTTP-only and full with a throwaway cert): OK. **Not enabled, nginx not reloaded, no certbot.** Run §7 once DNS points here. |
+| Verify | `curl -H 'Host: quick.jivo.in' http://127.0.0.1:18002/health/ready` = 200 `{"database":"ok","redis":"ok"}`; Celery ping `celery@` and `slow@` OK. |
+
+**Rollback of this update:**
+```bash
+cd /srv/jqc-prod/compose
+cp -p ../env/backend.env.bak-20261127-domain ../env/backend.env; cp -p .env.bak-20261127-domain .env
+docker compose -p jqcprod -f compose.prod.yml stop beat
+JQCPROD_IMAGE=jqcprod-backend:56b778d docker compose -p jqcprod -f compose.prod.yml up -d web worker worker-slow beat
+echo 56b778d > DEPLOYED_SHA
+# catalog only (empties the catalog again): restore backups/pre-catalog-20261127.dump with pg_restore --clean
+```
+
+**Next (2026-11-27):** DNS A record `quick.jivo.in` → `138.252.101.117`, then §7. Then stores/staff (step 6), backups and monitoring (step 7), SMS (P4), production Firebase (P5).
+
+**Earlier next steps (2026-11-26):** P1 domain + DNS, then the one nginx file and TLS (step 5), real data (step 6), backups
 and monitoring (step 7). Online payment: put the Razorpay **live** keys and webhook secret in
 `backend.env`, set `ONLINE_PAYMENTS_ENABLED=true`, run `release`, restart web and workers.
 
 **Stop the app only (keeps DB and infra):**
 ```bash
-cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:56b778d docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
+cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:f1cb51e docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
 ```
 
 **Undo (touches only production):**
 ```bash
 cd /srv/jqc-prod/compose && JQCPROD_IMAGE=x docker compose -p jqcprod -f compose.prod.yml down   # keeps volumes
 # full removal, only if nothing is needed:
-docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d
+docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d jqcprod-backend:f1cb51e
 sudo rm -rf /srv/jqc-prod
+```
+
+## 7. nginx + TLS for `quick.jivo.in` (run only once DNS points to `138.252.101.117`)
+
+The site file is `nginx/quick.jivo.in.conf` in this folder (generated from the staging file: every
+name `jqcprod_`, upstream `127.0.0.1:18002`, MinIO `127.0.0.1:19002`, files under `/srv/jqc-prod/`).
+A staged copy waits on the server at `/srv/jqc-prod/compose/nginx/quick.jivo.in.conf`; it is **not**
+in `/etc/nginx` and nginx has not been reloaded for it.
+
+Before and after: record the HTTP status of staging (`https://jqc.jivo.in/health/ready`) and of every
+other `server_name` in `sudo nginx -T`, and the md5 of `sudo nginx -T`. Any change in another site:
+remove our symlink, `nginx -t`, reload, stop.
+
+```bash
+# 0. DNS must answer with the server's IP, or certbot fails (and nothing else may be changed)
+dig +short quick.jivo.in            # must print 138.252.101.117
+cd /srv/jqc-prod/compose/nginx
+# 1. media cache directory (owner = the `user` in the host's nginx.conf)
+NGINX_USER=$(sudo nginx -T 2>/dev/null | awk '$1=="user"{gsub(";","",$2); print $2; exit}')
+sudo install -d -m 755 /srv/jqc-prod/cache
+sudo install -d -m 700 -o "${NGINX_USER:-www-data}" -g "${NGINX_USER:-www-data}" /srv/jqc-prod/cache/nginx-media
+sudo install -d -m 755 /srv/jqc-prod/acme
+# 2. HTTP-only bootstrap: our file without the HTTPS server block
+sed '/^# BEGIN JQCPROD HTTPS/,/^# END JQCPROD HTTPS/d' quick.jivo.in.conf | sudo tee /etc/nginx/sites-available/quick.jivo.in.conf >/dev/null
+sudo ln -s /etc/nginx/sites-available/quick.jivo.in.conf /etc/nginx/sites-enabled/quick.jivo.in.conf
+sudo nginx -t && sudo systemctl reload nginx      # on failure: sudo rm the symlink, stop
+# 3. certificate for quick.jivo.in ONLY (webroot; other sites' certificates untouched)
+sudo certbot certonly --webroot -w /srv/jqc-prod/acme -d quick.jivo.in --non-interactive --agree-tos \
+  --deploy-hook 'systemctl reload nginx'
+# 4. full file (HTTPS + HSTS)
+sudo install -m 644 quick.jivo.in.conf /etc/nginx/sites-available/quick.jivo.in.conf
+sudo nginx -t && sudo systemctl reload nginx
+# 5. check
+curl -sS -o /dev/null -w '%{http_code}\n' https://quick.jivo.in/health/ready    # 200
+sudo certbot renew --dry-run --cert-name quick.jivo.in
+```
+
+**Undo (only production's file):**
+```bash
+sudo rm /etc/nginx/sites-enabled/quick.jivo.in.conf && sudo nginx -t && sudo systemctl reload nginx
+# later, if not needed: sudo certbot delete --cert-name quick.jivo.in; sudo rm /etc/nginx/sites-available/quick.jivo.in.conf
 ```
