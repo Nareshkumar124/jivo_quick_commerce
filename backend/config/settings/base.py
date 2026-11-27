@@ -126,6 +126,9 @@ OTP_STATIC_THROTTLE_FACTOR = 5
 ORDERS_EXPORT_MAX_ROWS = env_int("ORDERS_EXPORT_MAX_ROWS", default=5000)
 # L7: Content-Security-Policy on /admin/ and /ops/, report-only until a week of clean reports.
 CSP_REPORT_ONLY = env_bool("CSP_REPORT_ONLY", default=True)
+# Django's default "same-origin" sends no Referer to other sites, and OpenStreetMap's tile servers
+# answer 403 "Access blocked" without one (store map editor). This sends only our origin cross-site.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
