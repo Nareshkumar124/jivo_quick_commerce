@@ -97,7 +97,7 @@ Future<void> bootstrap(Flavor flavor) async {
   // Started by a tapped foreground push notification: routed once the app
   // runs (PushMessaging.initialMessage).
   if (push is FirebasePushMessaging) push.setLocalLaunchPayload(launchPayload);
-  // Started by a real offer alert (its full-screen intent or a tap): the
+  // Started by a real offer alert (a tap on it): the
   // offer controller fetches the offer when the rider becomes active; this
   // also shows "Offer expired" if it ended meanwhile.
   final launchOffer =

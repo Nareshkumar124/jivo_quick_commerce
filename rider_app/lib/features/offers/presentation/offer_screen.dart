@@ -58,7 +58,7 @@ class _OfferScreenState extends ConsumerState<OfferScreen> {
   void initState() {
     super.initState();
     // Hidden (home button, screen off): the notification takes over, with
-    // its heads-up and full-screen intent. Back in front: the app rings and
+    // its heads-up notification. Back in front: the app rings and
     // the heads-up goes, so it never covers this screen.
     _lifecycle = AppLifecycleListener(
       onHide: () => _ring(ref.read(offerControllerProvider), inFront: false),

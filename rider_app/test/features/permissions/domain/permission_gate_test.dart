@@ -47,8 +47,6 @@ void main() {
       steps.add(nextStep(s, disclosure: true));
       s = s.copyWith(notifications: Grant.granted);
       steps.add(nextStep(s, disclosure: true));
-      s = s.copyWith(batteryOptimisationIgnored: true);
-      steps.add(nextStep(s, disclosure: true));
       s = s.copyWith(gpsEnabled: true);
       steps.add(nextStep(s, disclosure: true));
 
@@ -57,7 +55,6 @@ void main() {
         GateStep.locationWhenInUse,
         GateStep.locationAlways,
         GateStep.notifications,
-        GateStep.batteryOptimisation,
         GateStep.gps,
         null,
       ]);
@@ -92,12 +89,25 @@ void main() {
       expect(nextStep(s), isNull);
     });
 
-    test('battery exemption and GPS are both blocking', () {
-      expect(
-        nextStep(allGranted.copyWith(batteryOptimisationIgnored: false)),
-        GateStep.batteryOptimisation,
-      );
+    test('GPS is blocking', () {
       expect(nextStep(allGranted.copyWith(gpsEnabled: false)), GateStep.gps);
+    });
+
+    // Play policy (2026-11-28): the battery exemption is an optional tip.
+    test('battery optimisation never blocks going online; it is a tip', () {
+      final optimised = PermissionGate.evaluate(
+        allGranted.copyWith(batteryOptimisationIgnored: false),
+        disclosureAccepted: false,
+      );
+      expect(optimised.canGoOnline, isTrue);
+      expect(optimised.next, isNull);
+      expect(optimised.batteryTip, isTrue);
+
+      final exempt = PermissionGate.evaluate(
+        allGranted,
+        disclosureAccepted: false,
+      );
+      expect(exempt.batteryTip, isFalse);
     });
 
     test('permanently denied items are flagged for the settings page', () {
@@ -137,23 +147,6 @@ void main() {
         expect(gate.items.first.done, isTrue);
         expect(gate.next!.step, GateStep.locationAlways);
       });
-    });
-
-    test('a missing full-screen-intent permission is advisory on Android '
-        '14+ only and never blocks going online', () {
-      final s34 = allGranted.copyWith(fullScreenIntentAllowed: false);
-      final r34 = PermissionGate.evaluate(s34, disclosureAccepted: false);
-      expect(r34.fullScreenIntentMissing, isTrue);
-      expect(r34.canGoOnline, isTrue);
-
-      final s33 = s34.copyWith(sdkInt: 33);
-      expect(
-        PermissionGate.evaluate(
-          s33,
-          disclosureAccepted: false,
-        ).fullScreenIntentMissing,
-        isFalse,
-      );
     });
 
     test('"Approximate" keeps the location step open (04 §2.1)', () {

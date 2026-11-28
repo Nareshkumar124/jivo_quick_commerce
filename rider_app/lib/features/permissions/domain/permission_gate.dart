@@ -4,7 +4,9 @@ import 'permission_snapshot.dart';
 
 /// Blocking steps of the permissions gate, in the order the rider is taken
 /// through them (`docs/04-rider-app.md` §2.1). All must be done before the
-/// rider can go online.
+/// rider can go online. Battery optimisation is not one of them: it is an
+/// optional tip ([GateEvaluation.batteryTip]), because Play does not allow
+/// delivery apps to request the exemption directly (2026-11-28).
 enum GateStep {
   /// In-app prominent disclosure (Play policy). Must be accepted before the
   /// app asks for location, and in particular before "Allow all the time".
@@ -12,7 +14,6 @@ enum GateStep {
   locationWhenInUse,
   locationAlways,
   notifications,
-  batteryOptimisation,
   gps,
 }
 
@@ -44,17 +45,17 @@ class GateItem {
 class GateEvaluation {
   const GateEvaluation({
     required this.items,
-    required this.fullScreenIntentMissing,
+    required this.batteryTip,
     required this.oemBrand,
   });
 
   /// Every blocking step, in order.
   final List<GateItem> items;
 
-  /// Advisory: Android 14+ without USE_FULL_SCREEN_INTENT. Offers then arrive
-  /// as heads-up notifications instead of full screen. Does not block going
-  /// online (see the spike report).
-  final bool fullScreenIntentMissing;
+  /// Advisory and skippable: the app is not exempt from battery optimisation.
+  /// The gate offers the system battery list as a tip; it never blocks going
+  /// online (Play restricts the direct exemption request, 2026-11-28).
+  final bool batteryTip;
 
   /// Advisory: show auto-start guidance for this OEM. Null for other brands.
   final OemBrand? oemBrand;
@@ -87,9 +88,6 @@ abstract final class PermissionGate {
 
   /// Android 13 (API 33) made notifications a runtime permission.
   static const notificationPermissionSdk = 33;
-
-  /// Android 14 (API 34) restricted full-screen intents.
-  static const fullScreenIntentSdk = 34;
 
   static GateEvaluation evaluate(
     PermissionSnapshot s, {
@@ -132,14 +130,9 @@ abstract final class PermissionGate {
           done: notifications,
           blocked: s.notifications == Grant.blocked,
         ),
-        GateItem(
-          GateStep.batteryOptimisation,
-          done: s.batteryOptimisationIgnored,
-        ),
         GateItem(GateStep.gps, done: s.gpsEnabled),
       ],
-      fullScreenIntentMissing:
-          s.sdkInt >= fullScreenIntentSdk && !s.fullScreenIntentAllowed,
+      batteryTip: !s.batteryOptimisationIgnored,
       oemBrand: oemBrandOf(s.manufacturer),
     );
   }

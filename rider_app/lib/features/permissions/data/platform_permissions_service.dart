@@ -43,10 +43,9 @@ class PlatformPermissionsService implements PermissionsService {
           (fineOp != LocationOpMode.denied && await _isPrecise()),
       locationAlways: always,
       notifications: _grant(results[2]),
-      batteryOptimisationIgnored:
-          await ph.Permission.ignoreBatteryOptimizations.isGranted,
+      batteryOptimisationIgnored: await _device
+          .isIgnoringBatteryOptimizations(),
       gpsEnabled: await Geolocator.isLocationServiceEnabled(),
-      fullScreenIntentAllowed: await _device.canUseFullScreenIntent(),
     );
   }
 
@@ -80,16 +79,12 @@ class PlatformPermissionsService implements PermissionsService {
   Future<void> requestNotifications() => ph.Permission.notification.request();
 
   @override
-  Future<void> requestIgnoreBatteryOptimisation() =>
-      ph.Permission.ignoreBatteryOptimizations.request();
+  Future<void> openBatteryOptimisationSettings() =>
+      _device.openBatteryOptimizationSettings();
 
   @override
   Future<void> openLocationSettings() => Geolocator.openLocationSettings();
 
   @override
   Future<void> openAppSettings() => ph.openAppSettings();
-
-  @override
-  Future<void> openFullScreenIntentSettings() =>
-      _device.openFullScreenIntentSettings();
 }

@@ -1,7 +1,6 @@
 package `in`.jivo.rider
 
 import android.app.AppOpsManager
-import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -12,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.Process
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -26,7 +26,9 @@ import io.flutter.plugin.common.MethodChannel
  * for things no plugin covers:
  *  - device facts for the permissions gate (SDK level, manufacturer for OEM
  *    auto-start guidance),
- *  - the Android 14+ full-screen-intent permission check and settings page,
+ *  - whether the app is exempt from battery optimisation, and the system
+ *    list where the rider can exempt it (an optional tip; the app never
+ *    asks for the exemption directly, Play policy),
  *  - the location app-op modes (the runtime permission alone can read
  *    "granted" while the system gives the app no location),
  *  - ringing for an offer in the app while the offer screen is in front
@@ -57,11 +59,13 @@ class MainActivity : FlutterActivity() {
                             "model" to Build.MODEL,
                         ),
                     )
-                    "canUseFullScreenIntent" -> result.success(canUseFullScreenIntent())
+                    "isIgnoringBatteryOptimizations" ->
+                        result.success(isIgnoringBatteryOptimizations())
+                    "openBatteryOptimizationSettings" ->
+                        result.success(openBatteryOptimizationSettings())
                     // T-821: a Google map is only created when the build
                     // injected a Maps API key (build.gradle.kts).
                     "hasMapsKey" -> result.success(hasMapsKey())
-                    "openFullScreenIntentSettings" -> result.success(openFullScreenIntentSettings())
                     "locationOps" -> result.success(
                         mapOf(
                             "coarse" to opMode(AppOpsManager.OPSTR_COARSE_LOCATION),
@@ -88,7 +92,7 @@ class MainActivity : FlutterActivity() {
     /**
      * flutter_local_notifications launches this activity with action
      * SELECT_NOTIFICATION and the notification payload in the "payload" extra,
-     * for both taps and full-screen intents. Offer alerts use an "offer:"
+     * when the rider taps a notification. Offer alerts use an "offer:"
      * payload prefix (see offer_alert_notifications.dart).
      */
     private fun applyOfferLockScreenFlags(intent: Intent?) {
@@ -126,17 +130,37 @@ class MainActivity : FlutterActivity() {
         false
     }
 
+    /** Whether the system already exempts this app from battery optimisation. */
+    private fun isIgnoringBatteryOptimizations(): Boolean = try {
+        val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+        power.isIgnoringBatteryOptimizations(packageName)
+    } catch (e: Exception) {
+        false
+    }
+
     /**
-     * Android 14+. NotificationManager.canUseFullScreenIntent() is the API;
-     * the USE_FULL_SCREEN_INTENT app-op is read as well, since some OEM builds
-     * answer false while the op (what `appops get` and the settings page show)
-     * is allowed (device test 2026-11-17, realme RMX5056).
+     * The system list of battery-optimised apps, where the rider can pick
+     * Jivo Rider and choose "Don't optimise". This intent needs no special
+     * permission (unlike ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, which
+     * Play restricts). Falls back to the app's own settings page.
      */
-    private fun canUseFullScreenIntent(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.canUseFullScreenIntent()) return true
-        return opMode(OPSTR_USE_FULL_SCREEN_INTENT) == "allowed"
+    private fun openBatteryOptimizationSettings(): Boolean {
+        val intents = listOf(
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:$packageName"),
+            ),
+        )
+        for (candidate in intents) {
+            try {
+                startActivity(candidate)
+                return true
+            } catch (e: Exception) {
+                // Not on this OEM build: try the next page.
+            }
+        }
+        return false
     }
 
     /** "allowed", "foreground", "ignored", "errored", "default" or "unknown". */
@@ -226,27 +250,9 @@ class MainActivity : FlutterActivity() {
     private fun vibrator(): Vibrator? =
         getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
 
-    private fun openFullScreenIntentSettings(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return false
-        return try {
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
-                    Uri.parse("package:$packageName"),
-                ),
-            )
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     private companion object {
         const val CHANNEL = "in.jivo.rider/device"
         const val OFFER_PAYLOAD_PREFIX = "offer:"
-
-        /** AppOpsManager.OPSTR_USE_FULL_SCREEN_INTENT (API 34, hidden constant). */
-        const val OPSTR_USE_FULL_SCREEN_INTENT = "android:use_full_screen_intent"
 
         /** Same pattern as the offer notification channel (0, 800, 400, 800). */
         val VIBRATION = longArrayOf(0, 800, 400, 800)

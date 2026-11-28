@@ -35,6 +35,7 @@ import '../features/onboarding/presentation/onboarding_status_screen.dart';
 import '../features/onboarding/presentation/registration_screen.dart';
 import '../features/permissions/presentation/location_disclosure_screen.dart';
 import '../features/permissions/presentation/permissions_gate_screen.dart';
+import '../features/profile/presentation/delete_account_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/shift/presentation/home_screen.dart';
 import '../features/task/presentation/failed_delivery_screen.dart';
@@ -269,6 +270,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.rating,
         name: 'rating',
         builder: (_, _) => const MyRatingScreen(),
+      ),
+      GoRoute(
+        path: Routes.deleteAccount,
+        name: 'delete_account',
+        builder: (_, _) => const DeleteAccountScreen(),
       ),
       GoRoute(
         path: '/legal/:slug',

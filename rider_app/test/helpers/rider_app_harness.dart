@@ -40,6 +40,8 @@ import 'package:rider_app/features/notifications/presentation/push_providers.dar
 import 'package:rider_app/features/shift/data/fake_shift_backend.dart';
 import 'package:rider_app/features/legal/data/legal_repository.dart';
 import 'package:rider_app/features/legal/presentation/legal_providers.dart';
+import 'package:rider_app/features/profile/data/fake_account_deletion_backend.dart';
+import 'package:rider_app/features/profile/presentation/delete_account_controller.dart';
 import 'package:rider_app/features/rating/data/fake_rating_backend.dart';
 import 'package:rider_app/features/rating/presentation/rating_providers.dart';
 import 'package:rider_app/features/shift/data/fake_today_summary.dart';
@@ -246,6 +248,10 @@ class RiderTestHarness {
     clock: () => now,
   );
   final legal = FakeLegalBackend();
+  late final deletion = FakeAccountDeletionBackend(
+    delay: Duration.zero,
+    clock: () => now,
+  );
   List<String> scannerValues = const ['7K2P', 'HELLO-WORLD'];
 
   /// The phone's position for the maps (never geolocator in tests).
@@ -295,6 +301,7 @@ class RiderTestHarness {
     fakeSupportBackendProvider.overrideWithValue(support),
     fakeRatingBackendProvider.overrideWithValue(ratings),
     fakeLegalBackendProvider.overrideWithValue(legal),
+    fakeAccountDeletionBackendProvider.overrideWithValue(deletion),
     qrScannerBuilderProvider.overrideWith((ref) => fakeScanner(scannerValues)),
     scannerControllerProvider.overrideWith((ref) => null),
     mapLocationSourceProvider.overrideWithValue(mapLocation),

@@ -24,7 +24,6 @@ class PermissionSnapshot {
     required this.notifications,
     required this.batteryOptimisationIgnored,
     required this.gpsEnabled,
-    required this.fullScreenIntentAllowed,
     this.locationPrecise = true,
   });
 
@@ -48,13 +47,13 @@ class PermissionSnapshot {
   /// POST_NOTIFICATIONS, Android 13+.
   final Grant notifications;
 
+  /// The system already exempts the app from battery optimisation. Read
+  /// only, for the optional battery tip: never blocking, and the app never
+  /// asks for the exemption itself (Play policy, 2026-11-28).
   final bool batteryOptimisationIgnored;
 
   /// Device location (GPS) switched on.
   final bool gpsEnabled;
-
-  /// USE_FULL_SCREEN_INTENT, Android 14+. Not blocking (see PermissionGate).
-  final bool fullScreenIntentAllowed;
 
   PermissionSnapshot copyWith({
     int? sdkInt,
@@ -64,7 +63,6 @@ class PermissionSnapshot {
     Grant? notifications,
     bool? batteryOptimisationIgnored,
     bool? gpsEnabled,
-    bool? fullScreenIntentAllowed,
     bool? locationPrecise,
   }) => PermissionSnapshot(
     sdkInt: sdkInt ?? this.sdkInt,
@@ -75,8 +73,6 @@ class PermissionSnapshot {
     batteryOptimisationIgnored:
         batteryOptimisationIgnored ?? this.batteryOptimisationIgnored,
     gpsEnabled: gpsEnabled ?? this.gpsEnabled,
-    fullScreenIntentAllowed:
-        fullScreenIntentAllowed ?? this.fullScreenIntentAllowed,
     locationPrecise: locationPrecise ?? this.locationPrecise,
   );
 }

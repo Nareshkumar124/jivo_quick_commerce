@@ -7,7 +7,7 @@ import '../../../l10n/app_localizations.dart';
 import 'offer_alert_providers.dart';
 
 /// Dev-only stand-in for the P5 offer screen. Opened by the test offer alert
-/// (tap or full-screen intent), to prove the launch path end to end.
+/// (a tap on it), to prove the launch path end to end.
 class OfferAlertPreviewScreen extends ConsumerWidget {
   const OfferAlertPreviewScreen({super.key});
 

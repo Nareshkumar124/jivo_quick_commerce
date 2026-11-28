@@ -4,6 +4,16 @@
   "@appTitle": {
     "description": "App name (D-06)."
   },
+  "homeVersionLabel": "Version {version}",
+  "@homeVersionLabel": {
+    "description": "Prod home: the app version (for support).",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.0.0"
+      }
+    }
+  },
   "homeBuildLabel": "Build: {flavor}",
   "@homeBuildLabel": {
     "description": "Shows the build flavor on the placeholder home screen.",
@@ -30,8 +40,6 @@
   "gateStepLocationAlwaysHint": "On the next screen, choose \"Allow all the time\".",
   "gateStepNotifications": "Notifications",
   "gateStepNotificationsHint": "So you hear new orders and see that you are online.",
-  "gateStepBattery": "No battery restrictions",
-  "gateStepBatteryHint": "So your phone does not stop the app while you ride.",
   "gateStepGps": "GPS on",
   "gateStepGpsHint": "Switch on location in your phone settings.",
   "gateStatusDone": "Done",
@@ -41,12 +49,12 @@
   "gateActionLocationWhenInUse": "Allow location",
   "gateActionLocationAlways": "Allow all the time",
   "gateActionNotifications": "Allow notifications",
-  "gateActionBattery": "Remove battery restriction",
   "gateActionGps": "Turn on GPS",
   "gateActionOpenSettings": "Open settings",
-  "fullScreenIntentTitle": "Full-screen order alerts",
-  "fullScreenIntentBody": "Allow full-screen alerts so new orders show even when your phone is locked.",
-  "fullScreenIntentAction": "Allow full-screen alerts",
+  "batteryTipTitle": "Tip: stop battery saver closing the app",
+  "batteryTipBody": "Some phones close apps to save battery, and you may miss orders. Open the battery list, find Jivo Rider and choose \"Don't optimise\" or \"Unrestricted\". This is optional: you can go online without it.",
+  "batteryTipAction": "Open battery settings",
+  "batteryTipSkip": "Skip",
   "oemTitle": "Keep Jivo Rider running",
   "oemXiaomi": "Xiaomi, Redmi, POCO: open App settings, turn Autostart on, and set Battery saver to No restrictions.",
   "oemOppo": "OPPO: open App settings > Battery, then allow background activity and auto launch.",
@@ -66,7 +74,7 @@
   "onlineChannelName": "Online status",
   "onlineChannelDescription": "Shown while you are online and your location is shared.",
   "offerChannelName": "New order offers",
-  "offerChannelDescription": "Rings and opens full screen when a new order is offered to you.",
+  "offerChannelDescription": "Rings and shows an alert when a new order is offered to you.",
   "pushChannelOffersName": "Offer notifications",
   "pushChannelOffersDescription": "New order offers sent while the app is closed.",
   "pushChannelOrdersName": "Order updates",
@@ -483,7 +491,7 @@
   "offerTitle": "New order",
   "offerAlertTitle": "New order offer",
   "@offerAlertTitle": {
-    "description": "Offer notification title (rings, full screen)."
+    "description": "Offer notification title (rings, heads-up)."
   },
   "offerAlertBody": "{store} to {locality}",
   "@offerAlertBody": {
@@ -1479,5 +1487,41 @@
   },
   "mapTitleCustomer": "Map: you and the drop location",
   "mapTitleHome": "Map: you and your store",
-  "mapTitleOffer": "Map: you and the store"
+  "mapTitleOffer": "Map: you and the store",
+  "accountMenuTooltip": "More options",
+  "policyTermsOfUse": "Terms of use",
+  "policyPrivacy": "Privacy policy",
+  "deleteAccountTitle": "Delete account",
+  "deleteAccountEntrySubtitle": "Permanently delete your Jivo Rider account",
+  "deleteAccountWarningTitle": "Before you delete your account",
+  "deleteAccountWhatDeleted": "Your name, phone number, bank details, vehicle details, emergency contact and location history will be deleted. Your KYC documents are deleted once the period required by law ends.",
+  "deleteAccountGrace": "You have 30 days to change your mind. Log in again with the same number within 30 days to restore your account. After that, deletion is permanent.",
+  "deleteAccountKept": "Some records must be kept by law, such as completed deliveries, earnings, payouts and cash deposits. They are kept without your personal details.",
+  "deleteAccountCashAdvice": "Deposit any cash you are holding and check your payouts before you delete your account.",
+  "deleteAccountLearnMore": "Read more about account deletion",
+  "deleteAccountSendOtp": "Send OTP to confirm",
+  "deleteAccountOtpPrompt": "Enter the 6-digit OTP we sent to {phone} to confirm deletion.",
+  "@deleteAccountOtpPrompt": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAccountOtpLabel": "OTP",
+  "deleteAccountOtpTooShort": "Enter the 6-digit OTP.",
+  "deleteAccountConfirm": "Delete my account",
+  "deleteAccountBlockedOnline": "Go offline before you delete your account.",
+  "deleteAccountBlockedTask": "Finish your current delivery before you delete your account.",
+  "deleteAccountNoPhone": "We could not read your phone number. Go back and try again.",
+  "deleteAccountDoneTitle": "Account deleted",
+  "deleteAccountDoneBody": "Your account will be permanently deleted on {date}. To restore it before then, log in again with the same number.",
+  "@deleteAccountDoneBody": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteAccountDoneOk": "OK"
 }

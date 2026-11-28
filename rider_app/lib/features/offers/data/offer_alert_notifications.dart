@@ -4,8 +4,10 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../../shared/platform/device_channel.dart';
 
 /// The high-priority "new order offer" notification channel (04 §2.4):
-/// max importance, sound on the alarm stream, vibration, and a full-screen
-/// intent so the offer opens over the lock screen.
+/// max importance (heads-up), sound on the alarm stream, vibration, shown on
+/// the lock screen. No full-screen intent: Play restricts
+/// USE_FULL_SCREEN_INTENT to calling and alarm apps (2026-11-28). A tap
+/// opens the offer screen (over the lock screen, see MainActivity).
 ///
 /// Rung by the in-app offer flow (socket or polling) and, while the app is
 /// not running, by the FCM background handler for a data-only `offer.new`
@@ -38,7 +40,7 @@ class OfferAlertNotifications {
       payload != null && payload.startsWith(payloadPrefix);
 
   /// Creates the channel and registers [onOfferSelected] for taps and
-  /// full-screen launches while the app is running.
+  /// launches while the app is running.
   ///
   /// The plugin has one tap callback per process, so this is also where
   /// taps on the other local notifications arrive: foreground push
@@ -90,7 +92,7 @@ class OfferAlertNotifications {
     return (launch?.didNotificationLaunchApp ?? false) ? payload : null;
   }
 
-  /// Shows a fake offer through the real channel, to prove the full-screen
+  /// Shows a fake offer through the real channel, to prove the alert
   /// path. Dev flavor only.
   Future<void> showTestOffer({
     required String title,
@@ -110,7 +112,6 @@ class OfferAlertNotifications {
         // Matches the alarm audio stream. Open question for P5: alarm vs
         // call category (DND behaviour differs).
         category: AndroidNotificationCategory.alarm,
-        fullScreenIntent: true,
         visibility: NotificationVisibility.public,
         vibrationPattern: _vibration,
         audioAttributesUsage: AudioAttributesUsage.alarm,
@@ -142,7 +143,6 @@ class OfferAlertNotifications {
         importance: Importance.max,
         priority: Priority.max,
         category: AndroidNotificationCategory.alarm,
-        fullScreenIntent: true,
         visibility: NotificationVisibility.public,
         vibrationPattern: _vibration,
         audioAttributesUsage: AudioAttributesUsage.alarm,

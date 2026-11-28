@@ -67,7 +67,14 @@ class _PermissionsGateScreenState extends ConsumerState<PermissionsGateScreen> {
   }
 
   Future<void> _fixItem(GateItem next) async {
-    if (next.step == GateStep.disclosure) {
+    // A location row tapped before the disclosure shows the disclosure
+    // first (Play prominent disclosure precedes every location prompt).
+    final locationPrompt =
+        !next.blocked &&
+        (next.step == GateStep.locationWhenInUse ||
+            next.step == GateStep.locationAlways);
+    if (next.step == GateStep.disclosure ||
+        (locationPrompt && !_controller.disclosureSatisfied)) {
       final accepted = await context.push<bool>(Routes.disclosure);
       if (accepted ?? false) {
         await _controller.acceptDisclosure();
@@ -96,8 +103,9 @@ class _PermissionsGateScreenState extends ConsumerState<PermissionsGateScreen> {
           onFixItem: _fixItem,
           onOpenAppSettings: _controller.openAppSettings,
           onOpenLocationAlwaysSettings: _controller.openLocationAlwaysSettings,
-          onOpenFullScreenIntentSettings:
-              _controller.openFullScreenIntentSettings,
+          batteryTipSkipped: ref.watch(batteryTipSkippedProvider),
+          onOpenBatterySettings: _controller.openBatteryOptimisationSettings,
+          onSkipBatteryTip: _controller.skipBatteryTip,
         ),
         AsyncError() => Center(
           child: Padding(
@@ -129,7 +137,9 @@ class _GateBody extends StatelessWidget {
     required this.onFixItem,
     required this.onOpenAppSettings,
     required this.onOpenLocationAlwaysSettings,
-    required this.onOpenFullScreenIntentSettings,
+    required this.batteryTipSkipped,
+    required this.onOpenBatterySettings,
+    required this.onSkipBatteryTip,
   });
 
   final GateEvaluation evaluation;
@@ -138,7 +148,9 @@ class _GateBody extends StatelessWidget {
   final void Function(GateItem item) onFixItem;
   final VoidCallback onOpenAppSettings;
   final VoidCallback onOpenLocationAlwaysSettings;
-  final VoidCallback onOpenFullScreenIntentSettings;
+  final bool batteryTipSkipped;
+  final VoidCallback onOpenBatterySettings;
+  final VoidCallback onSkipBatteryTip;
 
   @override
   Widget build(BuildContext context) {
@@ -181,13 +193,20 @@ class _GateBody extends StatelessWidget {
                   ),
                 for (final item in evaluation.items)
                   _GateRow(item: item, onTap: () => onFixItem(item)),
-                if (evaluation.fullScreenIntentMissing)
+                // Optional (Play policy): never blocks going online, and the
+                // rider can skip it.
+                if (evaluation.batteryTip && !batteryTipSkipped)
                   _AdvisoryCard(
-                    icon: Icons.fullscreen,
-                    title: l10n.fullScreenIntentTitle,
-                    body: l10n.fullScreenIntentBody,
-                    action: l10n.fullScreenIntentAction,
-                    onAction: onOpenFullScreenIntentSettings,
+                    key: const Key('gate-battery-tip'),
+                    icon: Icons.battery_saver,
+                    title: l10n.batteryTipTitle,
+                    body: l10n.batteryTipBody,
+                    action: l10n.batteryTipAction,
+                    actionKey: const Key('gate-battery-open'),
+                    onAction: onOpenBatterySettings,
+                    secondaryAction: l10n.batteryTipSkip,
+                    secondaryKey: const Key('gate-battery-skip'),
+                    onSecondary: onSkipBatteryTip,
                   ),
                 if (oem != null)
                   // TODO(P5): replace with per-model guidance verified on the
@@ -230,7 +249,6 @@ class _GateBody extends StatelessWidget {
       GateStep.locationWhenInUse => l10n.gateActionLocationWhenInUse,
       GateStep.locationAlways => l10n.gateActionLocationAlways,
       GateStep.notifications => l10n.gateActionNotifications,
-      GateStep.batteryOptimisation => l10n.gateActionBattery,
       GateStep.gps => l10n.gateActionGps,
     };
   }
@@ -263,10 +281,6 @@ class _GateRow extends StatelessWidget {
       GateStep.notifications => (
         l10n.gateStepNotifications,
         l10n.gateStepNotificationsHint,
-      ),
-      GateStep.batteryOptimisation => (
-        l10n.gateStepBattery,
-        l10n.gateStepBatteryHint,
       ),
       GateStep.gps => (l10n.gateStepGps, l10n.gateStepGpsHint),
     };
@@ -367,11 +381,16 @@ class _NoticeCard extends StatelessWidget {
 
 class _AdvisoryCard extends StatelessWidget {
   const _AdvisoryCard({
+    super.key,
     required this.icon,
     required this.title,
     required this.body,
     required this.action,
     required this.onAction,
+    this.actionKey,
+    this.secondaryAction,
+    this.secondaryKey,
+    this.onSecondary,
   });
 
   final IconData icon;
@@ -379,6 +398,12 @@ class _AdvisoryCard extends StatelessWidget {
   final String body;
   final String action;
   final VoidCallback onAction;
+  final Key? actionKey;
+
+  /// A second, quieter choice (for example "Skip").
+  final String? secondaryAction;
+  final Key? secondaryKey;
+  final VoidCallback? onSecondary;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -403,7 +428,20 @@ class _AdvisoryCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(body),
           const SizedBox(height: 12),
-          OutlinedButton(onPressed: onAction, child: Text(action)),
+          OutlinedButton(
+            key: actionKey,
+            onPressed: onAction,
+            child: Text(action),
+          ),
+          if (secondaryAction != null) ...[
+            const SizedBox(height: 4),
+            TextButton(
+              key: secondaryKey,
+              style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: onSecondary,
+              child: Text(secondaryAction!),
+            ),
+          ],
         ],
       ),
     ),

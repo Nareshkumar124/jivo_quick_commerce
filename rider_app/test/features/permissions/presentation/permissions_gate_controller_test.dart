@@ -62,6 +62,31 @@ void main() {
     verify(() => perms.service.requestLocationAlways()).called(1);
   });
 
+  test('never asks for while-in-use location before the disclosure, except '
+      'to upgrade "Approximate" once background location is granted', () async {
+    perms = StubbedPermissions(freshInstall);
+    container = makeContainer();
+    await container.read(permissionsGateControllerProvider.future);
+
+    await controller().fix(
+      const GateItem(GateStep.locationWhenInUse, done: false),
+    );
+    verifyNever(() => perms.service.requestLocationWhenInUse());
+
+    container.dispose();
+    perms = StubbedPermissions(allGranted.copyWith(locationPrecise: false));
+    container = makeContainer();
+    await container.read(permissionsGateControllerProvider.future);
+    await controller().fix(
+      const GateItem(
+        GateStep.locationWhenInUse,
+        done: false,
+        approximate: true,
+      ),
+    );
+    verify(() => perms.service.requestLocationWhenInUse()).called(1);
+  });
+
   test('a blocked item opens the app settings page instead', () async {
     perms = StubbedPermissions(
       freshInstall.copyWith(notifications: Grant.blocked),
@@ -77,18 +102,40 @@ void main() {
     verifyNever(() => perms.service.requestNotifications());
   });
 
-  test('battery and GPS steps use their system pages', () async {
+  test('the GPS step uses its system page', () async {
     perms = StubbedPermissions(freshInstall);
     container = makeContainer();
     await container.read(permissionsGateControllerProvider.future);
 
-    await controller().fix(
-      const GateItem(GateStep.batteryOptimisation, done: false),
-    );
     await controller().fix(const GateItem(GateStep.gps, done: false));
 
-    verify(() => perms.service.requestIgnoreBatteryOptimisation()).called(1);
     verify(() => perms.service.openLocationSettings()).called(1);
+  });
+
+  test('the battery tip opens the system battery list and re-reads the '
+      'device; skipping hides it for the session', () async {
+    perms = StubbedPermissions(
+      allGranted.copyWith(batteryOptimisationIgnored: false),
+    );
+    container = makeContainer();
+    final before = await container.read(
+      permissionsGateControllerProvider.future,
+    );
+    expect(before.batteryTip, isTrue);
+    expect(before.canGoOnline, isTrue);
+
+    perms.current = allGranted;
+    await controller().openBatteryOptimisationSettings();
+
+    verify(() => perms.service.openBatteryOptimisationSettings()).called(1);
+    expect(
+      container.read(permissionsGateControllerProvider).requireValue.batteryTip,
+      isFalse,
+    );
+
+    expect(container.read(batteryTipSkippedProvider), isFalse);
+    controller().skipBatteryTip();
+    expect(container.read(batteryTipSkippedProvider), isTrue);
   });
 
   test('refresh picks up changes made in system settings', () async {

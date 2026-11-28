@@ -14,8 +14,10 @@ abstract interface class PermissionsService {
 
   Future<void> requestNotifications();
 
-  /// System dialog asking to ignore battery optimisations.
-  Future<void> requestIgnoreBatteryOptimisation();
+  /// The system list of battery-optimised apps, for the optional battery
+  /// tip. Never the direct "ignore battery optimisations" request: Play
+  /// restricts that permission to a short list of app types.
+  Future<void> openBatteryOptimisationSettings();
 
   /// Device location settings, to switch GPS on.
   Future<void> openLocationSettings();
@@ -23,7 +25,4 @@ abstract interface class PermissionsService {
   /// The app's system settings page (permanently denied permissions, OEM
   /// auto-start).
   Future<void> openAppSettings();
-
-  /// Android 14+ page to allow full-screen offer alerts.
-  Future<void> openFullScreenIntentSettings();
 }

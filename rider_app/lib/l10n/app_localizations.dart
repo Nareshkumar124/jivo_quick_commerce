@@ -100,6 +100,12 @@ abstract class AppLocalizations {
   /// **'Jivo Rider'**
   String get appTitle;
 
+  /// Prod home: the app version (for support).
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String homeVersionLabel(String version);
+
   /// Shows the build flavor on the placeholder home screen.
   ///
   /// In en, this message translates to:
@@ -202,18 +208,6 @@ abstract class AppLocalizations {
   /// **'So you hear new orders and see that you are online.'**
   String get gateStepNotificationsHint;
 
-  /// No description provided for @gateStepBattery.
-  ///
-  /// In en, this message translates to:
-  /// **'No battery restrictions'**
-  String get gateStepBattery;
-
-  /// No description provided for @gateStepBatteryHint.
-  ///
-  /// In en, this message translates to:
-  /// **'So your phone does not stop the app while you ride.'**
-  String get gateStepBatteryHint;
-
   /// No description provided for @gateStepGps.
   ///
   /// In en, this message translates to:
@@ -268,12 +262,6 @@ abstract class AppLocalizations {
   /// **'Allow notifications'**
   String get gateActionNotifications;
 
-  /// No description provided for @gateActionBattery.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove battery restriction'**
-  String get gateActionBattery;
-
   /// No description provided for @gateActionGps.
   ///
   /// In en, this message translates to:
@@ -286,23 +274,29 @@ abstract class AppLocalizations {
   /// **'Open settings'**
   String get gateActionOpenSettings;
 
-  /// No description provided for @fullScreenIntentTitle.
+  /// No description provided for @batteryTipTitle.
   ///
   /// In en, this message translates to:
-  /// **'Full-screen order alerts'**
-  String get fullScreenIntentTitle;
+  /// **'Tip: stop battery saver closing the app'**
+  String get batteryTipTitle;
 
-  /// No description provided for @fullScreenIntentBody.
+  /// No description provided for @batteryTipBody.
   ///
   /// In en, this message translates to:
-  /// **'Allow full-screen alerts so new orders show even when your phone is locked.'**
-  String get fullScreenIntentBody;
+  /// **'Some phones close apps to save battery, and you may miss orders. Open the battery list, find Jivo Rider and choose \"Don\'t optimise\" or \"Unrestricted\". This is optional: you can go online without it.'**
+  String get batteryTipBody;
 
-  /// No description provided for @fullScreenIntentAction.
+  /// No description provided for @batteryTipAction.
   ///
   /// In en, this message translates to:
-  /// **'Allow full-screen alerts'**
-  String get fullScreenIntentAction;
+  /// **'Open battery settings'**
+  String get batteryTipAction;
+
+  /// No description provided for @batteryTipSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get batteryTipSkip;
 
   /// No description provided for @oemTitle.
   ///
@@ -421,7 +415,7 @@ abstract class AppLocalizations {
   /// No description provided for @offerChannelDescription.
   ///
   /// In en, this message translates to:
-  /// **'Rings and opens full screen when a new order is offered to you.'**
+  /// **'Rings and shows an alert when a new order is offered to you.'**
   String get offerChannelDescription;
 
   /// No description provided for @pushChannelOffersName.
@@ -1622,7 +1616,7 @@ abstract class AppLocalizations {
   /// **'New order'**
   String get offerTitle;
 
-  /// Offer notification title (rings, full screen).
+  /// Offer notification title (rings, heads-up).
   ///
   /// In en, this message translates to:
   /// **'New order offer'**
@@ -4129,6 +4123,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Map: you and the store'**
   String get mapTitleOffer;
+
+  /// No description provided for @accountMenuTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get accountMenuTooltip;
+
+  /// No description provided for @policyTermsOfUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of use'**
+  String get policyTermsOfUse;
+
+  /// No description provided for @policyPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy policy'**
+  String get policyPrivacy;
+
+  /// No description provided for @deleteAccountTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get deleteAccountTitle;
+
+  /// No description provided for @deleteAccountEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete your Jivo Rider account'**
+  String get deleteAccountEntrySubtitle;
+
+  /// No description provided for @deleteAccountWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Before you delete your account'**
+  String get deleteAccountWarningTitle;
+
+  /// No description provided for @deleteAccountWhatDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your name, phone number, bank details, vehicle details, emergency contact and location history will be deleted. Your KYC documents are deleted once the period required by law ends.'**
+  String get deleteAccountWhatDeleted;
+
+  /// No description provided for @deleteAccountGrace.
+  ///
+  /// In en, this message translates to:
+  /// **'You have 30 days to change your mind. Log in again with the same number within 30 days to restore your account. After that, deletion is permanent.'**
+  String get deleteAccountGrace;
+
+  /// No description provided for @deleteAccountKept.
+  ///
+  /// In en, this message translates to:
+  /// **'Some records must be kept by law, such as completed deliveries, earnings, payouts and cash deposits. They are kept without your personal details.'**
+  String get deleteAccountKept;
+
+  /// No description provided for @deleteAccountCashAdvice.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit any cash you are holding and check your payouts before you delete your account.'**
+  String get deleteAccountCashAdvice;
+
+  /// No description provided for @deleteAccountLearnMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Read more about account deletion'**
+  String get deleteAccountLearnMore;
+
+  /// No description provided for @deleteAccountSendOtp.
+  ///
+  /// In en, this message translates to:
+  /// **'Send OTP to confirm'**
+  String get deleteAccountSendOtp;
+
+  /// No description provided for @deleteAccountOtpPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 6-digit OTP we sent to {phone} to confirm deletion.'**
+  String deleteAccountOtpPrompt(String phone);
+
+  /// No description provided for @deleteAccountOtpLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'OTP'**
+  String get deleteAccountOtpLabel;
+
+  /// No description provided for @deleteAccountOtpTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 6-digit OTP.'**
+  String get deleteAccountOtpTooShort;
+
+  /// No description provided for @deleteAccountConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete my account'**
+  String get deleteAccountConfirm;
+
+  /// No description provided for @deleteAccountBlockedOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Go offline before you delete your account.'**
+  String get deleteAccountBlockedOnline;
+
+  /// No description provided for @deleteAccountBlockedTask.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish your current delivery before you delete your account.'**
+  String get deleteAccountBlockedTask;
+
+  /// No description provided for @deleteAccountNoPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not read your phone number. Go back and try again.'**
+  String get deleteAccountNoPhone;
+
+  /// No description provided for @deleteAccountDoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account deleted'**
+  String get deleteAccountDoneTitle;
+
+  /// No description provided for @deleteAccountDoneBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account will be permanently deleted on {date}. To restore it before then, log in again with the same number.'**
+  String deleteAccountDoneBody(String date);
+
+  /// No description provided for @deleteAccountDoneOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get deleteAccountDoneOk;
 }
 
 class _AppLocalizationsDelegate
