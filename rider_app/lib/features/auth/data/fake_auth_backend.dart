@@ -4,6 +4,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../domain/account_repository.dart';
 import '../domain/auth_repository.dart';
+import '../domain/login_method.dart';
 
 /// TODO(api): stands in for the Phase 1 auth endpoints until the backend
 /// implements them. Responses and errors follow the examples in
@@ -15,6 +16,8 @@ import '../domain/auth_repository.dart';
 /// - last digit 2: `PENDING_KYC`, 3: `REJECTED`, 4: `SUSPENDED`,
 ///   5: `NONE` (no rider profile), anything else: `ACTIVE`
 /// - [rateLimitedPhone]: every OTP request is rate limited
+/// - email login: [registeredEmail] is an active rider; any other email
+///   gets `EMAIL_NOT_REGISTERED` at verify (as the server does)
 class FakeAuthBackend implements AuthRepository, AccountRepository {
   FakeAuthBackend({this.delay = const Duration(milliseconds: 400)});
 
@@ -22,7 +25,14 @@ class FakeAuthBackend implements AuthRepository, AccountRepository {
   static const rateLimitedPhone = '+919999999999';
   static const maxAttempts = 5;
 
+  static const registeredEmail = 'ravi@example.com';
+
   final Duration delay;
+
+  /// What `GET /auth/methods/?app=rider` answers. Tests change it.
+  List<LoginMethod> loginMethods = const [LoginMethod.phone];
+
+  String? _pendingEmail;
 
   String? _pendingPhone;
   int _failedAttempts = 0;
@@ -95,6 +105,9 @@ class FakeAuthBackend implements AuthRepository, AccountRepository {
       'name': status == RiderStatusEnum.NONE ? '' : 'Ravi Kumar',
       'email': null,
       'marketing_opt_in': false,
+      'has_phone': true,
+      'email_verified': false,
+      'business_category_name': null,
       'is_profile_complete': status != RiderStatusEnum.NONE,
       'rider_status': status.value,
       'created_at': '2026-10-28T04:00:00Z',
@@ -106,6 +119,99 @@ class FakeAuthBackend implements AuthRepository, AccountRepository {
       'user': user.toJson(),
       'is_new_user': status == RiderStatusEnum.NONE,
       'rider_status': status.value,
+      'deletion_cancelled': false,
+    });
+  }
+
+  @override
+  Future<List<LoginMethod>> fetchLoginMethods() async {
+    await _wait();
+    return loginMethods;
+  }
+
+  void _requireMethod(LoginMethod method) {
+    if (!loginMethods.contains(method)) {
+      throw ApiError(
+        code: ApiErrorCode.unknown,
+        rawCode: EmailLoginErrorCodes.loginMethodDisabled,
+        details: {
+          'app': 'rider',
+          'method': method.name,
+          'methods': [for (final m in loginMethods) m.name],
+        },
+        statusCode: 403,
+      );
+    }
+  }
+
+  @override
+  Future<OtpSent> requestEmailOtp(String email) async {
+    calls.add('requestEmailOtp $email');
+    await _wait();
+    _requireMethod(LoginMethod.email);
+    _pendingEmail = email.trim().toLowerCase();
+    _failedAttempts = 0;
+    return OtpSent.fromJson(const {
+      'otp_length': 6,
+      'expires_in_seconds': 300,
+      'resend_after_seconds': 30,
+    });
+  }
+
+  @override
+  Future<AuthSession> verifyEmailOtp({
+    required String email,
+    required String otp,
+    required String termsVersion,
+  }) async {
+    calls.add('verifyEmailOtp $email $otp terms=$termsVersion');
+    await _wait();
+    _requireMethod(LoginMethod.email);
+    final normalized = email.trim().toLowerCase();
+    if (_pendingEmail != normalized || _failedAttempts >= maxAttempts) {
+      throw const ApiError(
+        code: ApiErrorCode.otpExpired,
+        rawCode: 'OTP_EXPIRED',
+        statusCode: 400,
+      );
+    }
+    if (otp != validOtp) {
+      _failedAttempts++;
+      throw ApiError(
+        code: ApiErrorCode.otpInvalid,
+        rawCode: 'OTP_INVALID',
+        details: {'attempts_remaining': maxAttempts - _failedAttempts},
+        statusCode: 400,
+      );
+    }
+    _pendingEmail = null;
+    if (normalized != registeredEmail) {
+      throw const ApiError(
+        code: ApiErrorCode.unknown,
+        rawCode: EmailLoginErrorCodes.emailNotRegistered,
+        statusCode: 403,
+      );
+    }
+    final user = Me.fromJson({
+      'id': 57,
+      'phone': '+919811122233',
+      'name': 'Ravi Kumar',
+      'email': normalized,
+      'has_phone': true,
+      'email_verified': true,
+      'marketing_opt_in': false,
+      'business_category_name': null,
+      'is_profile_complete': true,
+      'rider_status': RiderStatusEnum.ACTIVE.value,
+      'created_at': '2026-10-28T04:00:00Z',
+    });
+    _currentUser = user;
+    return AuthSession.fromJson({
+      'access': 'fake-access-token',
+      'refresh': 'fake-refresh-token',
+      'user': user.toJson(),
+      'is_new_user': false,
+      'rider_status': RiderStatusEnum.ACTIVE.value,
       'deletion_cancelled': false,
     });
   }
@@ -152,14 +258,22 @@ class FakeAuthBackend implements AuthRepository, AccountRepository {
     return user;
   }
 
+  /// Tests: when set, [seedSignedIn] restores an account with no phone and
+  /// this verified email (as after an email sign-up).
+  String? seedVerifiedEmailOnly;
+
   /// Signs in [phoneE164] directly, as if a session was restored.
   void seedSignedIn(String phoneE164) {
+    final emailOnly = seedVerifiedEmailOnly;
     _currentUser = Me.fromJson({
       'id': 57,
-      'phone': phoneE164,
+      'phone': emailOnly == null ? phoneE164 : null,
       'name': 'Ravi Kumar',
-      'email': null,
+      'email': emailOnly,
       'marketing_opt_in': false,
+      'has_phone': emailOnly == null,
+      'email_verified': emailOnly != null,
+      'business_category_name': null,
       'is_profile_complete': true,
       'rider_status': statusForPhone(phoneE164).value,
       'created_at': '2026-10-28T04:00:00Z',

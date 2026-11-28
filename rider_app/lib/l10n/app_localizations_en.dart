@@ -405,6 +405,61 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your session has ended. Please log in again.';
 
   @override
+  String get loginMethodPhone => 'Phone';
+
+  @override
+  String get loginMethodEmail => 'Email';
+
+  @override
+  String get loginEmailSubtitle =>
+      'Enter the email on your rider account. We\'ll email you a one-time code.';
+
+  @override
+  String get loginEmailLabel => 'Email';
+
+  @override
+  String get loginEmailHint => 'name@example.com';
+
+  @override
+  String get loginEmailEmpty => 'Enter your email.';
+
+  @override
+  String get loginEmailInvalid => 'Enter a valid email address.';
+
+  @override
+  String get loginNewRiderPhone =>
+      'New rider? Register with your mobile number.';
+
+  @override
+  String get loginNewRiderEmailOnlyTitle => 'New rider?';
+
+  @override
+  String get loginEmailNotRegistered =>
+      'This email isn\'t registered as a rider. Contact Jivo support at info@jivo.in or +91 8595 349 565';
+
+  @override
+  String get loginNewRiderEmailOnly =>
+      'New riders can\'t sign up with an email. Contact Jivo support at info@jivo.in or +91 8595 349 565 to register.';
+
+  @override
+  String get loginMethodDisabled =>
+      'This way of logging in is switched off. Please use the other option shown.';
+
+  @override
+  String get loginSupportCall => 'Call support';
+
+  @override
+  String get loginSupportEmail => 'Email support';
+
+  @override
+  String otpSentToEmail(int length, String email) {
+    return 'We emailed a $length-digit code to $email. Check your inbox and spam folder.';
+  }
+
+  @override
+  String get otpChangeEmail => 'Change email';
+
+  @override
   String get otpTitle => 'Enter the code';
 
   @override
@@ -2514,7 +2569,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteAccountNoPhone =>
-      'We could not read your phone number. Go back and try again.';
+      'We could not read your phone number or email. Go back and try again.';
 
   @override
   String get deleteAccountDoneTitle => 'Account deleted';

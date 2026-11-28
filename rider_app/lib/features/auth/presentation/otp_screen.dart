@@ -12,6 +12,7 @@ import 'package:jivo_core/helpers.dart';
 import 'auth_error_text.dart';
 import 'auth_providers.dart';
 import 'login_controllers.dart';
+import 'support_contact_buttons.dart';
 
 /// OTP verify (04 §2.1): `otp_length` digits, resend countdown from
 /// `resend_after_seconds`, SMS autofill (User Consent API), and the
@@ -43,6 +44,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   /// Waits for the OTP SMS (one system prompt) and submits its code.
   Future<void> _listenForSms() async {
+    if (ref.read(otpChallengeProvider)?.isEmail ?? false) return;
     final code = await _autofill.listenForCode();
     if (!mounted || code == null) return;
     final length = ref.read(otpChallengeProvider)?.otpLength;
@@ -117,10 +119,16 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                     Text(l10n.otpTitle, style: theme.textTheme.headlineSmall),
                     const SizedBox(height: 8),
                     Text(
-                      l10n.otpSentTo(
-                        challenge.otpLength,
-                        IndianMobile.format(challenge.phone),
-                      ),
+                      challenge.isEmail
+                          ? l10n.otpSentToEmail(
+                              challenge.otpLength,
+                              challenge.email!,
+                            )
+                          : l10n.otpSentTo(
+                              challenge.otpLength,
+                              IndianMobile.format(challenge.phone!),
+                            ),
+                      key: const Key('otp-sent-to'),
                       style: theme.textTheme.bodyLarge,
                     ),
                     Align(
@@ -128,7 +136,11 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       child: TextButton(
                         key: const Key('otp-change-number'),
                         onPressed: state.busy ? null : _changeNumber,
-                        child: Text(l10n.otpChangeNumber),
+                        child: Text(
+                          challenge.isEmail
+                              ? l10n.otpChangeEmail
+                              : l10n.otpChangeNumber,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -162,6 +174,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                         authErrorText(context, error),
                         textKey: const Key('otp-error'),
                       ),
+                      if (isEmailNotRegistered(error))
+                        const SupportContactButtons(),
                     ],
                     const SizedBox(height: 8),
                     if (!state.expired)

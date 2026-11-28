@@ -776,6 +776,102 @@ abstract class AppLocalizations {
   /// **'Your session has ended. Please log in again.'**
   String get loginSessionExpired;
 
+  /// No description provided for @loginMethodPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get loginMethodPhone;
+
+  /// No description provided for @loginMethodEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get loginMethodEmail;
+
+  /// No description provided for @loginEmailSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the email on your rider account. We\'ll email you a one-time code.'**
+  String get loginEmailSubtitle;
+
+  /// No description provided for @loginEmailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get loginEmailLabel;
+
+  /// No description provided for @loginEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'name@example.com'**
+  String get loginEmailHint;
+
+  /// No description provided for @loginEmailEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email.'**
+  String get loginEmailEmpty;
+
+  /// No description provided for @loginEmailInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email address.'**
+  String get loginEmailInvalid;
+
+  /// No description provided for @loginNewRiderPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'New rider? Register with your mobile number.'**
+  String get loginNewRiderPhone;
+
+  /// No description provided for @loginNewRiderEmailOnlyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New rider?'**
+  String get loginNewRiderEmailOnlyTitle;
+
+  /// EMAIL_NOT_REGISTERED and the new-rider note when only email login is on. Keep the support email and phone exact.
+  ///
+  /// In en, this message translates to:
+  /// **'This email isn\'t registered as a rider. Contact Jivo support at info@jivo.in or +91 8595 349 565'**
+  String get loginEmailNotRegistered;
+
+  /// No description provided for @loginNewRiderEmailOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'New riders can\'t sign up with an email. Contact Jivo support at info@jivo.in or +91 8595 349 565 to register.'**
+  String get loginNewRiderEmailOnly;
+
+  /// No description provided for @loginMethodDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'This way of logging in is switched off. Please use the other option shown.'**
+  String get loginMethodDisabled;
+
+  /// No description provided for @loginSupportCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Call support'**
+  String get loginSupportCall;
+
+  /// No description provided for @loginSupportEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email support'**
+  String get loginSupportEmail;
+
+  /// No description provided for @otpSentToEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'We emailed a {length}-digit code to {email}. Check your inbox and spam folder.'**
+  String otpSentToEmail(int length, String email);
+
+  /// No description provided for @otpChangeEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Change email'**
+  String get otpChangeEmail;
+
   /// No description provided for @otpTitle.
   ///
   /// In en, this message translates to:
@@ -4235,7 +4331,7 @@ abstract class AppLocalizations {
   /// No description provided for @deleteAccountNoPhone.
   ///
   /// In en, this message translates to:
-  /// **'We could not read your phone number. Go back and try again.'**
+  /// **'We could not read your phone number or email. Go back and try again.'**
   String get deleteAccountNoPhone;
 
   /// No description provided for @deleteAccountDoneTitle.
