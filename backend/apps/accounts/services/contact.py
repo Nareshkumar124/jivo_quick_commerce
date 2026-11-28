@@ -1,8 +1,13 @@
 """Add a phone number or verify an email on a signed-in account (2026-11-28).
 
 - **Add phone** (`POST /me/phone/otp/` then `POST /me/phone/verify/`): a customer who signed up
-  with email has no phone and must add one, proved by an SMS OTP, before the first order
-  (`PHONE_REQUIRED` on `POST /orders/`). A phone, once set, is not changed in v1.
+  with email has no login phone and may add one, proved by an SMS OTP. A phone, once set, is not
+  changed in v1.
+- **Delivery contact** (`has_delivery_contact`): an order needs a number the rider and the store
+  can call. The account's login phone or the delivery address's `receiver_phone` (a valid Indian
+  mobile, typed in the address form, never verified by OTP) is enough; only when neither exists
+  does `POST /orders/` answer 422 `PHONE_REQUIRED`. This lets email-only customers order while
+  SMS does not deliver. The receiver phone is a contact number only, never a login.
 - **Verify email** (`POST /me/email/otp/` then `POST /me/email/verify/`): proves the user owns an
   email, so it can be used for email OTP sign-in. Sets the email as well (replacing an
   unverified one).
@@ -11,6 +16,8 @@ Both use the same OTP rules, limits and lockouts as sign-in. The OTP is bound to
 was sent to; whoever can read it owns that address. Conflicts are only reported after the
 code is verified, so the request step never reveals whether another account uses an address.
 """
+
+import re
 
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -23,8 +30,18 @@ from apps.core import audit
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
 
+_INDIAN_MOBILE = re.compile(r"^\+91[6-9][0-9]{9}\Z")  # as `indian_mobile_validator`
+
 MSG_PHONE_ALREADY_SET = "Your account already has a phone number."
 MSG_EMAIL_ALREADY_VERIFIED = "This email is already verified on your account."
+
+
+def has_delivery_contact(user: User, address) -> bool:
+    """True when an order to `address` has a number to call: the user's login phone, or the
+    address's `receiver_phone` when it is a valid Indian mobile (E.164)."""
+    if user.phone:
+        return True
+    return address is not None and bool(_INDIAN_MOBILE.match(address.receiver_phone or ""))
 
 
 def _phone_already_set() -> ApiError:

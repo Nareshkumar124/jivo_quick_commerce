@@ -99,6 +99,10 @@ PUBLIC = {
     "auth_otp_request",
     "auth_otp_verify",
     "auth_token_refresh",
+    # 2026-11-28: email OTP sign-in and the login method switch.
+    "auth_methods",
+    "auth_email_otp_request",
+    "auth_email_otp_verify",
     "config_app",
     # Phase 2: browsing needs no account, and these ignore credentials entirely.
     "serviceability_check",

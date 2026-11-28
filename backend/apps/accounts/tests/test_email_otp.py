@@ -461,27 +461,47 @@ class TestEmailVerifyRider:
         assert body["rider_status"] == RiderStatus.ACTIVE
         assert body["is_new_user"] is False
 
-    def test_unknown_email_never_creates_a_rider_account(self, api_client, email_login):
-        """P8-EOTP-15: email never creates rider accounts (new riders register by phone)."""
-        request_email_otp(api_client, TEST_EMAIL, app="rider")
-        err = error(verify(api_client, "123456", TEST_EMAIL, app="rider"), 403)
-        assert err["code"] == "EMAIL_NOT_REGISTERED"
-        assert not User.objects.exists()
+    def test_unknown_email_creates_a_new_user_for_registration(self, api_client, email_login):
+        """P8-EOTP-15 (owner decision 2026-11-28): a new email in the rider app creates a user
+        with no phone and rider_status NONE, exactly like a new phone sign-up; no welcome
+        reward (rider app)."""
+        from apps.promotions.choices import CouponSource
+        from apps.promotions.models import Coupon
 
-    def test_customer_without_rider_profile_is_refused(self, api_client, email_login):
-        UserFactory(email=TEST_EMAIL, email_verified_at=timezone.now())
         request_email_otp(api_client, TEST_EMAIL, app="rider")
-        err = error(verify(api_client, "123456", TEST_EMAIL, app="rider"), 403)
-        assert err["code"] == "EMAIL_NOT_REGISTERED"
+        response = verify(api_client, "123456", TEST_EMAIL, app="rider")
+        assert response.status_code == 200, response.content
+        body = response.json()
+        assert body["is_new_user"] is True
+        assert body["rider_status"] == RiderStatus.NONE
+        assert body["user"]["phone"] is None
+        assert body["user"]["has_phone"] is False
+        user = User.objects.get(email=TEST_EMAIL)
+        assert user.email_verified_at is not None
+        assert not hasattr(user, "rider_profile")
+        assert not Coupon.objects.filter(owner=user, source=CouponSource.WELCOME).exists()
 
-    def test_unverified_rider_email_is_refused(
+    def test_customer_without_rider_profile_signs_in(self, api_client, email_login):
+        """One user table: an existing customer's verified email opens the rider app on the
+        same account (as with phone), which can then register."""
+        customer = UserFactory(email=TEST_EMAIL, email_verified_at=timezone.now())
+        request_email_otp(api_client, TEST_EMAIL, app="rider")
+        body = verify(api_client, "123456", TEST_EMAIL, app="rider").json()
+        assert body["user"]["id"] == customer.pk
+        assert body["is_new_user"] is False
+        assert body["rider_status"] == RiderStatus.NONE
+
+    def test_unverified_rider_email_is_only_a_claim(
         self, api_client, email_login, rider_user, django_capture_on_commit_callbacks
     ):
+        """An unverified copy never signs in to that account: the prover gets a new account and
+        the claim is released (same rule as the customer app)."""
         User.objects.filter(pk=rider_user.pk).update(email_verified_at=None)
-        err = error(sign_in(api_client, django_capture_on_commit_callbacks, app="rider"), 403)
-        assert err["code"] == "EMAIL_NOT_REGISTERED"
+        body = sign_in(api_client, django_capture_on_commit_callbacks, app="rider").json()
+        assert body["user"]["id"] != rider_user.pk
+        assert body["is_new_user"] is True
         rider_user.refresh_from_db()
-        assert rider_user.email == EMAIL  # nothing released in the rider app
+        assert rider_user.email is None
 
     def test_staff_rider_email_is_refused(self, api_client, email_login):
         StaffUserFactory(email=TEST_EMAIL, email_verified_at=timezone.now())
@@ -496,3 +516,110 @@ class TestEmailVerifyRider:
 
         body = sign_in(api_client, django_capture_on_commit_callbacks, app="rider").json()
         assert AccessToken(body["access"])["app"] == "rider"
+
+
+# --------------------------------------------------------------------------- review fixes
+
+
+KELVIN_EMAIL = chr(0x212A) + "umar@example.com"  # KELVIN SIGN matches [A-Z] with re.I
+
+
+class TestEmailIsAsciiOnly:
+    """P8-EOTP-28 (email OTP review): look-alike Unicode is refused, never normalised."""
+
+    @pytest.mark.parametrize(
+        "email",
+        [
+            "asha.verma@exampl" + chr(0x435) + ".com",  # Cyrillic ie in the domain
+            KELVIN_EMAIL,  # Kelvin sign: matches [A-Z] case-insensitively
+            "asha@b" + chr(0xFC) + "cher.de",  # IDN domain
+            chr(0x430) + "sha@example.com",  # Cyrillic a in the local part
+            "asha" + chr(0xFF20) + "example.com",  # fullwidth at sign
+        ],
+    )
+    def test_non_ascii_email_is_refused(self, api_client, email_login, email):
+        response = request_email_otp(api_client, email)
+        details = error(response, 400)["details"]
+        assert list(details) == ["email"]
+        assert not OTPRequest.objects.exists()
+
+    def test_non_ascii_is_refused_on_verify_too(self, api_client, email_login):
+        response = verify(api_client, "123456", email=KELVIN_EMAIL)
+        assert list(error(response, 400)["details"]) == ["email"]
+
+    def test_ascii_email_is_trimmed_and_lowercased(self, api_client, email_login):
+        assert request_email_otp(api_client, "  Asha.Verma@Example.COM ").status_code == 200
+        assert OTPRequest.objects.get().email == EMAIL
+
+    def test_profile_email_is_ascii_only(self, make_auth_client):
+        client = make_auth_client(UserFactory())
+        response = client.patch("/api/v1/me/", {"email": KELVIN_EMAIL}, format="json")
+        assert list(error(response, 400)["details"]) == ["email"]
+
+
+class TestEmailDeliveryChecks:
+    """P8-EOTP-29: accounts.E008-E010 / W002-W003, deployed environments really send email."""
+
+    SMTP = "django.core.mail.backends.smtp.EmailBackend"
+
+    @pytest.fixture
+    def deployed(self, settings):
+        settings.DEBUG = False
+        settings.EMAIL_BACKEND = self.SMTP
+        settings.EMAIL_HOST = "smtp.gmail.com"
+        settings.DEFAULT_FROM_EMAIL = "Jivo Quick Commerce <noreply@jivo.in>"
+        return settings
+
+    @staticmethod
+    def ids() -> list[str]:
+        from apps.accounts.checks import check_email_delivery
+
+        return sorted(problem.id for problem in check_email_delivery(None))
+
+    @pytest.mark.parametrize("environment", ["staging", "production"])
+    def test_a_real_mail_setup_passes(self, deployed, environment):
+        deployed.APP_ENVIRONMENT = environment
+        assert self.ids() == []
+
+    @pytest.mark.parametrize("kind", ["console", "locmem", "filebased", "dummy"])
+    def test_production_refuses_non_delivering_backends(self, deployed, kind):
+        deployed.APP_ENVIRONMENT = "production"
+        deployed.EMAIL_BACKEND = f"django.core.mail.backends.{kind}.EmailBackend"
+        assert self.ids() == ["accounts.E008"]
+
+    def test_staging_warns_about_a_non_delivering_backend(self, deployed):
+        deployed.APP_ENVIRONMENT = "staging"
+        deployed.EMAIL_BACKEND = "django.core.mail.backends.dummy.EmailBackend"
+        assert self.ids() == ["accounts.W002"]
+
+    @pytest.mark.parametrize("host", ["localhost", "127.0.0.1", "", " LOCALHOST "])
+    def test_local_smtp_host(self, deployed, host):
+        deployed.EMAIL_HOST = host
+        deployed.APP_ENVIRONMENT = "production"
+        assert self.ids() == ["accounts.E009"]
+        deployed.APP_ENVIRONMENT = "staging"
+        assert self.ids() == ["accounts.W003"]
+
+    @pytest.mark.parametrize(
+        "sender", ["Jivo Quick Commerce <noreply@localhost>", "noreply@localhost", ""]
+    )
+    def test_production_needs_a_real_sender(self, deployed, sender):
+        deployed.DEFAULT_FROM_EMAIL = sender
+        deployed.APP_ENVIRONMENT = "production"
+        assert self.ids() == ["accounts.E010"]
+        deployed.APP_ENVIRONMENT = "staging"
+        assert self.ids() == []
+
+    @pytest.mark.parametrize("environment", ["local", "test"])
+    def test_development_is_not_checked(self, settings, environment):
+        settings.APP_ENVIRONMENT = environment
+        settings.EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+        settings.EMAIL_HOST = "localhost"
+        settings.DEFAULT_FROM_EMAIL = "noreply@localhost"
+        assert self.ids() == []
+
+    def test_debug_is_not_checked(self, deployed):
+        deployed.APP_ENVIRONMENT = "production"
+        deployed.DEBUG = True
+        deployed.EMAIL_HOST = "localhost"
+        assert self.ids() == []

@@ -213,7 +213,8 @@ def checkout_body(
         "description": f"Order {order.order_number}",
         "prefill": {
             "name": user.name or "",
-            "contact": user.phone or "",
+            # An email-only customer has no login phone: the order's delivery contact instead.
+            "contact": user.phone or (order.address_snapshot or {}).get("receiver_phone", ""),
             "email": user.email or "",
         },
         "expires_at": order.payment_expires_at,

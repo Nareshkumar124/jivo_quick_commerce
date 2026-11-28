@@ -191,6 +191,26 @@ def request_otp(
     return sent_response()
 
 
+def newest_active_target(targets: list[dict], *, purpose: str) -> dict | None:
+    """Of `targets` (`{"phone": ...}` / `{"email": ...}`), the one with the newest unused,
+    unexpired OTP for `purpose`; None when none has one."""
+    now = timezone.now()
+    newest, newest_at = None, None
+    for target in targets:
+        fields = _Target(target.get("phone"), target.get("email")).fields
+        created = (
+            OTPRequest.objects.filter(
+                **fields, purpose=purpose, verified_at__isnull=True, expires_at__gt=now
+            )
+            .order_by("-created_at")
+            .values_list("created_at", flat=True)
+            .first()
+        )
+        if created is not None and (newest_at is None or created > newest_at):
+            newest, newest_at = target, created
+    return newest
+
+
 def verify_otp(
     *,
     purpose: str,

@@ -122,17 +122,23 @@ Sources: `docs/task-tracker.md`, `plan/00-roadmap.md`, `release-checklist.md`. T
 | P8-EOTP-12 | Unverified email on another profile never signs in to it (claim released) | BE |
 | P8-EOTP-13 | 5 attempts then locked; expiry; single use | BE |
 | P8-EOTP-14 | Rider app: existing rider with verified email signs in | BE |
-| P8-EOTP-15 | Rider app: unknown email gets `EMAIL_NOT_REGISTERED`, no account created | BE |
+| P8-EOTP-15 | Rider app: unknown email creates a user with no phone and `rider_status: NONE` (owner decision 2026-11-28; was `EMAIL_NOT_REGISTERED`) | BE |
 | P8-EOTP-16 | `/me/` `has_phone` / `email_verified` | BE |
 | P8-EOTP-17 | Email-only account cannot drop its sign-in email by PATCH | BE |
 | P8-EOTP-18 | Add a phone by SMS OTP (`/me/phone/otp/`, `/me/phone/verify/`) | BE |
 | P8-EOTP-19 | Phone of another account: `PHONE_IN_USE`, never merged | BE |
 | P8-EOTP-20 | Verify an email (`/me/email/otp/`, `/me/email/verify/`) | BE |
 | P8-EOTP-21 | Email verified on another account: `EMAIL_IN_USE` | BE |
-| P8-EOTP-22 | `POST /orders/` without a phone: 422 `PHONE_REQUIRED` | BE |
+| P8-EOTP-22 | `POST /orders/` with no login phone and no `receiver_phone` on the address: 422 `PHONE_REQUIRED` (`details.address_id`), cart blocker `PHONE_REQUIRED` (`orders/tests/test_phone_gate.py`) | BE |
 | P8-EOTP-23 | Account without a phone deletes itself with an email OTP | BE |
 | P8-EOTP-24 | `send_otp_email` is idempotent | BE |
 | P8-EOTP-25 | Production refuses `OTP_TEST_EMAILS` | BE |
+| P8-EOTP-26 | Email-only customer orders once the address has a `receiver_phone` (no OTP); order snapshot and Razorpay prefill carry it | BE |
+| P8-EOTP-27 | Phone customer's idempotent `POST /orders/` replay still returns 200 | BE |
+| P8-EOTP-28 | Non-ASCII / look-alike emails refused on request, verify and profile | BE |
+| P8-EOTP-29 | Deploy checks `accounts.E008`-`E010` / `W002`-`W003` for email delivery | BE |
+| P8-EOTP-30 | Rider without a login phone registers with `contact_phone` (no OTP); profile and tracking show it (`delivery/tests/test_registration_api.py`) | BE |
+| P8-EOTP-31 | `me/delete/` accepts a `delete_account` OTP sent to the verified email of an account that has a phone; newest code wins | BE |
 
 Reference open cases: P5 (21 not run, including P0 TC-12, 42, 45, 51, 110), P6 (3 failed, 9 not run) and P7 (4 not run) must be closed before this gate (see the phase 5, 6 and 7 files).
 

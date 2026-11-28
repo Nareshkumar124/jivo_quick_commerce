@@ -15,11 +15,11 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.utils import datetime_from_epoch
 
-from apps.accounts.choices import AppName, LoginMethod, OtpPurpose, RiderStatus
+from apps.accounts.choices import AppName, LoginMethod, OtpPurpose
 from apps.accounts.managers import normalise_email
 from apps.accounts.models import Address, Device, OTPRequest, User
 from apps.accounts.services.login_methods import ensure_login_method
-from apps.accounts.services.otp import request_otp, verify_otp
+from apps.accounts.services.otp import newest_active_target, request_otp, verify_otp
 from apps.core import audit
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
@@ -72,10 +72,13 @@ def login_with_otp(
 MSG_STAFF_EMAIL_LOGIN = "Staff accounts can't sign in with an email code. Use your phone number."
 
 
-def _customer_by_email(email: str, *, ip: str | None) -> tuple[User, bool]:
-    """The customer whose verified email this is, or a new customer with this email (verified,
-    no phone). An unverified copy of the email on another account is only a claim: the person
-    who just proved they own the address wins, and the claim is removed from that account
+def _user_by_email(email: str, *, ip: str | None) -> tuple[User, bool]:
+    """The user whose verified email this is, or a new user with this email (verified, no
+    phone), for either app, exactly like phone sign-in (owner decision 2026-11-28: new riders may
+    sign up by email; the rider app then runs its registration + KYC flow, with `rider_status`
+    NONE until `POST /rider/register/`). An unverified copy of the email on another account is
+    only a claim: the person who just proved they own the address wins, and the claim is removed
+    from that account
     (audited as `auth.unverified_email_released`)."""
     now = timezone.now()
     user = User.objects.select_for_update().filter(email=email).first()
@@ -94,35 +97,18 @@ def _customer_by_email(email: str, *, ip: str | None) -> tuple[User, bool]:
         return User.objects.select_for_update().get(email=email), False
 
 
-def _rider_by_email(email: str) -> User:
-    """Rider app: only an existing rider (a rider profile, so a phone on file) whose verified
-    email this is. Email never creates a rider account: new riders register with their phone."""
-    user = (
-        User.objects.select_for_update()
-        .filter(email=email, email_verified_at__isnull=False)
-        .first()
-    )
-    if user is not None and user.is_staff:
-        raise ApiError(ErrorCode.PERMISSION_DENIED, MSG_STAFF_EMAIL_LOGIN)
-    if user is None or not user.phone or user.rider_status == RiderStatus.NONE:
-        raise ApiError(ErrorCode.EMAIL_NOT_REGISTERED)
-    return user
-
-
 def login_with_email_otp(
     *, email: str, code: str, app: str, terms_version: str, ip: str | None
 ) -> LoginResult:
-    """Email OTP sign-in (2026-11-28). Customer app: the user with this verified email, else a
-    new customer with this email and no phone (`user.has_phone` false: a phone must be added
-    before the first order). Rider app: see `_rider_by_email`."""
+    """Email OTP sign-in (2026-11-28), both apps: the user with this verified email, else a new
+    user with this email and no phone (`user.has_phone` false). Customers then order with a
+    `receiver_phone` on the delivery address; new riders register with a `contact_phone`.
+    Staff accounts are refused."""
     ensure_login_method(app, LoginMethod.EMAIL)
     email = normalise_email(email)
     verify_otp(email=email, purpose=OtpPurpose.LOGIN, code=code, ip=ip, app=app)
     with transaction.atomic():
-        if app == AppName.RIDER:
-            user, is_new_user = _rider_by_email(email), False
-        else:
-            user, is_new_user = _customer_by_email(email, ip=ip)
+        user, is_new_user = _user_by_email(email, ip=ip)
         return _complete_login(user, is_new_user, app=app, terms_version=terms_version)
 
 
@@ -279,13 +265,20 @@ def anonymise_after(user: User):
 
 
 def delete_account(user: User, *, code: str, reason: str, ip: str | None) -> User:
-    """Confirmed by a `delete_account` OTP sent to the user's own phone (03 §2.2), or, for an
-    account without a phone (email sign-up, 2026-11-28), to its verified email."""
-    if user.is_staff or not (user.phone or (user.email and user.email_verified_at)):
+    """Confirmed by a `delete_account` OTP sent to the user's own phone (03 §2.2) or to its
+    verified email (2026-11-28: SMS does not deliver in production yet, and riders always have a
+    phone). When both exist, the code is checked against whichever of the two received the
+    newest still-active `delete_account` OTP, so one wrong code counts one attempt only."""
+    targets = []
+    if user.phone:
+        targets.append({"phone": user.phone})
+    if user.email and user.email_verified_at:
+        targets.append({"email": user.email})
+    if user.is_staff or not targets:
         raise ApiError(
             ErrorCode.PERMISSION_DENIED, "Staff accounts are deleted by an administrator."
         )
-    target = {"phone": user.phone} if user.phone else {"email": user.email}
+    target = newest_active_target(targets, purpose=OtpPurpose.DELETE_ACCOUNT) or targets[0]
     verify_otp(**target, purpose=OtpPurpose.DELETE_ACCOUNT, code=code, ip=ip)
     with transaction.atomic():
         user.deleted_at = timezone.now()

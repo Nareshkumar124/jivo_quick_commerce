@@ -19,6 +19,7 @@ URGENT = (
     "orders.auto_accept_orders",
     "orders.store_acceptance_sla_alert",
     "accounts.send_otp_sms",
+    "accounts.send_otp_email",
     "notifications.send_push",
     "notifications.send_sms",
     "notifications.notify_order_event",

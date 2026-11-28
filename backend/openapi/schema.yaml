@@ -1606,7 +1606,7 @@ paths:
       description: |-
         Emails a 6-digit OTP to `email` for `app`, with the same rules as the SMS OTP (5-minute expiry, 5 attempts, 3 sends per email per 10 minutes and 10 per day, per-IP limits). The response is the same whether or not the email has an account. The email is case-insensitive.
 
-        Needs email sign-in switched on for the app (`GET /auth/methods/`), else 403 `LOGIN_METHOD_DISABLED`. With `purpose: delete_account` (for an account without a phone) the switch does not apply and nothing is sent unless the email is the verified email of an account; the response is identical.
+        Needs email sign-in switched on for the app (`GET /auth/methods/`), else 403 `LOGIN_METHOD_DISABLED`. With `purpose: delete_account` (any account with a verified email, with or without a phone) the switch does not apply and nothing is sent unless the email is the verified email of an account; the response is identical.
 
         Fixed-OTP test emails exist only outside production.
       summary: Send an OTP by email
@@ -1751,8 +1751,8 @@ paths:
       description: |-
         Verifies a `login` OTP for `email` + `app` and returns a token pair (same body as `/auth/otp/verify/`). Attempts, expiry, deletion grace and `terms_version` work exactly as for phone.
 
-        - **Customer app:** signs in the account whose verified email this is; otherwise creates a new customer with this email and **no phone** (`is_new_user: true`, `user.has_phone: false`). Such a customer must add a phone (`POST /me/phone/otp/`, `/me/phone/verify/`) before the first order. An unverified copy of the email on another account (typed into a profile, never proved) is removed from that account.
-        - **Rider app:** only an existing rider whose verified email is on file; anyone else gets 403 `EMAIL_NOT_REGISTERED` (new riders register with their phone).
+        - **Customer app:** signs in the account whose verified email this is; otherwise creates a new customer with this email and **no phone** (`is_new_user: true`, `user.has_phone: false`). Such a customer orders with a `receiver_phone` on the delivery address (no OTP), else `POST /orders/` answers 422 `PHONE_REQUIRED`. An unverified copy of the email on another account (typed into a profile, never proved) is removed from that account.
+        - **Rider app** (owner decision 2026-11-28): the same. A new email creates a user with no phone and `rider_status: NONE` (`is_new_user: true`), exactly like a new phone sign-up: continue with `POST /rider/register/`, which then needs `contact_phone` (the rider's mobile, no OTP). `EMAIL_NOT_REGISTERED` is no longer returned.
         - Staff accounts cannot sign in with an email code (403 `PERMISSION_DENIED`).
         - Email sign-in switched off for the app: 403 `LOGIN_METHOD_DISABLED`.
       summary: Verify the email OTP and sign in
@@ -1843,6 +1843,28 @@ paths:
                     is_new_user: false
                     rider_status: ACTIVE
                     deletion_cancelled: false
+                NewRider(registerNext):
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjExODAwLCJpYXQiOjE3OTM2MTA5MDAsImp0aSI6IjZmMWMyYjllOGQ3YTRjNWI5ZTBmMWEyYjNjNGQ1ZTZmIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    user:
+                      id: 78
+                      phone: null
+                      name: ''
+                      email: asha.verma@example.com
+                      marketing_opt_in: false
+                      has_phone: false
+                      email_verified: true
+                      business_category: null
+                      business_category_name: null
+                      business_name: ''
+                      is_profile_complete: false
+                      rider_status: NONE
+                      created_at: '2026-11-02T10:15:00Z'
+                    is_new_user: true
+                    rider_status: NONE
+                    deletion_cancelled: false
+                  summary: New rider (register next)
           description: Signed in.
         '400':
           content:
@@ -1895,14 +1917,6 @@ paths:
                         - email
                   summary: 'This sign-in method is switched off for the app: offer
                     `details.methods`'
-                EMAILNOTREGISTERED:
-                  value:
-                    error:
-                      code: EMAIL_NOT_REGISTERED
-                      message: This email is not linked to a rider account. Sign in
-                        with your phone number.
-                      details: {}
-                  summary: EMAIL_NOT_REGISTERED
                 PERMISSIONDENIED:
                   value:
                     error:
@@ -1918,8 +1932,8 @@ paths:
                         your phone number.
                       details: {}
                   summary: Staff accounts cannot use an email code
-          description: Email sign-in is switched off for this app, the rider app does
-            not know this email, the account is deactivated, or it is a staff account.
+          description: Email sign-in is switched off for this app, the account is
+            deactivated, or it is a staff account.
         '429':
           content:
             application/json:
@@ -10444,7 +10458,12 @@ paths:
     post:
       operationId: me_delete_account
       description: |-
-        Two steps: (1) `POST /auth/otp/request/` with the user's own phone and `purpose: delete_account`; (2) this call with that OTP. Only a `delete_account` OTP issued to the caller's phone is accepted.
+        Two steps: (1) request a `delete_account` OTP, then (2) this call with that OTP.
+
+        - Account with a phone: `POST /auth/otp/request/` `{phone, app, purpose: delete_account}` with the account's own phone (SMS).
+        - Account with a verified email (`email_verified: true`, with or without a phone; use this while SMS does not deliver): `POST /auth/email-otp/request/` `{email, app, purpose: delete_account}` with that email. Works even when email sign-in is switched off.
+
+        A `delete_account` OTP issued to the caller's own phone or own verified email is accepted (whichever was requested last).
 
         On success every refresh token of the user is revoked and their devices are deactivated: clear local data and go to the login screen. Personal data is anonymised after the grace period (`anonymise_after`, 30 days, 07 §4); order and invoice records are kept without personal data.
       summary: Delete my account (OTP confirmed)
@@ -11790,11 +11809,12 @@ paths:
     post:
       operationId: me_phone_otp
       description: 'Step 1 of adding a phone to an account that has none (an email
-        sign-up, `user.has_phone: false`). A customer needs a phone before the first
-        order. Same OTP rules and limits as sign-in, and not affected by the login
-        method switch. The response never says whether another account uses the number
-        (step 2 reports that, once the code proves the number is the caller''s). An
-        account that already has a phone gets 400 (not changeable in v1).'
+        sign-up, `user.has_phone: false`). Optional: orders only need a `receiver_phone`
+        on the delivery address. Same OTP rules and limits as sign-in, and not affected
+        by the login method switch. The response never says whether another account
+        uses the number (step 2 reports that, once the code proves the number is the
+        caller''s). An account that already has a phone gets 400 (not changeable in
+        v1).'
       summary: Send an SMS OTP to add a phone number
       tags:
       - account
@@ -12587,7 +12607,7 @@ paths:
 
         Send the same `Idempotency-Key` when retrying a request whose response was lost: the first order is returned (200) and nothing is placed twice. Disable the button while a request is in flight.
 
-        **Phone required:** a customer who signed up with email and has no phone yet (`GET /me/` `has_phone: false`) gets 422 `PHONE_REQUIRED`: add a phone with `POST /me/phone/otp/` and `/me/phone/verify/`, then place the order again.
+        **Phone required:** the rider and the store need a number to call. A customer without a login phone (email sign-up, `GET /me/` `has_phone: false`) can order when the chosen address has a `receiver_phone` (any valid Indian mobile, no OTP). With neither the answer is 422 `PHONE_REQUIRED` with `details.address_id`: ask for a phone number and save it on that address (`PATCH /addresses/{id}/` `receiver_phone`), then place the order again. The cart shows the same problem in advance as the `PHONE_REQUIRED` checkout blocker.
       summary: Place an order from the cart
       parameters:
       - in: header
@@ -13355,10 +13375,12 @@ paths:
                   value:
                     error:
                       code: PHONE_REQUIRED
-                      message: Add your phone number to place an order.
-                      details: {}
-                  summary: 'Email sign-up without a phone: add one (`/me/phone/otp/`)
-                    first'
+                      message: Add a phone number to this address so the delivery
+                        partner can call you.
+                      details:
+                        address_id: 13
+                  summary: 'No login phone and no receiver_phone on the address: add
+                    one to the address first'
                 COUPONNOTELIGIBLE:
                   value:
                     error:
@@ -19782,6 +19804,7 @@ paths:
                       online_seconds: 0
                     id: 42
                     phone: '+919811122233'
+                    contact_phone: ''
                     rejection_reason: ''
                     suspension_reason: ''
                     full_name: Ravi Kumar
@@ -19834,6 +19857,7 @@ paths:
                       online_seconds: 0
                     id: 42
                     phone: '+919811122233'
+                    contact_phone: ''
                     rejection_reason: ''
                     suspension_reason: ''
                     full_name: Ravi Kumar
@@ -19921,6 +19945,7 @@ paths:
                       online_seconds: 0
                     id: 42
                     phone: '+919811122233'
+                    contact_phone: ''
                     rejection_reason: Your PAN photo is not readable. Upload a clear
                       photo.
                     suspension_reason: ''
@@ -20009,6 +20034,7 @@ paths:
                       online_seconds: 21600
                     id: 42
                     phone: '+919811122233'
+                    contact_phone: ''
                     rejection_reason: ''
                     suspension_reason: ''
                     full_name: Ravi Kumar
@@ -20100,6 +20126,7 @@ paths:
                       online_seconds: 21600
                     id: 42
                     phone: '+919811122233'
+                    contact_phone: ''
                     rejection_reason: ''
                     suspension_reason: ''
                     full_name: Ravi Kumar
@@ -20300,10 +20327,10 @@ paths:
     patch:
       operationId: rider_me_partial_update
       description: 'Any registration field. PENDING_KYC and REJECTED riders may change
-        all of them; ACTIVE and SUSPENDED riders only `emergency_contact_name` and
-        `emergency_contact_phone` (anything else: 400 with "Contact ops"). A REJECTED
-        rider''s application returns to PENDING_KYC once nothing required is missing
-        or rejected (the rider fixed what ops asked).'
+        all of them; ACTIVE and SUSPENDED riders only `emergency_contact_name`, `emergency_contact_phone`
+        and `contact_phone` (anything else: 400 with "Contact ops"). A REJECTED rider''s
+        application returns to PENDING_KYC once nothing required is missing or rejected
+        (the rider fixed what ops asked).'
       summary: Edit my rider profile
       tags:
       - rider
@@ -20336,6 +20363,7 @@ paths:
                       online_seconds: 21600
                     id: 42
                     phone: '+919811122233'
+                    contact_phone: ''
                     rejection_reason: ''
                     suspension_reason: ''
                     full_name: Ravi Kumar
@@ -21546,13 +21574,10 @@ paths:
   /api/v1/rider/register/:
     post:
       operationId: rider_register
-      description: 'Creates the rider profile in PENDING_KYC (04 §2.2) for the signed-in
-        user. Then upload the documents in `required_documents` and the bank details;
-        when nothing is missing, `ready_for_review` is true and ops review the application.
-        Once only: afterwards 409 `INVALID_STATE_TRANSITION` (edit with `PATCH /rider/me/`).
-        The rider must be 18 or older (IST date); the emergency contact must not be
-        the rider''s own number; `vehicle_number` is required exactly for MOTORBIKE
-        and SCOOTER.'
+      description: |-
+        Creates the rider profile in PENDING_KYC (04 §2.2) for the signed-in user. Then upload the documents in `required_documents` and the bank details; when nothing is missing, `ready_for_review` is true and ops review the application. Once only: afterwards 409 `INVALID_STATE_TRANSITION` (edit with `PATCH /rider/me/`). The rider must be 18 or older (IST date); the emergency contact must not be the rider's own number; `vehicle_number` is required exactly for MOTORBIKE and SCOOTER.
+
+        Email sign-up (2026-11-28): an account without a login phone (`GET /me/` `has_phone: false`) must send `contact_phone`, the rider's own mobile (no OTP), else 400 `VALIDATION_ERROR` on `contact_phone`. Customers and the store call it.
       summary: Register as a rider
       tags:
       - rider
@@ -21579,6 +21604,17 @@ paths:
                   emergency_contact_phone: '+919899001122'
                   preferred_store_id: 1
                   vehicle_type: BICYCLE
+              EmailSign-up(noLoginPhone):
+                value:
+                  full_name: Ravi Kumar
+                  dob: '1998-04-12'
+                  emergency_contact_name: Sunita Devi
+                  emergency_contact_phone: '+919812345670'
+                  contact_phone: '+919811122233'
+                  preferred_store_id: 1
+                  vehicle_type: MOTORBIKE
+                  vehicle_number: HR26DQ1234
+                summary: Email sign-up (no login phone)
         required: true
       security:
       - jwtAuth: []
@@ -21599,6 +21635,7 @@ paths:
                       online_seconds: 0
                     id: 42
                     phone: '+919811122233'
+                    contact_phone: ''
                     rejection_reason: ''
                     suspension_reason: ''
                     full_name: Ravi Kumar
@@ -26818,9 +26855,11 @@ components:
             value; null is rejected.
           maxLength: 120
         receiver_phone:
-          description: Defaults to the user's phone. Send an empty string to reset
-            it to the user's own (copied when saved). Omit it to keep the current
-            value; null is rejected.
+          description: 'Defaults to the user''s phone. Send an empty string to reset
+            it to the user''s own (copied when saved). Omit it to keep the current
+            value; null is rejected. The rider calls this number. An account without
+            a phone (email sign-up, `has_phone: false`) must fill it to order to this
+            address (no OTP; else `PHONE_REQUIRED`): it is stored as "" until then.'
           oneOf:
           - type: string
             pattern: ^\+91[6-9][0-9]{9}$
@@ -26921,9 +26960,11 @@ components:
             value; null is rejected.
           maxLength: 120
         receiver_phone:
-          description: Defaults to the user's phone. Send an empty string to reset
-            it to the user's own (copied when saved). Omit it to keep the current
-            value; null is rejected.
+          description: 'Defaults to the user''s phone. Send an empty string to reset
+            it to the user''s own (copied when saved). Omit it to keep the current
+            value; null is rejected. The rider calls this number. An account without
+            a phone (email sign-up, `has_phone: false`) must fill it to order to this
+            address (no OTP; else `PHONE_REQUIRED`): it is stored as "" until then.'
           oneOf:
           - type: string
             pattern: ^\+91[6-9][0-9]{9}$
@@ -27756,6 +27797,7 @@ components:
       - CART_EMPTY
       - ADDRESS_REQUIRED
       - NOT_SERVICEABLE
+      - PHONE_REQUIRED
       - STORE_CLOSED
       - STOCK_UNAVAILABLE
       - MIN_QTY_REQUIRED
@@ -27770,6 +27812,7 @@ components:
         * `CART_EMPTY` - Add items to your cart.
         * `ADDRESS_REQUIRED` - Select a delivery address.
         * `NOT_SERVICEABLE` - We do not deliver to this address from this store.
+        * `PHONE_REQUIRED` - Add a phone number to this address so the delivery partner can call you.
         * `STORE_CLOSED` - The store is not accepting orders right now.
         * `STOCK_UNAVAILABLE` - Some items are not available as chosen.
         * `MIN_QTY_REQUIRED` - Some items are below their minimum per order.
@@ -28642,7 +28685,7 @@ components:
             * `REFERRAL_NOT_ELIGIBLE` - Referral codes are only for new customers before their first order.
             * `LOGIN_METHOD_DISABLED` - This sign-in method is not available. Use another way to sign in.
             * `EMAIL_NOT_REGISTERED` - This email is not linked to a rider account. Sign in with your phone number.
-            * `PHONE_REQUIRED` - Add your phone number to place an order.
+            * `PHONE_REQUIRED` - Add a phone number to this address so the delivery partner can call you.
             * `PHONE_IN_USE` - This phone number is linked to another account. Sign in with it instead.
             * `EMAIL_IN_USE` - This email is linked to another account. Sign in with it instead.
         message:
@@ -28760,7 +28803,7 @@ components:
         * `REFERRAL_NOT_ELIGIBLE` - Referral codes are only for new customers before their first order.
         * `LOGIN_METHOD_DISABLED` - This sign-in method is not available. Use another way to sign in.
         * `EMAIL_NOT_REGISTERED` - This email is not linked to a rider account. Sign in with your phone number.
-        * `PHONE_REQUIRED` - Add your phone number to place an order.
+        * `PHONE_REQUIRED` - Add a phone number to this address so the delivery partner can call you.
         * `PHONE_IN_USE` - This phone number is linked to another account. Sign in with it instead.
         * `EMAIL_IN_USE` - This email is linked to another account. Sign in with it instead.
     ErrorEnvelope:
@@ -29328,9 +29371,10 @@ components:
           type: boolean
           readOnly: true
           description: 'False for an account created by email sign-in that has not
-            added a phone yet. Customers must add one (`POST /me/phone/otp/`, `POST
-            /me/phone/verify/`) before placing an order: `POST /orders/` answers 422
-            `PHONE_REQUIRED` until then.'
+            added a login phone. Such a customer can still order: the delivery address
+            needs a `receiver_phone` (no OTP); without one `POST /orders/` answers
+            422 `PHONE_REQUIRED`. Adding a login phone (`POST /me/phone/otp/`, `/me/phone/verify/`)
+            is optional.'
         email_verified:
           type: boolean
           readOnly: true
@@ -30613,9 +30657,11 @@ components:
             value; null is rejected.
           maxLength: 120
         receiver_phone:
-          description: Defaults to the user's phone. Send an empty string to reset
-            it to the user's own (copied when saved). Omit it to keep the current
-            value; null is rejected.
+          description: 'Defaults to the user''s phone. Send an empty string to reset
+            it to the user''s own (copied when saved). Omit it to keep the current
+            value; null is rejected. The rider calls this number. An account without
+            a phone (email sign-up, `has_phone: false`) must fill it to order to this
+            address (no OTP; else `PHONE_REQUIRED`): it is stored as "" until then.'
           oneOf:
           - type: string
             pattern: ^\+91[6-9][0-9]{9}$
@@ -30734,6 +30780,15 @@ components:
           type: string
           minLength: 1
           description: Indian mobile number (E.164, +91...), not the rider's own number.
+          pattern: ^\+91[6-9][0-9]{9}$
+          maxLength: 15
+        contact_phone:
+          type: string
+          minLength: 1
+          description: 'The rider''s own mobile (E.164, +91...), for customers and
+            the store to call. No OTP. **Required at registration when the account
+            has no login phone** (email sign-up, `GET /me/` `has_phone: false`; else
+            400 on `contact_phone`); optional otherwise. Editable in any status.'
           pattern: ^\+91[6-9][0-9]{9}$
           maxLength: 15
         preferred_store_id:
@@ -31947,7 +32002,11 @@ components:
           type: integer
         phone:
           type: string
-          description: Login phone (E.164).
+          description: 'The rider''s number (E.164): the login phone, or `contact_phone`
+            for an account created by email sign-in.'
+        contact_phone:
+          type: string
+          description: The unverified mobile given at registration ("" when not given).
         status:
           allOf:
           - $ref: '#/components/schemas/RiderStatusEnum'
@@ -32045,6 +32104,7 @@ components:
       required:
       - bank_account
       - cash
+      - contact_phone
       - created_at
       - dob
       - documents
@@ -32159,6 +32219,15 @@ components:
           type: string
           minLength: 1
           description: Indian mobile number (E.164, +91...), not the rider's own number.
+          pattern: ^\+91[6-9][0-9]{9}$
+          maxLength: 15
+        contact_phone:
+          type: string
+          minLength: 1
+          description: 'The rider''s own mobile (E.164, +91...), for customers and
+            the store to call. No OTP. **Required at registration when the account
+            has no login phone** (email sign-up, `GET /me/` `has_phone: false`; else
+            400 on `contact_phone`); optional otherwise. Editable in any status.'
           pattern: ^\+91[6-9][0-9]{9}$
           maxLength: 15
         preferred_store_id:

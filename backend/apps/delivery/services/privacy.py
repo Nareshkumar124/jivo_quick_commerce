@@ -42,6 +42,7 @@ def scrub_rider(user, now=None) -> bool:
         dob=None,
         emergency_contact_name="",
         emergency_contact_phone="",
+        contact_phone="",
         vehicle_number="",
         bank_account_name="",
         bank_account_number_encrypted="",

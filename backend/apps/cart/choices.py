@@ -34,6 +34,10 @@ class CheckoutBlockerCode(models.TextChoices):
     CART_EMPTY = "CART_EMPTY", "Add items to your cart."
     ADDRESS_REQUIRED = "ADDRESS_REQUIRED", "Select a delivery address."
     NOT_SERVICEABLE = "NOT_SERVICEABLE", "We do not deliver to this address from this store."
+    PHONE_REQUIRED = (
+        "PHONE_REQUIRED",
+        "Add a phone number to this address so the delivery partner can call you.",
+    )
     STORE_CLOSED = "STORE_CLOSED", "The store is not accepting orders right now."
     STOCK_UNAVAILABLE = "STOCK_UNAVAILABLE", "Some items are not available as chosen."
     MIN_QTY_REQUIRED = "MIN_QTY_REQUIRED", "Some items are below their minimum per order."

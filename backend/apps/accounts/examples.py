@@ -123,6 +123,7 @@ SESSION_RIDER_EMAIL = {
     },
     "rider_status": "ACTIVE",
 }
+SESSION_NEW_EMAIL_RIDER = {**SESSION_NEW_CUSTOMER, "user": {**EMAIL_NEW_ME, "id": 78}}
 LOGIN_METHODS_PHONE = {"app": "customer", "methods": ["phone"]}
 LOGIN_METHODS_BOTH = {"app": "customer", "methods": ["phone", "email"]}
 LOGIN_METHODS_EMAIL = {"app": "rider", "methods": ["email"]}

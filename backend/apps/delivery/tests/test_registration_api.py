@@ -477,3 +477,78 @@ def test_unregister_device(make_auth_client):
         APIClient().delete("/api/v1/me/devices/", {"fcm_token": "x"}, format="json").status_code
         == 401
     )
+
+
+# --------------------------------------------------------------------------- email sign-up
+
+
+class TestEmailSignupRegistration:
+    """P8-EOTP-30 (owner decision 2026-11-28): a rider who signed up by email (no login phone)
+    registers with an unverified `contact_phone`; customers and the store call that number."""
+
+    @pytest.fixture
+    def email_user(self):
+        from django.utils import timezone
+
+        return UserFactory(phone=None, email="ravi.k@example.com", email_verified_at=timezone.now())
+
+    def test_contact_phone_is_required_without_a_login_phone(self, client_for, store, email_user):
+        response = client_for(email_user).post(REGISTER, payload(store), format="json")
+        assert response.status_code == 400, response.content
+        assert list(response.json()["error"]["details"]) == ["contact_phone"]
+        assert not Rider.objects.exists()
+
+    def test_register_with_contact_phone(self, client_for, store, email_user):
+        client = client_for(email_user)
+        response = client.post(
+            REGISTER, payload(store, contact_phone="+919811122233"), format="json"
+        )
+        assert response.status_code == 201, response.content
+        body = client.get(ME).json()
+        assert body["phone"] == "+919811122233"
+        assert body["contact_phone"] == "+919811122233"
+        assert body["status"] == RiderStatus.PENDING_KYC
+        email_user.refresh_from_db()
+        assert email_user.phone is None  # never a login phone
+        rider = Rider.objects.get(user=email_user)
+        assert rider.phone_number == "+919811122233"
+
+    def test_contact_phone_must_be_an_indian_mobile(self, client_for, store, email_user):
+        response = client_for(email_user).post(
+            REGISTER, payload(store, contact_phone="12345"), format="json"
+        )
+        assert list(response.json()["error"]["details"]) == ["contact_phone"]
+
+    def test_emergency_contact_is_not_the_contact_phone(self, client_for, store, email_user):
+        response = client_for(email_user).post(
+            REGISTER,
+            payload(store, contact_phone="+919812345670"),  # same as the emergency contact
+            format="json",
+        )
+        assert list(response.json()["error"]["details"]) == ["emergency_contact_phone"]
+
+    def test_phone_user_needs_no_contact_phone(self, client_for, store):
+        user = UserFactory()
+        client = client_for(user)
+        assert client.post(REGISTER, payload(store), format="json").status_code == 201
+        body = client.get(ME).json()
+        assert body["phone"] == user.phone
+        assert body["contact_phone"] == ""
+
+    def test_active_rider_may_change_the_contact_phone(self, client_for, email_user):
+        rider = active_rider(user=email_user, contact_phone="+919811122233")
+        response = client_for(email_user).patch(
+            ME, {"contact_phone": "+919811122244"}, format="json"
+        )
+        assert response.status_code == 200, response.content
+        rider.refresh_from_db()
+        assert rider.contact_phone == "+919811122244"
+
+    def test_tracking_shows_the_contact_phone(self, email_user):
+        from apps.delivery.services.tracking import rider_body
+        from apps.orders.choices import OrderStatus
+        from apps.orders.models import Order
+
+        rider = active_rider(user=email_user, contact_phone="+919811122233")
+        order = Order(status=OrderStatus.OUT_FOR_DELIVERY)
+        assert rider_body(order, rider, None, None)["phone"] == "+919811122233"

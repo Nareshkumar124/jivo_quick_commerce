@@ -35,6 +35,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.accounts.models import Address
 from apps.accounts.serializers import AddressSerializer
+from apps.accounts.services import contact
 from apps.accounts.services.addresses import live_addresses
 from apps.cart.choices import CartLineIssueCode, CheckoutBlockerCode, PaymentUnavailableReason
 from apps.cart.models import Cart, CartItem, empty_instructions
@@ -1006,8 +1007,12 @@ def _coupon_blocker(check) -> dict:
     return {"code": check.error.value, "message": message}
 
 
-def blockers(state: CartState, *, status, store: StoreArea, address: Address | None) -> list[dict]:
-    """What stops the order now, most important first. An empty cart has only CART_EMPTY."""
+def blockers(
+    state: CartState, *, status, store: StoreArea, address: Address | None, user=None
+) -> list[dict]:
+    """What stops the order now, most important first. An empty cart has only CART_EMPTY.
+    PHONE_REQUIRED (2026-11-28): the customer has no login phone and the address has no valid
+    `receiver_phone` (`contact.has_delivery_contact`), the same rule as `POST /orders/`."""
     if not state.lines:
         return [
             {
@@ -1067,6 +1072,13 @@ def blockers(state: CartState, *, status, store: StoreArea, address: Address | N
                 ),
             }
         )
+    if address is not None and user is not None and not contact.has_delivery_contact(user, address):
+        found.append(
+            {
+                "code": CheckoutBlockerCode.PHONE_REQUIRED,
+                "message": CheckoutBlockerCode.PHONE_REQUIRED.label,
+            }
+        )
     return found
 
 
@@ -1082,7 +1094,7 @@ def cart_body(
     state = evaluate(cart, store, user, now=now)
     status = store_status(store, now)
     address = address or _cart_address(cart, user)
-    found = blockers(state, status=status, store=store, address=address)
+    found = blockers(state, status=status, store=store, address=address, user=user)
     instructions = cart.instructions or empty_instructions()
     return {
         "store": status.as_dict(),

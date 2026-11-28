@@ -27,6 +27,8 @@ from apps.accounts.validators import (
 )
 from apps.core.middleware import APP_VERSION_PATTERN
 
+MSG_EMAIL_ASCII = "Enter a valid email address using English letters, digits and symbols only."
+
 
 @extend_schema_field(OpenApiTypes.EMAIL)
 class OptionalEmailField(serializers.Field):
@@ -36,7 +38,10 @@ class OptionalEmailField(serializers.Field):
     Dart generator cannot handle); "" is still accepted on input and stored as null.
     """
 
-    default_error_messages = {"invalid": "Enter a valid email address."}
+    default_error_messages = {
+        "invalid": "Enter a valid email address.",
+        "non_ascii": MSG_EMAIL_ASCII,
+    }
 
     def __init__(self, **kwargs):
         kwargs.setdefault("allow_null", True)
@@ -51,6 +56,8 @@ class OptionalEmailField(serializers.Field):
         if not isinstance(data, str) or len(data.strip()) > 254:
             self.fail("invalid")
         value = data.strip()
+        if not value.isascii():  # same rule as LoginEmailField
+            self.fail("non_ascii")
         try:
             validate_email(value)
         except DjangoValidationError:
@@ -106,13 +113,22 @@ class OtpVerifySerializer(serializers.Serializer):
 
 
 class LoginEmailField(serializers.EmailField):
-    """A required email, trimmed and stored lowercase (unique case-insensitively)."""
+    """A required email, trimmed and stored lowercase (unique case-insensitively).
+
+    ASCII only (email OTP review, 2026-11-28): Django's validator accepts look-alike Unicode
+    (e.g. the Kelvin sign U+212A matches `[A-Z]` case-insensitively, and IDN domains), so two
+    different strings could name one mailbox, or one string reach another mailbox after the
+    mail server normalises it. Internationalised addresses are refused rather than normalised."""
+
+    default_error_messages = {"non_ascii": MSG_EMAIL_ASCII}
 
     def __init__(self, **kwargs):
         kwargs.setdefault("max_length", 254)
         super().__init__(**kwargs)
 
     def to_internal_value(self, data) -> str:
+        if isinstance(data, str) and not data.isascii():
+            self.fail("non_ascii")
         return super().to_internal_value(data).strip().lower()
 
 
@@ -217,9 +233,10 @@ class MeSerializer(serializers.Serializer):
     has_phone = serializers.BooleanField(
         read_only=True,
         help_text=(
-            "False for an account created by email sign-in that has not added a phone yet. "
-            "Customers must add one (`POST /me/phone/otp/`, `POST /me/phone/verify/`) before "
-            "placing an order: `POST /orders/` answers 422 `PHONE_REQUIRED` until then."
+            "False for an account created by email sign-in that has not added a login phone. "
+            "Such a customer can still order: the delivery address needs a `receiver_phone` "
+            "(no OTP); without one `POST /orders/` answers 422 `PHONE_REQUIRED`. Adding a login "
+            "phone (`POST /me/phone/otp/`, `/me/phone/verify/`) is optional."
         ),
     )
     email_verified = serializers.BooleanField(
@@ -388,7 +405,10 @@ class AddressSerializer(serializers.Serializer):
         validators=[indian_mobile_validator],
         help_text=(
             "Defaults to the user's phone. Send an empty string to reset it to the user's own "
-            "(copied when saved). Omit it to keep the current value; null is rejected."
+            "(copied when saved). Omit it to keep the current value; null is rejected. The rider "
+            "calls this number. An account without a phone (email sign-up, `has_phone: false`) "
+            "must fill it to order to this address (no OTP; else `PHONE_REQUIRED`): it is "
+            'stored as "" until then.'
         ),
     )
     house = serializers.CharField(max_length=120, help_text="House / flat / floor.")

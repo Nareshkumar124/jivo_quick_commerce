@@ -31,7 +31,7 @@ def rider_body(order: Order, rider, location: dict | None, photo_url: str | None
     recorded_at = location["recorded_at"] if location else None
     return {
         "name": _short_name(rider.full_name),
-        "phone": rider.user.phone if show_contact else None,
+        "phone": (rider.phone_number or None) if show_contact else None,
         "photo": photo_url,
         "vehicle_type": rider.vehicle_type or None,
         "lat": location["lat"] if location else None,

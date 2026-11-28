@@ -159,3 +159,74 @@ def check_signing_keys(app_configs, **kwargs):
             )
         )
     return errors
+
+
+# Django's mail backends that never deliver: they log, store in memory or a file, or drop.
+NON_DELIVERING_EMAIL_BACKENDS = frozenset(
+    {
+        "django.core.mail.backends.console.EmailBackend",
+        "django.core.mail.backends.locmem.EmailBackend",
+        "django.core.mail.backends.filebased.EmailBackend",
+        "django.core.mail.backends.dummy.EmailBackend",
+    }
+)
+SMTP_EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+_LOCAL_HOSTS = frozenset({"", "localhost", "127.0.0.1", "::1", "0.0.0.0"})  # noqa: S104 - compared, not bound
+
+
+@register()
+def check_email_delivery(app_configs, **kwargs):
+    """2026-11-28 (email OTP review): email is a sign-in channel (login, verify-email and
+    delete-account OTPs), so a deployed environment must really send mail.
+
+    - accounts.E008 (production) / W002 (staging): `EMAIL_BACKEND` logs, stores or drops mail.
+      Production is always an Error: the login switch lives in the database, so a check cannot
+      tell whether email sign-in is on, and production must be able to turn it on at any time.
+      Staging is a Warning (it may run without SMTP, using fixed-OTP test emails).
+    - accounts.E009 (production) / W003 (staging): the SMTP backend points at this machine
+      (`EMAIL_HOST` localhost: Mailpit in development, nothing in a container).
+    - accounts.E010 (production): `DEFAULT_FROM_EMAIL` is the development default
+      (`...@localhost`): providers reject or spam-folder such mail."""
+    environment = settings.APP_ENVIRONMENT
+    if environment not in ("staging", "production") or settings.DEBUG:
+        return []
+    production = environment == "production"
+    problems = []
+    backend = settings.EMAIL_BACKEND
+    if backend in NON_DELIVERING_EMAIL_BACKENDS:
+        problems.append(
+            (Error if production else Warning)(
+                f"EMAIL_BACKEND {backend.rsplit('.', 2)[-2]} does not send mail, but email "
+                f"OTPs (sign-in, email verification, account deletion) need it in {environment}.",
+                hint=(
+                    "Set EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend and the "
+                    "EMAIL_HOST / EMAIL_PORT / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD / "
+                    "EMAIL_USE_TLS variables of the mail provider."
+                ),
+                id="accounts.E008" if production else "accounts.W002",
+            )
+        )
+    if backend == SMTP_EMAIL_BACKEND and (settings.EMAIL_HOST or "").strip().lower() in (
+        _LOCAL_HOSTS
+    ):
+        problems.append(
+            (Error if production else Warning)(
+                f"EMAIL_HOST is {settings.EMAIL_HOST or 'empty'!r}: no mail server runs there "
+                f"in {environment}, so email OTPs are never delivered.",
+                hint="Set EMAIL_HOST (and EMAIL_PORT, EMAIL_USE_TLS) to the mail provider.",
+                id="accounts.E009" if production else "accounts.W003",
+            )
+        )
+    sender = (settings.DEFAULT_FROM_EMAIL or "").strip().lower().rstrip(">")
+    if production and (not sender or sender.endswith("@localhost")):
+        problems.append(
+            Error(
+                "DEFAULT_FROM_EMAIL is the development default (...@localhost).",
+                hint=(
+                    "Set DEFAULT_FROM_EMAIL to a real sender on a domain the mail provider may "
+                    'send for, e.g. "Jivo Quick Commerce <noreply@jivo.in>".'
+                ),
+                id="accounts.E010",
+            )
+        )
+    return problems

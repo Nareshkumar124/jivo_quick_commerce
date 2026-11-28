@@ -86,7 +86,10 @@ class ErrorCode(models.TextChoices):
         "EMAIL_NOT_REGISTERED",
         "This email is not linked to a rider account. Sign in with your phone number.",
     )
-    PHONE_REQUIRED = "PHONE_REQUIRED", "Add your phone number to place an order."
+    PHONE_REQUIRED = (
+        "PHONE_REQUIRED",
+        "Add a phone number to this address so the delivery partner can call you.",
+    )
     PHONE_IN_USE = (
         "PHONE_IN_USE",
         "This phone number is linked to another account. Sign in with it instead.",

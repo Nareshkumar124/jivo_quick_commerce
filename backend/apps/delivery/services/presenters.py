@@ -90,7 +90,8 @@ def profile_body(rider: Rider, now: datetime | None = None) -> dict:
 
     return {
         "id": rider.pk,
-        "phone": rider.user.phone,
+        "phone": rider.phone_number,
+        "contact_phone": rider.contact_phone,
         "status": rider.status,
         "rejection_reason": rider.rejection_reason,
         "suspension_reason": rider.suspension_reason,

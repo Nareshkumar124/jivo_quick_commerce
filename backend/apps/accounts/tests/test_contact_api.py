@@ -4,7 +4,6 @@
 import importlib
 import sys
 from datetime import timedelta
-from decimal import Decimal
 
 import pytest
 from django.core import mail
@@ -296,35 +295,6 @@ class TestVerifyEmail:
 
 
 class TestEmailOnlyAccount:
-    def test_order_needs_a_phone(self, email_user):
-        """P8-EOTP-22: POST /orders/ refuses PHONE_REQUIRED before anything else."""
-        from apps.orders import services as order_services
-
-        with pytest.raises(ApiError) as exc:
-            order_services.place_order(
-                email_user,
-                None,
-                address_id=1,
-                payment_method="COD",
-                expected_grand_total=Decimal("100.00"),
-                idempotency_key="k" * 16,
-            )
-        assert exc.value.error_code == "PHONE_REQUIRED"
-        assert exc.value.status_code == 422
-
-    def test_order_endpoint_answers_phone_required(self, email_client):
-        from apps.stores.tests.factories import DarkStoreFactory
-
-        store = DarkStoreFactory()
-        response = email_client.post(
-            "/api/v1/orders/",
-            {"address_id": 1, "payment_method": "COD", "expected_grand_total": "100.00"},
-            format="json",
-            HTTP_X_STORE_ID=str(store.pk),
-            HTTP_IDEMPOTENCY_KEY="0b3c6f1e-8a52-4d1b-9c37-5d2a7e9f1a20",
-        )
-        assert error(response, 422)["code"] == "PHONE_REQUIRED"
-
     def test_delete_account_with_an_email_code(self, email_client, email_user, api_client):
         """P8-EOTP-23: an account without a phone confirms deletion by email OTP."""
         User.objects.filter(pk=email_user.pk).update(email=TEST_EMAIL)
@@ -426,3 +396,104 @@ class TestSettings:
 
     def test_staging_allows_them(self, deploy_env):
         assert self._load("staging").OTP_TEST_EMAILS == {"reviewer@example.com": "123456"}
+
+
+class TestEmailOnlyAccountDeletion:
+    def test_delete_with_a_real_emailed_code_while_email_login_is_off(
+        self, email_client, email_user, api_client, django_capture_on_commit_callbacks
+    ):
+        """P8-EOTP-23: the apps' public request endpoint emails a delete_account code to an
+        email-only account even with email sign-in switched off (the default)."""
+        from apps.cms.services import login_methods
+
+        assert login_methods("customer") == ["phone"]
+        with django_capture_on_commit_callbacks(execute=True):
+            response = api_client.post(
+                "/api/v1/auth/email-otp/request/",
+                {"email": EMAIL.upper(), "app": "customer", "purpose": "delete_account"},
+                format="json",
+            )
+        assert response.status_code == 200, response.content
+        assert len(mail.outbox) == 1
+        assert mail.outbox[0].to == [EMAIL]
+        code = mail.outbox[0].body.split("code is ")[1][:6]
+        response = email_client.post("/api/v1/me/delete/", {"otp": code}, format="json")
+        assert response.status_code == 200, response.content
+        email_user.refresh_from_db()
+        assert email_user.deleted_at is not None
+
+
+class TestDeleteWithEmailWhenThePhoneExists:
+    """P8-EOTP-31 (PM 2026-11-28): SMS does not deliver in production, so an account WITH a phone
+    (every rider) may confirm deletion with a code sent to its verified email."""
+
+    @pytest.fixture
+    def both(self):
+        return UserFactory(phone="+919876543210", email=EMAIL, email_verified_at=timezone.now())
+
+    def request_email_code(self, api_client, capture) -> str:
+        with capture(execute=True):
+            response = api_client.post(
+                "/api/v1/auth/email-otp/request/",
+                {"email": EMAIL, "app": "rider", "purpose": "delete_account"},
+                format="json",
+            )
+        assert response.status_code == 200, response.content
+        return mail.outbox[-1].body.split("code is ")[1][:6]
+
+    def request_phone_code(self, api_client, capture) -> str:
+        with capture(execute=True):
+            response = api_client.post(
+                "/api/v1/auth/otp/request/",
+                {"phone": "+919876543210", "app": "rider", "purpose": "delete_account"},
+                format="json",
+            )
+        assert response.status_code == 200, response.content
+        return sms.outbox[-1].body.split()[1]
+
+    def test_email_code_deletes_an_account_with_a_phone(
+        self, both, make_auth_client, api_client, django_capture_on_commit_callbacks
+    ):
+        code = self.request_email_code(api_client, django_capture_on_commit_callbacks)
+        response = make_auth_client(both, "rider").post("/api/v1/me/delete/", {"otp": code})
+        assert response.status_code == 200, response.content
+        both.refresh_from_db()
+        assert both.deleted_at is not None
+
+    def test_phone_code_still_works(
+        self, both, make_auth_client, api_client, django_capture_on_commit_callbacks
+    ):
+        code = self.request_phone_code(api_client, django_capture_on_commit_callbacks)
+        response = make_auth_client(both).post("/api/v1/me/delete/", {"otp": code})
+        assert response.status_code == 200, response.content
+
+    def test_newest_request_wins_and_a_wrong_code_counts_once(
+        self, both, make_auth_client, api_client, django_capture_on_commit_callbacks
+    ):
+        phone_code = self.request_phone_code(api_client, django_capture_on_commit_callbacks)
+        email_code = self.request_email_code(api_client, django_capture_on_commit_callbacks)
+        client = make_auth_client(both)
+        wrong = "000000" if email_code != "000000" else "111111"
+        response = client.post("/api/v1/me/delete/", {"otp": wrong})
+        assert error(response, 400)["code"] == "OTP_INVALID"
+        otps = OTPRequest.objects.filter(purpose="delete_account")
+        assert otps.get(email=EMAIL).attempts == 1
+        assert otps.exclude(email=EMAIL).get().attempts == 0
+        if phone_code != email_code:  # the older phone code is not checked meanwhile
+            response = client.post("/api/v1/me/delete/", {"otp": phone_code})
+            assert error(response, 400)["code"] == "OTP_INVALID"
+        assert client.post("/api/v1/me/delete/", {"otp": email_code}).status_code == 200
+
+    def test_unverified_email_is_not_accepted(
+        self, make_auth_client, api_client, django_capture_on_commit_callbacks
+    ):
+        user = UserFactory(phone="+919876543210", email=EMAIL, email_verified_at=None)
+        with django_capture_on_commit_callbacks(execute=True):
+            api_client.post(
+                "/api/v1/auth/email-otp/request/",
+                {"email": EMAIL, "app": "customer", "purpose": "delete_account"},
+                format="json",
+            )
+        assert mail.outbox == []  # nothing sent to an unverified address
+        response = make_auth_client(user).post("/api/v1/me/delete/", {"otp": "123456"})
+        assert error(response, 400)["code"] == "OTP_EXPIRED"

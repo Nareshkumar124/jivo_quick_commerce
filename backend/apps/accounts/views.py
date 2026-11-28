@@ -348,8 +348,9 @@ class EmailOtpRequestView(OtpThrottleMixin, _PublicView):
             "per-IP limits). The response is the same whether or not the email has an account. "
             "The email is case-insensitive.\n\n"
             "Needs email sign-in switched on for the app (`GET /auth/methods/`), else 403 "
-            "`LOGIN_METHOD_DISABLED`. With `purpose: delete_account` (for an account without a "
-            "phone) the switch does not apply and nothing is sent unless the email is the "
+            "`LOGIN_METHOD_DISABLED`. With `purpose: delete_account` (any account with a "
+            "verified email, with or without a phone) the switch does not apply and nothing "
+            "is sent unless the email is the "
             "verified email of an account; the response is identical.\n\n"
             "Fixed-OTP test emails exist only outside production."
         ),
@@ -398,12 +399,16 @@ class EmailOtpVerifyView(OtpThrottleMixin, _PublicView):
             "exactly as for phone.\n\n"
             "- **Customer app:** signs in the account whose verified email this is; otherwise "
             "creates a new customer with this email and **no phone** (`is_new_user: true`, "
-            "`user.has_phone: false`). Such a customer must add a phone "
-            "(`POST /me/phone/otp/`, `/me/phone/verify/`) before the first order. An unverified "
+            "`user.has_phone: false`). Such a customer orders with a `receiver_phone` on the "
+            "delivery address (no OTP), else `POST /orders/` answers 422 `PHONE_REQUIRED`. "
+            "An unverified "
             "copy of the email on another account (typed into a profile, never proved) is "
             "removed from that account.\n"
-            "- **Rider app:** only an existing rider whose verified email is on file; anyone "
-            "else gets 403 `EMAIL_NOT_REGISTERED` (new riders register with their phone).\n"
+            "- **Rider app** (owner decision 2026-11-28): the same. A new email creates a user "
+            "with no phone and `rider_status: NONE` (`is_new_user: true`), exactly like a new "
+            "phone sign-up: continue with `POST /rider/register/`, which then needs "
+            "`contact_phone` (the rider's mobile, no OTP). `EMAIL_NOT_REGISTERED` is no longer "
+            "returned.\n"
             "- Staff accounts cannot sign in with an email code (403 `PERMISSION_DENIED`).\n"
             "- Email sign-in switched off for the app: 403 `LOGIN_METHOD_DISABLED`."
         ),
@@ -428,6 +433,7 @@ class EmailOtpVerifyView(OtpThrottleMixin, _PublicView):
                     ("New customer (no phone yet)", ex.SESSION_NEW_EMAIL_CUSTOMER),
                     ("Returning customer", ex.SESSION_RETURNING_CUSTOMER),
                     ("Rider", ex.SESSION_RIDER_EMAIL),
+                    ("New rider (register next)", ex.SESSION_NEW_EMAIL_RIDER),
                 ),
                 400: error_response(
                     "Wrong or expired OTP, or invalid input.",
@@ -436,10 +442,9 @@ class EmailOtpVerifyView(OtpThrottleMixin, _PublicView):
                     validation_error({"otp": ["Enter the 6-digit OTP."]}),
                 ),
                 403: error_response(
-                    "Email sign-in is switched off for this app, the rider app does not know "
-                    "this email, the account is deactivated, or it is a staff account.",
+                    "Email sign-in is switched off for this app, the account is deactivated, "
+                    "or it is a staff account.",
                     LOGIN_METHOD_DISABLED_EXAMPLE,
-                    error_example(ErrorCode.EMAIL_NOT_REGISTERED),
                     error_example(ErrorCode.PERMISSION_DENIED, "This account is deactivated."),
                     error_example(
                         ErrorCode.PERMISSION_DENIED,
@@ -648,7 +653,8 @@ class MePhoneOtpView(OtpThrottleMixin, APIView):
         summary="Send an SMS OTP to add a phone number",
         description=(
             "Step 1 of adding a phone to an account that has none (an email sign-up, "
-            "`user.has_phone: false`). A customer needs a phone before the first order. Same "
+            "`user.has_phone: false`). Optional: orders only need a `receiver_phone` on the "
+            "delivery address. Same "
             "OTP rules and limits as sign-in, and not affected by the login method switch. The "
             "response never says whether another account uses the number (step 2 reports "
             "that, once the code proves the number is the caller's). An account that already "
@@ -882,9 +888,15 @@ class AccountDeleteView(OtpThrottleMixin, APIView):
         tags=["account"],
         summary="Delete my account (OTP confirmed)",
         description=(
-            "Two steps: (1) `POST /auth/otp/request/` with the user's own phone and "
-            "`purpose: delete_account`; (2) this call with that OTP. Only a `delete_account` OTP "
-            "issued to the caller's phone is accepted.\n\n"
+            "Two steps: (1) request a `delete_account` OTP, then (2) this call with that OTP.\n\n"
+            "- Account with a phone: `POST /auth/otp/request/` "
+            "`{phone, app, purpose: delete_account}` with the account's own phone (SMS).\n"
+            "- Account with a verified email (`email_verified: true`, with or without a phone; "
+            "use this while SMS does not deliver): `POST /auth/email-otp/request/` "
+            "`{email, app, purpose: delete_account}` with that email. Works even when email "
+            "sign-in is switched off.\n\n"
+            "A `delete_account` OTP issued to the caller's own phone or own verified email is "
+            "accepted (whichever was requested last).\n\n"
             "On success every refresh token of the user is revoked and their devices are "
             "deactivated: clear local data and go to the login screen. Personal data is "
             "anonymised after the grace period (`anonymise_after`, 30 days, 07 §4); order and "

@@ -246,6 +246,7 @@ Phase 5 implementation (slices 5.1/5.2, migration `delivery.0001`):
 - **Rider:**
   - `full_name` is the legal name.
   - The emergency contact is split into `emergency_contact_name` and `emergency_contact_phone`.
+  - `contact_phone` (2026-11-28, blank default): the rider's own mobile typed at registration, not OTP-verified; required by `POST /rider/register/` when the user has no login phone (email sign-up). `Rider.phone_number` = `user.phone` or `contact_phone` is the number customers and the store see. Cleared on anonymisation. Never a login identifier.
   - `preferred_store` is the store chosen at registration; `home_store` is set by ops on approval.
   - Added: `suspension_reason`, `last_heartbeat_at`, `submitted_at`, `approved_at` and `approved_by`.
   - Bank fields are `bank_account_name`, `bank_account_number_encrypted` (Fernet, `FIELD_ENCRYPTION_KEYS`), `bank_account_last4`, `ifsc`, `upi_id` and `bank_updated_at`.
