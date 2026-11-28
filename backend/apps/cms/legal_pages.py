@@ -17,7 +17,7 @@ SUPPORT_EMAIL = "info@jivo.in"
 
 _EMAIL = '<a href="mailto:info@jivo.in">info@jivo.in</a>'
 _PHONE = '<a href="tel:+918595349565">+91 8595 349 565</a>'
-_ADDRESS = "Khasra No. 20//9/2 & 10/1/2, Bhakarpur, Ganaur, District Sonipat, Haryana – 131101"
+_ADDRESS = "Khasra No. 20//9/2 &amp; 10/1/2, Bhakarpur, Ganaur, District Sonipat, Haryana – 131101"
 _UPDATED = "<p><strong>Last updated: 28 November 2026</strong></p>"
 
 TERMS_HTML = f"""{_UPDATED}

@@ -163,7 +163,7 @@ class TestLoadLegalPages:
         assert all(Page.objects.values_list("is_published", flat=True))
         terms = Page.objects.get(slug="terms")
         assert terms.title == "Terms of use"
-        assert "Jivo Mart Pvt. Ltd." in terms.body_html
+        assert "Jivo Beverages Pvt. Ltd." in terms.body_html
         assert "Done: 6 change(s) written." in out
 
     def test_is_idempotent(self):
