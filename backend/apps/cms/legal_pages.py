@@ -17,12 +17,12 @@ SUPPORT_EMAIL = "info@jivo.in"
 
 _EMAIL = '<a href="mailto:info@jivo.in">info@jivo.in</a>'
 _PHONE = '<a href="tel:+918595349565">+91 8595 349 565</a>'
-_ADDRESS = "A-35/1, Industrial Area Phase 1, Mayapuri, New Delhi – 110064"
+_ADDRESS = "Khasra No. 20//9/2 & 10/1/2, Bhakarpur, Ganaur, District Sonipat, Haryana – 131101"
 _UPDATED = "<p><strong>Last updated: 28 November 2026</strong></p>"
 
 TERMS_HTML = f"""{_UPDATED}
 <p>These terms apply to the Jivo Quick Commerce customer app and website ("the app"), run by \
-<strong>Jivo Mart Pvt. Ltd.</strong>, {_ADDRESS} ("Jivo", "we", "us"). By creating an account or \
+<strong>Jivo Beverages Pvt. Ltd.</strong>, {_ADDRESS} ("Jivo", "we", "us"). By creating an account or \
 placing an order you agree to these terms, our Privacy policy, our Refund and cancellation policy \
 and our Delivery policy.</p>
 <h2>1. Who can use the app</h2>
@@ -74,12 +74,12 @@ weather, strikes, traffic restrictions or network outages).</p>
 <p>We may update these terms. The app will show the new version and ask you to accept it when you \
 next log in.</p>
 <h2>10. Law and disputes</h2>
-<p>These terms are governed by the laws of India. Courts in New Delhi have jurisdiction. Before \
+<p>These terms are governed by the laws of India. Courts in Sonipat, Haryana have jurisdiction. Before \
 going to court, please contact us (see the Contact page) so we can try to solve the problem.</p>
 """
 
 PRIVACY_HTML = f"""{_UPDATED}
-<p>Jivo Mart Pvt. Ltd. ("Jivo", "we") runs the Jivo Quick Commerce apps. This policy explains \
+<p>Jivo Beverages Pvt. Ltd. ("Jivo", "we") runs the Jivo Quick Commerce apps. This policy explains \
 what personal data we collect, why, and your rights under the Digital Personal Data Protection \
 Act, 2023.</p>
 <h2>What we collect</h2>
@@ -125,7 +125,7 @@ is stored encrypted, and staff access is limited by role.</p>
 <h2>Children</h2>
 <p>The app is not meant for anyone under 18. We do not knowingly collect children's data.</p>
 <h2>Contact and grievance</h2>
-<p>Grievance contact, Jivo Mart Pvt. Ltd., {_ADDRESS}. Email: {_EMAIL}. Phone: {_PHONE}.</p>
+<p>Grievance contact, Jivo Beverages Pvt. Ltd., {_ADDRESS}. Email: {_EMAIL}. Phone: {_PHONE}.</p>
 """
 
 REFUND_HTML = f"""{_UPDATED}
@@ -187,7 +187,7 @@ outside India.</p>
 """
 
 CONTACT_HTML = f"""<p><strong>Jivo Quick Commerce</strong> is run by \
-<strong>Jivo Mart Pvt. Ltd.</strong><br>{_ADDRESS}</p>
+<strong>Jivo Beverages Pvt. Ltd.</strong><br>{_ADDRESS}<br>GSTIN: 06AAGCJ4460J1ZG</p>
 <ul>
 <li><strong>Orders and support:</strong> {_PHONE}</li>
 <li><strong>Email:</strong> {_EMAIL}</li>
@@ -195,13 +195,13 @@ CONTACT_HTML = f"""<p><strong>Jivo Quick Commerce</strong> is run by \
 order.</li>
 </ul>
 <p><strong>Grievance contact</strong> (Consumer Protection (E-Commerce) Rules, 2020 and DPDP Act, \
-2023): Grievance Officer, Jivo Mart Pvt. Ltd., at the address above, {_EMAIL}, {_PHONE}. We \
+2023): Grievance Officer, Jivo Beverages Pvt. Ltd., at the address above, {_EMAIL}, {_PHONE}. We \
 acknowledge complaints within 48 hours and aim to resolve them within one month.</p>
 """
 
 DELETE_ACCOUNT_HTML = f"""{_UPDATED}
 <p>This page explains how to delete your account in the <strong>Jivo Quick Commerce</strong> \
-customer app or the <strong>Jivo Rider</strong> app, run by Jivo Mart Pvt. Ltd.</p>
+customer app or the <strong>Jivo Rider</strong> app, run by Jivo Beverages Pvt. Ltd.</p>
 <h2>Delete in the app</h2>
 <ol>
 <li>Open the app and log in.</li>
