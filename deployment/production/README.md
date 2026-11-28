@@ -153,6 +153,31 @@ Public policy pages at `/legal/` and the `load_legal_pages` command, no migratio
 
 **Rollback:** `cd /srv/jqc-prod/compose && export JQCPROD_IMAGE=jqcprod-backend:2ff583f && docker compose -p jqcprod -f compose.prod.yml stop beat && docker compose -p jqcprod -f compose.prod.yml up -d web worker worker-slow beat && echo 2ff583f > DEPLOYED_SHA` (`2ff583f` was running before; use `1178306` the same way to go one further back). The policy pages and config values stay in the DB (harmless for the old code); to undo them too, restore `backups/pre-1c7724d.dump` with `pg_restore --clean`. Every compose command needs `JQCPROD_IMAGE` set, even `stop` (without it compose refuses to run).
 
+### 2026-11-28 catalog text (owner approved: launch work)
+
+Product text without health claims, from pushed `main` `eb7e93c` `data/catalog/text_only/products.csv` (columns slug, short_description, description, highlights; 33 rows; fetched from GitHub raw at that commit, sha256 matches git). Dump before: `backups/pre-catalog-text-20261128.dump` (600). File in `/srv/jqc-prod/import/catalog_text/`, copied into the web container with `docker cp` (`/tmp/catalog_text`, gone when the container is recreated). Dry run (`logs/import-catalog-text-dryrun-20261128.log`): products.csv 0 created, 33 updated, categories/variants not found. Field-level preview inside a rolled-back transaction (`logs/import-catalog-text-preview-20261128.log`): only `short_description`, `description`, `highlights` (+ `updated_at`) changed on 33 products; nothing else in categories, products, variants, price tiers, images, collections, banners or stock. Then `import_catalog --commit --yes` (`logs/import-catalog-text-commit-20261128.log`): 33 updated. A hash of every other catalog/stock field is identical before and after (`import/snapshot-before.txt`, `import/snapshot-after.txt`). Checked `sano-sunflower-oil` in the DB: new text, variant `SNO-SUN-5L` MRP/price 1475.00 unchanged, 5 images. (The public API could not show it: production has no stores yet, so every catalog call needs a store and returns `STORE_NOT_FOUND`.) **Undo:** restore `backups/pre-catalog-text-20261128.dump` with `pg_restore --clean` (also undoes anything saved after it).
+
+### 2026-11-28 all products hidden (owner instruction)
+
+Nothing deleted. Dump before: `backups/pre-hide-products-20261128.dump` (600). List of what was active before: `backups/active-products-20261128.txt` (600; 48 `product <id> <slug>` lines, 99 `variant <id> <sku>` lines). In one transaction `Product.objects.filter(is_active=True).update(is_active=False)` (48 rows; 1 product was already inactive), then the catalog cache version bumped (`apps.catalog.cache.bump_global_version`, as the app's signals do). Variants were **not** changed: the catalog API (`_visible_products()`) and the cart both check `Product.is_active`, so hiding products is enough. Result: 0 of 49 products active, `_visible_products()` 0, 99 active variants untouched (`logs/hide-products-20261128.log`). `/health/ready` 200.
+
+**Restore exactly (shows the same 48 products again):**
+```bash
+cd /srv/jqc-prod
+docker cp backups/active-products-20261128.txt jqcprod-web-1:/tmp/active-products.txt
+docker exec jqcprod-web-1 python manage.py shell -c "
+from django.db import transaction
+from apps.catalog.models import Product
+from apps.catalog.cache import bump_global_version
+ids = [int(l.split()[1]) for l in open('/tmp/active-products.txt') if l.startswith('product ')]
+with transaction.atomic():
+    n = Product.objects.filter(id__in=ids).update(is_active=True)
+    transaction.on_commit(bump_global_version)
+print('restored', n, 'of', len(ids))"
+docker exec jqcprod-web-1 rm /tmp/active-products.txt
+```
+(Variants were never changed, so nothing to restore for them.)
+
 **Next (2026-11-27):** stores/staff (step 6), backups and monitoring (step 7), SMS (P4), production Firebase (P5).
 
 **Earlier next steps (2026-11-26):** P1 domain + DNS, then the one nginx file and TLS (step 5), real data (step 6), backups
