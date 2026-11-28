@@ -1,11 +1,28 @@
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.shortcuts import redirect
 from django.urls import reverse
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.widgets import UnfoldAdminTextareaWidget
 
+from apps.accounts import roles
+from apps.cms import services as cms_services
 from apps.cms.models import FAQ, AppConfig, AppVersionPolicy, Page
+from apps.core.net import client_ip
+
+# App -> AppConfig field of its login switch (2026-11-28, email OTP). Saved only through
+# `cms.services.set_login_methods`, which audits the change.
+LOGIN_METHOD_FIELDS = {"customer": "customer_login_methods", "rider": "rider_login_methods"}
+
+
+def can_set_login_methods(user) -> bool:
+    """05 §3 "App config, global settings": Super Admin only (and superusers)."""
+    return bool(
+        user.is_active
+        and user.is_staff
+        and (user.is_superuser or user.groups.filter(name=roles.SUPER_ADMIN).exists())
+    )
 
 
 def _https_urls(overrides: dict) -> dict:
@@ -67,6 +84,16 @@ class AppConfigAdmin(ModelAdmin):
                 )
             },
         ),
+        (
+            "Login methods",
+            {
+                "fields": tuple(LOGIN_METHOD_FIELDS.values()),
+                "description": (
+                    "How people sign in to each app: phone OTP, email OTP or both. "
+                    "Phone needs SMS, which is not live yet; use Email."
+                ),
+            },
+        ),
         ("Feature flags", {"fields": ("feature_flags",)}),
         ("Record", {"fields": ("updated_at",)}),
     )
@@ -81,6 +108,36 @@ class AppConfigAdmin(ModelAdmin):
 
     def has_delete_permission(self, request, obj=None) -> bool:
         return False
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        if not can_set_login_methods(request.user):
+            fields += list(LOGIN_METHOD_FIELDS.values())
+        return fields
+
+    def save_model(self, request, obj, form, change):
+        """The login switches never go through a raw field save: the rest of the form is saved
+        with the stored values, then each changed switch goes through
+        `cms.services.set_login_methods` (audited, cache dropped)."""
+        wanted = {}
+        if obj.pk:
+            stored = (
+                AppConfig.objects.filter(pk=obj.pk).values(*LOGIN_METHOD_FIELDS.values()).first()
+            )
+            for app, field in LOGIN_METHOD_FIELDS.items():
+                if stored is None:
+                    continue
+                if getattr(obj, field) != stored[field]:
+                    wanted[app] = getattr(obj, field)
+                setattr(obj, field, stored[field])
+        super().save_model(request, obj, form, change)
+        if wanted and not can_set_login_methods(request.user):
+            raise PermissionDenied
+        for app, setting in wanted.items():
+            saved = cms_services.set_login_methods(
+                app, setting, actor=request.user, ip=client_ip(request)
+            )
+            setattr(obj, LOGIN_METHOD_FIELDS[app], getattr(saved, LOGIN_METHOD_FIELDS[app]))
 
 
 # --------------------------------------------------------------------------- P7: pages and FAQs
