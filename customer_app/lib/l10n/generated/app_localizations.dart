@@ -340,6 +340,24 @@ abstract class AppLocalizations {
   /// **'Refund Policy'**
   String get refundPolicy;
 
+  /// Link to the delivery policy page (slug delivery-policy).
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery Policy'**
+  String get deliveryPolicy;
+
+  /// Link to the contact page (slug contact): company address, phone and email.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Us'**
+  String get contactUs;
+
+  /// Link to the delete-account policy page (slug delete-account), on Account and the delete-account screen.
+  ///
+  /// In en, this message translates to:
+  /// **'How account deletion works'**
+  String get deleteAccountPolicyLink;
+
   /// Shown on login after the session ended.
   ///
   /// In en, this message translates to:
@@ -2427,12 +2445,6 @@ abstract class AppLocalizations {
   /// **'Continue shopping'**
   String get continueShopping;
 
-  /// Shown until the tracking screen exists.
-  ///
-  /// In en, this message translates to:
-  /// **'Order tracking arrives in a later update.'**
-  String get trackingComingSoon;
-
   /// Payment failed screen title.
   ///
   /// In en, this message translates to:
@@ -3608,12 +3620,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Email us'**
   String get emailSupport;
-
-  /// Help when no contact option is available.
-  ///
-  /// In en, this message translates to:
-  /// **'Support is coming soon to the app.'**
-  String get helpComingSoon;
 
   /// Help: FAQ section.
   ///

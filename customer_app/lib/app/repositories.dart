@@ -123,12 +123,11 @@ final serviceabilityRepositoryProvider = Provider<ServiceabilityRepository>(
       : ApiServiceabilityRepository(ref.watch(jivoApiProvider)),
 );
 
-/// Whether this build has a cart: the dev flavor until the cart is proven
-/// against the real backend at S3-B. Staging and prod show "cart coming
-/// soon" instead of ADD (DL-30/DL-32).
-final cartAvailableProvider = Provider<bool>(
-  (ref) => ref.watch(appEnvProvider).flavor != Flavor.prod,
-);
+/// Whether this build has a cart, orders and tracking: every flavor since
+/// the Play Store launch (2026-11-28; staging since 2026-11-13, prod was
+/// off until launch, DL-30/DL-32). Tests override it to cover the
+/// "cart coming soon" fallback.
+final cartAvailableProvider = Provider<bool>((ref) => true);
 
 /// The stand-in for the server cart and orders (`06 §2.5`, `§2.6`) for the
 /// dev flavor's `FAKE_API=true` and tests. One instance serves both
@@ -157,7 +156,7 @@ final fakeCommerceBackendProvider = Provider<FakeCommerceBackend>(
 );
 
 /// The server cart (`06 §2.5`): the API in the dev flavor, the fake with
-/// `FAKE_API=true`, nothing in staging/prod yet.
+/// `FAKE_API=true` (dev only), nothing where [cartAvailableProvider] is off.
 final cartRepositoryProvider = Provider<CartRepository>((ref) {
   if (!ref.watch(cartAvailableProvider)) {
     return const UnavailableCartRepository();
@@ -195,7 +194,7 @@ final orderHistoryRepositoryProvider = Provider<OrderHistoryRepository>((ref) {
 });
 
 /// Whether this build can show live tracking: wherever orders exist (the
-/// dev flavor today, like [cartAvailableProvider]); `GET /orders/{id}/track/`
+/// same switch as [cartAvailableProvider]); `GET /orders/{id}/track/`
 /// is bound since P5.
 final trackingAvailableProvider = Provider<bool>(
   (ref) => ref.watch(cartAvailableProvider),
@@ -231,12 +230,9 @@ final ratingRepositoryProvider = Provider<RatingRepository>((ref) {
   return ApiRatingRepository(ref.watch(jivoApiProvider));
 });
 
-/// Whether FAQs and support tickets are shown: the dev flavor (API or
-/// fakes) since the P7 support API (T-713); staging and prod show only
-/// "Call support" until it is enabled there.
-final supportAvailableProvider = Provider<bool>(
-  (ref) => ref.watch(appEnvProvider).flavor != Flavor.prod,
-);
+/// Whether FAQs and support tickets are shown: every flavor since the Play
+/// Store launch (2026-11-28; P7 support API, T-713). Tests override it.
+final supportAvailableProvider = Provider<bool>((ref) => true);
 
 /// FAQs and tickets: the API, the fake with `FAKE_API`.
 final supportRepositoryProvider = Provider<SupportRepository>((ref) {
@@ -252,11 +248,12 @@ final ticketPhotoPickerProvider = Provider<TicketPhotoPicker>(
   (ref) => ImagePickerTicketPhotoPicker(),
 );
 
-/// Whether Legal and About open in the in-app CMS viewer (dev flavor since
-/// T-713); otherwise the policy URLs from `config/app` open in the browser.
-final cmsAvailableProvider = Provider<bool>(
-  (ref) => ref.watch(appEnvProvider).flavor != Flavor.prod,
-);
+/// Whether the policy pages open in the in-app CMS viewer: every flavor
+/// since the launch policy pages are live (2026-11-28, `load_legal_pages`).
+/// A page the server lacks offers its web URL instead
+/// ([PolicyLinks.forSlug]). When false (tests), the `config/app` policy
+/// URLs open in the browser.
+final cmsAvailableProvider = Provider<bool>((ref) => true);
 
 /// CMS pages: the API, the fake with `FAKE_API`.
 final cmsRepositoryProvider = Provider<CmsRepository>((ref) {

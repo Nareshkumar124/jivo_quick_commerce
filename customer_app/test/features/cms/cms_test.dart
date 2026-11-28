@@ -1,5 +1,6 @@
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/cms/data/cms_repository.dart';
+import 'package:customer_app/features/launch/domain/launch_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jivo_core/jivo_core.dart';
@@ -116,6 +117,102 @@ void main() {
     );
     expect(find.byKey(const Key('legal-${CmsSlugs.terms}')), findsNothing);
     expect(find.text('Terms of Service'), findsOneWidget);
+  });
+
+  testWidgets('Account lists every launch policy page in the app', (
+    tester,
+  ) async {
+    await openAccount(tester, app());
+    for (final slug in [
+      CmsSlugs.terms,
+      CmsSlugs.privacy,
+      CmsSlugs.refund,
+      CmsSlugs.deliveryPolicy,
+      CmsSlugs.contact,
+      CmsSlugs.deleteAccount,
+    ]) {
+      expect(find.byKey(Key('legal-$slug')), findsOneWidget, reason: slug);
+    }
+    await openPage(tester, CmsSlugs.deliveryPolicy);
+    expect(cms.requests, [CmsSlugs.deliveryPolicy]);
+    expect(find.text('Delivery Policy'), findsWidgets);
+  });
+
+  testWidgets('a launch page the server lacks offers its /legal/ URL', (
+    tester,
+  ) async {
+    cms.pages.remove(CmsSlugs.contact);
+    final a = app();
+    a.config.config = LaunchConfig(
+      maintenance: false,
+      termsVersion: '2026-11-28',
+      policies: PolicyLinks(
+        terms: Uri.parse('https://quick.jivo.in/legal/terms/'),
+        privacy: Uri.parse('https://quick.jivo.in/legal/privacy/'),
+        refund: Uri.parse('https://quick.jivo.in/legal/refund-policy/'),
+      ),
+    );
+    await openAccount(tester, a);
+    await openPage(tester, CmsSlugs.contact);
+    expect(find.byKey(const Key('cms-fallback')), findsOneWidget);
+    await tester.tap(find.text('Open in browser'));
+    await tester.pumpAndSettle();
+    expect(a.urls.opened, [Uri.parse('https://quick.jivo.in/legal/contact/')]);
+  });
+
+  testWidgets('delete-account screen links the deletion policy page', (
+    tester,
+  ) async {
+    // Tall enough for the whole Account list: no scrolling needed.
+    tester.view.physicalSize = const Size(800, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await openAccount(tester, app());
+    final row = find.text('Delete account');
+    await Scrollable.ensureVisible(tester.element(row), alignment: 0.5);
+    await tester.pumpAndSettle();
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('delete-account-policy')));
+    await tester.pumpAndSettle();
+    expect(cms.requests, [CmsSlugs.deleteAccount]);
+    expect(find.byKey(const Key('cms-page')), findsOneWidget);
+  });
+
+  group('PolicyLinks.forSlug', () {
+    final legal = PolicyLinks(
+      terms: Uri.parse('https://quick.jivo.in/legal/terms/'),
+      privacy: Uri.parse('https://quick.jivo.in/legal/privacy/'),
+      refund: Uri.parse('https://quick.jivo.in/legal/refund-policy/'),
+    );
+
+    test('config URLs for terms, privacy and refund', () {
+      expect(legal.forSlug(CmsSlugs.terms), legal.terms);
+      expect(legal.forSlug(CmsSlugs.privacy), legal.privacy);
+      expect(legal.forSlug(CmsSlugs.refund), legal.refund);
+    });
+
+    test('siblings of a /legal/ terms URL for the other pages', () {
+      expect(
+        legal.forSlug(CmsSlugs.deliveryPolicy),
+        Uri.parse('https://quick.jivo.in/legal/delivery-policy/'),
+      );
+      expect(
+        legal.forSlug(CmsSlugs.deleteAccount),
+        Uri.parse('https://quick.jivo.in/legal/delete-account/'),
+      );
+      expect(legal.forSlug('../x'), isNull);
+    });
+
+    test('no sibling when the terms URL is not a /legal/ page', () {
+      final other = PolicyLinks(
+        terms: Uri.parse('https://jivo.in/terms'),
+        privacy: Uri.parse('https://jivo.in/privacy'),
+        refund: Uri.parse('https://jivo.in/refund'),
+      );
+      expect(other.forSlug(CmsSlugs.contact), isNull);
+      expect(other.forSlug(CmsSlugs.terms), other.terms);
+    });
   });
 
   test('unknown slug is NOT_FOUND', () async {
