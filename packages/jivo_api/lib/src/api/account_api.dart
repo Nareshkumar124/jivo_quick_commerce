@@ -353,7 +353,7 @@ class AccountApi {
   }
 
   /// Delete my account (OTP confirmed)
-  /// Two steps: (1) &#x60;POST /auth/otp/request/&#x60; with the user&#39;s own phone and &#x60;purpose: delete_account&#x60;; (2) this call with that OTP. Only a &#x60;delete_account&#x60; OTP issued to the caller&#39;s phone is accepted.  On success every refresh token of the user is revoked and their devices are deactivated: clear local data and go to the login screen. Personal data is anonymised after the grace period (&#x60;anonymise_after&#x60;, 30 days, 07 §4); order and invoice records are kept without personal data.
+  /// Two steps: (1) request a &#x60;delete_account&#x60; OTP, then (2) this call with that OTP.  - Account with a phone: &#x60;POST /auth/otp/request/&#x60; &#x60;{phone, app, purpose: delete_account}&#x60; with the account&#39;s own phone (SMS). - Account with a verified email (&#x60;email_verified: true&#x60;, with or without a phone; use this while SMS does not deliver): &#x60;POST /auth/email-otp/request/&#x60; &#x60;{email, app, purpose: delete_account}&#x60; with that email. Works even when email sign-in is switched off.  A &#x60;delete_account&#x60; OTP issued to the caller&#39;s own phone or own verified email is accepted (whichever was requested last).  On success every refresh token of the user is revoked and their devices are deactivated: clear local data and go to the login screen. Personal data is anonymised after the grace period (&#x60;anonymise_after&#x60;, 30 days, 07 §4); order and invoice records are kept without personal data.
   ///
   /// Parameters:
   /// * [accountDeleteRequest]
@@ -771,7 +771,7 @@ class AccountApi {
   }
 
   /// Send an SMS OTP to add a phone number
-  /// Step 1 of adding a phone to an account that has none (an email sign-up, &#x60;user.has_phone: false&#x60;). A customer needs a phone before the first order. Same OTP rules and limits as sign-in, and not affected by the login method switch. The response never says whether another account uses the number (step 2 reports that, once the code proves the number is the caller&#39;s). An account that already has a phone gets 400 (not changeable in v1).
+  /// Step 1 of adding a phone to an account that has none (an email sign-up, &#x60;user.has_phone: false&#x60;). Optional: orders only need a &#x60;receiver_phone&#x60; on the delivery address. Same OTP rules and limits as sign-in, and not affected by the login method switch. The response never says whether another account uses the number (step 2 reports that, once the code proves the number is the caller&#39;s). An account that already has a phone gets 400 (not changeable in v1).
   ///
   /// Parameters:
   /// * [phoneOtpSendRequest]

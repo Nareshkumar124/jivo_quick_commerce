@@ -66,7 +66,7 @@ class Me {
   @JsonKey(name: r'marketing_opt_in', required: false, includeIfNull: false)
   final bool? marketingOptIn;
 
-  /// False for an account created by email sign-in that has not added a phone yet. Customers must add one (`POST /me/phone/otp/`, `POST /me/phone/verify/`) before placing an order: `POST /orders/` answers 422 `PHONE_REQUIRED` until then.
+  /// False for an account created by email sign-in that has not added a login phone. Such a customer can still order: the delivery address needs a `receiver_phone` (no OTP); without one `POST /orders/` answers 422 `PHONE_REQUIRED`. Adding a login phone (`POST /me/phone/otp/`, `/me/phone/verify/`) is optional.
   @JsonKey(name: r'has_phone', required: true, includeIfNull: false)
   final bool hasPhone;
 

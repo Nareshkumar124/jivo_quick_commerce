@@ -63,7 +63,7 @@ class AddressRequest {
   @JsonKey(name: r'receiver_name', required: false, includeIfNull: false)
   final String? receiverName;
 
-  /// Defaults to the user's phone. Send an empty string to reset it to the user's own (copied when saved). Omit it to keep the current value; null is rejected.
+  /// Defaults to the user's phone. Send an empty string to reset it to the user's own (copied when saved). Omit it to keep the current value; null is rejected. The rider calls this number. An account without a phone (email sign-up, `has_phone: false`) must fill it to order to this address (no OTP; else `PHONE_REQUIRED`): it is stored as \"\" until then.
   @JsonKey(name: r'receiver_phone', required: false, includeIfNull: false)
   final String? receiverPhone;
 

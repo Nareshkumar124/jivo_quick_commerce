@@ -579,7 +579,7 @@ class RiderApi {
   }
 
   /// Edit my rider profile
-  /// Any registration field. PENDING_KYC and REJECTED riders may change all of them; ACTIVE and SUSPENDED riders only &#x60;emergency_contact_name&#x60; and &#x60;emergency_contact_phone&#x60; (anything else: 400 with \&quot;Contact ops\&quot;). A REJECTED rider&#39;s application returns to PENDING_KYC once nothing required is missing or rejected (the rider fixed what ops asked).
+  /// Any registration field. PENDING_KYC and REJECTED riders may change all of them; ACTIVE and SUSPENDED riders only &#x60;emergency_contact_name&#x60;, &#x60;emergency_contact_phone&#x60; and &#x60;contact_phone&#x60; (anything else: 400 with \&quot;Contact ops\&quot;). A REJECTED rider&#39;s application returns to PENDING_KYC once nothing required is missing or rejected (the rider fixed what ops asked).
   ///
   /// Parameters:
   /// * [patchedRiderProfileUpdateRequest]
@@ -1142,7 +1142,7 @@ class RiderApi {
   }
 
   /// Register as a rider
-  /// Creates the rider profile in PENDING_KYC (04 §2.2) for the signed-in user. Then upload the documents in &#x60;required_documents&#x60; and the bank details; when nothing is missing, &#x60;ready_for_review&#x60; is true and ops review the application. Once only: afterwards 409 &#x60;INVALID_STATE_TRANSITION&#x60; (edit with &#x60;PATCH /rider/me/&#x60;). The rider must be 18 or older (IST date); the emergency contact must not be the rider&#39;s own number; &#x60;vehicle_number&#x60; is required exactly for MOTORBIKE and SCOOTER.
+  /// Creates the rider profile in PENDING_KYC (04 §2.2) for the signed-in user. Then upload the documents in &#x60;required_documents&#x60; and the bank details; when nothing is missing, &#x60;ready_for_review&#x60; is true and ops review the application. Once only: afterwards 409 &#x60;INVALID_STATE_TRANSITION&#x60; (edit with &#x60;PATCH /rider/me/&#x60;). The rider must be 18 or older (IST date); the emergency contact must not be the rider&#39;s own number; &#x60;vehicle_number&#x60; is required exactly for MOTORBIKE and SCOOTER.  Email sign-up (2026-11-28): an account without a login phone (&#x60;GET /me/&#x60; &#x60;has_phone: false&#x60;) must send &#x60;contact_phone&#x60;, the rider&#39;s own mobile (no OTP), else 400 &#x60;VALIDATION_ERROR&#x60; on &#x60;contact_phone&#x60;. Customers and the store call it.
   ///
   /// Parameters:
   /// * [riderRegisterRequest]

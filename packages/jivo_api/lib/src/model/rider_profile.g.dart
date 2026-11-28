@@ -11,6 +11,8 @@ abstract class _$RiderProfileCWProxy {
 
   RiderProfile phone(String phone);
 
+  RiderProfile contactPhone(String contactPhone);
+
   RiderProfile status(RiderStatusEnum status);
 
   RiderProfile rejectionReason(String rejectionReason);
@@ -66,6 +68,7 @@ abstract class _$RiderProfileCWProxy {
   RiderProfile call({
     int id,
     String phone,
+    String contactPhone,
     RiderStatusEnum status,
     String rejectionReason,
     String suspensionReason,
@@ -103,6 +106,10 @@ class _$RiderProfileCWProxyImpl implements _$RiderProfileCWProxy {
 
   @override
   RiderProfile phone(String phone) => this(phone: phone);
+
+  @override
+  RiderProfile contactPhone(String contactPhone) =>
+      this(contactPhone: contactPhone);
 
   @override
   RiderProfile status(RiderStatusEnum status) => this(status: status);
@@ -198,6 +205,7 @@ class _$RiderProfileCWProxyImpl implements _$RiderProfileCWProxy {
   RiderProfile call({
     Object? id = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
+    Object? contactPhone = const $CopyWithPlaceholder(),
     Object? status = const $CopyWithPlaceholder(),
     Object? rejectionReason = const $CopyWithPlaceholder(),
     Object? suspensionReason = const $CopyWithPlaceholder(),
@@ -231,6 +239,10 @@ class _$RiderProfileCWProxyImpl implements _$RiderProfileCWProxy {
           ? _value.phone
           // ignore: cast_nullable_to_non_nullable
           : phone as String,
+      contactPhone: contactPhone == const $CopyWithPlaceholder()
+          ? _value.contactPhone
+          // ignore: cast_nullable_to_non_nullable
+          : contactPhone as String,
       status: status == const $CopyWithPlaceholder()
           ? _value.status
           // ignore: cast_nullable_to_non_nullable
@@ -348,6 +360,7 @@ RiderProfile _$RiderProfileFromJson(Map<String, dynamic> json) =>
           requiredKeys: const [
             'id',
             'phone',
+            'contact_phone',
             'status',
             'rejection_reason',
             'suspension_reason',
@@ -376,6 +389,7 @@ RiderProfile _$RiderProfileFromJson(Map<String, dynamic> json) =>
         final val = RiderProfile(
           id: $checkedConvert('id', (v) => (v as num).toInt()),
           phone: $checkedConvert('phone', (v) => v as String),
+          contactPhone: $checkedConvert('contact_phone', (v) => v as String),
           status: $checkedConvert(
             'status',
             (v) => $enumDecode(
@@ -481,6 +495,7 @@ RiderProfile _$RiderProfileFromJson(Map<String, dynamic> json) =>
         return val;
       },
       fieldKeyMap: const {
+        'contactPhone': 'contact_phone',
         'rejectionReason': 'rejection_reason',
         'suspensionReason': 'suspension_reason',
         'fullName': 'full_name',
@@ -506,6 +521,7 @@ Map<String, dynamic> _$RiderProfileToJson(RiderProfile instance) =>
     <String, dynamic>{
       'id': instance.id,
       'phone': instance.phone,
+      'contact_phone': instance.contactPhone,
       'status': _$RiderStatusEnumEnumMap[instance.status]!,
       'rejection_reason': instance.rejectionReason,
       'suspension_reason': instance.suspensionReason,

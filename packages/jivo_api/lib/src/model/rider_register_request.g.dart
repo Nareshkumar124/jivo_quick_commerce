@@ -15,6 +15,8 @@ abstract class _$RiderRegisterRequestCWProxy {
 
   RiderRegisterRequest emergencyContactPhone(String emergencyContactPhone);
 
+  RiderRegisterRequest contactPhone(String? contactPhone);
+
   RiderRegisterRequest preferredStoreId(int preferredStoreId);
 
   RiderRegisterRequest vehicleType(VehicleTypeEnum vehicleType);
@@ -32,6 +34,7 @@ abstract class _$RiderRegisterRequestCWProxy {
     DateTime dob,
     String emergencyContactName,
     String emergencyContactPhone,
+    String? contactPhone,
     int preferredStoreId,
     VehicleTypeEnum vehicleType,
     String? vehicleNumber,
@@ -60,6 +63,10 @@ class _$RiderRegisterRequestCWProxyImpl
       this(emergencyContactPhone: emergencyContactPhone);
 
   @override
+  RiderRegisterRequest contactPhone(String? contactPhone) =>
+      this(contactPhone: contactPhone);
+
+  @override
   RiderRegisterRequest preferredStoreId(int preferredStoreId) =>
       this(preferredStoreId: preferredStoreId);
 
@@ -83,6 +90,7 @@ class _$RiderRegisterRequestCWProxyImpl
     Object? dob = const $CopyWithPlaceholder(),
     Object? emergencyContactName = const $CopyWithPlaceholder(),
     Object? emergencyContactPhone = const $CopyWithPlaceholder(),
+    Object? contactPhone = const $CopyWithPlaceholder(),
     Object? preferredStoreId = const $CopyWithPlaceholder(),
     Object? vehicleType = const $CopyWithPlaceholder(),
     Object? vehicleNumber = const $CopyWithPlaceholder(),
@@ -105,6 +113,10 @@ class _$RiderRegisterRequestCWProxyImpl
           ? _value.emergencyContactPhone
           // ignore: cast_nullable_to_non_nullable
           : emergencyContactPhone as String,
+      contactPhone: contactPhone == const $CopyWithPlaceholder()
+          ? _value.contactPhone
+          // ignore: cast_nullable_to_non_nullable
+          : contactPhone as String?,
       preferredStoreId: preferredStoreId == const $CopyWithPlaceholder()
           ? _value.preferredStoreId
           // ignore: cast_nullable_to_non_nullable
@@ -160,6 +172,7 @@ RiderRegisterRequest _$RiderRegisterRequestFromJson(
         'emergency_contact_phone',
         (v) => v as String,
       ),
+      contactPhone: $checkedConvert('contact_phone', (v) => v as String?),
       preferredStoreId: $checkedConvert(
         'preferred_store_id',
         (v) => (v as num).toInt(),
@@ -180,6 +193,7 @@ RiderRegisterRequest _$RiderRegisterRequestFromJson(
     'fullName': 'full_name',
     'emergencyContactName': 'emergency_contact_name',
     'emergencyContactPhone': 'emergency_contact_phone',
+    'contactPhone': 'contact_phone',
     'preferredStoreId': 'preferred_store_id',
     'vehicleType': 'vehicle_type',
     'vehicleNumber': 'vehicle_number',
@@ -193,6 +207,7 @@ Map<String, dynamic> _$RiderRegisterRequestToJson(
   'dob': jivoDateToJson(instance.dob),
   'emergency_contact_name': instance.emergencyContactName,
   'emergency_contact_phone': instance.emergencyContactPhone,
+  'contact_phone': ?instance.contactPhone,
   'preferred_store_id': instance.preferredStoreId,
   'vehicle_type': _$VehicleTypeEnumEnumMap[instance.vehicleType]!,
   'vehicle_number': ?instance.vehicleNumber,
