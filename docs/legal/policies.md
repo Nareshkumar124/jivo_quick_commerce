@@ -1,6 +1,6 @@
 # Jivo Quick Commerce: policy pages (v1, 2026-11-28)
 
-Status: **published text for launch** (owner instruction 2026-11-28: create the policies, take contact details from shop.jivo.in). Jivo's legal team should still review it. Contact details come from the shop.jivo.in footer (Jivo Mart Pvt. Ltd., Mayapuri address, +91 8595 349 565, info@jivo.in). Not on shop.jivo.in and still to be added when Jivo gives them: GSTIN, FSSAI licence number, CIN, grievance officer name. The earlier `policy-pages-draft.md` is replaced by this file.
+Status: **published text for launch** (owner instruction 2026-11-28: create the policies, take contact details from shop.jivo.in). Jivo's legal team should still review it. Company: Jivo Beverages Pvt. Ltd., GSTIN 06AAGCJ4460J1ZG, Ganaur (Sonipat, Haryana), from its GST registration certificate (owner, 2026-11-28); phone and email from shop.jivo.in (+91 8595 349 565, info@jivo.in). Still to be added when Jivo gives them: FSSAI licence number, CIN, grievance officer name. The earlier `policy-pages-draft.md` is replaced by this file.
 
 Slugs (CMS `Page` rows, served in the apps at `GET /api/v1/pages/<slug>/` and on the web at `/legal/<slug>/`): `terms`, `privacy`, `refund-policy`, `delivery-policy`, `contact`, `delete-account`. The text is embedded for the server in `backend/apps/cms/legal_pages.py` and loaded with `manage.py load_legal_pages --base-url https://quick.jivo.in`; change both together.
 
@@ -12,7 +12,7 @@ Terms version: `2026-11-28`.
 
 **Last updated: 28 November 2026**
 
-These terms apply to the Jivo Quick Commerce customer app and website ("the app"), run by **Jivo Mart Pvt. Ltd.**, A-35/1, Industrial Area Phase 1, Mayapuri, New Delhi – 110064 ("Jivo", "we", "us"). By creating an account or placing an order you agree to these terms, our Privacy policy, our Refund and cancellation policy and our Delivery policy.
+These terms apply to the Jivo Quick Commerce customer app and website ("the app"), run by **Jivo Beverages Pvt. Ltd.**, Khasra No. 20//9/2 & 10/1/2, Bhakarpur, Ganaur, District Sonipat, Haryana – 131101 ("Jivo", "we", "us"). By creating an account or placing an order you agree to these terms, our Privacy policy, our Refund and cancellation policy and our Delivery policy.
 
 ### 1. Who can use the app
 You must be at least 18 years old and able to enter a binding contract under Indian law. You are responsible for keeping your login (phone number or email and the one-time code) to yourself and for all orders placed from your account.
@@ -47,7 +47,7 @@ We take care to deliver the right products in good condition. Our total liabilit
 We may update these terms. The app will show the new version and ask you to accept it when you next log in.
 
 ### 10. Law and disputes
-These terms are governed by the laws of India. Courts in New Delhi have jurisdiction. Before going to court, please contact us (see the Contact page) so we can try to solve the problem.
+These terms are governed by the laws of India. Courts in Sonipat, Haryana have jurisdiction. Before going to court, please contact us (see the Contact page) so we can try to solve the problem.
 
 ---
 
@@ -55,7 +55,7 @@ These terms are governed by the laws of India. Courts in New Delhi have jurisdic
 
 **Last updated: 28 November 2026**
 
-Jivo Mart Pvt. Ltd. ("Jivo", "we") runs the Jivo Quick Commerce apps. This policy explains what personal data we collect, why, and your rights under the Digital Personal Data Protection Act, 2023.
+Jivo Beverages Pvt. Ltd. ("Jivo", "we") runs the Jivo Quick Commerce apps. This policy explains what personal data we collect, why, and your rights under the Digital Personal Data Protection Act, 2023.
 
 ### What we collect
 - **Account:** your phone number and/or email address, name (if you give it).
@@ -85,7 +85,7 @@ Data is sent over encrypted connections (HTTPS). Sensitive rider data (such as b
 The app is not meant for anyone under 18. We do not knowingly collect children's data.
 
 ### Contact and grievance
-Grievance contact, Jivo Mart Pvt. Ltd., A-35/1, Industrial Area Phase 1, Mayapuri, New Delhi – 110064. Email: info@jivo.in. Phone: +91 8595 349 565.
+Grievance contact, Jivo Beverages Pvt. Ltd., Khasra No. 20//9/2 & 10/1/2, Bhakarpur, Ganaur, District Sonipat, Haryana – 131101. Email: info@jivo.in. Phone: +91 8595 349 565.
 
 ---
 
@@ -143,14 +143,15 @@ We deliver only with our own riders inside our delivery areas. We do not ship by
 
 ## contact: Contact us
 
-**Jivo Quick Commerce** is run by **Jivo Mart Pvt. Ltd.**
-A-35/1, Industrial Area Phase 1, Mayapuri, New Delhi – 110064
+**Jivo Quick Commerce** is run by **Jivo Beverages Pvt. Ltd.**
+Khasra No. 20//9/2 & 10/1/2, Bhakarpur, Ganaur, District Sonipat, Haryana – 131101
+GSTIN: 06AAGCJ4460J1ZG
 
 - **Orders and support:** +91 8595 349 565
 - **Email:** info@jivo.in
 - **In the app:** Account → **Help** for any question about an order.
 
-**Grievance contact** (Consumer Protection (E-Commerce) Rules, 2020 and DPDP Act, 2023): Grievance Officer, Jivo Mart Pvt. Ltd., at the address above, info@jivo.in, +91 8595 349 565. We acknowledge complaints within 48 hours and aim to resolve them within one month.
+**Grievance contact** (Consumer Protection (E-Commerce) Rules, 2020 and DPDP Act, 2023): Grievance Officer, Jivo Beverages Pvt. Ltd., at the address above, info@jivo.in, +91 8595 349 565. We acknowledge complaints within 48 hours and aim to resolve them within one month.
 
 ---
 
@@ -158,7 +159,7 @@ A-35/1, Industrial Area Phase 1, Mayapuri, New Delhi – 110064
 
 **Last updated: 28 November 2026**
 
-This page explains how to delete your account in the **Jivo Quick Commerce** customer app or the **Jivo Rider** app, run by Jivo Mart Pvt. Ltd.
+This page explains how to delete your account in the **Jivo Quick Commerce** customer app or the **Jivo Rider** app, run by Jivo Beverages Pvt. Ltd.
 
 ### Delete in the app
 1. Open the app and log in.
