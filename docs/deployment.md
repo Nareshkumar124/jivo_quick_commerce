@@ -664,9 +664,15 @@ Kept per environment in the secrets manager; never in git or in images:
 
 ### 12.2 One-time setup (needs the user; no cost)
 1. **Environment `release`** (Settings > Environments): required reviewers, "Prevent self-review", deployment branches `main` and `develop` only. Create it **before** adding secrets (a run that references a missing environment creates an unprotected one).
-2. **Upload keys:** one per app, generated offline by the key owner, never on a shared machine:
-   `keytool -genkeypair -v -keystore customer-upload.jks -keyalg RSA -keysize 4096 -validity 10000 -alias upload`
-   Keep the `.jks` and its passwords in Jivo's password manager (two people). With **Play App Signing** (recommended), Google holds the app-signing key and a lost upload key can be reset.
+2. **Upload keys: created 2026-11-28** on the PM machine, one per app, outside the repo:
+   `~/.config/jivo-quick-commerce/android-signing/<customer_app|rider_app>/upload-keystore.jks` (PKCS12, RSA 2048, 10000 days, alias `upload`, DN `CN=Jivo Mart Pvt. Ltd., O=Jivo Mart Pvt. Ltd., L=New Delhi, C=IN`) with its `key.properties` (absolute `storeFile`, store and key password the same, as PKCS12 requires) and a `README.md` beside them. **Back that folder up** to Jivo's password manager (two people). With **Play App Signing** (required for AABs), Google holds the app-signing key and a lost upload key can be reset, but that takes days. Upload certificate fingerprints (public):
+
+   | App | SHA-1 | SHA-256 |
+   |---|---|---|
+   | `in.jivo.quick` | `A6:B0:9D:4D:33:9F:8A:B4:81:98:AA:A3:26:B2:5E:16:31:4F:17:84` | `35:5D:4E:C8:B1:FD:1E:5E:03:4C:D6:0E:9A:25:2D:0B:75:32:2E:52:58:1C:25:75:ED:EE:B4:CA:8B:A3:7E:8C` |
+   | `in.jivo.rider` | `EB:D6:1F:8A:F2:58:EF:8C:1E:6F:C8:90:79:EE:97:F6:EE:A4:20:9C` | `38:A9:86:60:31:25:3D:B5:02:3D:37:93:BC:4C:67:60:49:3B:12:EE:23:5F:6D:CD:60:0A:8E:35:04:37:73:0C` |
+
+   Add these (and later the Play app-signing certificate's, from Play Console > App integrity) to the prod Firebase apps and the Google Maps key restrictions. A new key, if ever needed: `keytool -genkeypair -keystore upload-keystore.jks -storetype PKCS12 -keyalg RSA -keysize 2048 -validity 10000 -alias upload -dname "..."` with `-storepass:env`/`-keypass:env` so no password lands in shell history.
 3. **Environment secrets** in `release` (names exactly; values never in git, chat or logs):
 
    | Secret | Customer app | Rider app |
@@ -687,37 +693,45 @@ Kept per environment in the secrets manager; never in git or in images:
 
 With any of the required items missing, the "Release configuration is complete" step fails in seconds and lists each missing secret or variable by name.
 
-### 12.3 App side (owners: `flutter-customer-dev`, `flutter-rider-dev`)
-The workflow writes `<app>/android/key.properties` (gitignored) with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`. Both `android/app/build.gradle.kts` files still sign `release` with the debug key, so until they read that file the "Outputs are signed with the upload key" step fails on purpose. Needed in each app (standard Flutter pattern; keeps debug signing when the file is absent, so local `flutter run --release` still works):
+### 12.3 App side: signing in `android/app/build.gradle.kts` (done 2026-11-28)
+Both apps read `android/key.properties` (gitignored, like `*.jks`/`*.keystore`, via each `android/.gitignore`) with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`, and sign `release` with it.
+- **Prod release without the file fails** at `:app:preProdReleaseBuild` with "Prod release needs android/key.properties ... and refuses the debug key", or with "keystore in key.properties not found" when `storeFile` points nowhere. So a Play build can never be debug-signed.
+- **dev/staging release** without the file still falls back to the debug key, for local `flutter build apk --flavor dev --release` testing.
+- CI (`release-android.yml`) writes the same file from the `release` environment secrets.
 
-```kotlin
-import java.util.Properties
+### 12.3a Build a prod AAB locally (PM machine)
+From the app folder (`customer_app/` or `rider_app/`), with Flutter `C:\dev\flutter\bin\flutter`:
 
-val keystoreProperties = Properties().apply {
-    val file = rootProject.file("key.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
-}
-
-android {
-    signingConfigs {
-        create("release") {
-            if (!keystoreProperties.isEmpty) {
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-            }
-        }
-    }
-    buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName(
-                if (keystoreProperties.isEmpty) "debug" else "release",
-            )
-        }
-    }
-}
+```bash
+cp ~/.config/jivo-quick-commerce/android-signing/<app>/key.properties android/key.properties   # gitignored
+git check-ignore -v android/key.properties        # must print the android/.gitignore rule
+flutter pub get --enforce-lockfile
+flutter build appbundle --flavor prod -t lib/main_prod.dart --release \
+  --dart-define=API_BASE_URL=https://quick.jivo.in \
+  --obfuscate --split-debug-info=build/symbols
+# output: build/app/outputs/bundle/prodRelease/app-prod-release.aab
+keytool -printcert -jarfile build/app/outputs/bundle/prodRelease/app-prod-release.aab   # SHA-1/256 must match §12.2 table
 ```
+
+dart-defines (`packages/jivo_core/lib/src/env/app_env.dart`, `main_prod.dart` only calls `bootstrap(Flavor.prod)`):
+
+| Define | Prod | Notes |
+|---|---|---|
+| `API_BASE_URL` | **required**, must be `https://` | App throws `EnvConfigException` at start without it. Production origin `https://quick.jivo.in`. |
+| `SENTRY_DSN` | optional, leave out until D-19 | Empty disables Sentry. |
+| `APP_LINK_HOSTS` | optional, customer only | Comma-separated App Links hosts; empty means only `jivo://` links work. |
+| `FAKE_API` | never | Ignored for prod anyway. |
+
+Customer app only: the Google Maps key is read by Gradle from `MAPS_API_KEY` or `~/.config/jivo-quick-commerce/google-maps/android-api-key.txt` (DL-80); the build log says "Google Maps key found." Without it the app builds with manual address entry only, which is wrong for a store build. Firebase: `android/app/src/prod/google-services.json` (D-19); without it push is off.
+
+`--obfuscate --split-debug-info` keep Dart symbols out of the bundle; keep `build/symbols` and `build/app/outputs/mapping/prodRelease/mapping.txt` for Sentry/Play. Delete `android/key.properties` again when you are done if the machine is shared.
+
+### 12.3b 16 KB page-size check (Play requirement for apps targeting Android 15+)
+Every 64-bit native library (`arm64-v8a`, `x86_64`) must have its ELF `PT_LOAD` segments aligned to at least 16 KB (`0x4000`), and in APKs the uncompressed `.so` files must be zip-aligned to 16 KB.
+1. **ELF alignment in the AAB/APK:** `python infra/scripts/check_16k_alignment.py <app>/build/app/outputs/bundle/prodRelease/app-prod-release.aab` (stdlib only; reads the program headers of every `lib/*/*.so`; exit 1 if a 64-bit library is below `0x4000`). Same check by hand with the NDK: `llvm-readelf -lW lib.so | grep LOAD` (last column `0x4000` or higher). Result 2026-11-28: **all OK in both apps** (§12.6).
+2. **Zip alignment** happens when Play (bundletool) makes the APKs. To check a local APK: `C:\dev\android-sdk\build-tools\36.0.0\zipalign.exe -c -P 16 -v 4 app-prod-release.apk` (the CI APK, or a universal APK from `bundletool build-apks --mode=universal`). Neither app sets `useLegacyPackaging`/`extractNativeLibs`, so the AGP default (uncompressed, aligned) applies.
+   `release-android.yml` runs both checks (step "Native libraries are 16 KB aligned") on every release build.
+3. After a Play upload, Play Console > App bundle explorer shows "Supports 16 KB" per build; a plugin upgrade that adds a new `.so` is the usual way this breaks, so re-run step 1 for every release.
 
 ### 12.4 Runbook: cut a release build
 1. Merge the release candidate to `main` (or use `develop` for an internal-testing build).
@@ -729,6 +743,12 @@ android {
 - **Upload key compromised or lost:** with Play App Signing, request an upload key reset in Play Console, generate a new key (§12.2 step 2), replace the four `*_UPLOAD_*` secrets, and add the new certificate's SHA-1 to the Google Maps key's Android restrictions (§12.2 step 5).
 - **Sentry DSN:** replace the secret; the next build picks it up. Older builds keep the old value until users update.
 - **Google Maps API key leaked or abused:** create a new restricted key (§12.2 step 5), update `CUSTOMER_MAPS_API_KEY` and the local key file, ship a build, then delete the old key once enough users have updated (deleting it earlier breaks the map in older builds; manual address entry still works).
+
+### 12.6 Signing and 16 KB check results (2026-11-28, PM machine, test builds only)
+Flutter 3.47.9, NDK 28.2.13676358, `flutter build appbundle --flavor prod -t lib/main_prod.dart --release --dart-define=API_BASE_URL=https://quick.jivo.in` (no Maps key, no Firebase prod file, no Sentry DSN: test builds, not for Play).
+- **Without `key.properties`** (rider): fails at `:app:preProdReleaseBuild` with the expected message. PASS.
+- **With `key.properties`:** customer AAB 67.9 MB, rider AAB 68.2 MB; `keytool -printcert -jarfile` shows the upload certificates of §12.2 (customer SHA-1 `A6:B0:…:17:84`, rider SHA-1 `EB:D6:…:20:9C`). PASS.
+- **16 KB ELF alignment:** customer 18 libraries, rider 24 (adds CameraX `libimage_processing_util_jni.so`, `libsurface_util_jni.so`); every 64-bit library has `PT_LOAD` alignment `0x4000` (Flutter's `libflutter.so`/`libapp.so` `0x10000`). PASS, none to fix.
 
 ## 13. P8 drill results 2026-11-16 (staging `jqc.jivo.in`, DL-75)
 
