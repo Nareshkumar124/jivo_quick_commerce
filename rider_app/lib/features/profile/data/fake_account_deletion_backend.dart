@@ -38,6 +38,19 @@ class FakeAccountDeletionBackend implements AccountDeletionRepository {
   }
 
   @override
+  Future<OtpSent> requestDeletionOtpByEmail(String email) async {
+    calls.add('requestDeletionOtpByEmail $email');
+    await _wait();
+    _otpPending = true;
+    _failed = 0;
+    return OtpSent.fromJson(const {
+      'otp_length': 6,
+      'expires_in_seconds': 300,
+      'resend_after_seconds': 30,
+    });
+  }
+
+  @override
   Future<AccountDeletion> deleteAccount({
     required String otp,
     String? reason,

@@ -28,8 +28,8 @@ final accountDeletionRepositoryProvider = Provider<AccountDeletionRepository>((
   return ApiAccountDeletionRepository(ref.watch(jivoApiProvider));
 });
 
-/// `ApiError.rawCode` when the signed-in account has no phone to send the
-/// OTP to (never expected for a rider; shown as its own message).
+/// `ApiError.rawCode` when the signed-in account has neither a phone nor a
+/// verified email to send the OTP to (never expected for a rider).
 const noPhoneCode = 'NO_PHONE';
 
 enum DeleteAccountStep { explain, otp }
@@ -55,7 +55,8 @@ class DeleteAccountState {
   /// rule as logout (04 §2.9): the shift and the task must end first.
   final LogoutResult? blocked;
 
-  /// The phone the OTP went to (E.164).
+  /// Where the OTP went: the phone (E.164), or the verified email for an
+  /// account without a phone.
   final String? phone;
 
   /// When "Resend OTP" becomes available.
@@ -109,8 +110,15 @@ class DeleteAccountController extends Notifier<DeleteAccountState> {
       return false;
     }
     final account = ref.read(riderAccountControllerProvider);
-    final phone = account is AccountLoaded ? account.user.phone : null;
-    if (phone == null || phone.isEmpty) {
+    final user = account is AccountLoaded ? account.user : null;
+    final phone = user?.phone;
+    final email = user?.email;
+    // The server sends the delete OTP to the phone whenever the account has
+    // one, else to its verified email (accounts.delete_account).
+    final hasPhone = phone != null && phone.isNotEmpty;
+    final hasEmail =
+        user != null && user.emailVerified && email != null && email.isNotEmpty;
+    if (!hasPhone && !hasEmail) {
       state = state.copyWith(
         busy: false,
         error: const ApiError(code: ApiErrorCode.unknown, rawCode: noPhoneCode),
@@ -118,12 +126,14 @@ class DeleteAccountController extends Notifier<DeleteAccountState> {
       return false;
     }
     try {
-      final sent = await _repository.requestDeletionOtp(phone);
+      final sent = hasPhone
+          ? await _repository.requestDeletionOtp(phone)
+          : await _repository.requestDeletionOtpByEmail(email!);
       if (!ref.mounted) return false;
       state = state.copyWith(
         step: DeleteAccountStep.otp,
         busy: false,
-        phone: phone,
+        phone: hasPhone ? phone : email,
         resendAt: ref
             .read(clockProvider)()
             .add(Duration(seconds: sent.resendAfterSeconds)),

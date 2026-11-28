@@ -9,6 +9,7 @@ import '../../launch/presentation/launch_controller.dart';
 
 import 'package:jivo_core/helpers.dart';
 
+import '../domain/login_method.dart';
 import 'auth_providers.dart';
 import 'rider_account_controller.dart';
 
@@ -17,13 +18,19 @@ import 'rider_account_controller.dart';
 @immutable
 class OtpChallenge {
   const OtpChallenge({
-    required this.phone,
+    this.phone,
+    this.email,
     required this.otpLength,
     required this.resendAfterSeconds,
-  });
+  }) : assert((phone == null) != (email == null), 'phone xor email');
 
-  /// `+91XXXXXXXXXX`.
-  final String phone;
+  /// `+91XXXXXXXXXX` for an SMS code; null for an email code.
+  final String? phone;
+
+  /// The address an email code went to; null for an SMS code.
+  final String? email;
+
+  bool get isEmail => email != null;
 
   /// `otp_length` from the `OtpSent` response.
   final int otpLength;
@@ -51,6 +58,31 @@ int? retryAfterSeconds(ApiError error) {
   final value = error.details['retry_after_seconds'];
   return value is num ? value.toInt() : null;
 }
+
+// ------------------------------------------------------------ login methods
+
+/// The sign-in methods that are on for the rider app
+/// (`GET /auth/methods/?app=rider`). Any failure falls back to phone only,
+/// so login is never blocked by this call.
+final loginMethodsProvider = FutureProvider.autoDispose<List<LoginMethod>>((
+  ref,
+) async {
+  try {
+    final methods = await ref.read(authRepositoryProvider).fetchLoginMethods();
+    return methods.isEmpty ? const [LoginMethod.phone] : methods;
+  } on Object {
+    return const [LoginMethod.phone];
+  }
+});
+
+/// 403 `LOGIN_METHOD_DISABLED`: the method was switched off for the rider
+/// app (`details.methods` lists the ones that are on).
+bool isLoginMethodDisabled(ApiError error) =>
+    error.rawCode == EmailLoginErrorCodes.loginMethodDisabled;
+
+/// 403 `EMAIL_NOT_REGISTERED`: no rider has this verified email.
+bool isEmailNotRegistered(ApiError error) =>
+    error.rawCode == EmailLoginErrorCodes.emailNotRegistered;
 
 // ---------------------------------------------------------------- phone step
 
@@ -95,12 +127,44 @@ class PhoneLoginController extends Notifier<PhoneLoginState> {
       if (ref.mounted) state = const PhoneLoginState();
       return true;
     } on Object catch (e) {
-      final error = ApiError.from(e);
-      final handled = reportAppControlError(ref, error);
-      if (ref.mounted) {
-        state = PhoneLoginState(error: handled ? null : error);
-      }
+      _onRequestError(ApiError.from(e));
       return false;
+    }
+  }
+
+  /// Requests an email OTP (`POST /auth/email-otp/request/`). Returns true
+  /// when the OTP screen should open.
+  Future<bool> requestEmailOtp(String input) async {
+    final email = input.trim();
+    if (!looksLikeEmail(email) || state.submitting) return false;
+    state = const PhoneLoginState(submitting: true);
+    try {
+      final sent = await ref.read(authRepositoryProvider).requestEmailOtp(email);
+      ref
+          .read(otpChallengeProvider.notifier)
+          .set(
+            OtpChallenge(
+              email: email,
+              otpLength: sent.otpLength,
+              resendAfterSeconds: sent.resendAfterSeconds,
+            ),
+          );
+      unawaited(ref.read(analyticsProvider).logEvent('otp_requested'));
+      if (ref.mounted) state = const PhoneLoginState();
+      return true;
+    } on Object catch (e) {
+      _onRequestError(ApiError.from(e));
+      return false;
+    }
+  }
+
+  void _onRequestError(ApiError error) {
+    final handled = reportAppControlError(ref, error);
+    // The admin switched this method off meanwhile: re-read the methods so
+    // the screen offers the ones that are on.
+    if (isLoginMethodDisabled(error) && ref.mounted) ref.invalidate(loginMethodsProvider);
+    if (ref.mounted) {
+      state = PhoneLoginState(error: handled ? null : error);
     }
   }
 
@@ -205,11 +269,18 @@ class OtpController extends Notifier<OtpState> {
 
     state = state.copyWith(verifying: true, clearError: true);
     try {
-      final result = await auth.verifyOtp(
-        phoneE164: challenge.phone,
-        otp: code,
-        termsVersion: termsVersion,
-      );
+      final email = challenge.email;
+      final result = email != null
+          ? await auth.verifyEmailOtp(
+              email: email,
+              otp: code,
+              termsVersion: termsVersion,
+            )
+          : await auth.verifyOtp(
+              phoneE164: challenge.phone!,
+              otp: code,
+              termsVersion: termsVersion,
+            );
       await account.signedIn(result);
       challengeNotifier.clear();
       if (ref.mounted) state = state.copyWith(verifying: false);
@@ -225,14 +296,17 @@ class OtpController extends Notifier<OtpState> {
     if (challenge == null || state.busy) return;
     state = state.copyWith(resending: true, clearError: true);
     try {
-      final sent = await ref
-          .read(authRepositoryProvider)
-          .requestOtp(challenge.phone);
+      final auth = ref.read(authRepositoryProvider);
+      final email = challenge.email;
+      final sent = email != null
+          ? await auth.requestEmailOtp(email)
+          : await auth.requestOtp(challenge.phone!);
       ref
           .read(otpChallengeProvider.notifier)
           .set(
             OtpChallenge(
               phone: challenge.phone,
+              email: email,
               otpLength: sent.otpLength,
               resendAfterSeconds: sent.resendAfterSeconds,
             ),

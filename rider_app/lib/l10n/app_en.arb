@@ -212,6 +212,35 @@
   "loginPrivacyLink": "Privacy Policy",
   "loginGetOtp": "Get OTP",
   "loginSessionExpired": "Your session has ended. Please log in again.",
+  "loginMethodPhone": "Phone",
+  "loginMethodEmail": "Email",
+  "loginEmailSubtitle": "Enter the email on your rider account. We'll email you a one-time code.",
+  "loginEmailLabel": "Email",
+  "loginEmailHint": "name@example.com",
+  "loginEmailEmpty": "Enter your email.",
+  "loginEmailInvalid": "Enter a valid email address.",
+  "loginNewRiderPhone": "New rider? Register with your mobile number.",
+  "loginNewRiderEmailOnlyTitle": "New rider?",
+  "loginEmailNotRegistered": "This email isn't registered as a rider. Contact Jivo support at info@jivo.in or +91 8595 349 565",
+  "@loginEmailNotRegistered": {
+    "description": "EMAIL_NOT_REGISTERED and the new-rider note when only email login is on. Keep the support email and phone exact."
+  },
+  "loginNewRiderEmailOnly": "New riders can't sign up with an email. Contact Jivo support at info@jivo.in or +91 8595 349 565 to register.",
+  "loginMethodDisabled": "This way of logging in is switched off. Please use the other option shown.",
+  "loginSupportCall": "Call support",
+  "loginSupportEmail": "Email support",
+  "otpSentToEmail": "We emailed a {length}-digit code to {email}. Check your inbox and spam folder.",
+  "@otpSentToEmail": {
+    "placeholders": {
+      "length": {
+        "type": "int"
+      },
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "otpChangeEmail": "Change email",
   "otpTitle": "Enter the code",
   "otpSentTo": "We sent a {length}-digit code to {phone}.",
   "@otpSentTo": {
@@ -1513,7 +1542,7 @@
   "deleteAccountConfirm": "Delete my account",
   "deleteAccountBlockedOnline": "Go offline before you delete your account.",
   "deleteAccountBlockedTask": "Finish your current delivery before you delete your account.",
-  "deleteAccountNoPhone": "We could not read your phone number. Go back and try again.",
+  "deleteAccountNoPhone": "We could not read your phone number or email. Go back and try again.",
   "deleteAccountDoneTitle": "Account deleted",
   "deleteAccountDoneBody": "Your account will be permanently deleted on {date}. To restore it before then, log in again with the same number.",
   "@deleteAccountDoneBody": {

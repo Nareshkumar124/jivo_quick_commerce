@@ -10,6 +10,8 @@ import '../../../shared/errors/rider_error_text.dart';
 /// jivo_core's [apiErrorMessage]. Server messages are never shown.
 String authErrorText(BuildContext context, ApiError error) {
   final l10n = AppLocalizations.of(context);
+  if (isEmailNotRegistered(error)) return l10n.loginEmailNotRegistered;
+  if (isLoginMethodDisabled(error)) return l10n.loginMethodDisabled;
   switch (error.code) {
     case ApiErrorCode.otpInvalid:
       final remaining = error.details['attempts_remaining'];

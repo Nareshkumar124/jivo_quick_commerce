@@ -252,7 +252,7 @@ class _OtpStep extends StatelessWidget {
       children: [
         Text(
           l10n.deleteAccountOtpPrompt(
-            phone.isEmpty ? phone : IndianMobile.format(phone),
+            phone.startsWith('+') ? IndianMobile.format(phone) : phone,
           ),
           key: const Key('delete-account-otp-prompt'),
           style: theme.textTheme.bodyLarge,
