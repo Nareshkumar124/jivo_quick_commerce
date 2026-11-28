@@ -1,0 +1,7 @@
+{% extends "cms/legal_base.html" %}
+{% block title %}{{ page.title }}{% endblock %}
+{% block heading %}{{ page.title }}{% endblock %}
+{% block content %}
+{# body_html is sanitised to the apps.cms.html allow-list on save and again in page_body(). #}
+<article>{{ page.html|safe }}</article>
+{% endblock %}
