@@ -48,6 +48,11 @@ String apiErrorMessage(JivoCoreLocalizations l10n, ApiError error) =>
       ApiErrorCode.referralSelf => l10n.errorReferralSelf,
       ApiErrorCode.referralAlreadyApplied => l10n.errorReferralAlreadyApplied,
       ApiErrorCode.referralNotEligible => l10n.errorReferralNotEligible,
+      ApiErrorCode.loginMethodDisabled => l10n.errorLoginMethodDisabled,
+      ApiErrorCode.emailNotRegistered => l10n.errorEmailNotRegistered,
+      ApiErrorCode.phoneRequired => l10n.errorPhoneRequired,
+      ApiErrorCode.phoneInUse => l10n.errorPhoneInUse,
+      ApiErrorCode.emailInUse => l10n.errorEmailInUse,
       // Protocol errors are app bugs the user can't act on.
       ApiErrorCode.methodNotAllowed ||
       ApiErrorCode.notAcceptable ||

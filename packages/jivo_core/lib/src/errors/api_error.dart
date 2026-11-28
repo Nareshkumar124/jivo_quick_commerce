@@ -75,6 +75,22 @@ enum ApiErrorCode {
   /// program is paused).
   referralNotEligible('REFERRAL_NOT_ELIGIBLE'),
 
+  /// The sign-in method (phone or email OTP) is switched off for this app
+  /// (403); details `{app, method, methods}` (the methods to offer instead).
+  loginMethodDisabled('LOGIN_METHOD_DISABLED'),
+
+  /// Rider app email sign-in: no rider has this verified email (403).
+  emailNotRegistered('EMAIL_NOT_REGISTERED'),
+
+  /// `POST /orders/` by a customer without a phone (422).
+  phoneRequired('PHONE_REQUIRED'),
+
+  /// `me/phone/verify/`: the number belongs to another account (409).
+  phoneInUse('PHONE_IN_USE'),
+
+  /// `me/email/verify/`: the email is verified on another account (409).
+  emailInUse('EMAIL_IN_USE'),
+
   /// No connection, DNS failure, refused connection or TLS failure.
   network(null),
 

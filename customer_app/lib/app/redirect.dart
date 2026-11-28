@@ -25,6 +25,13 @@ abstract final class Routes {
   static const newAddress = '/account/addresses/new';
   static const deleteAccount = '/account/delete';
 
+  /// Add a mobile number (`me/phone/*`, SMS OTP). Pops `true` on success.
+  static const addPhone = '/account/add-phone';
+
+  /// Add or verify an email (`me/email/*`); `extra` is the email to
+  /// pre-fill. Pops `true` on success.
+  static const addEmail = '/account/add-email';
+
   /// Refer & earn: the customer's code, and entering a friend's.
   static const referral = '/account/referral';
 

@@ -14,6 +14,7 @@ class ProfileForm extends ConsumerStatefulWidget {
     required this.buttonLabel,
     this.initialName = '',
     this.initialEmail,
+    this.emailLocked = false,
     this.onSaved,
     super.key,
   });
@@ -24,6 +25,10 @@ class ProfileForm extends ConsumerStatefulWidget {
   final String buttonLabel;
   final String initialName;
   final String? initialEmail;
+
+  /// The email is the account's only sign-in (no phone): shown read-only;
+  /// the server refuses changing or clearing it.
+  final bool emailLocked;
   final VoidCallback? onSaved;
 
   @override
@@ -80,10 +85,18 @@ class _ProfileFormState extends ConsumerState<ProfileForm> {
           TextFormField(
             key: ProfileForm.emailFieldKey,
             controller: _email,
+            readOnly: widget.emailLocked,
+            enabled: !widget.emailLocked,
             keyboardType: TextInputType.emailAddress,
             autofillHints: const [AutofillHints.email],
             decoration: InputDecoration(
-              labelText: l10n.emailLabel,
+              labelText: widget.emailLocked
+                  ? l10n.emailAddressLabel
+                  : l10n.emailLabel,
+              helperText: widget.emailLocked
+                  ? l10n.emailSignInNotEditable
+                  : null,
+              helperMaxLines: 2,
               errorText: state.emailRejected ? l10n.emailCantBeUsed : null,
             ),
             validator: (value) {

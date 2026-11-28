@@ -19,6 +19,8 @@ import '../../notifications/presentation/inbox_screen.dart';
 import '../../referral/presentation/referral_controller.dart';
 import '../../referral/presentation/referral_screen.dart'
     show referralHeadlineText, referralRewardLabel;
+import '../../auth/domain/auth_models.dart';
+import '../domain/user_profile.dart';
 import 'profile_controllers.dart';
 import 'profile_form.dart';
 
@@ -68,7 +70,7 @@ class AccountScreen extends ConsumerWidget {
             JivoSpacing.xl,
           ),
           children: [
-            _ProfileHeader(name: value.name, phone: value.phone),
+            _ProfileHeader(user: value),
             const SizedBox(height: JivoSpacing.md),
             Row(
               children: [
@@ -218,11 +220,13 @@ String _maskPhone(String phone) {
   return '${phone.substring(0, 3)} ${'•' * (phone.length - 6)}$tail';
 }
 
+/// Name, mobile number and email with its state, Edit, and the ways to
+/// add what is missing (`03 §2.11`): a phone (SMS OTP), an email or its
+/// verification (email OTP).
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.name, required this.phone});
+  const _ProfileHeader({required this.user});
 
-  final String name;
-  final String phone;
+  final UserProfile user;
 
   @override
   Widget build(BuildContext context) {
@@ -230,6 +234,21 @@ class _ProfileHeader extends StatelessWidget {
     final colors = context.customerColors;
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
+    final name = user.name;
+    final hasPhone = user.hasPhone && user.phone.isNotEmpty;
+    final email = user.email;
+    Widget chip(Key key, IconData icon, String label, VoidCallback onPressed) =>
+        ActionChip(
+          key: key,
+          avatar: Icon(icon, size: 16, color: scheme.primary),
+          label: Text(label),
+          labelStyle: TextStyle(color: scheme.onPrimaryContainer),
+          backgroundColor: colors.softTint,
+          side: BorderSide.none,
+          materialTapTargetSize: MaterialTapTargetSize.padded,
+          onPressed: onPressed,
+        );
+    final muted = text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
     // Home redesign: a white card (was the green gradient band).
     return Container(
       padding: const EdgeInsets.all(JivoSpacing.lg),
@@ -267,25 +286,65 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  _maskPhone(phone),
-                  style: text.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
+                  hasPhone ? _maskPhone(user.phone) : l10n.accountNoPhone,
+                  key: const Key('account-phone'),
+                  style: muted,
                 ),
-                const SizedBox(height: JivoSpacing.sm),
-                ActionChip(
-                  key: const Key('account-edit'),
-                  avatar: Icon(
-                    Icons.edit_outlined,
-                    size: 16,
-                    color: scheme.primary,
+                if (email != null)
+                  Row(
+                    key: const Key('account-email'),
+                    children: [
+                      Flexible(
+                        child: Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: muted,
+                        ),
+                      ),
+                      if (user.emailVerified) ...[
+                        const SizedBox(width: JivoSpacing.xs),
+                        Icon(
+                          Icons.verified,
+                          size: 16,
+                          color: scheme.primary,
+                          semanticLabel: l10n.accountEmailVerified,
+                        ),
+                      ],
+                    ],
                   ),
-                  label: Text(l10n.edit),
-                  labelStyle: TextStyle(color: scheme.onPrimaryContainer),
-                  backgroundColor: colors.softTint,
-                  side: BorderSide.none,
-                  materialTapTargetSize: MaterialTapTargetSize.padded,
-                  onPressed: () => context.push(Routes.editProfile),
+                const SizedBox(height: JivoSpacing.sm),
+                Wrap(
+                  spacing: JivoSpacing.sm,
+                  children: [
+                    chip(
+                      const Key('account-edit'),
+                      Icons.edit_outlined,
+                      l10n.edit,
+                      () => context.push(Routes.editProfile),
+                    ),
+                    if (!hasPhone)
+                      chip(
+                        const Key('account-add-phone'),
+                        Icons.phone_android,
+                        l10n.addPhone,
+                        () => context.push(Routes.addPhone),
+                      ),
+                    if (email == null)
+                      chip(
+                        const Key('account-add-email'),
+                        Icons.mail_outline,
+                        l10n.addEmail,
+                        () => context.push(Routes.addEmail),
+                      )
+                    else if (!user.emailVerified)
+                      chip(
+                        const Key('account-verify-email'),
+                        Icons.mark_email_read_outlined,
+                        l10n.verifyEmailAction,
+                        () => context.push(Routes.addEmail, extra: email),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -485,19 +544,22 @@ class EditProfileScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
-                initialValue: value.phone,
-                enabled: false,
-                decoration: InputDecoration(
-                  labelText: l10n.phoneLabel,
-                  helperText: l10n.phoneNotEditable,
+              if (value.hasPhone && value.phone.isNotEmpty) ...[
+                TextFormField(
+                  initialValue: value.phone,
+                  enabled: false,
+                  decoration: InputDecoration(
+                    labelText: l10n.phoneLabel,
+                    helperText: l10n.phoneNotEditable,
+                  ),
                 ),
-              ),
-              const SizedBox(height: JivoSpacing.lg),
+                const SizedBox(height: JivoSpacing.lg),
+              ],
               ProfileForm(
                 buttonLabel: l10n.save,
                 initialName: value.name,
                 initialEmail: value.email,
+                emailLocked: value.emailLocked,
                 onSaved: () {
                   showMessage(context, l10n.profileSaved);
                   context.pop();
@@ -579,7 +641,15 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final state = ref.watch(deleteAccountProvider);
-    final phone = ref.watch(launchStateProvider).user?.phone ?? '';
+    final user = ref.watch(launchStateProvider).user;
+    // An email sign-up without a phone confirms by email (06: a
+    // `delete_account` OTP to its verified email).
+    final phone = user?.phone ?? '';
+    final byEmail =
+        phone.isEmpty &&
+        (user?.email?.isNotEmpty ?? false) &&
+        user!.emailVerified;
+    final destination = byEmail ? user.email! : phone;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.deleteAccountTitle)),
@@ -617,14 +687,19 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
               BusyButton(
                 label: l10n.sendOtpToConfirm,
                 busy: state.busy,
-                onPressed: phone.isEmpty
+                onPressed: destination.isEmpty
                     ? null
                     : () => ref
                           .read(deleteAccountProvider.notifier)
-                          .sendOtp(phone),
+                          .sendOtp(
+                            destination,
+                            method: byEmail
+                                ? LoginMethod.email
+                                : LoginMethod.phone,
+                          ),
               ),
             ] else ...[
-              Text(l10n.deleteOtpSentTo(phone)),
+              Text(l10n.deleteOtpSentTo(destination)),
               const SizedBox(height: JivoSpacing.md),
               TextField(
                 key: DeleteAccountScreen.otpFieldKey,

@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../app/launch_state.dart';
 import '../../../app/redirect.dart';
 import '../../../app/theme.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
+import '../../addresses/presentation/address_controllers.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_texts.dart';
 import '../../cart/presentation/widgets/bill_details.dart';
@@ -86,6 +88,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           );
           return;
         }
+        // An account without a phone (email sign-up): the order needs a
+        // contact number, which lives on the delivery address.
+        if (error.code == ApiErrorCode.phoneRequired) {
+          showMessage(context, describeErrorWithDetails(context, error));
+          final id = ref.read(deliveryProvider).location?.addressId;
+          if (id != null) context.push(Routes.editAddress(id));
+          return;
+        }
         // A changed total stays on screen as a notice above the payment
         // methods instead of a snackbar that is easy to miss (CA-19).
         if (priceChangeOf(error) != null) return;
@@ -132,6 +142,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ? checkout.method
         : (offered.isEmpty ? checkout.method : offered.first);
     final addressId = location?.addressId;
+    // An email sign-up without a phone must give a contact number on the
+    // delivery address before ordering (the rider and the store call it).
+    // Unknown (addresses still loading) does not block: the server answers
+    // PHONE_REQUIRED, handled above.
+    final noPhone = ref.watch(signedInUserHasPhoneProvider) == false;
+    final address = noPhone && addressId != null
+        ? ref
+              .watch(addressListProvider)
+              .value
+              ?.where((a) => a.id == addressId)
+              .firstOrNull
+        : null;
+    final needsContactPhone =
+        address != null && (address.input.receiverPhone ?? '').isEmpty;
     // The server decides (`Cart.checkout`); the order also needs a saved
     // address id and an offered method.
     // A total that can't be shown can't be paid (RD-02).
@@ -141,7 +165,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         grandTotal != null &&
         addressId != null &&
         snapshot.checkout.canPlaceOrder &&
-        offered.contains(method);
+        offered.contains(method) &&
+        !needsContactPhone;
     final blocker = snapshot.checkout.canPlaceOrder
         ? null
         : checkoutBlockerText(l10n, snapshot);
@@ -272,7 +297,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (blocker != null && !checkout.busy)
-                      CheckoutBlockerText(blocker),
+                      CheckoutBlockerText(blocker)
+                    else if (needsContactPhone && !checkout.busy) ...[
+                      CheckoutBlockerText(l10n.checkoutContactPhoneNeeded),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
+                        child: OutlinedButton.icon(
+                          key: const Key('checkout-add-contact-phone'),
+                          icon: const Icon(Icons.phone_android),
+                          label: Text(l10n.addContactPhone),
+                          onPressed: () =>
+                              context.push(Routes.editAddress(addressId!)),
+                        ),
+                      ),
+                    ],
                     if (progress != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
