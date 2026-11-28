@@ -141,6 +141,12 @@ class StaffStoreAccessInline(TabularInline):
         return False  # remove the row and add another store instead
 
 
+@admin.display(description="Email verified", boolean=True, ordering="email_verified_at")
+def email_verified_badge(obj) -> bool:
+    """Shown next to the email in the user and customer lists (email OTP sign-in, 2026-11-28)."""
+    return obj.email_verified
+
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin, ModelAdmin):
     """Every account (Super Admin only). The sidebar's "Staff users" link opens it filtered to
@@ -153,6 +159,7 @@ class UserAdmin(BaseUserAdmin, ModelAdmin):
     list_display = (
         "id",
         "email",
+        email_verified_badge,
         "phone",
         "name",
         "role_list",
@@ -500,6 +507,7 @@ class CustomerAdmin(ModelAdmin):
         "name",
         "phone",
         "email",
+        email_verified_badge,
         "status_badge",
         "cod_badge",
         "address_count",
