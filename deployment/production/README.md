@@ -178,6 +178,20 @@ docker exec jqcprod-web-1 rm /tmp/active-products.txt
 ```
 (Variants were never changed, so nothing to restore for them.)
 
+### 2026-11-28 update 6: code `01e0016` (owner approved: launch work)
+
+Email OTP login (backend, admin login switch, store-reviewer email logins, rider `contact_phone`). **Migrations (all additive):** `accounts.0010_email_otp_login`, `cms.0006_login_methods`, `delivery.0004_rider_contact_phone`. Staging and other sites checked before/after (`logs/sites-before-01e0016.txt`, `logs/sites-after-01e0016.txt`): identical status codes, `nginx -T` md5 unchanged, nginx untouched.
+
+| Step | Result |
+|---|---|
+| Env | Backup `env/backend.env.bak-20261128-email` (600). In `env/backend.env` (600): `EMAIL_BACKEND` changed from the dummy backend to `django.core.mail.backends.smtp.EmailBackend`; added `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS=true` (Gmail SMTP, values from the PM's `~/.config/jivo-quick-commerce/email/credentials.txt`, streamed over SSH, never printed); `DEFAULT_FROM_EMAIL=Jivo Quick <sender address>` (replaces `Jivo Quick Commerce <noreply@quick.jivo.in>`); `STORE_REVIEW_LOGINS` = customer reviewer email, rider reviewer email and review phone, each with its code (from `~/.config/jivo-quick-commerce/store-review/logins.txt`). |
+| Code | Pre-deploy dump `backups/pre-01e0016.dump` (600). `jqcprod-backend:01e0016` built from pushed `main` (`git -c core.autocrlf=false archive`; source `src/01e0016/`, log `logs/build-01e0016.log`). `release` (`logs/release-01e0016.log`): `check --deploy` no issues (so `accounts.E008`-`E011` pass), then the 3 migrations OK. Static copied additively. beat stopped, then web/worker/worker-slow/beat up on the new image (one beat). `compose/DEPLOYED_SHA` = `01e0016`. |
+| Login switch | `apps.cms.services.set_login_methods("customer"/"rider", "email", actor=None)` (audited as `config.login_methods`; log `logs/login-methods-20261128.log`): phone/phone → email/email. `GET /api/v1/auth/methods/?app=customer` and `?app=rider` → `{"methods":["email"]}`. |
+| Smoke | Customer reviewer: email-otp request 200, verify with its code 200 + tokens (user id 2 created, no email sent). Sender's own Gmail address: request 200, worker `accounts.send_otp_email` succeeded (`'sent'`). No other real email sent. Rider reviewer: verify with `app=rider` 200 (user id 3 created, `has_phone: false`, `rider_status: NONE`); **not registered yet**: `GET /rider/stores/` is empty (production has no stores), and `preferred_store_id` is required. Register it (contact_phone `+919999900002`) once a store exists. |
+| Verify | `/health/ready` 200; `/admin/login/` 200; Celery `celery@`/`slow@` OK; `online_payments_enabled()` False. Old images `1c7724d`, `2ff583f`, `1178306`, `a231672`, `ff30e9c`, `f1cb51e`, `56b778d` kept. |
+
+**Rollback:** `cd /srv/jqc-prod/compose && export JQCPROD_IMAGE=jqcprod-backend:1c7724d && docker compose -p jqcprod -f compose.prod.yml stop beat && docker compose -p jqcprod -f compose.prod.yml up -d web worker worker-slow beat && echo 1c7724d > DEPLOYED_SHA`. The migrations are additive, so the old code runs on the new schema; no DB restore needed (to undo the schema and the two reviewer users too, restore `backups/pre-01e0016.dump` with `pg_restore --clean`, which also drops anything saved after it). The new env lines are harmless for the old code; to undo them: `cp -p /srv/jqc-prod/env/backend.env.bak-20261128-email /srv/jqc-prod/env/backend.env`, then the `up -d` above. To switch logins back to phone without a rollback: Django admin login switch, or `set_login_methods(app, "phone")` in the web shell.
+
 **Next (2026-11-27):** stores/staff (step 6), backups and monitoring (step 7), SMS (P4), production Firebase (P5).
 
 **Earlier next steps (2026-11-26):** P1 domain + DNS, then the one nginx file and TLS (step 5), real data (step 6), backups
@@ -186,14 +200,14 @@ and monitoring (step 7). Online payment: put the Razorpay **live** keys and webh
 
 **Stop the app only (keeps DB and infra):**
 ```bash
-cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:1c7724d docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
+cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:01e0016 docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
 ```
 
 **Undo (touches only production):**
 ```bash
 cd /srv/jqc-prod/compose && JQCPROD_IMAGE=x docker compose -p jqcprod -f compose.prod.yml down   # keeps volumes
 # full removal, only if nothing is needed:
-docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d jqcprod-backend:f1cb51e jqcprod-backend:ff30e9c jqcprod-backend:a231672 jqcprod-backend:1178306 jqcprod-backend:2ff583f jqcprod-backend:1c7724d
+docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d jqcprod-backend:f1cb51e jqcprod-backend:ff30e9c jqcprod-backend:a231672 jqcprod-backend:1178306 jqcprod-backend:2ff583f jqcprod-backend:1c7724d jqcprod-backend:01e0016
 sudo rm -rf /srv/jqc-prod
 ```
 
