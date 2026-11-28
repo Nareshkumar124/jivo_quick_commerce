@@ -19,8 +19,8 @@ void main() {
     final backendCodes = ApiErrorCode.values.where((c) => c.wireValue != null);
     expect(
       backendCodes,
-      hasLength(42),
-      reason: '06 §6 + OpenAPI ErrorCodeEnum (+ REFERRAL_*, 2026-11-13)',
+      hasLength(47),
+      reason: '06 §6 + OpenAPI ErrorCodeEnum (+ REFERRAL_*, 2026-11-13; + email login codes, 2026-11-28)',
     );
 
     final specific = backendCodes.where((c) => !protocolCodes.contains(c));

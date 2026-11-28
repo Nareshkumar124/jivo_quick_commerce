@@ -4651,6 +4651,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Enter it before you place this order. You and your friend each get {reward} after it is delivered.'**
   String referralPromptBodyReward(String reward);
+
+  /// Label of the Phone / Email choice on the login screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in with'**
+  String get loginWith;
+
+  /// Login choice: phone OTP.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone'**
+  String get loginMethodPhone;
+
+  /// Login choice: email OTP.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get loginMethodEmail;
+
+  /// Login screen helper text, email sign-in.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email address to get an OTP.'**
+  String get loginSubtitleEmail;
+
+  /// Required email field label (email sign-in and adding an email).
+  ///
+  /// In en, this message translates to:
+  /// **'Email address'**
+  String get emailAddressLabel;
+
+  /// OTP screen heading, email.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your email'**
+  String get otpTitleEmail;
+
+  /// Under the OTP field when the code went by email.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t find it? Check your spam or promotions folder.'**
+  String get otpEmailSpamHint;
+
+  /// Goes back to the email entry.
+  ///
+  /// In en, this message translates to:
+  /// **'Change email'**
+  String get changeEmail;
+
+  /// Badge next to a verified email on the account screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified'**
+  String get accountEmailVerified;
+
+  /// Account screen when the user signed up by email.
+  ///
+  /// In en, this message translates to:
+  /// **'No mobile number added'**
+  String get accountNoPhone;
+
+  /// Opens the add-phone screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Add mobile number'**
+  String get addPhone;
+
+  /// Opens the add-email screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Add email'**
+  String get addEmail;
+
+  /// Opens the verify-email screen for an unverified email.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get verifyEmailAction;
+
+  /// Add-phone screen heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Add mobile number'**
+  String get addPhoneTitle;
+
+  /// Add-phone screen helper text.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll send an OTP by SMS to confirm this number.'**
+  String get addPhoneSubtitle;
+
+  /// Add/verify-email screen heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your email'**
+  String get addEmailTitle;
+
+  /// Add-email screen helper text.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll send an OTP to this email to confirm it. You can then log in with it too.'**
+  String get addEmailSubtitle;
+
+  /// Sends an OTP on the add-phone / add-email screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Send OTP'**
+  String get sendOtp;
+
+  /// Snackbar after a phone was verified.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile number added.'**
+  String get phoneAdded;
+
+  /// Snackbar after an email was verified.
+  ///
+  /// In en, this message translates to:
+  /// **'Email verified.'**
+  String get emailVerifiedMessage;
+
+  /// Helper under the locked email field of an email-only account.
+  ///
+  /// In en, this message translates to:
+  /// **'You log in with this email, so it can\'t be changed here.'**
+  String get emailSignInNotEditable;
+
+  /// Checkout blocker for a customer without a phone whose address has no receiver phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a mobile number to this address so the delivery partner can call you.'**
+  String get checkoutContactPhoneNeeded;
+
+  /// Checkout button: opens the address to add a receiver phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Add mobile number'**
+  String get addContactPhone;
+
+  /// Address form: receiver phone required for an account without a phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a mobile number so the delivery partner can reach you.'**
+  String get receiverPhoneRequired;
 }
 
 class _AppLocalizationsDelegate

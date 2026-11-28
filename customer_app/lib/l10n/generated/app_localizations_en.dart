@@ -2990,4 +2990,82 @@ class AppLocalizationsEn extends AppLocalizations {
   String referralPromptBodyReward(String reward) {
     return 'Enter it before you place this order. You and your friend each get $reward after it is delivered.';
   }
+
+  @override
+  String get loginWith => 'Log in with';
+
+  @override
+  String get loginMethodPhone => 'Phone';
+
+  @override
+  String get loginMethodEmail => 'Email';
+
+  @override
+  String get loginSubtitleEmail => 'Enter your email address to get an OTP.';
+
+  @override
+  String get emailAddressLabel => 'Email address';
+
+  @override
+  String get otpTitleEmail => 'Verify your email';
+
+  @override
+  String get otpEmailSpamHint =>
+      'Can\'t find it? Check your spam or promotions folder.';
+
+  @override
+  String get changeEmail => 'Change email';
+
+  @override
+  String get accountEmailVerified => 'Verified';
+
+  @override
+  String get accountNoPhone => 'No mobile number added';
+
+  @override
+  String get addPhone => 'Add mobile number';
+
+  @override
+  String get addEmail => 'Add email';
+
+  @override
+  String get verifyEmailAction => 'Verify';
+
+  @override
+  String get addPhoneTitle => 'Add mobile number';
+
+  @override
+  String get addPhoneSubtitle =>
+      'We\'ll send an OTP by SMS to confirm this number.';
+
+  @override
+  String get addEmailTitle => 'Add your email';
+
+  @override
+  String get addEmailSubtitle =>
+      'We\'ll send an OTP to this email to confirm it. You can then log in with it too.';
+
+  @override
+  String get sendOtp => 'Send OTP';
+
+  @override
+  String get phoneAdded => 'Mobile number added.';
+
+  @override
+  String get emailVerifiedMessage => 'Email verified.';
+
+  @override
+  String get emailSignInNotEditable =>
+      'You log in with this email, so it can\'t be changed here.';
+
+  @override
+  String get checkoutContactPhoneNeeded =>
+      'Add a mobile number to this address so the delivery partner can call you.';
+
+  @override
+  String get addContactPhone => 'Add mobile number';
+
+  @override
+  String get receiverPhoneRequired =>
+      'Enter a mobile number so the delivery partner can reach you.';
 }

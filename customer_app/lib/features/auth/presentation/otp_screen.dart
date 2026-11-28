@@ -4,16 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jivo_core/helpers.dart' show OtpAutofill;
 import 'package:jivo_core/jivo_core.dart';
 
 import '../../../app/repositories.dart';
 import '../../../app/redirect.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/state_views.dart';
+import '../domain/auth_models.dart';
 import 'auth_flow.dart';
 
-/// OTP entry with SMS autofill, resend countdown and error handling
-/// (`03 §2.2`).
+/// OTP entry with SMS autofill (phone), resend countdown and error handling
+/// (`03 §2.2`). The same screen for a code sent by email.
 class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({super.key});
 
@@ -26,11 +28,12 @@ class OtpScreen extends ConsumerStatefulWidget {
 class _OtpScreenState extends ConsumerState<OtpScreen> {
   final _otp = TextEditingController();
   bool _showIncomplete = false;
-  late final _autofill = ref.read(otpAutofillProvider);
+  late final OtpAutofill _autofill;
 
   @override
   void initState() {
     super.initState();
+    _autofill = ref.read(otpAutofillProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final challenge = ref.read(authFlowProvider).challenge;
       if (challenge != null) {
@@ -43,6 +46,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   }
 
   Future<void> _listenForSms() async {
+    if (ref.read(authFlowProvider).challenge?.method != LoginMethod.phone) {
+      return;
+    }
     final code = await _autofill.listenForCode();
     final length = ref.read(authFlowProvider).challenge?.otpLength ?? 6;
     if (!mounted || code == null || code.length != length) return;
@@ -103,6 +109,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     final countdown = ref.watch(resendCountdownProvider);
     if (challenge == null) return const Scaffold();
     final length = challenge.otpLength;
+    final byEmail = challenge.method == LoginMethod.email;
 
     return Scaffold(
       appBar: AppBar(
@@ -122,12 +129,16 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               Semantics(
                 header: true,
                 child: Text(
-                  l10n.otpTitle,
+                  byEmail ? l10n.otpTitleEmail : l10n.otpTitle,
                   style: theme.textTheme.headlineSmall,
                 ),
               ),
               const SizedBox(height: JivoSpacing.sm),
-              Text(l10n.otpSentTo(length, challenge.phone)),
+              Text(l10n.otpSentTo(length, challenge.destination)),
+              if (byEmail) ...[
+                const SizedBox(height: JivoSpacing.xs),
+                Text(l10n.otpEmailSpamHint, style: theme.textTheme.bodySmall),
+              ],
               const SizedBox(height: JivoSpacing.xl),
               TextField(
                 key: OtpScreen.otpFieldKey,
@@ -172,7 +183,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   ref.read(authFlowProvider.notifier).reset();
                   context.go(Routes.login);
                 },
-                child: Text(l10n.changeNumber),
+                child: Text(byEmail ? l10n.changeEmail : l10n.changeNumber),
               ),
             ],
           ),

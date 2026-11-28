@@ -96,6 +96,27 @@ final signedInUserIdProvider = NotifierProvider<SignedInUserId, int?>(
   SignedInUserId.new,
 );
 
+/// Whether the signed-in user has a phone; null when signed out or not
+/// loaded. False for an email sign-up that has not added one: checkout then
+/// needs a contact number on the address. Rebuilds on any user change.
+class SignedInUserHasPhone extends Notifier<bool?> {
+  @override
+  bool? build() {
+    final launch = ref.watch(launchStateProvider);
+    void sync() {
+      final value = launch.user?.hasPhone;
+      if (value != state) state = value;
+    }
+
+    launch.addListener(sync);
+    ref.onDispose(() => launch.removeListener(sync));
+    return launch.user?.hasPhone;
+  }
+}
+
+final signedInUserHasPhoneProvider =
+    NotifierProvider<SignedInUserHasPhone, bool?>(SignedInUserHasPhone.new);
+
 final launchStateProvider = Provider<LaunchState>((ref) {
   final state = LaunchState(
     onboardingSeen: ref.watch(appFlagsProvider).onboardingSeen,
