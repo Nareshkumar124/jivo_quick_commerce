@@ -158,5 +158,10 @@ const _$ErrorCodeEnumEnumMap = {
   ErrorCodeEnum.REFERRAL_SELF: 'REFERRAL_SELF',
   ErrorCodeEnum.REFERRAL_ALREADY_APPLIED: 'REFERRAL_ALREADY_APPLIED',
   ErrorCodeEnum.REFERRAL_NOT_ELIGIBLE: 'REFERRAL_NOT_ELIGIBLE',
+  ErrorCodeEnum.LOGIN_METHOD_DISABLED: 'LOGIN_METHOD_DISABLED',
+  ErrorCodeEnum.EMAIL_NOT_REGISTERED: 'EMAIL_NOT_REGISTERED',
+  ErrorCodeEnum.PHONE_REQUIRED: 'PHONE_REQUIRED',
+  ErrorCodeEnum.PHONE_IN_USE: 'PHONE_IN_USE',
+  ErrorCodeEnum.EMAIL_IN_USE: 'EMAIL_IN_USE',
   ErrorCodeEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

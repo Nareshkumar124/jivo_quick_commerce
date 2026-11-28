@@ -119,7 +119,7 @@ class Address {
   @JsonKey(name: r'is_default', required: true, includeIfNull: false)
   final bool isDefault;
 
-  /// True when the pin is inside an active store's service area (open or not), checked on every read. An unserviceable address can be saved but not used for an order: show it flagged (03 §2.4). Added in Phase 2.
+  /// True when an active store (open or not) delivers to the address, checked on every read: the pin is inside its service area or, for a store that delivers by pincode (ADR 0004), the address pincode is one of its active pincodes. An unserviceable address can be saved but not used for an order: show it flagged (03 §2.4). Added in Phase 2.
   @JsonKey(name: r'is_serviceable', required: true, includeIfNull: false)
   final bool isServiceable;
 

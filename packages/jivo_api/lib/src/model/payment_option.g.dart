@@ -156,6 +156,7 @@ const _$PaymentUnavailableReasonEnumEnumMap = {
   PaymentUnavailableReasonEnum.COD_DISABLED: 'COD_DISABLED',
   PaymentUnavailableReasonEnum.ABOVE_LIMIT: 'ABOVE_LIMIT',
   PaymentUnavailableReasonEnum.NOT_ALLOWED: 'NOT_ALLOWED',
+  PaymentUnavailableReasonEnum.ONLINE_DISABLED: 'ONLINE_DISABLED',
   PaymentUnavailableReasonEnum.unknownDefaultOpenApi:
       'unknown_default_open_api',
 };

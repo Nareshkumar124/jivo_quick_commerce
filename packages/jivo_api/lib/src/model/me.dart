@@ -30,6 +30,16 @@ class Me {
 
     this.marketingOptIn,
 
+    required this.hasPhone,
+
+    required this.emailVerified,
+
+    this.businessCategory,
+
+    required this.businessCategoryName,
+
+    this.businessName,
+
     required this.isProfileComplete,
 
     required this.riderStatus,
@@ -40,11 +50,11 @@ class Me {
   @JsonKey(name: r'id', required: true, includeIfNull: false)
   final int id;
 
-  /// Login phone. Not editable in v1.
+  /// Login phone. Null for an email sign-up until a phone is added with `POST /me/phone/verify/`; never changed once set (v1).
   @JsonKey(name: r'phone', required: true, includeIfNull: true)
   final String? phone;
 
-  /// Required to complete the profile. Cannot be blanked.
+  /// Cannot be blanked once sent. Empty after a skipped profile.
   @JsonKey(name: r'name', required: true, includeIfNull: false)
   final String name;
 
@@ -56,7 +66,27 @@ class Me {
   @JsonKey(name: r'marketing_opt_in', required: false, includeIfNull: false)
   final bool? marketingOptIn;
 
-  /// False until a name is set: show the complete-profile screen.
+  /// False for an account created by email sign-in that has not added a phone yet. Customers must add one (`POST /me/phone/otp/`, `POST /me/phone/verify/`) before placing an order: `POST /orders/` answers 422 `PHONE_REQUIRED` until then.
+  @JsonKey(name: r'has_phone', required: true, includeIfNull: false)
+  final bool hasPhone;
+
+  /// True when `email` was proved with an email code, so it works for email sign-in. Changing `email` with PATCH makes it false again (verify with `POST /me/email/otp/`).
+  @JsonKey(name: r'email_verified', required: true, includeIfNull: false)
+  final bool emailVerified;
+
+  /// Optional. An id from `GET /business-categories/` (active only). Null removes it. Re-sending the user's current category is accepted even if it was deactivated since.
+  @JsonKey(name: r'business_category', required: false, includeIfNull: false)
+  final int? businessCategory;
+
+  /// The chosen category's name, for display. Null when none.
+  @JsonKey(name: r'business_category_name', required: true, includeIfNull: true)
+  final String? businessCategoryName;
+
+  /// Optional shop / business name. An empty string removes it.
+  @JsonKey(name: r'business_name', required: false, includeIfNull: false)
+  final String? businessName;
+
+  /// Always true for riders and staff. Otherwise false only for a new user who has (PATCH `/me/` with `name`, `business_category` or `business_name`) nor skipped (`POST /me/profile-prompt/skip/`) the complete-profile screen: show that screen while it is false. Accounts created before 2026-11-26 are always true.
   @JsonKey(name: r'is_profile_complete', required: true, includeIfNull: false)
   final bool isProfileComplete;
 
@@ -81,6 +111,11 @@ class Me {
           other.name == name &&
           other.email == email &&
           other.marketingOptIn == marketingOptIn &&
+          other.hasPhone == hasPhone &&
+          other.emailVerified == emailVerified &&
+          other.businessCategory == businessCategory &&
+          other.businessCategoryName == businessCategoryName &&
+          other.businessName == businessName &&
           other.isProfileComplete == isProfileComplete &&
           other.riderStatus == riderStatus &&
           other.createdAt == createdAt;
@@ -92,6 +127,11 @@ class Me {
       name.hashCode +
       (email == null ? 0 : email.hashCode) +
       marketingOptIn.hashCode +
+      hasPhone.hashCode +
+      emailVerified.hashCode +
+      (businessCategory == null ? 0 : businessCategory.hashCode) +
+      (businessCategoryName == null ? 0 : businessCategoryName.hashCode) +
+      businessName.hashCode +
       isProfileComplete.hashCode +
       riderStatus.hashCode +
       createdAt.hashCode;
