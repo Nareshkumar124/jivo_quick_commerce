@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
+import 'package:customer_app/features/cms/data/cms_repository.dart';
 import 'package:customer_app/features/launch/data/config_repository.dart';
 import 'package:customer_app/features/launch/domain/launch_config.dart';
 import 'package:customer_app/features/orders/domain/order.dart';
@@ -172,7 +173,7 @@ void main() {
       expect(find.text('Email us'), findsNothing);
     });
 
-    testWidgets('email only: the row shows and "coming soon" does not', (
+    testWidgets('email only: the row shows, and the policy pages', (
       tester,
     ) async {
       final a = app(available: false);
@@ -180,7 +181,32 @@ void main() {
       await openHelp(tester, a);
       expect(find.byKey(const Key('help-call')), findsNothing);
       expect(find.byKey(const Key('help-email')), findsOneWidget);
-      expect(find.text('Support is coming soon to the app.'), findsNothing);
+      for (final slug in ['contact', 'delivery-policy', 'refund-policy']) {
+        expect(find.byKey(Key('help-page-$slug')), findsOneWidget);
+      }
+    });
+
+    testWidgets('no contacts at all: still the contact and policy pages', (
+      tester,
+    ) async {
+      final cms = FakeCmsRepository();
+      final a = TestApp(
+        tokens: signedInTokens,
+        commerce: backend,
+        extraOverrides: [
+          supportAvailableProvider.overrideWithValue(false),
+          cmsRepositoryProvider.overrideWithValue(cms),
+        ],
+      );
+      a.config.config = contacts();
+      await openHelp(tester, a);
+      expect(find.byKey(const Key('help-call')), findsNothing);
+      expect(find.byKey(const Key('help-email')), findsNothing);
+      await tester.tap(find.byKey(const Key('help-page-contact')));
+      await tester.pumpAndSettle();
+      expect(cms.requests, ['contact']);
+      expect(find.byKey(const Key('cms-page')), findsOneWidget);
+      expect(find.text('Contact Us'), findsWidgets);
     });
 
     testWidgets('new ticket without an order: validation, then the thread', (

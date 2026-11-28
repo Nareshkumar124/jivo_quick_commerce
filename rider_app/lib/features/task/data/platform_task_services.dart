@@ -81,7 +81,7 @@ class GeolocatorCurrentLocation implements CurrentLocationReader {
 }
 
 /// Rings through the Phase 0 offer channel (alarm stream, insistent,
-/// full-screen intent over the lock screen).
+/// a tap opens it over the lock screen).
 class NotificationOfferAlerter implements OfferAlerter {
   const NotificationOfferAlerter(
     this._alerts, {
@@ -103,7 +103,7 @@ class NotificationOfferAlerter implements OfferAlerter {
   }) async {
     if (inForeground) {
       // The offer screen is in front: ring in the app, no heads-up on top
-      // of it. Cancelling keeps the lock-screen flags (a full-screen launch
+      // of it. Cancelling keeps the lock-screen flags (a launch from the alert
       // still shows the offer over the lock screen).
       try {
         await _alerts.cancelOffer();

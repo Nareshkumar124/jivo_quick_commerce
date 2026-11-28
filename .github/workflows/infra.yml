@@ -110,8 +110,8 @@ jobs:
       - name: Ruff (infra Python)
         working-directory: backend
         run: |
-          uv run ruff check --config pyproject.toml ../infra/backup ../infra/monitoring ../infra/scripts/osv_gate.py
-          uv run ruff format --config pyproject.toml --check ../infra/backup ../infra/monitoring ../infra/scripts/osv_gate.py
+          uv run ruff check --config pyproject.toml ../infra/backup ../infra/monitoring ../infra/scripts/osv_gate.py ../infra/scripts/check_16k_alignment.py
+          uv run ruff format --config pyproject.toml --check ../infra/backup ../infra/monitoring ../infra/scripts/osv_gate.py ../infra/scripts/check_16k_alignment.py
 
       - name: Monitoring catalog, alerts and runbook anchors
         working-directory: backend

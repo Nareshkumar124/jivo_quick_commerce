@@ -16,7 +16,7 @@ import 'push_guard_store.dart';
 ///
 /// A message with a `notification` part is shown by the system on its
 /// channel. A **data-only** `offer.new` is the server's way to ring the
-/// rider (04 §2.4): it rings the full-screen offer alarm (the same
+/// rider (04 §2.4): it rings the offer alarm (the same
 /// notification the in-app path uses, so the two replace each other instead
 /// of stacking). `offer.withdrawn` / `offer.expired`, with or without text,
 /// remove the alarm. Tapping the alarm starts the app, which fetches the

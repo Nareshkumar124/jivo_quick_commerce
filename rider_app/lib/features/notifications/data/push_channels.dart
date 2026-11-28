@@ -9,7 +9,7 @@ import 'dart:convert';
 /// Two other channels exist and are not push channels: the location
 /// service's "You're online" channel (`rider_online`, owned by the
 /// foreground service) and the in-app offer alarm (`offer_alerts_v1`, alarm
-/// stream, full-screen intent; [OfferAlertNotifications]). Push never
+/// stream, heads-up; [OfferAlertNotifications]). Push never
 /// touches either.
 ///
 /// A channel's importance can't be changed once it exists on a device: to

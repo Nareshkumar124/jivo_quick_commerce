@@ -12,6 +12,7 @@ import '../../../shared/widgets/primary_action_bar.dart';
 import '../../../shared/widgets/sensitive_number_field.dart';
 import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/logout_button.dart';
+import '../../legal/presentation/account_menu_button.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../domain/onboarding_forms.dart';
 import '../domain/registration_draft_store.dart';
@@ -198,7 +199,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.registerTitle),
-        actions: const [LogoutButton()],
+        actions: const [AccountMenuButton(), LogoutButton()],
       ),
       body: Column(
         children: [

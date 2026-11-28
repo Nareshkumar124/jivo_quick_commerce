@@ -13,6 +13,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Jivo Rider';
 
   @override
+  String homeVersionLabel(String version) {
+    return 'Version $version';
+  }
+
+  @override
   String homeBuildLabel(String flavor) {
     return 'Build: $flavor';
   }
@@ -70,13 +75,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'So you hear new orders and see that you are online.';
 
   @override
-  String get gateStepBattery => 'No battery restrictions';
-
-  @override
-  String get gateStepBatteryHint =>
-      'So your phone does not stop the app while you ride.';
-
-  @override
   String get gateStepGps => 'GPS on';
 
   @override
@@ -104,23 +102,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gateActionNotifications => 'Allow notifications';
 
   @override
-  String get gateActionBattery => 'Remove battery restriction';
-
-  @override
   String get gateActionGps => 'Turn on GPS';
 
   @override
   String get gateActionOpenSettings => 'Open settings';
 
   @override
-  String get fullScreenIntentTitle => 'Full-screen order alerts';
+  String get batteryTipTitle => 'Tip: stop battery saver closing the app';
 
   @override
-  String get fullScreenIntentBody =>
-      'Allow full-screen alerts so new orders show even when your phone is locked.';
+  String get batteryTipBody =>
+      'Some phones close apps to save battery, and you may miss orders. Open the battery list, find Jivo Rider and choose \"Don\'t optimise\" or \"Unrestricted\". This is optional: you can go online without it.';
 
   @override
-  String get fullScreenIntentAction => 'Allow full-screen alerts';
+  String get batteryTipAction => 'Open battery settings';
+
+  @override
+  String get batteryTipSkip => 'Skip';
 
   @override
   String get oemTitle => 'Keep Jivo Rider running';
@@ -193,7 +191,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get offerChannelDescription =>
-      'Rings and opens full screen when a new order is offered to you.';
+      'Rings and shows an alert when a new order is offered to you.';
 
   @override
   String get pushChannelOffersName => 'Offer notifications';
@@ -2450,4 +2448,82 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapTitleOffer => 'Map: you and the store';
+
+  @override
+  String get accountMenuTooltip => 'More options';
+
+  @override
+  String get policyTermsOfUse => 'Terms of use';
+
+  @override
+  String get policyPrivacy => 'Privacy policy';
+
+  @override
+  String get deleteAccountTitle => 'Delete account';
+
+  @override
+  String get deleteAccountEntrySubtitle =>
+      'Permanently delete your Jivo Rider account';
+
+  @override
+  String get deleteAccountWarningTitle => 'Before you delete your account';
+
+  @override
+  String get deleteAccountWhatDeleted =>
+      'Your name, phone number, bank details, vehicle details, emergency contact and location history will be deleted. Your KYC documents are deleted once the period required by law ends.';
+
+  @override
+  String get deleteAccountGrace =>
+      'You have 30 days to change your mind. Log in again with the same number within 30 days to restore your account. After that, deletion is permanent.';
+
+  @override
+  String get deleteAccountKept =>
+      'Some records must be kept by law, such as completed deliveries, earnings, payouts and cash deposits. They are kept without your personal details.';
+
+  @override
+  String get deleteAccountCashAdvice =>
+      'Deposit any cash you are holding and check your payouts before you delete your account.';
+
+  @override
+  String get deleteAccountLearnMore => 'Read more about account deletion';
+
+  @override
+  String get deleteAccountSendOtp => 'Send OTP to confirm';
+
+  @override
+  String deleteAccountOtpPrompt(String phone) {
+    return 'Enter the 6-digit OTP we sent to $phone to confirm deletion.';
+  }
+
+  @override
+  String get deleteAccountOtpLabel => 'OTP';
+
+  @override
+  String get deleteAccountOtpTooShort => 'Enter the 6-digit OTP.';
+
+  @override
+  String get deleteAccountConfirm => 'Delete my account';
+
+  @override
+  String get deleteAccountBlockedOnline =>
+      'Go offline before you delete your account.';
+
+  @override
+  String get deleteAccountBlockedTask =>
+      'Finish your current delivery before you delete your account.';
+
+  @override
+  String get deleteAccountNoPhone =>
+      'We could not read your phone number. Go back and try again.';
+
+  @override
+  String get deleteAccountDoneTitle => 'Account deleted';
+
+  @override
+  String deleteAccountDoneBody(String date) {
+    return 'Your account will be permanently deleted on $date. To restore it before then, log in again with the same number.';
+  }
+
+  @override
+  String get deleteAccountDoneOk => 'OK';
 }

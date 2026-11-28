@@ -12,6 +12,7 @@ import '../../../shared/widgets/dev_tools_button.dart';
 import '../../../shared/widgets/resume_listener.dart';
 import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/logout_button.dart';
+import '../../legal/presentation/account_menu_button.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../../launch/presentation/blocking_message.dart';
 import '../../launch/presentation/launch_controller.dart';
@@ -93,7 +94,7 @@ class _RiderStatusScreenState extends ConsumerState<RiderStatusScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(l10n.appTitle),
-          actions: const [LogoutButton()],
+          actions: const [AccountMenuButton(), LogoutButton()],
         ),
         body: BlockingMessage(
           icon: icon,

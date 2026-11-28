@@ -20,13 +20,21 @@
     <!-- Android 13+: needed to show the "You're online" and offer notifications. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Battery-optimisation exemption (04 §3). Play reviews this permission. -->
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-
-    <!-- Offer alerts (04 §2.4): full-screen intent + ringtone/vibration.
-         Android 14+: Play revokes USE_FULL_SCREEN_INTENT by default for apps
-         that are not calling/alarm apps; the app checks it at runtime. -->
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Google Play launch (2026-11-28): two permissions Play restricts are
+         never requested and are stripped if a plugin merges them in.
+         - REQUEST_IGNORE_BATTERY_OPTIMIZATIONS: delivery apps are not on
+           Play's allowed list. Battery optimisation is an optional tip that
+           opens the system list (ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS,
+           no permission needed); it never blocks going online.
+         - USE_FULL_SCREEN_INTENT: only for calling and alarm apps. Offers
+           ring as a max-importance heads-up notification with alarm sound
+           and vibration on the offer channel (04 §2.4). -->
+    <uses-permission
+        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.USE_FULL_SCREEN_INTENT"
+        tools:node="remove" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Location runs only while the rider is online, so the service is never

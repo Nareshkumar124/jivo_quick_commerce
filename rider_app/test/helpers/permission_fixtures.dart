@@ -9,7 +9,6 @@ const freshInstall = PermissionSnapshot(
   notifications: Grant.denied,
   batteryOptimisationIgnored: false,
   gpsEnabled: false,
-  fullScreenIntentAllowed: true,
 );
 
 /// Android 14 phone with every gate item done.

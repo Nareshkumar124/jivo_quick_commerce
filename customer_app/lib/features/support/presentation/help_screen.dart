@@ -9,13 +9,15 @@ import '../../../app/redirect.dart';
 import '../../../app/repositories.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/widgets/state_views.dart';
+import '../../cms/data/cms_repository.dart';
+import '../../cms/presentation/policy_links.dart';
 import '../domain/support_models.dart';
 import 'support_controllers.dart';
 
 /// Help & support (`03 §2.11`, screen #31; P7 API since T-713): call
 /// or email support, "Get help with an order", my tickets and the FAQs.
-/// Where [supportAvailableProvider] is false (staging/prod for now) only
-/// the call and email options show.
+/// Contact, delivery and refund policy pages are always listed. Where
+/// [supportAvailableProvider] is false (tests) tickets and FAQs are hidden.
 class HelpScreen extends ConsumerWidget {
   const HelpScreen({super.key});
 
@@ -73,10 +75,23 @@ class HelpScreen extends ConsumerWidget {
                     .read(urlOpenerProvider)
                     .open(Uri(scheme: 'mailto', path: email)),
               ),
-            if (!available && phone == null && email == null)
-              Padding(
-                padding: const EdgeInsets.all(JivoSpacing.gutter),
-                child: Text(l10n.helpComingSoon),
+            // The policy pages people look for from Help (Play Store
+            // launch): contact details, delivery and refund rules.
+            for (final (label, slug, icon) in [
+              (l10n.contactUs, CmsSlugs.contact, Icons.contact_mail_outlined),
+              (
+                l10n.deliveryPolicy,
+                CmsSlugs.deliveryPolicy,
+                Icons.local_shipping_outlined,
+              ),
+              (l10n.refundPolicy, CmsSlugs.refund, Icons.currency_rupee),
+            ])
+              ListTile(
+                key: Key('help-page-$slug'),
+                leading: Icon(icon),
+                title: Text(label),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => openPolicyPage(context, ref, slug),
               ),
             if (available) ...[
               const Divider(),

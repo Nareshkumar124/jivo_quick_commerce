@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
+import 'package:jivo_core/jivo_core.dart' show Flavor;
 
 import '../../../app/env.dart';
 import '../../../app/providers.dart';
@@ -41,8 +42,12 @@ class HomeScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final work = ref.watch(riderWorkActiveProvider);
 
+    // Dev and staging name the build; prod (Play) shows only the app
+    // version, which support asks for (Play launch, 2026-11-28).
     final buildLabel = Text(
-      l10n.homeBuildLabel(env.flavor.name),
+      env.flavor == Flavor.prod
+          ? l10n.homeVersionLabel(ref.watch(clientInfoProvider).appVersion)
+          : l10n.homeBuildLabel(env.flavor.name),
       key: const Key('home-flavor'),
       textAlign: TextAlign.center,
       style: theme.textTheme.bodySmall,

@@ -293,3 +293,92 @@ def invalidate_faqs(sender, instance=None, **kwargs) -> None:
     from apps.accounts.choices import AppName
 
     _drop_content_cache([FAQ_CACHE_KEY.format(app=app) for app in AppName.values])
+
+
+# --------------------------------------------------------------------------- launch policy pages
+
+
+@dataclass(frozen=True)
+class LegalChange:
+    """One row or field `load_legal_pages` creates or changes (`action`: create/update/same)."""
+
+    target: str
+    action: str
+    detail: str = ""
+
+
+def legal_page_urls(base_url: str) -> dict[str, str]:
+    """`AppConfig` policy URL fields -> the public `/legal/<slug>/` pages under `base_url`."""
+    base = base_url.rstrip("/")
+    return {
+        "terms_url": f"{base}/legal/terms/",
+        "privacy_url": f"{base}/legal/privacy/",
+        "refund_url": f"{base}/legal/refund-policy/",
+    }
+
+
+def load_legal_pages(*, base_url: str | None = None, dry_run: bool = False) -> list[LegalChange]:
+    """Upsert the launch policy pages (published) from `apps.cms.legal_pages`; with
+    `base_url` also point `AppConfig` support contacts, policy URLs and `terms_version` at them.
+
+    Idempotent: a second run reports every row as `same` and writes nothing. Saves go through
+    `Model.save()`, so pages are sanitised and the page/config caches are dropped. `dry_run`
+    computes the same changes and writes nothing.
+    """
+    from apps.cms.html import sanitize_html
+    from apps.cms.legal_pages import (
+        LEGAL_PAGES,
+        SUPPORT_EMAIL,
+        SUPPORT_PHONE,
+        TERMS_VERSION,
+        page_html,
+    )
+    from apps.cms.models import Page
+
+    changes: list[LegalChange] = []
+    with transaction.atomic():
+        for slug, (title, _) in LEGAL_PAGES.items():
+            body = sanitize_html(page_html(slug, base_url))
+            page = Page.objects.select_for_update().filter(slug=slug).first()
+            if page is None:
+                changes.append(LegalChange(f"page {slug}", "create", title))
+                if not dry_run:
+                    Page.objects.create(slug=slug, title=title, body_html=body, is_published=True)
+                continue
+            differs = [
+                name
+                for name, old, new in (
+                    ("title", page.title, title),
+                    ("body_html", page.body_html, body),
+                    ("is_published", page.is_published, True),
+                )
+                if old != new
+            ]
+            if not differs:
+                changes.append(LegalChange(f"page {slug}", "same"))
+                continue
+            changes.append(LegalChange(f"page {slug}", "update", ", ".join(differs)))
+            if not dry_run:
+                page.title, page.body_html, page.is_published = title, body, True
+                page.save()
+
+        if base_url is not None:
+            config = AppConfig.objects.select_for_update().filter(pk=AppConfig.load().pk).get()
+            wanted = {
+                "support_phone": SUPPORT_PHONE,
+                "support_email": SUPPORT_EMAIL,
+                **legal_page_urls(base_url),
+                "terms_version": TERMS_VERSION,
+            }
+            changed = False
+            for name, new in wanted.items():
+                old = getattr(config, name)
+                if old == new:
+                    changes.append(LegalChange(f"config {name}", "same", new))
+                    continue
+                changes.append(LegalChange(f"config {name}", "update", f"{old!r} -> {new!r}"))
+                setattr(config, name, new)
+                changed = True
+            if changed and not dry_run:
+                config.save()
+    return changes

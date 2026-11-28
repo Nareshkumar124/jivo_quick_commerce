@@ -1,0 +1,12 @@
+{% extends "cms/legal_base.html" %}
+{% block title %}Policies{% endblock %}
+{% block heading %}Policies{% endblock %}
+{% block content %}
+{% if pages %}
+<ul>
+{% for page in pages %}<li><a href="{% url 'legal-page' page.slug %}">{{ page.title }}</a></li>
+{% endfor %}</ul>
+{% else %}
+<p>No policies are published yet.</p>
+{% endif %}
+{% endblock %}

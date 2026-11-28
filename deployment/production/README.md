@@ -1,6 +1,6 @@
 # Production on the same server: plan
 
-**Status (2026-11-27): live at `https://quick.jivo.in` (nginx site file + Let's Encrypt certificate). Cash on delivery only (DL-85). Catalog loaded; no stores or staff yet. See §6 and §7.** Each further step needs the owner's go-ahead.
+**Status (2026-11-28): live at `https://quick.jivo.in` (nginx site file + Let's Encrypt certificate), code `1c7724d`. Cash on delivery only (DL-85). Catalog and policy pages (`/legal/`) loaded; no stores or staff yet. See §6 and §7.** Each further step needs the owner's go-ahead.
 **No secret values ever go in this folder.** The repository is public.
 
 Production runs on the same shared server as staging (`138.252.101.117`), **next to** the staging
@@ -145,6 +145,39 @@ Store map editor CSS only (`static/ops/css/map-edit.css`, one line in `ops_conso
 
 `SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"` (OpenStreetMap tiles no longer 403), no migrations. Pre-deploy dump `backups/pre-1178306.dump` (600); `jqcprod-backend:1178306` built from pushed `main`; `release`: no issues, no migrations; static copied; beat stopped, web/worker/worker-slow/beat restarted; `compose/DEPLOYED_SHA` = `1178306`. Verified: `/health/ready` 200; `/admin/login/` sends `referrer-policy: strict-origin-when-cross-origin` (was `same-origin`); the nginx file sets `Referrer-Policy` only in the private `/jivo-media/` location, nothing for `/admin/`; Celery OK. Staging and other sites identical before/after, nginx untouched. Old images `a231672`, `ff30e9c`, `f1cb51e`, `56b778d` kept. **Rollback:** as update 2, with `jqcprod-backend:a231672` and `echo a231672 > DEPLOYED_SHA`.
 
+**Note:** before update 5, production was already running `jqcprod-backend:2ff583f` (store map "Use my current location" button; `backups/pre-2ff583f.dump`, `logs/build-2ff583f.log`, `logs/release-2ff583f.log`, `DEPLOYED_SHA` = `2ff583f` on 2026-11-27 17:27). That update was not written up here.
+
+### 2026-11-28 update 5: code `1c7724d` (owner approved: launch work)
+
+Public policy pages at `/legal/` and the `load_legal_pages` command, no migrations. Staging and other sites checked before/after (`logs/sites-before-1c7724d.txt`, `logs/sites-after-1c7724d.txt`): identical status codes, `nginx -T` md5 unchanged, nginx untouched. Pre-deploy dump `backups/pre-1c7724d.dump` (600); `jqcprod-backend:1c7724d` built from pushed `main` (`git -c core.autocrlf=false archive`; source `src/1c7724d/`, log `logs/build-1c7724d.log`); `release`: `check --deploy` no issues, no migrations (`logs/release-1c7724d.log`); static copied additively; web/worker/worker-slow/beat restarted (one beat only); `compose/DEPLOYED_SHA` = `1c7724d`. Then `load_legal_pages --base-url https://quick.jivo.in` (dry run first; log `logs/load-legal-pages-20261128.log`): 6 pages created (terms, privacy, refund-policy, delivery-policy, contact, delete-account); config support phone `+918595349565`, support email `info@jivo.in`, terms/privacy/refund URLs on `https://quick.jivo.in/legal/...`, `terms_version` `2026-11-28`. Verified: `/health/ready` 200; `/legal/` lists the 6 pages, each page 200; `/api/v1/config/app/` returns the new support and policy URLs; `online_payments_enabled()` False; Celery `celery@`/`slow@` OK. Old images `2ff583f`, `1178306`, `a231672`, `ff30e9c`, `f1cb51e`, `56b778d` kept.
+
+**Rollback:** `cd /srv/jqc-prod/compose && export JQCPROD_IMAGE=jqcprod-backend:2ff583f && docker compose -p jqcprod -f compose.prod.yml stop beat && docker compose -p jqcprod -f compose.prod.yml up -d web worker worker-slow beat && echo 2ff583f > DEPLOYED_SHA` (`2ff583f` was running before; use `1178306` the same way to go one further back). The policy pages and config values stay in the DB (harmless for the old code); to undo them too, restore `backups/pre-1c7724d.dump` with `pg_restore --clean`. Every compose command needs `JQCPROD_IMAGE` set, even `stop` (without it compose refuses to run).
+
+### 2026-11-28 catalog text (owner approved: launch work)
+
+Product text without health claims, from pushed `main` `eb7e93c` `data/catalog/text_only/products.csv` (columns slug, short_description, description, highlights; 33 rows; fetched from GitHub raw at that commit, sha256 matches git). Dump before: `backups/pre-catalog-text-20261128.dump` (600). File in `/srv/jqc-prod/import/catalog_text/`, copied into the web container with `docker cp` (`/tmp/catalog_text`, gone when the container is recreated). Dry run (`logs/import-catalog-text-dryrun-20261128.log`): products.csv 0 created, 33 updated, categories/variants not found. Field-level preview inside a rolled-back transaction (`logs/import-catalog-text-preview-20261128.log`): only `short_description`, `description`, `highlights` (+ `updated_at`) changed on 33 products; nothing else in categories, products, variants, price tiers, images, collections, banners or stock. Then `import_catalog --commit --yes` (`logs/import-catalog-text-commit-20261128.log`): 33 updated. A hash of every other catalog/stock field is identical before and after (`import/snapshot-before.txt`, `import/snapshot-after.txt`). Checked `sano-sunflower-oil` in the DB: new text, variant `SNO-SUN-5L` MRP/price 1475.00 unchanged, 5 images. (The public API could not show it: production has no stores yet, so every catalog call needs a store and returns `STORE_NOT_FOUND`.) **Undo:** restore `backups/pre-catalog-text-20261128.dump` with `pg_restore --clean` (also undoes anything saved after it).
+
+### 2026-11-28 all products hidden (owner instruction)
+
+Nothing deleted. Dump before: `backups/pre-hide-products-20261128.dump` (600). List of what was active before: `backups/active-products-20261128.txt` (600; 48 `product <id> <slug>` lines, 99 `variant <id> <sku>` lines). In one transaction `Product.objects.filter(is_active=True).update(is_active=False)` (48 rows; 1 product was already inactive), then the catalog cache version bumped (`apps.catalog.cache.bump_global_version`, as the app's signals do). Variants were **not** changed: the catalog API (`_visible_products()`) and the cart both check `Product.is_active`, so hiding products is enough. Result: 0 of 49 products active, `_visible_products()` 0, 99 active variants untouched (`logs/hide-products-20261128.log`). `/health/ready` 200.
+
+**Restore exactly (shows the same 48 products again):**
+```bash
+cd /srv/jqc-prod
+docker cp backups/active-products-20261128.txt jqcprod-web-1:/tmp/active-products.txt
+docker exec jqcprod-web-1 python manage.py shell -c "
+from django.db import transaction
+from apps.catalog.models import Product
+from apps.catalog.cache import bump_global_version
+ids = [int(l.split()[1]) for l in open('/tmp/active-products.txt') if l.startswith('product ')]
+with transaction.atomic():
+    n = Product.objects.filter(id__in=ids).update(is_active=True)
+    transaction.on_commit(bump_global_version)
+print('restored', n, 'of', len(ids))"
+docker exec jqcprod-web-1 rm /tmp/active-products.txt
+```
+(Variants were never changed, so nothing to restore for them.)
+
 **Next (2026-11-27):** stores/staff (step 6), backups and monitoring (step 7), SMS (P4), production Firebase (P5).
 
 **Earlier next steps (2026-11-26):** P1 domain + DNS, then the one nginx file and TLS (step 5), real data (step 6), backups
@@ -153,14 +186,14 @@ and monitoring (step 7). Online payment: put the Razorpay **live** keys and webh
 
 **Stop the app only (keeps DB and infra):**
 ```bash
-cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:1178306 docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
+cd /srv/jqc-prod/compose && JQCPROD_IMAGE=jqcprod-backend:1c7724d docker compose -p jqcprod -f compose.prod.yml stop web worker worker-slow beat
 ```
 
 **Undo (touches only production):**
 ```bash
 cd /srv/jqc-prod/compose && JQCPROD_IMAGE=x docker compose -p jqcprod -f compose.prod.yml down   # keeps volumes
 # full removal, only if nothing is needed:
-docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d jqcprod-backend:f1cb51e jqcprod-backend:ff30e9c jqcprod-backend:a231672 jqcprod-backend:1178306
+docker volume rm jqcprod_pgdata jqcprod_redisdata jqcprod_miniodata; docker image rm jqcprod-backend:3bdb522 jqcprod-backend:56b778d jqcprod-backend:f1cb51e jqcprod-backend:ff30e9c jqcprod-backend:a231672 jqcprod-backend:1178306 jqcprod-backend:2ff583f jqcprod-backend:1c7724d
 sudo rm -rf /srv/jqc-prod
 ```
 

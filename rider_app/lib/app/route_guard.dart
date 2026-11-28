@@ -10,7 +10,7 @@ import 'routes.dart';
 ///
 /// Order (04 §1, §2.1):
 /// 1. dev tools (dev flavor only) are never redirected, so the Phase 0 spike
-///    and the offer full-screen-intent launch keep working;
+///    and the offer alert launch keep working;
 /// 2. force update, then maintenance ([appControl], from 426/503 or
 ///    `config/app`; a force update outranks maintenance);
 /// 3. config not loaded or session not restored yet: splash;
@@ -23,7 +23,8 @@ import 'routes.dart';
 ///    the permissions gate (also reachable during a task), home or the
 ///    rider's records (earnings, cash, history, inbox, profile), and help,
 ///    tickets, My rating and the legal pages, in every flavor;
-/// 8. signed in: the screen for `rider_status`. `PENDING_KYC` and
+/// 8. signed in, any status: Delete account (Play policy);
+/// 9. signed in: the screen for `rider_status`. `PENDING_KYC` and
 ///    `REJECTED` riders may also open the application steps under it
 ///    (documents, bank details); everyone else gets exactly that screen.
 String? riderRedirect({
@@ -79,6 +80,9 @@ String? riderRedirect({
     // Help, tickets, My rating and the legal pages run in every flavor.
     if (Routes.isSupportRoute(location)) return null;
   }
+  // Delete account, for every signed-in rider (Play policy). ACTIVE riders
+  // with a task or an open offer were sent there above.
+  if (location == Routes.deleteAccount) return null;
   final target = routeFor(destinationFor(account.riderStatus));
   if (canEditApplication(account.riderStatus) &&
       location.startsWith('$target/')) {

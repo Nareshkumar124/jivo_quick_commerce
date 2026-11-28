@@ -203,8 +203,8 @@ jobs:
           flutter build appbundle "${common[@]}"
           flutter build apk "${common[@]}"
 
-      # Refuses a build signed by anything but the upload key: in particular the debug key, which
-      # android/app/build.gradle.kts still uses for release until the app owners wire key.properties.
+      # Refuses a build signed by anything but the upload key, in particular the debug key
+      # (build.gradle.kts already fails a prod release without key.properties; this double-checks).
       - name: Outputs are signed with the upload key
         run: |
           expected="$(cat "$RUNNER_TEMP/upload-cert.sha256")"
@@ -230,6 +230,17 @@ jobs:
           fi
           echo "AAB and APK are signed with the upload key ($expected)."
           sha256sum "$aab" "$apk"
+
+      # Play requires 16 KB page support (Android 15+ targets): ELF LOAD segments of every
+      # 64-bit .so aligned to 16 KB, and uncompressed .so entries zip-aligned to 16 KB.
+      - name: Native libraries are 16 KB aligned
+        run: |
+          aab=build/app/outputs/bundle/prodRelease/app-prod-release.aab
+          apk=build/app/outputs/flutter-apk/app-prod-release.apk
+          python3 ../infra/scripts/check_16k_alignment.py "$aab" "$apk"
+          zipalign="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/zipalign"
+          "$zipalign" -c -P 16 4 "$apk"
+          echo "APK zip alignment OK (16 KB pages)."
 
       - name: Collect artifacts
         env:

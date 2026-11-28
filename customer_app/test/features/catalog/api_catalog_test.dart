@@ -4,13 +4,13 @@ import 'package:customer_app/app/providers.dart';
 import 'package:customer_app/app/repositories.dart';
 import 'package:customer_app/features/auth/data/fake_token_refresher.dart';
 import 'package:customer_app/features/cart/data/api_cart_repository.dart';
-import 'package:customer_app/features/cart/data/cart_repository.dart';
 import 'package:customer_app/features/cart/data/fake_commerce_backend.dart';
 import 'package:customer_app/features/catalog/data/api_catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/fake_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog_models.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_controllers.dart';
 import 'package:customer_app/features/checkout/data/fake_payment_launcher.dart';
+import 'package:customer_app/features/cms/data/cms_repository.dart';
 import 'package:customer_app/features/checkout/data/gateway_payment_launcher.dart';
 import 'package:customer_app/features/checkout/data/razorpay_payment_launcher.dart';
 import 'package:customer_app/features/location/data/api_serviceability_repository.dart';
@@ -18,7 +18,6 @@ import 'package:customer_app/features/location/data/delivery_location_store.dart
 import 'package:customer_app/features/location/data/serviceability_repository.dart';
 import 'package:customer_app/features/location/presentation/delivery_controller.dart';
 import 'package:customer_app/features/orders/data/api_order_repository.dart';
-import 'package:customer_app/features/orders/data/order_repository.dart';
 import 'package:customer_app/features/search/presentation/search_controller.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -286,22 +285,21 @@ void main() {
           isA<ApiServiceabilityRepository>(),
           reason: env.flavor.name,
         );
-        // Staging has the real cart and orders (opened for device testing on
-        // jqc.jivo.in); prod keeps them off until launch.
-        final isStaging = env.flavor == Flavor.staging;
-        expect(container.read(cartAvailableProvider), isStaging);
+        // Both have the real cart and orders (staging since 2026-11-13,
+        // prod since the Play Store launch, 2026-11-28), support and the
+        // in-app policy pages.
+        expect(container.read(cartAvailableProvider), isTrue);
         expect(
           container.read(cartRepositoryProvider),
-          isStaging
-              ? isA<ApiCartRepository>()
-              : isA<UnavailableCartRepository>(),
+          isA<ApiCartRepository>(),
         );
         expect(
           container.read(orderRepositoryProvider),
-          isStaging
-              ? isA<ApiOrderRepository>()
-              : isA<UnavailableOrderRepository>(),
+          isA<ApiOrderRepository>(),
         );
+        expect(container.read(supportAvailableProvider), isTrue);
+        expect(container.read(cmsAvailableProvider), isTrue);
+        expect(container.read(cmsRepositoryProvider), isA<ApiCmsRepository>());
         // Real Razorpay only: no fake behind it.
         final launcher = container.read(paymentLauncherProvider);
         expect(launcher, isA<GatewayPaymentLauncher>());

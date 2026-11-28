@@ -16,6 +16,7 @@ import '../../../shared/widgets/resume_listener.dart';
 import '../../auth/domain/rider_account.dart';
 import '../../auth/domain/rider_destination.dart';
 import '../../auth/presentation/logout_button.dart';
+import '../../legal/presentation/account_menu_button.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../../launch/presentation/blocking_message.dart';
 import '../../launch/presentation/launch_controller.dart';
@@ -102,8 +103,10 @@ class _ApplicationStatus extends ConsumerWidget {
   }
 }
 
-AppBar _statusAppBar(AppLocalizations l10n) =>
-    AppBar(title: Text(l10n.appTitle), actions: const [LogoutButton()]);
+AppBar _statusAppBar(AppLocalizations l10n) => AppBar(
+  title: Text(l10n.appTitle),
+  actions: const [AccountMenuButton(), LogoutButton()],
+);
 
 class _ProfileStatus extends ConsumerWidget {
   const _ProfileStatus({

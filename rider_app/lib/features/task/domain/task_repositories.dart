@@ -161,7 +161,7 @@ class LocationUnavailable implements Exception {
 /// Rings and vibrates for an offer (04 §2.4), also over the lock screen.
 ///
 /// [ring] with `inForeground: false` posts the high-priority offer
-/// notification (heads-up, full-screen intent over the lock screen). With
+/// notification (heads-up, on the lock screen). With
 /// `inForeground: true` the offer screen is in front: the same sound and
 /// vibration play in the app and no heads-up is posted (one already posted
 /// is removed), so nothing covers the title and countdown (device test

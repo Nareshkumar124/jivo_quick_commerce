@@ -178,6 +178,10 @@ PAGE_SLUGS = (
     # prominent disclosure (Play policy, 09).
     "rider-agreement",
     "rider-location-disclosure",
+    # Launch (2026-11-28): docs/legal/policies.md, loaded by `manage.py load_legal_pages`.
+    "delivery-policy",
+    "contact",
+    "delete-account",
 )
 FAQ_ANSWER_MAX_LENGTH = 2000
 

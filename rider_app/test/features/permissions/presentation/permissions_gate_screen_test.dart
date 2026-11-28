@@ -52,7 +52,6 @@ void main() {
     expect(find.text('Before you go online'), findsOneWidget);
     expect(find.text('Location: Allow all the time'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
-    expect(find.text('No battery restrictions'), findsOneWidget);
     expect(find.text('GPS on'), findsOneWidget);
     expect(
       find.descendant(of: primary(), matching: find.text('Continue')),
@@ -82,6 +81,45 @@ void main() {
     expect(find.text('Before you go online'), findsOneWidget);
   });
 
+  testWidgets('tapping the location row first still shows the disclosure '
+      'before any system prompt', (tester) async {
+    await pumpGate(tester, freshInstall);
+
+    await tester.tap(find.byKey(const Key('gate-row-locationWhenInUse')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('disclosure-accept')), findsOneWidget);
+    verifyNever(() => perms.service.requestLocationWhenInUse());
+
+    await tester.tap(find.byKey(const Key('disclosure-accept')));
+    await tester.pumpAndSettle();
+    verify(() => perms.service.requestLocationWhenInUse()).called(1);
+  });
+
+  testWidgets('after a restart, tapping "Allow all the time" shows the '
+      'disclosure again instead of doing nothing; done rows are not '
+      'tappable', (tester) async {
+    // Fresh session: while-in-use granted earlier, disclosure not accepted.
+    await pumpGate(
+      tester,
+      freshInstall.copyWith(locationWhenInUse: Grant.granted),
+    );
+
+    final doneRow = tester.widget<ListTile>(
+      find.byKey(const Key('gate-row-locationWhenInUse')),
+    );
+    expect(doneRow.onTap, isNull);
+
+    await tester.tap(find.byKey(const Key('gate-row-locationAlways')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('disclosure-accept')), findsOneWidget);
+    verifyNever(() => perms.service.requestLocationAlways());
+
+    await tester.tap(find.byKey(const Key('disclosure-accept')));
+    await tester.pumpAndSettle();
+    verify(() => perms.service.requestLocationAlways()).called(1);
+  });
+
   testWidgets('"Not now" asks for nothing', (tester) async {
     await pumpGate(tester, freshInstall);
 
@@ -103,14 +141,37 @@ void main() {
     expect(find.text('Keep Jivo Rider running'), findsOneWidget);
   });
 
-  testWidgets('suggests full-screen alerts when Android 14 revoked them', (
+  // Play policy (2026-11-28): battery optimisation is an optional,
+  // skippable tip; the rider can go online without it.
+  testWidgets('battery tip: optional, opens the system list, skippable', (
     tester,
   ) async {
-    await pumpGate(tester, allGranted.copyWith(fullScreenIntentAllowed: false));
+    await pumpGate(
+      tester,
+      allGranted.copyWith(batteryOptimisationIgnored: false),
+    );
 
-    expect(find.text('Full-screen order alerts'), findsOneWidget);
-    await tester.tap(find.text('Allow full-screen alerts'));
-    verify(() => perms.service.openFullScreenIntentSettings()).called(1);
+    expect(find.text('All set. You can go online.'), findsOneWidget);
+    expect(
+      find.descendant(of: primary(), matching: find.text('Done')),
+      findsOneWidget,
+    );
+    final tip = find.byKey(const Key('gate-battery-tip'));
+    await tester.scrollUntilVisible(tip, 100);
+    expect(tip, findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('gate-battery-open')));
+    await tester.pumpAndSettle();
+    verify(() => perms.service.openBatteryOptimisationSettings()).called(1);
+
+    await tester.tap(find.byKey(const Key('gate-battery-skip')));
+    await tester.pumpAndSettle();
+    expect(tip, findsNothing);
+  });
+
+  testWidgets('no battery tip once the phone exempts the app', (tester) async {
+    await pumpGate(tester, allGranted);
+    expect(find.byKey(const Key('gate-battery-tip')), findsNothing);
   });
 
   // Device test 2026-11-17: "Location access: Done" while Android had no

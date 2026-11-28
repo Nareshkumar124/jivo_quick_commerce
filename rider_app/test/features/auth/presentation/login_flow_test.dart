@@ -419,7 +419,8 @@ void main() {
       await h.signedInBefore('+919811122231');
       await h.pump(tester);
 
-      expect(find.text('Build: prod'), findsOneWidget);
+      expect(find.text('Version 1.0.0'), findsOneWidget);
+      expect(find.textContaining('Build:'), findsNothing);
       expect(find.byKey(const Key('dev-tools')), findsNothing);
     });
   });

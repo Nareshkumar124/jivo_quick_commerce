@@ -112,6 +112,14 @@ class PermissionsGateController extends AsyncNotifier<GateEvaluation> {
     await refresh();
   }
 
+  /// Whether a location prompt may be shown now: the disclosure was accepted
+  /// in this session, or the rider has been through it already (its row is
+  /// done, e.g. background location granted and only "Precise" missing).
+  bool get disclosureSatisfied =>
+      ref.read(disclosureAcceptedProvider) ||
+      (state.value?.items.any((i) => i.step == GateStep.disclosure && i.done) ??
+          false);
+
   /// Runs the system request (or settings page) for [item]. The disclosure
   /// step is handled by the UI, which shows the disclosure screen.
   Future<void> fix(GateItem item) async {
@@ -123,11 +131,15 @@ class PermissionsGateController extends AsyncNotifier<GateEvaluation> {
         case GateStep.disclosure:
           return;
         case GateStep.locationWhenInUse:
+          // The prominent disclosure precedes every location prompt, also
+          // when the rider taps the row directly (Play launch check).
+          if (!disclosureSatisfied) return;
           await _service.requestLocationWhenInUse();
         case GateStep.locationAlways:
           // Play policy: never ask for background location before the
-          // disclosure was accepted in this session.
-          if (!ref.read(disclosureAcceptedProvider)) return;
+          // disclosure was accepted or already gone through (the screen shows
+          // the disclosure first when it is not, so a tap never does nothing).
+          if (!disclosureSatisfied) return;
           await _service.requestLocationAlways();
           final after = await refresh();
           final notChosen = after.items.any(
@@ -141,8 +153,6 @@ class PermissionsGateController extends AsyncNotifier<GateEvaluation> {
           return;
         case GateStep.notifications:
           await _service.requestNotifications();
-        case GateStep.batteryOptimisation:
-          await _service.requestIgnoreBatteryOptimisation();
         case GateStep.gps:
           await _service.openLocationSettings();
       }
@@ -152,6 +162,26 @@ class PermissionsGateController extends AsyncNotifier<GateEvaluation> {
 
   Future<void> openAppSettings() => _service.openAppSettings();
 
-  Future<void> openFullScreenIntentSettings() =>
-      _service.openFullScreenIntentSettings();
+  /// Optional battery tip: the system list of battery-optimised apps, where
+  /// the rider can pick Jivo Rider and choose "Don't optimise". Re-read on
+  /// return so the tip disappears once it is done.
+  Future<void> openBatteryOptimisationSettings() async {
+    await _service.openBatteryOptimisationSettings();
+    await refresh();
+  }
+
+  /// The rider skipped the battery tip: it is hidden until the app restarts.
+  void skipBatteryTip() => ref.read(batteryTipSkippedProvider.notifier).skip();
+}
+
+/// Whether the rider skipped the optional battery tip in this app session.
+final batteryTipSkippedProvider = NotifierProvider<BatteryTipSkipped, bool>(
+  BatteryTipSkipped.new,
+);
+
+class BatteryTipSkipped extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void skip() => state = true;
 }
