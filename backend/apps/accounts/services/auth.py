@@ -15,9 +15,11 @@ from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, Ou
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.utils import datetime_from_epoch
 
-from apps.accounts.choices import AppName, OtpPurpose
+from apps.accounts.choices import AppName, LoginMethod, OtpPurpose, RiderStatus
+from apps.accounts.managers import normalise_email
 from apps.accounts.models import Address, Device, OTPRequest, User
-from apps.accounts.services.otp import verify_otp
+from apps.accounts.services.login_methods import ensure_login_method
+from apps.accounts.services.otp import request_otp, verify_otp
 from apps.core import audit
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError
@@ -60,28 +62,91 @@ def _get_or_create_by_phone(phone: str) -> tuple[User, bool]:
 def login_with_otp(
     *, phone: str, code: str, app: str, terms_version: str, ip: str | None
 ) -> LoginResult:
+    ensure_login_method(app, LoginMethod.PHONE)
     verify_otp(phone=phone, purpose=OtpPurpose.LOGIN, code=code, ip=ip, app=app)
-    now = timezone.now()
     with transaction.atomic():
         user, is_new_user = _get_or_create_by_phone(phone)
-        if not user.is_active:
-            raise ApiError(ErrorCode.PERMISSION_DENIED, "This account is deactivated.")
-        deletion_cancelled = user.deleted_at is not None
-        if deletion_cancelled:  # login during the grace period restores the account
-            user.deleted_at = None
-            user.deletion_reason = ""
-        if user.terms_version != terms_version:
-            user.terms_version = terms_version
-            user.terms_accepted_at = now
-        user.last_login = now
-        user.save()
-        if is_new_user and app == AppName.CUSTOMER:
-            # ADR 0002 §7: a new customer account gets its one welcome reward (free carton) in
-            # the transaction that creates it. Accounts created before (or by the rider app)
-            # get none; the database keeps at most one per customer.
-            from apps.promotions.rewards import grant_welcome_reward
+        return _complete_login(user, is_new_user, app=app, terms_version=terms_version)
 
-            grant_welcome_reward(user, now=now)
+
+MSG_STAFF_EMAIL_LOGIN = "Staff accounts can't sign in with an email code. Use your phone number."
+
+
+def _customer_by_email(email: str, *, ip: str | None) -> tuple[User, bool]:
+    """The customer whose verified email this is, or a new customer with this email (verified,
+    no phone). An unverified copy of the email on another account is only a claim: the person
+    who just proved they own the address wins, and the claim is removed from that account
+    (audited as `auth.unverified_email_released`)."""
+    now = timezone.now()
+    user = User.objects.select_for_update().filter(email=email).first()
+    if user is not None and user.is_staff:
+        raise ApiError(ErrorCode.PERMISSION_DENIED, MSG_STAFF_EMAIL_LOGIN)
+    if user is not None and user.email_verified_at is not None:
+        return user, False
+    if user is not None:
+        user.email = None
+        user.save(update_fields=["email", "updated_at"])
+        audit.record(None, "auth.unverified_email_released", user, {"reason": "email_otp"}, ip=ip)
+    try:
+        with transaction.atomic():
+            return User.objects.create_user(email=email, email_verified_at=now), True
+    except IntegrityError:  # a concurrent verify created it first
+        return User.objects.select_for_update().get(email=email), False
+
+
+def _rider_by_email(email: str) -> User:
+    """Rider app: only an existing rider (a rider profile, so a phone on file) whose verified
+    email this is. Email never creates a rider account: new riders register with their phone."""
+    user = (
+        User.objects.select_for_update()
+        .filter(email=email, email_verified_at__isnull=False)
+        .first()
+    )
+    if user is not None and user.is_staff:
+        raise ApiError(ErrorCode.PERMISSION_DENIED, MSG_STAFF_EMAIL_LOGIN)
+    if user is None or not user.phone or user.rider_status == RiderStatus.NONE:
+        raise ApiError(ErrorCode.EMAIL_NOT_REGISTERED)
+    return user
+
+
+def login_with_email_otp(
+    *, email: str, code: str, app: str, terms_version: str, ip: str | None
+) -> LoginResult:
+    """Email OTP sign-in (2026-11-28). Customer app: the user with this verified email, else a
+    new customer with this email and no phone (`user.has_phone` false: a phone must be added
+    before the first order). Rider app: see `_rider_by_email`."""
+    ensure_login_method(app, LoginMethod.EMAIL)
+    email = normalise_email(email)
+    verify_otp(email=email, purpose=OtpPurpose.LOGIN, code=code, ip=ip, app=app)
+    with transaction.atomic():
+        if app == AppName.RIDER:
+            user, is_new_user = _rider_by_email(email), False
+        else:
+            user, is_new_user = _customer_by_email(email, ip=ip)
+        return _complete_login(user, is_new_user, app=app, terms_version=terms_version)
+
+
+def _complete_login(user: User, is_new_user: bool, *, app: str, terms_version: str) -> LoginResult:
+    """The shared end of every OTP sign-in. Runs inside the caller's transaction."""
+    now = timezone.now()
+    if not user.is_active:
+        raise ApiError(ErrorCode.PERMISSION_DENIED, "This account is deactivated.")
+    deletion_cancelled = user.deleted_at is not None
+    if deletion_cancelled:  # login during the grace period restores the account
+        user.deleted_at = None
+        user.deletion_reason = ""
+    if user.terms_version != terms_version:
+        user.terms_version = terms_version
+        user.terms_accepted_at = now
+    user.last_login = now
+    user.save()
+    if is_new_user and app == AppName.CUSTOMER:
+        # ADR 0002 §7: a new customer account gets its one welcome reward (free carton) in
+        # the transaction that creates it. Accounts created before (or by the rider app)
+        # get none; the database keeps at most one per customer.
+        from apps.promotions.rewards import grant_welcome_reward
+
+        grant_welcome_reward(user, now=now)
     access, refresh = issue_tokens(user, app)
     return LoginResult(user, access, refresh, is_new_user, deletion_cancelled)
 
@@ -214,12 +279,14 @@ def anonymise_after(user: User):
 
 
 def delete_account(user: User, *, code: str, reason: str, ip: str | None) -> User:
-    """Confirmed by a `delete_account` OTP sent to the user's own phone (03 §2.2)."""
-    if user.is_staff or not user.phone:
+    """Confirmed by a `delete_account` OTP sent to the user's own phone (03 §2.2), or, for an
+    account without a phone (email sign-up, 2026-11-28), to its verified email."""
+    if user.is_staff or not (user.phone or (user.email and user.email_verified_at)):
         raise ApiError(
             ErrorCode.PERMISSION_DENIED, "Staff accounts are deleted by an administrator."
         )
-    verify_otp(phone=user.phone, purpose=OtpPurpose.DELETE_ACCOUNT, code=code, ip=ip)
+    target = {"phone": user.phone} if user.phone else {"email": user.email}
+    verify_otp(**target, purpose=OtpPurpose.DELETE_ACCOUNT, code=code, ip=ip)
     with transaction.atomic():
         user.deleted_at = timezone.now()
         user.deletion_reason = reason
@@ -235,7 +302,7 @@ def anonymise_user(user_id: int) -> bool:
         user = User.objects.select_for_update().filter(pk=user_id).first()
         if user is None or user.deleted_at is None or user.anonymised_at is not None:
             return False
-        phone = user.phone
+        phone, email = user.phone, user.email
         user.phone = None
         user.email = None
         user.name = ""
@@ -252,6 +319,8 @@ def anonymise_user(user_id: int) -> bool:
         Device.objects.filter(user=user).delete()
         if phone:
             OTPRequest.objects.filter(phone=phone).delete()
+        if email:
+            OTPRequest.objects.filter(email=email).delete()
         revoke_all_tokens(user)
         _scrub_admin_log(user)
         # Phase 5: the rider profile's personal data (DPDP); KYC files follow D-14 retention.
@@ -307,3 +376,22 @@ def anonymise_due_accounts() -> int:
         "pk", flat=True
     )
     return sum(anonymise_user(pk) for pk in list(due))
+
+
+def request_sign_in_otp(
+    *,
+    app: str,
+    purpose: str,
+    ip: str | None,
+    phone: str | None = None,
+    email: str | None = None,
+    user_agent: str = "",
+) -> dict:
+    """`POST /auth/otp/request/` and `/auth/email-otp/request/`: a `login` OTP needs that
+    method switched on for the app (403 `LOGIN_METHOD_DISABLED`); `delete_account` always works,
+    so an account can be deleted whatever the switch says."""
+    if purpose == OtpPurpose.LOGIN:
+        ensure_login_method(app, LoginMethod.EMAIL if email is not None else LoginMethod.PHONE)
+    return request_otp(
+        phone=phone, email=email, app=app, purpose=purpose, ip=ip, user_agent=user_agent
+    )

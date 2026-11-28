@@ -42,6 +42,15 @@ OTP_TEST_NUMBERS = env_dict(
         "+919000000003": "123456",  # rider app login (no rider profile until Phase 5)
     },
 )
+# Fixed-OTP test emails (no email sent, no send limits). Override with OTP_TEST_EMAILS.
+OTP_TEST_EMAILS = env_dict(
+    "OTP_TEST_EMAILS",
+    default={
+        "customer1@example.com": "123456",  # = test customer +919000000001 (seed_demo)
+        "customer2@example.com": "123456",  # new email-only customer (no phone)
+        "rider1@example.com": "123456",  # = active test rider +919000000002 (seed_demo)
+    },
+)
 
 # Local MinIO from infra/docker-compose.yml unless S3_* variables are set (compose defaults).
 _LOCAL_S3 = {

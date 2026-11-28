@@ -209,7 +209,12 @@ def place_order(
     or failed by `expire_unpaid_orders` when its payment window ends, never left reserved.
 
     DL-85: with `ONLINE_PAYMENTS_ENABLED` off an ONLINE order is refused (503
-    `SERVICE_UNAVAILABLE`, reason `ONLINE_PAYMENTS_DISABLED`) before anything is created."""
+    `SERVICE_UNAVAILABLE`, reason `ONLINE_PAYMENTS_DISABLED`) before anything is created.
+
+    2026-11-28: a customer without a phone (an email sign-up that has not added one) is refused
+    with 422 `PHONE_REQUIRED` before anything else (the rider and the store need a number)."""
+    if not user.phone:
+        raise ApiError(ErrorCode.PHONE_REQUIRED)
     if payment_method == PaymentMethod.ONLINE:
         ensure_online_payments_enabled()
     fingerprint = request_fingerprint(store.pk, address_id, payment_method, expected_grand_total)

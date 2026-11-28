@@ -11,11 +11,13 @@ import redis
 from django.core.cache import cache
 from django.db import transaction
 
-from apps.cms.models import AppConfig
+from apps.accounts.choices import AppName, LoginMethod, LoginMethodSetting
+from apps.cms.models import SINGLETON_ID, AppConfig
+from apps.core import audit
 
 logger = logging.getLogger(__name__)
 
-CACHE_KEY = "cms:app-config:v2"  # v2: Phase 5 rider location fields
+CACHE_KEY = "cms:app-config:v3"  # v3: login methods per app (2026-11-28)
 CACHE_SECONDS = 60
 
 
@@ -49,6 +51,8 @@ class ConfigSnapshot:
     rider_location_active_sample_seconds: int = 5
     rider_location_idle_sample_seconds: int = 30
     rider_location_max_batch: int = 50
+    customer_login_methods: str = LoginMethodSetting.PHONE
+    rider_login_methods: str = LoginMethodSetting.PHONE
     feature_flags: dict = field(default_factory=dict)
     versions: dict[tuple[str, str], VersionPolicy] = field(default_factory=dict)
 
@@ -74,6 +78,8 @@ def _build_snapshot() -> ConfigSnapshot:
         rider_location_active_sample_seconds=config.rider_location_active_sample_seconds,
         rider_location_idle_sample_seconds=config.rider_location_idle_sample_seconds,
         rider_location_max_batch=config.rider_location_max_batch,
+        customer_login_methods=config.customer_login_methods,
+        rider_login_methods=config.rider_login_methods,
         feature_flags={str(k): bool(v) for k, v in (config.feature_flags or {}).items()},
         versions={
             (row.app, row.platform): VersionPolicy(
@@ -124,6 +130,58 @@ def invalidate_app_config(**kwargs) -> None:
     row before the admin's transaction committed cannot keep it for CACHE_SECONDS."""
     _drop_cached_snapshot()
     transaction.on_commit(_drop_cached_snapshot)
+
+
+# --------------------------------------------------------------------------- login methods
+# 2026-11-28: which sign-in methods each app offers (phone OTP, email OTP or both). Stored on the
+# `AppConfig` row, so staff change it without a redeploy; read through the cached snapshot,
+# which the save signal drops (`invalidate_app_config`).
+
+_LOGIN_METHOD_FIELD = {
+    AppName.CUSTOMER: "customer_login_methods",
+    AppName.RIDER: "rider_login_methods",
+}
+_SETTING_METHODS = {
+    LoginMethodSetting.PHONE: [LoginMethod.PHONE.value],
+    LoginMethodSetting.EMAIL: [LoginMethod.EMAIL.value],
+    LoginMethodSetting.BOTH: [LoginMethod.PHONE.value, LoginMethod.EMAIL.value],
+}
+
+
+def login_method_setting(app: str, config: ConfigSnapshot | None = None) -> str:
+    """The switch value (`phone`/`email`/`both`) for `app` (`customer`/`rider`)."""
+    config = config or get_app_config()
+    return getattr(config, _LOGIN_METHOD_FIELD[AppName(app)])
+
+
+def login_methods(app: str, config: ConfigSnapshot | None = None) -> list[str]:
+    """The methods the app's login screen offers, in display order (`["phone", "email"]`)."""
+    setting = login_method_setting(app, config)
+    return list(_SETTING_METHODS.get(setting, _SETTING_METHODS[LoginMethodSetting.PHONE]))
+
+
+def set_login_methods(app: str, setting: str, *, actor=None, ip: str | None = None) -> AppConfig:
+    """Change one app's login switch (for the admin). Audited as `config.login_methods`; the
+    cached snapshot is dropped by the save signal. Raises ValueError for an unknown app or
+    value. No-op (no audit entry) when the value is unchanged."""
+    field_name = _LOGIN_METHOD_FIELD[AppName(app)]
+    setting = LoginMethodSetting(setting)
+    with transaction.atomic():
+        AppConfig.load()  # the row exists before it is locked
+        config = AppConfig.objects.select_for_update().get(pk=SINGLETON_ID)
+        before = getattr(config, field_name)
+        if before == setting:
+            return config
+        setattr(config, field_name, setting.value)
+        config.save(update_fields=[field_name, "updated_at"])
+        audit.record(
+            actor,
+            "config.login_methods",
+            config,
+            {"app": str(app), "before": before, "after": setting.value},
+            ip=ip,
+        )
+    return config
 
 
 # --------------------------------------------------------------------------- P7: pages and FAQs

@@ -6,7 +6,7 @@ from django.core.validators import (
 )
 from django.db import models
 
-from apps.accounts.choices import AppName, Platform
+from apps.accounts.choices import AppName, LoginMethodSetting, Platform
 from apps.core.models import TimeStampedModel
 
 SINGLETON_ID = 1
@@ -67,6 +67,24 @@ class AppConfig(TimeStampedModel):
         default=50,
         validators=[MinValueValidator(10), MaxValueValidator(200)],
         help_text="Most points the app may send in one `POST /rider/locations/` request.",
+    )
+    # Login methods per app (2026-11-28): phone OTP, email OTP or both (the user picks). Read by
+    # `GET /auth/methods/` and enforced by the OTP endpoints. Change through
+    # `apps.cms.services.set_login_methods` (audited) or the admin.
+    customer_login_methods = models.CharField(
+        max_length=8,
+        choices=LoginMethodSetting.choices,
+        default=LoginMethodSetting.PHONE,
+        help_text="How customers sign in to the customer app.",
+    )
+    rider_login_methods = models.CharField(
+        max_length=8,
+        choices=LoginMethodSetting.choices,
+        default=LoginMethodSetting.PHONE,
+        help_text=(
+            "How riders sign in to the rider app. Email works only for an existing rider whose "
+            "verified email is on file."
+        ),
     )
     feature_flags = models.JSONField(
         default=dict, blank=True, help_text='Name -> true/false, e.g. {"new_home": true}.'

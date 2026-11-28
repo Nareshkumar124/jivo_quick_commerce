@@ -2,6 +2,8 @@
 
 - `+919000000002` (fixed-OTP test number, OTP 123456): an ACTIVE rider "Test Rider" with every
   document approved, bank details and home store GGN-01, offline. Log in with the rider app.
+- The active rider also has the verified email `rider1@example.com` (fixed email OTP 123456
+  outside production) for email OTP sign-in.
 - `+919000000003` is left without a rider profile, to walk through registration.
 - `+919000000021` (cannot log in: not a test number): a PENDING_KYC applicant with documents in
   review, for the admin's approval screens.
@@ -19,6 +21,7 @@ from PIL import Image
 
 from apps.accounts.choices import RiderStatus
 from apps.accounts.models import User
+from apps.accounts.seed import TEST_RIDER_EMAIL, attach_verified_email
 from apps.core.crypto import encrypt
 from apps.delivery import validators
 from apps.delivery.choices import DocumentStatus, DocumentType, VehicleType
@@ -124,6 +127,7 @@ def seed_riders(stdout, options) -> None:
     )
     _documents(active, DocumentStatus.APPROVED, now, stdout)
     _bank(active, now)
+    attach_verified_email(active.user, TEST_RIDER_EMAIL, stdout)  # email OTP sign-in (rider app)
     applicant = _rider(
         APPLICANT_PHONE,
         "Demo Applicant",

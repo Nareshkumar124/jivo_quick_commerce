@@ -73,6 +73,8 @@ class TestMe:
             "name": user.name,
             "email": None,
             "marketing_opt_in": False,
+            "has_phone": True,
+            "email_verified": False,
             "business_category": None,
             "business_category_name": None,
             "business_name": "",

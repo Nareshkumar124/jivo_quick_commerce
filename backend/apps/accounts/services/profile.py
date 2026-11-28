@@ -10,6 +10,10 @@ from apps.core.exceptions import ApiError
 
 # Deliberately generic: must not confirm that another account uses the address.
 EMAIL_UNAVAILABLE = "This email can't be used."
+EMAIL_IS_LOGIN_IDENTITY = (
+    "You sign in with this email, so it can't be changed or removed here. Verify the new email "
+    "with a code instead, or add a phone number first."
+)
 
 _EDITABLE = ("name", "email", "marketing_opt_in", "business_category", "business_name")
 # Sending any of these submits the complete-profile screen (03 §2.2).
@@ -24,6 +28,9 @@ def update_profile(user: User, data: dict) -> User:
     changes = {key: data[key] for key in _EDITABLE if key in data}
     if "email" in changes:
         changes["email"] = normalise_email(changes["email"])
+        if changes["email"] != user.email and not user.phone and user.email_verified_at:
+            # 2026-11-28: an email-only account signs in with this email; it must not lose it.
+            raise ApiError(ErrorCode.VALIDATION_ERROR, details={"email": [EMAIL_IS_LOGIN_IDENTITY]})
         if (
             changes["email"]
             and User.objects.filter(email=changes["email"]).exclude(pk=user.pk).exists()

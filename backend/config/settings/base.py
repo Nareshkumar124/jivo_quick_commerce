@@ -486,6 +486,11 @@ OTP_RETENTION_DAYS = 30  # 07 §4
 # D-15: phone -> fixed 6-digit code, no SMS and no send limits. Never in production.
 # Env format: "+919000000001:123456,+919000000002:123456". local.py has defaults.
 OTP_TEST_NUMBERS: dict[str, str] = env_dict("OTP_TEST_NUMBERS", default={})
+# Email OTP login (2026-11-28): same code length, expiry, attempt and send limits as phone OTP.
+# Fixed-OTP test emails, "email:code,email:code" (lowercase), no email sent and no send limits.
+# Never in production (like OTP_TEST_NUMBERS). local.py and test.py have defaults.
+OTP_TEST_EMAILS: dict[str, str] = env_dict("OTP_TEST_EMAILS", default={})
+OTP_EMAIL_SUBJECT = env_str("OTP_EMAIL_SUBJECT", default="Your Jivo verification code")
 
 # --------------------------------------------------------------------------- SMS (D-02)
 # Local default: the console backend (logs the OTP). Deployed environments default to
@@ -608,7 +613,8 @@ SPECTACULAR_SETTINGS = {
         "HealthCheckStatusEnum": "apps.core.serializers.HealthCheckStatus",
         "AppEnum": "apps.accounts.choices.AppName",
         "PlatformEnum": "apps.accounts.choices.Platform",
-        "OtpPurposeEnum": "apps.accounts.choices.OtpPurpose",
+        "OtpPurposeEnum": "apps.accounts.choices.RequestableOtpPurpose",
+        "LoginMethodEnum": "apps.accounts.choices.LoginMethod",
         "RiderStatusEnum": "apps.accounts.choices.RiderStatus",
         "AddressLabelEnum": "apps.accounts.choices.AddressLabel",
         "ProductSortEnum": "apps.catalog.choices.ProductSort",

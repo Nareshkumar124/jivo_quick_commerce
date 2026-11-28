@@ -1,9 +1,11 @@
 """Accounts Celery tasks. All idempotent and safe to retry."""
 
 import logging
+import smtplib
 
 from celery import shared_task
 from django.conf import settings
+from django.core.mail import send_mail
 from django.utils import timezone
 
 from apps.accounts.models import OTPRequest
@@ -57,6 +59,34 @@ def send_otp_sms(otp_request_id: int, code: str) -> str:
         return "unknown"
     OTPRequest.objects.filter(pk=request.pk, sms_sent_at__isnull=True).update(sms_sent_at=now)
     logger.info("OTP SMS sent: otp_request=%s phone=%s", request.pk, mask_phone(request.phone))
+    return "sent"
+
+
+@shared_task(
+    name="accounts.send_otp_email",
+    autoretry_for=(smtplib.SMTPException, OSError),
+    retry_backoff=2,
+    max_retries=3,
+)
+def send_otp_email(otp_request_id: int, code: str) -> str:
+    """Email OTP (2026-11-28), the email twin of `send_otp_sms`. Skips OTPs already sent, used
+    or expired, so a retry never double-sends. The code is never logged."""
+    request = OTPRequest.objects.filter(pk=otp_request_id).first()
+    now = timezone.now()
+    if (
+        request is None
+        or not request.email
+        or request.email_sent_at
+        or request.verified_at
+        or request.expires_at <= now
+    ):
+        return "skipped"
+    subject, body = otp.render_otp_email(code, request.purpose)
+    send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [request.email], fail_silently=False)
+    OTPRequest.objects.filter(pk=request.pk, email_sent_at__isnull=True).update(email_sent_at=now)
+    logger.info(
+        "OTP email sent: otp_request=%s email=%s", request.pk, otp.mask_email(request.email)
+    )
     return "sent"
 
 

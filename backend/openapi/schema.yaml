@@ -1600,6 +1600,387 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/auth/email-otp/request/:
+    post:
+      operationId: auth_email_otp_request
+      description: |-
+        Emails a 6-digit OTP to `email` for `app`, with the same rules as the SMS OTP (5-minute expiry, 5 attempts, 3 sends per email per 10 minutes and 10 per day, per-IP limits). The response is the same whether or not the email has an account. The email is case-insensitive.
+
+        Needs email sign-in switched on for the app (`GET /auth/methods/`), else 403 `LOGIN_METHOD_DISABLED`. With `purpose: delete_account` (for an account without a phone) the switch does not apply and nothing is sent unless the email is the verified email of an account; the response is identical.
+
+        Fixed-OTP test emails exist only outside production.
+      summary: Send an OTP by email
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailOtpSendRequest'
+            examples:
+              Login:
+                value:
+                  email: asha.verma@example.com
+                  app: customer
+              RiderLogin:
+                value:
+                  email: ravi.k@example.com
+                  app: rider
+                summary: Rider login
+              DeleteAccount:
+                value:
+                  email: asha.verma@example.com
+                  app: customer
+                  purpose: delete_account
+                summary: Delete account
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpSent'
+              examples:
+                Sent:
+                  value:
+                    otp_length: 6
+                    expires_in_seconds: 300
+                    resend_after_seconds: 30
+          description: OTP sent.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        email:
+                        - Enter a valid email address.
+                  summary: VALIDATION_ERROR
+          description: Invalid email, app or purpose.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                LOGINMETHODDISABLED:
+                  value:
+                    error:
+                      code: LOGIN_METHOD_DISABLED
+                      message: This sign-in method is not available. Use another way
+                        to sign in.
+                      details:
+                        app: customer
+                        method: phone
+                        methods:
+                        - email
+                  summary: 'This sign-in method is switched off for the app: offer
+                    `details.methods`'
+          description: This sign-in method is switched off for `app` (admin setting).
+            Call `GET /auth/methods/` again and show only `details.methods`.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPRATELIMITED:
+                  value:
+                    error:
+                      code: OTP_RATE_LIMITED
+                      message: Too many OTP requests. Try again later. Expected available
+                        in 540 seconds.
+                      details:
+                        retry_after_seconds: 540
+                  summary: OTP_RATE_LIMITED
+          description: 'Too many OTP requests or attempts (09 §3.1: 3 sends per phone
+            per 10 minutes, 10 per day, plus per-IP limits). Wait `details.retry_after_seconds`
+            (also in `Retry-After`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Sign-in is temporarily unavailable. Please try again
+                        in a minute.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: Maintenance mode (`MAINTENANCE`), or sign-in is temporarily
+            unavailable because the OTP rate-limit store is down (`SERVICE_UNAVAILABLE`;
+            fail-closed by design). Retry shortly.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+  /api/v1/auth/email-otp/verify/:
+    post:
+      operationId: auth_email_otp_verify
+      description: |-
+        Verifies a `login` OTP for `email` + `app` and returns a token pair (same body as `/auth/otp/verify/`). Attempts, expiry, deletion grace and `terms_version` work exactly as for phone.
+
+        - **Customer app:** signs in the account whose verified email this is; otherwise creates a new customer with this email and **no phone** (`is_new_user: true`, `user.has_phone: false`). Such a customer must add a phone (`POST /me/phone/otp/`, `/me/phone/verify/`) before the first order. An unverified copy of the email on another account (typed into a profile, never proved) is removed from that account.
+        - **Rider app:** only an existing rider whose verified email is on file; anyone else gets 403 `EMAIL_NOT_REGISTERED` (new riders register with their phone).
+        - Staff accounts cannot sign in with an email code (403 `PERMISSION_DENIED`).
+        - Email sign-in switched off for the app: 403 `LOGIN_METHOD_DISABLED`.
+      summary: Verify the email OTP and sign in
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailOtpVerifyRequest'
+            examples:
+              Customer:
+                value:
+                  email: asha.verma@example.com
+                  otp: '482913'
+                  app: customer
+                  terms_version: '2026-11-01'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSession'
+              examples:
+                NewCustomer(noPhoneYet):
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjExODAwLCJpYXQiOjE3OTM2MTA5MDAsImp0aSI6IjZmMWMyYjllOGQ3YTRjNWI5ZTBmMWEyYjNjNGQ1ZTZmIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    user:
+                      id: 77
+                      phone: null
+                      name: ''
+                      email: asha.verma@example.com
+                      marketing_opt_in: false
+                      has_phone: false
+                      email_verified: true
+                      business_category: null
+                      business_category_name: null
+                      business_name: ''
+                      is_profile_complete: false
+                      rider_status: NONE
+                      created_at: '2026-11-02T10:15:00Z'
+                    is_new_user: true
+                    rider_status: NONE
+                    deletion_cancelled: false
+                  summary: New customer (no phone yet)
+                ReturningCustomer:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjExODAwLCJpYXQiOjE3OTM2MTA5MDAsImp0aSI6IjZmMWMyYjllOGQ3YTRjNWI5ZTBmMWEyYjNjNGQ1ZTZmIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    user:
+                      id: 42
+                      phone: '+919876543210'
+                      name: Asha Verma
+                      email: asha.verma@example.com
+                      marketing_opt_in: false
+                      has_phone: true
+                      email_verified: true
+                      business_category: 2
+                      business_category_name: Restaurant / Café
+                      business_name: Asha's Kitchen
+                      is_profile_complete: true
+                      rider_status: NONE
+                      created_at: '2026-10-20T06:30:00Z'
+                    is_new_user: false
+                    rider_status: NONE
+                    deletion_cancelled: false
+                  summary: Returning customer
+                Rider:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzkzNjExODAwLCJpYXQiOjE3OTM2MTA5MDAsImp0aSI6IjZmMWMyYjllOGQ3YTRjNWI5ZTBmMWEyYjNjNGQ1ZTZmIiwidXNlcl9pZCI6NDJ9.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc5NjIwMjkwMCwiaWF0IjoxNzkzNjEwOTAwLCJqdGkiOiIwYTliOGM3ZDZlNWY0YTNiMmMxZDBlOWY4YTdiNmM1ZCIsInVzZXJfaWQiOjQyfQ.c2lnbmF0dXJlLWZvci1leGFtcGxlcy1vbmx5
+                    user:
+                      id: 57
+                      phone: '+919811122233'
+                      name: Ravi Kumar
+                      email: ravi.k@example.com
+                      marketing_opt_in: false
+                      has_phone: true
+                      email_verified: true
+                      business_category: null
+                      business_category_name: null
+                      business_name: ''
+                      is_profile_complete: true
+                      rider_status: ACTIVE
+                      created_at: '2026-10-28T04:00:00Z'
+                    is_new_user: false
+                    rider_status: ACTIVE
+                    deletion_cancelled: false
+          description: Signed in.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPINVALID:
+                  value:
+                    error:
+                      code: OTP_INVALID
+                      message: The OTP is incorrect.
+                      details:
+                        attempts_remaining: 3
+                  summary: Wrong OTP
+                OTPEXPIRED:
+                  value:
+                    error:
+                      code: OTP_EXPIRED
+                      message: The OTP has expired.
+                      details: {}
+                  summary: 'Expired, already used or out of attempts: request a new
+                    OTP'
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        otp:
+                        - Enter the 6-digit OTP.
+                  summary: VALIDATION_ERROR
+          description: Wrong or expired OTP, or invalid input.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                LOGINMETHODDISABLED:
+                  value:
+                    error:
+                      code: LOGIN_METHOD_DISABLED
+                      message: This sign-in method is not available. Use another way
+                        to sign in.
+                      details:
+                        app: customer
+                        method: phone
+                        methods:
+                        - email
+                  summary: 'This sign-in method is switched off for the app: offer
+                    `details.methods`'
+                EMAILNOTREGISTERED:
+                  value:
+                    error:
+                      code: EMAIL_NOT_REGISTERED
+                      message: This email is not linked to a rider account. Sign in
+                        with your phone number.
+                      details: {}
+                  summary: EMAIL_NOT_REGISTERED
+                PERMISSIONDENIED:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: This account is deactivated.
+                      details: {}
+                  summary: PERMISSION_DENIED
+                STAFFACCOUNT:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: Staff accounts can't sign in with an email code. Use
+                        your phone number.
+                      details: {}
+                  summary: Staff accounts cannot use an email code
+          description: Email sign-in is switched off for this app, the rider app does
+            not know this email, the account is deactivated, or it is a staff account.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPRATELIMITED:
+                  value:
+                    error:
+                      code: OTP_RATE_LIMITED
+                      message: Too many OTP requests. Try again later. Expected available
+                        in 540 seconds.
+                      details:
+                        retry_after_seconds: 540
+                  summary: OTP_RATE_LIMITED
+          description: 'Too many OTP requests or attempts (09 §3.1: 3 sends per phone
+            per 10 minutes, 10 per day, plus per-IP limits). Wait `details.retry_after_seconds`
+            (also in `Retry-After`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Sign-in is temporarily unavailable. Please try again
+                        in a minute.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: Maintenance mode (`MAINTENANCE`), or sign-in is temporarily
+            unavailable because the OTP rate-limit store is down (`SERVICE_UNAVAILABLE`;
+            fail-closed by design). Retry shortly.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
   /api/v1/auth/logout/:
     post:
       operationId: auth_logout
@@ -1734,6 +2115,118 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/auth/methods/:
+    get:
+      operationId: auth_methods
+      description: |-
+        Call before showing the login screen. The admin chooses per app: phone only (default), email only, or both (show a Phone / Email choice and let the user pick). The app is the `app` query parameter, else the `X-App-Name` header.
+
+        Phone: `POST /auth/otp/request/` + `/auth/otp/verify/`. Email: `POST /auth/email-otp/request/` + `/auth/email-otp/verify/`. A method switched off meanwhile answers 403 `LOGIN_METHOD_DISABLED` with `details.methods`.
+      summary: Sign-in methods the login screen offers
+      parameters:
+      - in: query
+        name: app
+        schema:
+          type: string
+          enum:
+          - customer
+          - rider
+        description: '`customer` or `rider`. Defaults to the `X-App-Name` header.'
+      tags:
+      - auth
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginMethods'
+              examples:
+                PhoneOnly(default):
+                  value:
+                    app: customer
+                    methods:
+                    - phone
+                  summary: Phone only (default)
+                PhoneOrEmail:
+                  value:
+                    app: customer
+                    methods:
+                    - phone
+                    - email
+                  summary: Phone or email
+                EmailOnly:
+                  value:
+                    app: rider
+                    methods:
+                    - email
+                  summary: Email only
+          description: The methods to offer.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        app:
+                        - '"web" is not a valid choice.'
+                  summary: VALIDATION_ERROR
+          description: No valid app in `app` or `X-App-Name`.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                RATELIMITED:
+                  value:
+                    error:
+                      code: RATE_LIMITED
+                      message: Request was throttled. Expected available in 30 seconds.
+                      details:
+                        retry_after_seconds: 30
+                  summary: RATE_LIMITED
+          description: Too many requests. Wait `details.retry_after_seconds` (also
+            in `Retry-After`), then retry.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+          description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
+            true`). `message` is the text to show.'
   /api/v1/auth/otp/request/:
     post:
       operationId: auth_otp_request
@@ -1796,6 +2289,27 @@ paths:
                         - Enter a 10-digit Indian mobile number in the form +919876543210.
                   summary: VALIDATION_ERROR
           description: Invalid phone, app or purpose.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                LOGINMETHODDISABLED:
+                  value:
+                    error:
+                      code: LOGIN_METHOD_DISABLED
+                      message: This sign-in method is not available. Use another way
+                        to sign in.
+                      details:
+                        app: customer
+                        method: phone
+                        methods:
+                        - email
+                  summary: 'This sign-in method is switched off for the app: offer
+                    `details.methods`'
+          description: This sign-in method is switched off for `app` (admin setting).
+            Call `GET /auth/methods/` again and show only `details.methods`.
         '429':
           content:
             application/json:
@@ -1907,6 +2421,8 @@ paths:
                       name: ''
                       email: null
                       marketing_opt_in: false
+                      has_phone: true
+                      email_verified: false
                       business_category: null
                       business_category_name: null
                       business_name: ''
@@ -1927,6 +2443,8 @@ paths:
                       name: Asha Verma
                       email: asha.verma@example.com
                       marketing_opt_in: false
+                      has_phone: true
+                      email_verified: true
                       business_category: 2
                       business_category_name: Restaurant / Café
                       business_name: Asha's Kitchen
@@ -1947,6 +2465,8 @@ paths:
                       name: ''
                       email: null
                       marketing_opt_in: false
+                      has_phone: true
+                      email_verified: false
                       business_category: null
                       business_category_name: null
                       business_name: ''
@@ -1967,6 +2487,8 @@ paths:
                       name: Ravi Kumar
                       email: null
                       marketing_opt_in: false
+                      has_phone: true
+                      email_verified: false
                       business_category: null
                       business_category_name: null
                       business_name: ''
@@ -1987,6 +2509,8 @@ paths:
                       name: Asha Verma
                       email: asha.verma@example.com
                       marketing_opt_in: false
+                      has_phone: true
+                      email_verified: true
                       business_category: 2
                       business_category_name: Restaurant / Café
                       business_name: Asha's Kitchen
@@ -2043,7 +2567,21 @@ paths:
                       message: This account is deactivated.
                       details: {}
                   summary: PERMISSION_DENIED
-          description: The account is deactivated.
+                LOGINMETHODDISABLED:
+                  value:
+                    error:
+                      code: LOGIN_METHOD_DISABLED
+                      message: This sign-in method is not available. Use another way
+                        to sign in.
+                      details:
+                        app: customer
+                        method: phone
+                        methods:
+                        - email
+                  summary: 'This sign-in method is switched off for the app: offer
+                    `details.methods`'
+          description: The account is deactivated, or phone sign-in is switched off
+            for this app.
         '429':
           content:
             application/json:
@@ -9587,6 +10125,8 @@ paths:
                     name: Asha Verma
                     email: asha.verma@example.com
                     marketing_opt_in: false
+                    has_phone: true
+                    email_verified: true
                     business_category: 2
                     business_category_name: Restaurant / Café
                     business_name: Asha's Kitchen
@@ -9600,6 +10140,8 @@ paths:
                     name: ''
                     email: null
                     marketing_opt_in: false
+                    has_phone: true
+                    email_verified: false
                     business_category: null
                     business_category_name: null
                     business_name: ''
@@ -9614,6 +10156,8 @@ paths:
                     name: Ravi Kumar
                     email: null
                     marketing_opt_in: false
+                    has_phone: true
+                    email_verified: false
                     business_category: null
                     business_category_name: null
                     business_name: ''
@@ -9761,6 +10305,8 @@ paths:
                     name: Asha Verma
                     email: asha.verma@example.com
                     marketing_opt_in: false
+                    has_phone: true
+                    email_verified: true
                     business_category: 2
                     business_category_name: Restaurant / Café
                     business_name: Asha's Kitchen
@@ -10353,6 +10899,358 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/me/email/otp/:
+    post:
+      operationId: me_email_otp
+      description: Step 1 of verifying an email for email sign-in (`user.email_verified`).
+        Works for the current email or a new one; the email is only changed by step
+        2. Same OTP rules and limits as sign-in, and not affected by the login method
+        switch. 400 if this email is already verified on the account.
+      summary: Send an email OTP to verify an email address
+      tags:
+      - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailOtpForMeRequest'
+            examples:
+              VerifyEmail:
+                value:
+                  email: asha.verma@example.com
+                summary: Verify email
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpSent'
+              examples:
+                Sent:
+                  value:
+                    otp_length: 6
+                    expires_in_seconds: 300
+                    resend_after_seconds: 30
+          description: OTP sent.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        email:
+                        - Enter a valid email address.
+                  summary: VALIDATION_ERROR
+                AlreadyVerified:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        email:
+                        - This email is already verified on your account.
+                  summary: Already verified
+          description: Invalid email, or already verified.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPRATELIMITED:
+                  value:
+                    error:
+                      code: OTP_RATE_LIMITED
+                      message: Too many OTP requests. Try again later. Expected available
+                        in 540 seconds.
+                      details:
+                        retry_after_seconds: 540
+                  summary: OTP_RATE_LIMITED
+          description: 'Too many OTP requests or attempts (09 §3.1: 3 sends per phone
+            per 10 minutes, 10 per day, plus per-IP limits). Wait `details.retry_after_seconds`
+            (also in `Retry-After`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Sign-in is temporarily unavailable. Please try again
+                        in a minute.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: Maintenance mode (`MAINTENANCE`), or sign-in is temporarily
+            unavailable because the OTP rate-limit store is down (`SERVICE_UNAVAILABLE`;
+            fail-closed by design). Retry shortly.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+  /api/v1/me/email/verify/:
+    post:
+      operationId: me_email_verify
+      description: 'Step 2: sets `email` to this address, verified (`email_verified:
+        true`), and returns the user. 409 `EMAIL_IN_USE` if another account has this
+        email verified (or is a staff account). An unverified copy of the email on
+        another account is removed from it, because the caller just proved they own
+        the address.'
+      summary: Verify the email OTP and set the verified email
+      tags:
+      - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailVerifyRequest'
+            examples:
+              Verify:
+                value:
+                  email: asha.verma@example.com
+                  otp: '482913'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+              examples:
+                Verified:
+                  value:
+                    id: 42
+                    phone: '+919876543210'
+                    name: Asha Verma
+                    email: asha.verma@example.com
+                    marketing_opt_in: false
+                    has_phone: true
+                    email_verified: true
+                    business_category: 2
+                    business_category_name: Restaurant / Café
+                    business_name: Asha's Kitchen
+                    is_profile_complete: true
+                    rider_status: NONE
+                    created_at: '2026-10-20T06:30:00Z'
+          description: The user, email verified.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPINVALID:
+                  value:
+                    error:
+                      code: OTP_INVALID
+                      message: The OTP is incorrect.
+                      details:
+                        attempts_remaining: 3
+                  summary: Wrong OTP
+                OTPEXPIRED:
+                  value:
+                    error:
+                      code: OTP_EXPIRED
+                      message: The OTP has expired.
+                      details: {}
+                  summary: 'Expired, already used or out of attempts: request a new
+                    OTP'
+          description: Wrong or expired OTP, or invalid input.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                EMAILINUSE:
+                  value:
+                    error:
+                      code: EMAIL_IN_USE
+                      message: This email is linked to another account. Sign in with
+                        it instead.
+                      details: {}
+                  summary: EMAIL_IN_USE
+          description: The email belongs to another account.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPRATELIMITED:
+                  value:
+                    error:
+                      code: OTP_RATE_LIMITED
+                      message: Too many OTP requests. Try again later. Expected available
+                        in 540 seconds.
+                      details:
+                        retry_after_seconds: 540
+                  summary: OTP_RATE_LIMITED
+          description: 'Too many OTP requests or attempts (09 §3.1: 3 sends per phone
+            per 10 minutes, 10 per day, plus per-IP limits). Wait `details.retry_after_seconds`
+            (also in `Retry-After`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Sign-in is temporarily unavailable. Please try again
+                        in a minute.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: Maintenance mode (`MAINTENANCE`), or sign-in is temporarily
+            unavailable because the OTP rate-limit store is down (`SERVICE_UNAVAILABLE`;
+            fail-closed by design). Retry shortly.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
   /api/v1/me/notifications/:
     get:
       operationId: me_notifications_list
@@ -10888,6 +11786,368 @@ paths:
                       details: {}
           description: 'Maintenance mode is on (`/api/v1/config/app/` returns `maintenance:
             true`). `message` is the text to show.'
+  /api/v1/me/phone/otp/:
+    post:
+      operationId: me_phone_otp
+      description: 'Step 1 of adding a phone to an account that has none (an email
+        sign-up, `user.has_phone: false`). A customer needs a phone before the first
+        order. Same OTP rules and limits as sign-in, and not affected by the login
+        method switch. The response never says whether another account uses the number
+        (step 2 reports that, once the code proves the number is the caller''s). An
+        account that already has a phone gets 400 (not changeable in v1).'
+      summary: Send an SMS OTP to add a phone number
+      tags:
+      - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PhoneOtpSendRequest'
+            examples:
+              AddPhone:
+                value:
+                  phone: '+919876543210'
+                summary: Add phone
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpSent'
+              examples:
+                Sent:
+                  value:
+                    otp_length: 6
+                    expires_in_seconds: 300
+                    resend_after_seconds: 30
+          description: OTP sent.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                VALIDATIONERROR:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        phone:
+                        - Enter a 10-digit Indian mobile number in the form +919876543210.
+                  summary: VALIDATION_ERROR
+                PhoneAlreadySet:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        phone:
+                        - Your account already has a phone number.
+                  summary: Phone already set
+          description: Invalid phone, or the account already has one.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPRATELIMITED:
+                  value:
+                    error:
+                      code: OTP_RATE_LIMITED
+                      message: Too many OTP requests. Try again later. Expected available
+                        in 540 seconds.
+                      details:
+                        retry_after_seconds: 540
+                  summary: OTP_RATE_LIMITED
+          description: 'Too many OTP requests or attempts (09 §3.1: 3 sends per phone
+            per 10 minutes, 10 per day, plus per-IP limits). Wait `details.retry_after_seconds`
+            (also in `Retry-After`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Sign-in is temporarily unavailable. Please try again
+                        in a minute.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: Maintenance mode (`MAINTENANCE`), or sign-in is temporarily
+            unavailable because the OTP rate-limit store is down (`SERVICE_UNAVAILABLE`;
+            fail-closed by design). Retry shortly.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
+  /api/v1/me/phone/verify/:
+    post:
+      operationId: me_phone_verify
+      description: 'Step 2: sets the caller''s phone (`has_phone` becomes true) and
+        returns the user. 409 `PHONE_IN_USE` if the number belongs to another account:
+        accounts are never merged, so suggest signing in with that number instead.'
+      summary: Verify the SMS OTP and add the phone number
+      tags:
+      - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PhoneVerifyRequest'
+            examples:
+              Verify:
+                value:
+                  phone: '+919876543210'
+                  otp: '482913'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+              examples:
+                Added:
+                  value:
+                    id: 77
+                    phone: '+919876543210'
+                    name: ''
+                    email: asha.verma@example.com
+                    marketing_opt_in: false
+                    has_phone: true
+                    email_verified: true
+                    business_category: null
+                    business_category_name: null
+                    business_name: ''
+                    is_profile_complete: false
+                    rider_status: NONE
+                    created_at: '2026-11-02T10:15:00Z'
+          description: The user, now with a phone.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPINVALID:
+                  value:
+                    error:
+                      code: OTP_INVALID
+                      message: The OTP is incorrect.
+                      details:
+                        attempts_remaining: 3
+                  summary: Wrong OTP
+                OTPEXPIRED:
+                  value:
+                    error:
+                      code: OTP_EXPIRED
+                      message: The OTP has expired.
+                      details: {}
+                  summary: 'Expired, already used or out of attempts: request a new
+                    OTP'
+                PhoneAlreadySet:
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Some fields are invalid.
+                      details:
+                        phone:
+                        - Your account already has a phone number.
+                  summary: Phone already set
+          description: Wrong or expired OTP, invalid input, or the account already
+            has a phone.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                AUTHREQUIRED:
+                  value:
+                    error:
+                      code: AUTH_REQUIRED
+                      message: Authentication is required.
+                      details: {}
+                  summary: No Authorization header
+                TOKENINVALID:
+                  value:
+                    error:
+                      code: TOKEN_INVALID
+                      message: Given token not valid for any token type
+                      details: {}
+                  summary: Expired token
+          description: No access token (`AUTH_REQUIRED`), or the token is invalid,
+            expired or revoked (`TOKEN_INVALID`). On `TOKEN_INVALID`, refresh once
+            and retry.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPHEADERMISMATCH:
+                  value:
+                    error:
+                      code: PERMISSION_DENIED
+                      message: X-App-Name does not match the app this session was
+                        signed in to. Sign in again in this app.
+                      details:
+                        reason: APP_HEADER_MISMATCH
+                        header_app: rider
+                        token_app: customer
+                  summary: X-App-Name names a different app than the token
+          description: '`X-App-Name` names a different app than the access token''s
+            `app` claim: `details.reason` = `APP_HEADER_MISMATCH`.'
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                PHONEINUSE:
+                  value:
+                    error:
+                      code: PHONE_IN_USE
+                      message: This phone number is linked to another account. Sign
+                        in with it instead.
+                      details: {}
+                  summary: PHONE_IN_USE
+          description: The number belongs to another account.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                OTPRATELIMITED:
+                  value:
+                    error:
+                      code: OTP_RATE_LIMITED
+                      message: Too many OTP requests. Try again later. Expected available
+                        in 540 seconds.
+                      details:
+                        retry_after_seconds: 540
+                  summary: OTP_RATE_LIMITED
+          description: 'Too many OTP requests or attempts (09 §3.1: 3 sends per phone
+            per 10 minutes, 10 per day, plus per-IP limits). Wait `details.retry_after_seconds`
+            (also in `Retry-After`).'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                MAINTENANCE:
+                  value:
+                    error:
+                      code: MAINTENANCE
+                      message: Jivo is down for scheduled maintenance. We will be
+                        back by 6:00 AM.
+                      details: {}
+                SERVICEUNAVAILABLE:
+                  value:
+                    error:
+                      code: SERVICE_UNAVAILABLE
+                      message: Sign-in is temporarily unavailable. Please try again
+                        in a minute.
+                      details: {}
+                  summary: SERVICE_UNAVAILABLE
+          description: Maintenance mode (`MAINTENANCE`), or sign-in is temporarily
+            unavailable because the OTP rate-limit store is down (`SERVICE_UNAVAILABLE`;
+            fail-closed by design). Retry shortly.
+        '426':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                APPUPDATEREQUIRED:
+                  value:
+                    error:
+                      code: APP_UPDATE_REQUIRED
+                      message: Please update the app to continue.
+                      details:
+                        min_supported_version: 1.2.0
+                        latest_version: 1.4.0
+                        store_url: https://play.google.com/store/apps/details?id=in.jivo.quick
+                  summary: APP_UPDATE_REQUIRED
+          description: Force update. Sent only when the request carries `X-App-Name`,
+            `X-Platform` and `X-App-Version`, and the version is below `min_supported_version`
+            for that app and platform. Requests without these headers never get 426.
   /api/v1/me/profile-prompt/skip/:
     post:
       operationId: me_profile_prompt_skip
@@ -10914,6 +12174,8 @@ paths:
                     name: ''
                     email: null
                     marketing_opt_in: false
+                    has_phone: true
+                    email_verified: false
                     business_category: null
                     business_category_name: null
                     business_name: ''
@@ -11324,6 +12586,8 @@ paths:
         **ONLINE:** the order is PAYMENT_PENDING for the payment window (15 minutes); the stock and the coupon are held. Open Razorpay checkout with `razorpay`, then call `POST /payments/razorpay/verify/`. The cart is emptied only when the payment is confirmed; if it never is, the order fails, the stock is released and the cart is still there to try again.
 
         Send the same `Idempotency-Key` when retrying a request whose response was lost: the first order is returned (200) and nothing is placed twice. Disable the button while a request is in flight.
+
+        **Phone required:** a customer who signed up with email and has no phone yet (`GET /me/` `has_phone: false`) gets 422 `PHONE_REQUIRED`: add a phone with `POST /me/phone/otp/` and `/me/phone/verify/`, then place the order again.
       summary: Place an order from the cart
       parameters:
       - in: header
@@ -12087,6 +13351,14 @@ paths:
                         reason: ABOVE_LIMIT
                         cod_max_order_value: '2000.00'
                   summary: COD_NOT_AVAILABLE
+                PHONEREQUIRED:
+                  value:
+                    error:
+                      code: PHONE_REQUIRED
+                      message: Add your phone number to place an order.
+                      details: {}
+                  summary: 'Email sign-up without a phone: add one (`/me/phone/otp/`)
+                    first'
                 COUPONNOTELIGIBLE:
                   value:
                     error:
@@ -27223,6 +28495,94 @@ components:
       - order_number
       - task_id
       - total
+    EmailOtpForMeRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: The email to verify. Case does not matter.
+          maxLength: 254
+      required:
+      - email
+    EmailOtpSendRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: The email to send the code to. Case does not matter.
+          maxLength: 254
+        app:
+          allOf:
+          - $ref: '#/components/schemas/AppEnum'
+          description: |-
+            The app asking. Same value as `X-App-Name`.
+
+            * `customer` - Customer app
+            * `rider` - Rider app
+        purpose:
+          allOf:
+          - $ref: '#/components/schemas/OtpPurposeEnum'
+          default: login
+          description: |-
+            `login` (default): for `/auth/email-otp/verify/`. `delete_account`: for `/me/delete/` by an account without a phone; it can never log anyone in.
+
+            * `login` - Log in or sign up
+            * `delete_account` - Confirm account deletion
+      required:
+      - app
+      - email
+    EmailOtpVerifyRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        otp:
+          type: string
+          minLength: 1
+          description: 6 digits.
+          pattern: ^[0-9]{6}$
+        app:
+          allOf:
+          - $ref: '#/components/schemas/AppEnum'
+          description: |-
+            Must match the `app` the OTP was requested for. Authoritative over X-App-Name.
+
+            * `customer` - Customer app
+            * `rider` - Rider app
+        terms_version:
+          type: string
+          minLength: 1
+          description: 'The Terms & Privacy version the user accepted on the login
+            screen: send `terms_version` from `/config/app/` (DPDP consent record).'
+          maxLength: 32
+      required:
+      - app
+      - email
+      - otp
+      - terms_version
+    EmailVerifyRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 254
+        otp:
+          type: string
+          minLength: 1
+          description: 6 digits.
+          pattern: ^[0-9]{6}$
+      required:
+      - email
+      - otp
     ErrorBody:
       type: object
       description: The `error` object of every error response.
@@ -27279,6 +28639,11 @@ components:
             * `REFERRAL_SELF` - You cannot use your own referral code.
             * `REFERRAL_ALREADY_APPLIED` - You have already used a referral code.
             * `REFERRAL_NOT_ELIGIBLE` - Referral codes are only for new customers before their first order.
+            * `LOGIN_METHOD_DISABLED` - This sign-in method is not available. Use another way to sign in.
+            * `EMAIL_NOT_REGISTERED` - This email is not linked to a rider account. Sign in with your phone number.
+            * `PHONE_REQUIRED` - Add your phone number to place an order.
+            * `PHONE_IN_USE` - This phone number is linked to another account. Sign in with it instead.
+            * `EMAIL_IN_USE` - This email is linked to another account. Sign in with it instead.
         message:
           type: string
           description: Human-readable message (English).
@@ -27339,6 +28704,11 @@ components:
       - REFERRAL_SELF
       - REFERRAL_ALREADY_APPLIED
       - REFERRAL_NOT_ELIGIBLE
+      - LOGIN_METHOD_DISABLED
+      - EMAIL_NOT_REGISTERED
+      - PHONE_REQUIRED
+      - PHONE_IN_USE
+      - EMAIL_IN_USE
       type: string
       description: |-
         * `VALIDATION_ERROR` - Some fields are invalid.
@@ -27387,6 +28757,11 @@ components:
         * `REFERRAL_SELF` - You cannot use your own referral code.
         * `REFERRAL_ALREADY_APPLIED` - You have already used a referral code.
         * `REFERRAL_NOT_ELIGIBLE` - Referral codes are only for new customers before their first order.
+        * `LOGIN_METHOD_DISABLED` - This sign-in method is not available. Use another way to sign in.
+        * `EMAIL_NOT_REGISTERED` - This email is not linked to a rider account. Sign in with your phone number.
+        * `PHONE_REQUIRED` - Add your phone number to place an order.
+        * `PHONE_IN_USE` - This phone number is linked to another account. Sign in with it instead.
+        * `EMAIL_IN_USE` - This email is linked to another account. Sign in with it instead.
     ErrorEnvelope:
       type: object
       description: Body of every non-2xx API response.
@@ -27877,6 +29252,35 @@ components:
       - implausible_jump
       - invalid_point
       - too_old
+    LoginMethodEnum:
+      enum:
+      - phone
+      - email
+      type: string
+      description: |-
+        * `phone` - Phone number (SMS OTP)
+        * `email` - Email address (email OTP)
+    LoginMethods:
+      type: object
+      properties:
+        app:
+          allOf:
+          - $ref: '#/components/schemas/AppEnum'
+          description: |-
+            The app asked about.
+
+            * `customer` - Customer app
+            * `rider` - Rider app
+        methods:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoginMethodEnum'
+          description: 'The sign-in methods to offer, in display order: `["phone"]`,
+            `["email"]` or `["phone", "email"]` (show a Phone / Email choice). Never
+            empty.'
+      required:
+      - app
+      - methods
     LogoutRequest:
       type: object
       properties:
@@ -27904,7 +29308,8 @@ components:
           type: string
           readOnly: true
           nullable: true
-          description: Login phone. Not editable in v1.
+          description: Login phone. Null for an email sign-up until a phone is added
+            with `POST /me/phone/verify/`; never changed once set (v1).
         name:
           type: string
           description: Cannot be blanked once sent. Empty after a skipped profile.
@@ -27918,6 +29323,19 @@ components:
         marketing_opt_in:
           type: boolean
           description: Consent to promotional push notifications.
+        has_phone:
+          type: boolean
+          readOnly: true
+          description: 'False for an account created by email sign-in that has not
+            added a phone yet. Customers must add one (`POST /me/phone/otp/`, `POST
+            /me/phone/verify/`) before placing an order: `POST /orders/` answers 422
+            `PHONE_REQUIRED` until then.'
+        email_verified:
+          type: boolean
+          readOnly: true
+          description: True when `email` was proved with an email code, so it works
+            for email sign-in. Changing `email` with PATCH makes it false again (verify
+            with `POST /me/email/otp/`).
         business_category:
           type: integer
           nullable: true
@@ -27960,6 +29378,8 @@ components:
       required:
       - business_category_name
       - created_at
+      - email_verified
+      - has_phone
       - id
       - is_profile_complete
       - name
@@ -29460,6 +30880,31 @@ components:
       description: |-
         * `PENDING` - Pending
         * `PAID` - Paid
+    PhoneOtpSendRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          minLength: 1
+          description: E.164 Indian mobile, e.g. +919876543210.
+          pattern: ^\+91[6-9][0-9]{9}$
+      required:
+      - phone
+    PhoneVerifyRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+          minLength: 1
+          pattern: ^\+91[6-9][0-9]{9}$
+        otp:
+          type: string
+          minLength: 1
+          description: 6 digits.
+          pattern: ^[0-9]{6}$
+      required:
+      - otp
+      - phone
     PickupCodeState:
       type: object
       properties:

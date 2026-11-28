@@ -77,6 +77,24 @@ class ErrorCode(models.TextChoices):
         "REFERRAL_NOT_ELIGIBLE",
         "Referral codes are only for new customers before their first order.",
     )
+    # --- Added 2026-11-28 (email OTP login, login method switch) ----------------------------
+    LOGIN_METHOD_DISABLED = (
+        "LOGIN_METHOD_DISABLED",
+        "This sign-in method is not available. Use another way to sign in.",
+    )
+    EMAIL_NOT_REGISTERED = (
+        "EMAIL_NOT_REGISTERED",
+        "This email is not linked to a rider account. Sign in with your phone number.",
+    )
+    PHONE_REQUIRED = "PHONE_REQUIRED", "Add your phone number to place an order."
+    PHONE_IN_USE = (
+        "PHONE_IN_USE",
+        "This phone number is linked to another account. Sign in with it instead.",
+    )
+    EMAIL_IN_USE = (
+        "EMAIL_IN_USE",
+        "This email is linked to another account. Sign in with it instead.",
+    )
 
 
 ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
@@ -126,6 +144,11 @@ ERROR_HTTP_STATUS: dict[ErrorCode, int] = {
     ErrorCode.REFERRAL_SELF: 422,
     ErrorCode.REFERRAL_ALREADY_APPLIED: 422,
     ErrorCode.REFERRAL_NOT_ELIGIBLE: 422,
+    ErrorCode.LOGIN_METHOD_DISABLED: 403,
+    ErrorCode.EMAIL_NOT_REGISTERED: 403,
+    ErrorCode.PHONE_REQUIRED: 422,
+    ErrorCode.PHONE_IN_USE: 409,
+    ErrorCode.EMAIL_IN_USE: 409,
 }
 
 

@@ -11,7 +11,14 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from rest_framework.fields import empty
 
-from apps.accounts.choices import AddressLabel, AppName, OtpPurpose, Platform, RiderStatus
+from apps.accounts.choices import (
+    AddressLabel,
+    AppName,
+    LoginMethod,
+    Platform,
+    RequestableOtpPurpose,
+    RiderStatus,
+)
 from apps.accounts.models import BusinessCategory
 from apps.accounts.validators import (
     indian_mobile_validator,
@@ -65,8 +72,8 @@ class OtpSendSerializer(serializers.Serializer):
         choices=AppName.choices, help_text="The app asking. Same value as `X-App-Name`."
     )
     purpose = serializers.ChoiceField(
-        choices=OtpPurpose.choices,
-        default=OtpPurpose.LOGIN,
+        choices=RequestableOtpPurpose.choices,
+        default=RequestableOtpPurpose.LOGIN,
         help_text=(
             "`login` (default): for `/auth/otp/verify/`. `delete_account`: for `/me/delete/` "
             "only; it can never log anyone in."
@@ -98,6 +105,83 @@ class OtpVerifySerializer(serializers.Serializer):
     )
 
 
+class LoginEmailField(serializers.EmailField):
+    """A required email, trimmed and stored lowercase (unique case-insensitively)."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("max_length", 254)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data) -> str:
+        return super().to_internal_value(data).strip().lower()
+
+
+class EmailOtpSendSerializer(serializers.Serializer):
+    email = LoginEmailField(help_text="The email to send the code to. Case does not matter.")
+    app = serializers.ChoiceField(
+        choices=AppName.choices, help_text="The app asking. Same value as `X-App-Name`."
+    )
+    purpose = serializers.ChoiceField(
+        choices=RequestableOtpPurpose.choices,
+        default=RequestableOtpPurpose.LOGIN,
+        help_text=(
+            "`login` (default): for `/auth/email-otp/verify/`. `delete_account`: for "
+            "`/me/delete/` by an account without a phone; it can never log anyone in."
+        ),
+    )
+
+
+class EmailOtpVerifySerializer(serializers.Serializer):
+    email = LoginEmailField()
+    otp = serializers.CharField(validators=[otp_code_validator], help_text="6 digits.")
+    app = serializers.ChoiceField(
+        choices=AppName.choices,
+        help_text="Must match the `app` the OTP was requested for. Authoritative over X-App-Name.",
+    )
+    terms_version = serializers.CharField(
+        max_length=32,
+        help_text=(
+            "The Terms & Privacy version the user accepted on the login screen: send "
+            "`terms_version` from `/config/app/` (DPDP consent record)."
+        ),
+    )
+
+
+class AppQuerySerializer(serializers.Serializer):
+    app = serializers.ChoiceField(choices=AppName.choices)
+
+
+class LoginMethodsSerializer(serializers.Serializer):
+    app = serializers.ChoiceField(choices=AppName.choices, help_text="The app asked about.")
+    methods = serializers.ListField(
+        child=serializers.ChoiceField(choices=LoginMethod.choices),
+        help_text=(
+            'The sign-in methods to offer, in display order: `["phone"]`, `["email"]` or '
+            '`["phone", "email"]` (show a Phone / Email choice). Never empty.'
+        ),
+    )
+
+
+class PhoneOtpSendSerializer(serializers.Serializer):
+    phone = serializers.CharField(
+        validators=[indian_mobile_validator], help_text="E.164 Indian mobile, e.g. +919876543210."
+    )
+
+
+class PhoneVerifySerializer(serializers.Serializer):
+    phone = serializers.CharField(validators=[indian_mobile_validator])
+    otp = serializers.CharField(validators=[otp_code_validator], help_text="6 digits.")
+
+
+class EmailOtpForMeSerializer(serializers.Serializer):
+    email = LoginEmailField(help_text="The email to verify. Case does not matter.")
+
+
+class EmailVerifySerializer(serializers.Serializer):
+    email = LoginEmailField()
+    otp = serializers.CharField(validators=[otp_code_validator], help_text="6 digits.")
+
+
 CATEGORY_NOT_IN_LIST = "Choose a business category from the list."
 
 
@@ -113,7 +197,12 @@ class MeSerializer(serializers.Serializer):
 
     id = serializers.IntegerField(read_only=True)
     phone = serializers.CharField(
-        read_only=True, allow_null=True, help_text="Login phone. Not editable in v1."
+        read_only=True,
+        allow_null=True,
+        help_text=(
+            "Login phone. Null for an email sign-up until a phone is added with "
+            "`POST /me/phone/verify/`; never changed once set (v1)."
+        ),
     )
     name = serializers.CharField(
         max_length=120, help_text="Cannot be blanked once sent. Empty after a skipped profile."
@@ -124,6 +213,21 @@ class MeSerializer(serializers.Serializer):
     )
     marketing_opt_in = serializers.BooleanField(
         required=False, help_text="Consent to promotional push notifications."
+    )
+    has_phone = serializers.BooleanField(
+        read_only=True,
+        help_text=(
+            "False for an account created by email sign-in that has not added a phone yet. "
+            "Customers must add one (`POST /me/phone/otp/`, `POST /me/phone/verify/`) before "
+            "placing an order: `POST /orders/` answers 422 `PHONE_REQUIRED` until then."
+        ),
+    )
+    email_verified = serializers.BooleanField(
+        read_only=True,
+        help_text=(
+            "True when `email` was proved with an email code, so it works for email sign-in. "
+            "Changing `email` with PATCH makes it false again (verify with `POST /me/email/otp/`)."
+        ),
     )
     business_category = serializers.PrimaryKeyRelatedField(
         queryset=BusinessCategory.objects.all(),
