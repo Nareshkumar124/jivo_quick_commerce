@@ -486,6 +486,10 @@ OTP_RETENTION_DAYS = 30  # 07 §4
 # D-15: phone -> fixed 6-digit code, no SMS and no send limits. Never in production.
 # Env format: "+919000000001:123456,+919000000002:123456". local.py has defaults.
 OTP_TEST_NUMBERS: dict[str, str] = env_dict("OTP_TEST_NUMBERS", default={})
+# Store-reviewer logins (Play / App Store review, D-15): phone -> fixed 6-digit code, no SMS;
+# rate limits still apply. Allowed in production. Empty = off. Same "phone:code,..." format;
+# codes must not be trivial (system check accounts.E008). See accounts/services/review_login.py.
+STORE_REVIEW_LOGINS: dict[str, str] = env_dict("STORE_REVIEW_LOGINS", default={})
 
 # --------------------------------------------------------------------------- SMS (D-02)
 # Local default: the console backend (logs the OTP). Deployed environments default to

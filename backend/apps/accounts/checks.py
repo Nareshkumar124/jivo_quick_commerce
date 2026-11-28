@@ -1,3 +1,4 @@
+import itertools
 import re
 
 from django.conf import settings
@@ -23,6 +24,35 @@ def check_otp_test_numbers(app_configs, **kwargs):
                     id="accounts.E002",
                 )
             )
+    return errors
+
+
+def _weak_code(code: str) -> bool:
+    """Trivial codes a reviewer login must not use: one repeated digit, or a straight run up or
+    down (123456, 654321, 012345, ...)."""
+    if len(set(code)) == 1:
+        return True
+    steps = {int(b) - int(a) for a, b in itertools.pairwise(code)}
+    return steps in ({1}, {-1})
+
+
+@register()
+def check_store_review_logins(app_configs, **kwargs):
+    """D-15: store-reviewer logins (allowed in production) must be well formed, use a
+    non-trivial 6-digit code, and not reuse a fixed-OTP test number."""
+    errors = []
+    logins = getattr(settings, "STORE_REVIEW_LOGINS", {}) or {}
+    test_numbers = getattr(settings, "OTP_TEST_NUMBERS", {}) or {}
+    for phone, code in logins.items():
+        if not _PHONE.match(phone) or not _CODE.match(code) or _weak_code(code):
+            reason = "invalid (use +91XXXXXXXXXX:6 digits, not a trivial code like 123456)"
+        elif phone in test_numbers:
+            reason = "also in OTP_TEST_NUMBERS (use a different number)"
+        else:
+            continue
+        errors.append(
+            Error(f"STORE_REVIEW_LOGINS entry for {phone[:6]}... is {reason}.", id="accounts.E008")
+        )
     return errors
 
 
