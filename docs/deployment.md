@@ -441,6 +441,8 @@ CI runs `check --deploy` with placeholder values, so it cannot catch a real envi
 5. Stop the old `beat`, then start the new one (never two, §4).
 6. Smoke: `/health/ready`, `/api/v1/config/app/`, a test-number OTP login on staging, and the new release visible in Sentry.
 
+**Policy pages (one-off, launch 2026-11-28):** `manage.py load_legal_pages --base-url https://quick.jivo.in` (run with `--dry-run` first) loads the six policy pages served at `/legal/<slug>/` and points the app config's support contacts, policy URLs and `terms_version` at them. **Re-running it overwrites admin edits to those six pages**, so after anyone edits them in the admin, change `backend/apps/cms/legal_pages.py` to match before running it again.
+
 ### 8.3 Rollback
 - **Code:** redeploy the previous image tag (steps 3–5). Because migrations are expand-only, the previous version runs against the new schema.
 - **A migration must be reverted:** only when it is reversible and data-safe: `manage.py migrate <app> <previous>` as a one-off task, then roll back the code. Otherwise fix forward.

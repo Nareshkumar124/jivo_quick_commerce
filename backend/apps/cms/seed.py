@@ -81,6 +81,20 @@ PAGES = {
         "your location, also in the background, to offer you nearby orders and show customers "
         "where their order is.</p><p>Location is not collected while you are offline.</p>",
     ),
+    # The real launch text is loaded by `manage.py load_legal_pages` (apps/cms/legal_pages.py).
+    "delivery-policy": (
+        "Delivery Policy",
+        "<h1>Delivery Policy</h1><p>Most orders arrive in 10 to 30 minutes inside our delivery "
+        "areas.</p>",
+    ),
+    "contact": (
+        "Contact Us",
+        f"<h1>Contact Us</h1><p>Questions? Write to {SUPPORT_LINK}.</p>",
+    ),
+    "delete-account": (
+        "Delete Your Account",
+        "<h1>Delete Your Account</h1><p>Open the app, go to Account, then Delete account.</p>",
+    ),
 }
 
 FAQS = [
