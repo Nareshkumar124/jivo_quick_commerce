@@ -10,6 +10,7 @@ import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../addresses/presentation/address_controllers.dart';
+import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_texts.dart';
 import '../../cart/presentation/widgets/bill_details.dart';
@@ -92,7 +93,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         // contact number, which lives on the delivery address.
         if (error.code == ApiErrorCode.phoneRequired) {
           showMessage(context, describeErrorWithDetails(context, error));
-          final id = ref.read(deliveryProvider).location?.addressId;
+          // The server names the address (`details.address_id`).
+          final id =
+              _intOrNull(error.details['address_id']) ??
+              ref.read(deliveryProvider).location?.addressId;
           if (id != null) context.push(Routes.editAddress(id));
           return;
         }
@@ -154,8 +158,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               ?.where((a) => a.id == addressId)
               .firstOrNull
         : null;
+    // The server's PHONE_REQUIRED blocker says the same.
     final needsContactPhone =
-        address != null && (address.input.receiverPhone ?? '').isEmpty;
+        (address != null && (address.input.receiverPhone ?? '').isEmpty) ||
+        snapshot.checkout.blockers.any(
+          (b) => b.code == CheckoutBlockerCode.phoneRequired,
+        );
     // The server decides (`Cart.checkout`); the order also needs a saved
     // address id and an offered method.
     // A total that can't be shown can't be paid (RD-02).
@@ -167,7 +175,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         snapshot.checkout.canPlaceOrder &&
         offered.contains(method) &&
         !needsContactPhone;
-    final blocker = snapshot.checkout.canPlaceOrder
+    // PHONE_REQUIRED shows with its "Add mobile number" action below.
+    final blocker =
+        snapshot.checkout.canPlaceOrder ||
+            (needsContactPhone &&
+                snapshot.checkout.blockers.firstOrNull?.code ==
+                    CheckoutBlockerCode.phoneRequired)
         ? null
         : checkoutBlockerText(l10n, snapshot);
     final progress = switch (checkout.step) {
@@ -298,7 +311,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   children: [
                     if (blocker != null && !checkout.busy)
                       CheckoutBlockerText(blocker)
-                    else if (needsContactPhone && !checkout.busy) ...[
+                    else if (needsContactPhone &&
+                        addressId != null &&
+                        !checkout.busy) ...[
                       CheckoutBlockerText(l10n.checkoutContactPhoneNeeded),
                       Padding(
                         padding: const EdgeInsets.only(bottom: JivoSpacing.sm),
@@ -307,7 +322,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           icon: const Icon(Icons.phone_android),
                           label: Text(l10n.addContactPhone),
                           onPressed: () =>
-                              context.push(Routes.editAddress(addressId!)),
+                              context.push(Routes.editAddress(addressId)),
                         ),
                       ),
                     ],
@@ -464,3 +479,10 @@ class CodUnavailableTile extends StatelessWidget {
     );
   }
 }
+
+/// An id from an error's details: an int, or a numeric string.
+int? _intOrNull(Object? value) => switch (value) {
+  final int v => v,
+  final String v => int.tryParse(v),
+  _ => null,
+};

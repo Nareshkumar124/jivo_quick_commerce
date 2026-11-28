@@ -104,4 +104,24 @@ void main() {
       'address.',
     );
   });
+
+  test('the PHONE_REQUIRED blocker asks for a mobile number', () async {
+    final l10n = await AppLocalizations.delegate.load(const Locale('en'));
+    const cart = CartSnapshot(
+      checkout: CheckoutStatus(
+        canPlaceOrder: false,
+        blockers: [
+          CheckoutBlocker(
+            code: CheckoutBlockerCode.phoneRequired,
+            message: 'server text',
+          ),
+        ],
+      ),
+    );
+    expect(
+      checkoutBlockerText(l10n, cart),
+      'Add a mobile number to this address so the delivery partner can '
+      'call you.',
+    );
+  });
 }

@@ -540,6 +540,9 @@ enum CheckoutBlockerCode {
   cartEmpty,
   addressRequired,
   notServiceable,
+
+  /// The account has no phone and the address no receiver phone.
+  phoneRequired,
   storeClosed,
   stockUnavailable,
 

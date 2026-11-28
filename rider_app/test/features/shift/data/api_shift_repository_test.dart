@@ -131,6 +131,7 @@ void main() {
 const _riderMe = {
   'id': 3,
   'phone': '+919811122231',
+  'contact_phone': '',
   'status': 'ACTIVE',
   'rejection_reason': '',
   'suspension_reason': '',

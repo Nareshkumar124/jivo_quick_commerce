@@ -72,7 +72,7 @@ void main() {
       );
     });
 
-    testWidgets('both: a Phone / Email choice switches the field', (
+    testWidgets('both: Email by default, a Phone / Email choice switches', (
       tester,
     ) async {
       final app = TestApp();
@@ -80,7 +80,13 @@ void main() {
       await app.pump(tester);
 
       expect(find.byKey(const Key('login-method')), findsOneWidget);
+      expect(find.byKey(const Key('login-email')), findsOneWidget);
+      expect(find.byKey(const Key('login-phone')), findsNothing);
+
+      await tester.tap(find.text('Phone'));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('login-phone')), findsOneWidget);
+      expect(find.byKey(const Key('login-email')), findsNothing);
 
       await tester.tap(find.text('Email'));
       await tester.pumpAndSettle();
@@ -103,6 +109,8 @@ void main() {
           'methods': ['email'],
         },
       );
+      await tester.tap(find.text('Phone'));
+      await tester.pumpAndSettle();
 
       await loginToOtp(tester, '9876543210');
 
@@ -293,6 +301,36 @@ void main() {
         OtpPurpose.deleteAccount,
       ));
       expect(find.textContaining('asha@example.com'), findsOneWidget);
+    });
+
+    testWidgets('delete account uses the verified email even with a phone', (
+      tester,
+    ) async {
+      final app = TestApp(tokens: signedInTokens);
+      app.profile.profile = const UserProfile(
+        id: 3,
+        phone: '+919876543210',
+        name: 'Asha Verma',
+        email: 'asha@example.com',
+        isProfileComplete: true,
+        emailVerified: true,
+      );
+      await app.pump(tester);
+      await openAccount(tester);
+      await tester.scrollUntilVisible(find.text('Delete account'), 100);
+      await tester.drag(find.byType(ListView).last, const Offset(0, -300));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Delete account'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Send OTP to confirm'));
+      await tester.pumpAndSettle();
+
+      expect(app.auth.otpRequests, isEmpty);
+      expect(app.auth.emailOtpRequests.single, (
+        'asha@example.com',
+        OtpPurpose.deleteAccount,
+      ));
     });
 
     testWidgets(

@@ -818,29 +818,11 @@ abstract class AppLocalizations {
   /// **'Enter a valid email address.'**
   String get loginEmailInvalid;
 
-  /// No description provided for @loginNewRiderPhone.
-  ///
-  /// In en, this message translates to:
-  /// **'New rider? Register with your mobile number.'**
-  String get loginNewRiderPhone;
-
-  /// No description provided for @loginNewRiderEmailOnlyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'New rider?'**
-  String get loginNewRiderEmailOnlyTitle;
-
-  /// EMAIL_NOT_REGISTERED and the new-rider note when only email login is on. Keep the support email and phone exact.
+  /// EMAIL_NOT_REGISTERED (old servers only). Keep the support email and phone exact.
   ///
   /// In en, this message translates to:
   /// **'This email isn\'t registered as a rider. Contact Jivo support at info@jivo.in or +91 8595 349 565'**
   String get loginEmailNotRegistered;
-
-  /// No description provided for @loginNewRiderEmailOnly.
-  ///
-  /// In en, this message translates to:
-  /// **'New riders can\'t sign up with an email. Contact Jivo support at info@jivo.in or +91 8595 349 565 to register.'**
-  String get loginNewRiderEmailOnly;
 
   /// No description provided for @loginMethodDisabled.
   ///
@@ -1135,6 +1117,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'About you'**
   String get registerSectionAboutYou;
+
+  /// The rider's own mobile at registration, shown only for an email sign-up (no login phone). Customers and the store call it.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile number'**
+  String get registerMobile;
+
+  /// No description provided for @registerMobileHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers and the store call you on this number.'**
+  String get registerMobileHelp;
 
   /// No description provided for @registerFullName.
   ///
@@ -2803,6 +2797,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vehicle'**
   String get profileVehicle;
+
+  /// No description provided for @profileMobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile number'**
+  String get profileMobile;
+
+  /// No description provided for @profileMobileEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Change mobile number'**
+  String get profileMobileEdit;
+
+  /// No description provided for @profileMobileAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add mobile number'**
+  String get profileMobileAdd;
+
+  /// No description provided for @profileMobileSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get profileMobileSave;
+
+  /// No description provided for @profileMobileCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get profileMobileCancel;
+
+  /// No description provided for @profileMobileSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile number saved.'**
+  String get profileMobileSaved;
+
+  /// No description provided for @profileMobileServerInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'This number can\'t be used. Check it, or use a number different from your emergency contact.'**
+  String get profileMobileServerInvalid;
 
   /// No description provided for @profileKycStatus.
   ///

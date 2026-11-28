@@ -24,7 +24,8 @@ import 'onboarding_text.dart';
 
 /// Registration form (04 §2.2, screen 3) for `rider_status: NONE`: name,
 /// date of birth (18+), emergency contact, preferred store, vehicle type and
-/// (motorised only) vehicle number. Submits `POST /rider/register/`; the
+/// (motorised only) vehicle number. An email sign-up (`GET /me/`
+/// `has_phone: false`) also gives a mobile number (`contact_phone`). Submits `POST /rider/register/`; the
 /// router then opens the status screen with the next step.
 class RegistrationScreen extends ConsumerStatefulWidget {
   const RegistrationScreen({super.key});
@@ -38,6 +39,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   final _emergencyName = TextEditingController();
   final _emergencyPhone = TextEditingController();
   final _vehicleNumber = TextEditingController();
+  final _contactPhone = TextEditingController();
   DateTime? _dob;
   int? _storeId;
   VehicleType? _vehicle;
@@ -63,7 +65,12 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     _session = ref.read(sessionManagerProvider);
     final account = ref.read(riderAccountControllerProvider);
     if (account is AccountLoaded) _name.text = account.user.name.trim();
-    for (final field in [_name, _emergencyName, _emergencyPhone]) {
+    for (final field in [
+      _name,
+      _emergencyName,
+      _emergencyPhone,
+      _contactPhone,
+    ]) {
       field.addListener(_scheduleSave);
     }
     _vehicleNumber.addListener(_scheduleSave);
@@ -78,6 +85,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
       _emergencyName.text = saved.emergencyName;
       _emergencyPhone.text = saved.emergencyPhone;
       _vehicleNumber.text = saved.vehicleNumber;
+      _contactPhone.text = saved.contactPhone;
       _dob = saved.dateOfBirth;
       _storeId = saved.storeId;
       _vehicle = saved.vehicleType;
@@ -116,6 +124,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     _emergencyName.dispose();
     _emergencyPhone.dispose();
     _vehicleNumber.dispose();
+    _contactPhone.dispose();
     super.dispose();
   }
 
@@ -129,7 +138,15 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     storeId: _storeId,
     vehicleType: _vehicle,
     vehicleNumber: _vehicleNumber.text,
+    contactPhone: _needsContactPhone ? _contactPhone.text : '',
   );
+
+  /// An email sign-up has no login phone: the server requires
+  /// `contact_phone` (400 `VALIDATION_ERROR` on it otherwise).
+  bool get _needsContactPhone {
+    final account = ref.read(riderAccountControllerProvider);
+    return account is AccountLoaded && !account.user.hasPhone;
+  }
 
   void _clear(RegistrationField field) {
     ref.read(registrationControllerProvider.notifier).clearError();
@@ -167,6 +184,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     final errors = draft.validate(
       today: _today,
       riderPhoneE164: account is AccountLoaded ? account.user.phone : null,
+      needsContactPhone: _needsContactPhone,
     );
     setState(() => _errors = errors);
     if (errors.isNotEmpty) return;
@@ -180,8 +198,27 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   }
 
   String? _error(AppLocalizations l10n, RegistrationField field) {
-    final error = _errors[field];
+    final error = _errors[field] ?? _serverFieldError(field);
     return error == null ? null : fieldErrorText(l10n, error);
+  }
+
+  /// `VALIDATION_ERROR` on a phone field (`contact_phone` missing or bad,
+  /// or the emergency number equal to it) shown under that field. Server
+  /// messages are never shown.
+  FieldError? _serverFieldError(RegistrationField field) {
+    final error = ref.read(registrationControllerProvider).error;
+    if (error == null || error.code != ApiErrorCode.validationError) {
+      return null;
+    }
+    return switch (field) {
+      RegistrationField.contactPhone
+          when error.details.containsKey('contact_phone') =>
+        FieldError.phoneInvalid,
+      RegistrationField.emergencyPhone
+          when error.details.containsKey('emergency_contact_phone') =>
+        FieldError.phoneSameAsRider,
+      _ => null,
+    };
   }
 
   @override
@@ -227,6 +264,31 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                   ),
                   onChanged: (_) => _clear(RegistrationField.fullName),
                 ),
+                if (_needsContactPhone) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    key: const Key('register-contact-phone'),
+                    controller: _contactPhone,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    autofillHints: const [
+                      AutofillHints.telephoneNumberNational,
+                    ],
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    decoration: InputDecoration(
+                      labelText: l10n.registerMobile,
+                      hintText: l10n.loginPhoneHint,
+                      helperText: l10n.registerMobileHelp,
+                      helperMaxLines: 2,
+                      prefixText: '+91 ',
+                      errorText: _error(l10n, RegistrationField.contactPhone),
+                    ),
+                    onChanged: (_) => _clear(RegistrationField.contactPhone),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 _DateOfBirthField(
                   value: _dob,

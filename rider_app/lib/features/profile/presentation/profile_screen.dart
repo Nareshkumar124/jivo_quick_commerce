@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_api/jivo_api.dart' show RiderStatusEnum;
@@ -20,6 +21,7 @@ import '../../onboarding/data/fake_rider_onboarding_backend.dart';
 import '../../onboarding/domain/kyc_document.dart';
 import '../../onboarding/domain/rider_profile.dart';
 import '../../onboarding/presentation/onboarding_providers.dart';
+import '../../onboarding/domain/validators.dart';
 import '../../onboarding/presentation/onboarding_text.dart';
 import '../../support/presentation/support_email_button.dart';
 
@@ -79,7 +81,11 @@ class _ProfileBody extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final account = ref.watch(riderAccountControllerProvider);
-    final phone = account is AccountLoaded ? account.user.phone : null;
+    final loginPhone = account is AccountLoaded ? account.user.phone : null;
+    // `phone` of `GET /rider/me/`: the login phone, or `contact_phone` for
+    // an email sign-up, which the rider can change here.
+    final phone = profile.phone ?? loginPhone;
+    final emailAccount = account is AccountLoaded && !account.user.hasPhone;
     final store = profile.homeStore ?? profile.preferredStore;
     final photo = profile.photoUrl;
     final safePhoto = Uri.tryParse(photo ?? '')?.scheme == 'https';
@@ -134,12 +140,31 @@ class _ProfileBody extends ConsumerWidget {
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall,
           ),
-          if (phone != null)
+          if (phone != null && !emailAccount)
             Text(
               IndianMobile.format(phone),
               key: const Key('profile-phone'),
               textAlign: TextAlign.center,
             ),
+          if (emailAccount) ...[
+            const SizedBox(height: 8),
+            Card(
+              child: _InfoRow(
+                key: const Key('profile-contact-phone'),
+                icon: Icons.phone,
+                label: l10n.profileMobile,
+                value: profile.contactPhone == null
+                    ? l10n.profileMobileAdd
+                    : IndianMobile.format(profile.contactPhone!),
+                trailingIcon: Icons.edit,
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (_) =>
+                      _ContactPhoneDialog(initial: profile.contactPhone),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Card(
             child: Column(
@@ -353,6 +378,7 @@ class _InfoRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.onTap,
+    this.trailingIcon = Icons.chevron_right,
     super.key,
   });
 
@@ -360,6 +386,7 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
   final VoidCallback? onTap;
+  final IconData trailingIcon;
 
   @override
   Widget build(BuildContext context) => InkWell(
@@ -379,9 +406,110 @@ class _InfoRow extends StatelessWidget {
               ],
             ),
           ),
-          if (onTap != null) const Icon(Icons.chevron_right),
+          if (onTap != null) Icon(trailingIcon),
         ],
       ),
     ),
   );
+}
+
+/// Change `contact_phone` (email accounts): 10 digits, checked here for
+/// shape; the server decides the rest (`VALIDATION_ERROR` on it).
+class _ContactPhoneDialog extends ConsumerStatefulWidget {
+  const _ContactPhoneDialog({required this.initial});
+
+  final String? initial;
+
+  @override
+  ConsumerState<_ContactPhoneDialog> createState() =>
+      _ContactPhoneDialogState();
+}
+
+class _ContactPhoneDialogState extends ConsumerState<_ContactPhoneDialog> {
+  late final _controller = TextEditingController(
+    text: IndianMobile.nationalDigits(widget.initial ?? ''),
+  );
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
+    final invalid = validateContactPhone(_controller.text);
+    if (invalid != null) {
+      setState(() => _error = fieldErrorText(l10n, invalid));
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    final error = await ref
+        .read(riderProfileControllerProvider.notifier)
+        .updateContactPhone(IndianMobile.toE164(_controller.text)!);
+    if (!mounted) return;
+    if (error == null) {
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.of(context).pop();
+      messenger.showSnackBar(SnackBar(content: Text(l10n.profileMobileSaved)));
+      return;
+    }
+    setState(() {
+      _saving = false;
+      _error = error.code == ApiErrorCode.validationError
+          ? l10n.profileMobileServerInvalid
+          : onboardingErrorText(context, error);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.profileMobileEdit),
+      content: TextField(
+        key: const Key('profile-contact-phone-field'),
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.phone,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(10),
+        ],
+        decoration: InputDecoration(
+          labelText: l10n.profileMobile,
+          hintText: l10n.loginPhoneHint,
+          prefixText: '+91 ',
+          errorText: _error,
+          errorMaxLines: 3,
+        ),
+        onChanged: (_) {
+          if (_error != null) setState(() => _error = null);
+        },
+        onSubmitted: (_) => _saving ? null : _save(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: Text(l10n.profileMobileCancel),
+        ),
+        FilledButton(
+          key: const Key('profile-contact-phone-save'),
+          style: FilledButton.styleFrom(minimumSize: const Size(96, 56)),
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox.square(
+                  dimension: 24,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                )
+              : Text(l10n.profileMobileSave),
+        ),
+      ],
+    );
+  }
 }

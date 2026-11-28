@@ -36,6 +36,33 @@ void main() {
     expect(byKey('capture-camera'), findsNothing);
   });
 
+  testWidgets('a phone account: no editable Mobile number', (tester) async {
+    await openFromHome(tester, h, 'home-profile');
+    expect(byKey('profile-contact-phone'), findsNothing);
+  });
+
+  testWidgets('an email account changes its Mobile number '
+      '(PATCH /rider/me/ contact_phone)', (tester) async {
+    h.backend.seedVerifiedEmailOnly = 'ravi@example.com';
+    await openFromHome(tester, h, 'home-profile');
+    expect(byKey('profile-phone'), findsNothing);
+    expect(find.text('Add mobile number'), findsOneWidget);
+
+    await tester.tap(byKey('profile-contact-phone'));
+    await tester.pumpAndSettle();
+    await tester.enterText(byKey('profile-contact-phone-field'), '12345');
+    await tester.tap(byKey('profile-contact-phone-save'));
+    await tester.pumpAndSettle();
+    expect(h.onboarding.calls, isNot(contains('updateContactPhone')));
+
+    await tester.enterText(byKey('profile-contact-phone-field'), '9811122299');
+    await tester.tap(byKey('profile-contact-phone-save'));
+    await tester.pumpAndSettle();
+    expect(h.onboarding.calls, contains('updateContactPhone'));
+    expect(find.text('+91 98111 22299'), findsOneWidget);
+    expect(find.text('Mobile number saved.'), findsOneWidget);
+  });
+
   testWidgets('a failed load offers Retry', (tester) async {
     await pumpActiveHome(tester, h);
     h.onboarding.failNext = const ApiError(code: ApiErrorCode.network);

@@ -226,6 +226,91 @@ void main() {
     expect(h.onboarding.calls, ['fetchStores', 'fetchStores']);
   });
 
+  group('email sign-up (has_phone false): contact_phone', () {
+    Future<void> openEmail(WidgetTester tester) async {
+      h.backend.seedVerifiedEmailOnly = 'ravi@example.com';
+      await open(tester);
+    }
+
+    // The Mobile number sits near the top: scroll back up to it.
+    Future<void> showUp(WidgetTester tester, String key) async {
+      await tester.scrollUntilVisible(
+        byKey(key),
+        -150,
+        scrollable: find
+            .descendant(of: find.byKey(form), matching: find.byType(Scrollable))
+            .first,
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a phone account sees no Mobile number field', (tester) async {
+      await open(tester);
+      expect(byKey('register-contact-phone'), findsNothing);
+    });
+
+    testWidgets('the Mobile number is required and sent as contact_phone', (
+      tester,
+    ) async {
+      await openEmail(tester);
+      expect(byKey('register-contact-phone'), findsOneWidget);
+      await fillValidForm(tester);
+      await chooseVehicle(tester, VehicleType.bicycle);
+      await submit(tester);
+      await showUp(tester, 'register-contact-phone');
+      expect(find.text('This is required.'), findsOneWidget);
+      expect(h.onboarding.calls, isNot(contains('register')));
+
+      await tester.enterText(byKey('register-contact-phone'), '9811122299');
+      await submit(tester);
+      expect(h.onboarding.calls, contains('register'));
+      final profile = h.onboarding.profileOf('user-57')!;
+      expect(profile.contactPhone, '+919811122299');
+    });
+
+    testWidgets('the emergency number must differ from the Mobile number', (
+      tester,
+    ) async {
+      await openEmail(tester);
+      await fillValidForm(tester);
+      await chooseVehicle(tester, VehicleType.bicycle);
+      await showUp(tester, 'register-contact-phone');
+      await tester.enterText(byKey('register-contact-phone'), '9876500001');
+      await submit(tester);
+      await show(tester, 'register-emergency-phone');
+      expect(
+        find.text("Enter someone else's number, not your own."),
+        findsOneWidget,
+      );
+      expect(h.onboarding.calls, isNot(contains('register')));
+    });
+
+    testWidgets('400 VALIDATION_ERROR on contact_phone shows under the '
+        'field', (tester) async {
+      await openEmail(tester);
+      await fillValidForm(tester);
+      await chooseVehicle(tester, VehicleType.bicycle);
+      await showUp(tester, 'register-contact-phone');
+      await tester.enterText(byKey('register-contact-phone'), '9811122299');
+      h.onboarding.failNext = const ApiError(
+        code: ApiErrorCode.validationError,
+        rawCode: 'VALIDATION_ERROR',
+        statusCode: 400,
+        details: {
+          'contact_phone': ['Enter a valid number.'],
+        },
+      );
+      await submit(tester);
+      await showUp(tester, 'register-contact-phone');
+      expect(
+        find.text(
+          'Enter a valid Indian mobile number starting with 6, 7, 8 or 9.',
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('RA-07', () {
     testWidgets('the selected vehicle tile shows a check mark', (tester) async {
       await open(tester);

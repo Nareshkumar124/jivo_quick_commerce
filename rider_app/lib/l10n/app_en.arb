@@ -219,13 +219,10 @@
   "loginEmailHint": "name@example.com",
   "loginEmailEmpty": "Enter your email.",
   "loginEmailInvalid": "Enter a valid email address.",
-  "loginNewRiderPhone": "New rider? Register with your mobile number.",
-  "loginNewRiderEmailOnlyTitle": "New rider?",
   "loginEmailNotRegistered": "This email isn't registered as a rider. Contact Jivo support at info@jivo.in or +91 8595 349 565",
   "@loginEmailNotRegistered": {
-    "description": "EMAIL_NOT_REGISTERED and the new-rider note when only email login is on. Keep the support email and phone exact."
+    "description": "EMAIL_NOT_REGISTERED (old servers only). Keep the support email and phone exact."
   },
-  "loginNewRiderEmailOnly": "New riders can't sign up with an email. Contact Jivo support at info@jivo.in or +91 8595 349 565 to register.",
   "loginMethodDisabled": "This way of logging in is switched off. Please use the other option shown.",
   "loginSupportCall": "Call support",
   "loginSupportEmail": "Email support",
@@ -340,6 +337,11 @@
   "fieldDrivingLicenceInvalid": "Enter your licence number exactly as printed on the card.",
   "registerIntro": "Tell us about yourself and your vehicle. Next, you'll upload your documents.",
   "registerSectionAboutYou": "About you",
+  "registerMobile": "Mobile number",
+  "@registerMobile": {
+    "description": "The rider's own mobile at registration, shown only for an email sign-up (no login phone). Customers and the store call it."
+  },
+  "registerMobileHelp": "Customers and the store call you on this number.",
   "registerFullName": "Full name (as on Aadhaar)",
   "registerDob": "Date of birth",
   "registerDobHint": "Choose the date",
@@ -919,6 +921,13 @@
   "profileTitle": "Profile",
   "profileHomeStore": "Home store",
   "profileVehicle": "Vehicle",
+  "profileMobile": "Mobile number",
+  "profileMobileEdit": "Change mobile number",
+  "profileMobileAdd": "Add mobile number",
+  "profileMobileSave": "Save",
+  "profileMobileCancel": "Cancel",
+  "profileMobileSaved": "Mobile number saved.",
+  "profileMobileServerInvalid": "This number can't be used. Check it, or use a number different from your emergency contact.",
   "profileKycStatus": "KYC status",
   "profileKycApproved": "Verified",
   "profileRating": "Rating",

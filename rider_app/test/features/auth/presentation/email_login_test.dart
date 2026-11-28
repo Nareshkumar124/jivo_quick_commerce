@@ -11,10 +11,6 @@ Finder getOtp() => find.byKey(const Key('login-get-otp'));
 Finder codeField() => find.byKey(const Key('otp-code'));
 Finder toggle() => find.byKey(const Key('login-method-toggle'));
 
-const notRegistered =
-    "This email isn't registered as a rider. Contact Jivo support at "
-    'info@jivo.in or +91 8595 349 565';
-
 void main() {
   late RiderTestHarness h;
 
@@ -46,25 +42,19 @@ void main() {
       expect(phoneField(), findsNothing);
       expect(
         find.byKey(const Key('login-new-rider-phone')),
-        findsOneWidget,
-        reason: 'new riders are pointed to phone registration',
+        findsNothing,
+        reason: 'email sign-up works: no "register with phone" note',
       );
     });
 
-    testWidgets('email only: email field and the support note for new '
-        'riders (no dead end)', (tester) async {
+    testWidgets('email only: email field, no "contact support to '
+        'register" note (email sign-up works)', (tester) async {
       h.backend.loginMethods = const [LoginMethod.email];
       await h.pump(tester);
       expect(toggle(), findsNothing);
       expect(emailField(), findsOneWidget);
-      expect(find.byKey(const Key('login-new-rider-support')), findsOneWidget);
-
-      await tester.ensureVisible(
-        find.byKey(const Key('login-support-call')).first,
-      );
-      await tester.tap(find.byKey(const Key('login-support-call')).first);
-      await tester.pump();
-      expect(h.urls.opened.last.toString(), 'tel:+918595349565');
+      expect(find.byKey(const Key('login-new-rider-support')), findsNothing);
+      expect(find.byKey(const Key('login-support-call')), findsNothing);
     });
   });
 
@@ -86,9 +76,7 @@ void main() {
       expect(h.backend.calls, isEmpty);
     });
 
-    testWidgets('registered rider: email OTP signs in to home', (
-      tester,
-    ) async {
+    testWidgets('registered rider: email OTP signs in to home', (tester) async {
       await h.pump(tester);
       await emailToOtp(tester, FakeAuthBackend.registeredEmail);
 
@@ -118,19 +106,16 @@ void main() {
       expect(find.text('Wrong code. 4 attempts left.'), findsOneWidget);
     });
 
-    testWidgets('EMAIL_NOT_REGISTERED: support message and contacts', (
-      tester,
-    ) async {
+    testWidgets('a new email signs up: registration with a required '
+        'Mobile number field', (tester) async {
       await h.pump(tester);
       await emailToOtp(tester, 'someone@example.com');
       await tester.enterText(codeField(), FakeAuthBackend.validOtp);
-      await pumpFor(tester, const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
-      expect(find.text(notRegistered), findsOneWidget);
-      expect(h.session.isSignedIn, isFalse);
-      await tester.tap(find.byKey(const Key('login-support-email')));
-      await tester.pump();
-      expect(h.urls.opened.last.toString(), 'mailto:info@jivo.in');
+      expect(h.session.isSignedIn, isTrue);
+      expect(find.text('Become a Jivo rider'), findsOneWidget);
+      expect(find.byKey(const Key('register-contact-phone')), findsOneWidget);
     });
 
     testWidgets('LOGIN_METHOD_DISABLED: message, then the screen offers '

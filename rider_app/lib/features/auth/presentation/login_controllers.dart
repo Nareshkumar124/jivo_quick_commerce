@@ -80,7 +80,8 @@ final loginMethodsProvider = FutureProvider.autoDispose<List<LoginMethod>>((
 bool isLoginMethodDisabled(ApiError error) =>
     error.rawCode == EmailLoginErrorCodes.loginMethodDisabled;
 
-/// 403 `EMAIL_NOT_REGISTERED`: no rider has this verified email.
+/// 403 `EMAIL_NOT_REGISTERED`: the old server answer for an unknown email.
+/// No longer sent (email sign-up works); kept so an old server stays clear.
 bool isEmailNotRegistered(ApiError error) =>
     error.rawCode == EmailLoginErrorCodes.emailNotRegistered;
 
@@ -139,7 +140,9 @@ class PhoneLoginController extends Notifier<PhoneLoginState> {
     if (!looksLikeEmail(email) || state.submitting) return false;
     state = const PhoneLoginState(submitting: true);
     try {
-      final sent = await ref.read(authRepositoryProvider).requestEmailOtp(email);
+      final sent = await ref
+          .read(authRepositoryProvider)
+          .requestEmailOtp(email);
       ref
           .read(otpChallengeProvider.notifier)
           .set(
@@ -162,7 +165,9 @@ class PhoneLoginController extends Notifier<PhoneLoginState> {
     final handled = reportAppControlError(ref, error);
     // The admin switched this method off meanwhile: re-read the methods so
     // the screen offers the ones that are on.
-    if (isLoginMethodDisabled(error) && ref.mounted) ref.invalidate(loginMethodsProvider);
+    if (isLoginMethodDisabled(error) && ref.mounted) {
+      ref.invalidate(loginMethodsProvider);
+    }
     if (ref.mounted) {
       state = PhoneLoginState(error: handled ? null : error);
     }

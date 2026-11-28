@@ -82,6 +82,7 @@ const Map<String, Object?> riderMeActiveExample = {
   },
   "id": 42,
   "phone": "+919811122233",
+  "contact_phone": "",
   "rejection_reason": "",
   "suspension_reason": "",
   "full_name": "Ravi Kumar",

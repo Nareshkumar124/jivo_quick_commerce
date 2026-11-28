@@ -33,4 +33,8 @@ abstract interface class RiderOnboardingRepository {
 
   /// `PUT /rider/bank-account/`.
   Future<BankAccountSummary> saveBankAccount(BankAccountInput input);
+
+  /// `PATCH /rider/me/` with `contact_phone` (E.164): the rider's own
+  /// mobile, for an account created by email sign-in.
+  Future<RiderProfile> updateContactPhone(String contactPhoneE164);
 }
