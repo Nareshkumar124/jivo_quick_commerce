@@ -20,6 +20,7 @@ from django.utils import timezone
 from apps.accounts.choices import OtpPurpose
 from apps.accounts.managers import normalise_email
 from apps.accounts.models import OTPRequest, User
+from apps.accounts.services import review_login
 from apps.core.errors import ErrorCode
 from apps.core.exceptions import ApiError, OtpRateLimited
 from apps.core.ratelimit import Limit, RateLimitUnavailable, hit
@@ -167,7 +168,8 @@ def request_otp(
     if purpose == OtpPurpose.DELETE_ACCOUNT and not target.account_exists():
         return sent_response()  # same answer, nothing sent
 
-    code = test_code or f"{secrets.randbelow(10**OTP_DIGITS):0{OTP_DIGITS}d}"
+    review_code = review_login.code_for(phone)
+    code = test_code or review_code or f"{secrets.randbelow(10**OTP_DIGITS):0{OTP_DIGITS}d}"
     now = timezone.now()
     with transaction.atomic():
         # A new OTP replaces any still-active one for the same target, app and purpose.
@@ -183,7 +185,9 @@ def request_otp(
             ip=ip,
             user_agent=user_agent[:256],
         )
-        if test_code is None:
+        if review_code is not None:  # store reviewer: nothing sent
+            review_login.log_event("request", phone=phone, purpose=purpose, app=app)
+        elif test_code is None:
             from apps.accounts.tasks import send_otp_email, send_otp_sms
 
             task = send_otp_email if target.is_email else send_otp_sms
@@ -249,6 +253,9 @@ def verify_otp(
         else:
             otp.verified_at = now
             otp.save(update_fields=["verified_at", "updated_at"])
+    if review_login.code_for(phone) is not None:
+        outcome = "failed" if error is not None else "ok"
+        review_login.log_event("verify", phone=phone, purpose=purpose, app=app, outcome=outcome)
     if error is not None:
         raise error
     return otp

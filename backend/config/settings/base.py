@@ -491,6 +491,10 @@ OTP_TEST_NUMBERS: dict[str, str] = env_dict("OTP_TEST_NUMBERS", default={})
 # Never in production (like OTP_TEST_NUMBERS). local.py and test.py have defaults.
 OTP_TEST_EMAILS: dict[str, str] = env_dict("OTP_TEST_EMAILS", default={})
 OTP_EMAIL_SUBJECT = env_str("OTP_EMAIL_SUBJECT", default="Your Jivo verification code")
+# Store-reviewer logins (Play / App Store review, D-15): phone -> fixed 6-digit code, no SMS;
+# rate limits still apply. Allowed in production. Empty = off. Same "phone:code,..." format;
+# codes must not be trivial (system check accounts.E011). See accounts/services/review_login.py.
+STORE_REVIEW_LOGINS: dict[str, str] = env_dict("STORE_REVIEW_LOGINS", default={})
 
 # --------------------------------------------------------------------------- SMS (D-02)
 # Local default: the console backend (logs the OTP). Deployed environments default to
