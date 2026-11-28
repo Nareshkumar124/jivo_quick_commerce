@@ -14,6 +14,7 @@ import '../../../shared/formatting/formatters.dart';
 import '../../../shared/widgets/state_views.dart';
 import '../../auth/presentation/auth_flow.dart';
 import '../../cms/data/cms_repository.dart';
+import '../../cms/presentation/policy_links.dart';
 import '../../notifications/presentation/inbox_screen.dart';
 import '../../referral/presentation/referral_controller.dart';
 import '../../referral/presentation/referral_screen.dart'
@@ -54,6 +55,7 @@ class AccountScreen extends ConsumerWidget {
     final version = ref.watch(clientInfoProvider).appVersion;
     final opener = ref.read(urlOpenerProvider);
     final inAppPages = ref.watch(cmsAvailableProvider);
+    final showAbout = ref.watch(appEnvProvider).flavor != Flavor.prod;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.accountTitle)),
@@ -125,20 +127,14 @@ class AccountScreen extends ConsumerWidget {
                   trailing: const InboxUnreadBadge(),
                   onTap: () => context.push(Routes.notifications),
                 ),
+                // The launch policy pages (Play Store, 2026-11-28). About
+                // has no page on the production server, so only dev and
+                // staging list it.
                 if (inAppPages)
                   for (final (label, slug, icon) in [
-                    (l10n.aboutJivo, CmsSlugs.about, Icons.info_outline),
-                    (
-                      l10n.termsOfService,
-                      CmsSlugs.terms,
-                      Icons.description_outlined,
-                    ),
-                    (
-                      l10n.privacyPolicy,
-                      CmsSlugs.privacy,
-                      Icons.privacy_tip_outlined,
-                    ),
-                    (l10n.refundPolicy, CmsSlugs.refund, Icons.currency_rupee),
+                    if (showAbout)
+                      (l10n.aboutJivo, CmsSlugs.about, Icons.info_outline),
+                    ..._policyRows(l10n),
                   ])
                     _Row(
                       key: Key('legal-$slug'),
@@ -147,25 +143,14 @@ class AccountScreen extends ConsumerWidget {
                       onTap: () => context.push(Routes.page(slug)),
                     )
                 else if (policies != null)
-                  for (final (label, url, icon) in [
-                    (
-                      l10n.termsOfService,
-                      policies.terms,
-                      Icons.description_outlined,
-                    ),
-                    (
-                      l10n.privacyPolicy,
-                      policies.privacy,
-                      Icons.privacy_tip_outlined,
-                    ),
-                    (l10n.refundPolicy, policies.refund, Icons.currency_rupee),
-                  ])
-                    _Row(
-                      icon: icon,
-                      label: label,
-                      trailing: const Icon(Icons.open_in_new, size: 18),
-                      onTap: () => opener.open(url),
-                    ),
+                  for (final (label, slug, icon) in _policyRows(l10n))
+                    if (policies.forSlug(slug) case final url?)
+                      _Row(
+                        icon: icon,
+                        label: label,
+                        trailing: const Icon(Icons.open_in_new, size: 18),
+                        onTap: () => opener.open(url),
+                      ),
               ],
             ),
             const SizedBox(height: JivoSpacing.md),
@@ -203,6 +188,20 @@ class AccountScreen extends ConsumerWidget {
     );
   }
 }
+
+/// Account's policy rows: label, CMS slug, icon.
+List<(String, String, IconData)> _policyRows(AppLocalizations l10n) => [
+  (l10n.termsOfService, CmsSlugs.terms, Icons.description_outlined),
+  (l10n.privacyPolicy, CmsSlugs.privacy, Icons.privacy_tip_outlined),
+  (l10n.refundPolicy, CmsSlugs.refund, Icons.currency_rupee),
+  (l10n.deliveryPolicy, CmsSlugs.deliveryPolicy, Icons.local_shipping_outlined),
+  (l10n.contactUs, CmsSlugs.contact, Icons.contact_mail_outlined),
+  (
+    l10n.deleteAccountPolicyLink,
+    CmsSlugs.deleteAccount,
+    Icons.manage_accounts_outlined,
+  ),
+];
 
 String _initials(String name) {
   final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty);
@@ -590,7 +589,16 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(l10n.deleteAccountExplainer),
-            const SizedBox(height: JivoSpacing.lg),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                key: const Key('delete-account-policy'),
+                onPressed: () =>
+                    openPolicyPage(context, ref, CmsSlugs.deleteAccount),
+                child: Text(l10n.deleteAccountPolicyLink),
+              ),
+            ),
+            const SizedBox(height: JivoSpacing.sm),
             TextField(
               controller: _reason,
               maxLines: 3,

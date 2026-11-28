@@ -48,13 +48,8 @@ class CmsPageScreen extends ConsumerWidget {
   Uri? _fallbackUrl(WidgetRef ref, Object error) {
     if (ApiError.from(error).code != ApiErrorCode.notFound) return null;
     final policies = ref.read(launchStateProvider).config?.policies;
-    if (policies == null) return null;
-    return switch (slug) {
-      CmsSlugs.terms => policies.terms,
-      CmsSlugs.privacy => policies.privacy,
-      CmsSlugs.refund => policies.refund,
-      _ => null,
-    };
+    if (policies == null || slug == CmsSlugs.about) return null;
+    return policies.forSlug(slug);
   }
 
   @override

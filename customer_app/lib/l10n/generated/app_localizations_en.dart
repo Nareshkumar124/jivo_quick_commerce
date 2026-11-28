@@ -138,6 +138,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get refundPolicy => 'Refund Policy';
 
   @override
+  String get deliveryPolicy => 'Delivery Policy';
+
+  @override
+  String get contactUs => 'Contact Us';
+
+  @override
+  String get deleteAccountPolicyLink => 'How account deletion works';
+
+  @override
   String get sessionExpired => 'Your session has expired. Please log in again.';
 
   @override
@@ -1451,9 +1460,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get continueShopping => 'Continue shopping';
 
   @override
-  String get trackingComingSoon => 'Order tracking arrives in a later update.';
-
-  @override
   String get paymentFailedTitle => 'Payment failed';
 
   @override
@@ -2218,9 +2224,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get emailSupport => 'Email us';
-
-  @override
-  String get helpComingSoon => 'Support is coming soon to the app.';
 
   @override
   String get faqTitle => 'Frequently asked questions';

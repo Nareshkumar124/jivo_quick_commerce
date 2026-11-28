@@ -28,6 +28,11 @@ abstract final class CmsSlugs {
   static const terms = 'terms';
   static const privacy = 'privacy';
   static const refund = 'refund-policy';
+
+  // The launch policy pages (2026-11-28, backend `load_legal_pages`).
+  static const deliveryPolicy = 'delivery-policy';
+  static const contact = 'contact';
+  static const deleteAccount = 'delete-account';
 }
 
 /// CMS pages: [ApiCmsRepository] on the API, [FakeCmsRepository] with
@@ -138,6 +143,27 @@ class FakeCmsRepository implements CmsRepository {
       html:
           '<h1>Refund Policy</h1><p>Refunds go back to the original '
           'payment method within 5–7 working days.</p>',
+    ),
+    CmsSlugs.deliveryPolicy: const CmsPage(
+      slug: CmsSlugs.deliveryPolicy,
+      title: 'Delivery Policy',
+      html:
+          '<h1>Delivery Policy</h1><p>We deliver from the nearest store, '
+          'usually within 30 minutes.</p>',
+    ),
+    CmsSlugs.contact: const CmsPage(
+      slug: CmsSlugs.contact,
+      title: 'Contact Us',
+      html:
+          '<h1>Contact Us</h1><p>Write to <a href="mailto:info@jivo.in">'
+          'info@jivo.in</a>.</p>',
+    ),
+    CmsSlugs.deleteAccount: const CmsPage(
+      slug: CmsSlugs.deleteAccount,
+      title: 'Delete your account',
+      html:
+          '<h1>Delete your account</h1><p>Go to Account, then Delete '
+          'account, and confirm with the OTP.</p>',
     ),
   };
 }
