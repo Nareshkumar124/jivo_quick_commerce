@@ -8,11 +8,13 @@ plugins {
 
 // Release signing (docs/deployment.md §12.3): CI writes android/key.properties
 // (gitignored, like the .jks it points at) with storeFile, storePassword,
-// keyAlias and keyPassword. Without the file, release falls back to the debug
-// key so a local `flutter run --release` still works.
+// keyAlias and keyPassword. Without the file, dev/staging release falls back
+// to the debug key so a local `flutter run --release` still works; a prod
+// release fails instead (preProdReleaseBuild check below), so a Play build can
+// never be debug-signed.
+val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties().apply {
-    val file = rootProject.file("key.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
+    if (keystorePropertiesFile.exists()) keystorePropertiesFile.inputStream().use { load(it) }
 }
 
 // Firebase Cloud Messaging (D-19). Each flavor reads its own config from
@@ -129,6 +131,26 @@ android {
             signingConfig = signingConfigs.getByName(
                 if (keystoreProperties.isEmpty) "debug" else "release",
             )
+        }
+    }
+}
+
+// Prod release must be signed with the upload key (docs/deployment.md §12).
+// Runs only when a prod release is actually built, so debug and dev/staging
+// builds are unaffected.
+tasks.matching { it.name == "preProdReleaseBuild" }.configureEach {
+    doFirst {
+        val storePath = keystoreProperties.getProperty("storeFile")
+        if (!keystorePropertiesFile.exists() || storePath.isNullOrBlank()) {
+            throw GradleException(
+                "Prod release needs android/key.properties (storeFile, storePassword, " +
+                    "keyAlias, keyPassword) and refuses the debug key. Copy it from " +
+                    "~/.config/jivo-quick-commerce/android-signing/<app>/key.properties " +
+                    "(see docs/deployment.md section 12).",
+            )
+        }
+        if (!file(storePath).isFile) {
+            throw GradleException("Prod release: keystore in key.properties not found: $storePath")
         }
     }
 }
