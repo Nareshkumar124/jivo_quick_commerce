@@ -90,12 +90,15 @@ final selectedLoginMethodProvider =
     );
 
 /// The method the login screen shows: the user's pick if it is on,
+/// otherwise email when the server offers it (SMS may not be delivering),
 /// otherwise the first method the server lists.
 LoginMethod effectiveLoginMethod(
   List<LoginMethod> methods,
   LoginMethod? selected,
 ) => selected != null && methods.contains(selected)
     ? selected
+    : methods.contains(LoginMethod.email)
+    ? LoginMethod.email
     : (methods.isEmpty ? LoginMethod.phone : methods.first);
 
 @immutable

@@ -265,6 +265,8 @@ CheckoutBlockerCode _blockerCode(api.CheckoutBlockerCodeEnum code) =>
         CheckoutBlockerCode.addressRequired,
       api.CheckoutBlockerCodeEnum.NOT_SERVICEABLE =>
         CheckoutBlockerCode.notServiceable,
+      api.CheckoutBlockerCodeEnum.PHONE_REQUIRED =>
+        CheckoutBlockerCode.phoneRequired,
       api.CheckoutBlockerCodeEnum.STORE_CLOSED =>
         CheckoutBlockerCode.storeClosed,
       api.CheckoutBlockerCodeEnum.STOCK_UNAVAILABLE =>

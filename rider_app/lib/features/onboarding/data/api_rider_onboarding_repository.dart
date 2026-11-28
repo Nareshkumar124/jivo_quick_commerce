@@ -3,6 +3,7 @@ import 'package:jivo_api/jivo_api.dart'
     as api
     show
         JivoApi,
+        PatchedRiderProfileUpdateRequest,
         RiderBankAccount,
         RiderBankAccountUpdateRequest,
         RiderDocument,
@@ -58,10 +59,23 @@ class ApiRiderOnboardingRepository implements RiderOnboardingRepository {
           (t) => t.value == r.vehicleType.wireValue,
         ),
         vehicleNumber: r.vehicleNumber,
+        contactPhone: r.contactPhone,
       ),
     )).data!;
     return profileFromApi(profile);
   });
+
+  @override
+  Future<RiderProfile> updateContactPhone(String contactPhoneE164) => _call(
+    () async {
+      final profile = (await _api.getRiderApi().riderMePartialUpdate(
+        patchedRiderProfileUpdateRequest: api.PatchedRiderProfileUpdateRequest(
+          contactPhone: contactPhoneE164,
+        ),
+      )).data!;
+      return profileFromApi(profile);
+    },
+  );
 
   @override
   Future<RiderProfile> fetchProfile() => _call(
@@ -144,6 +158,8 @@ RiderProfile profileFromApi(api.RiderProfile p) => RiderProfile(
   bankAccount: p.bankAccount == null ? null : _bank(p.bankAccount!),
   photoUrl: p.photoUrl,
   rating: p.ratingAvg,
+  phone: p.phone.isEmpty ? null : p.phone,
+  contactPhone: p.contactPhone.isEmpty ? null : p.contactPhone,
 );
 
 /// A document the app knows, or null for a type this version does not.

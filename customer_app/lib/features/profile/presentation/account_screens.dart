@@ -642,13 +642,11 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
     final l10n = AppLocalizations.of(context);
     final state = ref.watch(deleteAccountProvider);
     final user = ref.watch(launchStateProvider).user;
-    // An email sign-up without a phone confirms by email (06: a
-    // `delete_account` OTP to its verified email).
+    // A verified email confirms by email (06: a `delete_account` OTP to
+    // it), even when the account also has a phone: SMS may not deliver.
+    // The phone is used otherwise.
     final phone = user?.phone ?? '';
-    final byEmail =
-        phone.isEmpty &&
-        (user?.email?.isNotEmpty ?? false) &&
-        user!.emailVerified;
+    final byEmail = (user?.email?.isNotEmpty ?? false) && user!.emailVerified;
     final destination = byEmail ? user.email! : phone;
 
     return Scaffold(

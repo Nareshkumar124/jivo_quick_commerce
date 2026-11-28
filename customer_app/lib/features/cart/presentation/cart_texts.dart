@@ -54,6 +54,7 @@ String? checkoutBlockerText(AppLocalizations l10n, CartSnapshot cart) {
       blocker.message.trim().isEmpty
           ? l10n.blockerNotServiceable
           : blocker.message.trim(),
+    CheckoutBlockerCode.phoneRequired => l10n.checkoutContactPhoneNeeded,
     CheckoutBlockerCode.storeClosed => l10n.cartStoreClosed,
     CheckoutBlockerCode.stockUnavailable => l10n.cartProblemsBanner,
     CheckoutBlockerCode.minQtyRequired => l10n.blockerMinQtyRequired,

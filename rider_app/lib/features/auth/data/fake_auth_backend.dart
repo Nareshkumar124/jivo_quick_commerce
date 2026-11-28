@@ -17,7 +17,8 @@ import '../domain/login_method.dart';
 ///   5: `NONE` (no rider profile), anything else: `ACTIVE`
 /// - [rateLimitedPhone]: every OTP request is rate limited
 /// - email login: [registeredEmail] is an active rider; any other email
-///   gets `EMAIL_NOT_REGISTERED` at verify (as the server does)
+///   signs up: a new account with no phone and `rider_status: NONE`
+///   (registration asks for `contact_phone`), as the server does
 class FakeAuthBackend implements AuthRepository, AccountRepository {
   FakeAuthBackend({this.delay = const Duration(milliseconds: 400)});
 
@@ -186,11 +187,29 @@ class FakeAuthBackend implements AuthRepository, AccountRepository {
     }
     _pendingEmail = null;
     if (normalized != registeredEmail) {
-      throw const ApiError(
-        code: ApiErrorCode.unknown,
-        rawCode: EmailLoginErrorCodes.emailNotRegistered,
-        statusCode: 403,
-      );
+      // Email sign-up: no phone yet, no rider profile.
+      final user = Me.fromJson({
+        'id': 58,
+        'phone': null,
+        'name': '',
+        'email': normalized,
+        'has_phone': false,
+        'email_verified': true,
+        'marketing_opt_in': false,
+        'business_category_name': null,
+        'is_profile_complete': false,
+        'rider_status': RiderStatusEnum.NONE.value,
+        'created_at': '2026-10-28T04:00:00Z',
+      });
+      _currentUser = user;
+      return AuthSession.fromJson({
+        'access': 'fake-access-token',
+        'refresh': 'fake-refresh-token',
+        'user': user.toJson(),
+        'is_new_user': true,
+        'rider_status': RiderStatusEnum.NONE.value,
+        'deletion_cancelled': false,
+      });
     }
     final user = Me.fromJson({
       'id': 57,

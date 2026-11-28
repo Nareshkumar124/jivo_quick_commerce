@@ -91,6 +91,8 @@ class RiderProfile {
     this.bankAccount,
     this.photoUrl,
     this.rating,
+    this.phone,
+    this.contactPhone,
   });
 
   final RiderStatusEnum status;
@@ -123,6 +125,13 @@ class RiderProfile {
 
   /// `rating_avg` as the server sends it (`"4.8"`), null without ratings.
   final String? rating;
+
+  /// `phone`: the login phone, or [contactPhone] for an email account.
+  final String? phone;
+
+  /// `contact_phone`: the unverified mobile given at registration (null
+  /// when not given). Editable with `PATCH /rider/me/`.
+  final String? contactPhone;
 
   List<KycDocumentType> get requiredDocuments =>
       requiredDocumentsFor(vehicleType);
@@ -177,6 +186,8 @@ class RiderProfile {
     bool clearRejectionReason = false,
     List<RiderDocument>? documents,
     BankAccountSummary? bankAccount,
+    String? phone,
+    String? contactPhone,
   }) => RiderProfile(
     status: status ?? this.status,
     fullName: fullName,
@@ -194,6 +205,8 @@ class RiderProfile {
     bankAccount: bankAccount ?? this.bankAccount,
     photoUrl: photoUrl,
     rating: rating,
+    phone: phone ?? this.phone,
+    contactPhone: contactPhone ?? this.contactPhone,
   );
 
   /// This profile with [document] added or replacing the one of its type.

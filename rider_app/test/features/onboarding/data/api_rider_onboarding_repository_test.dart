@@ -14,6 +14,7 @@ import '../../../helpers/canned_http.dart';
 const _profile = {
   'id': 3,
   'phone': '+919811122231',
+  'contact_phone': '',
   'status': 'REJECTED',
   'rejection_reason': 'PAN photo is blurred.',
   'suspension_reason': '',
@@ -102,7 +103,42 @@ void main() {
     expect(body['dob'], '1998-04-02');
     expect(body['vehicle_type'], 'MOTORBIKE');
     expect(body['preferred_store_id'], 1);
+    expect(body.containsKey('contact_phone'), isFalse);
   });
+
+  test('email sign-up: register sends contact_phone', () async {
+    http.answers['/api/v1/rider/register/'] = const Canned(201, _profile);
+    await repo.register(
+      RiderRegistration(
+        fullName: 'Ravi Kumar',
+        dateOfBirth: DateTime(1998, 4, 2),
+        emergencyContactName: 'Sita',
+        emergencyContactPhone: '+919811100000',
+        preferredStoreId: 1,
+        vehicleType: VehicleType.bicycle,
+        contactPhone: '+919811122299',
+      ),
+    );
+    final body = http.jsonBody('/api/v1/rider/register/');
+    expect(body['contact_phone'], '+919811122299');
+  });
+
+  test(
+    'PATCH /rider/me/ sends only contact_phone and maps the phones',
+    () async {
+      http.answers['/api/v1/rider/me/'] = Canned(200, {
+        ..._profile,
+        'phone': '+919811122299',
+        'contact_phone': '+919811122299',
+      });
+      final profile = await repo.updateContactPhone('+919811122299');
+      expect(http.jsonBody('/api/v1/rider/me/'), {
+        'contact_phone': '+919811122299',
+      });
+      expect(profile.contactPhone, '+919811122299');
+      expect(profile.phone, '+919811122299');
+    },
+  );
 
   test('GET /rider/me/ maps status, rejection, documents and bank', () async {
     http.answers['/api/v1/rider/me/'] = const Canned(200, _profile);

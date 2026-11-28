@@ -23,8 +23,9 @@ abstract interface class AuthRepository {
   Future<OtpSent> requestEmailOtp(String email);
 
   /// `POST /api/v1/auth/email-otp/verify/`: the same session as
-  /// [verifyOtp]. Only an existing rider with this verified email gets in;
-  /// anyone else gets 403 `EMAIL_NOT_REGISTERED`.
+  /// [verifyOtp]. A new email signs up (`is_new_user`, no phone,
+  /// `rider_status: NONE`) and goes to registration. (`EMAIL_NOT_REGISTERED`
+  /// is no longer sent; the app still shows it harmlessly.)
   Future<AuthSession> verifyEmailOtp({
     required String email,
     required String otp,

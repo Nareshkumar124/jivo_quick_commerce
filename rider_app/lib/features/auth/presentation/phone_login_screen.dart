@@ -255,36 +255,36 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                           onSubmitted: (_) => _submitEmail(),
                         )
                       else
-                      TextField(
-                        key: const Key('login-phone'),
-                        controller: _phone,
-                        autofocus: true,
-                        keyboardType: TextInputType.phone,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [
-                          AutofillHints.telephoneNumberNational,
-                        ],
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(_phoneDigits),
-                        ],
-                        // Room for the error line under the field.
-                        scrollPadding: const EdgeInsets.fromLTRB(
-                          20,
-                          20,
-                          20,
-                          64,
+                        TextField(
+                          key: const Key('login-phone'),
+                          controller: _phone,
+                          autofocus: true,
+                          keyboardType: TextInputType.phone,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [
+                            AutofillHints.telephoneNumberNational,
+                          ],
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(_phoneDigits),
+                          ],
+                          // Room for the error line under the field.
+                          scrollPadding: const EdgeInsets.fromLTRB(
+                            20,
+                            20,
+                            20,
+                            64,
+                          ),
+                          style: theme.textTheme.headlineSmall,
+                          decoration: InputDecoration(
+                            labelText: l10n.loginPhoneLabel,
+                            hintText: l10n.loginPhoneHint,
+                            prefixText: '+91 ',
+                            errorText: _inputErrorText(l10n),
+                          ),
+                          onChanged: _onPhoneChanged,
+                          onSubmitted: (_) => _submit(),
                         ),
-                        style: theme.textTheme.headlineSmall,
-                        decoration: InputDecoration(
-                          labelText: l10n.loginPhoneLabel,
-                          hintText: l10n.loginPhoneHint,
-                          prefixText: '+91 ',
-                          errorText: _inputErrorText(l10n),
-                        ),
-                        onChanged: _onPhoneChanged,
-                        onSubmitted: (_) => _submit(),
-                      ),
                       if (serverError != null) ...[
                         const SizedBox(height: 12),
                         ErrorLine(
@@ -293,10 +293,6 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                         ),
                         if (isEmailNotRegistered(serverError))
                           const SupportContactButtons(),
-                      ],
-                      if (isEmail) ...[
-                        const SizedBox(height: 16),
-                        _NewRiderNote(emailOnly: methods.length == 1),
                       ],
                     ],
                   ),
@@ -340,47 +336,6 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Under the email field. New riders register with their phone (the server
-/// cannot create a rider from an email): with the toggle, point to Phone;
-/// with email only, show the support contact instead of a dead end.
-class _NewRiderNote extends StatelessWidget {
-  const _NewRiderNote({required this.emailOnly});
-
-  final bool emailOnly;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    if (!emailOnly) {
-      return Text(
-        l10n.loginNewRiderPhone,
-        key: const Key('login-new-rider-phone'),
-        style: theme.textTheme.bodyMedium,
-      );
-    }
-    return Card(
-      key: const Key('login-new-rider-support'),
-      color: theme.colorScheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.loginNewRiderEmailOnlyTitle,
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            Text(l10n.loginNewRiderEmailOnly),
-            const SupportContactButtons(),
-          ],
         ),
       ),
     );

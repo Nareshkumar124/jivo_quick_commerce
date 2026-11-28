@@ -6,6 +6,7 @@ import 'vehicle_type.dart';
 
 enum RegistrationField {
   fullName,
+  contactPhone,
   dateOfBirth,
   emergencyName,
   emergencyPhone,
@@ -25,6 +26,7 @@ class RegistrationDraft {
     this.storeId,
     this.vehicleType,
     this.vehicleNumber = '',
+    this.contactPhone = '',
   });
 
   final String fullName;
@@ -35,13 +37,22 @@ class RegistrationDraft {
   final VehicleType? vehicleType;
   final String vehicleNumber;
 
+  /// The rider's own mobile (10 digits typed), asked only when the account
+  /// has no login phone (email sign-up).
+  final String contactPhone;
+
   /// [today] is the IST date ([istToday]). [riderPhoneE164] is the signed-in
-  /// phone, which cannot be the emergency contact.
+  /// phone, which cannot be the emergency contact. With [needsContactPhone]
+  /// (`GET /me/` `has_phone: false`) the [contactPhone] is required and
+  /// takes the place of the rider's phone.
   Map<RegistrationField, FieldError> validate({
     required DateTime today,
     String? riderPhoneE164,
+    bool needsContactPhone = false,
   }) => {
     RegistrationField.fullName: ?validatePersonName(fullName),
+    if (needsContactPhone)
+      RegistrationField.contactPhone: ?validateContactPhone(contactPhone),
     RegistrationField.dateOfBirth: ?validateDateOfBirth(
       dateOfBirth,
       today: today,
@@ -49,7 +60,9 @@ class RegistrationDraft {
     RegistrationField.emergencyName: ?validatePersonName(emergencyName),
     RegistrationField.emergencyPhone: ?validateEmergencyPhone(
       emergencyPhone,
-      riderPhoneE164: riderPhoneE164,
+      riderPhoneE164: needsContactPhone
+          ? IndianMobile.toE164(contactPhone)
+          : riderPhoneE164,
     ),
     if (storeId == null) RegistrationField.store: FieldError.required,
     if (vehicleType == null) RegistrationField.vehicleType: FieldError.required,
@@ -67,7 +80,8 @@ class RegistrationDraft {
       emergencyPhone.trim().isEmpty &&
       storeId == null &&
       vehicleType == null &&
-      vehicleNumber.trim().isEmpty;
+      vehicleNumber.trim().isEmpty &&
+      contactPhone.trim().isEmpty;
 
   /// The saved form (UX audit RA-07), so a rider whose app Android stopped
   /// while they fetched their RC finds what they typed. It holds no
@@ -84,6 +98,7 @@ class RegistrationDraft {
     'store_id': ?storeId,
     'vehicle_type': ?vehicleType?.wireValue,
     'vehicle_number': vehicleNumber,
+    'contact_phone': contactPhone,
   };
 
   /// Reads [toJson]'s output; unknown or wrongly typed values are dropped.
@@ -110,10 +125,13 @@ class RegistrationDraft {
         _ => null,
       },
       vehicleNumber: text('vehicle_number'),
+      contactPhone: text('contact_phone'),
     );
   }
 
-  /// The request. The vehicle number is dropped for non-motorised vehicles.
+  /// The request. The vehicle number is dropped for non-motorised vehicles;
+  /// `contact_phone` is sent only when one was typed (asked for with
+  /// `needsContactPhone`).
   RiderRegistration toRegistration() {
     final vehicle = vehicleType!;
     return RiderRegistration(
@@ -126,6 +144,9 @@ class RegistrationDraft {
       vehicleNumber: vehicle.isMotorised
           ? normaliseRegistrationNumber(vehicleNumber)
           : null,
+      contactPhone: contactPhone.trim().isEmpty
+          ? null
+          : IndianMobile.toE164(contactPhone),
     );
   }
 }

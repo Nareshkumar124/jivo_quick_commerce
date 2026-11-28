@@ -89,6 +89,15 @@ FieldError? validatePersonName(String input) {
 /// An emergency contact's mobile number. It must not be the rider's own
 /// number ([riderPhoneE164]), or nobody can be reached when the rider
 /// can't.
+/// The rider's own mobile (`contact_phone`), required for an email sign-up.
+FieldError? validateContactPhone(String input) =>
+    switch (IndianMobile.validate(input)) {
+      PhoneInputError.empty => FieldError.required,
+      PhoneInputError.incomplete => FieldError.phoneIncomplete,
+      PhoneInputError.invalid => FieldError.phoneInvalid,
+      null => null,
+    };
+
 FieldError? validateEmergencyPhone(String input, {String? riderPhoneE164}) {
   switch (IndianMobile.validate(input)) {
     case PhoneInputError.empty:

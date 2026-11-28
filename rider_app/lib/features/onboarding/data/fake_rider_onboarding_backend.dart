@@ -94,8 +94,26 @@ class FakeRiderOnboardingBackend implements RiderOnboardingRepository {
       vehicleNumber: registration.vehicleType.isMotorised
           ? registration.vehicleNumber
           : null,
+      phone: rider.key.startsWith('+') ? rider.key : registration.contactPhone,
+      contactPhone: registration.contactPhone,
     );
     return _profiles[rider.key] = profile;
+  }
+
+  @override
+  Future<RiderProfile> updateContactPhone(String contactPhoneE164) async {
+    await _call('updateContactPhone');
+    final rider = _rider();
+    final profile = _profile();
+    if (contactPhoneE164 == profile.emergencyContactPhone) {
+      throw _validation({
+        'contact_phone': ['Must differ from the emergency contact.'],
+      });
+    }
+    return _profiles[rider.key] = profile.copyWith(
+      contactPhone: contactPhoneE164,
+      phone: rider.key.startsWith('+') ? null : contactPhoneE164,
+    );
   }
 
   @override

@@ -113,6 +113,22 @@ class RiderProfileController extends AsyncNotifier<RiderProfile> {
     }
   }
 
+  /// `PATCH /rider/me/` with `contact_phone` (email accounts). Returns the
+  /// error, or null when saved (the profile then shows the new number).
+  Future<ApiError?> updateContactPhone(String contactPhoneE164) async {
+    try {
+      final profile = await ref
+          .read(riderOnboardingRepositoryProvider)
+          .updateContactPhone(contactPhoneE164);
+      state = AsyncData(profile);
+      return null;
+    } on Object catch (e) {
+      final error = ApiError.from(e);
+      reportAppControlError(ref, error);
+      return error;
+    }
+  }
+
   /// After `POST /rider/documents/`: shows the new status without a reload.
   void documentUploaded(RiderDocument document) {
     final profile = state.value;

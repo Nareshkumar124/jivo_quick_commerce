@@ -427,19 +427,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loginEmailInvalid => 'Enter a valid email address.';
 
   @override
-  String get loginNewRiderPhone =>
-      'New rider? Register with your mobile number.';
-
-  @override
-  String get loginNewRiderEmailOnlyTitle => 'New rider?';
-
-  @override
   String get loginEmailNotRegistered =>
       'This email isn\'t registered as a rider. Contact Jivo support at info@jivo.in or +91 8595 349 565';
-
-  @override
-  String get loginNewRiderEmailOnly =>
-      'New riders can\'t sign up with an email. Contact Jivo support at info@jivo.in or +91 8595 349 565 to register.';
 
   @override
   String get loginMethodDisabled =>
@@ -629,6 +618,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get registerSectionAboutYou => 'About you';
+
+  @override
+  String get registerMobile => 'Mobile number';
+
+  @override
+  String get registerMobileHelp =>
+      'Customers and the store call you on this number.';
 
   @override
   String get registerFullName => 'Full name (as on Aadhaar)';
@@ -1605,6 +1601,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileVehicle => 'Vehicle';
+
+  @override
+  String get profileMobile => 'Mobile number';
+
+  @override
+  String get profileMobileEdit => 'Change mobile number';
+
+  @override
+  String get profileMobileAdd => 'Add mobile number';
+
+  @override
+  String get profileMobileSave => 'Save';
+
+  @override
+  String get profileMobileCancel => 'Cancel';
+
+  @override
+  String get profileMobileSaved => 'Mobile number saved.';
+
+  @override
+  String get profileMobileServerInvalid =>
+      'This number can\'t be used. Check it, or use a number different from your emergency contact.';
 
   @override
   String get profileKycStatus => 'KYC status';

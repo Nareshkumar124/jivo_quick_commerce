@@ -20,6 +20,7 @@ class RiderRegistration {
     required this.preferredStoreId,
     required this.vehicleType,
     this.vehicleNumber,
+    this.contactPhone,
   });
 
   final String fullName;
@@ -35,6 +36,10 @@ class RiderRegistration {
 
   /// Normalised (upper case, no spaces). Only for motorised vehicles.
   final String? vehicleNumber;
+
+  /// The rider's own mobile (E.164, no OTP): `contact_phone`, required by
+  /// the server when the account has no login phone (email sign-up).
+  final String? contactPhone;
 
   @override
   String toString() =>
