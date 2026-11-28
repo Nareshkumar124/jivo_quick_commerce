@@ -14,6 +14,9 @@ final meJson = {
   'name': '',
   'email': null,
   'is_profile_complete': false,
+  'has_phone': true,
+  'email_verified': false,
+  'business_category_name': null,
   'rider_status': 'NONE',
   'created_at': '2026-11-02T10:15:00Z',
 };

@@ -29,6 +29,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
 from apps.accounts.serializers import AddressSerializer
+from apps.accounts.services import contact
 from apps.cart import services as cart_services
 from apps.cart.choices import PaymentUnavailableReason
 from apps.cart.models import Cart, CartItem, empty_instructions
@@ -209,7 +210,13 @@ def place_order(
     or failed by `expire_unpaid_orders` when its payment window ends, never left reserved.
 
     DL-85: with `ONLINE_PAYMENTS_ENABLED` off an ONLINE order is refused (503
-    `SERVICE_UNAVAILABLE`, reason `ONLINE_PAYMENTS_DISABLED`) before anything is created."""
+    `SERVICE_UNAVAILABLE`, reason `ONLINE_PAYMENTS_DISABLED`) before anything is created.
+
+    2026-11-28: the rider and the store need a number to call. A customer without a login phone
+    (an email sign-up) may order when the delivery address has a valid `receiver_phone`; with
+    neither the order is refused with 422 `PHONE_REQUIRED` (`details.address_id`), checked in
+    `_place` under the cart lock right after the address is resolved. A replay of an already
+    placed order is never refused by it."""
     if payment_method == PaymentMethod.ONLINE:
         ensure_online_payments_enabled()
     fingerprint = request_fingerprint(store.pk, address_id, payment_method, expected_grand_total)
@@ -438,6 +445,8 @@ def _place(
             ErrorCode.INVALID_STATE_TRANSITION, MSG_PENDING, details={"pending_order_id": pending}
         )
     address = cart_services.resolve_address(user, address_id)
+    if not contact.has_delivery_contact(user, address):
+        raise ApiError(ErrorCode.PHONE_REQUIRED, details={"address_id": address.pk})
     if not cart_services.serves(store, address):
         raise ApiError(
             ErrorCode.NOT_SERVICEABLE,

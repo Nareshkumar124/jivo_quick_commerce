@@ -17,14 +17,14 @@ SUPPORT_EMAIL = "info@jivo.in"
 
 _EMAIL = '<a href="mailto:info@jivo.in">info@jivo.in</a>'
 _PHONE = '<a href="tel:+918595349565">+91 8595 349 565</a>'
-_ADDRESS = "Khasra No. 20//9/2 & 10/1/2, Bhakarpur, Ganaur, District Sonipat, Haryana – 131101"
+_ADDRESS = "Khasra No. 20//9/2 &amp; 10/1/2, Bhakarpur, Ganaur, District Sonipat, Haryana – 131101"
 _UPDATED = "<p><strong>Last updated: 28 November 2026</strong></p>"
 
 TERMS_HTML = f"""{_UPDATED}
 <p>These terms apply to the Jivo Quick Commerce customer app and website ("the app"), run by \
-<strong>Jivo Beverages Pvt. Ltd.</strong>, {_ADDRESS} ("Jivo", "we", "us"). By creating an account or \
-placing an order you agree to these terms, our Privacy policy, our Refund and cancellation policy \
-and our Delivery policy.</p>
+<strong>Jivo Beverages Pvt. Ltd.</strong>, {_ADDRESS} ("Jivo", "we", "us"). By creating an \
+account or placing an order you agree to these terms, our Privacy policy, our Refund and \
+cancellation policy and our Delivery policy.</p>
 <h2>1. Who can use the app</h2>
 <p>You must be at least 18 years old and able to enter a binding contract under Indian law. You \
 are responsible for keeping your login (phone number or email and the one-time code) to yourself \
@@ -74,8 +74,9 @@ weather, strikes, traffic restrictions or network outages).</p>
 <p>We may update these terms. The app will show the new version and ask you to accept it when you \
 next log in.</p>
 <h2>10. Law and disputes</h2>
-<p>These terms are governed by the laws of India. Courts in Sonipat, Haryana have jurisdiction. Before \
-going to court, please contact us (see the Contact page) so we can try to solve the problem.</p>
+<p>These terms are governed by the laws of India. Courts in Sonipat, Haryana have \
+jurisdiction. Before going to court, please contact us (see the Contact page) so we can try \
+to solve the problem.</p>
 """
 
 PRIVACY_HTML = f"""{_UPDATED}

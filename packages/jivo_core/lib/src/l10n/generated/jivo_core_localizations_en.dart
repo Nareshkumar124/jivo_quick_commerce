@@ -171,6 +171,26 @@ class JivoCoreLocalizationsEn extends JivoCoreLocalizations {
       'Referral codes are only for new customers, before their first order.';
 
   @override
+  String get errorLoginMethodDisabled =>
+      'This sign-in option is turned off right now. Please use the other option.';
+
+  @override
+  String get errorEmailNotRegistered =>
+      'No account uses this email. Please sign in with your phone number.';
+
+  @override
+  String get errorPhoneRequired =>
+      'Please add a contact phone number before placing the order.';
+
+  @override
+  String get errorPhoneInUse =>
+      'This phone number is already used by another account.';
+
+  @override
+  String get errorEmailInUse =>
+      'This email is already used by another account.';
+
+  @override
   String get errorReferralProgramPaused =>
       'Refer & earn is paused right now. Please try again later.';
 

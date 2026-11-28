@@ -5,18 +5,26 @@ import '../../profile/domain/user_profile.dart';
 
 enum OtpPurpose { login, deleteAccount }
 
-/// An OTP has been sent (`POST /api/v1/auth/otp/request/`).
+/// How a customer signs in (`GET /auth/methods/`): an SMS OTP to the phone
+/// or an email OTP. Also the channel an OTP was sent over.
+enum LoginMethod { phone, email }
+
+/// An OTP has been sent (`POST /auth/otp/request/`,
+/// `/auth/email-otp/request/`, `/me/phone/otp/`, `/me/email/otp/`).
 @immutable
 class OtpChallenge {
   const OtpChallenge({
-    required this.phone,
+    required this.destination,
     required this.otpLength,
     required this.resendAfterSeconds,
     required this.expiresInSeconds,
+    this.method = LoginMethod.phone,
   });
 
-  /// `+91…`
-  final String phone;
+  /// Where the OTP went: `+91…` for [LoginMethod.phone], the email address
+  /// for [LoginMethod.email].
+  final String destination;
+  final LoginMethod method;
   final int otpLength;
   final int resendAfterSeconds;
   final int expiresInSeconds;

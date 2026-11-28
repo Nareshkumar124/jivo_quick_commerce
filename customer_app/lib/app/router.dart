@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../features/auth/domain/auth_models.dart';
+import '../features/profile/presentation/contact_verify_screen.dart';
 import '../features/addresses/data/device_location.dart';
 import '../features/addresses/presentation/address_screens.dart';
 import '../features/auth/presentation/auth_flow.dart';
@@ -280,6 +282,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         Routes.deleteAccount,
         'delete_account',
         (_) => const DeleteAccountScreen(),
+      ),
+      route(
+        Routes.addPhone,
+        'add_phone',
+        (_) => const ContactVerifyScreen(kind: LoginMethod.phone),
+      ),
+      route(
+        Routes.addEmail,
+        'add_email',
+        (state) => ContactVerifyScreen(
+          kind: LoginMethod.email,
+          initial: state.extra as String?,
+        ),
       ),
       route(Routes.referral, 'referral', (_) => const ReferralScreen()),
       // Rewards (was My coupons, ADR 0002): same path and name.

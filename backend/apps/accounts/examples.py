@@ -34,6 +34,8 @@ ME = {
     "name": "Asha Verma",
     "email": "asha.verma@example.com",
     "marketing_opt_in": False,
+    "has_phone": True,
+    "email_verified": True,
     "business_category": 2,
     "business_category_name": "Restaurant / Café",
     "business_name": "Asha's Kitchen",
@@ -47,6 +49,8 @@ NEW_ME = {
     "name": "",
     "email": None,
     "marketing_opt_in": False,
+    "has_phone": True,
+    "email_verified": False,
     "business_category": None,
     "business_category_name": None,
     "business_name": "",
@@ -60,6 +64,8 @@ RIDER_ME = {
     "name": "Ravi Kumar",
     "email": None,
     "marketing_opt_in": False,
+    "has_phone": True,
+    "email_verified": False,
     "business_category": None,
     "business_category_name": None,
     "business_name": "",
@@ -96,6 +102,32 @@ SESSION_RIDER_PENDING_KYC = {
     "is_new_user": False,
     "rider_status": "PENDING_KYC",
 }
+
+# 2026-11-28: a customer who signed up with email OTP (no phone until one is added).
+EMAIL_NEW_ME = {
+    **NEW_ME,
+    "id": 77,
+    "phone": None,
+    "email": "asha.verma@example.com",
+    "has_phone": False,
+    "email_verified": True,
+}
+SESSION_NEW_EMAIL_CUSTOMER = {**SESSION_NEW_CUSTOMER, "user": EMAIL_NEW_ME}
+SESSION_RIDER_EMAIL = {
+    **SESSION_RIDER_PENDING_KYC,
+    "user": {
+        **RIDER_ME,
+        "email": "ravi.k@example.com",
+        "email_verified": True,
+        "rider_status": "ACTIVE",
+    },
+    "rider_status": "ACTIVE",
+}
+SESSION_NEW_EMAIL_RIDER = {**SESSION_NEW_CUSTOMER, "user": {**EMAIL_NEW_ME, "id": 78}}
+LOGIN_METHODS_PHONE = {"app": "customer", "methods": ["phone"]}
+LOGIN_METHODS_BOTH = {"app": "customer", "methods": ["phone", "email"]}
+LOGIN_METHODS_EMAIL = {"app": "rider", "methods": ["email"]}
+EMAIL_ME_WITH_PHONE = {**EMAIL_NEW_ME, "phone": "+919876543210", "has_phone": True}
 
 TOKEN_PAIR = {"access": ROTATED_ACCESS_TOKEN, "refresh": ROTATED_REFRESH_TOKEN}
 

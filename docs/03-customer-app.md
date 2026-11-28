@@ -55,11 +55,13 @@ Until a delivery location is chosen, Home shows a "Choose a delivery location" p
 | Feature | Details |
 |---------|---------|
 | Phone login | Indian mobile number (+91, 10 digits, validated). Consent checkbox/text for T&C and Privacy Policy. |
+| Login methods (2026-11-28) | `GET /auth/methods/?app=customer` is loaded once per app run at start-up (signed out), with a 6 s timeout; any error falls back to **phone**. `phone`: the phone screen as before. `email`: an email field instead. `both`: a **Phone / Email** choice on the login screen (phone first). A `LOGIN_METHOD_DISABLED` answer switches the screen to the `methods` in its details. |
+| Email login (2026-11-28) | `POST /auth/email-otp/request/` then `/auth/email-otp/verify/` with the terms version; the same OTP screen (6 digits, resend countdown, attempts left, "Verify your email", "Change email", a check-your-spam hint, no SMS autofill) and the same session as phone. A new email user has no phone (`has_phone: false`) and goes through the new-user profile; its verified email is read-only in the profile (it is the only sign-in). |
 | OTP verify | 6-digit OTP, autofilled on Android via SMS Retriever. Resend after a 30 s countdown. Errors for wrong or expired OTP. Lockout message when rate-limited. |
 | New-user profile | **Shown only right after the first OTP sign-up** (updated 2026-11-26, user request). One screen with **Name**, **Business category** (dropdown from `GET /business-categories/`, active ones in admin order) and **Business name**, plus **Skip** and **Submit**. Submit sends `PATCH /me/` with `name` and the optional `business_category` (id) and `business_name`; Skip calls `POST /me/profile-prompt/skip/`. Either one is remembered on the server, so the screen never shows again on any device. The app shows the screen only while `is_profile_complete` is false (it is false only for a new user who has neither submitted nor skipped; accounts created before 2026-11-26 are already true). The business fields stay editable later via `PATCH /me/`. Email stays optional (Edit profile). |
 | Session | Tokens in secure storage. Silent refresh. On refresh failure, log out to the login screen. |
 | Logout | Revokes the refresh token, unregisters the device's FCM token, clears local data |
-| Delete account | Account → Delete account → confirm via OTP → account anonymised per policy (Play Store and DPDP requirement) |
+| Delete account | Account → Delete account → confirm via OTP → account anonymised per policy (Play Store and DPDP requirement). An account without a phone gets the `delete_account` OTP by email (`/auth/email-otp/request/` with its verified email, 2026-11-28). |
 
 ### 2.3 Location & serviceability [P2]
 | Feature | Details |
@@ -135,6 +137,7 @@ All product tiles show the image, name, variant (e.g., 1 L), selling price, stru
 |---------|---------|
 | Payment method | Pay online (Razorpay: UPI intent/collect, cards, net banking, wallets) or Cash on Delivery (shown only if eligible) |
 | Place order | `POST /orders/` with an Idempotency-Key. Online: opens Razorpay checkout. COD: goes straight to success. |
+| Contact phone (2026-11-28) | A customer without a phone (email sign-up, `has_phone: false`) must give a contact number before ordering: when the delivery address has no **receiver phone**, checkout shows "Add a mobile number to this address…" with **Add mobile number** (opens the address form, where the receiver phone is then required) and Place order stays off. `422 PHONE_REQUIRED` from `POST /orders/` shows the message and opens the address form. No SMS verification in checkout (SMS may not deliver; backend change pending). |
 | Payment result | Success leads to verify-on-server then the success screen. Failure or cancel shows "Payment failed" with **Retry** (within 15 min) and **Change method**. |
 | Order success | Animation, order number, ETA, "Track order" |
 | Edge cases | App killed mid-payment: on next launch, pending orders are fetched and the server status (webhook-confirmed) is shown. Double-tap protection on Place Order. |
@@ -172,7 +175,7 @@ All product tiles show the image, name, variant (e.g., 1 L), selling price, stru
 ### 2.11 Account [P1/P7]
 | Feature | Details |
 |---------|---------|
-| Profile | View/edit name and email. The phone number is shown but is not editable in v1. |
+| Profile | View/edit name and email. The phone number is shown but is not editable in v1. The account header shows the masked phone (or "No mobile number added") and the email with a verified tick; chips **Add mobile number** (`/me/phone/otp/` + `/me/phone/verify/`, SMS OTP), **Add email** / **Verify** (`/me/email/otp/` + `/me/email/verify/`, email OTP) open one add-contact screen (enter → OTP, resend countdown; `PHONE_IN_USE` / `EMAIL_IN_USE` explained). An account without a phone can't change its verified email in Edit profile (2026-11-28). |
 | Addresses | See 2.4 |
 | Notifications | In-app notification inbox [P6]. Toggle for promotional push. |
 | Help & support | FAQs, "Get help with an order" (choose an order, then an issue type, which creates a ticket with an optional photo), ticket list and replies, call or email support [P7] |

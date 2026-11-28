@@ -6,7 +6,8 @@ user's id is a 404). The 426/503 guard runs in `apps.cms.middleware`.
 """
 
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -15,25 +16,34 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenRefreshView as SimpleJWTTokenRefreshView
 
 from apps.accounts import examples as ex
+from apps.accounts.choices import AppName
 from apps.accounts.models import Address, BusinessCategory
 from apps.accounts.serializers import (
     AccountDeleteSerializer,
     AccountDeletionSerializer,
     AddressSerializer,
+    AppQuerySerializer,
     AuthSessionSerializer,
     BusinessCategorySerializer,
     DeviceSerializer,
     DeviceUnregisterSerializer,
+    EmailOtpForMeSerializer,
+    EmailOtpSendSerializer,
+    EmailOtpVerifySerializer,
+    EmailVerifySerializer,
+    LoginMethodsSerializer,
     LogoutSerializer,
     MeSerializer,
     OtpSendSerializer,
     OtpSentSerializer,
     OtpVerifySerializer,
     PaginatedAddressListSerializer,
+    PhoneOtpSendSerializer,
+    PhoneVerifySerializer,
     TokenPairSerializer,
     TokenRefreshSerializer,
 )
-from apps.accounts.services import addresses, auth, otp, profile
+from apps.accounts.services import addresses, auth, contact, login_methods, otp, profile
 from apps.accounts.services.addresses import MSG_TOO_MANY
 from apps.core.autoschema import BodyOnDeleteSchema
 from apps.core.errors import ErrorCode
@@ -101,6 +111,36 @@ OTP_EXPIRED = error_example(
 )
 
 
+LOGIN_METHOD_DISABLED_EXAMPLE = error_example(
+    ErrorCode.LOGIN_METHOD_DISABLED,
+    details={"app": "customer", "method": "phone", "methods": ["email"]},
+    summary="This sign-in method is switched off for the app: offer `details.methods`",
+)
+LOGIN_METHOD_DISABLED_RESPONSE = error_response(
+    "This sign-in method is switched off for `app` (admin setting). Call `GET /auth/methods/` "
+    "again and show only `details.methods`.",
+    LOGIN_METHOD_DISABLED_EXAMPLE,
+)
+
+
+def _session_response(result: auth.LoginResult) -> Response:
+    session = {
+        "access": result.access,
+        "refresh": result.refresh,
+        "user": result.user,
+        "is_new_user": result.is_new_user,
+        "rider_status": result.user.rider_status,
+        "deletion_cancelled": result.deletion_cancelled,
+    }
+    return Response(AuthSessionSerializer(session).data)
+
+
+def _token_app(request: Request) -> str:
+    """The app the caller's session belongs to (the token's `app` claim; 02 §6)."""
+    claim = request.auth.get("app") if request.auth is not None else None
+    return claim if claim in AppName.values else AppName.CUSTOMER
+
+
 class _PublicView(APIView):
     """No authentication at all: a stale or garbage Bearer token never blocks these."""
 
@@ -148,6 +188,7 @@ class OtpRequestView(OtpThrottleMixin, _PublicView):
                         }
                     ),
                 ),
+                403: LOGIN_METHOD_DISABLED_RESPONSE,
                 429: OTP_RATE_LIMITED,
                 503: OTP_SERVICE_UNAVAILABLE,
             }
@@ -156,7 +197,7 @@ class OtpRequestView(OtpThrottleMixin, _PublicView):
     def post(self, request: Request) -> Response:
         serializer = OtpSendSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        sent = otp.request_otp(
+        sent = auth.request_sign_in_otp(
             **serializer.validated_data,
             ip=client_ip(request),
             user_agent=request.headers.get("User-Agent", ""),
@@ -221,8 +262,9 @@ class OtpVerifyView(OtpThrottleMixin, _PublicView):
                     validation_error({"otp": ["Enter the 6-digit OTP."]}),
                 ),
                 403: error_response(
-                    "The account is deactivated.",
+                    "The account is deactivated, or phone sign-in is switched off for this app.",
                     error_example(ErrorCode.PERMISSION_DENIED, "This account is deactivated."),
+                    LOGIN_METHOD_DISABLED_EXAMPLE,
                 ),
                 429: OTP_RATE_LIMITED,
                 503: OTP_SERVICE_UNAVAILABLE,
@@ -240,15 +282,194 @@ class OtpVerifyView(OtpThrottleMixin, _PublicView):
             terms_version=data["terms_version"],
             ip=client_ip(request),
         )
-        session = {
-            "access": result.access,
-            "refresh": result.refresh,
-            "user": result.user,
-            "is_new_user": result.is_new_user,
-            "rider_status": result.user.rider_status,
-            "deletion_cancelled": result.deletion_cancelled,
-        }
-        return Response(AuthSessionSerializer(session).data)
+        return _session_response(result)
+
+
+class LoginMethodsView(_PublicView):
+    @extend_schema(
+        operation_id="auth_methods",
+        tags=["auth"],
+        summary="Sign-in methods the login screen offers",
+        description=(
+            "Call before showing the login screen. The admin chooses per app: phone only "
+            "(default), email only, or both (show a Phone / Email choice and let the user "
+            "pick). The app is the `app` query parameter, else the `X-App-Name` header.\n\n"
+            "Phone: `POST /auth/otp/request/` + `/auth/otp/verify/`. Email: "
+            "`POST /auth/email-otp/request/` + `/auth/email-otp/verify/`. A method switched off "
+            "meanwhile answers 403 `LOGIN_METHOD_DISABLED` with `details.methods`."
+        ),
+        auth=[],
+        parameters=[
+            OpenApiParameter(
+                "app",
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                required=False,
+                enum=AppName.values,
+                description="`customer` or `rider`. Defaults to the `X-App-Name` header.",
+            )
+        ],
+        responses=app_responses(
+            {
+                200: _ok(
+                    LoginMethodsSerializer,
+                    "The methods to offer.",
+                    ("Phone only (default)", ex.LOGIN_METHODS_PHONE),
+                    ("Phone or email", ex.LOGIN_METHODS_BOTH),
+                    ("Email only", ex.LOGIN_METHODS_EMAIL),
+                ),
+                400: error_response(
+                    "No valid app in `app` or `X-App-Name`.",
+                    validation_error({"app": ['"web" is not a valid choice.']}),
+                ),
+            }
+        ),
+    )
+    def get(self, request: Request) -> Response:
+        app = request.query_params.get("app")
+        if app is None:
+            info = getattr(request, "client_info", None)
+            app = getattr(info, "app_name", None) or ""
+        serializer = AppQuerySerializer(data={"app": app})
+        serializer.is_valid(raise_exception=True)
+        app = serializer.validated_data["app"]
+        body = {"app": app, "methods": login_methods.methods_for(app)}
+        return Response(LoginMethodsSerializer(body).data)
+
+
+class EmailOtpRequestView(OtpThrottleMixin, _PublicView):
+    @extend_schema(
+        operation_id="auth_email_otp_request",
+        tags=["auth"],
+        summary="Send an OTP by email",
+        description=(
+            "Emails a 6-digit OTP to `email` for `app`, with the same rules as the SMS OTP "
+            "(5-minute expiry, 5 attempts, 3 sends per email per 10 minutes and 10 per day, "
+            "per-IP limits). The response is the same whether or not the email has an account. "
+            "The email is case-insensitive.\n\n"
+            "Needs email sign-in switched on for the app (`GET /auth/methods/`), else 403 "
+            "`LOGIN_METHOD_DISABLED`. With `purpose: delete_account` (any account with a "
+            "verified email, with or without a phone) the switch does not apply and nothing "
+            "is sent unless the email is the "
+            "verified email of an account; the response is identical.\n\n"
+            "Fixed-OTP test emails exist only outside production."
+        ),
+        auth=[],
+        request=EmailOtpSendSerializer,
+        examples=[
+            _request_example("Login", {"email": "asha.verma@example.com", "app": "customer"}),
+            _request_example("Rider login", {"email": "ravi.k@example.com", "app": "rider"}),
+            _request_example(
+                "Delete account",
+                {"email": "asha.verma@example.com", "app": "customer", "purpose": "delete_account"},
+            ),
+        ],
+        responses=app_responses(
+            {
+                200: _ok(OtpSentSerializer, "OTP sent.", ("Sent", ex.OTP_SENT)),
+                400: error_response(
+                    "Invalid email, app or purpose.",
+                    validation_error({"email": ["Enter a valid email address."]}),
+                ),
+                403: LOGIN_METHOD_DISABLED_RESPONSE,
+                429: OTP_RATE_LIMITED,
+                503: OTP_SERVICE_UNAVAILABLE,
+            }
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        serializer = EmailOtpSendSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        sent = auth.request_sign_in_otp(
+            **serializer.validated_data,
+            ip=client_ip(request),
+            user_agent=request.headers.get("User-Agent", ""),
+        )
+        return Response(OtpSentSerializer(sent).data)
+
+
+class EmailOtpVerifyView(OtpThrottleMixin, _PublicView):
+    @extend_schema(
+        operation_id="auth_email_otp_verify",
+        tags=["auth"],
+        summary="Verify the email OTP and sign in",
+        description=(
+            "Verifies a `login` OTP for `email` + `app` and returns a token pair (same body as "
+            "`/auth/otp/verify/`). Attempts, expiry, deletion grace and `terms_version` work "
+            "exactly as for phone.\n\n"
+            "- **Customer app:** signs in the account whose verified email this is; otherwise "
+            "creates a new customer with this email and **no phone** (`is_new_user: true`, "
+            "`user.has_phone: false`). Such a customer orders with a `receiver_phone` on the "
+            "delivery address (no OTP), else `POST /orders/` answers 422 `PHONE_REQUIRED`. "
+            "An unverified "
+            "copy of the email on another account (typed into a profile, never proved) is "
+            "removed from that account.\n"
+            "- **Rider app** (owner decision 2026-11-28): the same. A new email creates a user "
+            "with no phone and `rider_status: NONE` (`is_new_user: true`), exactly like a new "
+            "phone sign-up: continue with `POST /rider/register/`, which then needs "
+            "`contact_phone` (the rider's mobile, no OTP). `EMAIL_NOT_REGISTERED` is no longer "
+            "returned.\n"
+            "- Staff accounts cannot sign in with an email code (403 `PERMISSION_DENIED`).\n"
+            "- Email sign-in switched off for the app: 403 `LOGIN_METHOD_DISABLED`."
+        ),
+        auth=[],
+        request=EmailOtpVerifySerializer,
+        examples=[
+            _request_example(
+                "Customer",
+                {
+                    "email": "asha.verma@example.com",
+                    "otp": "482913",
+                    "app": "customer",
+                    "terms_version": "2026-11-01",
+                },
+            ),
+        ],
+        responses=app_responses(
+            {
+                200: _ok(
+                    AuthSessionSerializer,
+                    "Signed in.",
+                    ("New customer (no phone yet)", ex.SESSION_NEW_EMAIL_CUSTOMER),
+                    ("Returning customer", ex.SESSION_RETURNING_CUSTOMER),
+                    ("Rider", ex.SESSION_RIDER_EMAIL),
+                    ("New rider (register next)", ex.SESSION_NEW_EMAIL_RIDER),
+                ),
+                400: error_response(
+                    "Wrong or expired OTP, or invalid input.",
+                    OTP_INVALID,
+                    OTP_EXPIRED,
+                    validation_error({"otp": ["Enter the 6-digit OTP."]}),
+                ),
+                403: error_response(
+                    "Email sign-in is switched off for this app, the account is deactivated, "
+                    "or it is a staff account.",
+                    LOGIN_METHOD_DISABLED_EXAMPLE,
+                    error_example(ErrorCode.PERMISSION_DENIED, "This account is deactivated."),
+                    error_example(
+                        ErrorCode.PERMISSION_DENIED,
+                        auth.MSG_STAFF_EMAIL_LOGIN,
+                        name="STAFF_ACCOUNT",
+                        summary="Staff accounts cannot use an email code",
+                    ),
+                ),
+                429: OTP_RATE_LIMITED,
+                503: OTP_SERVICE_UNAVAILABLE,
+            }
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        serializer = EmailOtpVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        result = auth.login_with_email_otp(
+            email=data["email"],
+            code=data["otp"],
+            app=data["app"],
+            terms_version=data["terms_version"],
+            ip=client_ip(request),
+        )
+        return _session_response(result)
 
 
 class TokenRefreshView(SimpleJWTTokenRefreshView):
@@ -425,6 +646,189 @@ class MeView(APIView):
         return Response(MeSerializer(user).data)
 
 
+class MePhoneOtpView(OtpThrottleMixin, APIView):
+    @extend_schema(
+        operation_id="me_phone_otp",
+        tags=["account"],
+        summary="Send an SMS OTP to add a phone number",
+        description=(
+            "Step 1 of adding a phone to an account that has none (an email sign-up, "
+            "`user.has_phone: false`). Optional: orders only need a `receiver_phone` on the "
+            "delivery address. Same "
+            "OTP rules and limits as sign-in, and not affected by the login method switch. The "
+            "response never says whether another account uses the number (step 2 reports "
+            "that, once the code proves the number is the caller's). An account that already "
+            "has a phone gets 400 (not changeable in v1)."
+        ),
+        request=PhoneOtpSendSerializer,
+        examples=[_request_example("Add phone", {"phone": "+919876543210"})],
+        responses=app_responses(
+            {
+                200: _ok(OtpSentSerializer, "OTP sent.", ("Sent", ex.OTP_SENT)),
+                400: error_response(
+                    "Invalid phone, or the account already has one.",
+                    validation_error(
+                        {
+                            "phone": [
+                                "Enter a 10-digit Indian mobile number in the form +919876543210."
+                            ]
+                        }
+                    ),
+                    validation_error(
+                        {"phone": [contact.MSG_PHONE_ALREADY_SET]}, name="Phone already set"
+                    ),
+                ),
+                401: UNAUTHORIZED,
+                429: OTP_RATE_LIMITED,
+                503: OTP_SERVICE_UNAVAILABLE,
+            }
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        serializer = PhoneOtpSendSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        sent = contact.request_add_phone(
+            request.user,
+            phone=serializer.validated_data["phone"],
+            app=_token_app(request),
+            ip=client_ip(request),
+            user_agent=request.headers.get("User-Agent", ""),
+        )
+        return Response(OtpSentSerializer(sent).data)
+
+
+class MePhoneVerifyView(OtpThrottleMixin, APIView):
+    @extend_schema(
+        operation_id="me_phone_verify",
+        tags=["account"],
+        summary="Verify the SMS OTP and add the phone number",
+        description=(
+            "Step 2: sets the caller's phone (`has_phone` becomes true) and returns the user. "
+            "409 `PHONE_IN_USE` if the number belongs to another account: accounts are never "
+            "merged, so suggest signing in with that number instead."
+        ),
+        request=PhoneVerifySerializer,
+        examples=[_request_example("Verify", {"phone": "+919876543210", "otp": "482913"})],
+        responses=app_responses(
+            {
+                200: _ok(
+                    MeSerializer, "The user, now with a phone.", ("Added", ex.EMAIL_ME_WITH_PHONE)
+                ),
+                400: error_response(
+                    "Wrong or expired OTP, invalid input, or the account already has a phone.",
+                    OTP_INVALID,
+                    OTP_EXPIRED,
+                    validation_error(
+                        {"phone": [contact.MSG_PHONE_ALREADY_SET]}, name="Phone already set"
+                    ),
+                ),
+                401: UNAUTHORIZED,
+                409: error_response(
+                    "The number belongs to another account.",
+                    error_example(ErrorCode.PHONE_IN_USE),
+                ),
+                429: OTP_RATE_LIMITED,
+                503: OTP_SERVICE_UNAVAILABLE,
+            }
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        serializer = PhoneVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = contact.verify_add_phone(
+            request.user,
+            phone=serializer.validated_data["phone"],
+            code=serializer.validated_data["otp"],
+            app=_token_app(request),
+            ip=client_ip(request),
+        )
+        return Response(MeSerializer(user).data)
+
+
+class MeEmailOtpView(OtpThrottleMixin, APIView):
+    @extend_schema(
+        operation_id="me_email_otp",
+        tags=["account"],
+        summary="Send an email OTP to verify an email address",
+        description=(
+            "Step 1 of verifying an email for email sign-in (`user.email_verified`). Works for "
+            "the current email or a new one; the email is only changed by step 2. Same OTP "
+            "rules and limits as sign-in, and not affected by the login method switch. 400 if "
+            "this email is already verified on the account."
+        ),
+        request=EmailOtpForMeSerializer,
+        examples=[_request_example("Verify email", {"email": "asha.verma@example.com"})],
+        responses=app_responses(
+            {
+                200: _ok(OtpSentSerializer, "OTP sent.", ("Sent", ex.OTP_SENT)),
+                400: error_response(
+                    "Invalid email, or already verified.",
+                    validation_error({"email": ["Enter a valid email address."]}),
+                    validation_error(
+                        {"email": [contact.MSG_EMAIL_ALREADY_VERIFIED]}, name="Already verified"
+                    ),
+                ),
+                401: UNAUTHORIZED,
+                429: OTP_RATE_LIMITED,
+                503: OTP_SERVICE_UNAVAILABLE,
+            }
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        serializer = EmailOtpForMeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        sent = contact.request_verify_email(
+            request.user,
+            email=serializer.validated_data["email"],
+            app=_token_app(request),
+            ip=client_ip(request),
+            user_agent=request.headers.get("User-Agent", ""),
+        )
+        return Response(OtpSentSerializer(sent).data)
+
+
+class MeEmailVerifyView(OtpThrottleMixin, APIView):
+    @extend_schema(
+        operation_id="me_email_verify",
+        tags=["account"],
+        summary="Verify the email OTP and set the verified email",
+        description=(
+            "Step 2: sets `email` to this address, verified (`email_verified: true`), and "
+            "returns the user. 409 `EMAIL_IN_USE` if another account has this email verified "
+            "(or is a staff account). An unverified copy of the email on another account is "
+            "removed from it, because the caller just proved they own the address."
+        ),
+        request=EmailVerifySerializer,
+        examples=[_request_example("Verify", {"email": "asha.verma@example.com", "otp": "482913"})],
+        responses=app_responses(
+            {
+                200: _ok(MeSerializer, "The user, email verified.", ("Verified", ex.ME)),
+                400: error_response(
+                    "Wrong or expired OTP, or invalid input.", OTP_INVALID, OTP_EXPIRED
+                ),
+                401: UNAUTHORIZED,
+                409: error_response(
+                    "The email belongs to another account.",
+                    error_example(ErrorCode.EMAIL_IN_USE),
+                ),
+                429: OTP_RATE_LIMITED,
+                503: OTP_SERVICE_UNAVAILABLE,
+            }
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        serializer = EmailVerifySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = contact.verify_email(
+            request.user,
+            email=serializer.validated_data["email"],
+            code=serializer.validated_data["otp"],
+            app=_token_app(request),
+            ip=client_ip(request),
+        )
+        return Response(MeSerializer(user).data)
+
+
 class ProfilePromptSkipView(APIView):
     @extend_schema(
         operation_id="me_profile_prompt_skip",
@@ -484,9 +888,15 @@ class AccountDeleteView(OtpThrottleMixin, APIView):
         tags=["account"],
         summary="Delete my account (OTP confirmed)",
         description=(
-            "Two steps: (1) `POST /auth/otp/request/` with the user's own phone and "
-            "`purpose: delete_account`; (2) this call with that OTP. Only a `delete_account` OTP "
-            "issued to the caller's phone is accepted.\n\n"
+            "Two steps: (1) request a `delete_account` OTP, then (2) this call with that OTP.\n\n"
+            "- Account with a phone: `POST /auth/otp/request/` "
+            "`{phone, app, purpose: delete_account}` with the account's own phone (SMS).\n"
+            "- Account with a verified email (`email_verified: true`, with or without a phone; "
+            "use this while SMS does not deliver): `POST /auth/email-otp/request/` "
+            "`{email, app, purpose: delete_account}` with that email. Works even when email "
+            "sign-in is switched off.\n\n"
+            "A `delete_account` OTP issued to the caller's own phone or own verified email is "
+            "accepted (whichever was requested last).\n\n"
             "On success every refresh token of the user is revoked and their devices are "
             "deactivated: clear local data and go to the login screen. Personal data is "
             "anonymised after the grace period (`anonymise_after`, 30 days, 07 §4); order and "

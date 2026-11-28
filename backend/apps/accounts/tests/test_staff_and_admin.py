@@ -297,6 +297,10 @@ class TestOtpTestNumberSafety:
         # Production's SMS default (the test settings' locmem backend is E003, BUG-0005).
         settings.SMS_BACKEND = "apps.notifications.sms.UnconfiguredSmsBackend"
         settings.SIMPLE_JWT = {**settings.SIMPLE_JWT, "SIGNING_KEY": "j" * 64}  # T-814 (L3)
+        # A real mail setup (accounts.E008-E010 are tested in test_email_otp.py).
+        settings.EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+        settings.EMAIL_HOST = "smtp.example.com"
+        settings.DEFAULT_FROM_EMAIL = "noreply@example.com"
         ids = {error.id for error in run_checks() if error.id.startswith("accounts.")}
         assert ids == {"accounts.E001"}
 

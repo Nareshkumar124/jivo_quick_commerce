@@ -104,6 +104,43 @@ Sources: `docs/task-tracker.md`, `plan/00-roadmap.md`, `release-checklist.md`. T
 | UAT with pilot users (ops lead, store manager, 2 to 3 staff, 3 to 5 riders, 10+ customers) | 10 §7 | UAT | Planned, human run |
 | Production smoke after deploy: config, login, browse, COD order to delivery, refund | release-checklist §8 | E2E | Planned |
 
+**Email OTP login and login method switch (added 2026-11-28, backend run `backend/email-otp`).** Backend-only ids `P8-EOTP-nn` (not `P8-TC`, which QA owns), automated in `backend/apps/accounts/tests/test_email_otp.py` and `test_contact_api.py`:
+
+| Id | Case | Layer |
+|---|---|---|
+| P8-EOTP-01 | `GET /auth/methods/` defaults to `["phone"]` for both apps | BE |
+| P8-EOTP-02 | Each setting (phone / email / both) per app | BE |
+| P8-EOTP-03 | A switch change is seen at once (cache dropped on save) | BE |
+| P8-EOTP-04 | Phone OTP request / verify refused with `LOGIN_METHOD_DISABLED` when phone is off | BE |
+| P8-EOTP-05 | Email OTP refused while email is off (default) | BE |
+| P8-EOTP-06 | Email OTP sent by email, hashed, `email_sent_at` set | BE |
+| P8-EOTP-07 | No OTP and no full email address in logs | BE |
+| P8-EOTP-08 | Fixed-OTP test emails send nothing (non-production only) | BE |
+| P8-EOTP-09 | Send limits per email (3 / 10 min, 10 / day) and shared per-IP limit | BE |
+| P8-EOTP-10 | New email creates a customer with a verified email and no phone | BE |
+| P8-EOTP-11 | Verified email signs in the existing account (one user table) | BE |
+| P8-EOTP-12 | Unverified email on another profile never signs in to it (claim released) | BE |
+| P8-EOTP-13 | 5 attempts then locked; expiry; single use | BE |
+| P8-EOTP-14 | Rider app: existing rider with verified email signs in | BE |
+| P8-EOTP-15 | Rider app: unknown email creates a user with no phone and `rider_status: NONE` (owner decision 2026-11-28; was `EMAIL_NOT_REGISTERED`) | BE |
+| P8-EOTP-16 | `/me/` `has_phone` / `email_verified` | BE |
+| P8-EOTP-17 | Email-only account cannot drop its sign-in email by PATCH | BE |
+| P8-EOTP-18 | Add a phone by SMS OTP (`/me/phone/otp/`, `/me/phone/verify/`) | BE |
+| P8-EOTP-19 | Phone of another account: `PHONE_IN_USE`, never merged | BE |
+| P8-EOTP-20 | Verify an email (`/me/email/otp/`, `/me/email/verify/`) | BE |
+| P8-EOTP-21 | Email verified on another account: `EMAIL_IN_USE` | BE |
+| P8-EOTP-22 | `POST /orders/` with no login phone and no `receiver_phone` on the address: 422 `PHONE_REQUIRED` (`details.address_id`), cart blocker `PHONE_REQUIRED` (`orders/tests/test_phone_gate.py`) | BE |
+| P8-EOTP-23 | Account without a phone deletes itself with an email OTP | BE |
+| P8-EOTP-24 | `send_otp_email` is idempotent | BE |
+| P8-EOTP-25 | Production refuses `OTP_TEST_EMAILS` | BE |
+| P8-EOTP-26 | Email-only customer orders once the address has a `receiver_phone` (no OTP); order snapshot and Razorpay prefill carry it | BE |
+| P8-EOTP-27 | Phone customer's idempotent `POST /orders/` replay still returns 200 | BE |
+| P8-EOTP-28 | Non-ASCII / look-alike emails refused on request, verify and profile | BE |
+| P8-EOTP-29 | Deploy checks `accounts.E008`-`E010` / `W002`-`W003` for email delivery | BE |
+| P8-EOTP-30 | Rider without a login phone registers with `contact_phone` (no OTP); profile and tracking show it (`delivery/tests/test_registration_api.py`) | BE |
+| P8-EOTP-32 | `STORE_REVIEW_LOGINS` email entries: fixed code on the email OTP path, no email, masked audit, `accounts.E011` rules (`accounts/tests/test_review_login.py`) | BE |
+| P8-EOTP-31 | `me/delete/` accepts a `delete_account` OTP sent to the verified email of an account that has a phone; newest code wins | BE |
+
 Reference open cases: P5 (21 not run, including P0 TC-12, 42, 45, 51, 110), P6 (3 failed, 9 not run) and P7 (4 not run) must be closed before this gate (see the phase 5, 6 and 7 files).
 
 ## 4. Exit criteria

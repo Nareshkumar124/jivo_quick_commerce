@@ -64,7 +64,18 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         unique=True,
         null=True,
         blank=True,
-        help_text="Stored lowercase. Login identifier for staff.",
+        help_text=(
+            "Stored lowercase (unique case-insensitively). Staff: password login. Customers and "
+            "riders: email OTP login once verified."
+        ),
+    )
+    email_verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "When the user proved they own `email` with an email OTP. Only a verified email "
+            "signs in with email OTP. Cleared whenever the email changes."
+        ),
     )
     name = models.CharField(max_length=120, blank=True)
     # Business profile (03 §2.2, 2026-11-26): asked once, right after the first OTP sign-up.
@@ -147,6 +158,15 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         return self.is_staff or self.rider_status != RiderStatus.NONE
 
     @property
+    def has_phone(self) -> bool:
+        """False for an email sign-up that has not added a phone yet (no orders until then)."""
+        return bool(self.phone)
+
+    @property
+    def email_verified(self) -> bool:
+        return bool(self.email) and self.email_verified_at is not None
+
+    @property
     def rider_status(self) -> str:
         """The rider profile's status (07 §2.8, Phase 5); NONE without a profile."""
         from django.core.exceptions import ObjectDoesNotExist
@@ -160,9 +180,34 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         super().clean()
         self._normalise_identifiers()
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._remember_email_state()
+        return instance
+
+    def _remember_email_state(self) -> None:
+        self._loaded_email = self.__dict__.get("email")
+        self._loaded_email_verified_at = self.__dict__.get("email_verified_at")
+
     def save(self, *args, **kwargs) -> None:
         self._normalise_identifiers()
+        self._unverify_changed_email(kwargs)
         super().save(*args, **kwargs)
+        self._remember_email_state()
+
+    def _unverify_changed_email(self, kwargs: dict) -> None:
+        """Whoever changes the email (profile, admin, shell), it is no longer verified, unless
+        the same save also stamps a new `email_verified_at` (an email OTP just proved it)."""
+        if not hasattr(self, "_loaded_email") or "email" not in self.__dict__:
+            return
+        if self.email == self._loaded_email:
+            return
+        if self.email is None or self.email_verified_at == self._loaded_email_verified_at:
+            self.email_verified_at = None
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "email" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "email_verified_at"}
 
     def _normalise_identifiers(self) -> None:
         self.email = normalise_email(self.email)
@@ -188,9 +233,11 @@ class Customer(User):
 
 
 class OTPRequest(TimeStampedModel):
-    """One OTP sent to a phone (07 §2.1). The code is stored only as a keyed hash."""
+    """One OTP sent to a phone (SMS) or an email address (07 §2.1). Exactly one of `phone` and
+    `email` is set; the other is "". The code is stored only as a keyed hash."""
 
-    phone = models.CharField(max_length=15)
+    phone = models.CharField(max_length=15, blank=True)
+    email = models.EmailField(blank=True, default="", help_text="Lowercase. Email OTPs only.")
     app = models.CharField(max_length=16, choices=AppName.choices)
     purpose = models.CharField(max_length=20, choices=OtpPurpose.choices, default=OtpPurpose.LOGIN)
     code_hash = models.CharField(max_length=64)
@@ -200,6 +247,9 @@ class OTPRequest(TimeStampedModel):
     sms_sent_at = models.DateTimeField(
         null=True, blank=True, help_text="Set when the SMS went out (keeps the task idempotent)."
     )
+    email_sent_at = models.DateTimeField(
+        null=True, blank=True, help_text="Set when the email went out (keeps the task idempotent)."
+    )
     ip = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.CharField(max_length=256, blank=True)
 
@@ -207,6 +257,9 @@ class OTPRequest(TimeStampedModel):
         verbose_name = "OTP request"
         indexes = [
             models.Index(fields=["phone", "app", "purpose", "-created_at"], name="otp_lookup_idx"),
+            models.Index(
+                fields=["email", "app", "purpose", "-created_at"], name="otp_email_lookup_idx"
+            ),
             models.Index(fields=["created_at"], name="otp_created_idx"),
         ]
 

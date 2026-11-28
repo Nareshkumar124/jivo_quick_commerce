@@ -141,11 +141,16 @@ class RiderRegisterView(APIView):
             "missing, `ready_for_review` is true and ops review the application. Once only: "
             "afterwards 409 `INVALID_STATE_TRANSITION` (edit with `PATCH /rider/me/`). The rider "
             "must be 18 or older (IST date); the emergency contact must not be the rider's own "
-            "number; `vehicle_number` is required exactly for MOTORBIKE and SCOOTER."
+            "number; `vehicle_number` is required exactly for MOTORBIKE and SCOOTER.\n\n"
+            "Email sign-up (2026-11-28): an account without a login phone (`GET /me/` "
+            "`has_phone: false`) must send `contact_phone`, the rider's own mobile (no OTP), "
+            "else 400 `VALIDATION_ERROR` on `contact_phone`. Customers and the store call it."
         ),
         request=s.RiderRegisterSerializer,
         examples=request_examples(
-            ("Motorbike", ex.REGISTER_REQUEST), ("Bicycle", ex.REGISTER_REQUEST_BICYCLE)
+            ("Motorbike", ex.REGISTER_REQUEST),
+            ("Bicycle", ex.REGISTER_REQUEST_BICYCLE),
+            ("Email sign-up (no login phone)", ex.REGISTER_REQUEST_EMAIL_SIGNUP),
         ),
         responses=app_responses(
             {
@@ -232,8 +237,9 @@ class RiderMeView(APIView):
         summary="Edit my rider profile",
         description=(
             "Any registration field. PENDING_KYC and REJECTED riders may change all of them; "
-            "ACTIVE and SUSPENDED riders only `emergency_contact_name` and "
-            '`emergency_contact_phone` (anything else: 400 with "Contact ops"). A REJECTED '
+            "ACTIVE and SUSPENDED riders only `emergency_contact_name`, "
+            "`emergency_contact_phone` and `contact_phone` (anything else: 400 with "
+            '"Contact ops"). A REJECTED '
             "rider's application returns to PENDING_KYC once nothing required is missing or "
             "rejected (the rider fixed what ops asked)."
         ),

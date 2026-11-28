@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jivo_core/jivo_core.dart';
 
+import '../../../app/launch_state.dart';
 import '../../../app/redirect.dart';
 import '../../../l10n/generated/app_localizations.dart';
 import '../../../shared/validation/validators.dart';
@@ -491,6 +492,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     final state = ref.watch(addressFormProvider);
     final point = state.point;
     final hasMap = ref.watch(mapsAvailableProvider).value ?? false;
+    final needsReceiverPhone =
+        ref.watch(launchStateProvider).user?.hasPhone == false;
     ref.listen(addressFormProvider.select((s) => s.parts), (_, parts) {
       if (parts != null) _prefill(parts);
     });
@@ -761,9 +764,12 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),
                   ],
-                  validator: (v) => (v ?? '').isEmpty || Validators.isMobile(v!)
-                      ? null
-                      : l10n.phoneInvalid,
+                  // An email sign-up without a phone: the rider and the
+                  // store reach the customer on this number, so it is
+                  // required (checkout asks for it too).
+                  validator: (v) => (v ?? '').isEmpty
+                      ? (needsReceiverPhone ? l10n.receiverPhoneRequired : null)
+                      : (Validators.isMobile(v!) ? null : l10n.phoneInvalid),
                 ),
                 if (state.error != null) ...[
                   Text(

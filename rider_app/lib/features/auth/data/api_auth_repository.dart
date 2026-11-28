@@ -2,7 +2,10 @@ import 'package:jivo_api/jivo_api.dart'
     show
         AppEnum,
         AuthSession,
+        EmailOtpSendRequest,
+        EmailOtpVerifyRequest,
         JivoApi,
+        LoginMethodEnum,
         LogoutRequest,
         Me,
         OtpPurposeEnum,
@@ -13,6 +16,7 @@ import 'package:jivo_core/jivo_core.dart';
 
 import '../domain/account_repository.dart';
 import '../domain/auth_repository.dart';
+import '../domain/login_method.dart';
 
 /// [AuthRepository] and [AccountRepository] over the generated client.
 class ApiAuthRepository implements AuthRepository, AccountRepository {
@@ -40,6 +44,47 @@ class ApiAuthRepository implements AuthRepository, AccountRepository {
     () async => (await _api.getAuthApi().authOtpVerify(
       otpVerifyRequest: OtpVerifyRequest(
         phone: phoneE164,
+        otp: otp,
+        app: AppEnum.rider,
+        termsVersion: termsVersion,
+      ),
+    )).data,
+  );
+
+  @override
+  Future<List<LoginMethod>> fetchLoginMethods() async {
+    final body = await _call(
+      () async => (await _api.getAuthApi().authMethods(app: 'rider')).data,
+    );
+    return [
+      for (final method in body.methods)
+        if (method == LoginMethodEnum.phone)
+          LoginMethod.phone
+        else if (method == LoginMethodEnum.email)
+          LoginMethod.email,
+    ];
+  }
+
+  @override
+  Future<OtpSent> requestEmailOtp(String email) => _call(
+    () async => (await _api.getAuthApi().authEmailOtpRequest(
+      emailOtpSendRequest: EmailOtpSendRequest(
+        email: email,
+        app: AppEnum.rider,
+        purpose: OtpPurposeEnum.login,
+      ),
+    )).data,
+  );
+
+  @override
+  Future<AuthSession> verifyEmailOtp({
+    required String email,
+    required String otp,
+    required String termsVersion,
+  }) => _call(
+    () async => (await _api.getAuthApi().authEmailOtpVerify(
+      emailOtpVerifyRequest: EmailOtpVerifyRequest(
+        email: email,
         otp: otp,
         app: AppEnum.rider,
         termsVersion: termsVersion,

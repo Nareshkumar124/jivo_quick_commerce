@@ -7,3 +7,4 @@ SEED_DEMO_ALLOWED = env_bool("SEED_DEMO_ALLOWED", default=True)
 
 # D-15: fixed-OTP test numbers are allowed on staging, configured explicitly per deployment.
 OTP_TEST_NUMBERS = env_dict("OTP_TEST_NUMBERS", default={})
+OTP_TEST_EMAILS = env_dict("OTP_TEST_EMAILS", default={})

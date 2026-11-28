@@ -93,6 +93,7 @@ const _$CheckoutBlockerCodeEnumEnumMap = {
   CheckoutBlockerCodeEnum.CART_EMPTY: 'CART_EMPTY',
   CheckoutBlockerCodeEnum.ADDRESS_REQUIRED: 'ADDRESS_REQUIRED',
   CheckoutBlockerCodeEnum.NOT_SERVICEABLE: 'NOT_SERVICEABLE',
+  CheckoutBlockerCodeEnum.PHONE_REQUIRED: 'PHONE_REQUIRED',
   CheckoutBlockerCodeEnum.STORE_CLOSED: 'STORE_CLOSED',
   CheckoutBlockerCodeEnum.STOCK_UNAVAILABLE: 'STOCK_UNAVAILABLE',
   CheckoutBlockerCodeEnum.MIN_QTY_REQUIRED: 'MIN_QTY_REQUIRED',

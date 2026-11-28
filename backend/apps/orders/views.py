@@ -191,7 +191,14 @@ class OrderListCreateView(APIView):
             "still there to try again.\n\n"
             "Send the same `Idempotency-Key` when retrying a request whose response was lost: "
             "the first order is returned (200) and nothing is placed twice. Disable the button "
-            "while a request is in flight."
+            "while a request is in flight.\n\n"
+            "**Phone required:** the rider and the store need a number to call. A customer "
+            "without a login phone (email sign-up, `GET /me/` `has_phone: false`) can order "
+            "when the chosen address has a `receiver_phone` (any valid Indian mobile, no OTP). "
+            "With neither the answer is 422 `PHONE_REQUIRED` with `details.address_id`: ask for "
+            "a phone number and save it on that address (`PATCH /addresses/{id}/` "
+            "`receiver_phone`), then place the order again. The cart shows the same problem in "
+            "advance as the `PHONE_REQUIRED` checkout blocker."
         ),
         parameters=[IDEMPOTENCY_KEY_PARAMETER, STORE_ID_PARAMETER],
         request=OrderCreateSerializer,
@@ -268,6 +275,14 @@ class OrderListCreateView(APIView):
                         ErrorCode.COD_NOT_AVAILABLE,
                         "Cash on delivery is available on orders up to ₹2,000.",
                         ex.COD_ABOVE_LIMIT_DETAILS,
+                    ),
+                    error_example(
+                        ErrorCode.PHONE_REQUIRED,
+                        details={"address_id": 13},
+                        summary=(
+                            "No login phone and no receiver_phone on the address: add one to "
+                            "the address first"
+                        ),
                     ),
                     *COUPON_ERRORS,
                 ),

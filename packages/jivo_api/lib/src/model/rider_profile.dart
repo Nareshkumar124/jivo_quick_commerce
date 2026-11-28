@@ -33,6 +33,8 @@ class RiderProfile {
 
     required this.phone,
 
+    required this.contactPhone,
+
     required this.status,
 
     required this.rejectionReason,
@@ -83,9 +85,13 @@ class RiderProfile {
   @JsonKey(name: r'id', required: true, includeIfNull: false)
   final int id;
 
-  /// Login phone (E.164).
+  /// The rider's number (E.164): the login phone, or `contact_phone` for an account created by email sign-in.
   @JsonKey(name: r'phone', required: true, includeIfNull: false)
   final String phone;
+
+  /// The unverified mobile given at registration (\"\" when not given).
+  @JsonKey(name: r'contact_phone', required: true, includeIfNull: false)
+  final String contactPhone;
 
   /// PENDING_KYC, ACTIVE, REJECTED or SUSPENDED (never NONE here). Same value as `rider_status` of `GET /me/`.  * `NONE` - No rider profile: show registration * `PENDING_KYC` - Registered, waiting for KYC approval * `ACTIVE` - Approved: can go online * `REJECTED` - KYC rejected: see the reason, re-submit * `SUSPENDED` - Suspended by ops
   @JsonKey(
@@ -209,6 +215,7 @@ class RiderProfile {
       other is RiderProfile &&
           other.id == id &&
           other.phone == phone &&
+          other.contactPhone == contactPhone &&
           other.status == status &&
           other.rejectionReason == rejectionReason &&
           other.suspensionReason == suspensionReason &&
@@ -237,6 +244,7 @@ class RiderProfile {
   int get hashCode =>
       id.hashCode +
       phone.hashCode +
+      contactPhone.hashCode +
       status.hashCode +
       rejectionReason.hashCode +
       suspensionReason.hashCode +

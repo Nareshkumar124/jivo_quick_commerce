@@ -16,12 +16,16 @@ import '../../launch/presentation/launch_controller.dart';
 
 import 'package:jivo_core/helpers.dart';
 
+import '../domain/login_method.dart';
 import 'auth_error_text.dart';
 import 'login_controllers.dart';
+import 'support_contact_buttons.dart';
 
-/// Phone login (04 §2.1): +91 and 10 digits, consent with links to the
-/// Terms and Privacy policy from `config/app`, then `POST /auth/otp/request/`
-/// with `app: rider`.
+/// Login (04 §2.1): phone (+91 and 10 digits, `POST /auth/otp/request/`)
+/// and/or email (`POST /auth/email-otp/request/`), as
+/// `GET /auth/methods/?app=rider` says (phone when that call fails; a
+/// Phone/Email toggle when both are on). Consent with links to the Terms and
+/// Privacy policy from `config/app`.
 class PhoneLoginScreen extends ConsumerStatefulWidget {
   const PhoneLoginScreen({super.key});
 
@@ -31,6 +35,13 @@ class PhoneLoginScreen extends ConsumerStatefulWidget {
 
 class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
   final _phone = TextEditingController();
+  final _email = TextEditingController();
+
+  /// The rider's pick on the Phone/Email toggle (when both are on).
+  LoginMethod? _chosen;
+
+  /// Shown only after the rider tried to continue with an email.
+  String? _emailError;
 
   /// Shown only after the rider tried to continue, or for a complete
   /// 10-digit number that can't be an Indian mobile. Never while a number
@@ -55,7 +66,31 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
   @override
   void dispose() {
     _phone.dispose();
+    _email.dispose();
     super.dispose();
+  }
+
+  LoginMethod _mode(List<LoginMethod> methods) {
+    final chosen = _chosen;
+    return chosen != null && methods.contains(chosen) ? chosen : methods.first;
+  }
+
+  Future<void> _submitFor(LoginMethod mode) =>
+      mode == LoginMethod.email ? _submitEmail() : _submit();
+
+  Future<void> _submitEmail() async {
+    final l10n = AppLocalizations.of(context);
+    final text = _email.text.trim();
+    final error = text.isEmpty
+        ? l10n.loginEmailEmpty
+        : (looksLikeEmail(text) ? null : l10n.loginEmailInvalid);
+    setState(() => _emailError = error);
+    if (error != null) return;
+    FocusScope.of(context).unfocus();
+    final ok = await ref
+        .read(phoneLoginControllerProvider.notifier)
+        .requestEmailOtp(text);
+    if (ok && mounted) context.go(Routes.otp);
   }
 
   Future<void> _submit() async {
@@ -87,6 +122,10 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
         SignOutReason.sessionExpired;
     final wrongApp = ref.watch(wrongAppNoticeProvider);
     final serverError = state.error;
+    final methods =
+        ref.watch(loginMethodsProvider).value ?? const [LoginMethod.phone];
+    final mode = _mode(methods);
+    final isEmail = mode == LoginMethod.email;
 
     return Scaffold(
       body: SafeArea(
@@ -121,8 +160,47 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                         ),
                         const SizedBox(height: 16),
                       ],
+                      if (methods.length > 1) ...[
+                        SegmentedButton<LoginMethod>(
+                          key: const Key('login-method-toggle'),
+                          segments: [
+                            ButtonSegment(
+                              value: LoginMethod.phone,
+                              icon: const Icon(Icons.phone_android),
+                              label: Text(
+                                l10n.loginMethodPhone,
+                                key: const Key('login-method-phone'),
+                              ),
+                            ),
+                            ButtonSegment(
+                              value: LoginMethod.email,
+                              icon: const Icon(Icons.email_outlined),
+                              label: Text(
+                                l10n.loginMethodEmail,
+                                key: const Key('login-method-email'),
+                              ),
+                            ),
+                          ],
+                          selected: {mode},
+                          showSelectedIcon: false,
+                          style: SegmentedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
+                          ),
+                          onSelectionChanged: state.submitting
+                              ? null
+                              : (picked) {
+                                  ref
+                                      .read(
+                                        phoneLoginControllerProvider.notifier,
+                                      )
+                                      .clearError();
+                                  setState(() => _chosen = picked.first);
+                                },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       Text(
-                        l10n.loginSubtitle,
+                        isEmail ? l10n.loginEmailSubtitle : l10n.loginSubtitle,
                         style: theme.textTheme.bodyLarge,
                       ),
                       if (expired) ...[
@@ -144,6 +222,39 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                         ),
                       ],
                       const SizedBox(height: 24),
+                      if (isEmail)
+                        TextField(
+                          key: const Key('login-email'),
+                          controller: _email,
+                          autofocus: true,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.done,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          autofillHints: const [AutofillHints.email],
+                          scrollPadding: const EdgeInsets.fromLTRB(
+                            20,
+                            20,
+                            20,
+                            64,
+                          ),
+                          style: theme.textTheme.titleLarge,
+                          decoration: InputDecoration(
+                            labelText: l10n.loginEmailLabel,
+                            hintText: l10n.loginEmailHint,
+                            errorText: _emailError,
+                          ),
+                          onChanged: (_) {
+                            if (_emailError != null) {
+                              setState(() => _emailError = null);
+                            }
+                            ref
+                                .read(phoneLoginControllerProvider.notifier)
+                                .clearError();
+                          },
+                          onSubmitted: (_) => _submitEmail(),
+                        )
+                      else
                       TextField(
                         key: const Key('login-phone'),
                         controller: _phone,
@@ -180,6 +291,12 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                           authErrorText(context, serverError),
                           textKey: const Key('login-error'),
                         ),
+                        if (isEmailNotRegistered(serverError))
+                          const SupportContactButtons(),
+                      ],
+                      if (isEmail) ...[
+                        const SizedBox(height: 16),
+                        _NewRiderNote(emailOnly: methods.length == 1),
                       ],
                     ],
                   ),
@@ -204,7 +321,9 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                         const SizedBox(height: 8),
                         FilledButton(
                           key: const Key('login-get-otp'),
-                          onPressed: state.submitting ? null : _submit,
+                          onPressed: state.submitting
+                              ? null
+                              : () => _submitFor(mode),
                           child: state.submitting
                               ? const SizedBox.square(
                                   dimension: 24,
@@ -221,6 +340,47 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Under the email field. New riders register with their phone (the server
+/// cannot create a rider from an email): with the toggle, point to Phone;
+/// with email only, show the support contact instead of a dead end.
+class _NewRiderNote extends StatelessWidget {
+  const _NewRiderNote({required this.emailOnly});
+
+  final bool emailOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    if (!emailOnly) {
+      return Text(
+        l10n.loginNewRiderPhone,
+        key: const Key('login-new-rider-phone'),
+        style: theme.textTheme.bodyMedium,
+      );
+    }
+    return Card(
+      key: const Key('login-new-rider-support'),
+      color: theme.colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.loginNewRiderEmailOnlyTitle,
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(l10n.loginNewRiderEmailOnly),
+            const SupportContactButtons(),
+          ],
         ),
       ),
     );

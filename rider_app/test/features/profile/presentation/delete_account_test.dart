@@ -105,6 +105,20 @@ void main() {
     expect(byKey('login-phone'), findsOneWidget);
   });
 
+  testWidgets('an account without a phone gets the OTP by email '
+      '(the server sends to the verified email then)', (tester) async {
+    h.backend.seedVerifiedEmailOnly = 'ravi@example.com';
+    await openDeleteFromProfile(tester);
+
+    await tester.tap(byKey('delete-account-send-otp'));
+    await tester.pumpAndSettle();
+    expect(h.deletion.calls, ['requestDeletionOtpByEmail ravi@example.com']);
+    expect(
+      textOf(tester, 'delete-account-otp-prompt'),
+      contains('ravi@example.com'),
+    );
+  });
+
   testWidgets('refused while online, like logout: nothing is sent', (
     tester,
   ) async {

@@ -60,6 +60,16 @@ REGISTER_REQUEST = {
     "vehicle_type": "MOTORBIKE",
     "vehicle_number": "HR26DQ1234",
 }
+REGISTER_REQUEST_EMAIL_SIGNUP = {
+    "full_name": "Ravi Kumar",
+    "dob": "1998-04-12",
+    "emergency_contact_name": "Sunita Devi",
+    "emergency_contact_phone": "+919812345670",
+    "contact_phone": "+919811122233",
+    "preferred_store_id": 1,
+    "vehicle_type": "MOTORBIKE",
+    "vehicle_number": "HR26DQ1234",
+}
 REGISTER_REQUEST_BICYCLE = {
     "full_name": "Amit Singh",
     "dob": "2001-09-30",
@@ -72,6 +82,7 @@ REGISTER_REQUEST_BICYCLE = {
 _PROFILE_BASE = {
     "id": 42,
     "phone": "+919811122233",
+    "contact_phone": "",
     "rejection_reason": "",
     "suspension_reason": "",
     "full_name": "Ravi Kumar",

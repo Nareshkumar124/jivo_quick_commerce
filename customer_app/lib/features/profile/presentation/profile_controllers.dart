@@ -99,13 +99,18 @@ class DeleteAccountState {
 }
 
 /// Delete account (`03 §2.2`): request a `delete_account` OTP for the
-/// user's phone, then `POST /me/delete/`. The caller shows the result and
+/// user's phone (or, for an account without a phone, its verified email),
+/// then `POST /me/delete/`. The caller shows the result and
 /// then calls [finish] to sign out.
 class DeleteAccountController extends Notifier<DeleteAccountState> {
   @override
   DeleteAccountState build() => const DeleteAccountState();
 
-  Future<void> sendOtp(String phone) async {
+  /// Sends the OTP to [destination] over [method] (phone or email).
+  Future<void> sendOtp(
+    String destination, {
+    LoginMethod method = LoginMethod.phone,
+  }) async {
     if (state.busy) return;
     state = DeleteAccountState(
       step: state.step,
@@ -113,9 +118,17 @@ class DeleteAccountController extends Notifier<DeleteAccountState> {
       challenge: state.challenge,
     );
     try {
-      final challenge = await ref
-          .read(authRepositoryProvider)
-          .requestOtp(phone, purpose: OtpPurpose.deleteAccount);
+      final repository = ref.read(authRepositoryProvider);
+      final challenge = switch (method) {
+        LoginMethod.phone => await repository.requestOtp(
+          destination,
+          purpose: OtpPurpose.deleteAccount,
+        ),
+        LoginMethod.email => await repository.requestEmailOtp(
+          destination,
+          purpose: OtpPurpose.deleteAccount,
+        ),
+      };
       state = DeleteAccountState(step: DeleteStep.otp, challenge: challenge);
     } catch (error) {
       state = DeleteAccountState(

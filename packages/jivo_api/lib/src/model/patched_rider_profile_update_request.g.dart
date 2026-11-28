@@ -19,6 +19,8 @@ abstract class _$PatchedRiderProfileUpdateRequestCWProxy {
     String? emergencyContactPhone,
   );
 
+  PatchedRiderProfileUpdateRequest contactPhone(String? contactPhone);
+
   PatchedRiderProfileUpdateRequest preferredStoreId(int? preferredStoreId);
 
   PatchedRiderProfileUpdateRequest vehicleType(VehicleTypeEnum? vehicleType);
@@ -36,6 +38,7 @@ abstract class _$PatchedRiderProfileUpdateRequestCWProxy {
     DateTime? dob,
     String? emergencyContactName,
     String? emergencyContactPhone,
+    String? contactPhone,
     int? preferredStoreId,
     VehicleTypeEnum? vehicleType,
     String? vehicleNumber,
@@ -67,6 +70,10 @@ class _$PatchedRiderProfileUpdateRequestCWProxyImpl
   ) => this(emergencyContactPhone: emergencyContactPhone);
 
   @override
+  PatchedRiderProfileUpdateRequest contactPhone(String? contactPhone) =>
+      this(contactPhone: contactPhone);
+
+  @override
   PatchedRiderProfileUpdateRequest preferredStoreId(int? preferredStoreId) =>
       this(preferredStoreId: preferredStoreId);
 
@@ -90,6 +97,7 @@ class _$PatchedRiderProfileUpdateRequestCWProxyImpl
     Object? dob = const $CopyWithPlaceholder(),
     Object? emergencyContactName = const $CopyWithPlaceholder(),
     Object? emergencyContactPhone = const $CopyWithPlaceholder(),
+    Object? contactPhone = const $CopyWithPlaceholder(),
     Object? preferredStoreId = const $CopyWithPlaceholder(),
     Object? vehicleType = const $CopyWithPlaceholder(),
     Object? vehicleNumber = const $CopyWithPlaceholder(),
@@ -112,6 +120,10 @@ class _$PatchedRiderProfileUpdateRequestCWProxyImpl
           ? _value.emergencyContactPhone
           // ignore: cast_nullable_to_non_nullable
           : emergencyContactPhone as String?,
+      contactPhone: contactPhone == const $CopyWithPlaceholder()
+          ? _value.contactPhone
+          // ignore: cast_nullable_to_non_nullable
+          : contactPhone as String?,
       preferredStoreId: preferredStoreId == const $CopyWithPlaceholder()
           ? _value.preferredStoreId
           // ignore: cast_nullable_to_non_nullable
@@ -160,6 +172,7 @@ PatchedRiderProfileUpdateRequest _$PatchedRiderProfileUpdateRequestFromJson(
         'emergency_contact_phone',
         (v) => v as String?,
       ),
+      contactPhone: $checkedConvert('contact_phone', (v) => v as String?),
       preferredStoreId: $checkedConvert(
         'preferred_store_id',
         (v) => (v as num?)?.toInt(),
@@ -180,6 +193,7 @@ PatchedRiderProfileUpdateRequest _$PatchedRiderProfileUpdateRequestFromJson(
     'fullName': 'full_name',
     'emergencyContactName': 'emergency_contact_name',
     'emergencyContactPhone': 'emergency_contact_phone',
+    'contactPhone': 'contact_phone',
     'preferredStoreId': 'preferred_store_id',
     'vehicleType': 'vehicle_type',
     'vehicleNumber': 'vehicle_number',
@@ -193,6 +207,7 @@ Map<String, dynamic> _$PatchedRiderProfileUpdateRequestToJson(
   'dob': ?jivoNullableDateToJson(instance.dob),
   'emergency_contact_name': ?instance.emergencyContactName,
   'emergency_contact_phone': ?instance.emergencyContactPhone,
+  'contact_phone': ?instance.contactPhone,
   'preferred_store_id': ?instance.preferredStoreId,
   'vehicle_type': ?_$VehicleTypeEnumEnumMap[instance.vehicleType],
   'vehicle_number': ?instance.vehicleNumber,

@@ -42,6 +42,24 @@ BUSINESS_CATEGORIES = [
 ]
 
 
+# 2026-11-28: verified emails for email OTP sign-in (fixed code in OTP_TEST_EMAILS, local/test).
+TEST_CUSTOMER_EMAIL = "customer1@example.com"
+TEST_RIDER_EMAIL = "rider1@example.com"
+
+
+def attach_verified_email(user: User, email: str, stdout) -> None:
+    """Give `user` this verified email unless it already has one or another account uses it
+    (never overwrites real data). Idempotent."""
+    if user.email == email and user.email_verified_at is not None:
+        return
+    if user.email or User.objects.filter(email=email).exclude(pk=user.pk).exists():
+        stdout.write(f"  {email} not attached to user {user.pk}: email already set or in use")
+        return
+    user.email = email
+    user.email_verified_at = timezone.now()
+    user.save(update_fields=["email", "email_verified_at", "updated_at"])
+
+
 def seed_business_categories(stdout, options) -> None:
     """Idempotent: creates missing categories; admin edits to existing ones are kept."""
     created = 0
@@ -115,8 +133,13 @@ def seed_test_customers(stdout, options) -> None:
             lng=Decimal("77.026600"),
             is_default=True,
         )
-    stdout.write(f"  test customer {TEST_CUSTOMER_PHONE} with a default address")
+    attach_verified_email(customer, TEST_CUSTOMER_EMAIL, stdout)
+    stdout.write(
+        f"  test customer {TEST_CUSTOMER_PHONE} ({TEST_CUSTOMER_EMAIL}) with a default address"
+    )
     numbers = ", ".join(
         f"{phone} (OTP {code})" for phone, code in settings.OTP_TEST_NUMBERS.items()
     )
     stdout.write(f"  fixed-OTP test numbers: {numbers or 'none configured'}")
+    emails = ", ".join(f"{email} (OTP {code})" for email, code in settings.OTP_TEST_EMAILS.items())
+    stdout.write(f"  fixed-OTP test emails: {emails or 'none configured'}")

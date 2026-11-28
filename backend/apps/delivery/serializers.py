@@ -152,7 +152,16 @@ class RiderProfileSerializer(serializers.Serializer):
     """`GET /rider/me/`: everything the onboarding, status, home and profile screens need."""
 
     id = serializers.IntegerField()
-    phone = serializers.CharField(help_text="Login phone (E.164).")
+    phone = serializers.CharField(
+        help_text=(
+            "The rider's number (E.164): the login phone, or `contact_phone` for an account "
+            "created by email sign-in."
+        )
+    )
+    contact_phone = serializers.CharField(
+        allow_blank=True,
+        help_text='The unverified mobile given at registration ("" when not given).',
+    )
     status = serializers.ChoiceField(
         choices=RiderStatus.choices,
         help_text=(
@@ -234,6 +243,17 @@ class RiderProfileFieldsSerializer(serializers.Serializer):
         validators=[indian_mobile_validator],
         help_text="Indian mobile number (E.164, +91...), not the rider's own number.",
     )
+    contact_phone = serializers.CharField(
+        max_length=15,
+        required=False,
+        validators=[indian_mobile_validator],
+        help_text=(
+            "The rider's own mobile (E.164, +91...), for customers and the store to call. No "
+            "OTP. **Required at registration when the account has no login phone** (email "
+            "sign-up, `GET /me/` `has_phone: false`; else 400 on `contact_phone`); optional "
+            "otherwise. Editable in any status."
+        ),
+    )
     preferred_store_id = serializers.IntegerField(help_text="From `GET /rider/stores/`.")
     vehicle_type = serializers.ChoiceField(choices=VehicleType.choices)
     vehicle_number = serializers.CharField(
@@ -275,6 +295,8 @@ class RiderProfileFieldsSerializer(serializers.Serializer):
     def validate_emergency_contact_phone(self, value: str) -> str:
         user = self.context.get("user")
         if user is not None and value == user.phone:
+            raise serializers.ValidationError("Use someone else's number, not your own.")
+        if value and value == self.initial_data.get("contact_phone"):
             raise serializers.ValidationError("Use someone else's number, not your own.")
         return value
 

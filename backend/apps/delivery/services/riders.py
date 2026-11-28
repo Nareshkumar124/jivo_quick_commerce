@@ -49,7 +49,10 @@ MSG_BAD_IMAGE = "Upload a JPEG or PNG photo."
 MSG_UNKNOWN_STORE = "Choose a store from the list."
 MSG_STAFF = "Staff accounts cannot register as riders."
 
-EDITABLE_WHEN_APPROVED = frozenset({"emergency_contact_name", "emergency_contact_phone"})
+EDITABLE_WHEN_APPROVED = frozenset(
+    {"emergency_contact_name", "emergency_contact_phone", "contact_phone"}
+)
+MSG_CONTACT_PHONE_REQUIRED = "Enter your mobile number."
 OPEN_STATUSES = frozenset({RiderStatus.PENDING_KYC, RiderStatus.REJECTED})
 MAX_IMAGE_PIXELS = 40_000_000  # 40 MP: far above any phone photo, far below a decompression bomb
 JPEG_QUALITY = 88
@@ -143,6 +146,11 @@ def register(user, data: dict) -> Rider:
     """`POST /rider/register/`: create the profile in PENDING_KYC (04 §2.2). Once only (409
     `INVALID_STATE_TRANSITION` after that; edit with PATCH /rider/me/)."""
     require_can_register(user)
+    contact_phone = data.get("contact_phone") or ""
+    if not user.phone and not contact_phone:  # email sign-up (2026-11-28): a number to call
+        raise ApiError(
+            ErrorCode.VALIDATION_ERROR, details={"contact_phone": [MSG_CONTACT_PHONE_REQUIRED]}
+        )
     store = _store(data["preferred_store_id"])
     existing = rider_for(user)
     if existing is not None:
@@ -156,6 +164,7 @@ def register(user, data: dict) -> Rider:
                 dob=data["dob"],
                 emergency_contact_name=data["emergency_contact_name"],
                 emergency_contact_phone=data["emergency_contact_phone"],
+                contact_phone=contact_phone,
                 vehicle_type=data["vehicle_type"],
                 vehicle_number=data.get("vehicle_number") or "",
                 preferred_store=store,

@@ -3,6 +3,7 @@ import 'package:jivo_api/jivo_api.dart'
         AccountDeleteRequest,
         AccountDeletion,
         AppEnum,
+        EmailOtpSendRequest,
         JivoApi,
         OtpPurposeEnum,
         OtpSendRequest,
@@ -22,6 +23,17 @@ class ApiAccountDeletionRepository implements AccountDeletionRepository {
     () async => (await _api.getAuthApi().authOtpRequest(
       otpSendRequest: OtpSendRequest(
         phone: phoneE164,
+        app: AppEnum.rider,
+        purpose: OtpPurposeEnum.deleteAccount,
+      ),
+    )).data,
+  );
+
+  @override
+  Future<OtpSent> requestDeletionOtpByEmail(String email) => _call(
+    () async => (await _api.getAuthApi().authEmailOtpRequest(
+      emailOtpSendRequest: EmailOtpSendRequest(
+        email: email,
         app: AppEnum.rider,
         purpose: OtpPurposeEnum.deleteAccount,
       ),

@@ -128,6 +128,11 @@ OTP_TEST_NUMBERS = {
     "+919000000002": "123456",
     "+919000000003": "123456",
 }
+OTP_TEST_EMAILS = {
+    "customer1@example.com": "123456",
+    "customer2@example.com": "123456",
+    "rider1@example.com": "123456",
+}
 
 # Phase 3: tests never call a real payment gateway.
 PAYMENT_GATEWAY = "apps.payments.gateways.FakeRazorpayGateway"

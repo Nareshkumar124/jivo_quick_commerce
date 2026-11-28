@@ -29,6 +29,8 @@ class RiderRegisterRequest {
 
     required this.emergencyContactPhone,
 
+    this.contactPhone,
+
     required this.preferredStoreId,
 
     required this.vehicleType,
@@ -64,6 +66,10 @@ class RiderRegisterRequest {
   )
   final String emergencyContactPhone;
 
+  /// The rider's own mobile (E.164, +91...), for customers and the store to call. No OTP. **Required at registration when the account has no login phone** (email sign-up, `GET /me/` `has_phone: false`; else 400 on `contact_phone`); optional otherwise. Editable in any status.
+  @JsonKey(name: r'contact_phone', required: false, includeIfNull: false)
+  final String? contactPhone;
+
   /// From `GET /rider/stores/`.
   @JsonKey(name: r'preferred_store_id', required: true, includeIfNull: false)
   final int preferredStoreId;
@@ -88,6 +94,7 @@ class RiderRegisterRequest {
           other.dob == dob &&
           other.emergencyContactName == emergencyContactName &&
           other.emergencyContactPhone == emergencyContactPhone &&
+          other.contactPhone == contactPhone &&
           other.preferredStoreId == preferredStoreId &&
           other.vehicleType == vehicleType &&
           other.vehicleNumber == vehicleNumber;
@@ -98,6 +105,7 @@ class RiderRegisterRequest {
       dob.hashCode +
       emergencyContactName.hashCode +
       emergencyContactPhone.hashCode +
+      contactPhone.hashCode +
       preferredStoreId.hashCode +
       vehicleType.hashCode +
       (vehicleNumber == null ? 0 : vehicleNumber.hashCode);

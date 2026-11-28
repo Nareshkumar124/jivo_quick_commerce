@@ -17,6 +17,9 @@ SEED_DEMO_ALLOWED = False
 if env_str("OTP_TEST_NUMBERS", default="").strip():
     raise ImproperlyConfigured("OTP_TEST_NUMBERS must not be set in production (D-15).")
 OTP_TEST_NUMBERS: dict[str, str] = {}
+if env_str("OTP_TEST_EMAILS", default="").strip():
+    raise ImproperlyConfigured("OTP_TEST_EMAILS must not be set in production (D-15).")
+OTP_TEST_EMAILS: dict[str, str] = {}
 
 # T-812: load-test data commands never run in production (also the system check loadtest.E001).
 if env_bool("LOADTEST_DATA_ALLOWED", default=False):

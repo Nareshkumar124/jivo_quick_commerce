@@ -355,6 +355,36 @@ abstract class JivoCoreLocalizations {
   /// **'Referral codes are only for new customers, before their first order.'**
   String get errorReferralNotEligible;
 
+  /// LOGIN_METHOD_DISABLED: phone or email sign-in is switched off for the app.
+  ///
+  /// In en, this message translates to:
+  /// **'This sign-in option is turned off right now. Please use the other option.'**
+  String get errorLoginMethodDisabled;
+
+  /// EMAIL_NOT_REGISTERED (rider app email sign-in).
+  ///
+  /// In en, this message translates to:
+  /// **'No account uses this email. Please sign in with your phone number.'**
+  String get errorEmailNotRegistered;
+
+  /// PHONE_REQUIRED: POST /orders/ by a customer without a phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Please add a contact phone number before placing the order.'**
+  String get errorPhoneRequired;
+
+  /// PHONE_IN_USE: me/phone/verify/.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone number is already used by another account.'**
+  String get errorPhoneInUse;
+
+  /// EMAIL_IN_USE: me/email/verify/.
+  ///
+  /// In en, this message translates to:
+  /// **'This email is already used by another account.'**
+  String get errorEmailInUse;
+
   /// REFERRAL_NOT_ELIGIBLE with details.reason PROGRAM_OFF (customer app).
   ///
   /// In en, this message translates to:

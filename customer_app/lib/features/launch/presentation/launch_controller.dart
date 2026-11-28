@@ -5,6 +5,7 @@ import 'package:jivo_core/jivo_core.dart';
 import '../../../app/launch_state.dart';
 import '../../../app/providers.dart';
 import '../../../app/repositories.dart';
+import '../../auth/presentation/auth_flow.dart';
 import '../domain/launch_config.dart';
 
 /// Applies `config/app`: force update, maintenance and the optional-update
@@ -44,11 +45,17 @@ class SplashController extends AsyncNotifier<void> {
   @override
   Future<void> build() async {
     final launch = ref.read(launchStateProvider);
+    final session = ref.read(sessionProvider);
+    // A signed-out user lands on login: load which sign-in methods are on
+    // alongside the config, so login opens on the right form. It never
+    // fails (phone is the fallback).
+    final methods = session.isSignedIn
+        ? null
+        : ref.read(loginMethodsProvider.future);
     final config = await ref.read(configRepositoryProvider).fetch();
     if (!ref.mounted) return;
     applyConfig(ref, config);
 
-    final session = ref.read(sessionProvider);
     if (session.isSignedIn && launch.user == null) {
       try {
         final user = await ref.read(profileRepositoryProvider).fetchMe();
@@ -60,6 +67,8 @@ class SplashController extends AsyncNotifier<void> {
         if (session.isSignedIn) rethrow;
       }
     }
+    if (methods != null) await methods;
+    if (!ref.mounted) return;
     launch.markReady();
   }
 }

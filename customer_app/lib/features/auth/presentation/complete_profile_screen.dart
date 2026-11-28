@@ -39,6 +39,7 @@ class CompleteProfileScreen extends ConsumerWidget {
                   buttonLabel: l10n.continueLabel,
                   initialName: user?.name ?? '',
                   initialEmail: user?.email,
+                  emailLocked: user?.emailLocked ?? false,
                 ),
               ],
             ),

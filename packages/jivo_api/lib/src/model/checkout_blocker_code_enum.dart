@@ -6,7 +6,7 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-/// * `CART_EMPTY` - Add items to your cart. * `ADDRESS_REQUIRED` - Select a delivery address. * `NOT_SERVICEABLE` - We do not deliver to this address from this store. * `STORE_CLOSED` - The store is not accepting orders right now. * `STOCK_UNAVAILABLE` - Some items are not available as chosen. * `MIN_QTY_REQUIRED` - Some items are below their minimum per order. * `MIN_ORDER_NOT_MET` - The minimum order value is not met. * `MIN_UNITS_NOT_MET` - The minimum number of units per order is not met. * `COUPON_INVALID` - The coupon is not valid. * `COUPON_EXPIRED` - The coupon has expired. * `COUPON_NOT_ELIGIBLE` - This cart is not eligible for the coupon. * `COUPON_USAGE_EXCEEDED` - The coupon usage limit is reached.
+/// * `CART_EMPTY` - Add items to your cart. * `ADDRESS_REQUIRED` - Select a delivery address. * `NOT_SERVICEABLE` - We do not deliver to this address from this store. * `PHONE_REQUIRED` - Add a phone number to this address so the delivery partner can call you. * `STORE_CLOSED` - The store is not accepting orders right now. * `STOCK_UNAVAILABLE` - Some items are not available as chosen. * `MIN_QTY_REQUIRED` - Some items are below their minimum per order. * `MIN_ORDER_NOT_MET` - The minimum order value is not met. * `MIN_UNITS_NOT_MET` - The minimum number of units per order is not met. * `COUPON_INVALID` - The coupon is not valid. * `COUPON_EXPIRED` - The coupon has expired. * `COUPON_NOT_ELIGIBLE` - This cart is not eligible for the coupon. * `COUPON_USAGE_EXCEEDED` - The coupon usage limit is reached.
 enum CheckoutBlockerCodeEnum {
   @JsonValue(r'CART_EMPTY')
   CART_EMPTY(r'CART_EMPTY'),
@@ -14,6 +14,8 @@ enum CheckoutBlockerCodeEnum {
   ADDRESS_REQUIRED(r'ADDRESS_REQUIRED'),
   @JsonValue(r'NOT_SERVICEABLE')
   NOT_SERVICEABLE(r'NOT_SERVICEABLE'),
+  @JsonValue(r'PHONE_REQUIRED')
+  PHONE_REQUIRED(r'PHONE_REQUIRED'),
   @JsonValue(r'STORE_CLOSED')
   STORE_CLOSED(r'STORE_CLOSED'),
   @JsonValue(r'STOCK_UNAVAILABLE')

@@ -63,6 +63,16 @@ class Rider(TimeStampedModel):
     dob = models.DateField("date of birth", null=True, help_text="Null once anonymised.")
     emergency_contact_name = models.CharField(max_length=120)
     emergency_contact_phone = models.CharField(max_length=15)
+    contact_phone = models.CharField(
+        max_length=15,
+        blank=True,
+        default="",
+        help_text=(
+            "The rider's own mobile, typed at registration, not verified by OTP (2026-11-28). "
+            "Needed when the account has no login phone (email sign-up). A contact number "
+            "only, never a login."
+        ),
+    )
     vehicle_type = models.CharField(max_length=12, choices=VehicleType.choices)
     vehicle_number = models.CharField(
         max_length=16, blank=True, help_text="Motorised vehicles only, e.g. HR26DQ1234."
@@ -189,6 +199,11 @@ class Rider(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.full_name} ({self.get_status_display()})"
+
+    @property
+    def phone_number(self) -> str:
+        """The number customers and the store call: the login phone, else `contact_phone`."""
+        return self.user.phone or self.contact_phone
 
     @property
     def required_documents(self) -> list[str]:

@@ -8,6 +8,7 @@ import 'package:jivo_api/src/model/applied_coupon.dart';
 import 'package:jivo_api/src/model/arrived_customer_request.dart';
 import 'package:jivo_api/src/model/auth_session.dart';
 import 'package:jivo_api/src/model/bill.dart';
+import 'package:jivo_api/src/model/business_category.dart';
 import 'package:jivo_api/src/model/cart.dart';
 import 'package:jivo_api/src/model/cart_item_add_request.dart';
 import 'package:jivo_api/src/model/cart_item_update_request.dart';
@@ -42,6 +43,10 @@ import 'package:jivo_api/src/model/earning_totals.dart';
 import 'package:jivo_api/src/model/earnings.dart';
 import 'package:jivo_api/src/model/earnings_adjustment.dart';
 import 'package:jivo_api/src/model/earnings_order.dart';
+import 'package:jivo_api/src/model/email_otp_for_me_request.dart';
+import 'package:jivo_api/src/model/email_otp_send_request.dart';
+import 'package:jivo_api/src/model/email_otp_verify_request.dart';
+import 'package:jivo_api/src/model/email_verify_request.dart';
 import 'package:jivo_api/src/model/error_body.dart';
 import 'package:jivo_api/src/model/error_envelope.dart';
 import 'package:jivo_api/src/model/faq.dart';
@@ -60,6 +65,7 @@ import 'package:jivo_api/src/model/location_batch_request.dart';
 import 'package:jivo_api/src/model/location_batch_result.dart';
 import 'package:jivo_api/src/model/location_point_request.dart';
 import 'package:jivo_api/src/model/location_reject_reasons.dart';
+import 'package:jivo_api/src/model/login_methods.dart';
 import 'package:jivo_api/src/model/logout_request.dart';
 import 'package:jivo_api/src/model/me.dart';
 import 'package:jivo_api/src/model/next_price_tier.dart';
@@ -103,6 +109,8 @@ import 'package:jivo_api/src/model/patched_rider_profile_update_request.dart';
 import 'package:jivo_api/src/model/payment_option.dart';
 import 'package:jivo_api/src/model/payment_verify_request.dart';
 import 'package:jivo_api/src/model/payout.dart';
+import 'package:jivo_api/src/model/phone_otp_send_request.dart';
+import 'package:jivo_api/src/model/phone_verify_request.dart';
 import 'package:jivo_api/src/model/pickup_code_state.dart';
 import 'package:jivo_api/src/model/pickup_request.dart';
 import 'package:jivo_api/src/model/policy_urls.dart';
@@ -260,6 +268,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'BannerLinkTypeEnum':
     case 'Bill':
       return Bill.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'BusinessCategory':
+      return BusinessCategory.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'CancelReasonEnum':
     case 'CancelledByEnum':
     case 'Cart':
@@ -362,6 +373,18 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'EarningsOrder':
       return EarningsOrder.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'EmailOtpForMeRequest':
+      return EmailOtpForMeRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'EmailOtpSendRequest':
+      return EmailOtpSendRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'EmailOtpVerifyRequest':
+      return EmailOtpVerifyRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'EmailVerifyRequest':
+      return EmailVerifyRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'ErrorBody':
       return ErrorBody.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'ErrorCodeEnum':
@@ -409,6 +432,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'LocationRejectReasons':
       return LocationRejectReasons.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'LoginMethodEnum':
+    case 'LoginMethods':
+      return LoginMethods.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'LogoutRequest':
       return LogoutRequest.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -534,6 +560,12 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'Payout':
       return Payout.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'PayoutStatusEnum':
+    case 'PhoneOtpSendRequest':
+      return PhoneOtpSendRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'PhoneVerifyRequest':
+      return PhoneVerifyRequest.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'PickupCodeState':
       return PickupCodeState.fromJson(value as Map<String, dynamic>)
           as ReturnType;

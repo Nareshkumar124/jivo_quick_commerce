@@ -13,13 +13,23 @@ abstract class _$PatchedMeRequestCWProxy {
 
   PatchedMeRequest marketingOptIn(bool? marketingOptIn);
 
+  PatchedMeRequest businessCategory(int? businessCategory);
+
+  PatchedMeRequest businessName(String? businessName);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `PatchedMeRequest(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
   /// ```dart
   /// PatchedMeRequest(...).copyWith(id: 12, name: "My name")
   /// ````
-  PatchedMeRequest call({String? name, String? email, bool? marketingOptIn});
+  PatchedMeRequest call({
+    String? name,
+    String? email,
+    bool? marketingOptIn,
+    int? businessCategory,
+    String? businessName,
+  });
 }
 
 /// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfPatchedMeRequest.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfPatchedMeRequest.copyWith.fieldName(...)`
@@ -39,6 +49,14 @@ class _$PatchedMeRequestCWProxyImpl implements _$PatchedMeRequestCWProxy {
       this(marketingOptIn: marketingOptIn);
 
   @override
+  PatchedMeRequest businessCategory(int? businessCategory) =>
+      this(businessCategory: businessCategory);
+
+  @override
+  PatchedMeRequest businessName(String? businessName) =>
+      this(businessName: businessName);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `PatchedMeRequest(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -49,6 +67,8 @@ class _$PatchedMeRequestCWProxyImpl implements _$PatchedMeRequestCWProxy {
     Object? name = const $CopyWithPlaceholder(),
     Object? email = const $CopyWithPlaceholder(),
     Object? marketingOptIn = const $CopyWithPlaceholder(),
+    Object? businessCategory = const $CopyWithPlaceholder(),
+    Object? businessName = const $CopyWithPlaceholder(),
   }) {
     return PatchedMeRequest(
       name: name == const $CopyWithPlaceholder()
@@ -63,6 +83,14 @@ class _$PatchedMeRequestCWProxyImpl implements _$PatchedMeRequestCWProxy {
           ? _value.marketingOptIn
           // ignore: cast_nullable_to_non_nullable
           : marketingOptIn as bool?,
+      businessCategory: businessCategory == const $CopyWithPlaceholder()
+          ? _value.businessCategory
+          // ignore: cast_nullable_to_non_nullable
+          : businessCategory as int?,
+      businessName: businessName == const $CopyWithPlaceholder()
+          ? _value.businessName
+          // ignore: cast_nullable_to_non_nullable
+          : businessName as String?,
     );
   }
 }
@@ -78,18 +106,37 @@ extension $PatchedMeRequestCopyWith on PatchedMeRequest {
 // **************************************************************************
 
 PatchedMeRequest _$PatchedMeRequestFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('PatchedMeRequest', json, ($checkedConvert) {
-      final val = PatchedMeRequest(
-        name: $checkedConvert('name', (v) => v as String?),
-        email: $checkedConvert('email', (v) => v as String?),
-        marketingOptIn: $checkedConvert('marketing_opt_in', (v) => v as bool?),
-      );
-      return val;
-    }, fieldKeyMap: const {'marketingOptIn': 'marketing_opt_in'});
+    $checkedCreate(
+      'PatchedMeRequest',
+      json,
+      ($checkedConvert) {
+        final val = PatchedMeRequest(
+          name: $checkedConvert('name', (v) => v as String?),
+          email: $checkedConvert('email', (v) => v as String?),
+          marketingOptIn: $checkedConvert(
+            'marketing_opt_in',
+            (v) => v as bool?,
+          ),
+          businessCategory: $checkedConvert(
+            'business_category',
+            (v) => (v as num?)?.toInt(),
+          ),
+          businessName: $checkedConvert('business_name', (v) => v as String?),
+        );
+        return val;
+      },
+      fieldKeyMap: const {
+        'marketingOptIn': 'marketing_opt_in',
+        'businessCategory': 'business_category',
+        'businessName': 'business_name',
+      },
+    );
 
 Map<String, dynamic> _$PatchedMeRequestToJson(PatchedMeRequest instance) =>
     <String, dynamic>{
       'name': ?instance.name,
       'email': ?instance.email,
       'marketing_opt_in': ?instance.marketingOptIn,
+      'business_category': ?instance.businessCategory,
+      'business_name': ?instance.businessName,
     };
