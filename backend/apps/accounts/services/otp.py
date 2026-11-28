@@ -168,7 +168,7 @@ def request_otp(
     if purpose == OtpPurpose.DELETE_ACCOUNT and not target.account_exists():
         return sent_response()  # same answer, nothing sent
 
-    review_code = review_login.code_for(phone)
+    review_code = review_login.code_for(phone=target.phone, email=target.email)
     code = test_code or review_code or f"{secrets.randbelow(10**OTP_DIGITS):0{OTP_DIGITS}d}"
     now = timezone.now()
     with transaction.atomic():
@@ -186,7 +186,9 @@ def request_otp(
             user_agent=user_agent[:256],
         )
         if review_code is not None:  # store reviewer: nothing sent
-            review_login.log_event("request", phone=phone, purpose=purpose, app=app)
+            review_login.log_event(
+                "request", phone=target.phone, email=target.email, purpose=purpose, app=app
+            )
         elif test_code is None:
             from apps.accounts.tasks import send_otp_email, send_otp_sms
 
@@ -253,9 +255,16 @@ def verify_otp(
         else:
             otp.verified_at = now
             otp.save(update_fields=["verified_at", "updated_at"])
-    if review_login.code_for(phone) is not None:
+    if review_login.code_for(phone=target.phone, email=target.email) is not None:
         outcome = "failed" if error is not None else "ok"
-        review_login.log_event("verify", phone=phone, purpose=purpose, app=app, outcome=outcome)
+        review_login.log_event(
+            "verify",
+            phone=target.phone,
+            email=target.email,
+            purpose=purpose,
+            app=app,
+            outcome=outcome,
+        )
     if error is not None:
         raise error
     return otp

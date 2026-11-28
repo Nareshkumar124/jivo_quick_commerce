@@ -38,22 +38,42 @@ def _weak_code(code: str) -> bool:
 
 @register()
 def check_store_review_logins(app_configs, **kwargs):
-    """D-15: store-reviewer logins (allowed in production) must be well formed, use a
-    non-trivial 6-digit code, and not reuse a fixed-OTP test number."""
+    """D-15: store-reviewer logins (allowed in production) must be well formed (a phone or, since
+    2026-11-28, an ASCII email), use a non-trivial 6-digit code, and not reuse a fixed-OTP test
+    number or test email."""
     errors = []
     logins = getattr(settings, "STORE_REVIEW_LOGINS", {}) or {}
     test_numbers = getattr(settings, "OTP_TEST_NUMBERS", {}) or {}
-    for phone, code in logins.items():
-        if not _PHONE.match(phone) or not _CODE.match(code) or _weak_code(code):
-            reason = "invalid (use +91XXXXXXXXXX:6 digits, not a trivial code like 123456)"
-        elif phone in test_numbers:
-            reason = "also in OTP_TEST_NUMBERS (use a different number)"
+    test_emails = {key.strip().lower() for key in (getattr(settings, "OTP_TEST_EMAILS", {}) or {})}
+    for key, code in logins.items():
+        is_email = "@" in key
+        valid_key = _valid_email(key) if is_email else bool(_PHONE.match(key))
+        if not valid_key or not _CODE.match(code) or _weak_code(code):
+            reason = (
+                "invalid (use +91XXXXXXXXXX:6 digits or name@domain:6 digits, not a trivial "
+                "code like 123456)"
+            )
+        elif (key.lower() in test_emails) if is_email else (key in test_numbers):
+            reason = "also a fixed-OTP test login (use a different one)"
         else:
             continue
         errors.append(
-            Error(f"STORE_REVIEW_LOGINS entry for {phone[:6]}... is {reason}.", id="accounts.E011")
+            Error(f"STORE_REVIEW_LOGINS entry for {key[:3]}... is {reason}.", id="accounts.E011")
         )
     return errors
+
+
+def _valid_email(value: str) -> bool:
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+
+    if not value.isascii():
+        return False
+    try:
+        validate_email(value)
+    except ValidationError:
+        return False
+    return True
 
 
 @register()

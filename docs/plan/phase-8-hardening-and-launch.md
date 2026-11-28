@@ -138,6 +138,7 @@ Sources: `docs/task-tracker.md`, `plan/00-roadmap.md`, `release-checklist.md`. T
 | P8-EOTP-28 | Non-ASCII / look-alike emails refused on request, verify and profile | BE |
 | P8-EOTP-29 | Deploy checks `accounts.E008`-`E010` / `W002`-`W003` for email delivery | BE |
 | P8-EOTP-30 | Rider without a login phone registers with `contact_phone` (no OTP); profile and tracking show it (`delivery/tests/test_registration_api.py`) | BE |
+| P8-EOTP-32 | `STORE_REVIEW_LOGINS` email entries: fixed code on the email OTP path, no email, masked audit, `accounts.E011` rules (`accounts/tests/test_review_login.py`) | BE |
 | P8-EOTP-31 | `me/delete/` accepts a `delete_account` OTP sent to the verified email of an account that has a phone; newest code wins | BE |
 
 Reference open cases: P5 (21 not run, including P0 TC-12, 42, 45, 51, 110), P6 (3 failed, 9 not run) and P7 (4 not run) must be closed before this gate (see the phase 5, 6 and 7 files).

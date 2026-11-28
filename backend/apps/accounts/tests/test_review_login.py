@@ -186,3 +186,118 @@ class TestProductionSettings:
         deploy_env.setenv("OTP_TEST_NUMBERS", "+919000000001:123456")
         with pytest.raises(ImproperlyConfigured, match="OTP_TEST_NUMBERS"):
             self._load()
+
+
+# --------------------------------------------------------------------------- email entries
+
+REVIEWER_EMAIL = "reviewer@jivo.in"
+EMAIL_REQUEST = "/api/v1/auth/email-otp/request/"
+EMAIL_VERIFY = "/api/v1/auth/email-otp/verify/"
+
+
+@pytest.fixture
+def email_reviewer(production_like):
+    """Production with email sign-in only and one email reviewer login (2026-11-28)."""
+    from apps.accounts.choices import AppName, LoginMethodSetting
+    from apps.cms import services as cms_services
+
+    production_like.STORE_REVIEW_LOGINS = {REVIEWER: CODE, "Reviewer@Jivo.in": CODE}
+    production_like.OTP_TEST_EMAILS = {}
+    production_like.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    for app in (AppName.CUSTOMER, AppName.RIDER):
+        cms_services.set_login_methods(app, LoginMethodSetting.EMAIL)
+    return production_like
+
+
+def email_request(client, email=REVIEWER_EMAIL, app="customer", purpose=None):
+    body = {"email": email, "app": app}
+    if purpose:
+        body["purpose"] = purpose
+    return client.post(EMAIL_REQUEST, body, format="json")
+
+
+def email_verify(client, code, email=REVIEWER_EMAIL, app="customer"):
+    return client.post(
+        EMAIL_VERIFY,
+        {"email": email, "otp": code, "app": app, "terms_version": "2026-11-01"},
+        format="json",
+    )
+
+
+@pytest.mark.parametrize("app", ["customer", "rider"])
+def test_email_reviewer_logs_in_without_an_email(
+    email_reviewer, api_client, app, django_capture_on_commit_callbacks, caplog
+):
+    """P8-EOTP-32: an email reviewer entry signs in on the email OTP path: nothing is emailed,
+    the fixed code works (case-insensitive key), the audit line is masked."""
+    from django.core import mail
+
+    from apps.accounts.services.otp import email_target
+
+    caplog.set_level(logging.INFO, logger="apps.accounts.review_login")
+    with django_capture_on_commit_callbacks(execute=True):
+        assert email_request(api_client, "REVIEWER@jivo.in", app=app).status_code == 200
+    assert mail.outbox == []
+    otp = OTPRequest.objects.get(email=REVIEWER_EMAIL)
+    assert otp.code_hash == hash_code(email_target(REVIEWER_EMAIL), app, "login", CODE)
+    response = email_verify(api_client, CODE, app=app)
+    assert response.status_code == 200, response.content
+    assert AccessToken(response.json()["access"])["app"] == app
+    lines = [r.getMessage() for r in caplog.records]
+    assert any("request" in line and "email=r***@jivo.in" in line for line in lines)
+    assert any("verify" in line and "outcome=ok" in line for line in lines)
+    assert all(CODE not in line and REVIEWER_EMAIL not in line for line in lines)
+
+
+def test_email_reviewer_wrong_code_and_limits(email_reviewer, api_client):
+    email_request(api_client)
+    assert email_verify(api_client, "111111").json()["error"]["code"] == "OTP_INVALID"
+    assert OTPRequest.objects.get(email=REVIEWER_EMAIL).attempts == 1
+    email_request(api_client)
+    email_request(api_client)
+    assert email_request(api_client).status_code == 429  # send limits still apply
+
+
+def test_email_reviewer_deletes_the_account(email_reviewer, make_auth_client, api_client):
+    email_request(api_client)
+    session = email_verify(api_client, CODE).json()
+    user = User.objects.get(pk=session["user"]["id"])
+    assert email_request(APIClient(), purpose="delete_account").status_code == 200
+    response = make_auth_client(user).post(DELETE, {"otp": CODE}, format="json")
+    assert response.status_code == 200, response.content
+
+
+def test_unlisted_email_gets_a_real_code(
+    email_reviewer, api_client, django_capture_on_commit_callbacks
+):
+    from django.core import mail
+
+    with django_capture_on_commit_callbacks(execute=True):
+        email_request(api_client, "someone@example.com")
+    assert len(mail.outbox) == 1
+    assert email_verify(api_client, CODE, "someone@example.com").status_code == 400
+
+
+class TestEmailEntryChecks:
+    def ids(self):
+        return {e.id for e in run_checks() if e.id == "accounts.E011"}
+
+    def test_valid_email_entry_passes(self, settings):
+        settings.STORE_REVIEW_LOGINS = {REVIEWER_EMAIL: CODE}
+        assert self.ids() == set()
+
+    @pytest.mark.parametrize(
+        ("email", "code"),
+        [
+            (REVIEWER_EMAIL, "123456"),  # weak
+            (REVIEWER_EMAIL, "777777"),
+            (REVIEWER_EMAIL, "4829"),
+            ("reviewer@", CODE),
+            ("rev iewer@jivo.in", CODE),
+            ("reviewer@jiv" + chr(0x43E) + ".in", CODE),  # non-ASCII
+            ("Customer1@example.com", CODE),  # also a fixed-OTP test email (test settings)
+        ],
+    )
+    def test_bad_email_entries(self, settings, email, code):
+        settings.STORE_REVIEW_LOGINS = {email: code}
+        assert self.ids() == {"accounts.E011"}
