@@ -7,7 +7,7 @@ class PushMessage {
 
   final Map<String, String> data;
 
-  /// The rider tapped the notification (or its full-screen intent opened
+  /// The rider tapped the notification (which opened
   /// the app), rather than the message arriving while the app was open.
   final bool openedApp;
 
@@ -21,7 +21,7 @@ class PushMessage {
 /// A build with the flavor's `google-services.json` uses
 /// `FirebasePushMessaging` (chosen by `initializePush()` at start-up, see
 /// `data/push_setup.dart`), whose background handler turns a data-only
-/// `offer.new` into the full-screen offer alarm while the app is not
+/// `offer.new` into the offer alarm while the app is not
 /// running. A build without it (CI, a fresh checkout, a flavor whose
 /// Firebase project doesn't exist yet) uses `NoopPushMessaging`: no token,
 /// no messages; offers still arrive on the rider socket and by polling

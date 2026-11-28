@@ -83,6 +83,10 @@ abstract final class Routes {
   ).toString();
   static const rating = '/rating';
 
+  /// Delete account (Google Play requirement): any signed-in rider, whatever
+  /// the `rider_status`, but not over an active task or an open offer.
+  static const deleteAccount = '/delete-account';
+
   /// A CMS legal page, e.g. `/legal/privacy`.
   static String legal(String slug) => '/legal/$slug';
 

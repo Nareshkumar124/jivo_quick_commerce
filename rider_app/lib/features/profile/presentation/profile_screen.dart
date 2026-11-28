@@ -15,6 +15,7 @@ import '../../auth/domain/rider_account.dart';
 import '../../auth/presentation/logout_button.dart';
 import '../../auth/presentation/rider_account_controller.dart';
 import '../../launch/presentation/launch_controller.dart';
+import '../../legal/presentation/account_menu_button.dart';
 import '../../onboarding/data/fake_rider_onboarding_backend.dart';
 import '../../onboarding/domain/kyc_document.dart';
 import '../../onboarding/domain/rider_profile.dart';
@@ -103,6 +104,7 @@ class _ProfileBody extends ConsumerWidget {
     final supportEmail = supportEmailOf(
       ref.watch(launchControllerProvider).config,
     );
+    final policies = policyUris(ref);
     final devReview =
         ref.watch(appEnvProvider).showDevTools &&
         ref.watch(riderOnboardingRepositoryProvider)
@@ -284,6 +286,50 @@ class _ProfileBody extends ConsumerWidget {
               leading: const Icon(Icons.logout),
               title: Text(l10n.logout),
               onTap: () => logoutWithFeedback(context, ref),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Google Play: the policies and account deletion are reachable
+          // after login.
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  key: const Key('profile-terms'),
+                  minTileHeight: 64,
+                  leading: const Icon(Icons.description_outlined),
+                  title: Text(l10n.policyTermsOfUse),
+                  trailing: const Icon(Icons.open_in_new),
+                  enabled: policies.terms != null,
+                  onTap: () =>
+                      ref.read(urlOpenerProvider).open(policies.terms!),
+                ),
+                ListTile(
+                  key: const Key('profile-privacy'),
+                  minTileHeight: 64,
+                  leading: const Icon(Icons.privacy_tip_outlined),
+                  title: Text(l10n.policyPrivacy),
+                  trailing: const Icon(Icons.open_in_new),
+                  enabled: policies.privacy != null,
+                  onTap: () =>
+                      ref.read(urlOpenerProvider).open(policies.privacy!),
+                ),
+                ListTile(
+                  key: const Key('profile-delete-account'),
+                  minTileHeight: 64,
+                  leading: Icon(
+                    Icons.delete_forever_outlined,
+                    color: theme.colorScheme.error,
+                  ),
+                  title: Text(
+                    l10n.deleteAccountTitle,
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+                  subtitle: Text(l10n.deleteAccountEntrySubtitle),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push(Routes.deleteAccount),
+                ),
+              ],
             ),
           ),
         ],

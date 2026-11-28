@@ -55,7 +55,7 @@ abstract interface class PushNotifier {
 ///   system on the channel the server names (manifest default `general`);
 ///   a tap arrives through [FcmClient.onMessageOpenedApp] or, for a cold
 ///   start, [FcmClient.initialMessageData]. A data-only `offer.new` rings
-///   the full-screen offer alarm through the background handler
+///   the offer alarm through the background handler
 ///   (`push_background.dart`).
 /// - Foreground: every message goes to [messages] (the handler refreshes
 ///   the offer, task, cash or ticket). The system shows nothing, so a

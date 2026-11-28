@@ -12,11 +12,10 @@ class StubbedPermissions {
     when(() => service.requestLocationWhenInUse()).thenAnswer((_) async {});
     when(() => service.requestLocationAlways()).thenAnswer((_) async {});
     when(() => service.requestNotifications()).thenAnswer((_) async {});
-    when(() => service.requestIgnoreBatteryOptimisation())
+    when(() => service.openBatteryOptimisationSettings())
         .thenAnswer((_) async {});
     when(() => service.openLocationSettings()).thenAnswer((_) async {});
     when(() => service.openAppSettings()).thenAnswer((_) async {});
-    when(() => service.openFullScreenIntentSettings()).thenAnswer((_) async {});
   }
 
   final service = MockPermissionsService();

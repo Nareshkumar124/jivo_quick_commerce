@@ -32,19 +32,34 @@ class DeviceChannel {
     );
   }
 
-  /// Android 14+: whether this app may show full-screen intents
-  /// (`NotificationManager.canUseFullScreenIntent()`, or the
-  /// USE_FULL_SCREEN_INTENT app-op allowed). Play revokes the permission by
-  /// default for apps that are not calling/alarm apps. Always true below
-  /// Android 14, and when the check itself fails: it is advisory, and a
-  /// failed check must never send the rider to that settings page.
-  Future<bool> canUseFullScreenIntent() async {
+  /// Whether the system already exempts this app from battery optimisation
+  /// (`PowerManager.isIgnoringBatteryOptimizations`). Read only: the app
+  /// never asks for the exemption (Play policy). True when the check fails,
+  /// so a failed read never nags the rider with the optional tip.
+  Future<bool> isIgnoringBatteryOptimizations() async {
     try {
-      return await _channel.invokeMethod<bool>('canUseFullScreenIntent') ??
+      return await _channel.invokeMethod<bool>(
+            'isIgnoringBatteryOptimizations',
+          ) ??
           true;
     } on Object catch (error) {
-      debugPrint('DeviceChannel.canUseFullScreenIntent: $error');
+      debugPrint('DeviceChannel.isIgnoringBatteryOptimizations: $error');
       return true;
+    }
+  }
+
+  /// Opens the system list of battery-optimised apps
+  /// (`ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, no special permission),
+  /// or the app's settings page where that list is missing.
+  Future<bool> openBatteryOptimizationSettings() async {
+    try {
+      return await _channel.invokeMethod<bool>(
+            'openBatteryOptimizationSettings',
+          ) ??
+          false;
+    } on Object catch (error) {
+      debugPrint('DeviceChannel.openBatteryOptimizationSettings: $error');
+      return false;
     }
   }
 
@@ -79,11 +94,6 @@ class DeviceChannel {
 
   Future<void> stopOfferRinging() =>
       _channel.invokeMethod<void>('stopOfferRinging');
-
-  /// Opens the system page where the rider can allow full-screen alerts.
-  Future<bool> openFullScreenIntentSettings() async =>
-      await _channel.invokeMethod<bool>('openFullScreenIntentSettings') ??
-      false;
 
   /// Stops showing the app over the lock screen. Call when an offer alert is
   /// dismissed, accepted or rejected.
